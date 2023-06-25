@@ -18,12 +18,19 @@ import { forEach } from 'lodash-es';
 import { isAnySessionRejected } from 'services/api/thunks/session';
 import { appSocketInvocationError } from 'services/events/actions';
 
+export type ControlModes =
+  | 'balanced'
+  | 'more_prompt'
+  | 'more_control'
+  | 'unbalanced';
+
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   isEnabled: true,
   model: CONTROLNET_MODELS['lllyasviel/control_v11p_sd15_canny'].type,
   weight: 1,
   beginStepPct: 0,
   endStepPct: 1,
+  controlMode: 'balanced',
   controlImage: null,
   processedControlImage: null,
   processorType: 'canny_image_processor',
@@ -39,6 +46,7 @@ export type ControlNetConfig = {
   weight: number;
   beginStepPct: number;
   endStepPct: number;
+  controlMode: ControlModes;
   controlImage: string | null;
   processedControlImage: string | null;
   processorType: ControlNetProcessorType;
@@ -181,6 +189,13 @@ export const controlNetSlice = createSlice({
       const { controlNetId, endStepPct } = action.payload;
       state.controlNets[controlNetId].endStepPct = endStepPct;
     },
+    controlNetControlModeChanged: (
+      state,
+      action: PayloadAction<{ controlNetId: string; controlMode: ControlModes }>
+    ) => {
+      const { controlNetId, controlMode } = action.payload;
+      state.controlNets[controlNetId].controlMode = controlMode;
+    },
     controlNetProcessorParamsChanged: (
       state,
       action: PayloadAction<{
@@ -307,6 +322,7 @@ export const {
   controlNetWeightChanged,
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
+  controlNetControlModeChanged,
   controlNetProcessorParamsChanged,
   controlNetProcessorTypeChanged,
   controlNetReset,

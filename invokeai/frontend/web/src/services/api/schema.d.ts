@@ -648,6 +648,13 @@ export type components = {
        * @default 1
        */
       end_step_percent: number;
+      /**
+       * Control Mode 
+       * @description The contorl mode to use 
+       * @default balanced 
+       * @enum {string}
+       */
+      control_mode?: "balanced" | "more_prompt" | "more_control" | "unbalanced";
     };
     /**
      * ControlNetInvocation 
@@ -701,6 +708,13 @@ export type components = {
        * @default 1
        */
       end_step_percent?: number;
+      /**
+       * Control Mode 
+       * @description The control mode used 
+       * @default balanced 
+       * @enum {string}
+       */
+      control_mode?: "balanced" | "more_prompt" | "more_control" | "unbalanced";
     };
     /** ControlNetModelConfig */
     ControlNetModelConfig: {
@@ -2903,7 +2917,7 @@ export type components = {
     /** ModelsList */
     ModelsList: {
       /** Models */
-      models: (components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"])[];
+      models: (components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"])[];
     };
     /**
      * MultiplyInvocation 
@@ -4164,17 +4178,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion1ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion2ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion1ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;

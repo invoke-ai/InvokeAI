@@ -1,7 +1,7 @@
 # InvokeAI nodes for ControlNet image preprocessors
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
-from builtins import float
+from builtins import float, bool
 
 import numpy as np
 from typing import Literal, Optional, Union, List
@@ -94,6 +94,7 @@ CONTROLNET_DEFAULT_MODELS = [
 ]
 
 CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
+CONTROLNET_MODE_VALUES = Literal[tuple(["balanced", "more_prompt", "more_control", "unbalanced"])]
 
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="The control image")
@@ -104,6 +105,8 @@ class ControlField(BaseModel):
                                       description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
+    control_mode: CONTROLNET_MODE_VALUES = Field(default="balanced", description="The contorl mode to use")
+
     @validator("control_weight")
     def abs_le_one(cls, v):
         """validate that all abs(values) are <=1"""
@@ -144,11 +147,11 @@ class ControlNetInvocation(BaseInvocation):
     control_model: CONTROLNET_NAME_VALUES = Field(default="lllyasviel/sd-controlnet-canny",
                                                   description="control model used")
     control_weight: Union[float, List[float]] = Field(default=1.0, description="The weight given to the ControlNet")
-    # TODO: add support in backend core for begin_step_percent, end_step_percent, guess_mode
     begin_step_percent: float = Field(default=0, ge=0, le=1,
                                       description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
+    control_mode: CONTROLNET_MODE_VALUES = Field(default="balanced", description="The control mode used")
     # fmt: on
 
     class Config(InvocationConfig):
@@ -166,7 +169,6 @@ class ControlNetInvocation(BaseInvocation):
         }
 
     def invoke(self, context: InvocationContext) -> ControlOutput:
-
         return ControlOutput(
             control=ControlField(
                 image=self.image,
@@ -174,6 +176,7 @@ class ControlNetInvocation(BaseInvocation):
                 control_weight=self.control_weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
+                control_mode=self.control_mode,
             ),
         )
 

@@ -1,26 +1,27 @@
+import { Box, ChakraProps, Flex } from '@chakra-ui/react';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
+import { FaCopy, FaTrash } from 'react-icons/fa';
 import {
   ControlNetConfig,
   controlNetAdded,
   controlNetRemoved,
   controlNetToggled,
 } from '../store/controlNetSlice';
-import { useAppDispatch } from 'app/store/storeHooks';
 import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
-import { Flex, Box, ChakraProps } from '@chakra-ui/react';
-import { FaCopy, FaTrash } from 'react-icons/fa';
 
-import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
-import ControlNetImagePreview from './ControlNetImagePreview';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { v4 as uuidv4 } from 'uuid';
-import { useToggle } from 'react-use';
-import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
-import ControlNetProcessorComponent from './ControlNetProcessorComponent';
-import IAISwitch from 'common/components/IAISwitch';
 import { ChevronUpIcon } from '@chakra-ui/icons';
+import IAIIconButton from 'common/components/IAIIconButton';
+import IAISwitch from 'common/components/IAISwitch';
+import { useToggle } from 'react-use';
+import { v4 as uuidv4 } from 'uuid';
+import ControlNetImagePreview from './ControlNetImagePreview';
+import ControlNetProcessorComponent from './ControlNetProcessorComponent';
 import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
+import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
+import ParamControlNetControlMode from './parameters/ParamControlNetControlMode';
+import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
 
 const expandedControlImageSx: ChakraProps['sx'] = { maxH: 96 };
 
@@ -36,6 +37,7 @@ const ControlNet = (props: ControlNetProps) => {
     weight,
     beginStepPct,
     endStepPct,
+    controlMode,
     controlImage,
     processedControlImage,
     processorNode,
@@ -137,48 +139,51 @@ const ControlNet = (props: ControlNetProps) => {
       </Flex>
       {isEnabled && (
         <>
-          <Flex sx={{ gap: 4, w: 'full' }}>
-            <Flex
-              sx={{
-                flexDir: 'column',
-                gap: 2,
-                w: 'full',
-                h: isExpanded ? 28 : 24,
-                paddingInlineStart: 1,
-                paddingInlineEnd: isExpanded ? 1 : 0,
-                pb: 2,
-                justifyContent: 'space-between',
-              }}
-            >
-              <ParamControlNetWeight
-                controlNetId={controlNetId}
-                weight={weight}
-                mini={!isExpanded}
-              />
-              <ParamControlNetBeginEnd
-                controlNetId={controlNetId}
-                beginStepPct={beginStepPct}
-                endStepPct={endStepPct}
-                mini={!isExpanded}
-              />
-            </Flex>
-            {!isExpanded && (
+          <Flex sx={{ w: 'full', flexDirection: 'column' }}>
+            <Flex sx={{ gap: 4, w: 'full' }}>
               <Flex
                 sx={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  h: 24,
-                  w: 24,
-                  aspectRatio: '1/1',
+                  flexDir: 'column',
+                  gap: 3,
+                  w: 'full',
+                  paddingInlineStart: 1,
+                  paddingInlineEnd: isExpanded ? 1 : 0,
+                  pb: 2,
+                  justifyContent: 'space-between',
                 }}
               >
-                <ControlNetImagePreview
-                  controlNet={props.controlNet}
-                  height={24}
+                <ParamControlNetWeight
+                  controlNetId={controlNetId}
+                  weight={weight}
+                  mini={!isExpanded}
+                />
+                <ParamControlNetBeginEnd
+                  controlNetId={controlNetId}
+                  beginStepPct={beginStepPct}
+                  endStepPct={endStepPct}
+                  mini={!isExpanded}
                 />
               </Flex>
-            )}
+              {!isExpanded && (
+                <Flex
+                  sx={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    h: 24,
+                    w: 24,
+                    aspectRatio: '1/1',
+                  }}
+                >
+                  <ControlNetImagePreview controlNet={props.controlNet} />
+                </Flex>
+              )}
+            </Flex>
+            <ParamControlNetControlMode
+              controlNetId={controlNetId}
+              controlMode={controlMode}
+            />
           </Flex>
+
           {isExpanded && (
             <>
               <Box mt={2}>

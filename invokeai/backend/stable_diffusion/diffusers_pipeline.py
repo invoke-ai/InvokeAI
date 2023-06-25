@@ -215,10 +215,12 @@ class GeneratorToCallbackinator(Generic[ParamType, ReturnType, CallbackType]):
 @dataclass
 class ControlNetData:
     model: ControlNetModel = Field(default=None)
-    image_tensor: torch.Tensor= Field(default=None)
-    weight: Union[float, List[float]]= Field(default=1.0)
+    image_tensor: torch.Tensor = Field(default=None)
+    weight: Union[float, List[float]] = Field(default=1.0)
     begin_step_percent: float = Field(default=0.0)
     end_step_percent: float = Field(default=1.0)
+    control_mode: str = Field(default="balanced")
+
 
 @dataclass(frozen=True)
 class ConditioningData:
@@ -599,48 +601,68 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
-        latent_model_input = self.scheduler.scale_model_input(latents, timestep)
+        unet_latent_input = self.scheduler.scale_model_input(latents, timestep)
 
         # default is no controlnet, so set controlnet processing output to None
         down_block_res_samples, mid_block_res_sample = None, None
 
         if control_data is not None:
-            # FIXME: make sure guidance_scale < 1.0 is handled correctly if doing per-step guidance setting
-            # if conditioning_data.guidance_scale > 1.0:
-            if conditioning_data.guidance_scale is not None:
-                # expand the latents input to control model if doing classifier free guidance
-                #    (which I think for now is always true, there is conditional elsewhere that stops execution if
-                #     classifier_free_guidance is <= 1.0 ?)
-                latent_control_input = torch.cat([latent_model_input] * 2)
-            else:
-                latent_control_input = latent_model_input
             # control_data should be type List[ControlNetData]
             # this loop covers both ControlNet (one ControlNetData in list)
             #      and MultiControlNet (multiple ControlNetData in list)
             for i, control_datum in enumerate(control_data):
-                # print("controlnet", i, "==>", type(control_datum))
+                control_mode = control_datum.control_mode
+                # soft_injection and cfg_injection are the two ControlNet control_mode booleans
+                #     that are combined at higher level to make control_mode enum
+                #  soft_injection determines whether to do per-layer re-weighting adjustment (if True)
+                #     or default weighting (if False)
+                soft_injection = (control_mode == "more_prompt" or control_mode == "more_control")
+                #  cfg_injection = determines whether to apply ControlNet to only the conditional (if True)
+                #      or the default both conditional and unconditional (if False)
+                cfg_injection = (control_mode == "more_control" or control_mode == "unbalanced")
+
                 first_control_step = math.floor(control_datum.begin_step_percent * total_step_count)
                 last_control_step = math.ceil(control_datum.end_step_percent * total_step_count)
                 # only apply controlnet if current step is within the controlnet's begin/end step range
                 if step_index >= first_control_step and step_index <= last_control_step:
-                    # print("running controlnet", i, "for step", step_index)
+
+                    if cfg_injection:
+                        control_latent_input = unet_latent_input
+                    else:
+                        # expand the latents input to control model if doing classifier free guidance
+                        #    (which I think for now is always true, there is conditional elsewhere that stops execution if
+                        #     classifier_free_guidance is <= 1.0 ?)
+                        control_latent_input = torch.cat([unet_latent_input] * 2)
+
+                    if cfg_injection:  # only applying ControlNet to conditional instead of in unconditioned
+                        encoder_hidden_states = torch.cat([conditioning_data.unconditioned_embeddings])
+                    else:
+                        encoder_hidden_states = torch.cat([conditioning_data.unconditioned_embeddings,
+                                                           conditioning_data.text_embeddings])
                     if isinstance(control_datum.weight, list):
                         # if controlnet has multiple weights, use the weight for the current step
                         controlnet_weight = control_datum.weight[step_index]
                     else:
                         # if controlnet has a single weight, use it for all steps
                         controlnet_weight = control_datum.weight
+
+                    # controlnet(s) inference
                     down_samples, mid_sample = control_datum.model(
-                        sample=latent_control_input,
+                        sample=control_latent_input,
                         timestep=timestep,
-                        encoder_hidden_states=torch.cat([conditioning_data.unconditioned_embeddings,
-                                                         conditioning_data.text_embeddings]),
+                        encoder_hidden_states=encoder_hidden_states,
                         controlnet_cond=control_datum.image_tensor,
-                        conditioning_scale=controlnet_weight,
-                        # cross_attention_kwargs,
-                        guess_mode=False,
+                        conditioning_scale=controlnet_weight, # controlnet specific, NOT the guidance scale
+                        guess_mode=soft_injection, # this is still called guess_mode in diffusers ControlNetModel
                         return_dict=False,
                     )
+                    if cfg_injection:
+                        # Inferred ControlNet only for the conditional batch.
+                        # To apply the output of ControlNet to both the unconditional and conditional batches,
+                        #   add 0 to the unconditional batch to keep it unchanged.
+                        down_samples = [torch.cat([torch.zeros_like(d), d]) for d in down_samples]
+                        mid_sample = torch.cat([torch.zeros_like(mid_sample), mid_sample])
+
                     if down_block_res_samples is None and mid_block_res_sample is None:
                         down_block_res_samples, mid_block_res_sample = down_samples, mid_sample
                     else:
@@ -653,11 +675,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # predict the noise residual
         noise_pred = self.invokeai_diffuser.do_diffusion_step(
-            latent_model_input,
-            t,
-            conditioning_data.unconditioned_embeddings,
-            conditioning_data.text_embeddings,
-            conditioning_data.guidance_scale,
+            x=unet_latent_input,
+            sigma=t,
+            unconditioning=conditioning_data.unconditioned_embeddings,
+            conditioning=conditioning_data.text_embeddings,
+            unconditional_guidance_scale=conditioning_data.guidance_scale,
             step_index=step_index,
             total_step_count=total_step_count,
             down_block_additional_residuals=down_block_res_samples,  # from controlnet(s)
@@ -962,6 +984,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         device="cuda",
         dtype=torch.float16,
         do_classifier_free_guidance=True,
+        control_mode="balanced"
     ):
 
         if not isinstance(image, torch.Tensor):
@@ -992,6 +1015,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             repeat_by = num_images_per_prompt
         image = image.repeat_interleave(repeat_by, dim=0)
         image = image.to(device=device, dtype=dtype)
-        if do_classifier_free_guidance:
+        cfg_injection = (control_mode == "more_control" or control_mode == "unbalanced")
+        if do_classifier_free_guidance and not cfg_injection:
             image = torch.cat([image] * 2)
         return image

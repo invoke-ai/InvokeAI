@@ -287,19 +287,14 @@ class TextToLatentsInvocation(BaseInvocation):
         control_height_resize = latents_shape[2] * 8
         control_width_resize = latents_shape[3] * 8
         if control_input is None:
-            # print("control input is None")
             control_list = None
         elif isinstance(control_input, list) and len(control_input) == 0:
-            # print("control input is empty list")
             control_list = None
         elif isinstance(control_input, ControlField):
-            # print("control input is ControlField")
             control_list = [control_input]
         elif isinstance(control_input, list) and len(control_input) > 0 and isinstance(control_input[0], ControlField):
-            # print("control input is list[ControlField]")
             control_list = control_input
         else:
-            # print("input control is unrecognized:", type(self.control))
             control_list = None
         if (control_list is None):
             control_data = None
@@ -341,12 +336,15 @@ class TextToLatentsInvocation(BaseInvocation):
                     # num_images_per_prompt=num_images_per_prompt,
                     device=control_model.device,
                     dtype=control_model.dtype,
+                    control_mode=control_info.control_mode,
                 )
                 control_item = ControlNetData(model=control_model,
                                               image_tensor=control_image,
                                               weight=control_info.control_weight,
                                               begin_step_percent=control_info.begin_step_percent,
-                                              end_step_percent=control_info.end_step_percent)
+                                              end_step_percent=control_info.end_step_percent,
+                                              control_mode=control_info.control_mode,
+                                              )
                 control_data.append(control_item)
                 # MultiControlNetModel has been refactored out, just need list[ControlNetData]
         return control_data
