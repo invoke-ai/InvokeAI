@@ -605,6 +605,7 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
     for name in (
             "models",
             "databases",
+            "autoimport",
             "text-inversion-output",
             "text-inversion-training-data",
             "configs"

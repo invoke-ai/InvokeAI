@@ -227,7 +227,7 @@ from pydantic import BaseModel
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util import CUDA_DEVICE
+from invokeai.backend.util import CUDA_DEVICE, Chdir
 from .model_cache import ModelCache, ModelLocker
 from .models import (
     BaseModelType, ModelType, SubModelType,
@@ -488,11 +488,6 @@ class ModelManager(object):
     ) -> list[dict]:
         """
         Return a list of models.
-
-        Please use model_manager.models() to get all the model names,
-        model_manager.model_info('model-name') to get the stanza for the model
-        named 'model-name', and model_manager.config to get the full OmegaConf
-        object derived from models.yaml
         """
 
         models = []
@@ -659,44 +654,82 @@ class ModelManager(object):
     def scan_models_directory(self):
         loaded_files = set()
         new_models_found = False
-
-        for model_key, model_config in list(self.models.items()):
-            model_name, base_model, model_type = self.parse_key(model_key)
-            model_path = str(self.globals.root_path / model_config.path)
-            if not os.path.exists(model_path):
-                model_class = MODEL_CLASSES[base_model][model_type]
-                if model_class.save_to_config:
-                    model_config.error = ModelError.NotFound
+        
+        with Chdir(self.globals.root_path):
+            for model_key, model_config in list(self.models.items()):
+                model_name, base_model, model_type = self.parse_key(model_key)
+                model_path = str(model_config.path)
+                if not os.path.exists(model_path):
+                    model_class = MODEL_CLASSES[base_model][model_type]
+                    if model_class.save_to_config:
+                        model_config.error = ModelError.NotFound
+                    else:
+                        self.models.pop(model_key, None)
                 else:
-                    self.models.pop(model_key, None)
-            else:
-                loaded_files.add(model_path)
+                    loaded_files.add(model_path)
 
-        for base_model in BaseModelType:
-            for model_type in ModelType:
-                model_class = MODEL_CLASSES[base_model][model_type]
-                models_dir = os.path.join(self.globals.models_path, base_model, model_type)
+            for base_model in BaseModelType:
+                for model_type in ModelType:
+                    model_class = MODEL_CLASSES[base_model][model_type]
+                    models_dir = os.path.join(self.globals.models_dir, base_model, model_type)
 
-                if not os.path.exists(models_dir):
-                    continue # TODO: or create all folders?
-                
-                for entry_name in os.listdir(models_dir):
-                    model_path = os.path.join(models_dir, entry_name)
-                    if model_path not in loaded_files: # TODO: check
-                        model_path = Path(model_path)
-                        model_name = model_path.name if model_path.is_dir() else model_path.stem
-                        model_key = self.create_key(model_name, base_model, model_type)
+                    if not os.path.exists(models_dir):
+                        continue # TODO: or create all folders?
 
-                        if model_key in self.models:
-                            raise Exception(f"Model with key {model_key} added twice")
+                    for entry_name in os.listdir(models_dir):
+                        model_path = os.path.join(models_dir, entry_name)
+                        if model_path not in loaded_files: # TODO: check
+                            model_path = Path(model_path)
+                            model_name = model_path.name if model_path.is_dir() else model_path.stem
+                            model_key = self.create_key(model_name, base_model, model_type)
 
-                        model_config: ModelConfigBase = model_class.probe_config(str(model_path))
-                        self.models[model_key] = model_config
-                        new_models_found = True
+                            if model_key in self.models:
+                                raise Exception(f"Model with key {model_key} added twice")
 
-        if new_models_found and self.config_path:
+                            model_config: ModelConfigBase = model_class.probe_config(str(model_path))
+                            self.models[model_key] = model_config
+                            new_models_found = True
+
+        imported_models = self.autoimport()
+
+        if (new_models_found or imported_models) and self.config_path:
             self.commit()
 
+    def autoimport(self):
+        '''
+        Scan the autoimport directory (if defined) and import new models, delete defunct models.
+        '''
+        # avoid circular import
+        from invokeai.backend.install.model_install_backend import ModelInstall
+        installer = ModelInstall(config = self.globals,
+                                 model_manager = self)
+        
+        installed = set()
+        if not self.globals.autoimport_dir:
+            return installed
+        
+        autodir = self.globals.root_path / self.globals.autoimport_dir        
+        if not (autodir and autodir.exists()):
+            return installed
+        
+        known_paths = {(self.globals.root_path / x['path']).resolve() for x in self.list_models()}
+        scanned_dirs = set()
+        for root, dirs, files in os.walk(autodir):
+            for d in dirs:
+                path = Path(root) / d
+                if path in known_paths:
+                    continue
+                if any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin'}]):
+                    installed.update(installer.heuristic_install(path))
+                scanned_dirs.add(path)
+                
+            for f in files:
+                path = Path(root) / f
+                if path in known_paths or path.parent in scanned_dirs:
+                    continue
+                if path.suffix in {'.ckpt','.bin','.pth','.safetensors'}:
+                    installed.update(installer.heuristic_install(path))
+        return installed
 
     def heuristic_import(self,
                          items_to_import: Set[str],
@@ -724,8 +757,8 @@ class ModelManager(object):
                                  model_manager = self)
         for thing in items_to_import:
             try:
-                installer.heuristic_install(thing)
-                successfully_installed.add(thing)
+                installed = installer.heuristic_install(thing)
+                successfully_installed.update(installed)
             except Exception as e:
                 self.logger.warning(f'{thing} could not be imported: {str(e)}')
                 

@@ -65,8 +65,8 @@ def make_printable(s:str)->str:
     return s.translate(NOPRINT_TRANS_TABLE)
 
 class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
-    # for responsive resizing - disabled
-    # FIX_MINIMUM_SIZE_WHEN_CREATED = False
+    # for responsive resizing set to False, but this seems to cause a crash!
+    FIX_MINIMUM_SIZE_WHEN_CREATED = True
     
     # for persistence
     current_tab = 0
@@ -323,7 +323,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 FileBox,
                 max_height=3,
                 name=label,
-                value=str(config.autoimport_dir) if config.autoimport_dir else None,
+                value=str(config.root_path / config.autoimport_dir) if config.autoimport_dir else None,
                 select_dir=True,
                 must_exist=True,
                 use_two_lines=False,
@@ -501,7 +501,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         
         # rebuild the form, saving and restoring some of the fields that need to be preserved.
         saved_messages = self.monitor.entry_widget.values
-        autoload_dir = self.pipeline_models['autoload_directory'].value
+        autoload_dir = str(config.root_path / self.pipeline_models['autoload_directory'].value)
         autoscan = self.pipeline_models['autoscan_on_startup'].value
         
         app.main_form = app.addForm(
@@ -547,7 +547,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
         # load directory and whether to scan on startup
         if self.parentApp.autoload_pending:
-            selections.scan_directory = self.pipeline_models['autoload_directory'].value
+            selections.scan_directory = str(config.root_path / self.pipeline_models['autoload_directory'].value)
             self.parentApp.autoload_pending = False
         selections.autoscan_on_startup = self.pipeline_models['autoscan_on_startup'].value
 

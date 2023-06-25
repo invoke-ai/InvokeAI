@@ -183,61 +183,67 @@ class ModelInstall(object):
         else:
             update_autoimport_dir(None)
 
-    def heuristic_install(self, model_path_id_or_url: Union[str,Path]):
+    def heuristic_install(self,
+                          model_path_id_or_url: Union[str,Path],
+                          models_installed: Set[Path]=None)->Set[Path]:
+
+        if not models_installed:
+            models_installed = set()
+            
         # A little hack to allow nested routines to retrieve info on the requested ID
         self.current_id = model_path_id_or_url
-        
         path = Path(model_path_id_or_url)
 
-        # checkpoint file, or similar
-        if path.is_file():
-            self._install_path(path)
-            return
+        try:
+            # checkpoint file, or similar
+            if path.is_file():
+                models_installed.add(self._install_path(path))
 
-        # folders style or similar
-        if path.is_dir() and any([(path/x).exists() for x in ['config.json','model_index.json','learned_embeds.bin']]):
-            self._install_path(path)
-            return
+            # folders style or similar
+            elif path.is_dir() and any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin'}]):
+                models_installed.add(self._install_path(path))
 
-        # recursive scan
-        if path.is_dir():
-            for child in path.iterdir():
-                self.heuristic_install(child)
-            return
+            # recursive scan
+            elif path.is_dir():
+                for child in path.iterdir():
+                    self.heuristic_install(child, models_installed=models_installed)
 
-        # huggingface repo
-        parts = str(path).split('/')
-        if len(parts) == 2:
-            self._install_repo(str(path))
-            return
+            # huggingface repo
+            elif len(str(path).split('/')) == 2:
+                models_installed.add(self._install_repo(str(path)))
 
-        # a URL
-        if model_path_id_or_url.startswith(("http:", "https:", "ftp:")):
-            self._install_url(model_path_id_or_url)
-            return
+            # a URL
+            elif model_path_id_or_url.startswith(("http:", "https:", "ftp:")):
+                models_installed.add(self._install_url(model_path_id_or_url))
 
-        logger.warning(f'{str(model_path_id_or_url)} is not recognized as a local path, repo ID or URL. Skipping')
+            else:
+                logger.warning(f'{str(model_path_id_or_url)} is not recognized as a local path, repo ID or URL. Skipping')
+            
+        except ValueError as e:
+            logger.error(str(e))
+
+        return models_installed
 
     # install a model from a local path. The optional info parameter is there to prevent
     # the model from being probed twice in the event that it has already been probed.
-    def _install_path(self, path: Path, info: ModelProbeInfo=None):
+    def _install_path(self, path: Path, info: ModelProbeInfo=None)->Path:
         try:
             logger.info(f'Probing {path}')
             info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
-            if info.model_type == ModelType.Main:
-                model_name = path.stem if info.format=='checkpoint' else path.name
-                if self.mgr.model_exists(model_name, info.base_type, info.model_type):
-                    raise Exception(f'A model named "{model_name}" is already installed.')
-                attributes = self._make_attributes(path,info)
-                self.mgr.add_model(model_name = model_name,
-                                   base_model = info.base_type,
-                                   model_type = info.model_type,
-                                   model_attributes = attributes
-                                   )
+            model_name = path.stem if info.format=='checkpoint' else path.name
+            if self.mgr.model_exists(model_name, info.base_type, info.model_type):
+                raise ValueError(f'A model named "{model_name}" is already installed.')
+            attributes = self._make_attributes(path,info)
+            self.mgr.add_model(model_name = model_name,
+                               base_model = info.base_type,
+                               model_type = info.model_type,
+                               model_attributes = attributes
+                               )
         except Exception as e:
             logger.warning(f'{str(e)} Skipping registration.')
+        return path
 
-    def _install_url(self, url: str):
+    def _install_url(self, url: str)->Path:
         # copy to a staging area, probe, import and delete
         with TemporaryDirectory(dir=self.config.models_path) as staging:
             location = download_with_resume(url,Path(staging))
@@ -248,19 +254,9 @@ class ModelInstall(object):
             models_path = shutil.move(location,dest)
 
         # staged version will be garbage-collected at this time
-        self._install_path(Path(models_path), info)
+        return self._install_path(Path(models_path), info)
 
-    def _get_model_name(self,path_name: str, location: Path)->str:
-        '''
-        Calculate a name for the model - primitive implementation.
-        '''
-        if key := self.reverse_paths.get(path_name):
-            (name, base, mtype) = ModelManager.parse_key(key)
-            return name
-        else:
-            return location.stem
-
-    def _install_repo(self, repo_id: str):
+    def _install_repo(self, repo_id: str)->Path:
         hinfo = HfApi().model_info(repo_id)
         
         # we try to figure out how to download this most economically
@@ -300,7 +296,17 @@ class ModelInstall(object):
             if dest.exists():
                 shutil.rmtree(dest)
             shutil.copytree(location,dest)
-            self._install_path(dest, info)
+            return self._install_path(dest, info)
+
+    def _get_model_name(self,path_name: str, location: Path)->str:
+        '''
+        Calculate a name for the model - primitive implementation.
+        '''
+        if key := self.reverse_paths.get(path_name):
+            (name, base, mtype) = ModelManager.parse_key(key)
+            return name
+        else:
+            return location.stem
 
     def _make_attributes(self, path: Path, info: ModelProbeInfo)->dict:
         # convoluted way to retrieve the description from datasets
@@ -308,9 +314,11 @@ class ModelInstall(object):
         if key := self.reverse_paths.get(self.current_id):
             if key in self.datasets:
                 description = self.datasets[key]['description']
-                
+
+        rel_path = self.relative_to_root(path)
+
         attributes = dict(
-            path = str(path),
+            path = str(rel_path),
             description = str(description),
             model_format = info.format,
             )
@@ -318,17 +326,29 @@ class ModelInstall(object):
             attributes.update(dict(variant = info.variant_type,))
             if info.format=="checkpoint":
                 try:
-                    legacy_conf = LEGACY_CONFIGS[info.base_type][info.variant_type][info.prediction_type] if info.base_type == BaseModelType.StableDiffusion2 \
-                        else LEGACY_CONFIGS[info.base_type][info.variant_type]
+                    possible_conf = path.with_suffix('.yaml')
+                    if possible_conf.exists():
+                        legacy_conf = str(self.relative_to_root(possible_conf))
+                    elif info.base_type == BaseModelType.StableDiffusion2:
+                        legacy_conf = Path(self.config.legacy_conf_dir, LEGACY_CONFIGS[info.base_type][info.variant_type][info.prediction_type])
+                    else:
+                        legacy_conf = Path(self.config.legacy_conf_dir, LEGACY_CONFIGS[info.base_type][info.variant_type])
                 except KeyError:
-                    legacy_conf = 'v1-inference.yaml'  # best guess
+                    legacy_conf = Path(self.config.legacy_conf_dir, 'v1-inference.yaml')  # best guess
                     
                 attributes.update(
                     dict(
-                        config = str(self.config.legacy_conf_path / legacy_conf)
+                        config = str(legacy_conf)
                     )
                 )
         return attributes
+
+    def relative_to_root(self, path: Path)->Path:
+        root = self.config.root_path
+        if path.is_relative_to(root):
+            return path.relative_to(root)
+        else:
+            return path
 
     def _download_hf_pipeline(self, repo_id: str, staging: Path)->Path:
         '''
@@ -379,6 +399,9 @@ def update_autoimport_dir(autodir: Path):
     '''
     Update the "autoimport_dir" option in invokeai.yaml
     '''
+    with open('log.txt','a') as f:
+        print(f'autodir = {autodir}',file=f)
+        
     invokeai_config_path = config.init_file_path
     conf = OmegaConf.load(invokeai_config_path)
     conf.InvokeAI.Paths.autoimport_dir = str(autodir) if autodir else None
