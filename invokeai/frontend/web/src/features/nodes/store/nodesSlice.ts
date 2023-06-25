@@ -11,14 +11,13 @@ import {
   NodeChange,
   OnConnectStartParams,
 } from 'reactflow';
-import { ImageDTO } from 'services/api';
-import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { ImageField } from 'services/api/types';
+import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 import { parseSchema } from '../util/parseSchema';
 import { log } from 'app/logging/useLogger';
-import { forEach, size } from 'lodash-es';
+import { size } from 'lodash-es';
 import { RgbaColor } from 'react-colorful';
-import { imageUrlsReceived } from 'services/thunks/image';
 import { RootState } from 'app/store/store';
 
 export type NodesState = {
@@ -66,7 +65,7 @@ const nodesSlice = createSlice({
       action: PayloadAction<{
         nodeId: string;
         fieldName: string;
-        value: string | number | boolean | ImageDTO | RgbaColor | undefined;
+        value: string | number | boolean | ImageField | RgbaColor | undefined;
       }>
     ) => {
       const { nodeId, fieldName, value } = action.payload;
@@ -100,21 +99,6 @@ const nodesSlice = createSlice({
   extraReducers(builder) {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
       state.schema = action.payload;
-    });
-
-    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_url, thumbnail_url } = action.payload;
-
-      state.nodes.forEach((node) => {
-        forEach(node.data.inputs, (input) => {
-          if (input.type === 'image') {
-            if (input.value?.image_name === image_name) {
-              input.value.image_url = image_url;
-              input.value.thumbnail_url = thumbnail_url;
-            }
-          }
-        });
-      });
     });
   },
 });

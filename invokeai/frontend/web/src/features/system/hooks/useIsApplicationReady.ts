@@ -7,13 +7,12 @@ import { systemSelector } from '../store/systemSelectors';
 const isApplicationReadySelector = createSelector(
   [systemSelector, configSelector],
   (system, config) => {
-    const { wereModelsReceived, wasSchemaParsed } = system;
+    const { wasSchemaParsed } = system;
 
     const { disabledTabs } = config;
 
     return {
       disabledTabs,
-      wereModelsReceived,
       wasSchemaParsed,
     };
   }
@@ -23,21 +22,17 @@ const isApplicationReadySelector = createSelector(
  * Checks if the application is ready to be used, i.e. if the initial startup process is finished.
  */
 export const useIsApplicationReady = () => {
-  const { disabledTabs, wereModelsReceived, wasSchemaParsed } = useAppSelector(
+  const { disabledTabs, wasSchemaParsed } = useAppSelector(
     isApplicationReadySelector
   );
 
   const isApplicationReady = useMemo(() => {
-    if (!wereModelsReceived) {
-      return false;
-    }
-
     if (!disabledTabs.includes('nodes') && !wasSchemaParsed) {
       return false;
     }
 
     return true;
-  }, [disabledTabs, wereModelsReceived, wasSchemaParsed]);
+  }, [disabledTabs, wasSchemaParsed]);
 
   return isApplicationReady;
 };

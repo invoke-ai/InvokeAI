@@ -4,8 +4,8 @@ import { generateColorPalette } from '../util/generateColorPalette';
 export const greenTeaThemeColors: InvokeAIThemeColors = {
   base: generateColorPalette(223, 10),
   baseAlpha: generateColorPalette(223, 10, false, true),
-  accent: generateColorPalette(155, 80),
-  accentAlpha: generateColorPalette(155, 80, false, true),
+  accent: generateColorPalette(160, 60),
+  accentAlpha: generateColorPalette(160, 60, false, true),
   working: generateColorPalette(47, 68),
   workingAlpha: generateColorPalette(47, 68, false, true),
   warning: generateColorPalette(28, 75),
@@ -14,5 +14,5 @@ export const greenTeaThemeColors: InvokeAIThemeColors = {
   okAlpha: generateColorPalette(122, 49, false, true),
   error: generateColorPalette(0, 50),
   errorAlpha: generateColorPalette(0, 50, false, true),
-  gridLineColor: 'rgba(255, 255, 255, 0.2)',
+  gridLineColor: 'rgba(255, 255, 255, 0.15)',
 };

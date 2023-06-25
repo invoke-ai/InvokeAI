@@ -1,6 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
-import { Graph, ImageDTO } from 'services/api';
+import { Graph, ImageDTO, ImageField } from 'services/api/types';
 import { AnyInvocationType } from 'services/events/types';
 import { O } from 'ts-toolbelt';
 
@@ -61,6 +61,9 @@ export type FieldType =
   | 'image'
   | 'latents'
   | 'conditioning'
+  | 'unet'
+  | 'clip'
+  | 'vae'
   | 'control'
   | 'model'
   | 'array'
@@ -83,6 +86,9 @@ export type InputFieldValue =
   | ImageInputFieldValue
   | LatentsInputFieldValue
   | ConditioningInputFieldValue
+  | UNetInputFieldValue
+  | ClipInputFieldValue
+  | VaeInputFieldValue
   | ControlInputFieldValue
   | EnumInputFieldValue
   | ModelInputFieldValue
@@ -104,6 +110,9 @@ export type InputFieldTemplate =
   | ImageInputFieldTemplate
   | LatentsInputFieldTemplate
   | ConditioningInputFieldTemplate
+  | UNetInputFieldTemplate
+  | ClipInputFieldTemplate
+  | VaeInputFieldTemplate
   | ControlInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
@@ -188,9 +197,24 @@ export type ControlInputFieldValue = FieldValueBase & {
   value?: undefined;
 };
 
+export type UNetInputFieldValue = FieldValueBase & {
+  type: 'unet';
+  value?: undefined;
+};
+
+export type ClipInputFieldValue = FieldValueBase & {
+  type: 'clip';
+  value?: undefined;
+};
+
+export type VaeInputFieldValue = FieldValueBase & {
+  type: 'vae';
+  value?: undefined;
+};
+
 export type ImageInputFieldValue = FieldValueBase & {
   type: 'image';
-  value?: ImageDTO;
+  value?: ImageField;
 };
 
 export type ModelInputFieldValue = FieldValueBase & {

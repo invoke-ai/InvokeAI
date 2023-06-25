@@ -1,5 +1,5 @@
 import { startAppListening } from '..';
-import { sessionCreated } from 'services/thunks/session';
+import { sessionCreated } from 'services/api/thunks/session';
 import { buildNodesGraph } from 'features/nodes/util/graphBuilders/buildNodesGraph';
 import { log } from 'app/logging/useLogger';
 import { nodesGraphBuilt } from 'features/nodes/store/actions';

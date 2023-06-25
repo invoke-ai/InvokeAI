@@ -189,7 +189,7 @@ const ControlNet = (props: ControlNetProps) => {
               <Box mt={2}>
                 <ControlNetImagePreview
                   controlNet={props.controlNet}
-                  imageSx={expandedControlImageSx}
+                  height={96}
                 />
               </Box>
               <ParamControlNetProcessorSelect

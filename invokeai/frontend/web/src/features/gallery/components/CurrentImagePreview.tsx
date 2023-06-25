@@ -9,12 +9,12 @@ import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 import { memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import { configSelector } from '../../system/store/configSelectors';
-import { useAppToaster } from 'app/components/Toaster';
 import { imageSelected } from '../store/gallerySlice';
 import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api';
-import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { ImageDTO } from 'services/api/types';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -29,7 +29,7 @@ export const imagesSelector = createSelector(
     return {
       shouldShowImageDetails,
       shouldHidePreview,
-      image: selectedImage,
+      selectedImage,
       progressImage,
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
@@ -45,11 +45,19 @@ export const imagesSelector = createSelector(
 const CurrentImagePreview = () => {
   const {
     shouldShowImageDetails,
-    image,
+    selectedImage,
     progressImage,
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
+
+  const {
+    currentData: image,
+    isLoading,
+    isError,
+    isSuccess,
+  } = useGetImageDTOQuery(selectedImage ?? skipToken);
+
   const dispatch = useAppDispatch();
 
   const handleDrop = useCallback(
@@ -57,7 +65,7 @@ const CurrentImagePreview = () => {
       if (droppedImage.image_name === image?.image_name) {
         return;
       }
-      dispatch(imageSelected(droppedImage));
+      dispatch(imageSelected(droppedImage.image_name));
     },
     [dispatch, image?.image_name]
   );
@@ -67,9 +75,9 @@ const CurrentImagePreview = () => {
       sx={{
         width: 'full',
         height: 'full',
-        position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
       }}
     >
       {progressImage && shouldShowProgressInViewer ? (
@@ -89,21 +97,13 @@ const CurrentImagePreview = () => {
           }}
         />
       ) : (
-        <Flex
-          sx={{
-            width: 'full',
-            height: 'full',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IAIDndImage
-            image={image}
-            onDrop={handleDrop}
-            fallback={<IAIImageFallback sx={{ bg: 'none' }} />}
-            isUploadDisabled={true}
-          />
-        </Flex>
+        <IAIDndImage
+          image={image}
+          onDrop={handleDrop}
+          fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
+          isUploadDisabled={true}
+          fitContainer
+        />
       )}
       {shouldShowImageDetails && image && (
         <Box

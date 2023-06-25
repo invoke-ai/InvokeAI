@@ -53,14 +53,14 @@ export const appSocketDisconnected = createAction<BaseSocketPayload>(
  * Do not use. Only for use in middleware.
  */
 export const socketSubscribed = createAction<
-  BaseSocketPayload & { sessionId: string }
+  BaseSocketPayload & { sessionId: string; boardId: string | undefined }
 >('socket/socketSubscribed');
 
 /**
  * App-level Socket.IO Subscribed
  */
 export const appSocketSubscribed = createAction<
-  BaseSocketPayload & { sessionId: string }
+  BaseSocketPayload & { sessionId: string; boardId: string | undefined }
 >('socket/appSocketSubscribed');
 
 /**

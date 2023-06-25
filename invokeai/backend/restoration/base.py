@@ -5,7 +5,7 @@ class Restoration:
         pass
 
     def load_face_restore_models(
-        self, gfpgan_model_path="./models/gfpgan/GFPGANv1.4.pth"
+        self, gfpgan_model_path="./models/core/face_restoration/gfpgan/GFPGANv1.4.pth"
     ):
         # Load GFPGAN
         gfpgan = self.load_gfpgan(gfpgan_model_path)

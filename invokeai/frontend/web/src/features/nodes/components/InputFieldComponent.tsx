@@ -7,6 +7,9 @@ import EnumInputFieldComponent from './fields/EnumInputFieldComponent';
 import ImageInputFieldComponent from './fields/ImageInputFieldComponent';
 import LatentsInputFieldComponent from './fields/LatentsInputFieldComponent';
 import ConditioningInputFieldComponent from './fields/ConditioningInputFieldComponent';
+import UNetInputFieldComponent from './fields/UNetInputFieldComponent';
+import ClipInputFieldComponent from './fields/ClipInputFieldComponent';
+import VaeInputFieldComponent from './fields/VaeInputFieldComponent';
 import ControlInputFieldComponent from './fields/ControlInputFieldComponent';
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
@@ -91,6 +94,36 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'conditioning' && template.type === 'conditioning') {
     return (
       <ConditioningInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'unet' && template.type === 'unet') {
+    return (
+      <UNetInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'clip' && template.type === 'clip') {
+    return (
+      <ClipInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'vae' && template.type === 'vae') {
+    return (
+      <VaeInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}

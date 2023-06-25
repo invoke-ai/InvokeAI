@@ -1,6 +1,6 @@
 import { Box, Image } from '@chakra-ui/react';
 import { memo } from 'react';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 
 type OverlayDragImageProps = {
   image: ImageDTO;

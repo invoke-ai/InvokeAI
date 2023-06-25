@@ -12,7 +12,7 @@ import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useLayoutEffect } from 'react';
 import UnifiedCanvasToolbarBeta from './UnifiedCanvasBeta/UnifiedCanvasToolbarBeta';
 import UnifiedCanvasToolSettingsBeta from './UnifiedCanvasBeta/UnifiedCanvasToolSettingsBeta';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { useDroppable } from '@dnd-kit/core';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';

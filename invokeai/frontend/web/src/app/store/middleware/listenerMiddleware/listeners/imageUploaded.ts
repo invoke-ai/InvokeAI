@@ -1,5 +1,5 @@
 import { startAppListening } from '..';
-import { imageUploaded } from 'services/thunks/image';
+import { imageUploaded } from 'services/api/thunks/image';
 import { addToast } from 'features/system/store/systemSlice';
 import { log } from 'app/logging/useLogger';
 import { imageUpserted } from 'features/gallery/store/imagesSlice';
@@ -46,7 +46,12 @@ export const addImageUploadedFulfilledListener = () => {
 
       if (postUploadAction?.type === 'SET_CONTROLNET_IMAGE') {
         const { controlNetId } = postUploadAction;
-        dispatch(controlNetImageChanged({ controlNetId, controlImage: image }));
+        dispatch(
+          controlNetImageChanged({
+            controlNetId,
+            controlImage: image.image_name,
+          })
+        );
         return;
       }
 

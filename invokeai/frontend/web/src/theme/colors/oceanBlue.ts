@@ -14,5 +14,5 @@ export const oceanBlueColors: InvokeAIThemeColors = {
   okAlpha: generateColorPalette(122, 49, false, true),
   error: generateColorPalette(0, 100),
   errorAlpha: generateColorPalette(0, 100, false, true),
-  gridLineColor: 'rgba(136, 148, 184, 0.2)',
+  gridLineColor: 'rgba(136, 148, 184, 0.15)',
 };
