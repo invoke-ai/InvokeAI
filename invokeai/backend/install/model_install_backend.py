@@ -179,9 +179,9 @@ class ModelInstall(object):
         self.mgr.commit()
 
         if selections.autoscan_on_startup and Path(selections.scan_directory).is_dir():
-            update_autoconvert_dir(selections.scan_directory)
+            update_autoimport_dir(selections.scan_directory)
         else:
-            update_autoconvert_dir(None)
+            update_autoimport_dir(None)
 
     def heuristic_install(self, model_path_id_or_url: Union[str,Path]):
         # A little hack to allow nested routines to retrieve info on the requested ID
@@ -375,13 +375,13 @@ class ModelInstall(object):
         '''
         return {v.get('path') or v.get('repo_id') : k for k, v in datasets.items()}
 
-def update_autoconvert_dir(autodir: Path):
+def update_autoimport_dir(autodir: Path):
     '''
-    Update the "autoconvert_dir" option in invokeai.yaml
+    Update the "autoimport_dir" option in invokeai.yaml
     '''
     invokeai_config_path = config.init_file_path
     conf = OmegaConf.load(invokeai_config_path)
-    conf.InvokeAI.Paths.autoconvert_dir = str(autodir) if autodir else None
+    conf.InvokeAI.Paths.autoimport_dir = str(autodir) if autodir else None
     yaml = OmegaConf.to_yaml(conf)
     tmpfile = invokeai_config_path.parent / "new_config.tmp"
     with open(tmpfile, "w", encoding="utf-8") as outfile:

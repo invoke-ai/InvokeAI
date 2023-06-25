@@ -323,7 +323,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 FileBox,
                 max_height=3,
                 name=label,
-                value=str(config.autoconvert_dir) if config.autoconvert_dir else None,
+                value=str(config.autoimport_dir) if config.autoimport_dir else None,
                 select_dir=True,
                 must_exist=True,
                 use_two_lines=False,
@@ -336,7 +336,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             autoscan_on_startup = self.add_widget_intelligent(
                 npyscreen.Checkbox,
                 name="Scan and import from this directory each time InvokeAI starts",
-                value=config.autoconvert_dir is not None,
+                value=config.autoimport_dir is not None,
                 relx=4,
                 scroll_exit=True,
             )

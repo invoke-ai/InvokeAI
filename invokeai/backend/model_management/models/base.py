@@ -126,7 +126,10 @@ class ModelBase(metaclass=ABCMeta):
             if not isinstance(value, type) or not issubclass(value, ModelConfigBase):
                 continue
 
-            fields = inspect.get_annotations(value)
+            if hasattr(inspect,'get_annotations'):
+                fields = inspect.get_annotations(value)
+            else:
+                fields = value.__annotations__
             try:
                 field = fields["model_format"]
             except:

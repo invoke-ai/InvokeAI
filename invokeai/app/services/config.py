@@ -374,7 +374,8 @@ setting environment variables INVOKEAI_<setting>.
     tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
 
     root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
-    autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.', category='Paths')
+    autoimport_dir      : Path = Field(default='models/autoimport', description='Path to a directory of models files to be imported on startup.', category='Paths')
+    autoconvert_dir      : Path = Field(default=None, description='Deprecated configuration option.', category='Paths')
     conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
     models_dir          : Path = Field(default='./models', description='Path to the models directory', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
