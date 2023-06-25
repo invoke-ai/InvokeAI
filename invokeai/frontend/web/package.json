@@ -23,7 +23,7 @@
     "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
     "dev:host": "concurrently \"vite dev --host\" \"yarn run theme:watch\"",
     "build": "yarn run lint && vite build",
-    "typegen": "npx openapi-typescript http://localhost:9090/openapi.json --output src/services/schema.d.ts -t",
+    "typegen": "npx openapi-typescript http://localhost:9090/openapi.json --output src/services/api/schema.d.ts -t",
     "preview": "vite preview",
     "lint:madge": "madge --circular src/main.tsx",
     "lint:eslint": "eslint --max-warnings=0 .",
