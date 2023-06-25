@@ -1,107 +1,122 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.4
 
-ARG PYTHON_VERSION=3.9
-##################
-##  base image  ##
-##################
-FROM --platform=${TARGETPLATFORM} python:${PYTHON_VERSION}-slim AS python-base
+## Builder stage
 
-LABEL org.opencontainers.image.authors="mauwii@outlook.de"
+FROM ubuntu:22.04 AS builder
 
-# Prepare apt for buildkit cache
-RUN rm -f /etc/apt/apt.conf.d/docker-clean \
-  && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache
+ARG DEBIAN_FRONTEND=noninteractive
+RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt update && apt-get install -y \
+        git \
+        python3-venv \
+        python3-pip \
+        build-essential
 
-# Install dependencies
-RUN \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update \
-  && apt-get install -y \
-    --no-install-recommends \
-    libgl1-mesa-glx=20.3.* \
-    libglib2.0-0=2.66.* \
-    libopencv-dev=4.5.*
+ENV INVOKEAI_SRC=/opt/invokeai
+ENV VIRTUAL_ENV=/opt/venv/invokeai
 
-# Set working directory and env
-ARG APPDIR=/usr/src
-ARG APPNAME=InvokeAI
-WORKDIR ${APPDIR}
-ENV PATH ${APPDIR}/${APPNAME}/bin:$PATH
-# Keeps Python from generating .pyc files in the container
-ENV PYTHONDONTWRITEBYTECODE 1
-# Turns off buffering for easier container logging
-ENV PYTHONUNBUFFERED 1
-# Don't fall back to legacy build system
-ENV PIP_USE_PEP517=1
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ARG TORCH_VERSION=2.0.1
+ARG TORCHVISION_VERSION=0.15.2
+ARG GPU_DRIVER=cuda
+ARG TARGETPLATFORM
+# unused but available
+ARG BUILDPLATFORM
 
-#######################
-##  build pyproject  ##
-#######################
-FROM python-base AS pyproject-builder
+WORKDIR ${INVOKEAI_SRC}
 
-# Install build dependencies
-RUN \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update \
-  && apt-get install -y \
-    --no-install-recommends \
-    build-essential=12.9 \
-    gcc=4:10.2.* \
-    python3-dev=3.9.*
+# Install pytorch before all other pip packages
+# NOTE: there are no pytorch builds for arm64 + cuda, only cpu
+# x86_64/CUDA is default
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python3 -m venv ${VIRTUAL_ENV} &&\
+    if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cpu"; \
+    elif [ "$GPU_DRIVER" = "rocm" ]; then \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm5.2"; \
+    else \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu117"; \
+    fi &&\
+    pip install $extra_index_url_arg \
+        torch==$TORCH_VERSION \
+        torchvision==$TORCHVISION_VERSION
 
-# Prepare pip for buildkit cache
-ARG PIP_CACHE_DIR=/var/cache/buildkit/pip
-ENV PIP_CACHE_DIR ${PIP_CACHE_DIR}
-RUN mkdir -p ${PIP_CACHE_DIR}
+# Install the local package.
+# Editable mode helps use the same image for development:
+# the local working copy can be bind-mounted into the image
+# at path defined by ${INVOKEAI_SRC}
+COPY invokeai ./invokeai
+COPY pyproject.toml ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+    # xformers + triton fails to install on arm64
+    if [ "$GPU_DRIVER" = "cuda" ] && [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+        pip install -e ".[xformers]"; \
+    else \
+        pip install -e "."; \
+    fi
 
-# Create virtual environment
-RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
-  python3 -m venv "${APPNAME}" \
-  --upgrade-deps
+# #### Build the Web UI ------------------------------------
 
-# Install requirements
-COPY --link pyproject.toml .
-COPY --link invokeai/version/invokeai_version.py invokeai/version/__init__.py invokeai/version/
-ARG PIP_EXTRA_INDEX_URL
-ENV PIP_EXTRA_INDEX_URL ${PIP_EXTRA_INDEX_URL}
-RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
-  "${APPNAME}"/bin/pip install .
+FROM node:18 as web-builder
+WORKDIR /build
+COPY invokeai/frontend/web/ ./
+RUN --mount=type=cache,target=node_modules \
+    npm install --include dev
+RUN yarn vite build
 
-# Install pyproject.toml
-COPY --link . .
-RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
-  "${APPNAME}/bin/pip" install .
 
-# Build patchmatch
+#### Runtime stage ---------------------------------------
+
+FROM library/ubuntu:22.04 as runtime
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+RUN apt update && apt install -y --no-install-recommends \
+        git \
+        curl \
+        vim \
+        tmux \
+        ncdu \
+        iotop \
+        bzip2 \
+        gosu \
+        libglib2.0-0 \
+        libgl1-mesa-glx \
+        python3-venv \
+        python3-pip \
+        build-essential \
+        libopencv-dev &&\
+    apt-get clean && apt-get autoclean
+
+# globally add magic-wormhole
+# for ease of transferring data to and from the container
+# when running in sandboxed cloud environments; e.g. Runpod etc.
+RUN pip install magic-wormhole
+
+ENV INVOKEAI_SRC=/opt/invokeai
+ENV VIRTUAL_ENV=/opt/venv/invokeai
+ENV INVOKEAI_ROOT=/invokeai
+ENV PATH="$VIRTUAL_ENV/bin:$INVOKEAI_SRC:$PATH"
+
+# --link requires buldkit w/ dockerfile syntax 1.4
+COPY --link --from=builder ${INVOKEAI_SRC} ${INVOKEAI_SRC}
+COPY --link --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
+COPY --link --from=web-builder /build/dist ${INVOKEAI_SRC}/invokeai/frontend/web/dist
+
+WORKDIR ${INVOKEAI_SRC}
+
+# build patchmatch
+RUN cd /usr/lib/$(uname -p)-linux-gnu/pkgconfig/ && ln -sf opencv4.pc opencv.pc
 RUN python3 -c "from patchmatch import patch_match"
 
-#####################
-##  runtime image  ##
-#####################
-FROM python-base AS runtime
+# Create unprivileged user and make the local dir
+RUN useradd --create-home --shell /bin/bash -u 1000 --comment "container local user" invoke
+RUN mkdir -p ${INVOKEAI_ROOT} && chown -R invoke:invoke ${INVOKEAI_ROOT}
 
-# Create a new user
-ARG UNAME=appuser
-RUN useradd \
-  --no-log-init \
-  -m \
-  -U \
-  "${UNAME}"
-
-# Create volume directory
-ARG VOLUME_DIR=/data
-RUN mkdir -p "${VOLUME_DIR}" \
-  && chown -hR "${UNAME}:${UNAME}" "${VOLUME_DIR}"
-
-# Setup runtime environment
-USER ${UNAME}:${UNAME}
-COPY --chown=${UNAME}:${UNAME} --from=pyproject-builder ${APPDIR}/${APPNAME} ${APPNAME}
-ENV INVOKEAI_ROOT ${VOLUME_DIR}
-ENV TRANSFORMERS_CACHE ${VOLUME_DIR}/.cache
-ENV INVOKE_MODEL_RECONFIGURE "--yes --default_only"
-EXPOSE 9090
-ENTRYPOINT [ "invokeai" ]
-CMD [ "--web", "--host", "0.0.0.0", "--port", "9090" ]
-VOLUME [ "${VOLUME_DIR}" ]
+COPY docker/docker-entrypoint.sh ./
+ENTRYPOINT ["/opt/invokeai/docker-entrypoint.sh"]
+CMD ["invokeai-web", "--host", "0.0.0.0"]
