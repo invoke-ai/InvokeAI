@@ -25,13 +25,13 @@ usermod -u ${USER_ID} ${USER} 1>/dev/null
 configure() {
     # Configure the runtime directory
     if [[ -f ${INVOKEAI_ROOT}/invokeai.yaml ]]; then
-        echo "${INVOKEAI_ROOT}/invokeai.yaml found."
-        echo "To reconfigure InvokeAI, please delete it."
-        echo "==========================================="
+        echo "${INVOKEAI_ROOT}/invokeai.yaml exists. InvokeAI is already configured."
+        echo "To reconfigure InvokeAI, delete the above file."
+        echo "======================================================================"
     else
         mkdir -p ${INVOKEAI_ROOT}
         chown --recursive ${USER} ${INVOKEAI_ROOT}
-        gosu ${USER} invokeai-configure --yes
+        gosu ${USER} invokeai-configure --yes --default_only
     fi
 }
 
