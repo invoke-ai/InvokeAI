@@ -166,7 +166,7 @@ class LoHALayer(LoRALayerBase):
         layer_key: str,
         values: dict,
     ):
-        super().__init__(module_key, rank, alpha, bias)
+        super().__init__(layer_key, values)
 
         self.w1_a = values["hada_w1_a"]
         self.w1_b = values["hada_w1_b"]
@@ -239,7 +239,7 @@ class LoKRLayer(LoRALayerBase):
         layer_key: str,
         values: dict,
     ):
-        super().__init__(module_key, rank, alpha, bias)        
+        super().__init__(layer_key, values)        
 
         if "lokr_w1" in values:
             self.w1 = values["lokr_w1"]
