@@ -45,6 +45,26 @@ export default function ModelManagerModal({
 
   const { t } = useTranslation();
 
+  const renderModelEditTabs = () => {
+    if (!openModel || !pipelineModels) return;
+
+    if (pipelineModels['entities'][openModel]['model_format'] === 'diffusers') {
+      return (
+        <DiffusersModelEdit
+          modelToEdit={openModel}
+          retrievedModel={pipelineModels['entities'][openModel]}
+        />
+      );
+    } else {
+      return (
+        <CheckpointModelEdit
+          modelToEdit={openModel}
+          retrievedModel={pipelineModels['entities'][openModel]}
+        />
+      );
+    }
+  };
+
   return (
     <>
       {cloneElement(children, {
@@ -62,14 +82,7 @@ export default function ModelManagerModal({
           <ModalBody>
             <Flex width="100%" columnGap={8}>
               <ModelList />
-              {openModel &&
-              pipelineModels &&
-              pipelineModels['entities'][openModel]['model_format'] ===
-                'diffusers' ? (
-                <DiffusersModelEdit />
-              ) : (
-                <CheckpointModelEdit />
-              )}
+              {renderModelEditTabs()}
             </Flex>
           </ModalBody>
           <ModalFooter />

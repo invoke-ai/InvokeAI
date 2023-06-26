@@ -1,12 +1,9 @@
-import { createSelector } from '@reduxjs/toolkit';
-
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import IAINumberInput from 'common/components/IAINumberInput';
 import { useEffect, useState } from 'react';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { systemSelector } from 'features/system/store/systemSelectors';
 
 import {
   Flex,
@@ -21,39 +18,28 @@ import {
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
 
-import type { InvokeModelConfigProps } from 'app/types/invokeai';
 import type { RootState } from 'app/store/store';
-import type { FieldInputProps, FormikProps } from 'formik';
-import { isEqual, pickBy } from 'lodash-es';
-import ModelConvert from './ModelConvert';
-import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
-import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';
+import type { InvokeModelConfigProps } from 'app/types/invokeai';
 import IAIForm from 'common/components/IAIForm';
-
-const selector = createSelector(
-  [systemSelector],
-  (system) => {
-    const { openModel, model_list } = system;
-    return {
-      model_list,
-      openModel,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';
+import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
+import type { FieldInputProps, FormikProps } from 'formik';
+import ModelConvert from './ModelConvert';
 
 const MIN_MODEL_SIZE = 64;
 const MAX_MODEL_SIZE = 2048;
 
-export default function CheckpointModelEdit() {
-  const { openModel, model_list } = useAppSelector(selector);
+type CheckpointModelEditProps = {
+  modelToEdit: string;
+  retrievedModel: any;
+};
+
+export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
   const isProcessing = useAppSelector(
     (state: RootState) => state.system.isProcessing
   );
+
+  const { modelToEdit, retrievedModel } = props;
 
   const dispatch = useAppDispatch();
 
@@ -69,27 +55,24 @@ export default function CheckpointModelEdit() {
       width: 512,
       height: 512,
       default: false,
-      format: 'ckpt',
+      model_format: 'ckpt',
     });
 
   useEffect(() => {
-    if (openModel) {
-      const retrievedModel = pickBy(model_list, (_val, key) => {
-        return isEqual(key, openModel);
-      });
+    if (modelToEdit) {
       setEditModelFormValues({
-        name: openModel,
-        description: retrievedModel[openModel]?.description,
-        config: retrievedModel[openModel]?.config,
-        weights: retrievedModel[openModel]?.weights,
-        vae: retrievedModel[openModel]?.vae,
-        width: retrievedModel[openModel]?.width,
-        height: retrievedModel[openModel]?.height,
-        default: retrievedModel[openModel]?.default,
-        format: 'ckpt',
+        name: modelToEdit,
+        description: retrievedModel?.description,
+        config: retrievedModel?.config,
+        weights: retrievedModel?.weights,
+        vae: retrievedModel?.vae,
+        width: retrievedModel?.width,
+        height: retrievedModel?.height,
+        default: retrievedModel?.default,
+        model_format: 'ckpt',
       });
     }
-  }, [model_list, openModel]);
+  }, [retrievedModel, modelToEdit]);
 
   const editModelFormSubmitHandler = (values: InvokeModelConfigProps) => {
     dispatch(
@@ -101,13 +84,13 @@ export default function CheckpointModelEdit() {
     );
   };
 
-  return openModel ? (
+  return modelToEdit ? (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex alignItems="center" gap={4} justifyContent="space-between">
         <Text fontSize="lg" fontWeight="bold">
-          {openModel}
+          {modelToEdit}
         </Text>
-        <ModelConvert model={openModel} />
+        <ModelConvert model={modelToEdit} />
       </Flex>
       <Flex
         flexDirection="column"

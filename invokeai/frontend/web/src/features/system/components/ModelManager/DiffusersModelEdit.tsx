@@ -1,11 +1,8 @@
-import { createSelector } from '@reduxjs/toolkit';
-
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import { useEffect, useState } from 'react';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { systemSelector } from 'features/system/store/systemSelectors';
 
 import { Flex, FormControl, FormLabel, Text, VStack } from '@chakra-ui/react';
 
@@ -13,34 +10,23 @@ import { Flex, FormControl, FormLabel, Text, VStack } from '@chakra-ui/react';
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
 
-import type { InvokeDiffusersModelConfigProps } from 'app/types/invokeai';
 import type { RootState } from 'app/store/store';
-import { isEqual, pickBy } from 'lodash-es';
-import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
-import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';
+import type { InvokeDiffusersModelConfigProps } from 'app/types/invokeai';
 import IAIForm from 'common/components/IAIForm';
+import IAIFormErrorMessage from 'common/components/IAIForms/IAIFormErrorMessage';
+import IAIFormHelperText from 'common/components/IAIForms/IAIFormHelperText';
 
-const selector = createSelector(
-  [systemSelector],
-  (system) => {
-    const { openModel, model_list } = system;
-    return {
-      model_list,
-      openModel,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+type DiffusersModelEditProps = {
+  modelToEdit: string;
+  retrievedModel: any;
+};
 
-export default function DiffusersModelEdit() {
-  const { openModel, model_list } = useAppSelector(selector);
+export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
   const isProcessing = useAppSelector(
     (state: RootState) => state.system.isProcessing
   );
+
+  const { retrievedModel, modelToEdit } = props;
 
   const dispatch = useAppDispatch();
 
@@ -54,41 +40,31 @@ export default function DiffusersModelEdit() {
       path: '',
       vae: { repo_id: '', path: '' },
       default: false,
-      format: 'diffusers',
+      model_format: 'diffusers',
     });
 
   useEffect(() => {
-    if (openModel) {
-      const retrievedModel = pickBy(model_list, (_val, key) => {
-        return isEqual(key, openModel);
-      });
-
-      setEditModelFormValues({
-        name: openModel,
-        description: retrievedModel[openModel]?.description,
-        path:
-          retrievedModel[openModel]?.path &&
-          retrievedModel[openModel]?.path !== 'None'
-            ? retrievedModel[openModel]?.path
-            : '',
-        repo_id:
-          retrievedModel[openModel]?.repo_id &&
-          retrievedModel[openModel]?.repo_id !== 'None'
-            ? retrievedModel[openModel]?.repo_id
-            : '',
-        vae: {
-          repo_id: retrievedModel[openModel]?.vae?.repo_id
-            ? retrievedModel[openModel]?.vae?.repo_id
-            : '',
-          path: retrievedModel[openModel]?.vae?.path
-            ? retrievedModel[openModel]?.vae?.path
-            : '',
-        },
-        default: retrievedModel[openModel]?.default,
-        format: 'diffusers',
-      });
-    }
-  }, [model_list, openModel]);
+    setEditModelFormValues({
+      name: modelToEdit,
+      description: retrievedModel?.description,
+      path:
+        retrievedModel?.path && retrievedModel?.path !== 'None'
+          ? retrievedModel?.path
+          : '',
+      repo_id:
+        retrievedModel?.repo_id && retrievedModel?.repo_id !== 'None'
+          ? retrievedModel?.repo_id
+          : '',
+      vae: {
+        repo_id: retrievedModel?.vae?.repo_id
+          ? retrievedModel?.vae?.repo_id
+          : '',
+        path: retrievedModel?.vae?.path ? retrievedModel?.vae?.path : '',
+      },
+      default: retrievedModel?.default,
+      model_format: 'diffusers',
+    });
+  }, [retrievedModel, modelToEdit]);
 
   const editModelFormSubmitHandler = (
     values: InvokeDiffusersModelConfigProps
@@ -103,11 +79,11 @@ export default function DiffusersModelEdit() {
     dispatch(addNewModel(values));
   };
 
-  return openModel ? (
+  return modelToEdit ? (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex alignItems="center">
         <Text fontSize="lg" fontWeight="bold">
-          {openModel}
+          {retrievedModel.name}
         </Text>
       </Flex>
       <Flex flexDirection="column" overflowY="scroll" paddingInlineEnd={8}>
