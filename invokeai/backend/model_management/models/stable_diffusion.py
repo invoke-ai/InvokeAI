@@ -279,8 +279,8 @@ def _convert_ckpt_and_cache(
             raise Exception(f"Model variant {model_config.variant} not supported for {version}")
 
 
-    weights = app_config.root_dir / model_config.path
-    config_file = app_config.root_dir / model_config.config
+    weights = app_config.root_path / model_config.path
+    config_file = app_config.root_path / model_config.config
     output_path = Path(output_path)
 
     if version == BaseModelType.StableDiffusion1:
