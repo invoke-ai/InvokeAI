@@ -1,8 +1,5 @@
 *
 !invokeai
-!ldm
 !pyproject.toml
 !docker/docker-entrypoint.sh
 !LICENSE
-
-**/__pycache__
