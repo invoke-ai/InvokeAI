@@ -174,7 +174,10 @@ const ControlNet = (props: ControlNetProps) => {
                     aspectRatio: '1/1',
                   }}
                 >
-                  <ControlNetImagePreview controlNet={props.controlNet} />
+                  <ControlNetImagePreview
+                    controlNet={props.controlNet}
+                    height={24}
+                  />
                 </Flex>
               )}
             </Flex>
