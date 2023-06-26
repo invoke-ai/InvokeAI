@@ -9,6 +9,7 @@
     "vite.config.ts",
     "./config/vite.app.config.ts",
     "./config/vite.package.config.ts",
-    "./config/vite.common.config.ts"
+    "./config/vite.common.config.ts",
+    "./config/common.ts"
   ]
 }

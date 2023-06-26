@@ -53,6 +53,7 @@
     ]
   },
   "dependencies": {
+    "@apidevtools/swagger-parser": "^10.1.0",
     "@chakra-ui/anatomy": "^2.1.1",
     "@chakra-ui/icons": "^2.0.19",
     "@chakra-ui/react": "^2.7.1",
@@ -154,6 +155,7 @@
     "vite-plugin-css-injected-by-js": "^3.1.1",
     "vite-plugin-dts": "^2.3.0",
     "vite-plugin-eslint": "^1.8.1",
+    "vite-plugin-node-polyfills": "^0.9.0",
     "vite-tsconfig-paths": "^4.2.0",
     "yarn": "^1.22.19"
   }

@@ -27,7 +27,6 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
             borderWidth: '2px',
             borderColor: 'var(--invokeai-colors-base-800)',
             color: 'var(--invokeai-colors-base-100)',
-            padding: 10,
             paddingRight: 24,
             fontWeight: 600,
             '&:hover': { borderColor: 'var(--invokeai-colors-base-700)' },

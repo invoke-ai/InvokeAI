@@ -64,7 +64,7 @@ const IAIMantineSelect = (props: IAISelectProps) => {
             },
           },
           rightSection: {
-            width: 24,
+            width: 32,
           },
         })}
         {...rest}
