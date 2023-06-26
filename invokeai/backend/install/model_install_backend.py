@@ -399,9 +399,6 @@ def update_autoimport_dir(autodir: Path):
     '''
     Update the "autoimport_dir" option in invokeai.yaml
     '''
-    with open('log.txt','a') as f:
-        print(f'autodir = {autodir}',file=f)
-        
     invokeai_config_path = config.init_file_path
     conf = OmegaConf.load(invokeai_config_path)
     conf.InvokeAI.Paths.autoimport_dir = str(autodir) if autodir else None
