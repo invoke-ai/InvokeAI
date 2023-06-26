@@ -111,8 +111,6 @@ class StableDiffusion1Model(DiffusersModel):
         config: ModelConfigBase,
         base_model: BaseModelType,
     ) -> str:
-        assert model_path == config.path
-
         if isinstance(config, cls.CheckpointConfig):
             return _convert_ckpt_and_cache(
                 version=BaseModelType.StableDiffusion1,
@@ -215,8 +213,6 @@ class StableDiffusion2Model(DiffusersModel):
         config: ModelConfigBase,
         base_model: BaseModelType,
     ) -> str:
-        assert model_path == config.path
-
         if isinstance(config, cls.CheckpointConfig):
             return _convert_ckpt_and_cache(
                 version=BaseModelType.StableDiffusion2,

@@ -416,7 +416,7 @@ class ModelManager(object):
         dst_convert_path = self._get_model_cache_path(model_path)
         model_path = model_class.convert_if_required(
             base_model=base_model,
-            model_path=model_path,
+            model_path=str(model_path), # TODO: refactor str/Path types logic
             output_path=dst_convert_path,
             config=model_config,
         )
@@ -569,7 +569,7 @@ class ModelManager(object):
         if clobber or model_key not in self.models:
             raise Exception(f'Attempt to overwrite existing model definition "{model_key}"')
 
-        old_model = self.models.pop(model_key, False)
+        old_model = self.models.pop(model_key, None)
         if old_model is not None:
             # TODO: if path changed and old_model.path inside models folder should we delete this too?
 
