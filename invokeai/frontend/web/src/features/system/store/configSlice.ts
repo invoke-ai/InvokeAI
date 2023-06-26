@@ -10,6 +10,8 @@ export const initialConfigState: AppConfig = {
   disabledSDFeatures: [],
   canRestoreDeletedImagesFromBin: true,
   sd: {
+    disabledControlNetModels: [],
+    disabledControlNetProcessors: [],
     iterations: {
       initial: 1,
       min: 1,
@@ -57,6 +59,14 @@ export const initialConfigState: AppConfig = {
       inputMax: 1,
       fineStep: 0.01,
       coarseStep: 0.05,
+    },
+    dynamicPrompts: {
+      maxPrompts: {
+        initial: 100,
+        min: 1,
+        sliderMax: 1000,
+        inputMax: 10000,
+      },
     },
   },
 };

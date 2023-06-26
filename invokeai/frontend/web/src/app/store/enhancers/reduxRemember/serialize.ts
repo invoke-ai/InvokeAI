@@ -5,7 +5,6 @@ import { lightboxPersistDenylist } from 'features/lightbox/store/lightboxPersist
 import { nodesPersistDenylist } from 'features/nodes/store/nodesPersistDenylist';
 import { generationPersistDenylist } from 'features/parameters/store/generationPersistDenylist';
 import { postprocessingPersistDenylist } from 'features/parameters/store/postprocessingPersistDenylist';
-import { modelsPersistDenylist } from 'features/system/store/modelsPersistDenylist';
 import { systemPersistDenylist } from 'features/system/store/systemPersistDenylist';
 import { uiPersistDenylist } from 'features/ui/store/uiPersistDenylist';
 import { omit } from 'lodash-es';
@@ -18,7 +17,6 @@ const serializationDenylist: {
   gallery: galleryPersistDenylist,
   generation: generationPersistDenylist,
   lightbox: lightboxPersistDenylist,
-  models: modelsPersistDenylist,
   nodes: nodesPersistDenylist,
   postprocessing: postprocessingPersistDenylist,
   system: systemPersistDenylist,

@@ -26,7 +26,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { MdCancel, MdCancelScheduleSend } from 'react-icons/md';
 
-import { sessionCanceled } from 'services/thunks/session';
+import { sessionCanceled } from 'services/api/thunks/session';
 import { ChevronDownIcon } from '@chakra-ui/icons';
 
 const cancelButtonSelector = createSelector(
@@ -78,7 +78,7 @@ const CancelButton = (
       return;
     }
 
-    dispatch(sessionCanceled({ sessionId }));
+    dispatch(sessionCanceled({ session_id: sessionId }));
   }, [dispatch, sessionId, cancelType]);
 
   const { t } = useTranslation();

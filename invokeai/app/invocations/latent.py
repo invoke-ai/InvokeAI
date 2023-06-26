@@ -1,43 +1,36 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-import random
-import einops
-from typing import Literal, Optional, Union, List
+from contextlib import ExitStack
+from typing import List, Literal, Optional, Union
 
-from compel import Compel
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
+import einops
 
 from pydantic import BaseModel, Field, validator
 import torch
-
-from invokeai.app.invocations.util.choose_model import choose_model
-from invokeai.app.models.image import ImageCategory
-from invokeai.app.util.misc import SEED_MAX, get_random_seed
-
-from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from .controlnet_image_processors import ControlField
-
-from ...backend.model_management.model_manager import ModelManager
-from ...backend.util.devices import choose_torch_device, torch_dtype
-from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
-from ...backend.image_util.seamless import configure_model_padding
-from ...backend.prompting.conditioning import get_uc_and_c_and_ec
-
-from ...backend.stable_diffusion.diffusers_pipeline import ConditioningData, StableDiffusionGeneratorPipeline, image_resized_to_grid_as_tensor
-from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from ...backend.stable_diffusion.diffusers_pipeline import ControlNetData
-
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
-import numpy as np
-from ..services.image_file_storage import ResourceOrigin
-from .baseinvocation import BaseInvocation, InvocationContext
-from .image import ImageField, ImageOutput
-from .compel import ConditioningField
-from ...backend.stable_diffusion import PipelineIntermediateState
+from diffusers import ControlNetModel, DPMSolverMultistepScheduler
+from diffusers.image_processor import VaeImageProcessor
 from diffusers.schedulers import SchedulerMixin as Scheduler
-import diffusers
-from diffusers import DiffusionPipeline, ControlNetModel
 
+from invokeai.app.util.misc import SEED_MAX, get_random_seed
+from invokeai.app.util.step_callback import stable_diffusion_step_callback
+
+from ..models.image import ImageCategory, ImageField, ResourceOrigin
+from ...backend.image_util.seamless import configure_model_padding
+from ...backend.stable_diffusion import PipelineIntermediateState
+from ...backend.stable_diffusion.diffusers_pipeline import (
+    ConditioningData, ControlNetData, StableDiffusionGeneratorPipeline,
+    image_resized_to_grid_as_tensor)
+from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import \
+    PostprocessingSettings
+from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
+from ...backend.util.devices import choose_torch_device, torch_dtype
+from ...backend.model_management.lora import ModelPatcher
+from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
+                             InvocationConfig, InvocationContext)
+from .compel import ConditioningField
+from .controlnet_image_processors import ControlField
+from .image import ImageOutput
+from .model import ModelInfo, UNetField, VaeField
 
 class LatentsField(BaseModel):
     """A latents field used for passing latents between invocations"""
@@ -90,15 +83,22 @@ SAMPLER_NAME_VALUES = Literal[
 ]
 
 
-def get_scheduler(scheduler_name:str, model: StableDiffusionGeneratorPipeline)->Scheduler:
-    scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP['ddim'])
 
-    scheduler_config = model.scheduler.config
+def get_scheduler(
+    context: InvocationContext,
+    scheduler_info: ModelInfo,
+    scheduler_name: str,
+) -> Scheduler:
+    scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP['ddim'])
+    orig_scheduler_info = context.services.model_manager.get_model(**scheduler_info.dict())
+    with orig_scheduler_info as orig_scheduler:
+        scheduler_config = orig_scheduler.config
+        
     if "_backup" in scheduler_config:
         scheduler_config = scheduler_config["_backup"]
     scheduler_config = {**scheduler_config, **scheduler_extra_config, "_backup": scheduler_config}
     scheduler = scheduler_class.from_config(scheduler_config)
-
+    
     # hack copied over from generate.py
     if not hasattr(scheduler, 'uses_inpainting_model'):
         scheduler.uses_inpainting_model = lambda: False
@@ -127,7 +127,6 @@ def get_noise(width:int, height:int, device:torch.device, seed:int = 0, latent_c
     #     )
     #     x = (1 - self.perlin) * x + self.perlin * perlin_noise
     return x
-
 
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""
@@ -174,22 +173,36 @@ class TextToLatentsInvocation(BaseInvocation):
     negative_conditioning: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
     noise: Optional[LatentsField] = Field(description="The noise to use")
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
-    cfg_scale: float = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
+    cfg_scale: Union[float, List[float]] = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
-    model:       str = Field(default="", description="The model to use (currently ignored)")
+    unet: UNetField = Field(default=None, description="UNet submodel")
     control: Union[ControlField, list[ControlField]] = Field(default=None, description="The control to use")
-    # seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
-    # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
+    #seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
+    #seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
+
+    @validator("cfg_scale")
+    def ge_one(cls, v):
+        """validate that all cfg_scale values are >= 1"""
+        if isinstance(v, list):
+            for i in v:
+                if i < 1:
+                    raise ValueError('cfg_scale must be greater than 1')
+        else:
+            if v < 1:
+                raise ValueError('cfg_scale must be greater than 1')
+        return v
 
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["latents", "image"],
+                "tags": ["latents"],
                 "type_hints": {
                   "model": "model",
                   "control": "control",
+                  # "cfg_scale": "float",
+                  "cfg_scale": "number"
                 }
             },
         }
@@ -205,82 +218,83 @@ class TextToLatentsInvocation(BaseInvocation):
             source_node_id=source_node_id,
         )
 
-    def get_model(self, model_manager: ModelManager) -> StableDiffusionGeneratorPipeline:
-        model_info = choose_model(model_manager, self.model)
-        model_name = model_info['model_name']
-        model_hash = model_info['hash']
-        model: StableDiffusionGeneratorPipeline = model_info['model']
-        model.scheduler = get_scheduler(
-            model=model,
-            scheduler_name=self.scheduler
-        )
-
-        # if isinstance(model, DiffusionPipeline):
-        #     for component in [model.unet, model.vae]:
-        #         configure_model_padding(component,
-        #                                 self.seamless,
-        #                                 self.seamless_axes
-        #                                 )
-        # else:
-        #     configure_model_padding(model,
-        #                             self.seamless,
-        #                             self.seamless_axes
-        #                             )
-
-        return model
-
-
-    def get_conditioning_data(self, context: InvocationContext, model: StableDiffusionGeneratorPipeline) -> ConditioningData:
+    def get_conditioning_data(self, context: InvocationContext, scheduler) -> ConditioningData:
         c, extra_conditioning_info = context.services.latents.get(self.positive_conditioning.conditioning_name)
         uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
 
-        compel = Compel(
-            tokenizer=model.tokenizer,
-            text_encoder=model.text_encoder,
-            textual_inversion_manager=model.textual_inversion_manager,
-            dtype_for_device_getter=torch_dtype,
-            truncate_long_prompts=False,
-        )
-        [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
-
         conditioning_data = ConditioningData(
-            uc,
-            c,
-            self.cfg_scale,
-            extra_conditioning_info,
+            unconditioned_embeddings=uc,
+            text_embeddings=c,
+            guidance_scale=self.cfg_scale,
+            extra=extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(
                 threshold=0.0,#threshold,
                 warmup=0.2,#warmup,
                 h_symmetry_time_pct=None,#h_symmetry_time_pct,
                 v_symmetry_time_pct=None#v_symmetry_time_pct,
             ),
-        ).add_scheduler_args_if_applicable(model.scheduler, eta=0.0)#ddim_eta)
+        )
+
+        conditioning_data = conditioning_data.add_scheduler_args_if_applicable(
+            scheduler,
+
+            # for ddim scheduler
+            eta=0.0, #ddim_eta
+
+            # for ancestral and sde schedulers
+            generator=torch.Generator(device=uc.device).manual_seed(0),
+        )
         return conditioning_data
 
-    def prep_control_data(self,
-                          context: InvocationContext,
-                          model: StableDiffusionGeneratorPipeline, # really only need model for dtype and device
-                          control_input: List[ControlField],
-                          latents_shape: List[int],
-                          do_classifier_free_guidance: bool = True,
-                          ) -> List[ControlNetData]:
+    def create_pipeline(self, unet, scheduler) -> StableDiffusionGeneratorPipeline:
+        # TODO:
+        #configure_model_padding(
+        #    unet,
+        #    self.seamless,
+        #    self.seamless_axes,
+        #)
+
+        class FakeVae:
+            class FakeVaeConfig:
+                def __init__(self):
+                    self.block_out_channels = [0]
+            
+            def __init__(self):
+                self.config = FakeVae.FakeVaeConfig()
+
+        return StableDiffusionGeneratorPipeline(
+            vae=FakeVae(), # TODO: oh...
+            text_encoder=None,
+            tokenizer=None,
+            unet=unet,
+            scheduler=scheduler,
+            safety_checker=None,
+            feature_extractor=None,
+            requires_safety_checker=False,
+            precision="float16" if unet.dtype == torch.float16 else "float32",
+        )
+    
+    def prep_control_data(
+        self,
+        context: InvocationContext,
+        model: StableDiffusionGeneratorPipeline, # really only need model for dtype and device
+        control_input: List[ControlField],
+        latents_shape: List[int],
+        do_classifier_free_guidance: bool = True,
+    ) -> List[ControlNetData]:
+
         # assuming fixed dimensional scaling of 8:1 for image:latents
         control_height_resize = latents_shape[2] * 8
         control_width_resize = latents_shape[3] * 8
         if control_input is None:
-            # print("control input is None")
             control_list = None
         elif isinstance(control_input, list) and len(control_input) == 0:
-            # print("control input is empty list")
             control_list = None
         elif isinstance(control_input, ControlField):
-            # print("control input is ControlField")
             control_list = [control_input]
         elif isinstance(control_input, list) and len(control_input) > 0 and isinstance(control_input[0], ControlField):
-            # print("control input is list[ControlField]")
             control_list = control_input
         else:
-            # print("input control is unrecognized:", type(self.control))
             control_list = None
         if (control_list is None):
             control_data = None
@@ -307,8 +321,7 @@ class TextToLatentsInvocation(BaseInvocation):
                                                                     torch_dtype=model.unet.dtype).to(model.device)
                 control_models.append(control_model)
                 control_image_field = control_info.image
-                input_image = context.services.images.get_pil_image(control_image_field.image_origin,
-                                                                    control_image_field.image_name)
+                input_image = context.services.images.get_pil_image(control_image_field.image_name)
                 # self.image.image_type, self.image.image_name
                 # FIXME: still need to test with different widths, heights, devices, dtypes
                 #        and add in batch_size, num_images_per_prompt?
@@ -323,12 +336,15 @@ class TextToLatentsInvocation(BaseInvocation):
                     # num_images_per_prompt=num_images_per_prompt,
                     device=control_model.device,
                     dtype=control_model.dtype,
+                    control_mode=control_info.control_mode,
                 )
                 control_item = ControlNetData(model=control_model,
                                               image_tensor=control_image,
                                               weight=control_info.control_weight,
                                               begin_step_percent=control_info.begin_step_percent,
-                                              end_step_percent=control_info.end_step_percent)
+                                              end_step_percent=control_info.end_step_percent,
+                                              control_mode=control_info.control_mode,
+                                              )
                 control_data.append(control_item)
                 # MultiControlNetModel has been refactored out, just need list[ControlNetData]
         return control_data
@@ -343,22 +359,38 @@ class TextToLatentsInvocation(BaseInvocation):
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, source_node_id, state)
 
-        model = self.get_model(context.services.model_manager)
-        conditioning_data = self.get_conditioning_data(context, model)
+        unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
+        with unet_info as unet,\
+             ExitStack() as stack:
 
-        control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
-                                              latents_shape=noise.shape,
-                                              do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+            scheduler = get_scheduler(
+                context=context,
+                scheduler_info=self.unet.scheduler,
+                scheduler_name=self.scheduler,
+            )
+            
+            pipeline = self.create_pipeline(unet, scheduler)
+            conditioning_data = self.get_conditioning_data(context, scheduler)
 
-        # TODO: Verify the noise is the right size
-        result_latents, result_attention_map_saver = model.latents_from_embeddings(
-            latents=torch.zeros_like(noise, dtype=torch_dtype(model.device)),
-            noise=noise,
-            num_inference_steps=self.steps,
-            conditioning_data=conditioning_data,
-            control_data=control_data,  # list[ControlNetData]
-            callback=step_callback,
-        )
+            loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
+
+            control_data = self.prep_control_data(
+                model=pipeline, context=context, control_input=self.control,
+                latents_shape=noise.shape,
+                # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                do_classifier_free_guidance=True,
+            )
+
+            with ModelPatcher.apply_lora_unet(pipeline.unet, loras):
+                # TODO: Verify the noise is the right size
+                result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
+                    latents=torch.zeros_like(noise, dtype=torch_dtype(unet.device)),
+                    noise=noise,
+                    num_inference_steps=self.steps,
+                    conditioning_data=conditioning_data,
+                    control_data=control_data, # list[ControlNetData]
+                    callback=step_callback,
+                )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
@@ -366,7 +398,6 @@ class TextToLatentsInvocation(BaseInvocation):
         name = f'{context.graph_execution_state_id}__{self.id}'
         context.services.latents.save(name, result_latents)
         return build_latents_output(latents_name=name, latents=result_latents)
-
 
 class LatentsToLatentsInvocation(TextToLatentsInvocation):
     """Generates latents using latents as base image."""
@@ -385,6 +416,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 "type_hints": {
                     "model": "model",
                     "control": "control",
+                    "cfg_scale": "number",
                 }
             },
         }
@@ -400,31 +432,52 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         def step_callback(state: PipelineIntermediateState):
             self.dispatch_progress(context, source_node_id, state)
 
-        model = self.get_model(context.services.model_manager)
-        conditioning_data = self.get_conditioning_data(context, model)
-
-        print("type of control input: ", type(self.control))
-        control_data = self.prep_control_data(model=model, context=context, control_input=self.control,
-                                              latents_shape=noise.shape,
-                                              do_classifier_free_guidance=(self.cfg_scale >= 1.0))
-
-        # TODO: Verify the noise is the right size
-
-        initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
-            latent, device=model.device, dtype=latent.dtype
+        unet_info = context.services.model_manager.get_model(
+            **self.unet.unet.dict(),
         )
 
-        timesteps, _ = model.get_img2img_timesteps(self.steps, self.strength)
+        with unet_info as unet,\
+             ExitStack() as stack:
 
-        result_latents, result_attention_map_saver = model.latents_from_embeddings(
-            latents=initial_latents,
-            timesteps=timesteps,
-            noise=noise,
-            num_inference_steps=self.steps,
-            conditioning_data=conditioning_data,
-            control_data=control_data,  # list[ControlNetData]
-            callback=step_callback
-        )
+            scheduler = get_scheduler(
+                context=context,
+                scheduler_info=self.unet.scheduler,
+                scheduler_name=self.scheduler,
+            )
+
+            pipeline = self.create_pipeline(unet, scheduler)
+            conditioning_data = self.get_conditioning_data(context, scheduler)
+            
+            control_data = self.prep_control_data(
+                model=pipeline, context=context, control_input=self.control,
+                latents_shape=noise.shape,
+                # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                do_classifier_free_guidance=True,
+            )
+
+            # TODO: Verify the noise is the right size
+            initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
+                latent, device=unet.device, dtype=latent.dtype
+            )
+
+            timesteps, _ = pipeline.get_img2img_timesteps(
+                self.steps,
+                self.strength,
+                device=unet.device,
+            )
+
+            loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
+
+            with ModelPatcher.apply_lora_unet(pipeline.unet, loras):
+                result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
+                    latents=initial_latents,
+                    timesteps=timesteps,
+                    noise=noise,
+                    num_inference_steps=self.steps,
+                    conditioning_data=conditioning_data,
+                    control_data=control_data,  # list[ControlNetData]
+                    callback=step_callback
+                )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
@@ -442,16 +495,14 @@ class LatentsToImageInvocation(BaseInvocation):
 
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to generate an image from")
-    model: str = Field(default="", description="The model to use")
+    vae: VaeField = Field(default=None, description="Vae submodel")
+    tiled: bool = Field(default=False, description="Decode latents by overlaping tiles(less memory consumption)")
 
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
                 "tags": ["latents", "image"],
-                "type_hints": {
-                  "model": "model"
-                }
             },
         }
 
@@ -459,40 +510,45 @@ class LatentsToImageInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
-        # TODO: this only really needs the vae
-        model_info = choose_model(context.services.model_manager, self.model)
-        model: StableDiffusionGeneratorPipeline = model_info['model']
+        vae_info = context.services.model_manager.get_model(
+            **self.vae.vae.dict(),
+        )
 
-        with torch.inference_mode():
-            np_image = model.decode_latents(latents)
-            image = model.numpy_to_pil(np_image)[0]
+        with vae_info as vae:
+            if self.tiled or context.services.configuration.tiled_decode:
+                vae.enable_tiling()
+            else:
+                vae.disable_tiling()
 
-            # what happened to metadata?
-            # metadata = context.services.metadata.build_metadata(
-            #     session_id=context.graph_execution_state_id, node=self
-
+            # clear memory as vae decode can request a lot
             torch.cuda.empty_cache()
 
-            # new (post Image service refactor) way of using services to save image
-            #     and gnenerate unique image_name
-            image_dto = context.services.images.create(
-                image=image,
-                image_origin=ResourceOrigin.INTERNAL,
-                image_category=ImageCategory.GENERAL,
-                session_id=context.graph_execution_state_id,
-                node_id=self.id,
-                is_intermediate=self.is_intermediate
-            )
+            with torch.inference_mode():
+                # copied from diffusers pipeline
+                latents = latents / vae.config.scaling_factor
+                image = vae.decode(latents, return_dict=False)[0]
+                image = (image / 2 + 0.5).clamp(0, 1) # denormalize
+                # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
+                np_image = image.cpu().permute(0, 2, 3, 1).float().numpy()
 
-            return ImageOutput(
-                image=ImageField(
-                    image_name=image_dto.image_name,
-                    image_origin=image_dto.image_origin,
-                ),
-                width=image_dto.width,
-                height=image_dto.height,
-            )
+                image = VaeImageProcessor.numpy_to_pil(np_image)[0]
 
+        torch.cuda.empty_cache()
+
+        image_dto = context.services.images.create(
+            image=image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
 
 LATENTS_INTERPOLATION_MODE = Literal[
     "nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"
@@ -568,14 +624,14 @@ class ImageToLatentsInvocation(BaseInvocation):
 
     # Inputs
     image: Union[ImageField, None] = Field(description="The image to encode")
-    model: str = Field(default="", description="The model to use")
+    vae: VaeField = Field(default=None, description="Vae submodel")
+    tiled: bool = Field(default=False, description="Encode latents by overlaping tiles(less memory consumption)")
 
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
                 "tags": ["latents", "image"],
-                "type_hints": {"model": "model"},
             },
         }
 
@@ -584,24 +640,32 @@ class ImageToLatentsInvocation(BaseInvocation):
         # image = context.services.images.get(
         #     self.image.image_type, self.image.image_name
         # )
-        image = context.services.images.get_pil_image(
-            self.image.image_origin, self.image.image_name
+        image = context.services.images.get_pil_image(self.image.image_name)
+
+        #vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
+        vae_info = context.services.model_manager.get_model(
+            **self.vae.vae.dict(),
         )
 
-        # TODO: this only really needs the vae
-        model_info = choose_model(context.services.model_manager, self.model)
-        model: StableDiffusionGeneratorPipeline = model_info["model"]
-
         image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
-
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
-        latents = model.non_noised_latents_from_image(
-            image_tensor,
-            device=model._model_group.device_for(model.unet),
-            dtype=model.unet.dtype,
-        )
+        with vae_info as vae:
+            if self.tiled:
+                vae.enable_tiling()
+            else:
+                vae.disable_tiling()
+
+            # non_noised_latents_from_image
+            image_tensor = image_tensor.to(device=vae.device, dtype=vae.dtype)
+            with torch.inference_mode():
+                image_tensor_dist = vae.encode(image_tensor).latent_dist
+                latents = image_tensor_dist.sample().to(
+                    dtype=vae.dtype
+                )  # FIXME: uses torch.randn. make reproducible!
+
+            latents = 0.18215 * latents
 
         name = f"{context.graph_execution_state_id}__{self.id}"
         # context.services.latents.set(name, latents)

@@ -1,7 +1,7 @@
 import { canvasSavedToGallery } from 'features/canvas/store/actions';
 import { startAppListening } from '..';
 import { log } from 'app/logging/useLogger';
-import { imageUploaded } from 'services/thunks/image';
+import { imageUploaded } from 'services/api/thunks/image';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
 import { imageUpserted } from 'features/gallery/store/imagesSlice';
@@ -30,13 +30,11 @@ export const addCanvasSavedToGalleryListener = () => {
 
       const imageUploadedRequest = dispatch(
         imageUploaded({
-          formData: {
-            file: new File([blob], 'savedCanvas.png', {
-              type: 'image/png',
-            }),
-          },
-          imageCategory: 'general',
-          isIntermediate: false,
+          file: new File([blob], 'savedCanvas.png', {
+            type: 'image/png',
+          }),
+          image_category: 'general',
+          is_intermediate: false,
           postUploadAction: {
             type: 'TOAST_CANVAS_SAVED_TO_GALLERY',
           },

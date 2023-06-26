@@ -14,10 +14,9 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
-import { memo, ReactNode, useCallback, useMemo } from 'react';
+import { memo, MouseEvent, ReactNode, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
-import { GoTextSize } from 'react-icons/go';
 import {
   activeTabIndexSelector,
   activeTabNameSelector,
@@ -33,7 +32,7 @@ import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent
 import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
 import NodesTab from './tabs/Nodes/NodesTab';
-import { FaImage } from 'react-icons/fa';
+import { FaFont, FaImage } from 'react-icons/fa';
 import ResizeHandle from './tabs/ResizeHandle';
 import ImageTab from './tabs/ImageToImage/ImageToImageTab';
 import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
@@ -47,22 +46,22 @@ export interface InvokeTabInfo {
 const tabs: InvokeTabInfo[] = [
   {
     id: 'txt2img',
-    icon: <Icon as={GoTextSize} sx={{ boxSize: 6 }} />,
+    icon: <Icon as={FaFont} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <TextToImageTab />,
   },
   {
     id: 'img2img',
-    icon: <Icon as={FaImage} sx={{ boxSize: 6 }} />,
+    icon: <Icon as={FaImage} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <ImageTab />,
   },
   {
     id: 'unifiedCanvas',
-    icon: <Icon as={MdGridOn} sx={{ boxSize: 6 }} />,
+    icon: <Icon as={MdGridOn} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <UnifiedCanvasTab />,
   },
   {
     id: 'nodes',
-    icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6 }} />,
+    icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <NodesTab />,
   },
 ];
@@ -119,6 +118,12 @@ const InvokeTabs = () => {
     }
   }, [dispatch, activeTabName]);
 
+  const handleClickTab = useCallback((e: MouseEvent<HTMLElement>) => {
+    if (e.target instanceof HTMLElement) {
+      e.target.blur();
+    }
+  }, []);
+
   const tabs = useMemo(
     () =>
       enabledTabs.map((tab) => (
@@ -128,7 +133,7 @@ const InvokeTabs = () => {
           label={String(t(`common.${tab.id}` as ResourceKey))}
           placement="end"
         >
-          <Tab>
+          <Tab onClick={handleClickTab}>
             <VisuallyHidden>
               {String(t(`common.${tab.id}` as ResourceKey))}
             </VisuallyHidden>
@@ -136,7 +141,7 @@ const InvokeTabs = () => {
           </Tab>
         </Tooltip>
       )),
-    [t, enabledTabs]
+    [enabledTabs, t, handleClickTab]
   );
 
   const tabPanels = useMemo(

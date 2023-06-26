@@ -1,10 +1,11 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { Scheduler } from 'app/constants';
+import { SCHEDULER_LABEL_MAP, SCHEDULER_NAMES } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAICustomSelect from 'common/components/IAICustomSelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setScheduler } from 'features/parameters/store/generationSlice';
+import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,43 +13,46 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   [uiSelector, generationSelector],
   (ui, generation) => {
-    // TODO: DPMSolverSinglestepScheduler is fixed in https://github.com/huggingface/diffusers/pull/3413
-    // but we need to wait for the next release before removing this special handling.
-    const allSchedulers = ui.schedulers.filter((scheduler) => {
-      return !['dpmpp_2s'].includes(scheduler);
-    });
+    const { scheduler } = generation;
+    const { favoriteSchedulers: enabledSchedulers } = ui;
+
+    const data = SCHEDULER_NAMES.map((schedulerName) => ({
+      value: schedulerName,
+      label: SCHEDULER_LABEL_MAP[schedulerName as SchedulerParam],
+      group: enabledSchedulers.includes(schedulerName)
+        ? 'Favorites'
+        : undefined,
+    })).sort((a, b) => a.label.localeCompare(b.label));
 
     return {
-      scheduler: generation.scheduler,
-      allSchedulers,
+      scheduler,
+      data,
     };
   },
   defaultSelectorOptions
 );
 
 const ParamScheduler = () => {
-  const { allSchedulers, scheduler } = useAppSelector(selector);
-
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const { scheduler, data } = useAppSelector(selector);
 
   const handleChange = useCallback(
-    (v: string | null | undefined) => {
+    (v: string | null) => {
       if (!v) {
         return;
       }
-      dispatch(setScheduler(v as Scheduler));
+      dispatch(setScheduler(v as SchedulerParam));
     },
     [dispatch]
   );
 
   return (
-    <IAICustomSelect
+    <IAIMantineSelect
       label={t('parameters.scheduler')}
-      selectedItem={scheduler}
-      setSelectedItem={handleChange}
-      items={allSchedulers}
-      withCheckIcon
+      value={scheduler}
+      data={data}
+      onChange={handleChange}
     />
   );
 };

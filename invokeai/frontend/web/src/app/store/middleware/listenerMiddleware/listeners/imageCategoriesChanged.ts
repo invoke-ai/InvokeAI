@@ -1,6 +1,6 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
-import { receivedPageOfImages } from 'services/thunks/image';
+import { receivedPageOfImages } from 'services/api/thunks/image';
 import {
   imageCategoriesChanged,
   selectFilteredImagesAsArray,
@@ -12,12 +12,17 @@ export const addImageCategoriesChangedListener = () => {
   startAppListening({
     actionCreator: imageCategoriesChanged,
     effect: (action, { getState, dispatch }) => {
-      const filteredImagesCount = selectFilteredImagesAsArray(
-        getState()
-      ).length;
+      const state = getState();
+      const filteredImagesCount = selectFilteredImagesAsArray(state).length;
 
       if (!filteredImagesCount) {
-        dispatch(receivedPageOfImages());
+        dispatch(
+          receivedPageOfImages({
+            categories: action.payload,
+            board_id: state.boards.selectedBoardId,
+            is_intermediate: false,
+          })
+        );
       }
     },
   });

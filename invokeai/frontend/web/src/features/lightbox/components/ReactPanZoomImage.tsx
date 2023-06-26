@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { TransformComponent, useTransformContext } from 'react-zoom-pan-pinch';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 
 type ReactPanZoomProps = {
   image: ImageDTO;

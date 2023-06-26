@@ -1,6 +1,6 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
-import { imageMetadataReceived, imageUpdated } from 'services/thunks/image';
+import { imageMetadataReceived, imageUpdated } from 'services/api/thunks/image';
 import { imageUpserted } from 'features/gallery/store/imagesSlice';
 
 const moduleLog = log.child({ namespace: 'image' });
@@ -19,9 +19,8 @@ export const addImageMetadataReceivedFulfilledListener = () => {
       ) {
         dispatch(
           imageUpdated({
-            imageName: image.image_name,
-            imageOrigin: image.image_origin,
-            requestBody: { is_intermediate: false },
+            image_name: image.image_name,
+            is_intermediate: image.is_intermediate,
           })
         );
       } else if (image.is_intermediate) {

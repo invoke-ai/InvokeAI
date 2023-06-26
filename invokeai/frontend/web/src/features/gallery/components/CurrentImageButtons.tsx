@@ -51,9 +51,12 @@ import { useAppToaster } from 'app/components/Toaster';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { DeleteImageContext } from 'app/contexts/DeleteImageContext';
 import { DeleteImageButton } from './DeleteImageModal';
+import { selectImagesById } from '../store/imagesSlice';
+import { RootState } from 'app/store/store';
 
 const currentImageButtonsSelector = createSelector(
   [
+    (state: RootState) => state,
     systemSelector,
     gallerySelector,
     postprocessingSelector,
@@ -61,7 +64,7 @@ const currentImageButtonsSelector = createSelector(
     lightboxSelector,
     activeTabNameSelector,
   ],
-  (system, gallery, postprocessing, ui, lightbox, activeTabName) => {
+  (state, system, gallery, postprocessing, ui, lightbox, activeTabName) => {
     const {
       isProcessing,
       isConnected,
@@ -81,6 +84,8 @@ const currentImageButtonsSelector = createSelector(
       shouldShowProgressInViewer,
     } = ui;
 
+    const imageDTO = selectImagesById(state, gallery.selectedImage ?? '');
+
     const { selectedImage } = gallery;
 
     return {
@@ -97,10 +102,10 @@ const currentImageButtonsSelector = createSelector(
       activeTabName,
       isLightboxOpen,
       shouldHidePreview,
-      image: selectedImage,
-      seed: selectedImage?.metadata?.seed,
-      prompt: selectedImage?.metadata?.positive_conditioning,
-      negativePrompt: selectedImage?.metadata?.negative_conditioning,
+      image: imageDTO,
+      seed: imageDTO?.metadata?.seed,
+      prompt: imageDTO?.metadata?.positive_conditioning,
+      negativePrompt: imageDTO?.metadata?.negative_conditioning,
       shouldShowProgressInViewer,
     };
   },

@@ -1,7 +1,7 @@
 import { stagingAreaImageSaved } from 'features/canvas/store/actions';
 import { startAppListening } from '..';
 import { log } from 'app/logging/useLogger';
-import { imageUpdated } from 'services/thunks/image';
+import { imageUpdated } from 'services/api/thunks/image';
 import { imageUpserted } from 'features/gallery/store/imagesSlice';
 import { addToast } from 'features/system/store/systemSlice';
 
@@ -11,15 +11,12 @@ export const addStagingAreaImageSavedListener = () => {
   startAppListening({
     actionCreator: stagingAreaImageSaved,
     effect: async (action, { dispatch, getState, take }) => {
-      const { image_name, image_origin } = action.payload;
+      const { imageName } = action.payload;
 
       dispatch(
         imageUpdated({
-          imageName: image_name,
-          imageOrigin: image_origin,
-          requestBody: {
-            is_intermediate: false,
-          },
+          image_name: imageName,
+          is_intermediate: false,
         })
       );
 
@@ -27,7 +24,7 @@ export const addStagingAreaImageSavedListener = () => {
         (action) =>
           (imageUpdated.fulfilled.match(action) ||
             imageUpdated.rejected.match(action)) &&
-          action.meta.arg.imageName === image_name
+          action.meta.arg.image_name === imageName
       );
 
       if (imageUpdated.rejected.match(imageUpdatedAction)) {

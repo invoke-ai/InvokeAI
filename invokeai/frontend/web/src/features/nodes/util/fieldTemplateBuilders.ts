@@ -10,6 +10,9 @@ import {
   IntegerInputFieldTemplate,
   LatentsInputFieldTemplate,
   ConditioningInputFieldTemplate,
+  UNetInputFieldTemplate,
+  ClipInputFieldTemplate,
+  VaeInputFieldTemplate,
   ControlInputFieldTemplate,
   StringInputFieldTemplate,
   ModelInputFieldTemplate,
@@ -216,6 +219,51 @@ const buildConditioningInputFieldTemplate = ({
   return template;
 };
 
+const buildUNetInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): UNetInputFieldTemplate => {
+  const template: UNetInputFieldTemplate = {
+    ...baseField,
+    type: 'unet',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildClipInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ClipInputFieldTemplate => {
+  const template: ClipInputFieldTemplate = {
+    ...baseField,
+    type: 'clip',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildVaeInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): VaeInputFieldTemplate => {
+  const template: VaeInputFieldTemplate = {
+    ...baseField,
+    type: 'vae',
+    inputRequirement: 'always',
+    inputKind: 'connection',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildControlInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -301,21 +349,11 @@ export const getFieldType = (
 
   if (typeHints && name in typeHints) {
     rawFieldType = typeHints[name];
-  } else if (!schemaObject.type) {
-    // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
-    if (schemaObject.allOf) {
-      rawFieldType = refObjectToFieldType(
-        schemaObject.allOf![0] as OpenAPIV3.ReferenceObject
-      );
-    } else if (schemaObject.anyOf) {
-      rawFieldType = refObjectToFieldType(
-        schemaObject.anyOf![0] as OpenAPIV3.ReferenceObject
-      );
-    } else if (schemaObject.oneOf) {
-      rawFieldType = refObjectToFieldType(
-        schemaObject.oneOf![0] as OpenAPIV3.ReferenceObject
-      );
-    }
+  } else if (!schemaObject.type && schemaObject.allOf) {
+    // if schemaObject has no type, then it should have one of allOf
+    rawFieldType =
+      (schemaObject.allOf[0] as OpenAPIV3.SchemaObject).title ??
+      'Missing Field Type';
   } else if (schemaObject.enum) {
     rawFieldType = 'enum';
   } else if (schemaObject.type) {
@@ -357,6 +395,15 @@ export const buildInputFieldTemplate = (
   }
   if (['conditioning'].includes(fieldType)) {
     return buildConditioningInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['unet'].includes(fieldType)) {
+    return buildUNetInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['clip'].includes(fieldType)) {
+    return buildClipInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['vae'].includes(fieldType)) {
+    return buildVaeInputFieldTemplate({ schemaObject, baseField });
   }
   if (['control'].includes(fieldType)) {
     return buildControlInputFieldTemplate({ schemaObject, baseField });

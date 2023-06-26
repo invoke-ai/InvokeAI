@@ -175,7 +175,11 @@ const IAICanvasStagingAreaToolbar = () => {
           aria-label={t('unifiedCanvas.saveToGallery')}
           icon={<FaSave />}
           onClick={() =>
-            dispatch(stagingAreaImageSaved(currentStagingAreaImage.image))
+            dispatch(
+              stagingAreaImageSaved({
+                imageName: currentStagingAreaImage.imageName,
+              })
+            )
           }
           colorScheme="accent"
         />

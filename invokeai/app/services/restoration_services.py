@@ -16,13 +16,14 @@ class RestorationServices:
             gfpgan, codeformer, esrgan = None, None, None
             if args.restore or args.esrgan:
                 restoration = Restoration()
-                if args.restore:
+                # TODO: redo for new model structure
+                if False and args.restore:
                     gfpgan, codeformer = restoration.load_face_restore_models(
                         args.gfpgan_model_path
                     )
                 else:
                     logger.info("Face restoration disabled")
-                    if args.esrgan:
+                    if False and args.esrgan:
                         esrgan = restoration.load_esrgan(args.esrgan_bg_tile)
                     else:
                         logger.info("Upscaling disabled")

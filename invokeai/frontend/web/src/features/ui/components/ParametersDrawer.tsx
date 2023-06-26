@@ -1,21 +1,21 @@
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { memo, useMemo } from 'react';
-import { Box, Flex } from '@chakra-ui/react';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
-import OverlayScrollable from './common/OverlayScrollable';
-import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 import {
   activeTabNameSelector,
   uiSelector,
 } from 'features/ui/store/uiSelectors';
 import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
-import ResizableDrawer from './common/ResizableDrawer/ResizableDrawer';
+import { memo, useMemo } from 'react';
+import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 import PinParametersPanelButton from './PinParametersPanelButton';
-import TextToImageTabParameters from './tabs/TextToImage/TextToImageTabParameters';
+import OverlayScrollable from './common/OverlayScrollable';
+import ResizableDrawer from './common/ResizableDrawer/ResizableDrawer';
 import ImageToImageTabParameters from './tabs/ImageToImage/ImageToImageTabParameters';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import TextToImageTabParameters from './tabs/TextToImage/TextToImageTabParameters';
 import UnifiedCanvasParameters from './tabs/UnifiedCanvas/UnifiedCanvasParameters';
 
 const selector = createSelector(

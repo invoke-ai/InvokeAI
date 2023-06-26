@@ -1,12 +1,11 @@
 import { FACETOOL_TYPES } from 'app/constants';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAISelect from 'common/components/IAISelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   FacetoolType,
   setFacetoolType,
 } from 'features/parameters/store/postprocessingSlice';
-import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function FaceRestoreType() {
@@ -17,13 +16,13 @@ export default function FaceRestoreType() {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const handleChangeFacetoolType = (e: ChangeEvent<HTMLSelectElement>) =>
-    dispatch(setFacetoolType(e.target.value as FacetoolType));
+  const handleChangeFacetoolType = (v: string) =>
+    dispatch(setFacetoolType(v as FacetoolType));
 
   return (
-    <IAISelect
+    <IAIMantineSelect
       label={t('parameters.type')}
-      validValues={FACETOOL_TYPES.concat()}
+      data={FACETOOL_TYPES.concat()}
       value={facetoolType}
       onChange={handleChangeFacetoolType}
     />

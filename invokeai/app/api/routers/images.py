@@ -70,27 +70,25 @@ async def upload_image(
         raise HTTPException(status_code=500, detail="Failed to create image")
 
 
-@images_router.delete("/{image_origin}/{image_name}", operation_id="delete_image")
+@images_router.delete("/{image_name}", operation_id="delete_image")
 async def delete_image(
-    image_origin: ResourceOrigin = Path(description="The origin of image to delete"),
     image_name: str = Path(description="The name of the image to delete"),
 ) -> None:
     """Deletes an image"""
 
     try:
-        ApiDependencies.invoker.services.images.delete(image_origin, image_name)
+        ApiDependencies.invoker.services.images.delete(image_name)
     except Exception as e:
         # TODO: Does this need any exception handling at all?
         pass
 
 
 @images_router.patch(
-    "/{image_origin}/{image_name}",
+    "/{image_name}",
     operation_id="update_image",
     response_model=ImageDTO,
 )
 async def update_image(
-    image_origin: ResourceOrigin = Path(description="The origin of image to update"),
     image_name: str = Path(description="The name of the image to update"),
     image_changes: ImageRecordChanges = Body(
         description="The changes to apply to the image"
@@ -99,32 +97,29 @@ async def update_image(
     """Updates an image"""
 
     try:
-        return ApiDependencies.invoker.services.images.update(
-            image_origin, image_name, image_changes
-        )
+        return ApiDependencies.invoker.services.images.update(image_name, image_changes)
     except Exception as e:
         raise HTTPException(status_code=400, detail="Failed to update image")
 
 
 @images_router.get(
-    "/{image_origin}/{image_name}/metadata",
+    "/{image_name}/metadata",
     operation_id="get_image_metadata",
     response_model=ImageDTO,
 )
 async def get_image_metadata(
-    image_origin: ResourceOrigin = Path(description="The origin of image to get"),
     image_name: str = Path(description="The name of image to get"),
 ) -> ImageDTO:
     """Gets an image's metadata"""
 
     try:
-        return ApiDependencies.invoker.services.images.get_dto(image_origin, image_name)
+        return ApiDependencies.invoker.services.images.get_dto(image_name)
     except Exception as e:
         raise HTTPException(status_code=404)
 
 
 @images_router.get(
-    "/{image_origin}/{image_name}",
+    "/{image_name}",
     operation_id="get_image_full",
     response_class=Response,
     responses={
@@ -136,15 +131,12 @@ async def get_image_metadata(
     },
 )
 async def get_image_full(
-    image_origin: ResourceOrigin = Path(
-        description="The type of full-resolution image file to get"
-    ),
     image_name: str = Path(description="The name of full-resolution image file to get"),
 ) -> FileResponse:
     """Gets a full-resolution image file"""
 
     try:
-        path = ApiDependencies.invoker.services.images.get_path(image_origin, image_name)
+        path = ApiDependencies.invoker.services.images.get_path(image_name)
 
         if not ApiDependencies.invoker.services.images.validate_path(path):
             raise HTTPException(status_code=404)
@@ -160,7 +152,7 @@ async def get_image_full(
 
 
 @images_router.get(
-    "/{image_origin}/{image_name}/thumbnail",
+    "/{image_name}/thumbnail",
     operation_id="get_image_thumbnail",
     response_class=Response,
     responses={
@@ -172,14 +164,13 @@ async def get_image_full(
     },
 )
 async def get_image_thumbnail(
-    image_origin: ResourceOrigin = Path(description="The origin of thumbnail image file to get"),
     image_name: str = Path(description="The name of thumbnail image file to get"),
 ) -> FileResponse:
     """Gets a thumbnail image file"""
 
     try:
         path = ApiDependencies.invoker.services.images.get_path(
-            image_origin, image_name, thumbnail=True
+            image_name, thumbnail=True
         )
         if not ApiDependencies.invoker.services.images.validate_path(path):
             raise HTTPException(status_code=404)
@@ -192,25 +183,21 @@ async def get_image_thumbnail(
 
 
 @images_router.get(
-    "/{image_origin}/{image_name}/urls",
+    "/{image_name}/urls",
     operation_id="get_image_urls",
     response_model=ImageUrlsDTO,
 )
 async def get_image_urls(
-    image_origin: ResourceOrigin = Path(description="The origin of the image whose URL to get"),
     image_name: str = Path(description="The name of the image whose URL to get"),
 ) -> ImageUrlsDTO:
     """Gets an image and thumbnail URL"""
 
     try:
-        image_url = ApiDependencies.invoker.services.images.get_url(
-            image_origin, image_name
-        )
+        image_url = ApiDependencies.invoker.services.images.get_url(image_name)
         thumbnail_url = ApiDependencies.invoker.services.images.get_url(
-            image_origin, image_name, thumbnail=True
+            image_name, thumbnail=True
         )
         return ImageUrlsDTO(
-            image_origin=image_origin,
             image_name=image_name,
             image_url=image_url,
             thumbnail_url=thumbnail_url,
@@ -234,6 +221,9 @@ async def list_images_with_metadata(
     is_intermediate: Optional[bool] = Query(
         default=None, description="Whether to list intermediate images"
     ),
+    board_id: Optional[str] = Query(
+        default=None, description="The board id to filter by"
+    ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
 ) -> OffsetPaginatedResults[ImageDTO]:
@@ -245,6 +235,7 @@ async def list_images_with_metadata(
         image_origin,
         categories,
         is_intermediate,
+        board_id,
     )
 
     return image_dtos

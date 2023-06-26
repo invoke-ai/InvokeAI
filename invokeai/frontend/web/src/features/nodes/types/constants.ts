@@ -12,12 +12,17 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   ImageField: 'image',
   LatentsField: 'latents',
   ConditioningField: 'conditioning',
+  UNetField: 'unet',
+  ClipField: 'clip',
+  VaeField: 'vae',
   model: 'model',
   array: 'array',
   item: 'item',
   ColorField: 'color',
   ControlField: 'control',
   control: 'control',
+  cfg_scale: 'float',
+  control_weight: 'float',
 };
 
 const COLOR_TOKEN_VALUE = 500;
@@ -76,6 +81,24 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     colorCssVar: getColorTokenCssVariable('cyan'),
     title: 'Conditioning',
     description: 'Conditioning may be passed between nodes.',
+  },
+  unet: {
+    color: 'red',
+    colorCssVar: getColorTokenCssVariable('red'),
+    title: 'UNet',
+    description: 'UNet submodel.',
+  },
+  clip: {
+    color: 'green',
+    colorCssVar: getColorTokenCssVariable('green'),
+    title: 'Clip',
+    description: 'Tokenizer and text_encoder submodels.',
+  },
+  vae: {
+    color: 'blue',
+    colorCssVar: getColorTokenCssVariable('blue'),
+    title: 'Vae',
+    description: 'Vae submodel.',
   },
   control: {
     color: 'cyan',

@@ -1,9 +1,8 @@
 import { RootState } from 'app/store/store';
-import { forEach, size } from 'lodash-es';
-import { CollectInvocation, ControlNetInvocation } from 'services/api';
+import { filter } from 'lodash-es';
+import { CollectInvocation, ControlNetInvocation } from 'services/api/types';
 import { NonNullableGraph } from '../types/types';
-
-const CONTROL_NET_COLLECT = 'control_net_collect';
+import { CONTROL_NET_COLLECT } from './graphBuilders/constants';
 
 export const addControlNetToLinearGraph = (
   graph: NonNullableGraph,
@@ -12,9 +11,17 @@ export const addControlNetToLinearGraph = (
 ): void => {
   const { isEnabled: isControlNetEnabled, controlNets } = state.controlNet;
 
-  // Add ControlNet
-  if (isControlNetEnabled) {
-    if (size(controlNets) > 1) {
+  const validControlNets = filter(
+    controlNets,
+    (c) =>
+      c.isEnabled &&
+      (Boolean(c.processedControlImage) ||
+        (c.processorType === 'none' && Boolean(c.controlImage)))
+  );
+
+  if (isControlNetEnabled && Boolean(validControlNets.length)) {
+    if (validControlNets.length > 1) {
+      // We have multiple controlnets, add ControlNet collector
       const controlNetIterateNode: CollectInvocation = {
         id: CONTROL_NET_COLLECT,
         type: 'collect',
@@ -29,46 +36,38 @@ export const addControlNetToLinearGraph = (
       });
     }
 
-    forEach(controlNets, (controlNet, index) => {
+    validControlNets.forEach((controlNet) => {
       const {
         controlNetId,
-        isEnabled,
         controlImage,
         processedControlImage,
         beginStepPct,
         endStepPct,
+        controlMode,
         model,
         processorType,
         weight,
       } = controlNet;
-
-      if (!isEnabled) {
-        // Skip disabled ControlNets
-        return;
-      }
 
       const controlNetNode: ControlNetInvocation = {
         id: `control_net_${controlNetId}`,
         type: 'controlnet',
         begin_step_percent: beginStepPct,
         end_step_percent: endStepPct,
+        control_mode: controlMode,
         control_model: model as ControlNetInvocation['control_model'],
         control_weight: weight,
       };
 
       if (processedControlImage && processorType !== 'none') {
         // We've already processed the image in the app, so we can just use the processed image
-        const { image_name, image_origin } = processedControlImage;
         controlNetNode.image = {
-          image_name,
-          image_origin,
+          image_name: processedControlImage,
         };
       } else if (controlImage) {
         // The control image is preprocessed
-        const { image_name, image_origin } = controlImage;
         controlNetNode.image = {
-          image_name,
-          image_origin,
+          image_name: controlImage,
         };
       } else {
         // Skip ControlNets without an unprocessed image - should never happen if everything is working correctly
@@ -77,7 +76,8 @@ export const addControlNetToLinearGraph = (
 
       graph.nodes[controlNetNode.id] = controlNetNode;
 
-      if (size(controlNets) > 1) {
+      if (validControlNets.length > 1) {
+        // if we have multiple controlnets, link to the collector
         graph.edges.push({
           source: { node_id: controlNetNode.id, field: 'control' },
           destination: {
@@ -86,6 +86,7 @@ export const addControlNetToLinearGraph = (
           },
         });
       } else {
+        // otherwise, link directly to the base node
         graph.edges.push({
           source: { node_id: controlNetNode.id, field: 'control' },
           destination: {

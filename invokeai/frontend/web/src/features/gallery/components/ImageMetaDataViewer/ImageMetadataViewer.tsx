@@ -9,15 +9,15 @@ import {
   Tooltip,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import { ImageDTO } from 'services/api';
-import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
+import { ImageDTO } from 'services/api/types';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -93,19 +93,11 @@ type ImageMetadataViewerProps = {
   image: ImageDTO;
 };
 
-// TODO: I don't know if this is needed.
-const memoEqualityCheck = (
-  prev: ImageMetadataViewerProps,
-  next: ImageMetadataViewerProps
-) => prev.image.image_name === next.image.image_name;
-
-// TODO: Show more interesting information in this component.
-
 /**
  * Image metadata viewer overlays currently selected image and provides
  * access to any of its metadata for use in processing.
  */
-const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
+const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   const dispatch = useAppDispatch();
   const {
     recallBothPrompts,
@@ -324,7 +316,7 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
               borderRadius: 'base',
               bg: 'whiteAlpha.500',
               _dark: { bg: 'blackAlpha.500' },
-              w: 'max-content',
+              w: 'full',
             }}
           >
             <pre>{metadataJSON}</pre>
@@ -333,8 +325,6 @@ const ImageMetadataViewer = memo(({ image }: ImageMetadataViewerProps) => {
       </Flex>
     </Flex>
   );
-}, memoEqualityCheck);
+};
 
-ImageMetadataViewer.displayName = 'ImageMetadataViewer';
-
-export default ImageMetadataViewer;
+export default memo(ImageMetadataViewer);

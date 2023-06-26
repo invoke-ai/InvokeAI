@@ -1,4 +1,5 @@
 import {
+  ChakraProps,
   FormControl,
   FormControlProps,
   FormLabel,
@@ -39,6 +40,11 @@ import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 
+const SLIDER_MARK_STYLES: ChakraProps['sx'] = {
+  mt: 1.5,
+  fontSize: '2xs',
+};
+
 export type IAIFullSliderProps = {
   label?: string;
   value: number;
@@ -57,6 +63,7 @@ export type IAIFullSliderProps = {
   hideTooltip?: boolean;
   isCompact?: boolean;
   isDisabled?: boolean;
+  sliderMarks?: number[];
   sliderFormControlProps?: FormControlProps;
   sliderFormLabelProps?: FormLabelProps;
   sliderMarkProps?: Omit<SliderMarkProps, 'value'>;
@@ -88,6 +95,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
     hideTooltip = false,
     isCompact = false,
     isDisabled = false,
+    sliderMarks,
     handleReset,
     sliderFormControlProps,
     sliderFormLabelProps,
@@ -198,14 +206,14 @@ const IAISlider = (props: IAIFullSliderProps) => {
           isDisabled={isDisabled}
           {...rest}
         >
-          {withSliderMarks && (
+          {withSliderMarks && !sliderMarks && (
             <>
               <SliderMark
                 value={min}
                 sx={{
                   insetInlineStart: '0 !important',
                   insetInlineEnd: 'unset !important',
-                  mt: 1.5,
+                  ...SLIDER_MARK_STYLES,
                 }}
                 {...sliderMarkProps}
               >
@@ -216,12 +224,62 @@ const IAISlider = (props: IAIFullSliderProps) => {
                 sx={{
                   insetInlineStart: 'unset !important',
                   insetInlineEnd: '0 !important',
-                  mt: 1.5,
+                  ...SLIDER_MARK_STYLES,
                 }}
                 {...sliderMarkProps}
               >
                 {max}
               </SliderMark>
+            </>
+          )}
+          {withSliderMarks && sliderMarks && (
+            <>
+              {sliderMarks.map((m, i) => {
+                if (i === 0) {
+                  return (
+                    <SliderMark
+                      key={m}
+                      value={m}
+                      sx={{
+                        insetInlineStart: '0 !important',
+                        insetInlineEnd: 'unset !important',
+                        ...SLIDER_MARK_STYLES,
+                      }}
+                      {...sliderMarkProps}
+                    >
+                      {m}
+                    </SliderMark>
+                  );
+                } else if (i === sliderMarks.length - 1) {
+                  return (
+                    <SliderMark
+                      key={m}
+                      value={m}
+                      sx={{
+                        insetInlineStart: 'unset !important',
+                        insetInlineEnd: '0 !important',
+                        ...SLIDER_MARK_STYLES,
+                      }}
+                      {...sliderMarkProps}
+                    >
+                      {m}
+                    </SliderMark>
+                  );
+                } else {
+                  return (
+                    <SliderMark
+                      key={m}
+                      value={m}
+                      sx={{
+                        ...SLIDER_MARK_STYLES,
+                      }}
+                      {...sliderMarkProps}
+                    >
+                      {m}
+                    </SliderMark>
+                  );
+                }
+              })}
             </>
           )}
 

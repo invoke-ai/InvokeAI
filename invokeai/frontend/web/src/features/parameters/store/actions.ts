@@ -1,11 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
-import { isObject } from 'lodash-es';
-import { ImageDTO, ResourceOrigin } from 'services/api';
-
-export type ImageNameAndOrigin = {
-  image_name: string;
-  image_origin: ResourceOrigin;
-};
+import { ImageDTO } from 'services/api/types';
 
 export const initialImageSelected = createAction<ImageDTO | string | undefined>(
   'generation/initialImageSelected'

@@ -15,7 +15,7 @@ pretrained_model_url = (
 
 class CodeFormerRestoration:
     def __init__(
-        self, codeformer_dir="models/codeformer", codeformer_model_path="codeformer.pth"
+        self, codeformer_dir="./models/core/face_restoration/codeformer", codeformer_model_path="codeformer.pth"
     ) -> None:
 
         self.globals = InvokeAIAppConfig.get_config()
@@ -24,7 +24,7 @@ class CodeFormerRestoration:
         self.codeformer_model_exists = self.model_path.exists()
 
         if not self.codeformer_model_exists:
-            logger.error("NOT FOUND: CodeFormer model not found at " + self.model_path)
+            logger.error(f"NOT FOUND: CodeFormer model not found at {self.model_path}")
         sys.path.append(os.path.abspath(codeformer_dir))
 
     def process(self, image, strength, device, seed=None, fidelity=0.75):
@@ -71,7 +71,7 @@ class CodeFormerRestoration:
                 upscale_factor=1,
                 use_parse=True,
                 device=device,
-                model_rootpath = self.globals.root_dir / "gfpgan" / "weights"
+                model_rootpath = self.globals.model_path / 'core/face_restoration/gfpgan/weights'
             )
             face_helper.clean_all()
             face_helper.read_image(bgr_image_array)

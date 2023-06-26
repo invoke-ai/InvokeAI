@@ -1,14 +1,13 @@
 import { startAppListening } from '..';
-import { imageMetadataReceived } from 'services/thunks/image';
+import { imageMetadataReceived } from 'services/api/thunks/image';
 import { log } from 'app/logging/useLogger';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
-import { Graph } from 'services/api';
-import { sessionCreated } from 'services/thunks/session';
+import { Graph } from 'services/api/types';
+import { sessionCreated } from 'services/api/thunks/session';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
 import { socketInvocationComplete } from 'services/events/actions';
-import { isImageOutput } from 'services/types/guards';
+import { isImageOutput } from 'services/api/guards';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { pick } from 'lodash-es';
 
 const moduleLog = log.child({ namespace: 'controlNet' });
 
@@ -34,10 +33,7 @@ export const addControlNetImageProcessedListener = () => {
           [controlNet.processorNode.id]: {
             ...controlNet.processorNode,
             is_intermediate: true,
-            image: pick(controlNet.controlImage, [
-              'image_name',
-              'image_origin',
-            ]),
+            image: { image_name: controlNet.controlImage },
           },
         },
       };
@@ -84,7 +80,7 @@ export const addControlNetImageProcessedListener = () => {
         dispatch(
           controlNetProcessedImageChanged({
             controlNetId,
-            processedControlImage,
+            processedControlImage: processedControlImage.image_name,
           })
         );
       }

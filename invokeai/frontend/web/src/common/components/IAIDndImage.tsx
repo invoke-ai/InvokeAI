@@ -9,18 +9,17 @@ import {
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useCombinedRefs } from '@dnd-kit/utilities';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { IAIImageFallback } from 'common/components/IAIImageFallback';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { AnimatePresence } from 'framer-motion';
-import { ReactElement, SyntheticEvent, useCallback } from 'react';
+import { ReactElement, SyntheticEvent } from 'react';
 import { memo, useRef } from 'react';
-import { FaImage, FaTimes, FaUpload } from 'react-icons/fa';
-import { ImageDTO } from 'services/api';
+import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
+import { ImageDTO } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 import IAIDropOverlay from './IAIDropOverlay';
-import { PostUploadAction, imageUploaded } from 'services/thunks/image';
-import { useDropzone } from 'react-dropzone';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { PostUploadAction } from 'services/api/thunks/image';
+import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 
 type IAIDndImageProps = {
   image: ImageDTO | null | undefined;
@@ -39,6 +38,7 @@ type IAIDndImageProps = {
   minSize?: number;
   postUploadAction?: PostUploadAction;
   imageSx?: ChakraProps['sx'];
+  fitContainer?: boolean;
 };
 
 const IAIDndImage = (props: IAIDndImageProps) => {
@@ -53,13 +53,14 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     isDropDisabled = false,
     isDragDisabled = false,
     isUploadDisabled = false,
-    fallback = <IAIImageFallback />,
+    fallback = <IAIImageLoadingFallback />,
     payloadImage,
     minSize = 24,
     postUploadAction,
     imageSx,
+    fitContainer = false,
   } = props;
-  const dispatch = useAppDispatch();
+
   const dndId = useRef(uuidv4());
 
   const {
@@ -87,31 +88,9 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     disabled: isDragDisabled || !image,
   });
 
-  const handleOnDropAccepted = useCallback(
-    (files: Array<File>) => {
-      const file = files[0];
-      if (!file) {
-        return;
-      }
-
-      dispatch(
-        imageUploaded({
-          formData: { file },
-          imageCategory: 'user',
-          isIntermediate: false,
-          postUploadAction,
-        })
-      );
-    },
-    [dispatch, postUploadAction]
-  );
-
-  const { getRootProps, getInputProps } = useDropzone({
-    accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
-    onDropAccepted: handleOnDropAccepted,
-    noDrag: true,
-    multiple: false,
-    disabled: isUploadDisabled,
+  const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
+    postUploadAction,
+    isDisabled: isUploadDisabled,
   });
 
   const setNodeRef = useCombinedRefs(setDroppableRef, setDraggableRef);
@@ -149,13 +128,13 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           sx={{
             w: 'full',
             h: 'full',
+            position: fitContainer ? 'absolute' : 'relative',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
           <Image
             src={image.image_url}
-            fallbackStrategy="beforeLoadOrError"
             fallback={fallback}
             onError={onError}
             objectFit="contain"
@@ -174,14 +153,13 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                 position: 'absolute',
                 top: 0,
                 right: 0,
-                p: 2,
               }}
             >
               <IAIIconButton
                 size={resetIconSize}
                 tooltip="Reset Image"
                 aria-label="Reset Image"
-                icon={<FaTimes />}
+                icon={<FaUndo />}
                 onClick={onReset}
               />
             </Box>
@@ -206,9 +184,9 @@ const IAIDndImage = (props: IAIDndImageProps) => {
               color: 'base.500',
               ...uploadButtonStyles,
             }}
-            {...getRootProps()}
+            {...getUploadButtonProps()}
           >
-            <input {...getInputProps()} />
+            <input {...getUploadInputProps()} />
             <Icon
               as={isUploadDisabled ? FaImage : FaUpload}
               sx={{

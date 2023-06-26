@@ -11,11 +11,11 @@ import {
   useEffect,
   useState,
 } from 'react';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import { RootState } from 'app/store/store';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { controlNetSelector } from 'features/controlNet/store/controlNetSlice';
-import { nodesSelecter } from 'features/nodes/store/nodesSlice';
+import { nodesSelector } from 'features/nodes/store/nodesSlice';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { some } from 'lodash-es';
 
@@ -30,30 +30,28 @@ export const selectImageUsage = createSelector(
   [
     generationSelector,
     canvasSelector,
-    nodesSelecter,
+    nodesSelector,
     controlNetSelector,
     (state: RootState, image_name?: string) => image_name,
   ],
   (generation, canvas, nodes, controlNet, image_name) => {
-    const isInitialImage = generation.initialImage?.image_name === image_name;
+    const isInitialImage = generation.initialImage?.imageName === image_name;
 
     const isCanvasImage = canvas.layerState.objects.some(
-      (obj) => obj.kind === 'image' && obj.image.image_name === image_name
+      (obj) => obj.kind === 'image' && obj.imageName === image_name
     );
 
     const isNodesImage = nodes.nodes.some((node) => {
       return some(
         node.data.inputs,
-        (input) =>
-          input.type === 'image' && input.value?.image_name === image_name
+        (input) => input.type === 'image' && input.value === image_name
       );
     });
 
     const isControlNetImage = some(
       controlNet.controlNets,
       (c) =>
-        c.controlImage?.image_name === image_name ||
-        c.processedControlImage?.image_name === image_name
+        c.controlImage === image_name || c.processedControlImage === image_name
     );
 
     const imageUsage: ImageUsage = {

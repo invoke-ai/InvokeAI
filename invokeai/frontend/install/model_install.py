@@ -28,7 +28,7 @@ import torch
 from npyscreen import widget
 from omegaconf import OmegaConf
 
-import invokeai.backend.util.logging as logger
+from invokeai.backend.util.logging import InvokeAILogger
 
 from invokeai.backend.install.model_install_backend import (
     Dataset_path,
@@ -939,6 +939,7 @@ def main():
     if opt.full_precision:
         invoke_args.extend(['--precision','float32'])
     config.parse_args(invoke_args)
+    logger = InvokeAILogger().getLogger(config=config)
 
     if not (config.root_dir / config.conf_path.parent).exists():
         logger.info(

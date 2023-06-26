@@ -2,7 +2,7 @@ import { canvasMerged } from 'features/canvas/store/actions';
 import { startAppListening } from '..';
 import { log } from 'app/logging/useLogger';
 import { addToast } from 'features/system/store/systemSlice';
-import { imageUploaded } from 'services/thunks/image';
+import { imageUploaded } from 'services/api/thunks/image';
 import { setMergedCanvas } from 'features/canvas/store/canvasSlice';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { getFullBaseLayerBlob } from 'features/canvas/util/getFullBaseLayerBlob';
@@ -47,13 +47,11 @@ export const addCanvasMergedListener = () => {
 
       const imageUploadedRequest = dispatch(
         imageUploaded({
-          formData: {
-            file: new File([blob], 'mergedCanvas.png', {
-              type: 'image/png',
-            }),
-          },
-          imageCategory: 'general',
-          isIntermediate: true,
+          file: new File([blob], 'mergedCanvas.png', {
+            type: 'image/png',
+          }),
+          image_category: 'general',
+          is_intermediate: true,
           postUploadAction: {
             type: 'TOAST_CANVAS_MERGED',
           },
@@ -68,13 +66,13 @@ export const addCanvasMergedListener = () => {
           uploadedImageAction.meta.requestId === imageUploadedRequest.requestId
       );
 
-      const mergedCanvasImage = payload;
+      const { image_name } = payload;
 
       dispatch(
         setMergedCanvas({
           kind: 'image',
           layer: 'base',
-          image: mergedCanvasImage,
+          imageName: image_name,
           ...baseLayerRect,
         })
       );

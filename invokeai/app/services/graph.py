@@ -65,7 +65,6 @@ from typing import Optional, Union, List, get_args
 def is_union_subtype(t1, t2):
     t1_args = get_args(t1)
     t2_args = get_args(t2)
-    
     if not t1_args:
         # t1 is a single type
         return t1 in t2_args
@@ -86,7 +85,6 @@ def is_list_or_contains_list(t):
         for arg in t_args:
             if get_origin(arg) is list:
                 return True
-                
     return False
 
 
@@ -393,7 +391,7 @@ class Graph(BaseModel):
             from_node = self.get_node(edge.source.node_id)
             to_node = self.get_node(edge.destination.node_id)
         except NodeNotFoundError:
-            raise InvalidEdgeError("One or both nodes don't exist")
+            raise InvalidEdgeError("One or both nodes don't exist: {edge.source.node_id} -> {edge.destination.node_id}")
 
         # Validate that an edge to this node+field doesn't already exist
         input_edges = self._get_input_edges(edge.destination.node_id, edge.destination.field)
@@ -404,41 +402,41 @@ class Graph(BaseModel):
         g = self.nx_graph_flat()
         g.add_edge(edge.source.node_id, edge.destination.node_id)
         if not nx.is_directed_acyclic_graph(g):
-            raise InvalidEdgeError(f'Edge creates a cycle in the graph')
+            raise InvalidEdgeError(f'Edge creates a cycle in the graph: {edge.source.node_id} -> {edge.destination.node_id}')
 
         # Validate that the field types are compatible
         if not are_connections_compatible(
             from_node, edge.source.field, to_node, edge.destination.field
         ):
-            raise InvalidEdgeError(f'Fields are incompatible')
+            raise InvalidEdgeError(f'Fields are incompatible: cannot connect {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
 
         # Validate if iterator output type matches iterator input type (if this edge results in both being set)
         if isinstance(to_node, IterateInvocation) and edge.destination.field == "collection":
             if not self._is_iterator_connection_valid(
                 edge.destination.node_id, new_input=edge.source
             ):
-                raise InvalidEdgeError(f'Iterator input type does not match iterator output type')
+                raise InvalidEdgeError(f'Iterator input type does not match iterator output type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
 
         # Validate if iterator input type matches output type (if this edge results in both being set)
         if isinstance(from_node, IterateInvocation) and edge.source.field == "item":
             if not self._is_iterator_connection_valid(
                 edge.source.node_id, new_output=edge.destination
             ):
-                raise InvalidEdgeError(f'Iterator output type does not match iterator input type')
+                raise InvalidEdgeError(f'Iterator output type does not match iterator input type:, {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
 
         # Validate if collector input type matches output type (if this edge results in both being set)
         if isinstance(to_node, CollectInvocation) and edge.destination.field == "item":
             if not self._is_collector_connection_valid(
                 edge.destination.node_id, new_input=edge.source
             ):
-                raise InvalidEdgeError(f'Collector output type does not match collector input type')
+                raise InvalidEdgeError(f'Collector output type does not match collector input type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
 
         # Validate if collector output type matches input type (if this edge results in both being set)
         if isinstance(from_node, CollectInvocation) and edge.source.field == "collection":
             if not self._is_collector_connection_valid(
                 edge.source.node_id, new_output=edge.destination
             ):
-                raise InvalidEdgeError(f'Collector input type does not match collector output type')
+                raise InvalidEdgeError(f'Collector input type does not match collector output type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
 
 
     def has_node(self, node_path: str) -> bool:
@@ -859,11 +857,9 @@ class GraphExecutionState(BaseModel):
         if next_node is None:
             prepared_id = self._prepare()
 
-            # TODO: prepare multiple nodes at once?
-            # while prepared_id is not None and not isinstance(self.graph.nodes[prepared_id], IterateInvocation):
-            #     prepared_id = self._prepare()
-
-            if prepared_id is not None:
+            # Prepare as many nodes as we can
+            while prepared_id is not None:
+                prepared_id = self._prepare()
                 next_node = self._get_next_node()
 
         # Get values from edges
@@ -1010,14 +1006,30 @@ class GraphExecutionState(BaseModel):
         # Get flattened source graph
         g = self.graph.nx_graph_flat()
 
-        # Find next unprepared node where all source nodes are executed
+        # Find next node that:
+        # - was not already prepared
+        # - is not an iterate node whose inputs have not been executed
+        # - does not have an unexecuted iterate ancestor
         sorted_nodes = nx.topological_sort(g)
         next_node_id = next(
             (
                 n
                 for n in sorted_nodes
+                # exclude nodes that have already been prepared
                 if n not in self.source_prepared_mapping
-                and all((e[0] in self.executed for e in g.in_edges(n)))
+                # exclude iterate nodes whose inputs have not been executed
+                and not (
+                    isinstance(self.graph.get_node(n), IterateInvocation)  # `n` is an iterate node...
+                    and not all((e[0] in self.executed for e in g.in_edges(n)))  # ...that has unexecuted inputs
+                )
+                # exclude nodes who have unexecuted iterate ancestors
+                and not any(
+                    (
+                        isinstance(self.graph.get_node(a), IterateInvocation)  # `a` is an iterate ancestor of `n`...
+                        and a not in self.executed  # ...that is not executed
+                        for a in nx.ancestors(g, n)  # for all ancestors `a` of node `n`
+                    )
+                )
             ),
             None,
         )
@@ -1114,9 +1126,22 @@ class GraphExecutionState(BaseModel):
         )
 
     def _get_next_node(self) -> Optional[BaseInvocation]:
+        """Gets the deepest node that is ready to be executed"""
         g = self.execution_graph.nx_graph()
-        sorted_nodes = nx.topological_sort(g)
-        next_node = next((n for n in sorted_nodes if n not in self.executed), None)
+
+        # Depth-first search with pre-order traversal is a depth-first topological sort
+        sorted_nodes = nx.dfs_preorder_nodes(g)
+        
+        next_node = next(
+            (
+                n
+                for n in sorted_nodes
+                if n not in self.executed # the node must not already be executed...
+                and all((e[0] in self.executed for e in g.in_edges(n))) # ...and all its inputs must be executed
+            ),
+            None,
+        )
+
         if next_node is None:
             return None
 

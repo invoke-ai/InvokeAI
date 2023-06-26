@@ -4,7 +4,6 @@ from inspect import signature
 
 import uvicorn
 
-from invokeai.backend.util.logging import InvokeAILogger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -15,15 +14,19 @@ from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pathlib import Path
 from pydantic.schema import schema
 
+#This should come early so that modules can log their initialization properly
+from .services.config import InvokeAIAppConfig
+from ..backend.util.logging import InvokeAILogger
+app_config = InvokeAIAppConfig.get_config()
+app_config.parse_args()
+logger = InvokeAILogger.getLogger(config=app_config)
+
 import invokeai.frontend.web as web_dir
 
 from .api.dependencies import ApiDependencies
-from .api.routers import sessions, models, images
+from .api.routers import sessions, models, images, boards, board_images
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
-from .services.config import InvokeAIAppConfig
-
-logger = InvokeAILogger.getLogger()
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
@@ -40,11 +43,6 @@ app.add_middleware(
 )
 
 socket_io = SocketIO(app)
-
-# initialize config
-# this is a module global
-app_config = InvokeAIAppConfig.get_config()
-app_config.parse_args()
 
 # Add startup event to load dependencies
 @app.on_event("startup")
@@ -79,6 +77,10 @@ app.include_router(sessions.session_router, prefix="/api")
 app.include_router(models.models_router, prefix="/api")
 
 app.include_router(images.images_router, prefix="/api")
+
+app.include_router(boards.boards_router, prefix="/api")
+
+app.include_router(board_images.board_images_router, prefix="/api")
 
 # Build a custom OpenAPI to include all outputs
 # TODO: can outputs be included on metadata of invocation schemas somehow?
@@ -117,6 +119,22 @@ def custom_openapi():
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
 
         invoker_schema["output"] = outputs_ref
+
+    from invokeai.backend.model_management.models import get_model_config_enums
+    for model_config_format_enum in set(get_model_config_enums()):
+        name = model_config_format_enum.__qualname__
+
+        if name in openapi_schema["components"]["schemas"]:
+            # print(f"Config with name {name} already defined")
+            continue
+
+        # "BaseModelType":{"title":"BaseModelType","description":"An enumeration.","enum":["sd-1","sd-2"],"type":"string"}
+        openapi_schema["components"]["schemas"][name] = dict(
+            title=name,
+            description="An enumeration.",
+            type="string",
+            enum=list(v.value for v in model_config_format_enum),
+        )
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema

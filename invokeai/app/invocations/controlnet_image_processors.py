@@ -1,11 +1,12 @@
 # InvokeAI nodes for ControlNet image preprocessors
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
+from builtins import float, bool
 
 import numpy as np
 from typing import Literal, Optional, Union, List
 from PIL import Image, ImageFilter, ImageOps
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from ..models.image import ImageField, ImageCategory, ResourceOrigin
 from .baseinvocation import (
@@ -14,6 +15,7 @@ from .baseinvocation import (
     InvocationContext,
     InvocationConfig,
 )
+
 from controlnet_aux import (
     CannyDetector,
     HEDdetector,
@@ -92,19 +94,39 @@ CONTROLNET_DEFAULT_MODELS = [
 ]
 
 CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
+CONTROLNET_MODE_VALUES = Literal[tuple(["balanced", "more_prompt", "more_control", "unbalanced"])]
 
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="The control image")
     control_model: Optional[str] = Field(default=None, description="The ControlNet model to use")
-    control_weight: Optional[float] = Field(default=1, description="The weight given to the ControlNet")
+    # control_weight: Optional[float] = Field(default=1, description="weight given to controlnet")
+    control_weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(default=0, ge=0, le=1,
-                                                description="When the ControlNet is first applied (% of total steps)")
+                                      description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
+    control_mode: CONTROLNET_MODE_VALUES = Field(default="balanced", description="The contorl mode to use")
 
+    @validator("control_weight")
+    def abs_le_one(cls, v):
+        """validate that all abs(values) are <=1"""
+        if isinstance(v, list):
+            for i in v:
+                if abs(i) > 1:
+                    raise ValueError('all abs(control_weight) must be <= 1')
+        else:
+            if abs(v) > 1:
+                raise ValueError('abs(control_weight) must be <= 1')
+        return v
     class Config:
         schema_extra = {
-            "required": ["image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"]
+            "required": ["image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"],
+            "ui": {
+                "type_hints": {
+                    "control_weight": "float",
+                    # "control_weight": "number",
+                }
+            }
         }
 
 
@@ -112,7 +134,7 @@ class ControlOutput(BaseInvocationOutput):
     """node output for ControlNet info"""
     # fmt: off
     type: Literal["control_output"] = "control_output"
-    control: ControlField = Field(default=None, description="The output control image")
+    control: ControlField = Field(default=None, description="The control info")
     # fmt: on
 
 
@@ -123,18 +145,30 @@ class ControlNetInvocation(BaseInvocation):
     # Inputs
     image: ImageField = Field(default=None, description="The control image")
     control_model: CONTROLNET_NAME_VALUES = Field(default="lllyasviel/sd-controlnet-canny",
-                                                  description="The ControlNet model to use")
-    control_weight: float = Field(default=1.0, ge=0, le=1, description="The weight given to the ControlNet")
-    # TODO: add support in backend core for begin_step_percent, end_step_percent, guess_mode
+                                                  description="control model used")
+    control_weight: Union[float, List[float]] = Field(default=1.0, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(default=0, ge=0, le=1,
-                                        description="When the ControlNet is first applied (% of total steps)")
+                                      description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
-                                      description="When the ControlNet is last applied (% of total steps)")
+                                    description="When the ControlNet is last applied (% of total steps)")
+    control_mode: CONTROLNET_MODE_VALUES = Field(default="balanced", description="The control mode used")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["latents"],
+                "type_hints": {
+                  "model": "model",
+                  "control": "control",
+                  # "cfg_scale": "float",
+                  "cfg_scale": "number",
+                  "control_weight": "float",
+                }
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ControlOutput:
-
         return ControlOutput(
             control=ControlField(
                 image=self.image,
@@ -142,6 +176,7 @@ class ControlNetInvocation(BaseInvocation):
                 control_weight=self.control_weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
+                control_mode=self.control_mode,
             ),
         )
 
@@ -161,10 +196,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         return image
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-
-        raw_image = context.services.images.get_pil_image(
-            self.image.image_origin, self.image.image_name
-        )
+        raw_image = context.services.images.get_pil_image(self.image.image_name)
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(raw_image)
 
@@ -185,10 +217,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         )
 
         """Builds an ImageOutput and its ImageField"""
-        processed_image_field = ImageField(
-            image_name=image_dto.image_name,
-            image_origin=image_dto.image_origin,
-        )
+        processed_image_field = ImageField(image_name=image_dto.image_name)
         return ImageOutput(
             image=processed_image_field,
             # width=processed_image.width,
