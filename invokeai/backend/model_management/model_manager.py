@@ -566,7 +566,7 @@ class ModelManager(object):
         model_config = model_class.create_config(**model_attributes)
         model_key = self.create_key(model_name, base_model, model_type)
 
-        if clobber or model_key not in self.models:
+        if  model_key in self.models and not clobber:
             raise Exception(f'Attempt to overwrite existing model definition "{model_key}"')
 
         old_model = self.models.pop(model_key, None)
@@ -706,7 +706,7 @@ class ModelManager(object):
         if (new_models_found or imported_models) and self.config_path:
             self.commit()
 
-    def autoimport(self):
+    def autoimport(self)->set[Path]:
         '''
         Scan the autoimport directory (if defined) and import new models, delete defunct models.
         '''
