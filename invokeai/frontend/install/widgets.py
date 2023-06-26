@@ -42,6 +42,18 @@ def set_terminal_size(columns: int, lines: int, launch_command: str=None):
     elif OS in ["Darwin", "Linux"]:
         _set_terminal_size_unix(width,height)
 
+    # check whether it worked....
+    ts = get_terminal_size()
+    pause = False
+    if ts.columns < columns:
+        print('\033[1mThis window is too narrow for the user interface. Please make it wider.\033[0m')
+        pause = True
+    if ts.lines < lines:
+        print('\033[1mThis window is too short for the user interface. Please make it taller.\033[0m')
+        pause = True
+    if pause:
+        input('Press any key to continue..')
+
 def _set_terminal_size_powershell(width: int, height: int):
     script=f'''
 $pshost = get-host
