@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { ReactElement } from 'react';
 
+import { useListModelsQuery } from 'services/api/endpoints/models';
 import CheckpointModelEdit from './CheckpointModelEdit';
 import DiffusersModelEdit from './DiffusersModelEdit';
 import ModelList from './ModelList';
@@ -34,9 +35,9 @@ export default function ModelManagerModal({
     onClose: onModelManagerModalClose,
   } = useDisclosure();
 
-  const model_list = useAppSelector(
-    (state: RootState) => state.system.model_list
-  );
+  const { data: pipelineModels } = useListModelsQuery({
+    model_type: 'pipeline',
+  });
 
   const openModel = useAppSelector(
     (state: RootState) => state.system.openModel
@@ -61,7 +62,10 @@ export default function ModelManagerModal({
           <ModalBody>
             <Flex width="100%" columnGap={8}>
               <ModelList />
-              {openModel && model_list[openModel]['format'] === 'diffusers' ? (
+              {openModel &&
+              pipelineModels &&
+              pipelineModels['entities'][openModel]['model_format'] ===
+                'diffusers' ? (
                 <DiffusersModelEdit />
               ) : (
                 <CheckpointModelEdit />

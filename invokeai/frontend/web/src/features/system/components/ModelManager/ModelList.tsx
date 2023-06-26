@@ -1,36 +1,16 @@
 import { Box, Flex, Heading, Spacer, Spinner, Text } from '@chakra-ui/react';
-import IAIInput from 'common/components/IAIInput';
 import IAIButton from 'common/components/IAIButton';
+import IAIInput from 'common/components/IAIInput';
 
 import AddModel from './AddModel';
-import ModelListItem from './ModelListItem';
 import MergeModels from './MergeModels';
+import ModelListItem from './ModelListItem';
 
-import { useAppSelector } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
 
-import { createSelector } from '@reduxjs/toolkit';
-import { systemSelector } from 'features/system/store/systemSelectors';
-import type { SystemState } from 'features/system/store/systemSlice';
-import { isEqual, map } from 'lodash-es';
-
-import React, { useMemo, useState, useTransition } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
-
-const modelListSelector = createSelector(
-  systemSelector,
-  (system: SystemState) => {
-    const models = map(system.model_list, (model, key) => {
-      return { name: key, ...model };
-    });
-    return models;
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+import React, { useMemo, useState, useTransition } from 'react';
+import { useListModelsQuery } from 'services/api/endpoints/models';
 
 function ModelFilterButton({
   label,
@@ -58,7 +38,9 @@ function ModelFilterButton({
 }
 
 const ModelList = () => {
-  const models = useAppSelector(modelListSelector);
+  const { data: pipelineModels } = useListModelsQuery({
+    model_type: 'pipeline',
+  });
 
   const [renderModelList, setRenderModelList] = React.useState<boolean>(false);
 
@@ -90,43 +72,49 @@ const ModelList = () => {
     const filteredModelListItemsToRender: ReactNode[] = [];
     const localFilteredModelListItemsToRender: ReactNode[] = [];
 
-    models.forEach((model, i) => {
-      if (model.name.toLowerCase().includes(searchText.toLowerCase())) {
+    if (!pipelineModels) return;
+
+    const modelList = pipelineModels.entities;
+
+    Object.keys(modelList).forEach((model, i) => {
+      if (
+        modelList[model].name.toLowerCase().includes(searchText.toLowerCase())
+      ) {
         filteredModelListItemsToRender.push(
           <ModelListItem
             key={i}
-            name={model.name}
-            status={model.status}
-            description={model.description}
+            modelKey={model}
+            name={modelList[model].name}
+            description={modelList[model].description}
           />
         );
-        if (model.format === isSelectedFilter) {
+        if (modelList[model]?.model_format === isSelectedFilter) {
           localFilteredModelListItemsToRender.push(
             <ModelListItem
               key={i}
-              name={model.name}
-              status={model.status}
-              description={model.description}
+              modelKey={model}
+              name={modelList[model].name}
+              description={modelList[model].description}
             />
           );
         }
       }
-      if (model.format !== 'diffusers') {
+      if (modelList[model]?.model_format !== 'diffusers') {
         ckptModelListItemsToRender.push(
           <ModelListItem
             key={i}
-            name={model.name}
-            status={model.status}
-            description={model.description}
+            modelKey={model}
+            name={modelList[model].name}
+            description={modelList[model].description}
           />
         );
       } else {
         diffusersModelListItemsToRender.push(
           <ModelListItem
             key={i}
-            name={model.name}
-            status={model.status}
-            description={model.description}
+            modelKey={model}
+            name={modelList[model].name}
+            description={modelList[model].description}
           />
         );
       }
@@ -148,6 +136,23 @@ const ModelList = () => {
                   fontWeight: '500',
                   py: 2,
                   px: 4,
+                  mb: 4,
+                  borderRadius: 'base',
+                  width: 'max-content',
+                  fontSize: 'sm',
+                  bg: 'base.750',
+                }}
+              >
+                {t('modelManager.diffusersModels')}
+              </Text>
+              {diffusersModelListItemsToRender}
+            </Box>
+            <Box>
+              <Text
+                sx={{
+                  fontWeight: '500',
+                  py: 2,
+                  px: 4,
                   my: 4,
                   mx: 0,
                   borderRadius: 'base',
@@ -160,30 +165,7 @@ const ModelList = () => {
               </Text>
               {ckptModelListItemsToRender}
             </Box>
-            <Box>
-              <Text
-                sx={{
-                  fontWeight: '500',
-                  py: 2,
-                  px: 4,
-                  mb: 4,
-                  borderRadius: 'base',
-                  width: 'max-content',
-                  fontSize: 'sm',
-                  bg: 'base.750',
-                }}
-              >
-                {t('modelManager.diffusersModels')}
-              </Text>
-              {diffusersModelListItemsToRender}
-            </Box>
           </>
-        )}
-
-        {isSelectedFilter === 'ckpt' && (
-          <Flex flexDirection="column" marginTop={4}>
-            {ckptModelListItemsToRender}
-          </Flex>
         )}
 
         {isSelectedFilter === 'diffusers' && (
@@ -191,9 +173,15 @@ const ModelList = () => {
             {diffusersModelListItemsToRender}
           </Flex>
         )}
+
+        {isSelectedFilter === 'ckpt' && (
+          <Flex flexDirection="column" marginTop={4}>
+            {ckptModelListItemsToRender}
+          </Flex>
+        )}
       </Flex>
     );
-  }, [models, searchText, t, isSelectedFilter]);
+  }, [pipelineModels, searchText, t, isSelectedFilter]);
 
   return (
     <Flex flexDirection="column" rowGap={4} width="50%" minWidth="50%">
@@ -211,7 +199,7 @@ const ModelList = () => {
 
       <Flex
         flexDirection="column"
-        gap={1}
+        gap={4}
         maxHeight={window.innerHeight - 240}
         overflow="scroll"
         paddingInlineEnd={4}
@@ -223,14 +211,14 @@ const ModelList = () => {
             isActive={isSelectedFilter === 'all'}
           />
           <ModelFilterButton
-            label={t('modelManager.checkpointModels')}
-            onClick={() => setIsSelectedFilter('ckpt')}
-            isActive={isSelectedFilter === 'ckpt'}
-          />
-          <ModelFilterButton
             label={t('modelManager.diffusersModels')}
             onClick={() => setIsSelectedFilter('diffusers')}
             isActive={isSelectedFilter === 'diffusers'}
+          />
+          <ModelFilterButton
+            label={t('modelManager.checkpointModels')}
+            onClick={() => setIsSelectedFilter('ckpt')}
+            isActive={isSelectedFilter === 'ckpt'}
           />
         </Flex>
 

@@ -1,6 +1,6 @@
 import { DeleteIcon, EditIcon } from '@chakra-ui/icons';
 import { Box, Button, Flex, Spacer, Text, Tooltip } from '@chakra-ui/react';
-import { ModelStatus } from 'app/types/invokeai';
+
 // import { deleteModel, requestModelChange } from 'app/socketio/actions';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -10,9 +10,9 @@ import { setOpenModel } from 'features/system/store/systemSlice';
 import { useTranslation } from 'react-i18next';
 
 type ModelListItemProps = {
+  modelKey: string;
   name: string;
-  status: ModelStatus;
-  description: string;
+  description: string | undefined;
 };
 
 export default function ModelListItem(props: ModelListItemProps) {
@@ -28,18 +28,18 @@ export default function ModelListItem(props: ModelListItemProps) {
 
   const dispatch = useAppDispatch();
 
-  const { name, status, description } = props;
+  const { modelKey, name, description } = props;
 
   const handleChangeModel = () => {
-    dispatch(requestModelChange(name));
+    dispatch(requestModelChange(modelKey));
   };
 
   const openModelHandler = () => {
-    dispatch(setOpenModel(name));
+    dispatch(setOpenModel(modelKey));
   };
 
   const handleModelDelete = () => {
-    dispatch(deleteModel(name));
+    dispatch(deleteModel(modelKey));
     dispatch(setOpenModel(null));
   };
 
@@ -60,7 +60,7 @@ export default function ModelListItem(props: ModelListItemProps) {
       p={2}
       borderRadius="base"
       sx={
-        name === openModel
+        modelKey === openModel
           ? {
               bg: 'accent.750',
               _hover: {
@@ -81,7 +81,6 @@ export default function ModelListItem(props: ModelListItemProps) {
       </Box>
       <Spacer onClick={openModelHandler} cursor="pointer" />
       <Flex gap={2} alignItems="center">
-        <Text color={statusTextColor()}>{status}</Text>
         <Button
           size="sm"
           onClick={handleChangeModel}
