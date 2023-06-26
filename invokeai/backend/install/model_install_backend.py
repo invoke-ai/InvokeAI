@@ -411,7 +411,6 @@ def update_autoimport_dir(autodir: Path):
         outfile.write(yaml)
     tmpfile.replace(invokeai_config_path)
 
-
 # -------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
     default = "y" if default_yes else "n"

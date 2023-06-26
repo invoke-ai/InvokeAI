@@ -578,14 +578,14 @@ class StderrToMessage():
 # --------------------------------------------------------
 def ask_user_for_prediction_type(model_path: Path,
                                  tui_conn: Connection=None
-                                 )->Path:
+                                 )->SchedulerPredictionType:
     if tui_conn:
         logger.debug('Waiting for user response...')
         return _ask_user_for_pt_tui(model_path, tui_conn)        
     else:
         return _ask_user_for_pt_cmdline(model_path)
 
-def _ask_user_for_pt_cmdline(model_path):
+def _ask_user_for_pt_cmdline(model_path: Path)->SchedulerPredictionType:
     choices = [SchedulerPredictionType.Epsilon, SchedulerPredictionType.VPrediction, None]
     print(
 f"""
@@ -608,7 +608,7 @@ Please select the type of the V2 checkpoint named {model_path.name}:
             return
     return choice
         
-def _ask_user_for_pt_tui(model_path: Path, tui_conn: Connection)->Path:
+def _ask_user_for_pt_tui(model_path: Path, tui_conn: Connection)->SchedulerPredictionType:
     try:
         tui_conn.send_bytes(f'*need v2 config for:{model_path}'.encode('utf-8'))
         # note that we don't do any status checking here

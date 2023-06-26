@@ -712,8 +712,12 @@ class ModelManager(object):
         '''
         # avoid circular import
         from invokeai.backend.install.model_install_backend import ModelInstall
+        from invokeai.frontend.install.model_install import ask_user_for_prediction_type
+        
         installer = ModelInstall(config = self.app_config,
-                                 model_manager = self)
+                                 model_manager = self,
+                                 prediction_type_helper = ask_user_for_prediction_type,
+                                 )
         
         installed = set()
         if not self.app_config.autoimport_dir:

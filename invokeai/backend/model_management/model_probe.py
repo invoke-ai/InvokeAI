@@ -255,7 +255,8 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
                     return SchedulerPredictionType.Epsilon
                 elif checkpoint["global_step"] == 110000:
                     return SchedulerPredictionType.VPrediction
-            if self.checkpoint_path and self.helper:
+            if self.checkpoint_path and self.helper \
+               and not self.checkpoint_path.with_suffix('.yaml').exists():  # if a .yaml config file exists, then this step not needed
                 return self.helper(self.checkpoint_path)
             else:
                 return None
