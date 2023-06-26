@@ -82,6 +82,7 @@ import {
   addImageRemovedFromBoardFulfilledListener,
   addImageRemovedFromBoardRejectedListener,
 } from './listeners/imageRemovedFromBoard';
+import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -205,3 +206,6 @@ addImageAddedToBoardRejectedListener();
 addImageRemovedFromBoardFulfilledListener();
 addImageRemovedFromBoardRejectedListener();
 addBoardIdSelectedListener();
+
+// Node schemas
+addReceivedOpenAPISchemaListener();
