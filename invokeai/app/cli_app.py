@@ -18,8 +18,17 @@ config = InvokeAIAppConfig.get_config()
 config.parse_args()
 logger = InvokeAILogger().getLogger(config=config)
 
+from invokeai.app.services.board_image_record_storage import (
+    SqliteBoardImageRecordStorage,
+)
+from invokeai.app.services.board_images import (
+    BoardImagesService,
+    BoardImagesServiceDependencies,
+)
+from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
+from invokeai.app.services.boards import BoardService, BoardServiceDependencies
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
-from invokeai.app.services.images import ImageService
+from invokeai.app.services.images import ImageService, ImageServiceDependencies
 from invokeai.app.services.metadata import CoreMetadataService
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
@@ -230,21 +239,49 @@ def invoke_cli():
     image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
     names = SimpleNameService()
 
-    images = ImageService(
-        image_record_storage=image_record_storage,
-        image_file_storage=image_file_storage,
-        metadata=metadata,
-        url=urls,
-        logger=logger,
-        names=names,
-        graph_execution_manager=graph_execution_manager,
+    board_record_storage = SqliteBoardRecordStorage(db_location)
+    board_image_record_storage = SqliteBoardImageRecordStorage(db_location)
+
+    boards = BoardService(
+        services=BoardServiceDependencies(
+            board_image_record_storage=board_image_record_storage,
+            board_record_storage=board_record_storage,
+            image_record_storage=image_record_storage,
+            url=urls,
+            logger=logger,
+        )
     )
 
+    board_images = BoardImagesService(
+        services=BoardImagesServiceDependencies(
+            board_image_record_storage=board_image_record_storage,
+            board_record_storage=board_record_storage,
+            image_record_storage=image_record_storage,
+            url=urls,
+            logger=logger,
+        )
+    )
+
+    images = ImageService(
+        services=ImageServiceDependencies(
+            board_image_record_storage=board_image_record_storage,
+            image_record_storage=image_record_storage,
+            image_file_storage=image_file_storage,
+            metadata=metadata,
+            url=urls,
+            logger=logger,
+            names=names,
+            graph_execution_manager=graph_execution_manager,
+        )
+    )
+        
     services = InvocationServices(
         model_manager=model_manager,
         events=events,
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents')),
         images=images,
+        boards=boards,
+        board_images=board_images,
         queue=MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](
             filename=db_location, table_name="graphs"
