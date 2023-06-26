@@ -71,11 +71,19 @@ async def update_board(
 @boards_router.delete("/{board_id}", operation_id="delete_board")
 async def delete_board(
     board_id: str = Path(description="The id of board to delete"),
+    include_images: bool = Path(
+        description="Permanently delete all images on the board", default=False
+    ),
 ) -> None:
     """Deletes a board"""
 
     try:
-        ApiDependencies.invoker.services.boards.delete(board_id=board_id)
+        if include_images:
+            ApiDependencies.invoker.services.images.delete_images_on_board(
+                board_id=board_id
+            )
+        else:
+            ApiDependencies.invoker.services.boards.delete(board_id=board_id)
     except Exception as e:
         # TODO: Does this need any exception handling at all?
         pass
