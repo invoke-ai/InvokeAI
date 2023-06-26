@@ -8,6 +8,7 @@ import { memo } from 'react';
 import ParamPositiveConditioning from 'features/parameters/components/Parameters/Core/ParamPositiveConditioning';
 import ParamNegativeConditioning from 'features/parameters/components/Parameters/Core/ParamNegativeConditioning';
 import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
+import ParamDynamicPromptsCollapse from 'features/dynamicPrompts/components/ParamDynamicPromptsCollapse';
 
 const UnifiedCanvasParameters = () => {
   return (
@@ -16,6 +17,7 @@ const UnifiedCanvasParameters = () => {
       <ParamNegativeConditioning />
       <ProcessButtons />
       <UnifiedCanvasCoreParameters />
+      <ParamDynamicPromptsCollapse />
       <ParamControlNetCollapse />
       <ParamVariationCollapse />
       <ParamSymmetryCollapse />

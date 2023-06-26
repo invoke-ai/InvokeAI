@@ -47,6 +47,15 @@ export type InpaintInvocation = Invocation<'InpaintInvocation'>;
 export type ImageResizeInvocation = Invocation<'ImageResizeInvocation'>;
 export type RandomIntInvocation = Invocation<'RandomIntInvocation'>;
 export type CompelInvocation = Invocation<'CompelInvocation'>;
+export type DynamicPromptInvocation = Invocation<'DynamicPromptInvocation'>;
+export type NoiseInvocation = Invocation<'NoiseInvocation'>;
+export type TextToLatentsInvocation = Invocation<'TextToLatentsInvocation'>;
+export type LatentsToLatentsInvocation =
+  Invocation<'LatentsToLatentsInvocation'>;
+export type ImageToLatentsInvocation = Invocation<'ImageToLatentsInvocation'>;
+export type LatentsToImageInvocation = Invocation<'LatentsToImageInvocation'>;
+export type PipelineModelLoaderInvocation =
+  Invocation<'PipelineModelLoaderInvocation'>;
 
 // ControlNet Nodes
 export type ControlNetInvocation = Invocation<'ControlNetInvocation'>;

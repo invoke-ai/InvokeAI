@@ -15,6 +15,7 @@ export const imagesApi = api.injectEndpoints({
         }
         return tags;
       },
+      keepUnusedDataFor: 86400, // 24 hours
     }),
   }),
 });
