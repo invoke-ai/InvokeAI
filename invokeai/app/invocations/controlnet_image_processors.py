@@ -458,6 +458,10 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
     # fmt: on
 
     def run_processor(self, image):
+        # MediaPipeFaceDetector throws an error if image has alpha channel
+        #     so convert to RGB if needed
+        if image.mode == 'RGBA':
+            image = image.convert('RGB')
         mediapipe_face_processor = MediapipeFaceDetector()
         processed_image = mediapipe_face_processor(image, max_faces=self.max_faces, min_confidence=self.min_confidence)
         return processed_image
