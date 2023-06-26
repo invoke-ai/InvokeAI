@@ -48,7 +48,7 @@ const App = ({
   const isApplicationReady = useIsApplicationReady();
 
   const { data: pipelineModels } = useListModelsQuery({
-    model_type: 'pipeline',
+    model_type: 'main',
   });
   const { data: controlnetModels } = useListModelsQuery({
     model_type: 'controlnet',
