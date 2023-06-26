@@ -1,28 +1,24 @@
 import { RootState } from 'app/store/store';
 import {
   ImageResizeInvocation,
-  RandomIntInvocation,
-  RangeOfSizeInvocation,
+  ImageToLatentsInvocation,
 } from 'services/api/types';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { log } from 'app/logging/useLogger';
 import {
-  ITERATE,
   LATENTS_TO_IMAGE,
-  MODEL_LOADER,
+  PIPELINE_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  RANDOM_INT,
-  RANGE_OF_SIZE,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   LATENTS_TO_LATENTS,
   RESIZE,
 } from './constants';
-import { set } from 'lodash-es';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
+import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
@@ -44,9 +40,6 @@ export const buildLinearImageToImageGraph = (
     shouldFitToWidthHeight,
     width,
     height,
-    iterations,
-    seed,
-    shouldRandomizeSeed,
   } = state.generation;
 
   /**
@@ -79,30 +72,18 @@ export const buildLinearImageToImageGraph = (
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
       },
-      [RANGE_OF_SIZE]: {
-        type: 'range_of_size',
-        id: RANGE_OF_SIZE,
-        // seed - must be connected manually
-        // start: 0,
-        size: iterations,
-        step: 1,
-      },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
       },
-      [MODEL_LOADER]: {
+      [PIPELINE_MODEL_LOADER]: {
         type: 'pipeline_model_loader',
-        id: MODEL_LOADER,
+        id: PIPELINE_MODEL_LOADER,
         model,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
-      },
-      [ITERATE]: {
-        type: 'iterate',
-        id: ITERATE,
       },
       [LATENTS_TO_LATENTS]: {
         type: 'l2l',
@@ -124,7 +105,7 @@ export const buildLinearImageToImageGraph = (
     edges: [
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -134,7 +115,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -144,32 +125,12 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'vae',
         },
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'vae',
-        },
-      },
-      {
-        source: {
-          node_id: RANGE_OF_SIZE,
-          field: 'collection',
-        },
-        destination: {
-          node_id: ITERATE,
-          field: 'collection',
-        },
-      },
-      {
-        source: {
-          node_id: ITERATE,
-          field: 'item',
-        },
-        destination: {
-          node_id: NOISE,
-          field: 'seed',
         },
       },
       {
@@ -204,7 +165,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'vae',
         },
         destination: {
@@ -214,7 +175,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
@@ -244,26 +205,6 @@ export const buildLinearImageToImageGraph = (
       },
     ],
   };
-
-  // handle seed
-  if (shouldRandomizeSeed) {
-    // Random int node to generate the starting seed
-    const randomIntNode: RandomIntInvocation = {
-      id: RANDOM_INT,
-      type: 'rand_int',
-    };
-
-    graph.nodes[RANDOM_INT] = randomIntNode;
-
-    // Connect random int to the start of the range of size so the range starts on the random first seed
-    graph.edges.push({
-      source: { node_id: RANDOM_INT, field: 'a' },
-      destination: { node_id: RANGE_OF_SIZE, field: 'start' },
-    });
-  } else {
-    // User specified seed, so set the start of the range of size to the seed
-    (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
-  }
 
   // handle `fit`
   if (
@@ -313,9 +254,9 @@ export const buildLinearImageToImageGraph = (
     });
   } else {
     // We are not resizing, so we need to set the image on the `IMAGE_TO_LATENTS` node explicitly
-    set(graph.nodes[IMAGE_TO_LATENTS], 'image', {
+    (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image = {
       image_name: initialImage.imageName,
-    });
+    };
 
     // Pass the image's dimensions to the `NOISE` node
     graph.edges.push({
@@ -334,7 +275,10 @@ export const buildLinearImageToImageGraph = (
     });
   }
 
-  // add controlnet
+  // add dynamic prompts, mutating `graph`
+  addDynamicPromptsToGraph(graph, state);
+
+  // add controlnet, mutating `graph`
   addControlNetToLinearGraph(graph, LATENTS_TO_LATENTS, state);
 
   return graph;

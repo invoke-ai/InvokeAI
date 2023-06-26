@@ -22,6 +22,7 @@ import boardsReducer from 'features/gallery/store/boardSlice';
 import configReducer from 'features/system/store/configSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import uiReducer from 'features/ui/store/uiSlice';
+import dynamicPromptsReducer from 'features/dynamicPrompts/store/slice';
 
 import { listenerMiddleware } from './middleware/listenerMiddleware';
 
@@ -48,6 +49,7 @@ const allReducers = {
   controlNet: controlNetReducer,
   boards: boardsReducer,
   // session: sessionReducer,
+  dynamicPrompts: dynamicPromptsReducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -65,6 +67,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'system',
   'ui',
   'controlNet',
+  'dynamicPrompts',
   // 'boards',
   // 'hotkeys',
   // 'config',
@@ -100,3 +103,4 @@ export type AppGetState = typeof store.getState;
 export type RootState = ReturnType<typeof store.getState>;
 export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
 export type AppDispatch = typeof store.dispatch;
+export const stateSelector = (state: RootState) => state;

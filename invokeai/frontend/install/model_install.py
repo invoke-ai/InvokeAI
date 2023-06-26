@@ -965,13 +965,15 @@ def main():
             logger.error(
                 "Insufficient vertical space for the interface. Please make your window taller and try again"
             )
-        elif str(e).startswith("addwstr"):
+        input('Press any key to continue...')
+    except Exception as e:
+        if str(e).startswith("addwstr"):
             logger.error(
                 "Insufficient horizontal space for the interface. Please make your window wider and try again."
             )
-    except Exception as e:
-        print(f'An exception has occurred: {str(e)} Details:')
-        print(traceback.format_exc(), file=sys.stderr)
+        else:
+            print(f'An exception has occurred: {str(e)} Details:')
+            print(traceback.format_exc(), file=sys.stderr)
         input('Press any key to continue...')
     
 

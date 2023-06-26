@@ -4,7 +4,7 @@ import { RandomIntInvocation, RangeOfSizeInvocation } from 'services/api/types';
 import {
   ITERATE,
   LATENTS_TO_IMAGE,
-  MODEL_LOADER,
+  PIPELINE_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -15,6 +15,7 @@ import {
 } from './constants';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
+import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
@@ -62,13 +63,6 @@ export const buildCanvasTextToImageGraph = (
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
       },
-      [RANGE_OF_SIZE]: {
-        type: 'range_of_size',
-        id: RANGE_OF_SIZE,
-        // start: 0, // seed - must be connected manually
-        size: iterations,
-        step: 1,
-      },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
@@ -82,18 +76,14 @@ export const buildCanvasTextToImageGraph = (
         scheduler,
         steps,
       },
-      [MODEL_LOADER]: {
+      [PIPELINE_MODEL_LOADER]: {
         type: 'pipeline_model_loader',
-        id: MODEL_LOADER,
+        id: PIPELINE_MODEL_LOADER,
         model,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
-      },
-      [ITERATE]: {
-        type: 'iterate',
-        id: ITERATE,
       },
     },
     edges: [
@@ -119,7 +109,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -129,7 +119,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -139,7 +129,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
@@ -159,32 +149,12 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'vae',
         },
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'vae',
-        },
-      },
-      {
-        source: {
-          node_id: RANGE_OF_SIZE,
-          field: 'collection',
-        },
-        destination: {
-          node_id: ITERATE,
-          field: 'collection',
-        },
-      },
-      {
-        source: {
-          node_id: ITERATE,
-          field: 'item',
-        },
-        destination: {
-          node_id: NOISE,
-          field: 'seed',
         },
       },
       {
@@ -200,27 +170,10 @@ export const buildCanvasTextToImageGraph = (
     ],
   };
 
-  // handle seed
-  if (shouldRandomizeSeed) {
-    // Random int node to generate the starting seed
-    const randomIntNode: RandomIntInvocation = {
-      id: RANDOM_INT,
-      type: 'rand_int',
-    };
+  // add dynamic prompts, mutating `graph`
+  addDynamicPromptsToGraph(graph, state);
 
-    graph.nodes[RANDOM_INT] = randomIntNode;
-
-    // Connect random int to the start of the range of size so the range starts on the random first seed
-    graph.edges.push({
-      source: { node_id: RANDOM_INT, field: 'a' },
-      destination: { node_id: RANGE_OF_SIZE, field: 'start' },
-    });
-  } else {
-    // User specified seed, so set the start of the range of size to the seed
-    (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
-  }
-
-  // add controlnet
+  // add controlnet, mutating `graph`
   addControlNetToLinearGraph(graph, TEXT_TO_LATENTS, state);
 
   return graph;

@@ -3,7 +3,7 @@ import { startAppListening } from '..';
 import { createSelector } from '@reduxjs/toolkit';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import { nodesSelecter } from 'features/nodes/store/nodesSlice';
+import { nodesSelector } from 'features/nodes/store/nodesSlice';
 import { controlNetSelector } from 'features/controlNet/store/controlNetSlice';
 import { forEach, uniqBy } from 'lodash-es';
 import { imageUrlsReceived } from 'services/api/thunks/image';
@@ -16,7 +16,7 @@ const selectAllUsedImages = createSelector(
   [
     generationSelector,
     canvasSelector,
-    nodesSelecter,
+    nodesSelector,
     controlNetSelector,
     selectImagesEntities,
   ],
