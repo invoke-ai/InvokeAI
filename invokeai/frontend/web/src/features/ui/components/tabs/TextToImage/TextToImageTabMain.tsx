@@ -4,13 +4,13 @@ import CurrentImageDisplay from 'features/gallery/components/CurrentImageDisplay
 const TextToImageTabMain = () => {
   return (
     <Box
+      layerStyle={'first'}
       sx={{
         position: 'relative',
         width: '100%',
         height: '100%',
-        borderRadius: 'base',
-        bg: 'base.850',
         p: 4,
+        borderRadius: 'base',
       }}
     >
       <Flex

@@ -8,12 +8,12 @@ import { memo } from 'react';
 const NodeEditor = () => {
   return (
     <Box
+      layerStyle={'first'}
       sx={{
         position: 'relative',
         width: 'full',
         height: 'full',
-        borderRadius: 'md',
-        bg: 'base.850',
+        borderRadius: 'base',
       }}
     >
       <ReactFlowProvider>

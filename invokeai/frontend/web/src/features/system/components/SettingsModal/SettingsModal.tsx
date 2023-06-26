@@ -1,5 +1,4 @@
 import {
-  ChakraProps,
   Flex,
   Heading,
   Modal,
@@ -10,6 +9,7 @@ import {
   ModalHeader,
   ModalOverlay,
   Text,
+  useColorMode,
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
@@ -39,6 +39,7 @@ import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash-es';
 import {
   ChangeEvent,
+  PropsWithChildren,
   ReactElement,
   cloneElement,
   useCallback,
@@ -47,6 +48,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import SettingsSchedulers from './SettingsSchedulers';
+import { mode } from 'theme/util/mode';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
@@ -82,14 +84,6 @@ const selector = createSelector(
     memoizeOptions: { resultEqualityCheck: isEqual },
   }
 );
-
-const modalSectionStyles: ChakraProps['sx'] = {
-  flexDirection: 'column',
-  gap: 2,
-  p: 4,
-  bg: 'base.900',
-  borderRadius: 'base',
-};
 
 type ConfigOptions = {
   shouldShowDeveloperSettings: boolean;
@@ -183,12 +177,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
         isCentered
       >
         <ModalOverlay />
-        <ModalContent paddingInlineEnd={4}>
+        <ModalContent>
           <ModalHeader>{t('common.settingsLabel')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <Flex sx={{ gap: 4, flexDirection: 'column' }}>
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.general')}</Heading>
                 <IAISwitch
                   label={t('settings.confirmOnDelete')}
@@ -197,14 +191,14 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     dispatch(setShouldConfirmOnDelete(e.target.checked))
                   }
                 />
-              </Flex>
+              </StyledFlex>
 
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.generation')}</Heading>
                 <SettingsSchedulers />
-              </Flex>
+              </StyledFlex>
 
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.ui')}</Heading>
                 <IAISwitch
                   label={t('settings.displayHelpIcons')}
@@ -245,10 +239,10 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     )
                   }
                 />
-              </Flex>
+              </StyledFlex>
 
               {shouldShowDeveloperSettings && (
-                <Flex sx={modalSectionStyles}>
+                <StyledFlex>
                   <Heading size="sm">{t('settings.developer')}</Heading>
                   <IAISwitch
                     label={t('settings.shouldLogToConsole')}
@@ -269,10 +263,10 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                       dispatch(setEnableImageDebugging(e.target.checked))
                     }
                   />
-                </Flex>
+                </StyledFlex>
               )}
 
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.resetWebUI')}</Heading>
                 <IAIButton colorScheme="error" onClick={handleClickResetWebUI}>
                   {t('settings.resetWebUI')}
@@ -283,7 +277,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     <Text>{t('settings.resetWebUIDesc2')}</Text>
                   </>
                 )}
-              </Flex>
+              </StyledFlex>
             </Flex>
           </ModalBody>
 
@@ -319,3 +313,19 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 };
 
 export default SettingsModal;
+
+const StyledFlex = (props: PropsWithChildren) => {
+  return (
+    <Flex
+      layerStyle="second"
+      sx={{
+        flexDirection: 'column',
+        gap: 2,
+        p: 4,
+        borderRadius: 'base',
+      }}
+    >
+      {props.children}
+    </Flex>
+  );
+};

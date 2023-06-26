@@ -12,15 +12,25 @@ const IAINodeHeader = (props: IAINodeHeaderProps) => {
   const { nodeId, template } = props;
   return (
     <Flex
-      borderTopRadius="md"
-      justifyContent="space-between"
-      background="base.700"
-      px={2}
-      py={1}
-      alignItems="center"
+      sx={{
+        borderTopRadius: 'md',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        px: 2,
+        py: 1,
+        bg: 'base.300',
+        _dark: { bg: 'base.700' },
+      }}
     >
       <Tooltip label={nodeId}>
-        <Heading size="xs" fontWeight={600} color="base.100">
+        <Heading
+          size="xs"
+          sx={{
+            fontWeight: 600,
+            color: 'base.900',
+            _dark: { color: 'base.100' },
+          }}
+        >
           {template.title}
         </Heading>
       </Tooltip>
@@ -30,7 +40,16 @@ const IAINodeHeader = (props: IAINodeHeaderProps) => {
         hasArrow
         shouldWrapChildren
       >
-        <Icon color="base.300" as={FaInfoCircle} h="min-content" />
+        <Icon
+          sx={{
+            h: 'min-content',
+            color: 'base.700',
+            _dark: {
+              color: 'base.300',
+            },
+          }}
+          as={FaInfoCircle}
+        />
       </Tooltip>
     </Flex>
   );

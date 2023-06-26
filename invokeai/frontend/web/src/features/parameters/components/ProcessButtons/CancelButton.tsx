@@ -20,6 +20,8 @@ import {
   MenuList,
   MenuOptionGroup,
   MenuItemOption,
+  ButtonGroupProps,
+  ButtonProps,
 } from '@chakra-ui/react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -55,7 +57,7 @@ interface CancelButtonProps {
 }
 
 const CancelButton = (
-  props: CancelButtonProps & Omit<IAIIconButtonProps, 'aria-label'>
+  props: CancelButtonProps & Omit<ButtonProps, 'aria-label'>
 ) => {
   const dispatch = useAppDispatch();
   const { btnGroupWidth = 'auto', ...rest } = props;
@@ -139,12 +141,14 @@ const CancelButton = (
         <MenuButton
           as={IAIIconButton}
           tooltip={t('parameters.cancel.setType')}
+          tooltipPlacement="top"
           aria-label={t('parameters.cancel.setType')}
           icon={<ChevronDownIcon w="1em" h="1em" />}
           paddingX={0}
           paddingY={0}
           colorScheme="error"
           minWidth={5}
+          {...rest}
         />
         <MenuList minWidth="240px">
           <MenuOptionGroup

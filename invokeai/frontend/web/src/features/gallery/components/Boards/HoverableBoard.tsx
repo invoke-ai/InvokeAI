@@ -8,6 +8,7 @@ import {
   Image,
   MenuItem,
   MenuList,
+  useColorMode,
 } from '@chakra-ui/react';
 
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -30,6 +31,7 @@ import { AnimatePresence } from 'framer-motion';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
 import { SelectedItemOverlay } from '../SelectedItemOverlay';
 import { DeleteBoardImagesContext } from '../../../../app/contexts/DeleteBoardImagesContext';
+import { mode } from 'theme/util/mode';
 
 interface HoverableBoardProps {
   board: BoardDTO;
@@ -42,6 +44,8 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
   const { currentData: coverImage } = useGetImageDTOQuery(
     board.cover_image_name ?? skipToken
   );
+
+  const { colorMode } = useColorMode();
 
   const { board_name, board_id } = board;
 
@@ -110,7 +114,7 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
               </MenuItem>
             )}
             <MenuItem
-              sx={{ color: 'error.300' }}
+              sx={{ color: mode('error.700', 'error.300')(colorMode) }}
               icon={<FaTrash />}
               onClickCapture={handleDeleteBoard}
             >
@@ -180,7 +184,9 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
               >
                 <EditablePreview
                   sx={{
-                    color: isSelected ? 'base.50' : 'base.200',
+                    color: isSelected
+                      ? mode('base.900', 'base.50')(colorMode)
+                      : mode('base.700', 'base.200')(colorMode),
                     fontWeight: isSelected ? 600 : undefined,
                     fontSize: 'xs',
                     textAlign: 'center',
@@ -190,9 +196,9 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
                 />
                 <EditableInput
                   sx={{
-                    color: 'base.50',
+                    color: mode('base.900', 'base.50')(colorMode),
                     fontSize: 'xs',
-                    borderColor: 'base.500',
+                    borderColor: mode('base.500', 'base.500')(colorMode),
                     p: 0,
                     outline: 0,
                   }}

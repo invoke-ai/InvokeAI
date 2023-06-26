@@ -1,7 +1,5 @@
 import { ThemeOverride } from '@chakra-ui/react';
-import type { StyleFunctionProps } from '@chakra-ui/styled-system';
 
-import { invokeAIThemeColors } from 'theme/colors/invokeAI';
 import { accordionTheme } from './components/accordion';
 import { buttonTheme } from './components/button';
 import { checkboxTheme } from './components/checkbox';
@@ -19,6 +17,15 @@ import { switchTheme } from './components/switch';
 import { tabsTheme } from './components/tabs';
 import { textTheme } from './components/text';
 import { textareaTheme } from './components/textarea';
+import { tooltipTheme } from './components/tooltip';
+import { generateColorPalette } from './util/generateColorPalette';
+
+const BASE = { H: 240, S: 8 };
+const ACCENT = { H: 260, S: 52 };
+const WORKING = { H: 47, S: 50 };
+const WARNING = { H: 28, S: 50 };
+const OK = { H: 113, S: 50 };
+const ERROR = { H: 0, S: 50 };
 
 export const theme: ThemeOverride = {
   config: {
@@ -26,30 +33,32 @@ export const theme: ThemeOverride = {
     initialColorMode: 'dark',
     useSystemColorMode: false,
   },
+  layerStyles: {
+    body: {
+      bg: 'base.50',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.900', color: 'base.50' },
+    },
+    first: {
+      bg: 'base.100',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.850', color: 'base.100' },
+    },
+    second: {
+      bg: 'base.200',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.800', color: 'base.100' },
+    },
+  },
   styles: {
-    global: (_props: StyleFunctionProps) => ({
-      body: {
-        bg: 'base.900',
-        color: 'base.50',
-        overflow: {
-          base: 'scroll',
-          xl: 'hidden',
-        },
-      },
+    global: (props) => ({
+      layerStyle: 'body',
       '*': { ...no_scrollbar },
     }),
   },
   direction: 'ltr',
   fonts: {
-    body: `'InterVariable', sans-serif`,
-  },
-  breakpoints: {
-    base: '0em', // 0px and onwards
-    sm: '30em', // 480px and onwards
-    md: '48em', // 768px and onwards
-    lg: '62em', // 992px and onwards
-    xl: '80em', // 1280px and onwards
-    '2xl': '96em', // 1536px and onwards
+    body: `'Inter Variable', sans-serif`,
   },
   shadows: {
     light: {
@@ -69,7 +78,18 @@ export const theme: ThemeOverride = {
     nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-base-500)`,
   },
   colors: {
-    ...invokeAIThemeColors,
+    base: generateColorPalette(BASE.H, BASE.S),
+    baseAlpha: generateColorPalette(BASE.H, BASE.S, true),
+    accent: generateColorPalette(ACCENT.H, ACCENT.S),
+    accentAlpha: generateColorPalette(ACCENT.H, ACCENT.S, true),
+    working: generateColorPalette(WORKING.H, WORKING.S),
+    workingAlpha: generateColorPalette(WORKING.H, WORKING.S, true),
+    warning: generateColorPalette(WARNING.H, WARNING.S),
+    warningAlpha: generateColorPalette(WARNING.H, WARNING.S, true),
+    ok: generateColorPalette(OK.H, OK.S),
+    okAlpha: generateColorPalette(OK.H, OK.S, true),
+    error: generateColorPalette(ERROR.H, ERROR.S),
+    errorAlpha: generateColorPalette(ERROR.H, ERROR.S, true),
   },
   components: {
     Button: buttonTheme, // Button and IconButton
@@ -88,5 +108,6 @@ export const theme: ThemeOverride = {
     Checkbox: checkboxTheme,
     Menu: menuTheme,
     Text: textTheme,
+    Tooltip: tooltipTheme,
   },
 };
