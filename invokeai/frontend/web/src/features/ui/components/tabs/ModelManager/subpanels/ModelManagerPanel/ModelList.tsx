@@ -1,9 +1,7 @@
-import { Box, Flex, Heading, Spacer, Spinner, Text } from '@chakra-ui/react';
+import { Box, Flex, Spinner, Text } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 
-import AddModel from './AddModel';
-import MergeModels from './MergeModels';
 import ModelListItem from './ModelListItem';
 
 import { useTranslation } from 'react-i18next';
@@ -185,13 +183,6 @@ const ModelList = () => {
 
   return (
     <Flex flexDirection="column" rowGap={4} width="50%" minWidth="50%">
-      <Flex justifyContent="space-between" alignItems="center" gap={2}>
-        <Heading size="md">{t('modelManager.availableModels')}</Heading>
-        <Spacer />
-        <AddModel />
-        <MergeModels />
-      </Flex>
-
       <IAIInput
         onChange={handleSearchFilter}
         label={t('modelManager.search')}
