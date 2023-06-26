@@ -34,6 +34,10 @@ const IAIMantineSelect = (props: IAISelectProps) => {
             '&:focus': {
               borderColor: 'var(--invokeai-colors-accent-600)',
             },
+            '&:disabled': {
+              backgroundColor: 'var(--invokeai-colors-base-700)',
+              color: 'var(--invokeai-colors-base-400)',
+            },
           },
           dropdown: {
             backgroundColor: 'var(--invokeai-colors-base-800)',
@@ -64,7 +68,7 @@ const IAIMantineSelect = (props: IAISelectProps) => {
             },
           },
           rightSection: {
-            width: 24,
+            width: 32,
           },
         })}
         {...rest}

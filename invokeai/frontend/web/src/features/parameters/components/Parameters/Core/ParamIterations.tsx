@@ -1,4 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
@@ -10,27 +11,26 @@ import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector(
-  [generationSelector, configSelector, uiSelector, hotkeysSelector],
-  (generation, config, ui, hotkeys) => {
-    const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
-      config.sd.iterations;
-    const { iterations } = generation;
-    const { shouldUseSliders } = ui;
+const selector = createSelector([stateSelector], (state) => {
+  const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
+    state.config.sd.iterations;
+  const { iterations } = state.generation;
+  const { shouldUseSliders } = state.ui;
+  const isDisabled = state.dynamicPrompts.isEnabled;
 
-    const step = hotkeys.shift ? fineStep : coarseStep;
+  const step = state.hotkeys.shift ? fineStep : coarseStep;
 
-    return {
-      iterations,
-      initial,
-      min,
-      sliderMax,
-      inputMax,
-      step,
-      shouldUseSliders,
-    };
-  }
-);
+  return {
+    iterations,
+    initial,
+    min,
+    sliderMax,
+    inputMax,
+    step,
+    shouldUseSliders,
+    isDisabled,
+  };
+});
 
 const ParamIterations = () => {
   const {
@@ -41,6 +41,7 @@ const ParamIterations = () => {
     inputMax,
     step,
     shouldUseSliders,
+    isDisabled,
   } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -58,6 +59,7 @@ const ParamIterations = () => {
 
   return shouldUseSliders ? (
     <IAISlider
+      isDisabled={isDisabled}
       label={t('parameters.images')}
       step={step}
       min={min}
@@ -72,6 +74,7 @@ const ParamIterations = () => {
     />
   ) : (
     <IAINumberInput
+      isDisabled={isDisabled}
       label={t('parameters.images')}
       step={step}
       min={min}

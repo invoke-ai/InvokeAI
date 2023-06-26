@@ -9,10 +9,12 @@ type IAICanvasImageProps = {
 };
 const IAICanvasImage = (props: IAICanvasImageProps) => {
   const { width, height, x, y, imageName } = props.canvasImage;
-  const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
+  const { currentData: imageDTO, isError } = useGetImageDTOQuery(
+    imageName ?? skipToken
+  );
   const [image] = useImage(imageDTO?.image_url ?? '', 'anonymous');
 
-  if (!imageDTO) {
+  if (isError) {
     return <Rect x={x} y={y} width={width} height={height} fill="red" />;
   }
 

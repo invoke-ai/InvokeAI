@@ -9,6 +9,7 @@ import ParamHiresCollapse from 'features/parameters/components/Parameters/Hires/
 import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
 import TextToImageTabCoreParameters from './TextToImageTabCoreParameters';
 import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
+import ParamDynamicPromptsCollapse from 'features/dynamicPrompts/components/ParamDynamicPromptsCollapse';
 
 const TextToImageTabParameters = () => {
   return (
@@ -17,6 +18,7 @@ const TextToImageTabParameters = () => {
       <ParamNegativeConditioning />
       <ProcessButtons />
       <TextToImageTabCoreParameters />
+      <ParamDynamicPromptsCollapse />
       <ParamControlNetCollapse />
       <ParamVariationCollapse />
       <ParamNoiseCollapse />

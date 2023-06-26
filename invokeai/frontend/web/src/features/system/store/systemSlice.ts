@@ -4,7 +4,6 @@ import * as InvokeAI from 'app/types/invokeai';
 
 import { InvokeLogLevel } from 'app/logging/useLogger';
 import { userInvoked } from 'app/store/actions';
-import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
 import { TFuncKey, t } from 'i18next';
 import { LogLevelName } from 'roarr';
 import {
@@ -26,6 +25,7 @@ import {
 } from 'services/api/thunks/session';
 import { makeToast } from '../../../app/components/Toaster';
 import { LANGUAGES } from '../components/LanguagePicker';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -382,7 +382,7 @@ export const systemSlice = createSlice({
     /**
      * OpenAPI schema was parsed
      */
-    builder.addCase(parsedOpenAPISchema, (state) => {
+    builder.addCase(nodeTemplatesBuilt, (state) => {
       state.wasSchemaParsed = true;
     });
 

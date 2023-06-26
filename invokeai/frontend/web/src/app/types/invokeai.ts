@@ -171,6 +171,14 @@ export type AppConfig = {
       fineStep: number;
       coarseStep: number;
     };
+    dynamicPrompts: {
+      maxPrompts: {
+        initial: number;
+        min: number;
+        sliderMax: number;
+        inputMax: number;
+      };
+    };
   };
 };
 

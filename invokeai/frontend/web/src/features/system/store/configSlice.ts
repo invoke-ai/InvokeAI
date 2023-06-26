@@ -60,6 +60,14 @@ export const initialConfigState: AppConfig = {
       fineStep: 0.01,
       coarseStep: 0.05,
     },
+    dynamicPrompts: {
+      maxPrompts: {
+        initial: 100,
+        min: 1,
+        sliderMax: 1000,
+        inputMax: 10000,
+      },
+    },
   },
 };
 
