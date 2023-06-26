@@ -26,6 +26,7 @@ done
 if [ -z "$PYTHON" ]; then
     echo "A suitable Python interpreter could not be found"
     echo "Please install Python $MINIMUM_PYTHON_VERSION or higher (maximum $MAXIMUM_PYTHON_VERSION) before running this script. See instructions at $INSTRUCTIONS for help."
+    echo "For the best user experience we suggest enlarging or maximizing this window now."
     read -p "Press any key to exit"
     exit -1
 fi
