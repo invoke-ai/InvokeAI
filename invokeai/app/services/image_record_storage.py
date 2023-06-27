@@ -397,10 +397,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._lock.acquire()
 
             # Construct the SQLite query with the placeholders
-            query = f"DELETE FROM images WHERE id_column IN ({placeholders})"
+            query = f"DELETE FROM images WHERE image_name IN ({placeholders})"
 
             # Execute the query with the list of IDs as parameters
-            self._cursor.execute(query, placeholders)
+            self._cursor.execute(query, image_names)
 
             self._conn.commit()
         except sqlite3.Error as e:
