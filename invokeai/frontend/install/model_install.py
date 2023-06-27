@@ -590,8 +590,8 @@ def _ask_user_for_pt_cmdline(model_path: Path)->SchedulerPredictionType:
     print(
 f"""
 Please select the type of the V2 checkpoint named {model_path.name}:
-[1] A Stable Diffusion v2.x base model (512 pixels; there should be no 'parameterization:' line in its yaml file)
-[2] A Stable Diffusion v2.x v-predictive model (768 pixels; look for a 'parameterization: "v"' line in its yaml file)
+[1] A model based on Stable Diffusion v2 trained on 512 pixel images (SD-2-base)
+[2] A model based on Stable Diffusion v2 trained on 768 pixel images (SD-2-768)
 [3] Skip this model and come back later.
 """
         )
