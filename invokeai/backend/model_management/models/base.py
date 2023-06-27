@@ -397,7 +397,7 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
             checkpoint = safetensors.torch.load_file(path, device="cpu")
     else:
         if scan:
-            scan_result = scan_file_path(checkpoint)
+            scan_result = scan_file_path(path)
             if scan_result.infected_files != 0:
                 raise Exception(f"The model file \"{path}\" is potentially infected by malware. Aborting import.")
         checkpoint = torch.load(path, map_location=torch.device("meta"))

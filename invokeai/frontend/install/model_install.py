@@ -131,7 +131,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             window_width=window_width,
             exclude = self.starter_models
         )
-        self.pipeline_models['autoload_pending'] = True
+        # self.pipeline_models['autoload_pending'] = True
         bottom_of_table = max(bottom_of_table,self.nextrely)
 
         self.nextrely = top_of_table
@@ -316,31 +316,31 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             **kwargs,
         )
 
-        label = "Directory to scan for models to automatically import (<tab> autocompletes):"
-        self.nextrely += 1
-        widgets.update(
-            autoload_directory = self.add_widget_intelligent(
-                FileBox,
-                max_height=3,
-                name=label,
-                value=str(config.root_path / config.autoimport_dir) if config.autoimport_dir else None,
-                select_dir=True,
-                must_exist=True,
-                use_two_lines=False,
-                labelColor="DANGER",
-                begin_entry_at=len(label)+1,
-                scroll_exit=True,
-            )
-        )
-        widgets.update(
-            autoscan_on_startup = self.add_widget_intelligent(
-                npyscreen.Checkbox,
-                name="Scan and import from this directory each time InvokeAI starts",
-                value=config.autoimport_dir is not None,
-                relx=4,
-                scroll_exit=True,
-            )
-        )
+        # label = "Directory to scan for models to automatically import (<tab> autocompletes):"
+        # self.nextrely += 1
+        # widgets.update(
+        #     autoload_directory = self.add_widget_intelligent(
+        #         FileBox,
+        #         max_height=3,
+        #         name=label,
+        #         value=str(config.root_path / config.autoimport_dir) if config.autoimport_dir else None,
+        #         select_dir=True,
+        #         must_exist=True,
+        #         use_two_lines=False,
+        #         labelColor="DANGER",
+        #         begin_entry_at=len(label)+1,
+        #         scroll_exit=True,
+        #     )
+        # )
+        # widgets.update(
+        #     autoscan_on_startup = self.add_widget_intelligent(
+        #         npyscreen.Checkbox,
+        #         name="Scan and import from this directory each time InvokeAI starts",
+        #         value=config.autoimport_dir is not None,
+        #         relx=4,
+        #         scroll_exit=True,
+        #     )
+        # )
         return widgets
 
     def resize(self):
@@ -501,8 +501,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         
         # rebuild the form, saving and restoring some of the fields that need to be preserved.
         saved_messages = self.monitor.entry_widget.values
-        autoload_dir = str(config.root_path / self.pipeline_models['autoload_directory'].value)
-        autoscan = self.pipeline_models['autoscan_on_startup'].value
+        # autoload_dir = str(config.root_path / self.pipeline_models['autoload_directory'].value)
+        # autoscan = self.pipeline_models['autoscan_on_startup'].value
         
         app.main_form = app.addForm(
             "MAIN", addModelsForm, name="Install Stable Diffusion Models", multipage=self.multipage,
@@ -511,8 +511,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         
         app.main_form.monitor.entry_widget.values = saved_messages
         app.main_form.monitor.entry_widget.buffer([''],scroll_end=True)
-        app.main_form.pipeline_models['autoload_directory'].value = autoload_dir
-        app.main_form.pipeline_models['autoscan_on_startup'].value = autoscan
+        # app.main_form.pipeline_models['autoload_directory'].value = autoload_dir
+        # app.main_form.pipeline_models['autoscan_on_startup'].value = autoscan
         
     def marshall_arguments(self):
         """
@@ -546,17 +546,17 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 selections.install_models.extend(downloads.value.split())
 
         # load directory and whether to scan on startup
-        if self.parentApp.autoload_pending:
-            selections.scan_directory = str(config.root_path / self.pipeline_models['autoload_directory'].value)
-            self.parentApp.autoload_pending = False
-        selections.autoscan_on_startup = self.pipeline_models['autoscan_on_startup'].value
+        # if self.parentApp.autoload_pending:
+        #     selections.scan_directory = str(config.root_path / self.pipeline_models['autoload_directory'].value)
+        #     self.parentApp.autoload_pending = False
+        # selections.autoscan_on_startup = self.pipeline_models['autoscan_on_startup'].value
 
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self,opt):
         super().__init__()
         self.program_opts = opt
         self.user_cancelled = False
-        self.autoload_pending = True
+        # self.autoload_pending = True
         self.install_selections = InstallSelections()
 
     def onStart(self):

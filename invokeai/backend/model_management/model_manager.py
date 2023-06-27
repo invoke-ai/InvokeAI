@@ -168,11 +168,27 @@ structure at initialization time by scanning the models directory. The
 in-memory data structure can be resynchronized by calling
 `manager.scan_models_directory()`.
 
-Files and folders placed inside the `autoimport_dir` (path defined in
-`invokeai.yaml`, defaulting to `ROOTDIR/autoimport` will also be
-scanned for new models at initialization time and added to
-`models.yaml`. Files will not be moved from this location but
-preserved in-place.
+Files and folders placed inside the `autoimport` paths (paths
+defined in `invokeai.yaml`) will also be scanned for new models at
+initialization time and added to `models.yaml`. Files will not be
+moved from this location but preserved in-place. These directories
+are:
+
+  configuration    default              description
+  -------------    -------              -----------
+  autoimport_dir  autoimport/main       main models
+  lora_dir        autoimport/lora       LoRA/LyCORIS models
+  embedding_dir   autoimport/embedding  TI embeddings
+  controlnet_dir  autoimport/controlnet ControlNet models
+
+In actuality, models located in any of these directories are scanned
+to determine their type, so it isn't strictly necessary to organize
+the different types in this way. This entry in `invokeai.yaml` will
+recursively scan all subdirectories within `autoimport`, scan models
+files it finds, and import them if recognized.
+
+  Paths:
+     autoimport_dir: autoimport
 
 A model can be manually added using `add_model()` using the model's
 name, base model, type and a dict of model attributes. See
@@ -208,6 +224,7 @@ checkpoint or safetensors file.
 
 The path points to a file or directory on disk. If a relative path,
 the root is the InvokeAI ROOTDIR.
+
 """
 from __future__ import annotations
 
@@ -660,7 +677,7 @@ class ModelManager(object):
     ):
         loaded_files = set()
         new_models_found = False
-        
+
         with Chdir(self.app_config.root_path):
             for model_key, model_config in list(self.models.items()):
                 model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
@@ -720,30 +737,38 @@ class ModelManager(object):
                                  )
         
         installed = set()
-        if not self.app_config.autoimport_dir:
-            return installed
-        
-        autodir = self.app_config.root_path / self.app_config.autoimport_dir        
-        if not (autodir and autodir.exists()):
-            return installed
-        
-        known_paths = {(self.app_config.root_path / x['path']).resolve() for x in self.list_models()}
+
+        config = self.app_config
+        known_paths = {(self.app_config.root_path / x['path']) for x in self.list_models()}
         scanned_dirs = set()
-        for root, dirs, files in os.walk(autodir):
-            for d in dirs:
-                path = Path(root) / d
-                if path in known_paths:
-                    continue
-                if any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin'}]):
-                    installed.update(installer.heuristic_install(path))
-                scanned_dirs.add(path)
-                
-            for f in files:
-                path = Path(root) / f
-                if path in known_paths or path.parent in scanned_dirs:
-                    continue
-                if path.suffix in {'.ckpt','.bin','.pth','.safetensors'}:
-                    installed.update(installer.heuristic_install(path))
+
+        for autodir in [config.autoimport_dir,
+                        config.lora_dir,
+                        config.embedding_dir,
+                        config.controlnet_dir]:
+            if autodir is None:
+                continue
+        
+            autodir = self.app_config.root_path / autodir
+            if not autodir.exists():
+                continue
+        
+            for root, dirs, files in os.walk(autodir):
+                for d in dirs:
+                    path = Path(root) / d
+                    if path in known_paths or path.parent in scanned_dirs:
+                        scanned_dirs.add(path)
+                        continue
+                    if any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin'}]):
+                        installed.update(installer.heuristic_install(path))
+                        scanned_dirs.add(path)
+
+                for f in files:
+                    path = Path(root) / f
+                    if path in known_paths or path.parent in scanned_dirs:
+                        continue
+                    if path.suffix in {'.ckpt','.bin','.pth','.safetensors','.pt'}:
+                        installed.update(installer.heuristic_install(path))
         return installed
 
     def heuristic_import(self,

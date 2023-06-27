@@ -443,6 +443,26 @@ to allow InvokeAI to download restricted styles & subjects from the "Concept Lib
         )
         self.nextrely += 1
         self.add_widget_intelligent(
+            npyscreen.FixedText,
+            value="Directories containing textual inversion, controlnet and LoRA models (<tab> autocompletes, ctrl-N advances):",
+            editable=False,
+            color="CONTROL",
+        )
+        self.autoimport_dirs = {}
+        for description, config_name, path in autoimport_paths(old_opts):
+            self.autoimport_dirs[config_name] = self.add_widget_intelligent(
+                npyscreen.TitleFilename,
+                name=description+':',
+                value=str(path),
+                select_dir=True,
+                must_exist=False,
+                use_two_lines=False,
+                labelColor="GOOD",
+                begin_entry_at=32,
+                scroll_exit=True
+            )
+        self.nextrely += 1
+        self.add_widget_intelligent(
             npyscreen.TitleFixedText,
             name="== LICENSE ==",
             begin_entry_at=0,
@@ -505,10 +525,6 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
             bad_fields.append(
                 f"The output directory does not seem to be valid. Please check that {str(Path(opt.outdir).parent)} is an existing directory."
             )
-        # if not Path(opt.embedding_dir).parent.exists():
-        #     bad_fields.append(
-        #         f"The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_dir).parent)} is an existing directory."
-        #     )
         if len(bad_fields) > 0:
             message = "The following problems were detected and must be corrected:\n"
             for problem in bad_fields:
@@ -528,11 +544,14 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
                 "max_loaded_models",
                 "xformers_enabled",
                 "always_use_cpu",
-#                "embedding_dir",
-#                "lora_dir",
-#                "controlnet_dir",
         ]:
             setattr(new_opts, attr, getattr(self, attr).value)
+
+        for attr in self.autoimport_dirs:
+            directory = Path(self.autoimport_dirs[attr].value)
+            if directory.is_relative_to(config.root_path):
+                directory = directory.relative_to(config.root_path)
+            setattr(new_opts, attr, directory)
 
         new_opts.hf_token = self.hf_token.value
         new_opts.license_acceptance = self.license_acceptance.value
@@ -595,22 +614,32 @@ def default_user_selections(program_opts: Namespace) -> InstallSelections:
         else [models[x].path or models[x].repo_id for x in installer.recommended_models()]
         if program_opts.yes_to_all
         else list(),
-        scan_directory=None,
-        autoscan_on_startup=None,
+#        scan_directory=None,
+#        autoscan_on_startup=None,
     )
 
+# -------------------------------------
+def autoimport_paths(config: InvokeAIAppConfig):
+    return [
+        ('Checkpoints & diffusers models', 'autoimport_dir', config.root_path / config.autoimport_dir),
+        ('LoRA/LyCORIS models',            'lora_dir',       config.root_path / config.lora_dir),
+        ('Controlnet models',              'controlnet_dir', config.root_path / config.controlnet_dir),
+        ('Textual Inversion Embeddings',   'embedding_dir',  config.root_path / config.embedding_dir),
+    ]
+    
 # -------------------------------------
 def initialize_rootdir(root: Path, yes_to_all: bool = False):
     logger.info("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
     for name in (
             "models",
             "databases",
-            "autoimport",
             "text-inversion-output",
             "text-inversion-training-data",
             "configs"
     ):
         os.makedirs(os.path.join(root, name), exist_ok=True)
+    for model_type in ModelType:
+        Path(root, 'autoimport', model_type.value).mkdir(parents=True, exist_ok=True)
 
     configs_src = Path(configs.__path__[0])
     configs_dest = root / "configs"
@@ -618,9 +647,8 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
     dest = root / 'models'
-    for model_base in [BaseModelType.StableDiffusion1,BaseModelType.StableDiffusion2]:
-        for model_type in [ModelType.Main, ModelType.Vae, ModelType.Lora,
-                           ModelType.ControlNet,ModelType.TextualInversion]:
+    for model_base in BaseModelType:
+        for model_type in ModelType:
             path = dest / model_base.value / model_type.value
             path.mkdir(parents=True, exist_ok=True)
     path = dest / 'core'
@@ -632,9 +660,7 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
                                    }
                                   )
                         )
-#    with open(root / 'invokeai.yaml','w') as f:
-#        f.write('#empty invokeai.yaml initialization file')
-
+        
 # -------------------------------------
 def run_console_ui(
     program_opts: Namespace, initfile: Path = None

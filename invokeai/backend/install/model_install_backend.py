@@ -70,8 +70,8 @@ class ModelInstallList:
 class InstallSelections():
     install_models: List[str]= field(default_factory=list)
     remove_models: List[str]=field(default_factory=list)
-    scan_directory: Path = None
-    autoscan_on_startup: bool=False
+#    scan_directory: Path = None
+#    autoscan_on_startup: bool=False
 
 @dataclass
 class ModelLoadInfo():
@@ -155,8 +155,8 @@ class ModelInstall(object):
     def install(self, selections: InstallSelections):
         job = 1
         jobs = len(selections.remove_models) + len(selections.install_models)
-        if selections.scan_directory:
-            jobs += 1
+#        if selections.scan_directory:
+#            jobs += 1
         
         # remove requested models
         for key in selections.remove_models:
@@ -171,17 +171,7 @@ class ModelInstall(object):
             self.heuristic_install(path)
             job += 1
 
-        # import from the scan directory, if any
-        if path := selections.scan_directory:
-            logger.info(f'Scanning and importing models from directory {path} [{job}/{jobs}]')
-            self.heuristic_install(path)
-
         self.mgr.commit()
-
-        if selections.autoscan_on_startup and Path(selections.scan_directory).is_dir():
-            update_autoimport_dir(selections.scan_directory)
-        else:
-            update_autoimport_dir(None)
 
     def heuristic_install(self,
                           model_path_id_or_url: Union[str,Path],
@@ -237,7 +227,7 @@ class ModelInstall(object):
             self.mgr.add_model(model_name = model_name,
                                base_model = info.base_type,
                                model_type = info.model_type,
-                               model_attributes = attributes
+                               model_attributes = attributes,
                                )
         except Exception as e:
             logger.warning(f'{str(e)} Skipping registration.')
@@ -309,11 +299,11 @@ class ModelInstall(object):
             return location.stem
 
     def _make_attributes(self, path: Path, info: ModelProbeInfo)->dict:
-        # convoluted way to retrieve the description from datasets
-        description = f'{info.base_type.value} {info.model_type.value} model'
+        model_name = path.name if path.is_dir() else path.stem
+        description = f'{info.base_type.value} {info.model_type.value} model {model_name}'
         if key := self.reverse_paths.get(self.current_id):
             if key in self.datasets:
-                description = self.datasets[key]['description']
+                description = self.datasets[key].get('description') or description
 
         rel_path = self.relative_to_root(path)
 
@@ -394,19 +384,6 @@ class ModelInstall(object):
         Reverse mapping from repo_id/path to destination name.
         '''
         return {v.get('path') or v.get('repo_id') : k for k, v in datasets.items()}
-
-def update_autoimport_dir(autodir: Path):
-    '''
-    Update the "autoimport_dir" option in invokeai.yaml
-    '''
-    invokeai_config_path = config.init_file_path
-    conf = OmegaConf.load(invokeai_config_path)
-    conf.InvokeAI.Paths.autoimport_dir = str(autodir) if autodir else None
-    yaml = OmegaConf.to_yaml(conf)
-    tmpfile = invokeai_config_path.parent / "new_config.tmp"
-    with open(tmpfile, "w", encoding="utf-8") as outfile:
-        outfile.write(yaml)
-    tmpfile.replace(invokeai_config_path)
 
 # -------------------------------------
 def yes_or_no(prompt: str, default_yes=True):
