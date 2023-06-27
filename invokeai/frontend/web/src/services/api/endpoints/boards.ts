@@ -82,10 +82,13 @@ export const boardsApi = api.injectEndpoints({
         { type: 'Board', id: arg.board_id },
       ],
     }),
-
     deleteBoard: build.mutation<void, string>({
       query: (board_id) => ({ url: `boards/${board_id}`, method: 'DELETE' }),
       invalidatesTags: (result, error, arg) => [{ type: 'Board', id: arg }],
+    }),
+    deleteBoardAndImages: build.mutation<void, string>({
+      query: (board_id) => ({ url: `boards/${board_id}`, method: 'DELETE', params: { include_images: true } }),
+      invalidatesTags: (result, error, arg) => [{ type: 'Board', id: arg }, { type: 'Image', id: LIST_TAG }],
     }),
   }),
 });
@@ -96,4 +99,5 @@ export const {
   useCreateBoardMutation,
   useUpdateBoardMutation,
   useDeleteBoardMutation,
+  useDeleteBoardAndImagesMutation
 } = boardsApi;
