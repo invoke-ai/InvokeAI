@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt update && apt-get install -y \
         git \
-        python3-venv \
+        python3.10-venv \
         python3-pip \
         build-essential
 
@@ -64,7 +64,8 @@ WORKDIR /build
 COPY invokeai/frontend/web/ ./
 RUN --mount=type=cache,target=node_modules \
     npm install --include dev
-RUN yarn vite build
+RUN --mount=type=cache,target=node_modules \
+    yarn vite build
 
 
 #### Runtime stage ---------------------------------------
