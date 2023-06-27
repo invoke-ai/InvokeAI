@@ -3,3 +3,5 @@
 !pyproject.toml
 !docker/docker-entrypoint.sh
 !LICENSE
+
+node_modules
