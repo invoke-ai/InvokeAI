@@ -25,6 +25,7 @@ import DeleteImageModal from 'features/gallery/components/DeleteImageModal';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
 import { useListModelsQuery } from 'services/api/endpoints/models';
+import DeleteBoardImagesModal from '../../features/gallery/components/Boards/DeleteBoardImagesModal';
 
 const DEFAULT_CONFIG = {};
 
@@ -158,6 +159,7 @@ const App = ({
       </Grid>
       <DeleteImageModal />
       <UpdateImageBoardModal />
+      <DeleteBoardImagesModal />
       <Toaster />
       <GlobalHotkeys />
     </>
