@@ -34,17 +34,17 @@ class StableDiffusion1Model(DiffusersModel):
     class CheckpointConfig(ModelConfigBase):
         model_format: Literal[StableDiffusion1ModelFormat.Checkpoint]
         vae: Optional[str] = Field(None)
-        config: Optional[str] = Field(None)
+        config: str
         variant: ModelVariantType
 
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion1
-        assert model_type == ModelType.Pipeline
+        assert model_type == ModelType.Main
         super().__init__(
             model_path=model_path,
             base_model=BaseModelType.StableDiffusion1,
-            model_type=ModelType.Pipeline,
+            model_type=ModelType.Main,
         )
 
     @classmethod
@@ -69,7 +69,7 @@ class StableDiffusion1Model(DiffusersModel):
                 in_channels = unet_config['in_channels']
 
             else:
-                raise Exception("Not supported stable diffusion diffusers format(possibly onnx?)")
+                raise NotImplementedError(f"{path} is not a supported stable diffusion diffusers format")
 
         else:
             raise NotImplementedError(f"Unknown stable diffusion 1.* format: {model_format}")
@@ -81,6 +81,8 @@ class StableDiffusion1Model(DiffusersModel):
         else:
             raise Exception("Unkown stable diffusion 1.* model format")
 
+        if ckpt_config_path is None:
+            ckpt_config_path = _select_ckpt_config(BaseModelType.StableDiffusion1, variant)
 
         return cls.create_config(
             path=path,
@@ -109,14 +111,12 @@ class StableDiffusion1Model(DiffusersModel):
         config: ModelConfigBase,
         base_model: BaseModelType,
     ) -> str:
-        assert model_path == config.path
-
         if isinstance(config, cls.CheckpointConfig):
             return _convert_ckpt_and_cache(
                 version=BaseModelType.StableDiffusion1,
                 model_config=config,
                 output_path=output_path,
-            ) # TODO: args
+            )
         else:
             return model_path
 
@@ -131,25 +131,20 @@ class StableDiffusion2Model(DiffusersModel):
         model_format: Literal[StableDiffusion2ModelFormat.Diffusers]
         vae: Optional[str] = Field(None)
         variant: ModelVariantType
-        prediction_type: SchedulerPredictionType
-        upcast_attention: bool
 
     class CheckpointConfig(ModelConfigBase):
         model_format: Literal[StableDiffusion2ModelFormat.Checkpoint]
         vae: Optional[str] = Field(None)
-        config: Optional[str] = Field(None)
+        config: str
         variant: ModelVariantType
-        prediction_type: SchedulerPredictionType
-        upcast_attention: bool
-
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion2
-        assert model_type == ModelType.Pipeline
+        assert model_type == ModelType.Main
         super().__init__(
             model_path=model_path,
             base_model=BaseModelType.StableDiffusion2,
-            model_type=ModelType.Pipeline,
+            model_type=ModelType.Main,
         )
 
     @classmethod
@@ -188,13 +183,8 @@ class StableDiffusion2Model(DiffusersModel):
         else:
             raise Exception("Unkown stable diffusion 2.* model format")
 
-        if variant == ModelVariantType.Normal:
-            prediction_type = SchedulerPredictionType.VPrediction
-            upcast_attention = True
-
-        else:
-            prediction_type = SchedulerPredictionType.Epsilon
-            upcast_attention = False
+        if ckpt_config_path is None:
+            ckpt_config_path = _select_ckpt_config(BaseModelType.StableDiffusion2, variant)
 
         return cls.create_config(
             path=path,
@@ -202,8 +192,6 @@ class StableDiffusion2Model(DiffusersModel):
 
             config=ckpt_config_path,
             variant=variant,
-            prediction_type=prediction_type,
-            upcast_attention=upcast_attention,
         )
 
     @classproperty
@@ -225,14 +213,12 @@ class StableDiffusion2Model(DiffusersModel):
         config: ModelConfigBase,
         base_model: BaseModelType,
     ) -> str:
-        assert model_path == config.path
-
         if isinstance(config, cls.CheckpointConfig):
             return _convert_ckpt_and_cache(
                 version=BaseModelType.StableDiffusion2,
                 model_config=config,
                 output_path=output_path,
-            ) # TODO: args
+            )
         else:
             return model_path
 
@@ -243,18 +229,18 @@ def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
             ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
         },
         BaseModelType.StableDiffusion2: {
-            # code further will manually set upcast_attention and v_prediction
-            ModelVariantType.Normal: "v2-inference.yaml",
+            ModelVariantType.Normal: "v2-inference-v.yaml", # best guess, as we can't differentiate with base(512)
             ModelVariantType.Inpaint: "v2-inpainting-inference.yaml",
             ModelVariantType.Depth: "v2-midas-inference.yaml",
         }
     }
 
+    app_config = InvokeAIAppConfig.get_config()
     try:
-        # TODO: path
-        #model_config.config = app_config.config_dir / "stable-diffusion" / ckpt_configs[version][model_config.variant]
-        #return InvokeAIAppConfig.get_config().legacy_conf_dir / ckpt_configs[version][variant]
-        return InvokeAIAppConfig.get_config().root_dir / "configs" / "stable-diffusion" / ckpt_configs[version][variant]
+        config_path = app_config.legacy_conf_path / ckpt_configs[version][variant]
+        if config_path.is_relative_to(app_config.root_path):
+            config_path = config_path.relative_to(app_config.root_path)
+        return str(config_path)
             
     except:
         return None
@@ -273,35 +259,13 @@ def _convert_ckpt_and_cache(
     """
     app_config = InvokeAIAppConfig.get_config()
 
-    if model_config.config is None:
-        model_config.config = _select_ckpt_config(version, model_config.variant)
-        if model_config.config is None:
-            raise Exception(f"Model variant {model_config.variant} not supported for {version}")
-
-
     weights = app_config.root_path / model_config.path
     config_file = app_config.root_path / model_config.config
     output_path = Path(output_path)
 
-    if version == BaseModelType.StableDiffusion1:
-        upcast_attention = False
-        prediction_type = SchedulerPredictionType.Epsilon
-
-    elif version == BaseModelType.StableDiffusion2:
-        upcast_attention = model_config.upcast_attention
-        prediction_type = model_config.prediction_type
-
-    else:
-        raise Exception(f"Unknown model provided: {version}")
-
-
     # return cached version if it exists
     if output_path.exists():
         return output_path
-
-    # TODO: I think that it more correctly to convert with embedded vae
-    #       as if user will delete custom vae he will got not embedded but also custom vae
-    #vae_ckpt_path, vae_model = self._get_vae_for_conversion(weights, mconfig)
 
     # to avoid circular import errors
     from ..convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
@@ -313,9 +277,6 @@ def _convert_ckpt_and_cache(
             model_variant=model_config.variant,
             original_config_file=config_file,
             extract_ema=True,
-            upcast_attention=upcast_attention,
-            prediction_type=prediction_type,
             scan_needed=True,
-            model_root=app_config.models_path,
         )
     return output_path

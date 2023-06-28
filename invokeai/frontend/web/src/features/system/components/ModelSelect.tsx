@@ -24,7 +24,7 @@ const ModelSelect = () => {
   );
 
   const { data: pipelineModels } = useListModelsQuery({
-    model_type: 'pipeline',
+    model_type: 'main',
   });
 
   const data = useMemo(() => {

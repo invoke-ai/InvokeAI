@@ -1,9 +1,12 @@
+import json
 import os
 import sys
 import typing
 import inspect
 from enum import Enum
 from abc import ABCMeta, abstractmethod
+from pathlib import Path
+from picklescan.scanner import scan_file_path
 import torch
 import safetensors.torch
 from diffusers import DiffusionPipeline, ConfigMixin
@@ -18,7 +21,7 @@ class BaseModelType(str, Enum):
     #Kandinsky2_1 = "kandinsky-2.1"
 
 class ModelType(str, Enum):
-    Pipeline = "pipeline"
+    Main = "main"
     Vae = "vae"
     Lora = "lora"
     ControlNet = "controlnet" # used by model_probe
@@ -55,7 +58,6 @@ class ModelConfigBase(BaseModel):
 
     class Config:
         use_enum_values = True
-
 
 class EmptyConfigLoader(ConfigMixin):
     @classmethod
@@ -124,7 +126,10 @@ class ModelBase(metaclass=ABCMeta):
             if not isinstance(value, type) or not issubclass(value, ModelConfigBase):
                 continue
 
-            fields = inspect.get_annotations(value)
+            if hasattr(inspect,'get_annotations'):
+                fields = inspect.get_annotations(value)
+            else:
+                fields = value.__annotations__
             try:
                 field = fields["model_format"]
             except:
@@ -383,15 +388,18 @@ def _fast_safetensors_reader(path: str):
 
     return checkpoint
 
-
-def read_checkpoint_meta(path: str):
-    if path.endswith(".safetensors"):
+def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
+    if str(path).endswith(".safetensors"):
         try:
             checkpoint = _fast_safetensors_reader(path)
         except:
             # TODO: create issue for support "meta"?
             checkpoint = safetensors.torch.load_file(path, device="cpu")
     else:
+        if scan:
+            scan_result = scan_file_path(path)
+            if scan_result.infected_files != 0:
+                raise Exception(f"The model file \"{path}\" is potentially infected by malware. Aborting import.")
         checkpoint = torch.load(path, map_location=torch.device("meta"))
     return checkpoint
 
