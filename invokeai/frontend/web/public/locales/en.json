@@ -524,7 +524,8 @@
         "initialImage": "Initial Image",
         "showOptionsPanel": "Show Options Panel",
         "hidePreview": "Hide Preview",
-        "showPreview": "Show Preview"
+        "showPreview": "Show Preview",
+        "controlNetControlMode": "Control Mode"
     },
     "settings": {
         "models": "Models",

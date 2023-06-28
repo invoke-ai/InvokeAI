@@ -22,7 +22,7 @@ class ModelProbeInfo(object):
     variant_type: ModelVariantType
     prediction_type: SchedulerPredictionType
     upcast_attention: bool
-    format: Literal['diffusers','checkpoint']
+    format: Literal['diffusers','checkpoint', 'lycoris']
     image_size: int
 
 class ProbeBase(object):
@@ -75,22 +75,23 @@ class ModelProbe(object):
         between V2-Base and V2-768 SD models.
         '''
         if model_path:
-            format = 'diffusers' if model_path.is_dir() else 'checkpoint'
+            format_type = 'diffusers' if model_path.is_dir() else 'checkpoint'
         else:
-            format = 'diffusers' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
+            format_type = 'diffusers' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
 
         model_info = None
         try:
             model_type = cls.get_model_type_from_folder(model_path, model) \
-                if format == 'diffusers' \
+                if format_type == 'diffusers' \
                    else cls.get_model_type_from_checkpoint(model_path, model)
-            probe_class = cls.PROBES[format].get(model_type)
+            probe_class = cls.PROBES[format_type].get(model_type)
             if not probe_class:
                 return None
             probe = probe_class(model_path, model, prediction_type_helper)
             base_type = probe.get_base_type()
             variant_type = probe.get_variant_type()
             prediction_type = probe.get_scheduler_prediction_type()
+            format = probe.get_format()
             model_info = ModelProbeInfo(
                 model_type = model_type,
                 base_type = base_type,
@@ -116,10 +117,10 @@ class ModelProbe(object):
         if model_path.name == "learned_embeds.bin":
             return ModelType.TextualInversion
 
-        checkpoint = checkpoint or read_checkpoint_meta(model_path, scan=True)
-        checkpoint = checkpoint.get("state_dict", checkpoint)
+        ckpt = checkpoint if checkpoint else read_checkpoint_meta(model_path, scan=True)
+        ckpt = ckpt.get("state_dict", ckpt)
 
-        for key in checkpoint.keys():
+        for key in ckpt.keys():
             if any(key.startswith(v) for v in {"cond_stage_model.", "first_stage_model.", "model.diffusion_model."}):
                 return ModelType.Main
             elif any(key.startswith(v) for v in {"encoder.conv_in", "decoder.conv_in"}):
@@ -133,7 +134,7 @@ class ModelProbe(object):
 
         else:
             # diffusers-ti
-            if len(checkpoint) < 10 and all(isinstance(v, torch.Tensor) for v in checkpoint.values()):
+            if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
                 return ModelType.TextualInversion
         
         raise ValueError("Unable to determine model type")
@@ -201,6 +202,9 @@ class ProbeBase(object):
     def get_scheduler_prediction_type(self)->SchedulerPredictionType:
         pass
 
+    def get_format(self)->str:
+        pass
+
 class CheckpointProbeBase(ProbeBase):
     def __init__(self,
                  checkpoint_path: Path,
@@ -213,6 +217,9 @@ class CheckpointProbeBase(ProbeBase):
 
     def get_base_type(self)->BaseModelType:
         pass
+
+    def get_format(self)->str:
+        return 'checkpoint'
 
     def get_variant_type(self)-> ModelVariantType:
         model_type = ModelProbe.get_model_type_from_checkpoint(self.checkpoint_path,self.checkpoint)
@@ -255,7 +262,8 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
                     return SchedulerPredictionType.Epsilon
                 elif checkpoint["global_step"] == 110000:
                     return SchedulerPredictionType.VPrediction
-            if self.checkpoint_path and self.helper:
+            if self.checkpoint_path and self.helper \
+               and not self.checkpoint_path.with_suffix('.yaml').exists():  # if a .yaml config file exists, then this step not needed
                 return self.helper(self.checkpoint_path)
             else:
                 return None
@@ -266,6 +274,9 @@ class VaeCheckpointProbe(CheckpointProbeBase):
         return BaseModelType.StableDiffusion1
 
 class LoRACheckpointProbe(CheckpointProbeBase):
+    def get_format(self)->str:
+        return 'lycoris'
+
     def get_base_type(self)->BaseModelType:
         checkpoint = self.checkpoint
         key1 = "lora_te_text_model_encoder_layers_0_mlp_fc1.lora_down.weight"
@@ -285,6 +296,9 @@ class LoRACheckpointProbe(CheckpointProbeBase):
             return None
 
 class TextualInversionCheckpointProbe(CheckpointProbeBase):
+    def get_format(self)->str:
+        return None
+
     def get_base_type(self)->BaseModelType:
         checkpoint = self.checkpoint
         if 'string_to_token' in checkpoint:
@@ -331,6 +345,9 @@ class FolderProbeBase(ProbeBase):
     def get_variant_type(self)->ModelVariantType:
         return ModelVariantType.Normal
 
+    def get_format(self)->str:
+        return 'diffusers'
+    
 class PipelineFolderProbe(FolderProbeBase):
     def get_base_type(self)->BaseModelType:
         if self.model:
@@ -386,6 +403,9 @@ class VaeFolderProbe(FolderProbeBase):
         return BaseModelType.StableDiffusion1
 
 class TextualInversionFolderProbe(FolderProbeBase):
+    def get_format(self)->str:
+        return None
+    
     def get_base_type(self)->BaseModelType:
         path = self.folder_path / 'learned_embeds.bin'
         if not path.exists():

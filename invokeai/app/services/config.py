@@ -374,8 +374,10 @@ setting environment variables INVOKEAI_<setting>.
     tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
 
     root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
-    autoimport_dir      : Path = Field(default='autoimport', description='Path to a directory of models files to be imported on startup.', category='Paths')
-    autoconvert_dir     : Path = Field(default=None, description='Deprecated configuration option.', category='Paths')
+    autoimport_dir      : Path = Field(default='autoimport/main', description='Path to a directory of models files to be imported on startup.', category='Paths')
+    lora_dir            : Path = Field(default='autoimport/lora', description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', category='Paths')
+    embedding_dir       : Path = Field(default='autoimport/embedding', description='Path to a directory of Textual Inversion embeddings to be imported on startup.', category='Paths')
+    controlnet_dir      : Path = Field(default='autoimport/controlnet', description='Path to a directory of ControlNet embeddings to be imported on startup.', category='Paths')
     conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
     models_dir          : Path = Field(default='models', description='Path to the models directory', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')

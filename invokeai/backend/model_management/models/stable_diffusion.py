@@ -69,7 +69,7 @@ class StableDiffusion1Model(DiffusersModel):
                 in_channels = unet_config['in_channels']
 
             else:
-                raise Exception("Not supported stable diffusion diffusers format(possibly onnx?)")
+                raise NotImplementedError(f"{path} is not a supported stable diffusion diffusers format")
 
         else:
             raise NotImplementedError(f"Unknown stable diffusion 1.* format: {model_format}")
@@ -259,8 +259,8 @@ def _convert_ckpt_and_cache(
     """
     app_config = InvokeAIAppConfig.get_config()
 
-    weights = app_config.root_dir / model_config.path
-    config_file = app_config.root_dir / model_config.config
+    weights = app_config.root_path / model_config.path
+    config_file = app_config.root_path / model_config.config
     output_path = Path(output_path)
 
     # return cached version if it exists

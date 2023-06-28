@@ -34,12 +34,10 @@ export type InvocationTemplate = {
    * Array of invocation inputs
    */
   inputs: Record<string, InputFieldTemplate>;
-  // inputs: InputField[];
   /**
    * Array of the invocation outputs
    */
   outputs: Record<string, OutputFieldTemplate>;
-  // outputs: OutputField[];
 };
 
 export type FieldUIConfig = {
@@ -335,7 +333,7 @@ export type TypeHints = {
 };
 
 export type InvocationSchemaExtra = {
-  output: OpenAPIV3.ReferenceObject; // the output of the invocation
+  output: OpenAPIV3.SchemaObject; // the output of the invocation
   ui?: {
     tags?: string[];
     type_hints?: TypeHints;

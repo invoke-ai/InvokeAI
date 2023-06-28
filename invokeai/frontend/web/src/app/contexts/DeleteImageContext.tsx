@@ -15,7 +15,7 @@ import { ImageDTO } from 'services/api/types';
 import { RootState } from 'app/store/store';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { controlNetSelector } from 'features/controlNet/store/controlNetSlice';
-import { nodesSelecter } from 'features/nodes/store/nodesSlice';
+import { nodesSelector } from 'features/nodes/store/nodesSlice';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { some } from 'lodash-es';
 
@@ -30,7 +30,7 @@ export const selectImageUsage = createSelector(
   [
     generationSelector,
     canvasSelector,
-    nodesSelecter,
+    nodesSelector,
     controlNetSelector,
     (state: RootState, image_name?: string) => image_name,
   ],

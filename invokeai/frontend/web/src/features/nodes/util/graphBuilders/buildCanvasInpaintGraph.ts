@@ -9,7 +9,7 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { log } from 'app/logging/useLogger';
 import {
   ITERATE,
-  MODEL_LOADER,
+  PIPELINE_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
@@ -101,9 +101,9 @@ export const buildCanvasInpaintGraph = (
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
       },
-      [MODEL_LOADER]: {
+      [PIPELINE_MODEL_LOADER]: {
         type: 'pipeline_model_loader',
-        id: MODEL_LOADER,
+        id: PIPELINE_MODEL_LOADER,
         model,
       },
       [RANGE_OF_SIZE]: {
@@ -142,7 +142,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -152,7 +152,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -162,7 +162,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
@@ -172,7 +172,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: MODEL_LOADER,
+          node_id: PIPELINE_MODEL_LOADER,
           field: 'vae',
         },
         destination: {

@@ -14,9 +14,6 @@ import {
 import { ImageField } from 'services/api/types';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
-import { parseSchema } from '../util/parseSchema';
-import { log } from 'app/logging/useLogger';
-import { size } from 'lodash-es';
 import { RgbaColor } from 'react-colorful';
 import { RootState } from 'app/store/store';
 
@@ -78,25 +75,17 @@ const nodesSlice = createSlice({
     shouldShowGraphOverlayChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGraphOverlay = action.payload;
     },
-    parsedOpenAPISchema: (state, action: PayloadAction<OpenAPIV3.Document>) => {
-      try {
-        const parsedSchema = parseSchema(action.payload);
-
-        // TODO: Achtung! Side effect in a reducer!
-        log.info(
-          { namespace: 'schema', nodes: parsedSchema },
-          `Parsed ${size(parsedSchema)} nodes`
-        );
-        state.invocationTemplates = parsedSchema;
-      } catch (err) {
-        console.error(err);
-      }
+    nodeTemplatesBuilt: (
+      state,
+      action: PayloadAction<Record<string, InvocationTemplate>>
+    ) => {
+      state.invocationTemplates = action.payload;
     },
     nodeEditorReset: () => {
       return { ...initialNodesState };
     },
   },
-  extraReducers(builder) {
+  extraReducers: (builder) => {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
       state.schema = action.payload;
     });
@@ -112,10 +101,10 @@ export const {
   connectionStarted,
   connectionEnded,
   shouldShowGraphOverlayChanged,
-  parsedOpenAPISchema,
+  nodeTemplatesBuilt,
   nodeEditorReset,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
 
-export const nodesSelecter = (state: RootState) => state.nodes;
+export const nodesSelector = (state: RootState) => state.nodes;
