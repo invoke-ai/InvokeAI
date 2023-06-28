@@ -335,6 +335,7 @@
     "modelManager": {
         "modelManager": "Model Manager",
         "model": "Model",
+        "customVAE": "Custom VAE",
         "allModels": "All Models",
         "checkpointModels": "Checkpoints",
         "diffusersModels": "Diffusers",
