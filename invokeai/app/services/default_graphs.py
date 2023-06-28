@@ -1,4 +1,5 @@
-from ..invocations.latent import LatentsToImageInvocation, NoiseInvocation, TextToLatentsInvocation
+from ..invocations.latent import LatentsToImageInvocation, TextToLatentsInvocation
+from ..invocations.noise import NoiseInvocation
 from ..invocations.compel import CompelInvocation
 from ..invocations.params import ParamIntInvocation
 from .graph import Edge, EdgeConnection, ExposedNodeInput, ExposedNodeOutput, Graph, LibraryGraph
