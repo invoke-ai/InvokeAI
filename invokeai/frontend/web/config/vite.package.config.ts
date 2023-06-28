@@ -1,13 +1,19 @@
 import path from 'path';
-import { UserConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
-import { commonPlugins } from './common';
+import react from '@vitejs/plugin-react-swc';
+import { visualizer } from 'rollup-plugin-visualizer';
+import { PluginOption, UserConfig } from 'vite';
+import eslint from 'vite-plugin-eslint';
+import tsconfigPaths from 'vite-tsconfig-paths';
 
 export const packageConfig: UserConfig = {
   base: './',
   plugins: [
-    ...commonPlugins,
+    react(),
+    eslint(),
+    tsconfigPaths(),
+    visualizer() as unknown as PluginOption,
     dts({
       insertTypesEntry: true,
     }),
