@@ -1,23 +1,23 @@
+import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
+import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   ImageDTO,
   InpaintInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
 } from 'services/api/types';
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { log } from 'app/logging/useLogger';
+import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import {
+  INPAINT,
+  INPAINT_GRAPH,
   ITERATE,
-  PIPELINE_MODEL_LOADER,
+  MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
-  INPAINT_GRAPH,
-  INPAINT,
 } from './constants';
-import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
@@ -55,7 +55,7 @@ export const buildCanvasInpaintGraph = (
   // We may need to set the inpaint width and height to scale the image
   const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
 
-  const model = modelIdToPipelineModelField(modelId);
+  const model = modelIdToMainModelField(modelId);
 
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
@@ -101,9 +101,9 @@ export const buildCanvasInpaintGraph = (
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
       },
-      [PIPELINE_MODEL_LOADER]: {
-        type: 'pipeline_model_loader',
-        id: PIPELINE_MODEL_LOADER,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         model,
       },
       [RANGE_OF_SIZE]: {
@@ -142,7 +142,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -152,7 +152,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -162,7 +162,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
@@ -172,7 +172,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'vae',
         },
         destination: {

@@ -36,8 +36,8 @@ function ModelFilterButton({
 }
 
 const ModelList = () => {
-  const { data: pipelineModels } = useListModelsQuery({
-    model_type: 'pipeline',
+  const { data: mainModels } = useListModelsQuery({
+    model_type: 'main',
   });
 
   const [renderModelList, setRenderModelList] = React.useState<boolean>(false);
@@ -70,9 +70,9 @@ const ModelList = () => {
     const filteredModelListItemsToRender: ReactNode[] = [];
     const localFilteredModelListItemsToRender: ReactNode[] = [];
 
-    if (!pipelineModels) return;
+    if (!mainModels) return;
 
-    const modelList = pipelineModels.entities;
+    const modelList = mainModels.entities;
 
     Object.keys(modelList).forEach((model, i) => {
       if (
@@ -179,7 +179,7 @@ const ModelList = () => {
         )}
       </Flex>
     );
-  }, [pipelineModels, searchText, t, isSelectedFilter]);
+  }, [mainModels, searchText, t, isSelectedFilter]);
 
   return (
     <Flex flexDirection="column" rowGap={4} width="50%" minWidth="50%">

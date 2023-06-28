@@ -1,11 +1,13 @@
-from typing import Literal, Optional, Union, List
-from pydantic import BaseModel, Field
 import copy
+from typing import List, Literal, Optional, Union
 
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
+from pydantic import BaseModel, Field
 
-from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.model_management import BaseModelType, ModelType, SubModelType
+from ...backend.util.devices import choose_torch_device, torch_dtype
+from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
+                             InvocationConfig, InvocationContext)
+
 
 class ModelInfo(BaseModel):
     model_name: str = Field(description="Info to load submodel")
@@ -43,19 +45,19 @@ class ModelLoaderOutput(BaseInvocationOutput):
     #fmt: on
 
 
-class PipelineModelField(BaseModel):
-    """Pipeline model field"""
+class MainModelField(BaseModel):
+    """Main model field"""
 
     model_name: str = Field(description="Name of the model")
     base_model: BaseModelType = Field(description="Base model")
 
 
-class PipelineModelLoaderInvocation(BaseInvocation):
-    """Loads a pipeline model, outputting its submodels."""
+class MainModelLoaderInvocation(BaseInvocation):
+    """Loads a main model, outputting its submodels."""
 
-    type: Literal["pipeline_model_loader"] = "pipeline_model_loader"
+    type: Literal["main_model_loader"] = "main_model_loader"
 
-    model: PipelineModelField = Field(description="The model to load")
+    model: MainModelField = Field(description="The model to load")
     # TODO: precision?
 
     # Schema customisation

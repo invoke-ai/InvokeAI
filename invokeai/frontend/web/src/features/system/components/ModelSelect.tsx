@@ -5,9 +5,9 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { modelSelected } from 'features/parameters/store/generationSlice';
 
-import { forEach, isString } from 'lodash-es';
 import { SelectItem } from '@mantine/core';
 import { RootState } from 'app/store/store';
+import { forEach, isString } from 'lodash-es';
 import { useListModelsQuery } from 'services/api/endpoints/models';
 
 export const MODEL_TYPE_MAP = {
@@ -23,18 +23,18 @@ const ModelSelect = () => {
     (state: RootState) => state.generation.model
   );
 
-  const { data: pipelineModels, isLoading } = useListModelsQuery({
+  const { data: mainModels, isLoading } = useListModelsQuery({
     model_type: 'main',
   });
 
   const data = useMemo(() => {
-    if (!pipelineModels) {
+    if (!mainModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(pipelineModels.entities, (model, id) => {
+    forEach(mainModels.entities, (model, id) => {
       if (!model) {
         return;
       }
@@ -47,11 +47,11 @@ const ModelSelect = () => {
     });
 
     return data;
-  }, [pipelineModels]);
+  }, [mainModels]);
 
   const selectedModel = useMemo(
-    () => pipelineModels?.entities[selectedModelId],
-    [pipelineModels?.entities, selectedModelId]
+    () => mainModels?.entities[selectedModelId],
+    [mainModels?.entities, selectedModelId]
   );
 
   const handleChangeModel = useCallback(
@@ -65,20 +65,18 @@ const ModelSelect = () => {
   );
 
   useEffect(() => {
-    // If the selected model is not in the list of models, select the first one
-    // Handles first-run setting of models, and the user deleting the previously-selected model
-    if (selectedModelId && pipelineModels?.ids.includes(selectedModelId)) {
+    if (selectedModelId && mainModels?.ids.includes(selectedModelId)) {
       return;
     }
 
-    const firstModel = pipelineModels?.ids[0];
+    const firstModel = mainModels?.ids[0];
 
     if (!isString(firstModel)) {
       return;
     }
 
     handleChangeModel(firstModel);
-  }, [handleChangeModel, pipelineModels?.ids, selectedModelId]);
+  }, [handleChangeModel, mainModels?.ids, selectedModelId]);
 
   return isLoading ? (
     <IAIMantineSelect

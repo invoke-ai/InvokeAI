@@ -1,28 +1,28 @@
+import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
+import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   ImageCollectionInvocation,
   ImageResizeInvocation,
   ImageToLatentsInvocation,
   IterateInvocation,
 } from 'services/api/types';
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { log } from 'app/logging/useLogger';
+import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
+import { modelIdToMainModelField } from '../modelIdToMainModelField';
+import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import {
+  IMAGE_TO_IMAGE_GRAPH,
+  IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
-  PIPELINE_MODEL_LOADER,
+  LATENTS_TO_LATENTS,
+  MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  IMAGE_TO_IMAGE_GRAPH,
-  IMAGE_TO_LATENTS,
-  LATENTS_TO_LATENTS,
   RESIZE,
   IMAGE_COLLECTION,
   IMAGE_COLLECTION_ITERATE,
 } from './constants';
-import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
-import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
@@ -69,7 +69,7 @@ export const buildLinearImageToImageGraph = (
     throw new Error('No initial image found in state');
   }
 
-  const model = modelIdToPipelineModelField(modelId);
+  const model = modelIdToMainModelField(modelId);
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
@@ -89,9 +89,9 @@ export const buildLinearImageToImageGraph = (
         type: 'noise',
         id: NOISE,
       },
-      [PIPELINE_MODEL_LOADER]: {
-        type: 'pipeline_model_loader',
-        id: PIPELINE_MODEL_LOADER,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         model,
       },
       [LATENTS_TO_IMAGE]: {
@@ -118,7 +118,7 @@ export const buildLinearImageToImageGraph = (
     edges: [
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -128,7 +128,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -138,7 +138,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'vae',
         },
         destination: {
@@ -178,7 +178,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'vae',
         },
         destination: {
@@ -188,7 +188,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'unet',
         },
         destination: {

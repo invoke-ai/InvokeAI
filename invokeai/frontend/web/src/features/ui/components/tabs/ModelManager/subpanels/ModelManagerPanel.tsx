@@ -8,8 +8,8 @@ import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
 
 export default function ModelManagerPanel() {
-  const { data: pipelineModels } = useListModelsQuery({
-    model_type: 'pipeline',
+  const { data: mainModels } = useListModelsQuery({
+    model_type: 'main',
   });
 
   const openModel = useAppSelector(
@@ -17,20 +17,20 @@ export default function ModelManagerPanel() {
   );
 
   const renderModelEditTabs = () => {
-    if (!openModel || !pipelineModels) return;
+    if (!openModel || !mainModels) return;
 
-    if (pipelineModels['entities'][openModel]['model_format'] === 'diffusers') {
+    if (mainModels['entities'][openModel]['model_format'] === 'diffusers') {
       return (
         <DiffusersModelEdit
           modelToEdit={openModel}
-          retrievedModel={pipelineModels['entities'][openModel]}
+          retrievedModel={mainModels['entities'][openModel]}
         />
       );
     } else {
       return (
         <CheckpointModelEdit
           modelToEdit={openModel}
-          retrievedModel={pipelineModels['entities'][openModel]}
+          retrievedModel={mainModels['entities'][openModel]}
         />
       );
     }
