@@ -7,12 +7,46 @@ import {
   AlertDialogOverlay,
   Divider,
   Flex,
+  ListItem,
   Text,
+  UnorderedList,
 } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
 import { memo, useContext, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DeleteBoardImagesContext } from '../../../../app/contexts/DeleteBoardImagesContext';
+import { some } from 'lodash-es';
+import { ImageUsage } from '../../../../app/contexts/DeleteImageContext';
+
+const BoardImageInUseMessage = (props: { imagesUsage?: ImageUsage }) => {
+  const { imagesUsage } = props;
+
+  if (!imagesUsage) {
+    return null;
+  }
+
+  if (!some(imagesUsage)) {
+    return null;
+  }
+
+  return (
+    <>
+      <Text>
+        An image from this board is currently in use in the following features:
+      </Text>
+      <UnorderedList sx={{ paddingInlineStart: 6 }}>
+        {imagesUsage.isInitialImage && <ListItem>Image to Image</ListItem>}
+        {imagesUsage.isCanvasImage && <ListItem>Unified Canvas</ListItem>}
+        {imagesUsage.isControlNetImage && <ListItem>ControlNet</ListItem>}
+        {imagesUsage.isNodesImage && <ListItem>Node Editor</ListItem>}
+      </UnorderedList>
+      <Text>
+        If you delete images from this board, those features will immediately be
+        reset.
+      </Text>
+    </>
+  );
+};
 
 const DeleteBoardImagesModal = () => {
   const { t } = useTranslation();
@@ -23,6 +57,7 @@ const DeleteBoardImagesModal = () => {
     board,
     handleDeleteBoardImages,
     handleDeleteBoardOnly,
+    imagesUsage,
   } = useContext(DeleteBoardImagesContext);
 
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -43,6 +78,7 @@ const DeleteBoardImagesModal = () => {
 
             <AlertDialogBody>
               <Flex direction="column" gap={3}>
+                <BoardImageInUseMessage imagesUsage={imagesUsage} />
                 <Divider />
                 <Text>{t('common.areYouSure')}</Text>
                 <Text fontWeight="bold">
