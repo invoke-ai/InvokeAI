@@ -69,7 +69,7 @@ class StableDiffusion1Model(DiffusersModel):
                 in_channels = unet_config['in_channels']
 
             else:
-                raise Exception("Not supported stable diffusion diffusers format(possibly onnx?)")
+                raise NotImplementedError(f"{path} is not a supported stable diffusion diffusers format")
 
         else:
             raise NotImplementedError(f"Unknown stable diffusion 1.* format: {model_format}")

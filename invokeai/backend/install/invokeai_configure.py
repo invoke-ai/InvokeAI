@@ -7,8 +7,6 @@
 # Coauthor: Kevin Turner http://github.com/keturn
 #
 import sys
-print("Loading Python libraries...\n",file=sys.stderr)
-
 import argparse
 import io
 import os
@@ -705,18 +703,6 @@ def write_opts(opts: Namespace, init_file: Path):
 # -------------------------------------
 def default_output_dir() -> Path:
     return config.root_path / "outputs"
-
-# # -------------------------------------
-# def default_embedding_dir() -> Path:
-#     return config.root_path / "embeddings"
-
-# # -------------------------------------
-# def default_lora_dir() -> Path:
-#     return config.root_path / "loras"
-
-# # -------------------------------------
-# def default_controlnet_dir() -> Path:
-#     return config.root_path / "controlnets"
 
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):

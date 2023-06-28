@@ -316,31 +316,6 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             **kwargs,
         )
 
-        # label = "Directory to scan for models to automatically import (<tab> autocompletes):"
-        # self.nextrely += 1
-        # widgets.update(
-        #     autoload_directory = self.add_widget_intelligent(
-        #         FileBox,
-        #         max_height=3,
-        #         name=label,
-        #         value=str(config.root_path / config.autoimport_dir) if config.autoimport_dir else None,
-        #         select_dir=True,
-        #         must_exist=True,
-        #         use_two_lines=False,
-        #         labelColor="DANGER",
-        #         begin_entry_at=len(label)+1,
-        #         scroll_exit=True,
-        #     )
-        # )
-        # widgets.update(
-        #     autoscan_on_startup = self.add_widget_intelligent(
-        #         npyscreen.Checkbox,
-        #         name="Scan and import from this directory each time InvokeAI starts",
-        #         value=config.autoimport_dir is not None,
-        #         relx=4,
-        #         scroll_exit=True,
-        #     )
-        # )
         return widgets
 
     def resize(self):

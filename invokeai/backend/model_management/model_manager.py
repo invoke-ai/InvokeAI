@@ -714,9 +714,12 @@ class ModelManager(object):
 
                             if model_path.is_relative_to(self.app_config.root_path):
                                 model_path = model_path.relative_to(self.app_config.root_path)
-                            model_config: ModelConfigBase = model_class.probe_config(str(model_path))
-                            self.models[model_key] = model_config
-                            new_models_found = True
+                                try:
+                                    model_config: ModelConfigBase = model_class.probe_config(str(model_path))
+                                    self.models[model_key] = model_config
+                                    new_models_found = True
+                                except NotImplementedError as e:
+                                    self.logger.warning(e)
 
         imported_models = self.autoimport()
 
@@ -737,10 +740,10 @@ class ModelManager(object):
                                  )
         
         installed = set()
-
+        scanned_dirs = set()
+        
         config = self.app_config
         known_paths = {(self.app_config.root_path / x['path']) for x in self.list_models()}
-        scanned_dirs = set()
 
         for autodir in [config.autoimport_dir,
                         config.lora_dir,
@@ -748,19 +751,25 @@ class ModelManager(object):
                         config.controlnet_dir]:
             if autodir is None:
                 continue
+
+            self.logger.info(f'Scanning {autodir} for models to import')
         
             autodir = self.app_config.root_path / autodir
             if not autodir.exists():
                 continue
-        
+
+            items_scanned = 0
+            new_models_found = set()
+            
             for root, dirs, files in os.walk(autodir):
+                items_scanned += len(dirs) + len(files)
                 for d in dirs:
                     path = Path(root) / d
                     if path in known_paths or path.parent in scanned_dirs:
                         scanned_dirs.add(path)
                         continue
                     if any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin'}]):
-                        installed.update(installer.heuristic_install(path))
+                        new_models_found.update(installer.heuristic_install(path))
                         scanned_dirs.add(path)
 
                 for f in files:
@@ -768,7 +777,11 @@ class ModelManager(object):
                     if path in known_paths or path.parent in scanned_dirs:
                         continue
                     if path.suffix in {'.ckpt','.bin','.pth','.safetensors','.pt'}:
-                        installed.update(installer.heuristic_install(path))
+                        new_models_found.update(installer.heuristic_install(path))
+
+            self.logger.info(f'Scanned {items_scanned} files and directories, imported {len(new_models_found)} models')
+            installed.update(new_models_found)
+
         return installed
 
     def heuristic_import(self,

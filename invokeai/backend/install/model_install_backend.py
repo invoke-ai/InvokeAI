@@ -155,8 +155,6 @@ class ModelInstall(object):
     def install(self, selections: InstallSelections):
         job = 1
         jobs = len(selections.remove_models) + len(selections.install_models)
-#        if selections.scan_directory:
-#            jobs += 1
         
         # remove requested models
         for key in selections.remove_models:
@@ -218,7 +216,7 @@ class ModelInstall(object):
     # the model from being probed twice in the event that it has already been probed.
     def _install_path(self, path: Path, info: ModelProbeInfo=None)->Path:
         try:
-            logger.info(f'Probing {path}')
+            # logger.debug(f'Probing {path}')
             info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
             model_name = path.stem if info.format=='checkpoint' else path.name
             if self.mgr.model_exists(model_name, info.base_type, info.model_type):
