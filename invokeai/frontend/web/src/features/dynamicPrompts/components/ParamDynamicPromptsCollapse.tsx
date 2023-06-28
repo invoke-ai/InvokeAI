@@ -35,8 +35,8 @@ const ParamDynamicPromptsCollapse = () => {
       withSwitch
     >
       <Flex sx={{ gap: 2, flexDir: 'column' }}>
-        <ParamDynamicPromptsMaxPrompts />
         <ParamDynamicPromptsCombinatorial />
+        <ParamDynamicPromptsMaxPrompts />
       </Flex>
     </IAICollapse>
   );

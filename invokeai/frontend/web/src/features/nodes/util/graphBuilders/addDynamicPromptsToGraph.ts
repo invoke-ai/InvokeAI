@@ -37,7 +37,7 @@ export const addDynamicPromptsToGraph = (
     const dynamicPromptNode: DynamicPromptInvocation = {
       id: DYNAMIC_PROMPT,
       type: 'dynamic_prompt',
-      max_prompts: maxPrompts,
+      max_prompts: combinatorial ? maxPrompts : iterations,
       combinatorial,
       prompt: positivePrompt,
     };
