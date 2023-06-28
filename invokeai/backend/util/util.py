@@ -381,3 +381,18 @@ def image_to_dataURL(image: Image.Image, image_format: str = "PNG") -> str:
         buffered.getvalue()
     ).decode("UTF-8")
     return image_base64
+
+class Chdir(object):
+    '''Context manager to chdir to desired directory and change back after context exits:
+    Args:
+        path (Path): The path to the cwd
+    '''
+    def __init__(self, path: Path):
+        self.path = path
+        self.original = Path().absolute()
+
+    def __enter__(self):
+        os.chdir(self.path)
+
+    def __exit__(self,*args):
+        os.chdir(self.original)

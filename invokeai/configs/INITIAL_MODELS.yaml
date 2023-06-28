@@ -1,107 +1,92 @@
 # This file predefines a few models that the user may want to install.
-diffusers:
-   stable-diffusion-1.5:
-      description: Stable Diffusion version 1.5 diffusers model (4.27 GB)
-      repo_id: runwayml/stable-diffusion-v1-5
-      format: diffusers
-      vae:
-        repo_id: stabilityai/sd-vae-ft-mse
-      recommended: True
-      default: True
-   sd-inpainting-1.5:
-     description: RunwayML SD 1.5 model optimized for inpainting, diffusers version (4.27 GB)
-     repo_id: runwayml/stable-diffusion-inpainting
-     format: diffusers
-     vae:
-       repo_id: stabilityai/sd-vae-ft-mse
-     recommended: True
-   stable-diffusion-2.1:
-      description: Stable Diffusion version 2.1 diffusers model, trained on 768 pixel images (5.21 GB)
-      repo_id: stabilityai/stable-diffusion-2-1
-      format: diffusers
-      recommended: True
-   sd-inpainting-2.0:
-      description: Stable Diffusion version 2.0 inpainting model (5.21 GB)
-      repo_id: stabilityai/stable-diffusion-2-inpainting
-      format: diffusers
-      recommended: False
-   analog-diffusion-1.0:
-      description: An SD-1.5 model trained on diverse analog photographs (2.13 GB)
-      repo_id: wavymulder/Analog-Diffusion
-      format: diffusers
-      recommended: false
-   deliberate-1.0:
-      description: Versatile model that produces detailed images up to 768px (4.27 GB)
-      format: diffusers
-      repo_id: XpucT/Deliberate
-      recommended: False
-   d&d-diffusion-1.0:
-      description: Dungeons & Dragons characters (2.13 GB)
-      format: diffusers
-      repo_id: 0xJustin/Dungeons-and-Diffusion
-      recommended: False
-   dreamlike-photoreal-2.0:
-      description: A photorealistic model trained on 768 pixel images based on SD 1.5 (2.13 GB)
-      format: diffusers
-      repo_id: dreamlike-art/dreamlike-photoreal-2.0
-      recommended: False
-   inkpunk-1.0:
-      description: Stylized illustrations inspired by Gorillaz, FLCL and Shinkawa; prompt with "nvinkpunk" (4.27 GB)
-      format: diffusers
-      repo_id: Envvi/Inkpunk-Diffusion
-      recommended: False
-   openjourney-4.0:
-      description: An SD 1.5 model fine tuned on Midjourney; prompt with "mdjrny-v4 style" (2.13 GB)
-      format: diffusers
-      repo_id: prompthero/openjourney
-      vae:
-        repo_id: stabilityai/sd-vae-ft-mse
-      recommended: False
-   portrait-plus-1.0:
-      description: An SD-1.5 model trained on close range portraits of people; prompt with "portrait+" (2.13 GB)
-      format: diffusers
-      repo_id: wavymulder/portraitplus
-      recommended: False
-   seek-art-mega-1.0:
-      description: A general use SD-1.5 "anything" model that supports multiple styles (2.1 GB)
-      repo_id: coreco/seek.art_MEGA
-      format: diffusers
-      vae:
-        repo_id: stabilityai/sd-vae-ft-mse
-      recommended: False
-   trinart-2.0:
-      description: An SD-1.5 model finetuned with ~40K assorted high resolution manga/anime-style images (2.13 GB)
-      repo_id: naclbit/trinart_stable_diffusion_v2
-      format: diffusers
-      vae:
-        repo_id: stabilityai/sd-vae-ft-mse
-      recommended: False
-   waifu-diffusion-1.4:
-      description: An SD-1.5 model trained on 680k anime/manga-style images (2.13 GB)
-      repo_id: hakurei/waifu-diffusion
-      format: diffusers
-      vae:
-        repo_id: stabilityai/sd-vae-ft-mse
-      recommended: False
-controlnet:
-   canny: lllyasviel/control_v11p_sd15_canny
-   inpaint: lllyasviel/control_v11p_sd15_inpaint
-   mlsd: lllyasviel/control_v11p_sd15_mlsd
-   depth: lllyasviel/control_v11f1p_sd15_depth
-   normal_bae: lllyasviel/control_v11p_sd15_normalbae
-   seg: lllyasviel/control_v11p_sd15_seg
-   lineart: lllyasviel/control_v11p_sd15_lineart
-   lineart_anime: lllyasviel/control_v11p_sd15s2_lineart_anime
-   scribble: lllyasviel/control_v11p_sd15_scribble
-   softedge: lllyasviel/control_v11p_sd15_softedge
-   shuffle: lllyasviel/control_v11e_sd15_shuffle
-   tile: lllyasviel/control_v11f1e_sd15_tile
-   ip2p: lllyasviel/control_v11e_sd15_ip2p
-textual_inversion:
-   'EasyNegative': https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors
-   'ahx-beta-453407d': sd-concepts-library/ahx-beta-453407d
-lora:
-   'LowRA': https://civitai.com/api/download/models/63006
-   'Ink scenery': https://civitai.com/api/download/models/83390
-   'sd-model-finetuned-lora-t4': sayakpaul/sd-model-finetuned-lora-t4
- 
+sd-1/main/stable-diffusion-v1-5:
+   description: Stable Diffusion version 1.5 diffusers model (4.27 GB)
+   repo_id: runwayml/stable-diffusion-v1-5
+   recommended: True
+   default: True
+sd-1/main/stable-diffusion-inpainting:
+   description: RunwayML SD 1.5 model optimized for inpainting, diffusers version (4.27 GB)
+   repo_id: runwayml/stable-diffusion-inpainting
+   recommended: True
+sd-2/main/stable-diffusion-2-1:
+   description: Stable Diffusion version 2.1 diffusers model, trained on 768 pixel images (5.21 GB)
+   repo_id: stabilityai/stable-diffusion-2-1
+   recommended: True
+sd-2/main/stable-diffusion-2-inpainting:
+   description: Stable Diffusion version 2.0 inpainting model (5.21 GB)
+   repo_id: stabilityai/stable-diffusion-2-inpainting
+   recommended: False
+sd-1/main/Analog-Diffusion:
+   description: An SD-1.5 model trained on diverse analog photographs (2.13 GB)
+   repo_id: wavymulder/Analog-Diffusion
+   recommended: false
+sd-1/main/Deliberate:
+   description: Versatile model that produces detailed images up to 768px (4.27 GB)
+   repo_id: XpucT/Deliberate
+   recommended: False
+sd-1/main/Dungeons-and-Diffusion:
+   description: Dungeons & Dragons characters (2.13 GB)
+   repo_id: 0xJustin/Dungeons-and-Diffusion
+   recommended: False
+sd-1/main/dreamlike-photoreal-2:
+   description: A photorealistic model trained on 768 pixel images based on SD 1.5 (2.13 GB)
+   repo_id: dreamlike-art/dreamlike-photoreal-2.0
+   recommended: False
+sd-1/main/Inkpunk-Diffusion:
+   description: Stylized illustrations inspired by Gorillaz, FLCL and Shinkawa; prompt with "nvinkpunk" (4.27 GB)
+   repo_id: Envvi/Inkpunk-Diffusion
+   recommended: False
+sd-1/main/openjourney:
+   description: An SD 1.5 model fine tuned on Midjourney; prompt with "mdjrny-v4 style" (2.13 GB)
+   repo_id: prompthero/openjourney
+   recommended: False
+sd-1/main/portraitplus:
+   description: An SD-1.5 model trained on close range portraits of people; prompt with "portrait+" (2.13 GB)
+   repo_id: wavymulder/portraitplus
+   recommended: False
+sd-1/main/seek.art_MEGA:
+   repo_id: coreco/seek.art_MEGA
+   description: A general use SD-1.5 "anything" model that supports multiple styles (2.1 GB)
+   recommended: False
+sd-1/main/trinart_stable_diffusion_v2:
+   description: An SD-1.5 model finetuned with ~40K assorted high resolution manga/anime-style images (2.13 GB)
+   repo_id: naclbit/trinart_stable_diffusion_v2
+   recommended: False
+sd-1/main/waifu-diffusion:
+   description: An SD-1.5 model trained on 680k anime/manga-style images (2.13 GB)
+   repo_id: hakurei/waifu-diffusion
+   recommended: False
+sd-1/controlnet/canny:
+   repo_id: lllyasviel/control_v11p_sd15_canny
+sd-1/controlnet/inpaint:
+   repo_id: lllyasviel/control_v11p_sd15_inpaint
+sd-1/controlnet/mlsd:
+   repo_id: lllyasviel/control_v11p_sd15_mlsd
+sd-1/controlnet/depth:
+   repo_id: lllyasviel/control_v11f1p_sd15_depth
+sd-1/controlnet/normal_bae:
+   repo_id: lllyasviel/control_v11p_sd15_normalbae
+sd-1/controlnet/seg:
+   repo_id: lllyasviel/control_v11p_sd15_seg
+sd-1/controlnet/lineart:
+   repo_id: lllyasviel/control_v11p_sd15_lineart
+sd-1/controlnet/lineart_anime:
+   repo_id: lllyasviel/control_v11p_sd15s2_lineart_anime
+sd-1/controlnet/scribble:
+   repo_id: lllyasviel/control_v11p_sd15_scribble
+sd-1/controlnet/softedge:
+   repo_id: lllyasviel/control_v11p_sd15_softedge
+sd-1/controlnet/shuffle:
+   repo_id: lllyasviel/control_v11e_sd15_shuffle
+sd-1/controlnet/tile:
+   repo_id: lllyasviel/control_v11f1e_sd15_tile
+sd-1/controlnet/ip2p:
+   repo_id: lllyasviel/control_v11e_sd15_ip2p
+sd-1/embedding/EasyNegative:
+   path: https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors
+sd-1/embedding/ahx-beta-453407d:
+   repo_id: sd-concepts-library/ahx-beta-453407d
+sd-1/lora/LowRA:
+   path: https://civitai.com/api/download/models/63006
+sd-1/lora/Ink scenery:
+   path: https://civitai.com/api/download/models/83390

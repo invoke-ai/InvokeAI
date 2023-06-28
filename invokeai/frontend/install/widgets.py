@@ -17,8 +17,8 @@ from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 
 # minimum size for UIs
-MIN_COLS = 120
-MIN_LINES = 50
+MIN_COLS = 130
+MIN_LINES = 40
 
 # -------------------------------------
 def set_terminal_size(columns: int, lines: int, launch_command: str=None):
@@ -73,6 +73,12 @@ def _set_terminal_size_unix(width: int, height: int):
     import fcntl
     import termios
 
+    # These terminals accept the size command and report that the
+    # size changed, but they lie!!!
+    for bad_terminal in ['TERMINATOR_UUID', 'ALACRITTY_WINDOW_ID']:
+        if os.environ.get(bad_terminal):
+            return
+    
     winsize = struct.pack("HHHH", height, width, 0, 0)
     fcntl.ioctl(sys.stdout.fileno(), termios.TIOCSWINSZ, winsize)
     sys.stdout.write("\x1b[8;{height};{width}t".format(height=height, width=width))
@@ -86,6 +92,12 @@ def set_min_terminal_size(min_cols: int, min_lines: int, launch_command: str=Non
     cols = max(term_cols, min_cols)
     lines = max(term_lines, min_lines)
     set_terminal_size(cols, lines, launch_command)
+
+    # did it work?
+    term_cols, term_lines = get_terminal_size()
+    if term_cols < cols or term_lines < lines:
+        print(f'This window is too small for optimal display. For best results please enlarge it.')
+        input('After resizing, press any key to continue...')
 
 class IntSlider(npyscreen.Slider):
     def translate_value(self):
@@ -390,13 +402,12 @@ def select_stable_diffusion_config_file(
         wrap:bool =True,
         model_name:str='Unknown',
 ):
-    message = "Please select the correct base model for the V2 checkpoint named {model_name}. Press <CANCEL> to skip installation."
+    message = f"Please select the correct base model for the V2 checkpoint named '{model_name}'. Press <CANCEL> to skip installation."
     title = "CONFIG FILE SELECTION"
     options=[
         "An SD v2.x base model (512 pixels; no 'parameterization:' line in its yaml file)",
         "An SD v2.x v-predictive model (768 pixels; 'parameterization: \"v\"' line in its yaml file)",
         "Skip installation for now and come back later",
-        "Enter config file path manually",
     ]
 
     F = ConfirmCancelPopup(
@@ -418,35 +429,17 @@ def select_stable_diffusion_config_file(
     mlw.values = message
 
     choice = F.add(
-        SingleSelectWithChanged,
+        npyscreen.SelectOne,
         values = options,
         value = [0],
         max_height = len(options)+1,
         scroll_exit=True,
     )
-    file = F.add(
-        FileBox,
-        name='Path to config file',
-        max_height=3,
-        hidden=True,
-        must_exist=True,
-        scroll_exit=True
-    )
-
-    def toggle_visible(value):
-        value = value[0]
-        if value==3:
-            file.hidden=False
-        else:
-            file.hidden=True
-        F.display()
-        
-    choice.on_changed = toggle_visible
 
     F.editw = 1
     F.edit()
     if not F.value:
         return None
-    assert choice.value[0] in range(0,4),'invalid choice'
-    choices = ['epsilon','v','abort',file.value]
+    assert choice.value[0] in range(0,3),'invalid choice'
+    choices = ['epsilon','v','abort']
     return choices[choice.value[0]]

@@ -11,7 +11,6 @@ The work is actually done in backend code in model_install_backend.py.
 
 import argparse
 import curses
-import os
 import sys
 import textwrap
 import traceback
@@ -20,28 +19,22 @@ from multiprocessing import Process
 from multiprocessing.connection import Connection, Pipe
 from pathlib import Path
 from shutil import get_terminal_size
-from typing import List
 
 import logging
 import npyscreen
 import torch
 from npyscreen import widget
-from omegaconf import OmegaConf
 
 from invokeai.backend.util.logging import InvokeAILogger
 
 from invokeai.backend.install.model_install_backend import (
-    Dataset_path,
-    default_config_file,
-    default_dataset,
-    install_requested_models,
-    recommended_datasets,
     ModelInstallList,
-    UserSelections,
+    InstallSelections,
+    ModelInstall,
+    SchedulerPredictionType,
 )
-from invokeai.backend import ModelManager
+from invokeai.backend.model_management import ModelManager, ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
-from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.widgets import (
     CenteredTitleText,
     MultiSelectColumns,
@@ -58,6 +51,7 @@ from invokeai.frontend.install.widgets import (
 from invokeai.app.services.config import InvokeAIAppConfig
 
 config = InvokeAIAppConfig.get_config()
+logger = InvokeAILogger.getLogger()
 
 # build a table mapping all non-printable characters to None
 # for stripping control characters
@@ -71,8 +65,8 @@ def make_printable(s:str)->str:
     return s.translate(NOPRINT_TRANS_TABLE)
 
 class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
-    # for responsive resizing - disabled
-    # FIX_MINIMUM_SIZE_WHEN_CREATED = False
+    # for responsive resizing set to False, but this seems to cause a crash!
+    FIX_MINIMUM_SIZE_WHEN_CREATED = True
     
     # for persistence
     current_tab = 0
@@ -90,25 +84,10 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         if not config.model_conf_path.exists():
             with open(config.model_conf_path,'w') as file:
                 print('# InvokeAI model configuration file',file=file)
-        model_manager = ModelManager(config.model_conf_path)
-        
-        self.starter_models = OmegaConf.load(Dataset_path)['diffusers']
-        self.installed_diffusers_models = self.list_additional_diffusers_models(
-             model_manager,
-             self.starter_models,
-        )
-        self.installed_cn_models = model_manager.list_controlnet_models()
-        self.installed_lora_models = model_manager.list_lora_models()
-        self.installed_ti_models = model_manager.list_ti_models()
-
-        try:
-            self.existing_models = OmegaConf.load(default_config_file())
-        except:
-            self.existing_models = dict()
-            
-        self.starter_model_list = list(self.starter_models.keys())
-        self.installed_models = dict()
-
+        self.installer = ModelInstall(config)
+        self.all_models = self.installer.all_models()
+        self.starter_models = self.installer.starter_models()
+        self.model_labels = self._get_model_labels()        
         window_width, window_height = get_terminal_size()
 
         self.nextrely -= 1
@@ -141,39 +120,37 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             scroll_exit = True,
         )
         self.tabs.on_changed = self._toggle_tables
-        
+
         top_of_table = self.nextrely
-        self.starter_diffusers_models = self.add_starter_diffusers()
+        self.starter_pipelines = self.add_starter_pipelines()
         bottom_of_table = self.nextrely
 
         self.nextrely = top_of_table
-        self.diffusers_models = self.add_diffusers_widgets(
-            predefined_models=self.installed_diffusers_models,
-            model_type='Diffusers',
+        self.pipeline_models = self.add_pipeline_widgets(
+            model_type=ModelType.Main,
             window_width=window_width,
+            exclude = self.starter_models
         )
+        # self.pipeline_models['autoload_pending'] = True
         bottom_of_table = max(bottom_of_table,self.nextrely)
 
         self.nextrely = top_of_table
         self.controlnet_models = self.add_model_widgets(
-            predefined_models=self.installed_cn_models,
-            model_type='ControlNet',
+            model_type=ModelType.ControlNet,
             window_width=window_width,
         )
         bottom_of_table = max(bottom_of_table,self.nextrely)
 
         self.nextrely = top_of_table
         self.lora_models = self.add_model_widgets(
-            predefined_models=self.installed_lora_models,
-            model_type="LoRA/LyCORIS",
+            model_type=ModelType.Lora,
             window_width=window_width,
         )
         bottom_of_table = max(bottom_of_table,self.nextrely)
 
         self.nextrely = top_of_table
         self.ti_models = self.add_model_widgets(
-            predefined_models=self.installed_ti_models,
-            model_type="Textual Inversion Embeddings",
+            model_type=ModelType.TextualInversion,
             window_width=window_width,
         )
         bottom_of_table = max(bottom_of_table,self.nextrely)
@@ -184,7 +161,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             BufferBox,
             name='Log Messages',
             editable=False,
-            max_height = 16,
+            max_height = 10,
         )
         
         self.nextrely += 1
@@ -197,13 +174,14 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 rely=-3,
                 when_pressed_function=self.on_back,
             )
-        self.ok_button = self.add_widget_intelligent(
-            npyscreen.ButtonPress,
-            name=done_label,
-            relx=(window_width - len(done_label)) // 2,
-            rely=-3,
-            when_pressed_function=self.on_execute
-        )
+        else:
+            self.ok_button = self.add_widget_intelligent(
+                npyscreen.ButtonPress,
+                name=done_label,
+                relx=(window_width - len(done_label)) // 2,
+                rely=-3,
+                when_pressed_function=self.on_execute
+            )
 
         label = "APPLY CHANGES & EXIT"
         self.done = self.add_widget_intelligent(
@@ -220,18 +198,15 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self._toggle_tables([self.current_tab])
 
     ############# diffusers tab ##########        
-    def add_starter_diffusers(self)->dict[str, npyscreen.widget]:
+    def add_starter_pipelines(self)->dict[str, npyscreen.widget]:
         '''Add widgets responsible for selecting diffusers models'''
         widgets = dict()
-
-        starter_model_labels = self._get_starter_model_labels()
-        recommended_models = [
-            x
-            for x in self.starter_model_list
-            if self.starter_models[x].get("recommended", False)
-        ]
+        models = self.all_models
+        starters = self.starter_models
+        starter_model_labels = self.model_labels
+        
         self.installed_models = sorted(
-            [x for x in list(self.starter_models.keys()) if x in self.existing_models]
+            [x for x in starters if models[x].installed]
         )
 
         widgets.update(
@@ -246,55 +221,46 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.nextrely -= 1
         # if user has already installed some initial models, then don't patronize them
         # by showing more recommendations
-        show_recommended = not self.existing_models
+        show_recommended = len(self.installed_models)==0
+        keys = [x for x in models.keys() if x in starters]
         widgets.update(
             models_selected = self.add_widget_intelligent(
                 MultiSelectColumns,
                 columns=1,
                 name="Install Starter Models",
-                values=starter_model_labels,
+                values=[starter_model_labels[x] for x in keys],
                 value=[
-                    self.starter_model_list.index(x)
-                    for x in self.starter_model_list
-                    if (show_recommended and x in recommended_models)\
-                    or (x in self.existing_models)
+                    keys.index(x)
+                    for x in keys
+                    if (show_recommended and models[x].recommended) \
+                    or (x in self.installed_models)
                 ],
-                max_height=len(starter_model_labels) + 1,
+                max_height=len(starters) + 1,
                 relx=4,
                 scroll_exit=True,
-            )
+            ),
+            models = keys,
         )
 
-        widgets.update(
-            purge_deleted = self.add_widget_intelligent(
-                npyscreen.Checkbox,
-                name="Purge unchecked diffusers models from disk",
-                value=False,
-                scroll_exit=True,
-                relx=4,
-            )
-        )
-        widgets['purge_deleted'].when_value_edited = lambda: self.sync_purge_buttons(widgets['purge_deleted'])
-        
         self.nextrely += 1
         return widgets
 
     ############# Add a set of model install widgets ########
     def add_model_widgets(self,
-                          predefined_models: dict[str,bool],
-                          model_type: str,
+                          model_type: ModelType,
                           window_width: int=120,
                           install_prompt: str=None,
-                          add_purge_deleted: bool=False,
+                          exclude: set=set(),
                           )->dict[str,npyscreen.widget]:
         '''Generic code to create model selection widgets'''
         widgets = dict()
-        model_list = sorted(predefined_models.keys())
+        model_list = [x for x in self.all_models if self.all_models[x].model_type==model_type and not x in exclude]
+        model_labels = [self.model_labels[x] for x in model_list]
         if len(model_list) > 0:
-            max_width = max([len(x) for x in model_list])
+            max_width = max([len(x) for x in model_labels])
             columns = window_width // (max_width+8)  # 8 characters for "[x] " and padding
             columns = min(len(model_list),columns) or 1
-            prompt = install_prompt or f"Select the desired {model_type} models to install. Unchecked models will be purged from disk."
+            prompt = install_prompt or f"Select the desired {model_type.value.title()} models to install. Unchecked models will be purged from disk."
 
             widgets.update(
                 label1 = self.add_widget_intelligent(
@@ -310,30 +276,18 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                     MultiSelectColumns,
                     columns=columns,
                     name=f"Install {model_type} Models",
-                    values=model_list,
+                    values=model_labels,
                     value=[
                         model_list.index(x)
                         for x in model_list
-                        if predefined_models[x]
+                        if self.all_models[x].installed
                     ],
                     max_height=len(model_list)//columns + 1,
                     relx=4,
                     scroll_exit=True,
-                )
+                ),
+                models = model_list,
             )
-
-            if add_purge_deleted:
-                self.nextrely += 1
-                widgets.update(
-                    purge_deleted = self.add_widget_intelligent(
-                        npyscreen.Checkbox,
-                        name="Purge unchecked diffusers models from disk",
-                        value=False,
-                        scroll_exit=True,
-                        relx=4,
-                    )
-                )
-                widgets['purge_deleted'].when_value_edited = lambda: self.sync_purge_buttons(widgets['purge_deleted'])
 
         self.nextrely += 1
         widgets.update(
@@ -348,63 +302,33 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         return widgets
 
     ### Tab for arbitrary diffusers widgets ###
-    def add_diffusers_widgets(self,
-                              predefined_models: dict[str,bool],
-                              model_type: str='Diffusers',
-                              window_width: int=120,
-                              )->dict[str,npyscreen.widget]:
+    def add_pipeline_widgets(self,
+                             model_type: ModelType=ModelType.Main,
+                             window_width: int=120,
+                             **kwargs,
+                             )->dict[str,npyscreen.widget]:
         '''Similar to add_model_widgets() but adds some additional widgets at the bottom
         to support the autoload directory'''
         widgets = self.add_model_widgets(
-            predefined_models,
-            'Diffusers',
-            window_width,
-            install_prompt="Additional diffusers models already installed.",
-            add_purge_deleted=True
+            model_type = model_type,
+            window_width = window_width,
+            install_prompt=f"Additional {model_type.value.title()} models already installed.",
+            **kwargs,
         )
 
-        label = "Directory to scan for models to automatically import (<tab> autocompletes):"
-        self.nextrely += 1
-        widgets.update(
-            autoload_directory = self.add_widget_intelligent(
-                FileBox,
-                max_height=3,
-                name=label,
-                value=str(config.autoconvert_dir) if config.autoconvert_dir else None,
-                select_dir=True,
-                must_exist=True,
-                use_two_lines=False,
-                labelColor="DANGER",
-                begin_entry_at=len(label)+1,
-                scroll_exit=True,
-            )
-        )
-        widgets.update(
-            autoscan_on_startup = self.add_widget_intelligent(
-                npyscreen.Checkbox,
-                name="Scan and import from this directory each time InvokeAI starts",
-                value=config.autoconvert_dir is not None,
-                relx=4,
-                scroll_exit=True,
-            )
-        )
         return widgets
 
-    def sync_purge_buttons(self,checkbox):
-        value = checkbox.value
-        self.starter_diffusers_models['purge_deleted'].value = value
-        self.diffusers_models['purge_deleted'].value = value
-        
     def resize(self):
         super().resize()
-        if (s := self.starter_diffusers_models.get("models_selected")):
-            s.values = self._get_starter_model_labels()
+        if (s := self.starter_pipelines.get("models_selected")):
+            keys = [x for x in self.all_models.keys() if x in self.starter_models]
+            s.values = [self.model_labels[x] for x in keys]
 
     def _toggle_tables(self, value=None):
         selected_tab = value[0]
         widgets = [
-            self.starter_diffusers_models,
-            self.diffusers_models,
+            self.starter_pipelines,
+            self.pipeline_models,
             self.controlnet_models,
             self.lora_models,
             self.ti_models,
@@ -412,34 +336,38 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
         for group in widgets:
             for k,v in group.items():
-                v.hidden = True
-                v.editable = False
+                try:
+                    v.hidden = True
+                    v.editable = False
+                except:
+                    pass
         for k,v in widgets[selected_tab].items():
-            v.hidden = False
-            if not isinstance(v,(npyscreen.FixedText, npyscreen.TitleFixedText, CenteredTitleText)):
-                v.editable = True
+            try:
+                v.hidden = False
+                if not isinstance(v,(npyscreen.FixedText, npyscreen.TitleFixedText, CenteredTitleText)):
+                    v.editable = True
+            except:
+                pass
         self.__class__.current_tab = selected_tab  # for persistence
         self.display()
 
-    def _get_starter_model_labels(self) -> List[str]:
+    def _get_model_labels(self) -> dict[str,str]:
         window_width, window_height = get_terminal_size()
-        label_width = 25
         checkbox_width = 4
         spacing_width = 2
+        
+        models = self.all_models
+        label_width = max([len(models[x].name) for x in models])
         description_width = window_width - label_width - checkbox_width - spacing_width
-        im = self.starter_models
-        names = self.starter_model_list
-        descriptions = [
-            im[x].description[0 : description_width - 3] + "..."
-            if len(im[x].description) > description_width
-            else im[x].description
-            for x in names
-        ]
-        return [
-            f"%-{label_width}s %s" % (names[x], descriptions[x])
-            for x in range(0, len(names))
-        ]
 
+        result = dict()
+        for x in models.keys():
+            description = models[x].description
+            description = description[0 : description_width - 3] + "..." \
+                if description and len(description) > description_width \
+                   else description if description else ''
+            result[x] =  f"%-{label_width}s %s" % (models[x].name, description)
+        return result
             
     def _get_columns(self) -> int:
         window_width, window_height = get_terminal_size()
@@ -467,7 +395,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             target = process_and_execute,
             kwargs=dict(
                 opt = app.program_opts,
-                selections = app.user_selections,
+                selections = app.install_selections,
                 conn_out = child_conn,
             )
         )
@@ -475,8 +403,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         child_conn.close()
         self.subprocess_connection = parent_conn
         self.subprocess = p
-        app.user_selections = UserSelections()
-        # process_and_execute(app.opt, app.user_selections)
+        app.install_selections = InstallSelections()
+        # process_and_execute(app.opt, app.install_selections)
 
     def on_back(self):
         self.parentApp.switchFormPrevious()
@@ -492,7 +420,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.parentApp.setNextForm(None)
         self.parentApp.user_cancelled = False
         self.editing = False
-
+        
     ########## This routine monitors the child process that is performing model installation and removal #####
     def while_waiting(self):
         '''Called during idle periods. Main task is to update the Log Messages box with messages
@@ -548,8 +476,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         
         # rebuild the form, saving and restoring some of the fields that need to be preserved.
         saved_messages = self.monitor.entry_widget.values
-        autoload_dir = self.diffusers_models['autoload_directory'].value
-        autoscan = self.diffusers_models['autoscan_on_startup'].value
+        # autoload_dir = str(config.root_path / self.pipeline_models['autoload_directory'].value)
+        # autoscan = self.pipeline_models['autoscan_on_startup'].value
         
         app.main_form = app.addForm(
             "MAIN", addModelsForm, name="Install Stable Diffusion Models", multipage=self.multipage,
@@ -558,23 +486,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         
         app.main_form.monitor.entry_widget.values = saved_messages
         app.main_form.monitor.entry_widget.buffer([''],scroll_end=True)
-        app.main_form.diffusers_models['autoload_directory'].value = autoload_dir
-        app.main_form.diffusers_models['autoscan_on_startup'].value = autoscan
-        
-    ###############################################################
-    
-    def list_additional_diffusers_models(self,
-                                         manager: ModelManager,
-                                         starters:dict
-                                         )->dict[str,bool]:
-        '''Return a dict of all the currently installed models that are not on the starter list'''
-        model_info = manager.list_models()
-        additional_models = {
-            x:True for x in model_info \
-            if model_info[x]['format']=='diffusers' \
-            and x not in starters
-        }
-        return additional_models
+        # app.main_form.pipeline_models['autoload_directory'].value = autoload_dir
+        # app.main_form.pipeline_models['autoscan_on_startup'].value = autoscan
         
     def marshall_arguments(self):
         """
@@ -586,89 +499,40 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         .autoscan_on_startup:  True if invokeai should scan and import at startup time
         .import_model_paths:   list of URLs, repo_ids and file paths to import
         """
-        # we're using a global here rather than storing the result in the parentapp
-        # due to some bug in npyscreen that is causing attributes to be lost
-        selections = self.parentApp.user_selections
+        selections = self.parentApp.install_selections
+        all_models = self.all_models
 
-        # Starter models to install/remove
-        starter_models = dict(
-            map(
-                lambda x: (self.starter_model_list[x], True),
-                self.starter_diffusers_models['models_selected'].value,
-            )
-        )
-        selections.purge_deleted_models = self.starter_diffusers_models['purge_deleted'].value or \
-            self.diffusers_models['purge_deleted'].value
-        
-        selections.install_models = [x for x in starter_models if x not in self.existing_models]
-        selections.remove_models = [x for x in self.starter_model_list if x in self.existing_models and x not in starter_models]
+        # Defined models (in INITIAL_CONFIG.yaml or models.yaml) to add/remove
+        ui_sections = [self.starter_pipelines, self.pipeline_models,
+                       self.controlnet_models, self.lora_models, self.ti_models]
+        for section in ui_sections:
+            if not 'models_selected' in section:
+                continue
+            selected = set([section['models'][x] for x in section['models_selected'].value])
+            models_to_install = [x for x in selected if not self.all_models[x].installed]
+            models_to_remove = [x for x in section['models'] if x not in selected and self.all_models[x].installed]
+            selections.remove_models.extend(models_to_remove)
+            selections.install_models.extend(all_models[x].path or all_models[x].repo_id \
+                                             for x in models_to_install if all_models[x].path or all_models[x].repo_id)
 
-        # "More" models
-        selections.import_model_paths = self.diffusers_models['download_ids'].value.split()
-        if diffusers_selected := self.diffusers_models.get('models_selected'):
-            selections.remove_models.extend([x
-                                             for x in diffusers_selected.values
-                                             if self.installed_diffusers_models[x]
-                                             and diffusers_selected.values.index(x) not in diffusers_selected.value
-                                             ]
-                                            )
-                                        
-        # TODO: REFACTOR THIS REPETITIVE CODE
-        if cn_models_selected := self.controlnet_models.get('models_selected'):
-            selections.install_cn_models = [cn_models_selected.values[x]
-                                            for x in cn_models_selected.value
-                                            if not self.installed_cn_models[cn_models_selected.values[x]]
-                                            ]
-            selections.remove_cn_models = [x
-                                           for x in cn_models_selected.values
-                                           if self.installed_cn_models[x]
-                                           and cn_models_selected.values.index(x) not in cn_models_selected.value
-                                           ]
-        if (additional_cns := self.controlnet_models['download_ids'].value.split()):
-            valid_cns = [x for x in additional_cns if '/' in x]
-            selections.install_cn_models.extend(valid_cns)
+        # models located in the 'download_ids" section
+        for section in ui_sections:
+            if downloads := section.get('download_ids'):
+                selections.install_models.extend(downloads.value.split())
 
-        # same thing, for LoRAs
-        if loras_selected := self.lora_models.get('models_selected'):
-            selections.install_lora_models = [loras_selected.values[x]
-                                              for x in loras_selected.value
-                                              if not self.installed_lora_models[loras_selected.values[x]]
-                                              ]
-            selections.remove_lora_models = [x
-                                             for x in loras_selected.values
-                                             if self.installed_lora_models[x]
-                                             and loras_selected.values.index(x) not in loras_selected.value
-                                             ]
-        if (additional_loras := self.lora_models['download_ids'].value.split()):
-            selections.install_lora_models.extend(additional_loras)
-
-        # same thing, for TIs
-        # TODO: refactor
-        if tis_selected := self.ti_models.get('models_selected'):
-            selections.install_ti_models = [tis_selected.values[x]
-                                            for x in tis_selected.value
-                                            if not self.installed_ti_models[tis_selected.values[x]]
-                                            ]
-            selections.remove_ti_models = [x
-                                           for x in tis_selected.values
-                                           if self.installed_ti_models[x]
-                                           and tis_selected.values.index(x) not in tis_selected.value
-                                           ]
-                
-        if (additional_tis := self.ti_models['download_ids'].value.split()):
-            selections.install_ti_models.extend(additional_tis)
-            
         # load directory and whether to scan on startup
-        selections.scan_directory = self.diffusers_models['autoload_directory'].value
-        selections.autoscan_on_startup = self.diffusers_models['autoscan_on_startup'].value
-
+        # if self.parentApp.autoload_pending:
+        #     selections.scan_directory = str(config.root_path / self.pipeline_models['autoload_directory'].value)
+        #     self.parentApp.autoload_pending = False
+        # selections.autoscan_on_startup = self.pipeline_models['autoscan_on_startup'].value
 
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self,opt):
         super().__init__()
         self.program_opts = opt
         self.user_cancelled = False
-        self.user_selections = UserSelections()
+        # self.autoload_pending = True
+        self.install_selections = InstallSelections()
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
@@ -687,26 +551,22 @@ class StderrToMessage():
         pass
 
 # --------------------------------------------------------
-def ask_user_for_config_file(model_path: Path,
-                             tui_conn: Connection=None
-                             )->Path:
+def ask_user_for_prediction_type(model_path: Path,
+                                 tui_conn: Connection=None
+                                 )->SchedulerPredictionType:
     if tui_conn:
         logger.debug('Waiting for user response...')
-        return _ask_user_for_cf_tui(model_path, tui_conn)        
+        return _ask_user_for_pt_tui(model_path, tui_conn)        
     else:
-        return _ask_user_for_cf_cmdline(model_path)
+        return _ask_user_for_pt_cmdline(model_path)
 
-def _ask_user_for_cf_cmdline(model_path):
-    choices = [
-        config.legacy_conf_path / x
-        for x in ['v2-inference.yaml','v2-inference-v.yaml']
-    ]
-    choices.extend([None])
+def _ask_user_for_pt_cmdline(model_path: Path)->SchedulerPredictionType:
+    choices = [SchedulerPredictionType.Epsilon, SchedulerPredictionType.VPrediction, None]
     print(
 f"""
 Please select the type of the V2 checkpoint named {model_path.name}:
-[1] A Stable Diffusion v2.x base model (512 pixels; there should be no 'parameterization:' line in its yaml file)
-[2] A Stable Diffusion v2.x v-predictive model (768 pixels; look for a 'parameterization: "v"' line in its yaml file)
+[1] A model based on Stable Diffusion v2 trained on 512 pixel images (SD-2-base)
+[2] A model based on Stable Diffusion v2 trained on 768 pixel images (SD-2-768)
 [3] Skip this model and come back later.
 """
         )
@@ -723,7 +583,7 @@ Please select the type of the V2 checkpoint named {model_path.name}:
             return
     return choice
         
-def _ask_user_for_cf_tui(model_path: Path, tui_conn: Connection)->Path:
+def _ask_user_for_pt_tui(model_path: Path, tui_conn: Connection)->SchedulerPredictionType:
     try:
         tui_conn.send_bytes(f'*need v2 config for:{model_path}'.encode('utf-8'))
         # note that we don't do any status checking here
@@ -731,20 +591,20 @@ def _ask_user_for_cf_tui(model_path: Path, tui_conn: Connection)->Path:
         if response is None:
             return None
         elif response == 'epsilon':
-            return config.legacy_conf_path / 'v2-inference.yaml'
+            return SchedulerPredictionType.epsilon
         elif response == 'v':
-            return config.legacy_conf_path  / 'v2-inference-v.yaml'
+            return SchedulerPredictionType.VPrediction
         elif response == 'abort':
             logger.info('Conversion aborted')
             return None
         else:
-            return Path(response)
+            return response
     except:
         return None
         
 # --------------------------------------------------------
 def process_and_execute(opt: Namespace,
-                        selections: UserSelections,
+                        selections: InstallSelections,
                         conn_out: Connection=None,
                         ):
     # set up so that stderr is sent to conn_out
@@ -755,33 +615,13 @@ def process_and_execute(opt: Namespace,
         logger = InvokeAILogger.getLogger()
         logger.handlers.clear()
         logger.addHandler(logging.StreamHandler(translator))
-    
-    models_to_install = selections.install_models
-    models_to_remove = selections.remove_models
-    directory_to_scan = selections.scan_directory
-    scan_at_startup = selections.autoscan_on_startup
-    potential_models_to_install = selections.import_model_paths
 
-    install_requested_models(
-        diffusers = ModelInstallList(models_to_install, models_to_remove),
-        controlnet = ModelInstallList(selections.install_cn_models, selections.remove_cn_models),
-        lora = ModelInstallList(selections.install_lora_models, selections.remove_lora_models),
-        ti = ModelInstallList(selections.install_ti_models, selections.remove_ti_models),
-        scan_directory=Path(directory_to_scan) if directory_to_scan else None,
-        external_models=potential_models_to_install,
-        scan_at_startup=scan_at_startup,
-        precision="float32"
-        if opt.full_precision
-        else choose_precision(torch.device(choose_torch_device())),
-        purge_deleted=selections.purge_deleted_models,
-        config_file_path=Path(opt.config_file) if opt.config_file else config.model_conf_path,
-        model_config_file_callback = lambda x: ask_user_for_config_file(x,conn_out)
-    )
+    installer = ModelInstall(config, prediction_type_helper=lambda x: ask_user_for_prediction_type(x,conn_out))
+    installer.install(selections)
 
     if conn_out:
         conn_out.send_bytes('*done*'.encode('utf-8'))
         conn_out.close()
-
 
 def do_listings(opt)->bool:
     """List installed models of various sorts, and return
@@ -813,39 +653,34 @@ def select_and_download_models(opt: Namespace):
         if opt.full_precision
         else choose_precision(torch.device(choose_torch_device()))
     )
-
-    if do_listings(opt):
-        pass
-    # this processes command line additions/removals
-    elif opt.diffusers or opt.controlnets or opt.textual_inversions or opt.loras:
-        action = 'remove_models' if opt.delete else 'install_models'
-        diffusers_args = {'diffusers':ModelInstallList(remove_models=opt.diffusers or [])} \
-                          if opt.delete \
-                          else {'external_models':opt.diffusers or []} 
-        install_requested_models(
-            **diffusers_args,
-            controlnet=ModelInstallList(**{action:opt.controlnets or []}),
-            ti=ModelInstallList(**{action:opt.textual_inversions or []}),
-            lora=ModelInstallList(**{action:opt.loras or []}),
-            precision=precision,
-            purge_deleted=True,
-            model_config_file_callback=lambda x: ask_user_for_config_file(x),
+    config.precision = precision
+    helper = lambda x: ask_user_for_prediction_type(x)
+    # if do_listings(opt):
+    # pass
+    
+    installer = ModelInstall(config, prediction_type_helper=helper)
+    if opt.add or opt.delete:
+        selections = InstallSelections(
+            install_models = opt.add or [],
+            remove_models = opt.delete or []
         )
+        installer.install(selections)
     elif opt.default_only:
-        install_requested_models(
-            diffusers=ModelInstallList(install_models=default_dataset()),
-            precision=precision,
+        selections = InstallSelections(
+            install_models = installer.default_model()
         )
+        installer.install(selections)
     elif opt.yes_to_all:
-        install_requested_models(
-            diffusers=ModelInstallList(install_models=recommended_datasets()),
-            precision=precision,
+        selections = InstallSelections(
+            install_models = installer.recommended_models()
         )
+        installer.install(selections)
 
     # this is where the TUI is called
     else:
         # needed because the torch library is loaded, even though we don't use it
-        torch.multiprocessing.set_start_method("spawn")
+        # currently commented out because it has started generating errors (?)
+        # torch.multiprocessing.set_start_method("spawn")
 
         # the third argument is needed in the Windows 11 environment in
         # order to launch and resize a console window running this program
@@ -861,35 +696,20 @@ def select_and_download_models(opt: Namespace):
                     installApp.main_form.subprocess.terminate()
                     installApp.main_form.subprocess = None
             raise e
-        process_and_execute(opt, installApp.user_selections)
+        process_and_execute(opt, installApp.install_selections)
 
 # -------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
     parser.add_argument(
-        "--diffusers",
+        "--add",
         nargs="*",
-        help="List of URLs or repo_ids of diffusers to install/delete",
-    )
-    parser.add_argument(
-        "--loras",
-        nargs="*",
-        help="List of URLs or repo_ids of LoRA/LyCORIS models to install/delete",
-    )
-    parser.add_argument(
-        "--controlnets",
-        nargs="*",
-        help="List of URLs or repo_ids of controlnet models to install/delete",
-    )
-    parser.add_argument(
-        "--textual-inversions",
-        nargs="*",
-        help="List of URLs or repo_ids of textual inversion embeddings to install/delete",
+        help="List of URLs, local paths or repo_ids of models to install",
     )
     parser.add_argument(
         "--delete",
-        action="store_true",
-        help="Delete models listed on command line rather than installing them",
+        nargs="*",
+        help="List of names of models to idelete",
     )
     parser.add_argument(
         "--full-precision",
@@ -909,7 +729,7 @@ def main():
     parser.add_argument(
         "--default_only",
         action="store_true",
-        help="only install the default model",
+        help="Only install the default model",
     )
     parser.add_argument(
         "--list-models",
