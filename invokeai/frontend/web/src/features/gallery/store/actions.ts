@@ -1,6 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
 import { ImageUsage } from 'app/contexts/DeleteImageContext';
-import { ImageDTO } from 'services/api/types';
+import { ImageDTO, BoardDTO } from 'services/api/types';
 
 export type RequestedImageDeletionArg = {
   image: ImageDTO;
@@ -10,6 +10,16 @@ export type RequestedImageDeletionArg = {
 export const requestedImageDeletion = createAction<RequestedImageDeletionArg>(
   'gallery/requestedImageDeletion'
 );
+
+export type RequestedBoardImagesDeletionArg = {
+  board: BoardDTO;
+  imagesUsage: ImageUsage;
+};
+
+export const requestedBoardImagesDeletion =
+  createAction<RequestedBoardImagesDeletionArg>(
+    'gallery/requestedBoardImagesDeletion'
+  );
 
 export const sentImageToCanvas = createAction('gallery/sentImageToCanvas');
 
