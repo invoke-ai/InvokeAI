@@ -198,7 +198,7 @@ addControlNetImageProcessedListener();
 addControlNetAutoProcessListener();
 
 // Update image URLs on connect
-addUpdateImageUrlsOnConnectListener();
+// addUpdateImageUrlsOnConnectListener();
 
 // Boards
 addImageAddedToBoardFulfilledListener();
