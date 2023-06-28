@@ -81,7 +81,7 @@ do_choice() {
         ;;
     7)
         clear
-        printf "Re-run the configure script to fix a broken install\n"
+        printf "Re-run the configure script to fix a broken install or to complete a major upgrade\n"
         invokeai-configure --root ${INVOKEAI_ROOT} --yes --default_only
         ;;
     8)
@@ -118,12 +118,12 @@ do_choice() {
 do_dialog() {
     options=(
         1 "Generate images with a browser-based interface"
-        2 "Generate images using a command-line interface"
+        2 "Explore InvokeAI nodes using a command-line interface"
         3 "Textual inversion training"
         4 "Merge models (diffusers type only)"
         5 "Download and install models"
         6 "Change InvokeAI startup options"
-        7 "Re-run the configure script to fix a broken install"
+        7 "Re-run the configure script to fix a broken install or to complete a major upgrade"
         8 "Open the developer console"
         9 "Update InvokeAI")
 
