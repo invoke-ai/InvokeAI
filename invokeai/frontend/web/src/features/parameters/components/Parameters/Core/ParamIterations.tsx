@@ -16,7 +16,8 @@ const selector = createSelector([stateSelector], (state) => {
     state.config.sd.iterations;
   const { iterations } = state.generation;
   const { shouldUseSliders } = state.ui;
-  const isDisabled = state.dynamicPrompts.isEnabled;
+  const isDisabled =
+    state.dynamicPrompts.isEnabled && state.dynamicPrompts.combinatorial;
 
   const step = state.hotkeys.shift ? fineStep : coarseStep;
 
