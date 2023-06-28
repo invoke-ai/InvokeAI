@@ -7,8 +7,6 @@
 # Coauthor: Kevin Turner http://github.com/keturn
 #
 import sys
-print("Loading Python libraries...\n",file=sys.stderr)
-
 import argparse
 import io
 import os
@@ -16,6 +14,7 @@ import shutil
 import textwrap
 import traceback
 import warnings
+import yaml
 from argparse import Namespace
 from pathlib import Path
 from shutil import get_terminal_size
@@ -25,6 +24,7 @@ from urllib import request
 import npyscreen
 import transformers
 from diffusers import AutoencoderKL
+from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
@@ -34,6 +34,8 @@ from transformers import (
     CLIPSegForImageSegmentation,
     CLIPTextModel,
     CLIPTokenizer,
+    AutoFeatureExtractor,
+    BertTokenizerFast,
 )
 import invokeai.configs as configs
 
@@ -52,12 +54,13 @@ from invokeai.frontend.install.widgets import (
 )
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
-    default_dataset,
-    download_from_hf,
-    hf_download_with_resume,
-    recommended_datasets,
-    UserSelections,
+    hf_download_from_pretrained,
+    InstallSelections,
+    ModelInstall,
 )
+from invokeai.backend.model_management.model_probe import (
+    ModelType, BaseModelType
+    )
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -81,7 +84,7 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # or renaming it and then running invokeai-configure again.
 """
 
-logger=None
+logger=InvokeAILogger.getLogger()
 
 # --------------------------------------------
 def postscript(errors: None):
@@ -162,75 +165,91 @@ class ProgressBar:
 # ---------------------------------------------
 def download_with_progress_bar(model_url: str, model_dest: str, label: str = "the"):
     try:
-        print(f"Installing {label} model file {model_url}...", end="", file=sys.stderr)
+        logger.info(f"Installing {label} model file {model_url}...")
         if not os.path.exists(model_dest):
             os.makedirs(os.path.dirname(model_dest), exist_ok=True)
             request.urlretrieve(
                 model_url, model_dest, ProgressBar(os.path.basename(model_dest))
             )
-            print("...downloaded successfully", file=sys.stderr)
+            logger.info("...downloaded successfully")
         else:
-            print("...exists", file=sys.stderr)
+            logger.info("...exists")
     except Exception:
-        print("...download failed", file=sys.stderr)
-        print(f"Error downloading {label} model", file=sys.stderr)
+        logger.info("...download failed")
+        logger.info(f"Error downloading {label} model")
         print(traceback.format_exc(), file=sys.stderr)
 
 
-# ---------------------------------------------
-# this will preload the Bert tokenizer fles
-def download_bert():
-    print("Installing bert tokenizer...", file=sys.stderr)
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
-        from transformers import BertTokenizerFast
+def download_conversion_models():
+    target_dir = config.root_path / 'models/core/convert'
+    kwargs = dict()  # for future use
+    try:
+        logger.info('Downloading core tokenizers and text encoders')
 
-        download_from_hf(BertTokenizerFast, "bert-base-uncased")
+        # bert
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            bert = BertTokenizerFast.from_pretrained("bert-base-uncased", **kwargs)
+            bert.save_pretrained(target_dir / 'bert-base-uncased', safe_serialization=True)
+        
+        # sd-1
+        repo_id = 'openai/clip-vit-large-patch14'
+        hf_download_from_pretrained(CLIPTokenizer, repo_id, target_dir / 'clip-vit-large-patch14')
+        hf_download_from_pretrained(CLIPTextModel, repo_id, target_dir / 'clip-vit-large-patch14')
 
+        # sd-2
+        repo_id = "stabilityai/stable-diffusion-2"
+        pipeline = CLIPTokenizer.from_pretrained(repo_id, subfolder="tokenizer", **kwargs)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-2-clip' / 'tokenizer', safe_serialization=True)
 
-# ---------------------------------------------
-def download_sd1_clip():
-    print("Installing SD1 clip model...", file=sys.stderr)
-    version = "openai/clip-vit-large-patch14"
-    download_from_hf(CLIPTokenizer, version)
-    download_from_hf(CLIPTextModel, version)
+        pipeline = CLIPTextModel.from_pretrained(repo_id, subfolder="text_encoder", **kwargs)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-2-clip' / 'text_encoder', safe_serialization=True)
 
+        # VAE
+        logger.info('Downloading stable diffusion VAE')
+        vae = AutoencoderKL.from_pretrained('stabilityai/sd-vae-ft-mse', **kwargs)
+        vae.save_pretrained(target_dir / 'sd-vae-ft-mse', safe_serialization=True)
 
-# ---------------------------------------------
-def download_sd2_clip():
-    version = "stabilityai/stable-diffusion-2"
-    print("Installing SD2 clip model...", file=sys.stderr)
-    download_from_hf(CLIPTokenizer, version, subfolder="tokenizer")
-    download_from_hf(CLIPTextModel, version, subfolder="text_encoder")
+        # safety checking
+        logger.info('Downloading safety checker')
+        repo_id = "CompVis/stable-diffusion-safety-checker"
+        pipeline = AutoFeatureExtractor.from_pretrained(repo_id,**kwargs)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-safety-checker', safe_serialization=True)
 
+        pipeline = StableDiffusionSafetyChecker.from_pretrained(repo_id,**kwargs)
+        pipeline.save_pretrained(target_dir / 'stable-diffusion-safety-checker', safe_serialization=True)
+    except KeyboardInterrupt:
+        raise
+    except Exception as e:
+        logger.error(str(e))
 
 # ---------------------------------------------
 def download_realesrgan():
-    print("Installing models from RealESRGAN...", file=sys.stderr)
+    logger.info("Installing models from RealESRGAN...")
     model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
     wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
 
-    model_dest = config.root_path / "models/realesrgan/realesr-general-x4v3.pth"
-    wdn_model_dest = config.root_path / "models/realesrgan/realesr-general-wdn-x4v3.pth"
+    model_dest = config.root_path / "models/core/upscaling/realesrgan/realesr-general-x4v3.pth"
+    wdn_model_dest = config.root_path / "models/core/upscaling/realesrgan/realesr-general-wdn-x4v3.pth"
 
     download_with_progress_bar(model_url, str(model_dest), "RealESRGAN")
     download_with_progress_bar(wdn_model_url, str(wdn_model_dest), "RealESRGANwdn")
 
 
 def download_gfpgan():
-    print("Installing GFPGAN models...", file=sys.stderr)
+    logger.info("Installing GFPGAN models...")
     for model in (
         [
             "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
-            "./models/gfpgan/GFPGANv1.4.pth",
+            "./models/core/face_restoration/gfpgan/GFPGANv1.4.pth",
         ],
         [
             "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
-            "./models/gfpgan/weights/detection_Resnet50_Final.pth",
+            "./models/core/face_restoration/gfpgan/weights/detection_Resnet50_Final.pth",
         ],
         [
             "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
-            "./models/gfpgan/weights/parsing_parsenet.pth",
+            "./models/core/face_restoration/gfpgan/weights/parsing_parsenet.pth",
         ],
     ):
         model_url, model_dest = model[0], config.root_path / model[1]
@@ -239,70 +258,32 @@ def download_gfpgan():
 
 # ---------------------------------------------
 def download_codeformer():
-    print("Installing CodeFormer model file...", file=sys.stderr)
+    logger.info("Installing CodeFormer model file...")
     model_url = (
         "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
     )
-    model_dest = config.root_path / "models/codeformer/codeformer.pth"
+    model_dest = config.root_path / "models/core/face_restoration/codeformer/codeformer.pth"
     download_with_progress_bar(model_url, str(model_dest), "CodeFormer")
 
 
 # ---------------------------------------------
 def download_clipseg():
-    print("Installing clipseg model for text-based masking...", file=sys.stderr)
+    logger.info("Installing clipseg model for text-based masking...")
     CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
     try:
-        download_from_hf(AutoProcessor, CLIPSEG_MODEL)
-        download_from_hf(CLIPSegForImageSegmentation, CLIPSEG_MODEL)
+        hf_download_from_pretrained(AutoProcessor, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
+        hf_download_from_pretrained(CLIPSegForImageSegmentation, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
     except Exception:
-        print("Error installing clipseg model:")
-        print(traceback.format_exc())
+        logger.info("Error installing clipseg model:")
+        logger.info(traceback.format_exc())
 
 
-# -------------------------------------
-def download_safety_checker():
-    print("Installing model for NSFW content detection...", file=sys.stderr)
-    try:
-        from diffusers.pipelines.stable_diffusion.safety_checker import (
-            StableDiffusionSafetyChecker,
-        )
-        from transformers import AutoFeatureExtractor
-    except ModuleNotFoundError:
-        print("Error installing NSFW checker model:")
-        print(traceback.format_exc())
-        return
-    safety_model_id = "CompVis/stable-diffusion-safety-checker"
-    print("AutoFeatureExtractor...", file=sys.stderr)
-    download_from_hf(AutoFeatureExtractor, safety_model_id)
-    print("StableDiffusionSafetyChecker...", file=sys.stderr)
-    download_from_hf(StableDiffusionSafetyChecker, safety_model_id)
-
-
-# -------------------------------------
-def download_vaes():
-    print("Installing stabilityai VAE...", file=sys.stderr)
-    try:
-        # first the diffusers version
-        repo_id = "stabilityai/sd-vae-ft-mse"
-        args = dict(
-            cache_dir=config.cache_dir,
-        )
-        if not AutoencoderKL.from_pretrained(repo_id, **args):
-            raise Exception(f"download of {repo_id} failed")
-
-        repo_id = "stabilityai/sd-vae-ft-mse-original"
-        model_name = "vae-ft-mse-840000-ema-pruned.ckpt"
-        # next the legacy checkpoint version
-        if not hf_download_with_resume(
-            repo_id=repo_id,
-            model_name=model_name,
-            model_dir=str(config.root_path / Model_dir / Weights_dir),
-        ):
-            raise Exception(f"download of {model_name} failed")
-    except Exception as e:
-        print(f"Error downloading StabilityAI standard VAE: {str(e)}", file=sys.stderr)
-        print(traceback.format_exc(), file=sys.stderr)
-
+def download_support_models():
+    download_realesrgan()
+    download_gfpgan()
+    download_codeformer()
+    download_clipseg()
+    download_conversion_models()
 
 # -------------------------------------
 def get_root(root: str = None) -> str:
@@ -465,39 +446,19 @@ to allow InvokeAI to download restricted styles & subjects from the "Concept Lib
             editable=False,
             color="CONTROL",
         )
-        self.embedding_dir = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name=" Textual Inversion Embeddings:",
-            value=str(default_embedding_dir()),
-            select_dir=True,
-            must_exist=False,
-            use_two_lines=False,
-            labelColor="GOOD",
-            begin_entry_at=32,
-            scroll_exit=True,
-        )
-        self.lora_dir = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name="             LoRA and LyCORIS:",
-            value=str(default_lora_dir()),
-            select_dir=True,
-            must_exist=False,
-            use_two_lines=False,
-            labelColor="GOOD",
-            begin_entry_at=32,
-            scroll_exit=True,
-        )
-        self.controlnet_dir = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name="             ControlNets:",
-            value=str(default_controlnet_dir()),
-            select_dir=True,
-            must_exist=False,
-            use_two_lines=False,
-            labelColor="GOOD",
-            begin_entry_at=32,
-            scroll_exit=True,
-        )
+        self.autoimport_dirs = {}
+        for description, config_name, path in autoimport_paths(old_opts):
+            self.autoimport_dirs[config_name] = self.add_widget_intelligent(
+                npyscreen.TitleFilename,
+                name=description+':',
+                value=str(path),
+                select_dir=True,
+                must_exist=False,
+                use_two_lines=False,
+                labelColor="GOOD",
+                begin_entry_at=32,
+                scroll_exit=True
+            )
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
@@ -562,10 +523,6 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
             bad_fields.append(
                 f"The output directory does not seem to be valid. Please check that {str(Path(opt.outdir).parent)} is an existing directory."
             )
-        if not Path(opt.embedding_dir).parent.exists():
-            bad_fields.append(
-                f"The embedding directory does not seem to be valid. Please check that {str(Path(opt.embedding_dir).parent)} is an existing directory."
-            )
         if len(bad_fields) > 0:
             message = "The following problems were detected and must be corrected:\n"
             for problem in bad_fields:
@@ -585,11 +542,14 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
                 "max_loaded_models",
                 "xformers_enabled",
                 "always_use_cpu",
-                "embedding_dir",
-                "lora_dir",
-                "controlnet_dir",
         ]:
             setattr(new_opts, attr, getattr(self, attr).value)
+
+        for attr in self.autoimport_dirs:
+            directory = Path(self.autoimport_dirs[attr].value)
+            if directory.is_relative_to(config.root_path):
+                directory = directory.relative_to(config.root_path)
+            setattr(new_opts, attr, directory)
 
         new_opts.hf_token = self.hf_token.value
         new_opts.license_acceptance = self.license_acceptance.value
@@ -607,7 +567,8 @@ class EditOptApplication(npyscreen.NPSAppManaged):
         self.program_opts = program_opts
         self.invokeai_opts = invokeai_opts
         self.user_cancelled = False
-        self.user_selections = default_user_selections(program_opts)
+        self.autoload_pending = True
+        self.install_selections = default_user_selections(program_opts)
 
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
@@ -642,41 +603,62 @@ def default_startup_options(init_file: Path) -> Namespace:
         opts.nsfw_checker = True
     return opts
 
-def default_user_selections(program_opts: Namespace) -> UserSelections:
-    return UserSelections(
-        install_models=default_dataset()
+def default_user_selections(program_opts: Namespace) -> InstallSelections:
+    installer = ModelInstall(config)
+    models = installer.all_models()
+    return InstallSelections(
+        install_models=[models[installer.default_model()].path or models[installer.default_model()].repo_id]
         if program_opts.default_only
-        else recommended_datasets()
+        else [models[x].path or models[x].repo_id for x in installer.recommended_models()]
         if program_opts.yes_to_all
-        else dict(),
-        purge_deleted_models=False,
-        scan_directory=None,
-        autoscan_on_startup=None,
+        else list(),
+#        scan_directory=None,
+#        autoscan_on_startup=None,
     )
 
-
+# -------------------------------------
+def autoimport_paths(config: InvokeAIAppConfig):
+    return [
+        ('Checkpoints & diffusers models', 'autoimport_dir', config.root_path / config.autoimport_dir),
+        ('LoRA/LyCORIS models',            'lora_dir',       config.root_path / config.lora_dir),
+        ('Controlnet models',              'controlnet_dir', config.root_path / config.controlnet_dir),
+        ('Textual Inversion Embeddings',   'embedding_dir',  config.root_path / config.embedding_dir),
+    ]
+    
 # -------------------------------------
 def initialize_rootdir(root: Path, yes_to_all: bool = False):
-    print("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
-
+    logger.info("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
     for name in (
             "models",
-            "configs",
-            "embeddings",
             "databases",
-            "loras",
-            "controlnets",
             "text-inversion-output",
             "text-inversion-training-data",
+            "configs"
     ):
         os.makedirs(os.path.join(root, name), exist_ok=True)
+    for model_type in ModelType:
+        Path(root, 'autoimport', model_type.value).mkdir(parents=True, exist_ok=True)
 
     configs_src = Path(configs.__path__[0])
     configs_dest = root / "configs"
     if not os.path.samefile(configs_src, configs_dest):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
+    dest = root / 'models'
+    for model_base in BaseModelType:
+        for model_type in ModelType:
+            path = dest / model_base.value / model_type.value
+            path.mkdir(parents=True, exist_ok=True)
+    path = dest / 'core'
+    path.mkdir(parents=True, exist_ok=True)
 
+    with open(root / 'configs' / 'models.yaml','w') as yaml_file:
+        yaml_file.write(yaml.dump({'__metadata__':
+                                   {'version':'3.0.0'}
+                                   }
+                                  )
+                        )
+        
 # -------------------------------------
 def run_console_ui(
     program_opts: Namespace, initfile: Path = None
@@ -699,7 +681,7 @@ def run_console_ui(
     if editApp.user_cancelled:
         return (None, None)
     else:
-        return (editApp.new_opts, editApp.user_selections)
+        return (editApp.new_opts, editApp.install_selections)
 
 
 # -------------------------------------
@@ -721,18 +703,6 @@ def write_opts(opts: Namespace, init_file: Path):
 # -------------------------------------
 def default_output_dir() -> Path:
     return config.root_path / "outputs"
-
-# -------------------------------------
-def default_embedding_dir() -> Path:
-    return config.root_path / "embeddings"
-
-# -------------------------------------
-def default_lora_dir() -> Path:
-    return config.root_path / "loras"
-
-# -------------------------------------
-def default_controlnet_dir() -> Path:
-    return config.root_path / "controlnets"
 
 # -------------------------------------
 def write_default_options(program_opts: Namespace, initfile: Path):
@@ -758,14 +728,42 @@ def migrate_init_file(legacy_format:Path):
     new.nsfw_checker = old.safety_checker
     new.xformers_enabled = old.xformers
     new.conf_path = old.conf
-    new.embedding_dir = old.embedding_path
+    new.root = legacy_format.parent.resolve()
 
     invokeai_yaml = legacy_format.parent / 'invokeai.yaml'
     with open(invokeai_yaml,"w", encoding="utf-8") as outfile:
         outfile.write(new.to_yaml())
 
-    legacy_format.replace(legacy_format.parent / 'invokeai.init.old')
+    legacy_format.replace(legacy_format.parent / 'invokeai.init.orig')
 
+# -------------------------------------
+def migrate_models(root: Path):
+    from invokeai.backend.install.migrate_to_3 import do_migrate
+    do_migrate(root, root)
+
+def migrate_if_needed(opt: Namespace, root: Path)->bool:
+    # We check for to see if the runtime directory is correctly initialized.
+    old_init_file = root / 'invokeai.init'
+    new_init_file = root / 'invokeai.yaml'
+    old_hub = root / 'models/hub'
+    migration_needed =  old_init_file.exists() and not new_init_file.exists() or old_hub.exists()
+    
+    if migration_needed:
+        if opt.yes_to_all or \
+            yes_or_no(f'{str(config.root_path)} appears to be a 2.3 format root directory. Convert to version 3.0?'):
+
+            logger.info('** Migrating invokeai.init to invokeai.yaml')
+            migrate_init_file(old_init_file)
+            config.parse_args(argv=[],conf=OmegaConf.load(new_init_file))
+
+            if old_hub.exists():
+                migrate_models(config.root_path)
+        else:
+            print('Cannot continue without conversion. Aborting.')
+    
+    return migration_needed
+
+    
 # -------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
@@ -831,20 +829,16 @@ def main():
     errors = set()
 
     try:
-        models_to_download = default_user_selections(opt)
-
-        # We check for to see if the runtime directory is correctly initialized.
-        old_init_file = config.root_path / 'invokeai.init'
-        new_init_file = config.root_path / 'invokeai.yaml'
-        if old_init_file.exists() and not new_init_file.exists():
-            print('** Migrating invokeai.init to invokeai.yaml')
-            migrate_init_file(old_init_file)
-            # Load new init file into config
-            config.parse_args(argv=[],conf=OmegaConf.load(new_init_file))
+        # if we do a root migration/upgrade, then we are keeping previous
+        # configuration and we are done.
+        if migrate_if_needed(opt, config.root_path):
+            sys.exit(0)
 
         if not config.model_conf_path.exists():
             initialize_rootdir(config.root_path, opt.yes_to_all)
 
+        models_to_download = default_user_selections(opt)
+        new_init_file = config.root_path / 'invokeai.yaml'
         if opt.yes_to_all:
             write_default_options(opt, new_init_file)
             init_options = Namespace(
@@ -855,29 +849,21 @@ def main():
             if init_options:
                 write_opts(init_options, new_init_file)
             else:
-                print(
+                logger.info(
                     '\n** CANCELLED AT USER\'S REQUEST. USE THE "invoke.sh" LAUNCHER TO RUN LATER **\n'
                 )
                 sys.exit(0)
-
+                
         if opt.skip_support_models:
-            print("\n** SKIPPING SUPPORT MODEL DOWNLOADS PER USER REQUEST **")
+            logger.info("SKIPPING SUPPORT MODEL DOWNLOADS PER USER REQUEST")
         else:
-            print("\n** CHECKING/UPDATING SUPPORT MODELS **")
-            download_bert()
-            download_sd1_clip()
-            download_sd2_clip()
-            download_realesrgan()
-            download_gfpgan()
-            download_codeformer()
-            download_clipseg()
-            download_safety_checker()
-            download_vaes()
+            logger.info("CHECKING/UPDATING SUPPORT MODELS")
+            download_support_models()
 
         if opt.skip_sd_weights:
-            print("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
+            logger.info("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
         elif models_to_download:
-            print("\n** DOWNLOADING DIFFUSION WEIGHTS **")
+            logger.info("\n** DOWNLOADING DIFFUSION WEIGHTS **")
             process_and_execute(opt, models_to_download)
 
         postscript(errors=errors)

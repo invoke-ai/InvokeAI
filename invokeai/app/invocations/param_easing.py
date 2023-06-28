@@ -133,20 +133,19 @@ class StepParamEasingInvocation(BaseInvocation):
         postlist = list(num_poststeps * [self.post_end_value])
 
         if log_diagnostics:
-            logger = InvokeAILogger.getLogger(name="StepParamEasing")
-            logger.debug("start_step: " + str(start_step))
-            logger.debug("end_step: " + str(end_step))
-            logger.debug("num_easing_steps: " + str(num_easing_steps))
-            logger.debug("num_presteps: " + str(num_presteps))
-            logger.debug("num_poststeps: " + str(num_poststeps))
-            logger.debug("prelist size: " + str(len(prelist)))
-            logger.debug("postlist size: " + str(len(postlist)))
-            logger.debug("prelist: " + str(prelist))
-            logger.debug("postlist: " + str(postlist))
+            context.services.logger.debug("start_step: " + str(start_step))
+            context.services.logger.debug("end_step: " + str(end_step))
+            context.services.logger.debug("num_easing_steps: " + str(num_easing_steps))
+            context.services.logger.debug("num_presteps: " + str(num_presteps))
+            context.services.logger.debug("num_poststeps: " + str(num_poststeps))
+            context.services.logger.debug("prelist size: " + str(len(prelist)))
+            context.services.logger.debug("postlist size: " + str(len(postlist)))
+            context.services.logger.debug("prelist: " + str(prelist))
+            context.services.logger.debug("postlist: " + str(postlist))
 
         easing_class = EASING_FUNCTIONS_MAP[self.easing]
         if log_diagnostics:
-            logger.debug("easing class: " + str(easing_class))
+            context.services.logger.debug("easing class: " + str(easing_class))
         easing_list = list()
         if self.mirror:  # "expected" mirroring
             # if number of steps is even, squeeze duration down to (number_of_steps)/2
@@ -156,7 +155,7 @@ class StepParamEasingInvocation(BaseInvocation):
             # but if even then number_of_steps/2 === ceil(number_of_steps/2), so can just use ceil always
 
             base_easing_duration = int(np.ceil(num_easing_steps/2.0))
-            if log_diagnostics: logger.debug("base easing duration: " + str(base_easing_duration))
+            if log_diagnostics: context.services.logger.debug("base easing duration: " + str(base_easing_duration))
             even_num_steps = (num_easing_steps % 2 == 0)  # even number of steps
             easing_function = easing_class(start=self.start_value,
                                            end=self.end_value,
@@ -166,14 +165,14 @@ class StepParamEasingInvocation(BaseInvocation):
                 easing_val = easing_function.ease(step_index)
                 base_easing_vals.append(easing_val)
                 if log_diagnostics:
-                    logger.debug("step_index: " + str(step_index) + ", easing_val: " + str(easing_val))
+                    context.services.logger.debug("step_index: " + str(step_index) + ", easing_val: " + str(easing_val))
             if even_num_steps:
                 mirror_easing_vals = list(reversed(base_easing_vals))
             else:
                 mirror_easing_vals = list(reversed(base_easing_vals[0:-1]))
             if log_diagnostics:
-                logger.debug("base easing vals: " + str(base_easing_vals))
-                logger.debug("mirror easing vals: " + str(mirror_easing_vals))
+                context.services.logger.debug("base easing vals: " + str(base_easing_vals))
+                context.services.logger.debug("mirror easing vals: " + str(mirror_easing_vals))
             easing_list = base_easing_vals + mirror_easing_vals
 
         # FIXME: add alt_mirror option (alternative to default or mirror), or remove entirely
@@ -206,12 +205,12 @@ class StepParamEasingInvocation(BaseInvocation):
                 step_val = easing_function.ease(step_index)
                 easing_list.append(step_val)
                 if log_diagnostics:
-                    logger.debug("step_index: " + str(step_index) + ", easing_val: " + str(step_val))
+                    context.services.logger.debug("step_index: " + str(step_index) + ", easing_val: " + str(step_val))
 
         if log_diagnostics:
-            logger.debug("prelist size: " + str(len(prelist)))
-            logger.debug("easing_list size: " + str(len(easing_list)))
-            logger.debug("postlist size: " + str(len(postlist)))
+            context.services.logger.debug("prelist size: " + str(len(prelist)))
+            context.services.logger.debug("easing_list size: " + str(len(easing_list)))
+            context.services.logger.debug("postlist size: " + str(len(postlist)))
 
         param_list = prelist + easing_list + postlist
 

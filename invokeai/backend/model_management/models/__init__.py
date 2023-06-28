@@ -11,21 +11,21 @@ from .textual_inversion import TextualInversionModel
 
 MODEL_CLASSES = {
     BaseModelType.StableDiffusion1: {
-        ModelType.Pipeline: StableDiffusion1Model,
+        ModelType.Main: StableDiffusion1Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
     },
     BaseModelType.StableDiffusion2: {
-        ModelType.Pipeline: StableDiffusion2Model,
+        ModelType.Main: StableDiffusion2Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
     },
     #BaseModelType.Kandinsky2_1: {
-    #    ModelType.Pipeline: Kandinsky2_1Model,
+    #    ModelType.Main: Kandinsky2_1Model,
     #    ModelType.MoVQ: MoVQModel,
     #    ModelType.Lora: LoRAModel,
     #    ModelType.ControlNet: ControlNetModel,

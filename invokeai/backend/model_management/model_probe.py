@@ -1,27 +1,28 @@
 import json
-import traceback
 import torch
 import safetensors.torch
 
 from dataclasses import dataclass
-from enum import Enum
 
-from diffusers import ModelMixin, ConfigMixin, StableDiffusionPipeline, AutoencoderKL, ControlNetModel
+from diffusers import ModelMixin, ConfigMixin
 from pathlib import Path
 from typing import Callable, Literal, Union, Dict
 from picklescan.scanner import scan_file_path
 
-import invokeai.backend.util.logging as logger
-from .models import BaseModelType, ModelType, ModelVariantType, SchedulerPredictionType, SilenceWarnings
+from .models import (
+    BaseModelType, ModelType, ModelVariantType,
+    SchedulerPredictionType, SilenceWarnings,
+)
+from .models.base import read_checkpoint_meta
 
 @dataclass
-class ModelVariantInfo(object):
+class ModelProbeInfo(object):
     model_type: ModelType
     base_type: BaseModelType
     variant_type: ModelVariantType
     prediction_type: SchedulerPredictionType
     upcast_attention: bool
-    format: Literal['folder','checkpoint']
+    format: Literal['diffusers','checkpoint', 'lycoris']
     image_size: int
 
 class ProbeBase(object):
@@ -31,19 +32,19 @@ class ProbeBase(object):
 class ModelProbe(object):
     
     PROBES = {
-        'folder': { },
+        'diffusers': { },
         'checkpoint': { },
     }
 
     CLASS2TYPE = {
-        'StableDiffusionPipeline' : ModelType.Pipeline,
+        'StableDiffusionPipeline' : ModelType.Main,
         'AutoencoderKL' : ModelType.Vae,
         'ControlNetModel' : ModelType.ControlNet,
     }
     
     @classmethod
     def register_probe(cls,
-                       format: Literal['folder','file'],
+                       format: Literal['diffusers','checkpoint'],
                        model_type: ModelType,
                        probe_class: ProbeBase):
         cls.PROBES[format][model_type] = probe_class
@@ -51,8 +52,8 @@ class ModelProbe(object):
     @classmethod
     def heuristic_probe(cls,
                         model: Union[Dict, ModelMixin, Path],
-                        prediction_type_helper: Callable[[Path],BaseModelType]=None,
-                        )->ModelVariantInfo:
+                        prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
+                        )->ModelProbeInfo:
         if isinstance(model,Path):
             return cls.probe(model_path=model,prediction_type_helper=prediction_type_helper)
         elif isinstance(model,(dict,ModelMixin,ConfigMixin)):
@@ -64,7 +65,7 @@ class ModelProbe(object):
     def probe(cls,
               model_path: Path,
               model: Union[Dict, ModelMixin] = None,
-              prediction_type_helper: Callable[[Path],BaseModelType] = None)->ModelVariantInfo:
+              prediction_type_helper: Callable[[Path],SchedulerPredictionType] = None)->ModelProbeInfo:
         '''
         Probe the model at model_path and return sufficient information about it
         to place it somewhere in the models directory hierarchy. If the model is
@@ -74,23 +75,24 @@ class ModelProbe(object):
         between V2-Base and V2-768 SD models.
         '''
         if model_path:
-            format = 'folder' if model_path.is_dir() else 'checkpoint'
+            format_type = 'diffusers' if model_path.is_dir() else 'checkpoint'
         else:
-            format = 'folder' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
+            format_type = 'diffusers' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
 
         model_info = None
         try:
             model_type = cls.get_model_type_from_folder(model_path, model) \
-                if format == 'folder' \
+                if format_type == 'diffusers' \
                    else cls.get_model_type_from_checkpoint(model_path, model)
-            probe_class = cls.PROBES[format].get(model_type)
+            probe_class = cls.PROBES[format_type].get(model_type)
             if not probe_class:
                 return None
             probe = probe_class(model_path, model, prediction_type_helper)
             base_type = probe.get_base_type()
             variant_type = probe.get_variant_type()
             prediction_type = probe.get_scheduler_prediction_type()
-            model_info = ModelVariantInfo(
+            format = probe.get_format()
+            model_info = ModelProbeInfo(
                 model_type = model_type,
                 base_type = base_type,
                 variant_type = variant_type,
@@ -102,32 +104,40 @@ class ModelProbe(object):
                                      and prediction_type==SchedulerPredictionType.VPrediction \
                                      ) else 512,
             )
-        except Exception as e:
+        except Exception:
             return None
 
         return model_info
 
     @classmethod
-    def get_model_type_from_checkpoint(cls, model_path: Path, checkpoint: dict)->ModelType:
-        if model_path.suffix not in ('.bin','.pt','.ckpt','.safetensors'):
+    def get_model_type_from_checkpoint(cls, model_path: Path, checkpoint: dict) -> ModelType:
+        if model_path.suffix not in ('.bin','.pt','.ckpt','.safetensors','.pth'):
             return None
-        if model_path.name=='learned_embeds.bin':
+
+        if model_path.name == "learned_embeds.bin":
             return ModelType.TextualInversion
-        checkpoint = checkpoint or cls._scan_and_load_checkpoint(model_path)
-        state_dict = checkpoint.get("state_dict") or checkpoint
-        if any([x.startswith("model.diffusion_model") for x in state_dict.keys()]):
-            return ModelType.Pipeline
-        if any([x.startswith("encoder.conv_in") for x in state_dict.keys()]):
-            return ModelType.Vae
-        if "string_to_token" in state_dict or "emb_params" in state_dict:
-            return ModelType.TextualInversion
-        if any([x.startswith("lora") for x in state_dict.keys()]):
-            return ModelType.Lora
-        if any([x.startswith("control_model") for x in state_dict.keys()]):
-            return ModelType.ControlNet
-        if any([x.startswith("input_blocks") for x in state_dict.keys()]):
-            return ModelType.ControlNet
-        return None # give up
+
+        ckpt = checkpoint if checkpoint else read_checkpoint_meta(model_path, scan=True)
+        ckpt = ckpt.get("state_dict", ckpt)
+
+        for key in ckpt.keys():
+            if any(key.startswith(v) for v in {"cond_stage_model.", "first_stage_model.", "model.diffusion_model."}):
+                return ModelType.Main
+            elif any(key.startswith(v) for v in {"encoder.conv_in", "decoder.conv_in"}):
+                return ModelType.Vae
+            elif any(key.startswith(v) for v in {"lora_te_", "lora_unet_"}):
+                return ModelType.Lora
+            elif any(key.startswith(v) for v in {"control_model", "input_blocks"}):
+                return ModelType.ControlNet
+            elif key in {"emb_params", "string_to_param"}:
+                return ModelType.TextualInversion
+
+        else:
+            # diffusers-ti
+            if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
+                return ModelType.TextualInversion
+        
+        raise ValueError("Unable to determine model type")
 
     @classmethod
     def get_model_type_from_folder(cls, folder_path: Path, model: ModelMixin)->ModelType:
@@ -192,11 +202,14 @@ class ProbeBase(object):
     def get_scheduler_prediction_type(self)->SchedulerPredictionType:
         pass
 
+    def get_format(self)->str:
+        pass
+
 class CheckpointProbeBase(ProbeBase):
     def __init__(self,
                  checkpoint_path: Path,
                  checkpoint: dict,
-                 helper: Callable[[Path],BaseModelType] = None
+                 helper: Callable[[Path],SchedulerPredictionType] = None
                  )->BaseModelType:
         self.checkpoint = checkpoint or ModelProbe._scan_and_load_checkpoint(checkpoint_path)
         self.checkpoint_path = checkpoint_path
@@ -205,9 +218,12 @@ class CheckpointProbeBase(ProbeBase):
     def get_base_type(self)->BaseModelType:
         pass
 
+    def get_format(self)->str:
+        return 'checkpoint'
+
     def get_variant_type(self)-> ModelVariantType:
         model_type = ModelProbe.get_model_type_from_checkpoint(self.checkpoint_path,self.checkpoint)
-        if model_type != ModelType.Pipeline:
+        if model_type != ModelType.Main:
             return ModelVariantType.Normal
         state_dict = self.checkpoint.get('state_dict') or self.checkpoint
         in_channels = state_dict[
@@ -246,7 +262,8 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
                     return SchedulerPredictionType.Epsilon
                 elif checkpoint["global_step"] == 110000:
                     return SchedulerPredictionType.VPrediction
-            if self.checkpoint_path and self.helper:
+            if self.checkpoint_path and self.helper \
+               and not self.checkpoint_path.with_suffix('.yaml').exists():  # if a .yaml config file exists, then this step not needed
                 return self.helper(self.checkpoint_path)
             else:
                 return None
@@ -257,6 +274,9 @@ class VaeCheckpointProbe(CheckpointProbeBase):
         return BaseModelType.StableDiffusion1
 
 class LoRACheckpointProbe(CheckpointProbeBase):
+    def get_format(self)->str:
+        return 'lycoris'
+
     def get_base_type(self)->BaseModelType:
         checkpoint = self.checkpoint
         key1 = "lora_te_text_model_encoder_layers_0_mlp_fc1.lora_down.weight"
@@ -276,6 +296,9 @@ class LoRACheckpointProbe(CheckpointProbeBase):
             return None
 
 class TextualInversionCheckpointProbe(CheckpointProbeBase):
+    def get_format(self)->str:
+        return None
+
     def get_base_type(self)->BaseModelType:
         checkpoint = self.checkpoint
         if 'string_to_token' in checkpoint:
@@ -322,17 +345,16 @@ class FolderProbeBase(ProbeBase):
     def get_variant_type(self)->ModelVariantType:
         return ModelVariantType.Normal
 
+    def get_format(self)->str:
+        return 'diffusers'
+    
 class PipelineFolderProbe(FolderProbeBase):
     def get_base_type(self)->BaseModelType:
         if self.model:
             unet_conf = self.model.unet.config
-            scheduler_conf = self.model.scheduler.config
         else:
             with open(self.folder_path / 'unet' / 'config.json','r') as file:
                 unet_conf = json.load(file)
-            with open(self.folder_path / 'scheduler' / 'scheduler_config.json','r') as file:
-                scheduler_conf = json.load(file)
-            
         if unet_conf['cross_attention_dim'] == 768:
             return BaseModelType.StableDiffusion1  
         elif unet_conf['cross_attention_dim'] == 1024:
@@ -381,6 +403,9 @@ class VaeFolderProbe(FolderProbeBase):
         return BaseModelType.StableDiffusion1
 
 class TextualInversionFolderProbe(FolderProbeBase):
+    def get_format(self)->str:
+        return None
+    
     def get_base_type(self)->BaseModelType:
         path = self.folder_path / 'learned_embeds.bin'
         if not path.exists():
@@ -401,16 +426,24 @@ class ControlNetFolderProbe(FolderProbeBase):
                else BaseModelType.StableDiffusion2
 
 class LoRAFolderProbe(FolderProbeBase):
-    # I've never seen one of these in the wild, so this is a noop
-    pass
+    def get_base_type(self)->BaseModelType:
+        model_file = None
+        for suffix in ['safetensors','bin']:
+            base_file = self.folder_path / f'pytorch_lora_weights.{suffix}'
+            if base_file.exists():
+                model_file = base_file
+                break
+        if not model_file:
+            raise Exception('Unknown LoRA format encountered')
+        return LoRACheckpointProbe(model_file,None).get_base_type()
 
 ############## register probe classes ######
-ModelProbe.register_probe('folder', ModelType.Pipeline,  PipelineFolderProbe)
-ModelProbe.register_probe('folder', ModelType.Vae, VaeFolderProbe)
-ModelProbe.register_probe('folder', ModelType.Lora, LoRAFolderProbe)
-ModelProbe.register_probe('folder', ModelType.TextualInversion, TextualInversionFolderProbe)
-ModelProbe.register_probe('folder', ModelType.ControlNet, ControlNetFolderProbe)
-ModelProbe.register_probe('checkpoint', ModelType.Pipeline, PipelineCheckpointProbe)
+ModelProbe.register_probe('diffusers', ModelType.Main,  PipelineFolderProbe)
+ModelProbe.register_probe('diffusers', ModelType.Vae, VaeFolderProbe)
+ModelProbe.register_probe('diffusers', ModelType.Lora, LoRAFolderProbe)
+ModelProbe.register_probe('diffusers', ModelType.TextualInversion, TextualInversionFolderProbe)
+ModelProbe.register_probe('diffusers', ModelType.ControlNet, ControlNetFolderProbe)
+ModelProbe.register_probe('checkpoint', ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe('checkpoint', ModelType.Vae, VaeCheckpointProbe)
 ModelProbe.register_probe('checkpoint', ModelType.Lora, LoRACheckpointProbe)
 ModelProbe.register_probe('checkpoint', ModelType.TextualInversion, TextualInversionCheckpointProbe)

@@ -73,7 +73,7 @@ class PipelineModelLoaderInvocation(BaseInvocation):
 
         base_model = self.model.base_model
         model_name = self.model.model_name
-        model_type = ModelType.Pipeline
+        model_type = ModelType.Main
 
         # TODO: not found exceptions
         if not context.services.model_manager.model_exists(

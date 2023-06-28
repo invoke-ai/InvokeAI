@@ -9,17 +9,18 @@ import { stateSelector } from 'app/store/store';
 const selector = createSelector(
   stateSelector,
   (state) => {
-    const { maxPrompts } = state.dynamicPrompts;
+    const { maxPrompts, combinatorial } = state.dynamicPrompts;
     const { min, sliderMax, inputMax } =
       state.config.sd.dynamicPrompts.maxPrompts;
 
-    return { maxPrompts, min, sliderMax, inputMax };
+    return { maxPrompts, min, sliderMax, inputMax, combinatorial };
   },
   defaultSelectorOptions
 );
 
 const ParamDynamicPromptsMaxPrompts = () => {
-  const { maxPrompts, min, sliderMax, inputMax } = useAppSelector(selector);
+  const { maxPrompts, min, sliderMax, inputMax, combinatorial } =
+    useAppSelector(selector);
   const dispatch = useAppDispatch();
 
   const handleChange = useCallback(
@@ -36,6 +37,7 @@ const ParamDynamicPromptsMaxPrompts = () => {
   return (
     <IAISlider
       label="Max Prompts"
+      isDisabled={!combinatorial}
       min={min}
       max={sliderMax}
       value={maxPrompts}

@@ -1,13 +1,13 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) and 2023 Kent Keirsey (https://github.com/hipsterusername)
 
-from typing import Annotated, Literal, Optional, Union, Dict
+from typing import Literal, Optional, Union
 
 from fastapi import Query
 from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 from ..dependencies import ApiDependencies
 from invokeai.backend import BaseModelType, ModelType
-from invokeai.backend.model_management.models import OPENAPI_MODEL_CONFIGS
+from invokeai.backend.model_management.models import OPENAPI_MODEL_CONFIGS, SchedulerPredictionType
 MODEL_CONFIGS = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
@@ -51,11 +51,14 @@ class CreateModelResponse(BaseModel):
     info: Union[CkptModelInfo, DiffusersModelInfo] = Field(discriminator="format", description="The model info")
     status: str = Field(description="The status of the API response")
 
+class ImportModelRequest(BaseModel):
+    name: str = Field(description="A model path, repo_id or URL to import")
+    prediction_type: Optional[Literal['epsilon','v_prediction','sample']] = Field(description='Prediction type for SDv2 checkpoint files')
+
 class ConversionRequest(BaseModel):
     name: str = Field(description="The name of the new model")
     info: CkptModelInfo = Field(description="The converted model info")
     save_location: str = Field(description="The path to save the converted model weights")
-    
 
 class ConvertedModelResponse(BaseModel):
     name: str = Field(description="The name of the new model")
@@ -105,6 +108,28 @@ async def update_model(
 
     return model_response
 
+@models_router.post(
+    "/",
+    operation_id="import_model",
+    responses={200: {"status": "success"}},
+)
+async def import_model(
+    model_request: ImportModelRequest
+) -> None:
+    """ Add Model """
+    items_to_import = set([model_request.name])
+    prediction_types = { x.value: x for x in SchedulerPredictionType }
+    logger = ApiDependencies.invoker.services.logger
+    
+    installed_models = ApiDependencies.invoker.services.model_manager.heuristic_import(
+        items_to_import = items_to_import,
+        prediction_type_helper = lambda x: prediction_types.get(model_request.prediction_type)
+    )
+    if len(installed_models) > 0:
+        logger.info(f'Successfully imported {model_request.name}')
+    else:
+        logger.error(f'Model {model_request.name} not imported')
+        raise HTTPException(status_code=500, detail=f'Model {model_request.name} not imported')
 
 @models_router.delete(
     "/{model_name}",
