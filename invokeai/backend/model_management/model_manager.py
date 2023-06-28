@@ -675,13 +675,15 @@ class ModelManager(object):
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
     ):
+
         loaded_files = set()
         new_models_found = False
 
+        self.logger.info(f'scanning {self.app_config.models_path} for new models')
         with Chdir(self.app_config.root_path):
             for model_key, model_config in list(self.models.items()):
                 model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
-                model_path = self.app_config.root_path / model_config.path
+                model_path = self.app_config.root_path.absolute() / model_config.path
                 if not model_path.exists():
                     model_class = MODEL_CLASSES[cur_base_model][cur_model_type]
                     if model_class.save_to_config:
