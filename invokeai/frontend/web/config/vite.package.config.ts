@@ -6,14 +6,12 @@ import { visualizer } from 'rollup-plugin-visualizer';
 import { PluginOption, UserConfig } from 'vite';
 import eslint from 'vite-plugin-eslint';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import { commonPlugins } from './common';
 
 export const packageConfig: UserConfig = {
   base: './',
   plugins: [
-    react(),
-    eslint(),
-    tsconfigPaths(),
-    visualizer() as unknown as PluginOption,
+    ...commonPlugins,
     dts({
       insertTypesEntry: true,
     }),
