@@ -305,6 +305,21 @@ export type ConditioningInputFieldTemplate = InputFieldTemplateBase & {
   type: 'conditioning';
 };
 
+export type UNetInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'unet';
+};
+
+export type ClipInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'clip';
+};
+
+export type VaeInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'vae';
+};
+
 export type ControlInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
   type: 'control';
