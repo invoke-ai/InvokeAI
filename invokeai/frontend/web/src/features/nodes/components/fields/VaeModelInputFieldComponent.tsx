@@ -42,8 +42,8 @@ const VaeModelInputFieldComponent = (
     const data: SelectItem[] = [
       {
         value: 'auto',
-        label: 'auto',
-        group: 'Automatic',
+        label: 'Automatic',
+        group: 'Default',
       },
     ];
 
@@ -83,7 +83,7 @@ const VaeModelInputFieldComponent = (
     if (field.value && vaeModels?.ids.includes(field.value)) {
       return;
     }
-    handleValueChanged('none');
+    handleValueChanged('auto');
   }, [field.value, handleValueChanged, vaeModels?.ids]);
 
   return (

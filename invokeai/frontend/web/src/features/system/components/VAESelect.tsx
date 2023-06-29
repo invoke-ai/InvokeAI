@@ -35,8 +35,8 @@ const VAESelect = () => {
 
     const data: SelectItem[] = [
       {
-        value: 'none',
-        label: 'None',
+        value: 'auto',
+        label: 'Automatic',
         group: 'Default',
       },
     ];
@@ -75,13 +75,13 @@ const VAESelect = () => {
     if (selectedModelId && vaeModels?.ids.includes(selectedModelId)) {
       return;
     }
-    handleChangeModel('none');
+    handleChangeModel('auto');
   }, [handleChangeModel, vaeModels?.ids, selectedModelId]);
 
   return (
     <IAIMantineSelect
       tooltip={selectedModel?.description}
-      label={t('modelManager.customVAE')}
+      label={t('modelManager.vae')}
       value={selectedModelId}
       placeholder="Pick one"
       data={data}
