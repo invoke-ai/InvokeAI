@@ -7,7 +7,6 @@ import {
   VaeModelInputFieldValue,
 } from 'features/nodes/types/types';
 import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
-import { MODEL_TYPE_MAP } from 'features/system/components/VAESelect';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -55,7 +54,7 @@ const VaeModelInputFieldComponent = (
       data.push({
         value: id,
         label: model.name,
-        group: MODEL_TYPE_MAP[model.base_model],
+        group: BASE_MODEL_NAME_MAP[model.base_model],
       });
     });
 

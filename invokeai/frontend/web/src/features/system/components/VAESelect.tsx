@@ -10,11 +10,7 @@ import { useListModelsQuery } from 'services/api/endpoints/models';
 
 import { RootState } from 'app/store/store';
 import { vaeSelected } from 'features/parameters/store/generationSlice';
-
-export const MODEL_TYPE_MAP = {
-  'sd-1': 'Stable Diffusion 1.x',
-  'sd-2': 'Stable Diffusion 2.x',
-};
+import { MODEL_TYPE_MAP } from './ModelSelect';
 
 const VAESelect = () => {
   const dispatch = useAppDispatch();
