@@ -16,7 +16,6 @@ export type Rect = Coordinates & Dimensions;
 
 export interface UIState {
   activeTab: number;
-  currentTheme: string;
   shouldPinParametersPanel: boolean;
   shouldShowParametersPanel: boolean;
   shouldShowImageDetails: boolean;

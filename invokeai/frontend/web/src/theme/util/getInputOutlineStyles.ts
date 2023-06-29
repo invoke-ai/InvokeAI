@@ -1,40 +1,40 @@
-import { StyleFunctionProps } from '@chakra-ui/theme-tools';
+import { StyleFunctionProps, mode } from '@chakra-ui/theme-tools';
 
-export const getInputOutlineStyles = (_props?: StyleFunctionProps) => ({
+export const getInputOutlineStyles = (props: StyleFunctionProps) => ({
   outline: 'none',
   borderWidth: 2,
   borderStyle: 'solid',
-  borderColor: 'base.800',
-  bg: 'base.900',
+  borderColor: mode('base.200', 'base.800')(props),
+  bg: mode('base.50', 'base.900')(props),
   borderRadius: 'base',
-  color: 'base.100',
+  color: mode('base.900', 'base.100')(props),
   boxShadow: 'none',
   _hover: {
-    borderColor: 'base.600',
+    borderColor: mode('base.300', 'base.600')(props),
   },
   _focus: {
-    borderColor: 'accent.700',
+    borderColor: mode('accent.200', 'accent.600')(props),
     boxShadow: 'none',
     _hover: {
-      borderColor: 'accent.600',
+      borderColor: mode('accent.300', 'accent.500')(props),
     },
   },
   _invalid: {
-    borderColor: 'error.700',
+    borderColor: mode('error.300', 'error.600')(props),
     boxShadow: 'none',
     _hover: {
-      borderColor: 'error.600',
+      borderColor: mode('error.400', 'error.500')(props),
     },
   },
   _disabled: {
-    borderColor: 'base.700',
-    bg: 'base.700',
-    color: 'base.400',
+    borderColor: mode('base.300', 'base.700')(props),
+    bg: mode('base.300', 'base.700')(props),
+    color: mode('base.600', 'base.400')(props),
     _hover: {
-      borderColor: 'base.700',
+      borderColor: mode('base.300', 'base.700')(props),
     },
   },
   _placeholder: {
-    color: 'base.500',
+    color: mode('base.700', 'base.400')(props),
   },
 });

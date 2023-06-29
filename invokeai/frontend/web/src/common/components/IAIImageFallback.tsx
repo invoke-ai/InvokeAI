@@ -6,9 +6,10 @@ import {
   IconProps,
   Spinner,
   SpinnerProps,
+  useColorMode,
 } from '@chakra-ui/react';
-import { ReactElement } from 'react';
 import { FaImage } from 'react-icons/fa';
+import { mode } from 'theme/util/mode';
 
 type Props = FlexProps & {
   spinnerProps?: SpinnerProps;
@@ -17,10 +18,11 @@ type Props = FlexProps & {
 export const IAIImageLoadingFallback = (props: Props) => {
   const { spinnerProps, ...rest } = props;
   const { sx, ...restFlexProps } = rest;
+  const { colorMode } = useColorMode();
   return (
     <Flex
       sx={{
-        bg: 'base.900',
+        bg: mode('base.200', 'base.900')(colorMode),
         opacity: 0.7,
         w: 'full',
         h: 'full',
@@ -45,10 +47,12 @@ type IAINoImageFallbackProps = {
 export const IAINoImageFallback = (props: IAINoImageFallbackProps) => {
   const { sx: flexSx, ...restFlexProps } = props.flexProps ?? { sx: {} };
   const { sx: iconSx, ...restIconProps } = props.iconProps ?? { sx: {} };
+  const { colorMode } = useColorMode();
+
   return (
     <Flex
       sx={{
-        bg: 'base.900',
+        bg: mode('base.200', 'base.900')(colorMode),
         opacity: 0.7,
         w: 'full',
         h: 'full',
@@ -61,7 +65,7 @@ export const IAINoImageFallback = (props: IAINoImageFallbackProps) => {
     >
       <Icon
         as={props.as ?? FaImage}
-        sx={{ color: 'base.700', ...iconSx }}
+        sx={{ color: mode('base.700', 'base.500')(colorMode), ...iconSx }}
         {...restIconProps}
       />
     </Flex>

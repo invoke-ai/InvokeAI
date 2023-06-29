@@ -1,4 +1,4 @@
-import { Flex, Text } from '@chakra-ui/react';
+import { Flex, Text, useColorMode } from '@chakra-ui/react';
 import { FaImages } from 'react-icons/fa';
 import { boardIdSelected } from '../../store/boardSlice';
 import { useDispatch } from 'react-redux';
@@ -10,9 +10,11 @@ import { ImageDTO } from 'services/api/types';
 import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
 import { useDroppable } from '@dnd-kit/core';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
+import { mode } from 'theme/util/mode';
 
 const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
   const dispatch = useDispatch();
+  const { colorMode } = useColorMode();
 
   const handleAllImagesBoardClick = () => {
     dispatch(boardIdSelected());
@@ -79,7 +81,9 @@ const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
       </Flex>
       <Text
         sx={{
-          color: isSelected ? 'base.50' : 'base.200',
+          color: isSelected
+            ? mode('base.900', 'base.50')(colorMode)
+            : mode('base.700', 'base.200')(colorMode),
           fontWeight: isSelected ? 600 : undefined,
           fontSize: 'xs',
         }}

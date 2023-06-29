@@ -5,6 +5,7 @@ import {
   Icon,
   IconButtonProps,
   Image,
+  useColorMode,
 } from '@chakra-ui/react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useCombinedRefs } from '@dnd-kit/utilities';
@@ -20,6 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
 import IAIDropOverlay from './IAIDropOverlay';
 import { PostUploadAction } from 'services/api/thunks/image';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { mode } from 'theme/util/mode';
 
 type IAIDndImageProps = {
   image: ImageDTO | null | undefined;
@@ -62,6 +64,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
   } = props;
 
   const dndId = useRef(uuidv4());
+  const { colorMode } = useColorMode();
 
   const {
     isOver,
@@ -99,10 +102,10 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     ? {}
     : {
         cursor: 'pointer',
-        bg: 'base.800',
+        bg: mode('base.200', 'base.800')(colorMode),
         _hover: {
-          bg: 'base.750',
-          color: 'base.300',
+          bg: mode('base.300', 'base.650')(colorMode),
+          color: mode('base.500', 'base.300')(colorMode),
         },
       };
 
@@ -181,7 +184,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
               borderRadius: 'base',
               transitionProperty: 'common',
               transitionDuration: '0.1s',
-              color: 'base.500',
+              color: mode('base.500', 'base.500')(colorMode),
               ...uploadButtonStyles,
             }}
             {...getUploadButtonProps()}

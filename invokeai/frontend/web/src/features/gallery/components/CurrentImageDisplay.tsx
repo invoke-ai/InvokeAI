@@ -32,7 +32,6 @@ const CurrentImageDisplay = () => {
         height: '100%',
         width: '100%',
         rowGap: 4,
-        borderRadius: 'base',
         alignItems: 'center',
         justifyContent: 'center',
       }}

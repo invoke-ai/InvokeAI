@@ -67,14 +67,14 @@ const UnifiedCanvasContent = () => {
   if (shouldUseCanvasBetaLayout) {
     return (
       <Box
+        layerStyle="first"
         ref={setDroppableRef}
         tabIndex={0}
         sx={{
           w: 'full',
           h: 'full',
-          borderRadius: 'base',
-          bg: 'base.850',
           p: 4,
+          borderRadius: 'base',
         }}
       >
         <Flex
@@ -110,11 +110,11 @@ const UnifiedCanvasContent = () => {
       ref={setDroppableRef}
       tabIndex={-1}
       sx={{
+        layerStyle: 'first',
         w: 'full',
         h: 'full',
-        borderRadius: 'base',
-        bg: 'base.850',
         p: 4,
+        borderRadius: 'base',
       }}
     >
       <Flex

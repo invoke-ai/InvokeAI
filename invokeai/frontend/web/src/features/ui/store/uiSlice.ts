@@ -8,7 +8,6 @@ import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
 
 export const initialUIState: UIState = {
   activeTab: 0,
-  currentTheme: 'dark',
   shouldPinParametersPanel: true,
   shouldShowParametersPanel: true,
   shouldShowImageDetails: false,
@@ -29,9 +28,6 @@ export const uiSlice = createSlice({
   reducers: {
     setActiveTab: (state, action: PayloadAction<number | InvokeTabName>) => {
       setActiveTabReducer(state, action.payload);
-    },
-    setCurrentTheme: (state, action: PayloadAction<string>) => {
-      state.currentTheme = action.payload;
     },
     setShouldPinParametersPanel: (state, action: PayloadAction<boolean>) => {
       state.shouldPinParametersPanel = action.payload;
@@ -110,7 +106,6 @@ export const uiSlice = createSlice({
 
 export const {
   setActiveTab,
-  setCurrentTheme,
   setShouldPinParametersPanel,
   setShouldShowParametersPanel,
   setShouldShowImageDetails,

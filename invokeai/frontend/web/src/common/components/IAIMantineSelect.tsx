@@ -1,6 +1,8 @@
-import { Tooltip } from '@chakra-ui/react';
+import { Tooltip, useColorMode, useToken } from '@chakra-ui/react';
 import { Select, SelectProps } from '@mantine/core';
+import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
 import { memo } from 'react';
+import { mode } from 'theme/util/mode';
 
 export type IAISelectDataType = {
   value: string;
@@ -14,61 +16,104 @@ type IAISelectProps = SelectProps & {
 
 const IAIMantineSelect = (props: IAISelectProps) => {
   const { searchable = true, tooltip, ...rest } = props;
+  const {
+    base50,
+    base100,
+    base200,
+    base300,
+    base400,
+    base500,
+    base600,
+    base700,
+    base800,
+    base900,
+    accent200,
+    accent300,
+    accent400,
+    accent500,
+    accent600,
+  } = useChakraThemeTokens();
+
+  const { colorMode } = useColorMode();
+
+  const [boxShadow] = useToken('shadows', ['dark-lg']);
+
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
       <Select
         searchable={searchable}
         styles={() => ({
           label: {
-            color: 'var(--invokeai-colors-base-300)',
+            color: mode(base700, base300)(colorMode),
             fontWeight: 'normal',
           },
           input: {
-            backgroundColor: 'var(--invokeai-colors-base-900)',
+            backgroundColor: mode(base50, base900)(colorMode),
             borderWidth: '2px',
-            borderColor: 'var(--invokeai-colors-base-800)',
-            color: 'var(--invokeai-colors-base-100)',
+            borderColor: mode(base200, base800)(colorMode),
+            color: mode(base900, base100)(colorMode),
             paddingRight: 24,
             fontWeight: 600,
-            '&:hover': { borderColor: 'var(--invokeai-colors-base-700)' },
+            '&:hover': { borderColor: mode(base300, base600)(colorMode) },
             '&:focus': {
-              borderColor: 'var(--invokeai-colors-accent-600)',
+              borderColor: mode(accent300, accent600)(colorMode),
+            },
+            '&:is(:focus, :hover)': {
+              borderColor: mode(base400, base500)(colorMode),
+            },
+            '&:focus-within': {
+              borderColor: mode(accent200, accent600)(colorMode),
             },
             '&:disabled': {
-              backgroundColor: 'var(--invokeai-colors-base-700)',
-              color: 'var(--invokeai-colors-base-400)',
+              backgroundColor: mode(base300, base700)(colorMode),
+              color: mode(base600, base400)(colorMode),
+            },
+          },
+          value: {
+            backgroundColor: mode(base100, base900)(colorMode),
+            color: mode(base900, base100)(colorMode),
+            button: {
+              color: mode(base900, base100)(colorMode),
+            },
+            '&:hover': {
+              backgroundColor: mode(base300, base700)(colorMode),
+              cursor: 'pointer',
             },
           },
           dropdown: {
-            backgroundColor: 'var(--invokeai-colors-base-800)',
-            borderColor: 'var(--invokeai-colors-base-700)',
+            backgroundColor: mode(base200, base800)(colorMode),
+            borderColor: mode(base200, base800)(colorMode),
+            boxShadow,
           },
           item: {
-            backgroundColor: 'var(--invokeai-colors-base-800)',
-            color: 'var(--invokeai-colors-base-200)',
+            backgroundColor: mode(base200, base800)(colorMode),
+            color: mode(base800, base200)(colorMode),
             padding: 6,
             '&[data-hovered]': {
-              color: 'var(--invokeai-colors-base-100)',
-              backgroundColor: 'var(--invokeai-colors-base-750)',
+              color: mode(base900, base100)(colorMode),
+              backgroundColor: mode(base300, base700)(colorMode),
             },
             '&[data-active]': {
-              backgroundColor: 'var(--invokeai-colors-base-750)',
+              backgroundColor: mode(base300, base700)(colorMode),
               '&:hover': {
-                color: 'var(--invokeai-colors-base-100)',
-                backgroundColor: 'var(--invokeai-colors-base-750)',
+                color: mode(base900, base100)(colorMode),
+                backgroundColor: mode(base300, base700)(colorMode),
               },
             },
             '&[data-selected]': {
-              color: 'var(--invokeai-colors-base-50)',
-              backgroundColor: 'var(--invokeai-colors-accent-650)',
+              color: mode(base900, base50)(colorMode),
+              backgroundColor: mode(accent300, accent600)(colorMode),
               fontWeight: 600,
               '&:hover': {
-                backgroundColor: 'var(--invokeai-colors-accent-600)',
+                backgroundColor: mode(accent400, accent500)(colorMode),
               },
             },
           },
           rightSection: {
             width: 32,
+            button: {
+              color: mode(base900, base100)(colorMode),
+            },
           },
         })}
         {...rest}
