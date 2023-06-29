@@ -1,17 +1,20 @@
-import 'i18next';
+// TODO: Disabled for IDE performance issues with our translation JSON
 
-import en from '../public/locales/en.json';
+// import 'i18next';
 
-declare module 'i18next' {
-  // Extend CustomTypeOptions
-  interface CustomTypeOptions {
-    // Setting Default Namespace As English
-    defaultNS: 'en';
-    // Custom Types For Resources
-    resources: {
-      en: typeof en;
-    };
-    // Never Return Null
-    returnNull: false;
-  }
-}
+// import en from '../public/locales/en.json';
+
+// declare module 'i18next' {
+//   // Extend CustomTypeOptions
+//   interface CustomTypeOptions {
+//     // Setting Default Namespace As English
+//     defaultNS: 'en';
+//     // Custom Types For Resources
+//     resources: {
+//       en: typeof en;
+//     };
+//     // Never Return Null
+//     returnNull: false;
+//   }
+// }
+export default {};
