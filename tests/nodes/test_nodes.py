@@ -1,4 +1,4 @@
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, Union
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.image import ImageField
 from invokeai.app.services.invocation_services import InvocationServices
@@ -43,10 +43,19 @@ class ImageTestInvocationOutput(BaseInvocationOutput):
 
     image: ImageField = Field()
 
-class ImageTestInvocation(BaseInvocation):
-    type: Literal['test_image'] = 'test_image'
+class TextToImageTestInvocation(BaseInvocation):
+    type: Literal['test_text_to_image'] = 'test_text_to_image'
 
     prompt: str = Field(default = "")
+
+    def invoke(self, context: InvocationContext) -> ImageTestInvocationOutput:
+        return ImageTestInvocationOutput(image=ImageField(image_name=self.id))
+
+class ImageToImageTestInvocation(BaseInvocation):
+    type: Literal['test_image_to_image'] = 'test_image_to_image'
+
+    prompt: str = Field(default = "")
+    image: Union[ImageField, None] = Field(default=None)
 
     def invoke(self, context: InvocationContext) -> ImageTestInvocationOutput:
         return ImageTestInvocationOutput(image=ImageField(image_name=self.id))
@@ -61,7 +70,6 @@ class PromptCollectionTestInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
         return PromptCollectionTestInvocationOutput(collection=self.collection.copy())
-
 
 from invokeai.app.services.events import EventServiceBase
 from invokeai.app.services.graph import Edge, EdgeConnection
