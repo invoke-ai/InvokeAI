@@ -18,7 +18,6 @@ export const packageConfig: UserConfig = {
     cssInjectedByJsPlugin(),
   ],
   build: {
-    minify: false,
     cssCodeSplit: true,
     lib: {
       entry: path.resolve(__dirname, '../src/index.ts'),

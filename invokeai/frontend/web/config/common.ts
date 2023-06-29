@@ -7,7 +7,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 export const commonPlugins: UserConfig['plugins'] = [
   react(),
-  eslint(),
+  // eslint(),
   tsconfigPaths(),
   visualizer() as unknown as PluginOption,
   nodePolyfills(),
