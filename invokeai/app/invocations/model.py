@@ -73,7 +73,7 @@ class PipelineModelLoaderInvocation(BaseInvocation):
 
         base_model = self.model.base_model
         model_name = self.model.model_name
-        model_type = ModelType.Pipeline
+        model_type = ModelType.Main
 
         # TODO: not found exceptions
         if not context.services.model_manager.model_exists(
@@ -177,9 +177,13 @@ class LoraLoaderInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> LoraLoaderOutput:
 
+        # TODO: ui rewrite
+        base_model = BaseModelType.StableDiffusion1
+
         if not context.services.model_manager.model_exists(
+            base_model=base_model,
             model_name=self.lora_name,
-            model_type=SDModelType.Lora,
+            model_type=ModelType.Lora,
         ):
             raise Exception(f"Unkown lora name: {self.lora_name}!")
 
@@ -195,8 +199,9 @@ class LoraLoaderInvocation(BaseInvocation):
             output.unet = copy.deepcopy(self.unet)
             output.unet.loras.append(
                 LoraInfo(
+                    base_model=base_model,
                     model_name=self.lora_name,
-                    model_type=SDModelType.Lora,
+                    model_type=ModelType.Lora,
                     submodel=None,
                     weight=self.weight,
                 )
@@ -206,8 +211,9 @@ class LoraLoaderInvocation(BaseInvocation):
             output.clip = copy.deepcopy(self.clip)
             output.clip.loras.append(
                 LoraInfo(
+                    base_model=base_model,
                     model_name=self.lora_name,
-                    model_type=SDModelType.Lora,
+                    model_type=ModelType.Lora,
                     submodel=None,
                     weight=self.weight,
                 )
