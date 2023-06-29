@@ -1,5 +1,5 @@
 import { DeleteIcon, EditIcon } from '@chakra-ui/icons';
-import { Box, Button, Flex, Spacer, Text, Tooltip } from '@chakra-ui/react';
+import { Box, Flex, Spacer, Text, Tooltip } from '@chakra-ui/react';
 
 // import { deleteModel, requestModelChange } from 'app/socketio/actions';
 import { RootState } from 'app/store/store';
@@ -30,10 +30,6 @@ export default function ModelListItem(props: ModelListItemProps) {
 
   const { modelKey, name, description } = props;
 
-  const handleChangeModel = () => {
-    dispatch(requestModelChange(modelKey));
-  };
-
   const openModelHandler = () => {
     dispatch(setOpenModel(modelKey));
   };
@@ -41,17 +37,6 @@ export default function ModelListItem(props: ModelListItemProps) {
   const handleModelDelete = () => {
     dispatch(deleteModel(modelKey));
     dispatch(setOpenModel(null));
-  };
-
-  const statusTextColor = () => {
-    switch (status) {
-      case 'active':
-        return 'ok.500';
-      case 'cached':
-        return 'warning.500';
-      case 'not loaded':
-        return 'inherit';
-    }
   };
 
   return (
@@ -81,14 +66,6 @@ export default function ModelListItem(props: ModelListItemProps) {
       </Box>
       <Spacer onClick={openModelHandler} cursor="pointer" />
       <Flex gap={2} alignItems="center">
-        <Button
-          size="sm"
-          onClick={handleChangeModel}
-          isDisabled={status === 'active' || isProcessing || !isConnected}
-        >
-          {t('modelManager.load')}
-        </Button>
-
         <IAIIconButton
           icon={<EditIcon />}
           size="sm"

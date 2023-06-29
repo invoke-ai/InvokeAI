@@ -32,6 +32,7 @@ export default function ModelManagerPanel() {
         <CheckpointModelEdit
           modelToEdit={openModel}
           retrievedModel={mainModels['entities'][openModel]}
+          key={openModel}
         />
       );
     }
