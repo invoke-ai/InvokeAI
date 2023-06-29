@@ -326,7 +326,7 @@ class MigrateTo3(object):
                 vae_path = p
             elif repo_id := vae.get('repo_id'):
                 if repo_id=='stabilityai/sd-vae-ft-mse':  # this guy is already downloaded
-                    vae_path = 'models/core/convert/se-vae-ft-mse'
+                    vae_path = 'models/core/convert/sd-vae-ft-mse'
                 else:
                     vae_path = self._download_vae(repo_id, vae.get('subfolder'))
 
