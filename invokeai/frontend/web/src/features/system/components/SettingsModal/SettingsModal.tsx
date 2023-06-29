@@ -9,7 +9,6 @@ import {
   ModalHeader,
   ModalOverlay,
   Text,
-  useColorMode,
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
@@ -48,7 +47,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import SettingsSchedulers from './SettingsSchedulers';
-import { mode } from 'theme/util/mode';
 
 const selector = createSelector(
   [systemSelector, uiSelector],

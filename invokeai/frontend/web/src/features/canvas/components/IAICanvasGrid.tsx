@@ -1,8 +1,7 @@
 // Grid drawing adapted from https://longviewcoder.com/2021/12/08/konva-a-better-grid/
 
-import { useColorMode, useColorModeValue, useToken } from '@chakra-ui/react';
+import { useColorMode, useToken } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { isEqual, range } from 'lodash-es';
@@ -24,9 +23,6 @@ const selector = createSelector(
 );
 
 const IAICanvasGrid = () => {
-  const currentTheme = useAppSelector(
-    (state: RootState) => state.ui.currentTheme
-  );
   const { stageScale, stageCoordinates, stageDimensions } =
     useAppSelector(selector);
   const { colorMode } = useColorMode();
@@ -112,7 +108,6 @@ const IAICanvasGrid = () => {
     stageScale,
     stageCoordinates,
     stageDimensions,
-    currentTheme,
     unscale,
     colorMode,
     darkGridLineColor,

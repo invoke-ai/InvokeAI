@@ -1,35 +1,32 @@
+import {
+  ButtonGroup,
+  ButtonProps,
+  ButtonSpinner,
+  Menu,
+  MenuButton,
+  MenuItemOption,
+  MenuList,
+  MenuOptionGroup,
+} from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton, {
-  IAIIconButtonProps,
-} from 'common/components/IAIIconButton';
+import IAIIconButton from 'common/components/IAIIconButton';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
+  CancelStrategy,
   SystemState,
   cancelScheduled,
   cancelTypeChanged,
-  CancelStrategy,
 } from 'features/system/store/systemSlice';
 import { isEqual } from 'lodash-es';
-import { useCallback, memo, useMemo } from 'react';
-import {
-  ButtonSpinner,
-  ButtonGroup,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuOptionGroup,
-  MenuItemOption,
-  ButtonGroupProps,
-  ButtonProps,
-} from '@chakra-ui/react';
+import { memo, useCallback, useMemo } from 'react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { MdCancel, MdCancelScheduleSend } from 'react-icons/md';
 
-import { sessionCanceled } from 'services/api/thunks/session';
 import { ChevronDownIcon } from '@chakra-ui/icons';
+import { sessionCanceled } from 'services/api/thunks/session';
 
 const cancelButtonSelector = createSelector(
   systemSelector,
@@ -141,7 +138,6 @@ const CancelButton = (
         <MenuButton
           as={IAIIconButton}
           tooltip={t('parameters.cancel.setType')}
-          tooltipPlacement="top"
           aria-label={t('parameters.cancel.setType')}
           icon={<ChevronDownIcon w="1em" h="1em" />}
           paddingX={0}

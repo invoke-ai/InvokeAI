@@ -44,7 +44,7 @@ export const theme: ThemeOverride = {
     },
   },
   styles: {
-    global: (props) => ({
+    global: () => ({
       layerStyle: 'body',
       '*': { ...no_scrollbar },
     }),

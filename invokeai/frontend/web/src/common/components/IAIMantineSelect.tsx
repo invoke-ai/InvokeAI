@@ -32,7 +32,6 @@ const IAIMantineSelect = (props: IAISelectProps) => {
     accent400,
     accent500,
     accent600,
-    accent700,
   } = useChakraThemeTokens();
 
   const { colorMode } = useColorMode();

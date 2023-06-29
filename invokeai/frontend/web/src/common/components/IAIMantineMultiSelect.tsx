@@ -14,7 +14,6 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
     base50,
     base100,
     base200,
-    base250,
     base300,
     base400,
     base500,
@@ -27,7 +26,6 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
     accent400,
     accent500,
     accent600,
-    accent700,
   } = useChakraThemeTokens();
   const [boxShadow] = useToken('shadows', ['dark-lg']);
   const { colorMode } = useColorMode();
