@@ -81,19 +81,13 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
         flexDirection="column"
         maxHeight={window.innerHeight - 270}
         overflowY="scroll"
-        paddingInlineEnd={8}
       >
         <form
           onSubmit={checkpointEditForm.onSubmit((values) =>
             editModelFormSubmitHandler(values)
           )}
         >
-          <Flex
-            flexDirection="column"
-            overflowY="scroll"
-            gap={4}
-            paddingInlineEnd={8}
-          >
+          <Flex flexDirection="column" overflowY="scroll" gap={4}>
             <IAIInput
               label={t('modelManager.name')}
               {...checkpointEditForm.getInputProps('name')}

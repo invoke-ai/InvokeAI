@@ -60,7 +60,6 @@ export default function ModelConvert(props: ModelConvertProps) {
           size={'sm'}
           aria-label={t('modelManager.convertToDiffusers')}
           className=" modal-close-btn"
-          marginInlineEnd={8}
         >
           🧨 {t('modelManager.convertToDiffusers')}
         </IAIButton>

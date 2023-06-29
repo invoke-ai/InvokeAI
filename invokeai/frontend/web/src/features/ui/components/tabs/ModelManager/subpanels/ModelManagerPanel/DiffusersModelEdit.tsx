@@ -76,12 +76,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
           editModelFormSubmitHandler(values)
         )}
       >
-        <Flex
-          flexDirection="column"
-          overflowY="scroll"
-          gap={4}
-          paddingInlineEnd={8}
-        >
+        <Flex flexDirection="column" overflowY="scroll" gap={4}>
           <IAIInput
             label={t('modelManager.name')}
             {...diffusersEditForm.getInputProps('name')}
