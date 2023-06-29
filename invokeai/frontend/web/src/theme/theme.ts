@@ -1,5 +1,6 @@
 import { ThemeOverride } from '@chakra-ui/react';
 
+import { InvokeAIColors } from './colors/colors';
 import { accordionTheme } from './components/accordion';
 import { buttonTheme } from './components/button';
 import { checkboxTheme } from './components/checkbox';
@@ -10,7 +11,7 @@ import { modalTheme } from './components/modal';
 import { numberInputTheme } from './components/numberInput';
 import { popoverTheme } from './components/popover';
 import { progressTheme } from './components/progress';
-import { no_scrollbar, scrollbar as _scrollbar } from './components/scrollbar';
+import { no_scrollbar } from './components/scrollbar';
 import { selectTheme } from './components/select';
 import { sliderTheme } from './components/slider';
 import { switchTheme } from './components/switch';
@@ -18,14 +19,6 @@ import { tabsTheme } from './components/tabs';
 import { textTheme } from './components/text';
 import { textareaTheme } from './components/textarea';
 import { tooltipTheme } from './components/tooltip';
-import { generateColorPalette } from './util/generateColorPalette';
-
-const BASE = { H: 240, S: 8 };
-const ACCENT = { H: 260, S: 52 };
-const WORKING = { H: 47, S: 50 };
-const WARNING = { H: 28, S: 50 };
-const OK = { H: 113, S: 50 };
-const ERROR = { H: 0, S: 50 };
 
 export const theme: ThemeOverride = {
   config: {
@@ -77,20 +70,7 @@ export const theme: ThemeOverride = {
     },
     nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-base-500)`,
   },
-  colors: {
-    base: generateColorPalette(BASE.H, BASE.S),
-    baseAlpha: generateColorPalette(BASE.H, BASE.S, true),
-    accent: generateColorPalette(ACCENT.H, ACCENT.S),
-    accentAlpha: generateColorPalette(ACCENT.H, ACCENT.S, true),
-    working: generateColorPalette(WORKING.H, WORKING.S),
-    workingAlpha: generateColorPalette(WORKING.H, WORKING.S, true),
-    warning: generateColorPalette(WARNING.H, WARNING.S),
-    warningAlpha: generateColorPalette(WARNING.H, WARNING.S, true),
-    ok: generateColorPalette(OK.H, OK.S),
-    okAlpha: generateColorPalette(OK.H, OK.S, true),
-    error: generateColorPalette(ERROR.H, ERROR.S),
-    errorAlpha: generateColorPalette(ERROR.H, ERROR.S, true),
-  },
+  colors: InvokeAIColors,
   components: {
     Button: buttonTheme, // Button and IconButton
     Input: inputTheme,
