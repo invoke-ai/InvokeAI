@@ -24,6 +24,7 @@ import {
   TypeHints,
   UNetInputFieldTemplate,
   VaeInputFieldTemplate,
+  VaeModelInputFieldTemplate,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -167,6 +168,21 @@ const buildModelInputFieldTemplate = ({
   const template: ModelInputFieldTemplate = {
     ...baseField,
     type: 'model',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildVaeModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): VaeModelInputFieldTemplate => {
+  const template: VaeModelInputFieldTemplate = {
+    ...baseField,
+    type: 'vae_model',
     inputRequirement: 'always',
     inputKind: 'direct',
     default: schemaObject.default ?? undefined,
@@ -440,6 +456,9 @@ export const buildInputFieldTemplate = (
   }
   if (['model'].includes(fieldType)) {
     return buildModelInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['vae_model'].includes(fieldType)) {
+    return buildVaeModelInputFieldTemplate({ schemaObject, baseField });
   }
   if (['enum'].includes(fieldType)) {
     return buildEnumInputFieldTemplate({ schemaObject, baseField });

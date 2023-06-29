@@ -75,6 +75,10 @@ export const buildInputFieldValue = (
     if (template.type === 'model') {
       fieldValue.value = undefined;
     }
+
+    if (template.type === 'vae_model') {
+      fieldValue.value = undefined;
+    }
   }
 
   return fieldValue;
