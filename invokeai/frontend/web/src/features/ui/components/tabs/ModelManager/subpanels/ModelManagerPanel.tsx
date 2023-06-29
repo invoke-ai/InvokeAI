@@ -24,6 +24,7 @@ export default function ModelManagerPanel() {
         <DiffusersModelEdit
           modelToEdit={openModel}
           retrievedModel={mainModels['entities'][openModel]}
+          key={openModel}
         />
       );
     } else {
