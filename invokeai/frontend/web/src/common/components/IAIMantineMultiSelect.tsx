@@ -98,11 +98,12 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
               },
             },
             '&[data-selected]': {
-              color: mode(base900, base50)(colorMode),
-              backgroundColor: mode(accent300, accent600)(colorMode),
+              backgroundColor: mode(accent400, accent600)(colorMode),
+              color: mode(base50, base100)(colorMode),
               fontWeight: 600,
               '&:hover': {
-                backgroundColor: mode(accent400, accent500)(colorMode),
+                backgroundColor: mode(accent500, accent500)(colorMode),
+                color: mode('white', base50)(colorMode),
               },
             },
           },
