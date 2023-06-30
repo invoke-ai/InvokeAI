@@ -254,9 +254,9 @@ class VaeLoaderInvocation(BaseInvocation):
         }
         
     def invoke(self, context: InvocationContext) -> VaeLoaderOutput:
-        base_model = self.vae.base_model
-        model_name = self.vae.model_name
-        model_type = ModelType.vae
+        base_model = self.vae_model.base_model
+        model_name = self.vae_model.model_name
+        model_type = ModelType.Vae
 
         if not context.services.model_manager.model_exists(
                 base_model=base_model,
@@ -266,8 +266,10 @@ class VaeLoaderInvocation(BaseInvocation):
             raise Exception(f"Unkown vae name: {model_name}!")
         return VaeLoaderOutput(
             vae=VaeField(
-                model_name = model_name,
-                base_model = base_model,
-                model_type = model_type,
+                vae = ModelInfo(
+                    model_name = model_name,
+                    base_model = base_model,
+                    model_type = model_type,
+                )
             )
         )
