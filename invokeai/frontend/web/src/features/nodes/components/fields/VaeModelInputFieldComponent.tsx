@@ -38,13 +38,7 @@ const VaeModelInputFieldComponent = (
       return [];
     }
 
-    const data: SelectItem[] = [
-      {
-        value: 'auto',
-        label: 'Automatic',
-        group: 'Default',
-      },
-    ];
+    const data: SelectItem[] = [];
 
     forEach(vaeModels.entities, (model, id) => {
       if (!model) {
