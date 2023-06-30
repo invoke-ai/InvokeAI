@@ -1,10 +1,9 @@
 import copy
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 from ...backend.model_management import BaseModelType, ModelType, SubModelType
-from ...backend.util.devices import choose_torch_device, torch_dtype
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
 
@@ -31,7 +30,6 @@ class ClipField(BaseModel):
 class VaeField(BaseModel):
     # TODO: better naming?
     vae: ModelInfo = Field(description="Info to load vae submodel")
-
 
 class ModelLoaderOutput(BaseInvocationOutput):
     """Model loader output"""
@@ -223,3 +221,53 @@ class LoraLoaderInvocation(BaseInvocation):
 
         return output
 
+class VAEModelField(BaseModel):
+    """Vae model field"""
+
+    model_name: str = Field(description="Name of the model")
+    base_model: BaseModelType = Field(description="Base model")
+
+class VaeLoaderOutput(BaseInvocationOutput):
+    """Model loader output"""
+
+    #fmt: off
+    type: Literal["vae_loader_output"] = "vae_loader_output"
+
+    vae: VaeField = Field(default=None, description="Vae model")
+    #fmt: on
+
+class VaeLoaderInvocation(BaseInvocation):
+    """Loads a VAE model, outputting a VaeLoaderOutput"""
+    type: Literal["vae_loader"] = "vae_loader"
+    
+    vae_model: VAEModelField = Field(description="The VAE to load")
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "tags": ["model", "loader"],
+                "type_hints": {
+                  "vae_model": "vae_model"
+                }
+            },
+        }
+        
+    def invoke(self, context: InvocationContext) -> VaeLoaderOutput:
+        base_model = self.vae.base_model
+        model_name = self.vae.model_name
+        model_type = ModelType.vae
+
+        if not context.services.model_manager.model_exists(
+                base_model=base_model,
+                model_name=model_name,
+                model_type=model_type,
+        ):
+            raise Exception(f"Unkown vae name: {model_name}!")
+        return VaeLoaderOutput(
+            vae=VaeField(
+                model_name = model_name,
+                base_model = base_model,
+                model_type = model_type,
+            )
+        )
