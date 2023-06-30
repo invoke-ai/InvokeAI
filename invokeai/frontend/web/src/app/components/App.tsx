@@ -1,9 +1,8 @@
-import { Box, Flex, Grid, Portal } from '@chakra-ui/react';
+import { Flex, Grid, Portal } from '@chakra-ui/react';
 import { useLogger } from 'app/logging/useLogger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploader from 'common/components/ImageUploader';
-import Loading from 'common/components/Loading/Loading';
 import GalleryDrawer from 'features/gallery/components/GalleryPanel';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import SiteHeader from 'features/system/components/SiteHeader';
@@ -15,10 +14,8 @@ import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton'
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 import ParametersDrawer from 'features/ui/components/ParametersDrawer';
-import { AnimatePresence, motion } from 'framer-motion';
 import i18n from 'i18n';
 import { ReactNode, memo, useCallback, useEffect, useState } from 'react';
-import { APP_HEIGHT, APP_WIDTH } from 'theme/util/constants';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
 import DeleteImageModal from 'features/gallery/components/DeleteImageModal';
@@ -59,9 +56,6 @@ const App = ({
   const { data: embeddingModels } = useListModelsQuery({
     model_type: 'embedding',
   });
-
-  const [loadingOverridden, setLoadingOverridden] = useState(false);
-
   const dispatch = useAppDispatch();
 
   useEffect(() => {
@@ -72,27 +66,6 @@ const App = ({
     log.info({ namespace: 'App', data: config }, 'Received config');
     dispatch(configChanged(config));
   }, [dispatch, config, log]);
-
-  const handleOverrideClicked = useCallback(() => {
-    setLoadingOverridden(true);
-  }, []);
-
-  useEffect(() => {
-    if (isApplicationReady && setIsReady) {
-      setIsReady(true);
-    }
-
-    if (isApplicationReady) {
-      // TODO: This is a jank fix for canvas not filling the screen on first load
-      setTimeout(() => {
-        dispatch(requestCanvasRescale());
-      }, 200);
-    }
-
-    return () => {
-      setIsReady && setIsReady(false);
-    };
-  }, [dispatch, isApplicationReady, setIsReady]);
 
   return (
     <>
@@ -123,33 +96,6 @@ const App = ({
 
         <GalleryDrawer />
         <ParametersDrawer />
-
-        <AnimatePresence>
-          {!isApplicationReady && !loadingOverridden && (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 1 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              style={{ zIndex: 3 }}
-            >
-              <Box position="absolute" top={0} left={0} w="100vw" h="100vh">
-                <Loading />
-              </Box>
-              <Box
-                onClick={handleOverrideClicked}
-                position="absolute"
-                top={0}
-                right={0}
-                cursor="pointer"
-                w="2rem"
-                h="2rem"
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <Portal>
           <FloatingParametersPanelButtons />
         </Portal>

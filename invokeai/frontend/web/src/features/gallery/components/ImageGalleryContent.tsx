@@ -6,6 +6,7 @@ import {
   FlexProps,
   Grid,
   Icon,
+  Skeleton,
   Text,
   VStack,
   forwardRef,
@@ -233,7 +234,7 @@ const ImageGalleryContent = () => {
         borderRadius: 'base',
       }}
     >
-      <Box sx={{ w: 'full' }}>
+      <Box sx={{ w: 'full', minWidth: '200px' }}>
         <Flex
           ref={resizeObserverRef}
           sx={{
@@ -355,7 +356,9 @@ const ImageGalleryContent = () => {
         </Box>
       </Box>
       <Flex direction="column" gap={2} h="full" w="full">
-        {images.length || areMoreAvailable ? (
+        {isLoading ? (
+          <LoadingGallery />
+        ) : images.length || areMoreAvailable ? (
           <>
             <Box ref={rootRef} data-overlayscrollbars="" h="100%">
               {shouldUseSingleGalleryColumn ? (
@@ -407,27 +410,7 @@ const ImageGalleryContent = () => {
             </IAIButton>
           </>
         ) : (
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-              padding: 8,
-              h: '100%',
-              w: '100%',
-              color: 'base.500',
-            }}
-          >
-            <Icon
-              as={MdPhotoLibrary}
-              sx={{
-                w: 16,
-                h: 16,
-              }}
-            />
-            <Text textAlign="center">{t('gallery.noImagesInGallery')}</Text>
-          </Flex>
+          <EmptyGallery />
         )}
       </Flex>
     </VStack>
@@ -461,5 +444,51 @@ const ListContainer = forwardRef((props: ListContainerProps, ref) => {
     </Grid>
   );
 });
+
+const LoadingGallery = () => {
+  return (
+    <Box data-overlayscrollbars="" h="100%">
+      <VirtuosoGrid
+        style={{ height: '100%' }}
+        data={new Array(20)}
+        components={{
+          Item: ItemContainer,
+          List: ListContainer,
+        }}
+        itemContent={(index, item) => (
+          <Flex sx={{ pb: 2 }}>
+            <Skeleton sx={{ width: 'full', paddingBottom: '100%' }} />
+          </Flex>
+        )}
+      />
+    </Box>
+  );
+};
+const EmptyGallery = () => {
+  const { t } = useTranslation();
+  return (
+    <Flex
+      sx={{
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 2,
+        padding: 8,
+        h: '100%',
+        w: '100%',
+        color: 'base.500',
+      }}
+    >
+      <Icon
+        as={MdPhotoLibrary}
+        sx={{
+          w: 16,
+          h: 16,
+        }}
+      />
+      <Text textAlign="center">{t('gallery.noImagesInGallery')}</Text>
+    </Flex>
+  );
+};
 
 export default memo(ImageGalleryContent);

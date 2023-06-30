@@ -41,7 +41,7 @@ export const initialImagesState =
     offset: 0,
     limit: 0,
     total: 0,
-    isLoading: false,
+    isLoading: true,
     categories: IMAGE_CATEGORIES,
   });
 
