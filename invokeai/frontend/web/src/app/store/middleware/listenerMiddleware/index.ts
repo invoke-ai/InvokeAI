@@ -83,6 +83,7 @@ import {
   addImageRemovedFromBoardRejectedListener,
 } from './listeners/imageRemovedFromBoard';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
+import { addRequestedBoardImageDeletionListener } from './listeners/boardImagesDeleted';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -124,6 +125,7 @@ addRequestedImageDeletionListener();
 addImageDeletedPendingListener();
 addImageDeletedFulfilledListener();
 addImageDeletedRejectedListener();
+addRequestedBoardImageDeletionListener();
 
 // Image metadata
 addImageMetadataReceivedFulfilledListener();
@@ -198,7 +200,7 @@ addControlNetImageProcessedListener();
 addControlNetAutoProcessListener();
 
 // Update image URLs on connect
-addUpdateImageUrlsOnConnectListener();
+// addUpdateImageUrlsOnConnectListener();
 
 // Boards
 addImageAddedToBoardFulfilledListener();

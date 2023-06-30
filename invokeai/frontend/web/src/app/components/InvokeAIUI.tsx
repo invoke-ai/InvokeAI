@@ -24,6 +24,7 @@ import {
 import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
 import { AddImageToBoardContextProvider } from '../contexts/AddImageToBoardContext';
 import { $authToken, $baseUrl } from 'services/api/client';
+import { DeleteBoardImagesContextProvider } from '../contexts/DeleteBoardImagesContext';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -86,11 +87,13 @@ const InvokeAIUI = ({
             <ImageDndContext>
               <DeleteImageContextProvider>
                 <AddImageToBoardContextProvider>
-                  <App
-                    config={config}
-                    headerComponent={headerComponent}
-                    setIsReady={setIsReady}
-                  />
+                  <DeleteBoardImagesContextProvider>
+                    <App
+                      config={config}
+                      headerComponent={headerComponent}
+                      setIsReady={setIsReady}
+                    />
+                  </DeleteBoardImagesContextProvider>
                 </AddImageToBoardContextProvider>
               </DeleteImageContextProvider>
             </ImageDndContext>

@@ -4,17 +4,17 @@ import InitialImagePreview from './InitialImagePreview';
 const InitialImageDisplay = () => {
   return (
     <Flex
+      layerStyle={'first'}
       sx={{
         position: 'relative',
         flexDirection: 'column',
         height: '100%',
         width: '100%',
         rowGap: 4,
-        borderRadius: 'base',
         alignItems: 'center',
         justifyContent: 'center',
-        bg: 'base.850',
         p: 4,
+        borderRadius: 'base',
       }}
     >
       <Flex

@@ -1,6 +1,14 @@
 import { ChevronUpIcon } from '@chakra-ui/icons';
-import { Box, Collapse, Flex, Spacer, Switch } from '@chakra-ui/react';
+import {
+  Box,
+  Collapse,
+  Flex,
+  Spacer,
+  Switch,
+  useColorMode,
+} from '@chakra-ui/react';
 import { PropsWithChildren, memo } from 'react';
+import { mode } from 'theme/util/mode';
 
 export type IAIToggleCollapseProps = PropsWithChildren & {
   label: string;
@@ -11,6 +19,7 @@ export type IAIToggleCollapseProps = PropsWithChildren & {
 
 const IAICollapse = (props: IAIToggleCollapseProps) => {
   const { label, isOpen, onToggle, children, withSwitch = false } = props;
+  const { colorMode } = useColorMode();
   return (
     <Box>
       <Flex
@@ -21,10 +30,14 @@ const IAICollapse = (props: IAIToggleCollapseProps) => {
           px: 4,
           borderTopRadius: 'base',
           borderBottomRadius: isOpen ? 0 : 'base',
-          bg: isOpen ? 'base.750' : 'base.800',
-          color: 'base.100',
+          bg: isOpen
+            ? mode('base.200', 'base.750')(colorMode)
+            : mode('base.150', 'base.800')(colorMode),
+          color: mode('base.900', 'base.100')(colorMode),
           _hover: {
-            bg: isOpen ? 'base.700' : 'base.750',
+            bg: isOpen
+              ? mode('base.250', 'base.700')(colorMode)
+              : mode('base.200', 'base.750')(colorMode),
           },
           fontSize: 'sm',
           fontWeight: 600,
@@ -50,7 +63,13 @@ const IAICollapse = (props: IAIToggleCollapseProps) => {
         )}
       </Flex>
       <Collapse in={isOpen} animateOpacity style={{ overflow: 'unset' }}>
-        <Box sx={{ p: 4, borderBottomRadius: 'base', bg: 'base.800' }}>
+        <Box
+          sx={{
+            p: 4,
+            borderBottomRadius: 'base',
+            bg: mode('base.100', 'base.800')(colorMode),
+          }}
+        >
           {children}
         </Box>
       </Collapse>

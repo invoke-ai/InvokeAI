@@ -2,7 +2,7 @@ import { MantineThemeOverride } from '@mantine/core';
 
 export const mantineTheme: MantineThemeOverride = {
   colorScheme: 'dark',
-  fontFamily: `'InterVariable', sans-serif`,
+  fontFamily: `'Inter Variable', sans-serif`,
   components: {
     ScrollArea: {
       defaultProps: {

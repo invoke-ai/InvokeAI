@@ -333,7 +333,7 @@ export type TypeHints = {
 };
 
 export type InvocationSchemaExtra = {
-  output: OpenAPIV3.SchemaObject; // the output of the invocation
+  output: OpenAPIV3.ReferenceObject; // the output of the invocation
   ui?: {
     tags?: string[];
     type_hints?: TypeHints;

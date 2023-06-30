@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
   forwardRef,
+  useColorMode,
   useDisclosure,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -61,6 +62,7 @@ import BoardsList from './Boards/BoardsList';
 import { boardsSelector } from '../store/boardSlice';
 import { ChevronUpIcon } from '@chakra-ui/icons';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
+import { mode } from 'theme/util/mode';
 
 const itemSelector = createSelector(
   [(state: RootState) => state],
@@ -134,6 +136,8 @@ const ImageGalleryContent = () => {
       overflow: { x: 'hidden' },
     },
   });
+
+  const { colorMode } = useColorMode();
 
   const {
     shouldPinGallery,
@@ -267,13 +271,17 @@ const ImageGalleryContent = () => {
               alignItems: 'center',
               px: 2,
               _hover: {
-                bg: 'base.800',
+                bg: mode('base.100', 'base.800')(colorMode),
               },
             }}
           >
             <Text
               noOfLines={1}
-              sx={{ w: 'full', color: 'base.200', fontWeight: 600 }}
+              sx={{
+                w: 'full',
+                color: mode('base.800', 'base.200')(colorMode),
+                fontWeight: 600,
+              }}
             >
               {selectedBoard ? selectedBoard.board_name : 'All Images'}
             </Text>
