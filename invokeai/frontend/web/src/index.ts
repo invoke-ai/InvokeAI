@@ -6,3 +6,4 @@ export { default as InvokeAiLogoComponent } from './features/system/components/I
 export { default as ModelSelect } from './features/system/components/ModelSelect';
 export { default as SettingsModal } from './features/system/components/SettingsModal/SettingsModal';
 export { default as StatusIndicator } from './features/system/components/StatusIndicator';
+export { default as ColorModeButton } from './features/system/components/ColorModeButton';
