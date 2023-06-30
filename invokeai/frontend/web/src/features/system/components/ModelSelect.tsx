@@ -23,7 +23,7 @@ const ModelSelect = () => {
     (state: RootState) => state.generation.model
   );
 
-  const { data: pipelineModels } = useListModelsQuery({
+  const { data: pipelineModels, isLoading } = useListModelsQuery({
     model_type: 'main',
   });
 
@@ -78,7 +78,14 @@ const ModelSelect = () => {
     handleChangeModel(firstModel);
   }, [handleChangeModel, pipelineModels?.ids, selectedModelId]);
 
-  return (
+  return isLoading ? (
+    <IAIMantineSelect
+      label={t('modelManager.model')}
+      placeholder="Loading..."
+      disabled={true}
+      data={[]}
+    />
+  ) : (
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={t('modelManager.model')}
