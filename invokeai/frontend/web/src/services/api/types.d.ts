@@ -34,6 +34,7 @@ export type OffsetPaginatedResults_ImageDTO_ =
 export type ModelType = S<'ModelType'>;
 export type BaseModelType = S<'BaseModelType'>;
 export type MainModelField = S<'MainModelField'>;
+export type VAEModelField = S<'VAEModelField'>;
 export type ModelsList = S<'ModelsList'>;
 
 // Graphs

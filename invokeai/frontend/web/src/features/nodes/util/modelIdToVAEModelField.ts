@@ -1,4 +1,4 @@
-import { BaseModelType } from 'services/api/types';
+import { BaseModelType, VAEModelField } from 'services/api/types';
 
 /**
  * Crudely converts a model id to a main model field

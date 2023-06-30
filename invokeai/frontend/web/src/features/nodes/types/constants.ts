@@ -17,6 +17,7 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   ClipField: 'clip',
   VaeField: 'vae',
   model: 'model',
+  vae_model: 'vae_model',
   array: 'array',
   item: 'item',
   ColorField: 'color',
@@ -111,6 +112,12 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: 'Control info passed between nodes.',
   },
   model: {
+    color: 'teal',
+    colorCssVar: getColorTokenCssVariable('teal'),
+    title: 'Model',
+    description: 'Models are models.',
+  },
+  vae_model: {
     color: 'teal',
     colorCssVar: getColorTokenCssVariable('teal'),
     title: 'Model',
