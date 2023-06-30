@@ -37,19 +37,21 @@ const invokeAITablist = defineStyle((props) => {
         fill: mode('base.700', 'base.300')(props),
       },
       _selected: {
-        borderBottomColor: 'base.800',
-        bg: mode('accent.200', 'accent.600')(props),
-        color: mode('accent.800', 'accent.100')(props),
-        _hover: {
-          bg: mode('accent.300', 'accent.500')(props),
-          color: mode('accent.900', 'accent.50')(props),
-        },
+        bg: mode('accent.400', 'accent.600')(props),
+        color: mode('base.50', 'base.100')(props),
         svg: {
-          fill: mode('base.900', 'base.50')(props),
+          fill: mode(`base.50`, `base.100`)(props),
           filter: mode(
-            `drop-shadow(0px 0px 0.3rem var(--invokeai-colors-accent-100))`,
-            `drop-shadow(0px 0px 0.3rem var(--invokeai-colors-accent-900))`
+            `drop-shadow(0px 0px 0.3rem var(--invokeai-colors-${c}-600))`,
+            `drop-shadow(0px 0px 0.3rem var(--invokeai-colors-${c}-800))`
           )(props),
+        },
+        _hover: {
+          bg: mode('accent.500', 'accent.500')(props),
+          color: mode('white', 'base.50')(props),
+          svg: {
+            fill: mode('white', 'base.50')(props),
+          },
         },
       },
       _hover: {
@@ -81,5 +83,6 @@ export const tabsTheme = defineMultiStyleConfig({
   },
   defaultProps: {
     variant: 'invokeAI',
+    colorScheme: 'accent',
   },
 });
