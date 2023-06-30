@@ -234,7 +234,7 @@ const ImageGalleryContent = () => {
         borderRadius: 'base',
       }}
     >
-      <Box sx={{ w: 'full', minWidth: '200px' }}>
+      <Box sx={{ w: 'full' }}>
         <Flex
           ref={resizeObserverRef}
           sx={{
