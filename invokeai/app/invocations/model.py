@@ -62,6 +62,7 @@ class MainModelLoaderInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "Model Loader",
                 "tags": ["model", "loader"],
                 "type_hints": {
                   "model": "model"
@@ -175,6 +176,14 @@ class LoraLoaderInvocation(BaseInvocation):
     unet: Optional[UNetField] = Field(description="UNet model for applying lora")
     clip: Optional[ClipField] = Field(description="Clip model for applying lora")
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Lora Loader",
+                "tags": ["lora", "loader"],
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> LoraLoaderOutput:
 
         # TODO: ui rewrite
@@ -246,7 +255,8 @@ class VaeLoaderInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["model", "loader"],
+                "title": "VAE Loader",
+                "tags": ["vae", "loader"],
                 "type_hints": {
                   "vae_model": "vae_model"
                 }
