@@ -104,7 +104,10 @@ const IAICanvasStatusText = () => {
         margin: 1,
         borderRadius: 'base',
         pointerEvents: 'none',
-        bg: 'base.800',
+        bg: 'base.200',
+        _dark: {
+          bg: 'base.800',
+        },
       }}
     >
       <Box

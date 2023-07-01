@@ -112,6 +112,11 @@ class ImageServiceABC(ABC):
         """Deletes an image."""
         pass
 
+    @abstractmethod
+    def delete_images_on_board(self, board_id: str):
+        """Deletes all images on a board."""
+        pass
+
 
 class ImageServiceDependencies:
     """Service dependencies for the ImageService."""
@@ -339,6 +344,28 @@ class ImageService(ImageServiceABC):
             raise
         except Exception as e:
             self._services.logger.error("Problem deleting image record and file")
+            raise e
+
+    def delete_images_on_board(self, board_id: str):
+        try:
+            images = self._services.board_image_records.get_images_for_board(board_id)
+            image_name_list = list(
+                map(
+                    lambda r: r.image_name,
+                    images.items,
+                )
+            )
+            for image_name in image_name_list:
+                self._services.image_files.delete(image_name)
+            self._services.image_records.delete_many(image_name_list)
+        except ImageRecordDeleteException:
+            self._services.logger.error(f"Failed to delete image records")
+            raise
+        except ImageFileDeleteException:
+            self._services.logger.error(f"Failed to delete image files")
+            raise
+        except Exception as e:
+            self._services.logger.error("Problem deleting image records and files")
             raise e
 
     def _get_metadata(

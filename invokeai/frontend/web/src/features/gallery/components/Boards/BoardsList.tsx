@@ -62,13 +62,13 @@ const BoardsList = (props: Props) => {
   return (
     <Collapse in={isOpen} animateOpacity>
       <Flex
+        layerStyle={'first'}
         sx={{
           flexDir: 'column',
           gap: 2,
-          bg: 'base.800',
-          borderRadius: 'base',
           p: 2,
           mt: 2,
+          borderRadius: 'base',
         }}
       >
         <Flex sx={{ gap: 2, alignItems: 'center' }}>

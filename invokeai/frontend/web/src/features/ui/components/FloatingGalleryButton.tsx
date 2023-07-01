@@ -51,6 +51,7 @@ const FloatingGalleryButton = () => {
         w: 8,
         borderStartEndRadius: 0,
         borderEndEndRadius: 0,
+        shadow: '2xl',
       }}
     >
       <MdPhotoLibrary />

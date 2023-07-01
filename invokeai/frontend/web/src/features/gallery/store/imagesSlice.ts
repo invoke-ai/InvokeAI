@@ -60,6 +60,9 @@ const imagesSlice = createSlice({
     imageRemoved: (state, action: PayloadAction<string>) => {
       imagesAdapter.removeOne(state, action.payload);
     },
+    imagesRemoved: (state, action: PayloadAction<string[]>) => {
+      imagesAdapter.removeMany(state, action.payload);
+    },
     imageCategoriesChanged: (state, action: PayloadAction<ImageCategory[]>) => {
       state.categories = action.payload;
     },
@@ -117,6 +120,7 @@ export const {
   imageUpserted,
   imageUpdatedOne,
   imageRemoved,
+  imagesRemoved,
   imageCategoriesChanged,
 } = imagesSlice.actions;
 
