@@ -3,6 +3,7 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addVAEToGraph } from './addVAEToGraph';
 import {
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
@@ -145,16 +146,6 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'vae',
-        },
-      },
-      {
-        source: {
           node_id: NOISE,
           field: 'noise',
         },
@@ -165,6 +156,9 @@ export const buildCanvasTextToImageGraph = (
       },
     ],
   };
+
+  // Add VAE
+  addVAEToGraph(graph, state);
 
   // add dynamic prompts, mutating `graph`
   addDynamicPromptsToGraph(graph, state);

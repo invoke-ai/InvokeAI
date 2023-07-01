@@ -8,6 +8,7 @@ import {
   RangeOfSizeInvocation,
 } from 'services/api/types';
 import { modelIdToMainModelField } from '../modelIdToMainModelField';
+import { addVAEToGraph } from './addVAEToGraph';
 import {
   INPAINT,
   INPAINT_GRAPH,
@@ -172,16 +173,6 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'vae',
-        },
-      },
-      {
-        source: {
           node_id: RANGE_OF_SIZE,
           field: 'collection',
         },
@@ -202,6 +193,9 @@ export const buildCanvasInpaintGraph = (
       },
     ],
   };
+
+  // Add VAE
+  addVAEToGraph(graph, state);
 
   // handle seed
   if (shouldRandomizeSeed) {

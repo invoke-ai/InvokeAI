@@ -10,7 +10,10 @@ import {
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addVAEToGraph } from './addVAEToGraph';
 import {
+  IMAGE_COLLECTION,
+  IMAGE_COLLECTION_ITERATE,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
@@ -20,8 +23,6 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
-  IMAGE_COLLECTION,
-  IMAGE_COLLECTION_ITERATE,
 } from './constants';
 
 const moduleLog = log.child({ namespace: 'nodes' });
@@ -138,16 +139,6 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'vae',
-        },
-      },
-      {
-        source: {
           node_id: LATENTS_TO_LATENTS,
           field: 'latents',
         },
@@ -176,16 +167,7 @@ export const buildLinearImageToImageGraph = (
           field: 'noise',
         },
       },
-      {
-        source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'vae',
-        },
-      },
+
       {
         source: {
           node_id: MAIN_MODEL_LOADER,
@@ -322,6 +304,8 @@ export const buildLinearImageToImageGraph = (
       },
     });
   }
+  // Add VAE
+  addVAEToGraph(graph, state);
 
   // add dynamic prompts, mutating `graph`
   addDynamicPromptsToGraph(graph, state);

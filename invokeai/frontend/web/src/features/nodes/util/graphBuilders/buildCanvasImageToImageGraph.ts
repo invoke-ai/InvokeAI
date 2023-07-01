@@ -9,6 +9,7 @@ import {
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addVAEToGraph } from './addVAEToGraph';
 import {
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
@@ -124,16 +125,6 @@ export const buildCanvasImageToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'vae',
-        },
-      },
-      {
-        source: {
           node_id: LATENTS_TO_LATENTS,
           field: 'latents',
         },
@@ -160,16 +151,6 @@ export const buildCanvasImageToImageGraph = (
         destination: {
           node_id: LATENTS_TO_LATENTS,
           field: 'noise',
-        },
-      },
-      {
-        source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'vae',
         },
       },
       {
@@ -270,6 +251,9 @@ export const buildCanvasImageToImageGraph = (
       },
     });
   }
+
+  // Add VAE
+  addVAEToGraph(graph, state);
 
   // add dynamic prompts, mutating `graph`
   addDynamicPromptsToGraph(graph, state);
