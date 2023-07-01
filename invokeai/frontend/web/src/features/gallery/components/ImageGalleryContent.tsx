@@ -64,6 +64,9 @@ import { boardsSelector } from '../store/boardSlice';
 import { ChevronUpIcon } from '@chakra-ui/icons';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { mode } from 'theme/util/mode';
+import { ImageDTO } from 'services/api/types';
+
+const LOADING_IMAGE_ARRAY = Array(20).fill('loading');
 
 const itemSelector = createSelector(
   [(state: RootState) => state],
@@ -79,10 +82,10 @@ const itemSelector = createSelector(
         ? i.board_id === selectedBoardId
         : true;
       return isInCategory && isInSelectedBoard;
-    });
+    }) as (ImageDTO | string)[];
 
     return {
-      images,
+      images: isLoading ? images.concat(LOADING_IMAGE_ARRAY) : images,
       allImagesTotal,
       isLoading,
       categories,
@@ -356,24 +359,28 @@ const ImageGalleryContent = () => {
         </Box>
       </Box>
       <Flex direction="column" gap={2} h="full" w="full">
-        {isLoading ? (
-          <LoadingGallery />
-        ) : images.length || areMoreAvailable ? (
+        {images.length || areMoreAvailable ? (
           <>
             <Box ref={rootRef} data-overlayscrollbars="" h="100%">
               {shouldUseSingleGalleryColumn ? (
                 <Virtuoso
                   style={{ height: '100%' }}
-                  data={images}
+                  data={images as (ImageDTO | string)[]}
                   endReached={handleEndReached}
                   scrollerRef={(ref) => setScrollerRef(ref)}
                   itemContent={(index, item) => (
                     <Flex sx={{ pb: 2 }}>
-                      <HoverableImage
-                        key={`${item.image_name}-${item.thumbnail_url}`}
-                        image={item}
-                        isSelected={selectedImage === item?.image_name}
-                      />
+                      {typeof item === 'string' ? (
+                        <Skeleton
+                          sx={{ w: 'full', h: 'full', aspectRatio: '1/1' }}
+                        />
+                      ) : (
+                        <HoverableImage
+                          key={`${item.image_name}-${item.thumbnail_url}`}
+                          image={item}
+                          isSelected={selectedImage === item?.image_name}
+                        />
+                      )}
                     </Flex>
                   )}
                 />
@@ -388,11 +395,19 @@ const ImageGalleryContent = () => {
                   }}
                   scrollerRef={setScroller}
                   itemContent={(index, item) => (
-                    <HoverableImage
-                      key={`${item.image_name}-${item.thumbnail_url}`}
-                      image={item}
-                      isSelected={selectedImage === item?.image_name}
-                    />
+                    <Flex sx={{ pb: 2 }}>
+                      {typeof item === 'string' ? (
+                        <Skeleton
+                          sx={{ w: 'full', h: 'full', aspectRatio: '1/1' }}
+                        />
+                      ) : (
+                        <HoverableImage
+                          key={`${item.image_name}-${item.thumbnail_url}`}
+                          image={item}
+                          isSelected={selectedImage === item?.image_name}
+                        />
+                      )}
+                    </Flex>
                   )}
                 />
               )}
@@ -445,25 +460,6 @@ const ListContainer = forwardRef((props: ListContainerProps, ref) => {
   );
 });
 
-const LoadingGallery = () => {
-  return (
-    <Box data-overlayscrollbars="" h="100%">
-      <VirtuosoGrid
-        style={{ height: '100%' }}
-        data={new Array(20)}
-        components={{
-          Item: ItemContainer,
-          List: ListContainer,
-        }}
-        itemContent={(index, item) => (
-          <Flex sx={{ pb: 2 }}>
-            <Skeleton sx={{ width: 'full', paddingBottom: '100%' }} />
-          </Flex>
-        )}
-      />
-    </Box>
-  );
-};
 const EmptyGallery = () => {
   const { t } = useTranslation();
   return (
