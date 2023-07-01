@@ -285,8 +285,7 @@ class TextToLatentsInvocation(BaseInvocation):
             self.dispatch_progress(context, source_node_id, state)
 
         unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
-        with unet_info as unet,\
-             ExitStack() as stack:
+        with unet_info as unet:
 
             scheduler = get_scheduler(
                 context=context,
@@ -297,7 +296,7 @@ class TextToLatentsInvocation(BaseInvocation):
             pipeline = self.create_pipeline(unet, scheduler)
             conditioning_data = self.get_conditioning_data(context, scheduler)
 
-            loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
+            loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.unet.loras]
 
             control_data = self.prep_control_data(
                 model=pipeline, context=context, control_input=self.control,
@@ -361,8 +360,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             **self.unet.unet.dict(),
         )
 
-        with unet_info as unet,\
-             ExitStack() as stack:
+        with unet_info as unet:
 
             scheduler = get_scheduler(
                 context=context,
@@ -391,7 +389,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 device=unet.device,
             )
 
-            loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
+            loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.unet.loras]
 
             with ModelPatcher.apply_lora_unet(pipeline.unet, loras):
                 result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(

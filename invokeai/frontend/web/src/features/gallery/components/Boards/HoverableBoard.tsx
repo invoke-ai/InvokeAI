@@ -8,10 +8,11 @@ import {
   Image,
   MenuItem,
   MenuList,
+  useColorMode,
 } from '@chakra-ui/react';
 
 import { useAppDispatch } from 'app/store/storeHooks';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useContext } from 'react';
 import { FaFolder, FaTrash } from 'react-icons/fa';
 import { ContextMenu } from 'chakra-ui-contextmenu';
 import { BoardDTO, ImageDTO } from 'services/api/types';
@@ -29,6 +30,8 @@ import { useDroppable } from '@dnd-kit/core';
 import { AnimatePresence } from 'framer-motion';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
 import { SelectedItemOverlay } from '../SelectedItemOverlay';
+import { DeleteBoardImagesContext } from '../../../../app/contexts/DeleteBoardImagesContext';
+import { mode } from 'theme/util/mode';
 
 interface HoverableBoardProps {
   board: BoardDTO;
@@ -42,7 +45,11 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
     board.cover_image_name ?? skipToken
   );
 
+  const { colorMode } = useColorMode();
+
   const { board_name, board_id } = board;
+
+  const { onClickDeleteBoardImages } = useContext(DeleteBoardImagesContext);
 
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected(board_id));
@@ -64,6 +71,11 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
   const handleDeleteBoard = useCallback(() => {
     deleteBoard(board_id);
   }, [board_id, deleteBoard]);
+
+  const handleDeleteBoardAndImages = useCallback(() => {
+    console.log({ board });
+    onClickDeleteBoardImages(board);
+  }, [board, onClickDeleteBoardImages]);
 
   const handleDrop = useCallback(
     (droppedImage: ImageDTO) => {
@@ -92,8 +104,17 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
         menuProps={{ size: 'sm', isLazy: true }}
         renderMenu={() => (
           <MenuList sx={{ visibility: 'visible !important' }}>
+            {board.image_count > 0 && (
+              <MenuItem
+                sx={{ color: 'error.300' }}
+                icon={<FaTrash />}
+                onClickCapture={handleDeleteBoardAndImages}
+              >
+                Delete Board and Images
+              </MenuItem>
+            )}
             <MenuItem
-              sx={{ color: 'error.300' }}
+              sx={{ color: mode('error.700', 'error.300')(colorMode) }}
               icon={<FaTrash />}
               onClickCapture={handleDeleteBoard}
             >
@@ -163,7 +184,9 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
               >
                 <EditablePreview
                   sx={{
-                    color: isSelected ? 'base.50' : 'base.200',
+                    color: isSelected
+                      ? mode('base.900', 'base.50')(colorMode)
+                      : mode('base.700', 'base.200')(colorMode),
                     fontWeight: isSelected ? 600 : undefined,
                     fontSize: 'xs',
                     textAlign: 'center',
@@ -173,9 +196,9 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
                 />
                 <EditableInput
                   sx={{
-                    color: 'base.50',
+                    color: mode('base.900', 'base.50')(colorMode),
                     fontSize: 'xs',
-                    borderColor: 'base.500',
+                    borderColor: mode('base.500', 'base.500')(colorMode),
                     p: 0,
                     outline: 0,
                   }}

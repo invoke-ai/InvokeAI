@@ -12,8 +12,8 @@ import InvokeAILogoComponent from './InvokeAILogoComponent';
 import LanguagePicker from './LanguagePicker';
 import ModelManagerModal from './ModelManager/ModelManagerModal';
 import SettingsModal from './SettingsModal/SettingsModal';
-import ThemeChanger from './ThemeChanger';
 import { useFeatureStatus } from '../hooks/useFeatureStatus';
+import ColorModeButton from './ColorModeButton';
 
 const SiteHeader = () => {
   const { t } = useTranslation();
@@ -62,8 +62,6 @@ const SiteHeader = () => {
           icon={<FaKeyboard />}
         />
       </HotkeysModal>
-
-      <ThemeChanger />
 
       {isLocalizationEnabled && <LanguagePicker />}
 
@@ -120,6 +118,8 @@ const SiteHeader = () => {
           />
         </Link>
       )}
+
+      <ColorModeButton />
 
       <SettingsModal>
         <IAIIconButton

@@ -11,7 +11,6 @@ export type InvokeAIThemeColors = {
   okAlpha: Partial<InvokeAIPaletteSteps>;
   error: Partial<InvokeAIPaletteSteps>;
   errorAlpha: Partial<InvokeAIPaletteSteps>;
-  gridLineColor: string;
 };
 
 export type InvokeAIPaletteSteps = {

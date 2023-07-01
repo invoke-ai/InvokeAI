@@ -85,8 +85,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self.__cache_ids = Queue()
         self.__max_cache_size = 10  # TODO: get this from config
 
-        self.__output_folder: Path = output_folder if isinstance(output_folder, Path) else Path(output_folder)
-        self.__thumbnails_folder = self.__output_folder / 'thumbnails'
+        self.__output_folder: Path = (
+            output_folder if isinstance(output_folder, Path) else Path(output_folder)
+        )
+        self.__thumbnails_folder = self.__output_folder / "thumbnails"
 
         # Validate required output folders at launch
         self.__validate_storage_folders()
@@ -94,7 +96,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def get(self, image_name: str) -> PILImageType:
         try:
             image_path = self.get_path(image_name)
-            
+
             cache_item = self.__get_cache(image_path)
             if cache_item:
                 return cache_item
@@ -155,7 +157,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
     # TODO: make this a bit more flexible for e.g. cloud storage
     def get_path(self, image_name: str, thumbnail: bool = False) -> Path:
         path = self.__output_folder / image_name
-        
+
         if thumbnail:
             thumbnail_name = get_thumbnail_name(image_name)
             path = self.__thumbnails_folder / thumbnail_name
@@ -166,7 +168,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         """Validates the path given for an image or thumbnail."""
         path = path if isinstance(path, Path) else Path(path)
         return path.exists()
-    
+
     def __validate_storage_folders(self) -> None:
         """Checks if the required output folders exist and create them if they don't"""
         folders: list[Path] = [self.__output_folder, self.__thumbnails_folder]
@@ -179,7 +181,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def __set_cache(self, image_name: Path, image: PILImageType):
         if not image_name in self.__cache:
             self.__cache[image_name] = image
-            self.__cache_ids.put(image_name)  # TODO: this should refresh position for LRU cache
+            self.__cache_ids.put(
+                image_name
+            )  # TODO: this should refresh position for LRU cache
             if len(self.__cache) > self.__max_cache_size:
                 cache_id = self.__cache_ids.get()
                 if cache_id in self.__cache:

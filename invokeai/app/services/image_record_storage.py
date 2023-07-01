@@ -95,6 +95,11 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def delete_many(self, image_names: list[str]) -> None:
+        """Deletes many image records."""
+        pass
+
+    @abstractmethod
     def save(
         self,
         image_name: str,
@@ -378,6 +383,25 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """,
                 (image_name,),
             )
+            self._conn.commit()
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordDeleteException from e
+        finally:
+            self._lock.release()
+
+    def delete_many(self, image_names: list[str]) -> None:
+        try:
+            placeholders = ",".join("?" for _ in image_names)
+
+            self._lock.acquire()
+
+            # Construct the SQLite query with the placeholders
+            query = f"DELETE FROM images WHERE image_name IN ({placeholders})"
+
+            # Execute the query with the list of IDs as parameters
+            self._cursor.execute(query, image_names)
+
             self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()

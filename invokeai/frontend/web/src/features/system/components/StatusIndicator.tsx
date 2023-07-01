@@ -35,6 +35,18 @@ const statusIndicatorSelector = createSelector(
   defaultSelectorOptions
 );
 
+const DARK_COLOR_MAP = {
+  ok: 'green.400',
+  working: 'yellow.400',
+  error: 'red.400',
+};
+
+const LIGHT_COLOR_MAP = {
+  ok: 'green.600',
+  working: 'yellow.500',
+  error: 'red.500',
+};
+
 const StatusIndicator = () => {
   const {
     isConnected,
@@ -46,7 +58,7 @@ const StatusIndicator = () => {
   const { t } = useTranslation();
   const ref = useRef(null);
 
-  const statusColorScheme = useMemo(() => {
+  const statusString = useMemo(() => {
     if (isProcessing) {
       return 'working';
     }
@@ -90,9 +102,10 @@ const StatusIndicator = () => {
               sx={{
                 fontSize: 'sm',
                 fontWeight: '600',
-                color: `${statusColorScheme}.400`,
                 pb: '1px',
                 userSelect: 'none',
+                color: LIGHT_COLOR_MAP[statusString],
+                _dark: { color: DARK_COLOR_MAP[statusString] },
               }}
             >
               {t(statusTranslationKey as ResourceKey)}
@@ -101,7 +114,14 @@ const StatusIndicator = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      <Icon as={FaCircle} boxSize="0.5rem" color={`${statusColorScheme}.400`} />
+      <Icon
+        as={FaCircle}
+        sx={{
+          boxSize: '0.5rem',
+          color: LIGHT_COLOR_MAP[statusString],
+          _dark: { color: DARK_COLOR_MAP[statusString] },
+        }}
+      />
     </Flex>
   );
 };

@@ -1,7 +1,5 @@
-import SwaggerParser from '@apidevtools/swagger-parser';
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { log } from 'app/logging/useLogger';
-import { OpenAPIV3 } from 'openapi-types';
 
 const schemaLog = log.child({ namespace: 'schema' });
 
@@ -29,12 +27,13 @@ export const receivedOpenAPISchema = createAsyncThunk(
   'nodes/receivedOpenAPISchema',
   async (_, { dispatch, rejectWithValue }) => {
     try {
-      const dereferencedSchema = (await SwaggerParser.dereference(
-        'openapi.json'
-      )) as OpenAPIV3.Document;
+      const response = await fetch(`openapi.json`);
+      const openAPISchema = await response.json();
+
+      schemaLog.info({ openAPISchema }, 'Received OpenAPI schema');
 
       const schemaJSON = JSON.parse(
-        JSON.stringify(dereferencedSchema, getCircularReplacer())
+        JSON.stringify(openAPISchema, getCircularReplacer())
       );
 
       return schemaJSON;

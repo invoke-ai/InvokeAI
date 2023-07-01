@@ -1,4 +1,4 @@
-import { Box, ChakraProps, Flex } from '@chakra-ui/react';
+import { Box, ChakraProps, Flex, useColorMode } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { FaCopy, FaTrash } from 'react-icons/fa';
@@ -22,6 +22,7 @@ import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ParamControlNetControlMode from './parameters/ParamControlNetControlMode';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
+import { mode } from 'theme/util/mode';
 
 const expandedControlImageSx: ChakraProps['sx'] = { maxH: 96 };
 
@@ -46,7 +47,7 @@ const ControlNet = (props: ControlNetProps) => {
   } = props.controlNet;
   const dispatch = useAppDispatch();
   const [isExpanded, toggleIsExpanded] = useToggle(false);
-
+  const { colorMode } = useColorMode();
   const handleDelete = useCallback(() => {
     dispatch(controlNetRemoved({ controlNetId }));
   }, [controlNetId, dispatch]);
@@ -67,7 +68,7 @@ const ControlNet = (props: ControlNetProps) => {
         flexDir: 'column',
         gap: 2,
         p: 3,
-        bg: 'base.850',
+        bg: mode('base.200', 'base.850')(colorMode),
         borderRadius: 'base',
         position: 'relative',
       }}
@@ -115,7 +116,7 @@ const ControlNet = (props: ControlNetProps) => {
             <ChevronUpIcon
               sx={{
                 boxSize: 4,
-                color: 'base.300',
+                color: mode('base.700', 'base.300')(colorMode),
                 transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
                 transitionProperty: 'common',
                 transitionDuration: 'normal',
@@ -130,7 +131,7 @@ const ControlNet = (props: ControlNetProps) => {
               w: 1.5,
               h: 1.5,
               borderRadius: 'full',
-              bg: 'error.200',
+              bg: mode('error.700', 'error.200')(colorMode),
               top: 4,
               insetInlineEnd: 4,
             }}
