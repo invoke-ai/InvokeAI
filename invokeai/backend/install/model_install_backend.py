@@ -11,6 +11,7 @@ from typing import List, Dict, Callable, Union, Set
 
 import requests
 from diffusers import StableDiffusionPipeline
+from diffusers import logging as dlogging
 from huggingface_hub import hf_hub_url, HfFolder, HfApi
 from omegaconf import OmegaConf
 from tqdm import tqdm
@@ -153,6 +154,9 @@ class ModelInstall(object):
         return defaults[0]
 
     def install(self, selections: InstallSelections):
+        verbosity = dlogging.get_verbosity()  # quench NSFW nags
+        dlogging.set_verbosity_error()
+
         job = 1
         jobs = len(selections.remove_models) + len(selections.install_models)
         
@@ -160,7 +164,10 @@ class ModelInstall(object):
         for key in selections.remove_models:
             name,base,mtype = self.mgr.parse_key(key)
             logger.info(f'Deleting {mtype} model {name} [{job}/{jobs}]')
-            self.mgr.del_model(name,base,mtype)
+            try:
+                self.mgr.del_model(name,base,mtype)
+            except FileNotFoundError as e:
+                logger.warning(e)
             job += 1
             
         # add requested models
@@ -168,7 +175,8 @@ class ModelInstall(object):
             logger.info(f'Installing {path} [{job}/{jobs}]')
             self.heuristic_install(path)
             job += 1
-
+            
+        dlogging.set_verbosity(verbosity)
         self.mgr.commit()
 
     def heuristic_install(self,
