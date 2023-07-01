@@ -88,7 +88,7 @@ def save_progress(
 
 
 def parse_args():
-    config = InvokeAIAppConfig(argv=[])
+    config = InvokeAIAppConfig.get_config()
     parser = PagingArgumentParser(
         description="Textual inversion training"
     )

@@ -1,29 +1,33 @@
 import { AnyAction } from '@reduxjs/toolkit';
 import { isAnyGraphBuilt } from 'features/nodes/store/actions';
-import { forEach } from 'lodash-es';
-import { Graph } from 'services/api';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
+import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import { Graph } from 'services/api/types';
 
 export const actionSanitizer = <A extends AnyAction>(action: A): A => {
   if (isAnyGraphBuilt(action)) {
     if (action.payload.nodes) {
       const sanitizedNodes: Graph['nodes'] = {};
 
-      // Sanitize nodes as needed
-      forEach(action.payload.nodes, (node, key) => {
-        // Don't log the whole freaking dataURL
-        if (node.type === 'dataURL_image') {
-          const { dataURL, ...rest } = node;
-          sanitizedNodes[key] = { ...rest, dataURL: '<dataURL>' };
-        } else {
-          sanitizedNodes[key] = { ...node };
-        }
-      });
-
       return {
         ...action,
         payload: { ...action.payload, nodes: sanitizedNodes },
       };
     }
+  }
+
+  if (receivedOpenAPISchema.fulfilled.match(action)) {
+    return {
+      ...action,
+      payload: '<OpenAPI schema omitted>',
+    };
+  }
+
+  if (nodeTemplatesBuilt.match(action)) {
+    return {
+      ...action,
+      payload: '<Node templates omitted>',
+    };
   }
 
   return action;

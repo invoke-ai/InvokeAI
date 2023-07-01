@@ -11,6 +11,7 @@ on:
     paths:
       - 'pyproject.toml'
       - 'invokeai/**'
+      - 'tests/**'
       - '!invokeai/frontend/web/**'
     types:
       - 'ready_for_review'
@@ -32,19 +33,12 @@ jobs:
           # - '3.9'
           - '3.10'
         pytorch:
-          # - linux-cuda-11_6
           - linux-cuda-11_7
           - linux-rocm-5_2
           - linux-cpu
           - macos-default
           - windows-cpu
-          # - windows-cuda-11_6
-          # - windows-cuda-11_7
         include:
-          # - pytorch: linux-cuda-11_6
-          #   os: ubuntu-22.04
-          #   extra-index-url: 'https://download.pytorch.org/whl/cu116'
-          #   github-env: $GITHUB_ENV
           - pytorch: linux-cuda-11_7
             os: ubuntu-22.04
             github-env: $GITHUB_ENV
@@ -62,14 +56,6 @@ jobs:
           - pytorch: windows-cpu
             os: windows-2022
             github-env: $env:GITHUB_ENV
-          # - pytorch: windows-cuda-11_6
-          #   os: windows-2022
-          #   extra-index-url: 'https://download.pytorch.org/whl/cu116'
-          #   github-env: $env:GITHUB_ENV
-          # - pytorch: windows-cuda-11_7
-          #   os: windows-2022
-          #   extra-index-url: 'https://download.pytorch.org/whl/cu117'
-          #   github-env: $env:GITHUB_ENV
     name: ${{ matrix.pytorch }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     env:
@@ -100,40 +86,38 @@ jobs:
         id: run-pytest
         run: pytest
 
-      - name: run invokeai-configure
-        id: run-preload-models
-        env:
-          HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
-        run: >
-          invokeai-configure
-          --yes
-          --default_only
-          --full-precision
-        # can't use fp16 weights without a GPU
+      # - name: run invokeai-configure
+      #   env:
+      #     HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      #   run: >
+      #     invokeai-configure
+      #     --yes
+      #     --default_only
+      #     --full-precision
+      #   # can't use fp16 weights without a GPU
 
-      - name: run invokeai
-        id: run-invokeai
-        env:
-          # Set offline mode to make sure configure preloaded successfully.
-          HF_HUB_OFFLINE: 1
-          HF_DATASETS_OFFLINE: 1
-          TRANSFORMERS_OFFLINE: 1
-          INVOKEAI_OUTDIR: ${{ github.workspace }}/results
-        run: >
-          invokeai
-          --no-patchmatch
-          --no-nsfw_checker
-          --precision=float32
-          --always_use_cpu
-          --use_memory_db
-          --outdir ${{ env.INVOKEAI_OUTDIR }}/${{ matrix.python-version }}/${{ matrix.pytorch }}
-          --from_file ${{ env.TEST_PROMPTS }}
+      # - name: run invokeai
+      #   id: run-invokeai
+      #   env:
+      #     # Set offline mode to make sure configure preloaded successfully.
+      #     HF_HUB_OFFLINE: 1
+      #     HF_DATASETS_OFFLINE: 1
+      #     TRANSFORMERS_OFFLINE: 1
+      #     INVOKEAI_OUTDIR: ${{ github.workspace }}/results
+      #   run: >
+      #     invokeai
+      #     --no-patchmatch
+      #     --no-nsfw_checker
+      #     --precision=float32
+      #     --always_use_cpu
+      #     --use_memory_db
+      #     --outdir ${{ env.INVOKEAI_OUTDIR }}/${{ matrix.python-version }}/${{ matrix.pytorch }}
+      #     --from_file ${{ env.TEST_PROMPTS }}
 
-      - name: Archive results
-        id: archive-results
-        env:
-          INVOKEAI_OUTDIR: ${{ github.workspace }}/results
-        uses: actions/upload-artifact@v3
-        with:
-          name: results
-          path: ${{ env.INVOKEAI_OUTDIR }}
+      # - name: Archive results
+      #   env:
+      #     INVOKEAI_OUTDIR: ${{ github.workspace }}/results
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: results
+      #     path: ${{ env.INVOKEAI_OUTDIR }}

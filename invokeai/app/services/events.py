@@ -1,9 +1,10 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Any, Optional
-from invokeai.app.api.models.images import ProgressImage
+from typing import Any
+from invokeai.app.models.image import ProgressImage
 from invokeai.app.util.misc import get_timestamp
-
+from invokeai.app.services.model_manager_service import BaseModelType, ModelType, SubModelType, ModelInfo
+from invokeai.app.models.exceptions import CanceledException
 
 class EventServiceBase:
     session_event: str = "session_event"
@@ -99,5 +100,55 @@ class EventServiceBase:
             event_name="graph_execution_state_complete",
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
+            ),
+        )
+
+    def emit_model_load_started (
+            self,
+            graph_execution_state_id: str,
+            node: dict,
+            source_node_id: str,
+            model_name: str,
+            base_model: BaseModelType,
+            model_type: ModelType,
+            submodel: SubModelType,
+    ) -> None:
+        """Emitted when a model is requested"""
+        self.__emit_session_event(
+            event_name="model_load_started",
+            payload=dict(
+                graph_execution_state_id=graph_execution_state_id,
+                node=node,
+                source_node_id=source_node_id,
+                model_name=model_name,
+                base_model=base_model,
+                model_type=model_type,
+                submodel=submodel,
+            ),
+        )
+
+    def emit_model_load_completed(
+            self,
+            graph_execution_state_id: str,
+            node: dict,
+            source_node_id: str,
+            model_name: str,
+            base_model: BaseModelType,
+            model_type: ModelType,
+            submodel: SubModelType,
+            model_info: ModelInfo,
+    ) -> None:
+        """Emitted when a model is correctly loaded (returns model info)"""
+        self.__emit_session_event(
+            event_name="model_load_completed",
+            payload=dict(
+                graph_execution_state_id=graph_execution_state_id,
+                node=node,
+                source_node_id=source_node_id,
+                model_name=model_name,
+                base_model=base_model,
+                model_type=model_type,
+                submodel=submodel,
+                model_info=model_info,
             ),
         )

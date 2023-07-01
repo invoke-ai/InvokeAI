@@ -1,8 +1,10 @@
-import { Graph } from 'services/api';
+import { Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
-import { cloneDeep, reduce } from 'lodash-es';
+import { cloneDeep, omit, reduce } from 'lodash-es';
 import { RootState } from 'app/store/store';
 import { InputFieldValue } from 'features/nodes/types/types';
+import { AnyInvocation } from 'services/events/types';
+import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
 
 /**
  * We need to do special handling for some fields
@@ -20,6 +22,12 @@ export const parseFieldValue = (field: InputFieldValue) => {
 
       Object.assign(clonedValue, transformedColor);
       return clonedValue;
+    }
+  }
+
+  if (field.type === 'model') {
+    if (field.value) {
+      return modelIdToPipelineModelField(field.value);
     }
   }
 
@@ -88,6 +96,24 @@ export const buildNodesGraph = (state: RootState): Graph => {
     },
     []
   );
+
+  /**
+   * Omit all inputs that have edges connected.
+   *
+   * Fixes edge case where the user has connected an input, but also provided an invalid explicit,
+   * value.
+   *
+   * In this edge case, pydantic will invalidate the node based on the invalid explicit value,
+   * even though the actual value that will be used comes from the connection.
+   */
+  parsedEdges.forEach((edge) => {
+    const destination_node = parsedNodes[edge.destination.node_id];
+    const field = edge.destination.field;
+    parsedNodes[edge.destination.node_id] = omit(
+      destination_node,
+      field
+    ) as AnyInvocation;
+  });
 
   // Assemble!
   const graph = {

@@ -6,7 +6,7 @@ import {
   RandomRangeInvocation,
   RangeInvocation,
   TextToImageInvocation,
-} from 'services/api';
+} from 'services/api/types';
 
 export const buildEdges = (
   baseNode: TextToImageInvocation | ImageToImageInvocation | InpaintInvocation,

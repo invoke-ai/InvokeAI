@@ -11,14 +11,11 @@ import {
   NodeChange,
   OnConnectStartParams,
 } from 'reactflow';
-import { ImageDTO } from 'services/api';
-import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { ImageField } from 'services/api/types';
+import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
-import { parseSchema } from '../util/parseSchema';
-import { log } from 'app/logging/useLogger';
-import { size } from 'lodash-es';
-import { isAnyGraphBuilt } from './actions';
 import { RgbaColor } from 'react-colorful';
+import { RootState } from 'app/store/store';
 
 export type NodesState = {
   nodes: Node<InvocationValue>[];
@@ -65,7 +62,7 @@ const nodesSlice = createSlice({
       action: PayloadAction<{
         nodeId: string;
         fieldName: string;
-        value: string | number | boolean | ImageDTO | RgbaColor | undefined;
+        value: string | number | boolean | ImageField | RgbaColor | undefined;
       }>
     ) => {
       const { nodeId, fieldName, value } = action.payload;
@@ -78,29 +75,19 @@ const nodesSlice = createSlice({
     shouldShowGraphOverlayChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGraphOverlay = action.payload;
     },
-    parsedOpenAPISchema: (state, action: PayloadAction<OpenAPIV3.Document>) => {
-      try {
-        const parsedSchema = parseSchema(action.payload);
-
-        // TODO: Achtung! Side effect in a reducer!
-        log.info(
-          { namespace: 'schema', nodes: parsedSchema },
-          `Parsed ${size(parsedSchema)} nodes`
-        );
-        state.invocationTemplates = parsedSchema;
-      } catch (err) {
-        console.error(err);
-      }
+    nodeTemplatesBuilt: (
+      state,
+      action: PayloadAction<Record<string, InvocationTemplate>>
+    ) => {
+      state.invocationTemplates = action.payload;
+    },
+    nodeEditorReset: () => {
+      return { ...initialNodesState };
     },
   },
-  extraReducers(builder) {
+  extraReducers: (builder) => {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
       state.schema = action.payload;
-    });
-
-    builder.addMatcher(isAnyGraphBuilt, (state, action) => {
-      // TODO: Achtung! Side effect in a reducer!
-      log.info({ namespace: 'nodes', data: action.payload }, 'Graph built');
     });
   },
 });
@@ -114,7 +101,10 @@ export const {
   connectionStarted,
   connectionEnded,
   shouldShowGraphOverlayChanged,
-  parsedOpenAPISchema,
+  nodeTemplatesBuilt,
+  nodeEditorReset,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
+
+export const nodesSelector = (state: RootState) => state.nodes;

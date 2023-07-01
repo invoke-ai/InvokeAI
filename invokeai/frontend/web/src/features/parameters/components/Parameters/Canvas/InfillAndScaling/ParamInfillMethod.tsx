@@ -1,12 +1,12 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAISelect from 'common/components/IAISelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setInfillMethod } from 'features/parameters/store/generationSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
 
-import { ChangeEvent, memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
@@ -30,17 +30,17 @@ const ParamInfillMethod = () => {
   const { t } = useTranslation();
 
   const handleChange = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      dispatch(setInfillMethod(e.target.value));
+    (v: string) => {
+      dispatch(setInfillMethod(v));
     },
     [dispatch]
   );
 
   return (
-    <IAISelect
+    <IAIMantineSelect
       label={t('parameters.infillMethod')}
       value={infillMethod}
-      validValues={infillMethods}
+      data={infillMethods}
       onChange={handleChange}
     />
   );

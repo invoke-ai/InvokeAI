@@ -1,5 +1,4 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
-import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
@@ -9,7 +8,7 @@ from PIL.Image import Image as PILImageType
 from PIL import Image, PngImagePlugin
 from send2trash import send2trash
 
-from invokeai.app.models.image import ImageType
+from invokeai.app.models.image import ResourceOrigin
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
@@ -40,14 +39,12 @@ class ImageFileStorageBase(ABC):
     """Low-level service responsible for storing and retrieving image files."""
 
     @abstractmethod
-    def get(self, image_type: ImageType, image_name: str) -> PILImageType:
+    def get(self, image_name: str) -> PILImageType:
         """Retrieves an image as PIL Image."""
         pass
 
     @abstractmethod
-    def get_path(
-        self, image_type: ImageType, image_name: str, thumbnail: bool = False
-    ) -> str:
+    def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         """Gets the internal path to an image or thumbnail."""
         pass
 
@@ -62,7 +59,6 @@ class ImageFileStorageBase(ABC):
     def save(
         self,
         image: PILImageType,
-        image_type: ImageType,
         image_name: str,
         metadata: Optional[ImageMetadata] = None,
         thumbnail_size: int = 256,
@@ -71,7 +67,7 @@ class ImageFileStorageBase(ABC):
         pass
 
     @abstractmethod
-    def delete(self, image_type: ImageType, image_name: str) -> None:
+    def delete(self, image_name: str) -> None:
         """Deletes an image and its thumbnail (if one exists)."""
         pass
 
@@ -79,31 +75,28 @@ class ImageFileStorageBase(ABC):
 class DiskImageFileStorage(ImageFileStorageBase):
     """Stores images on disk"""
 
-    __output_folder: str
+    __output_folder: Path
     __cache_ids: Queue  # TODO: this is an incredibly naive cache
-    __cache: Dict[str, PILImageType]
+    __cache: Dict[Path, PILImageType]
     __max_cache_size: int
 
-    def __init__(self, output_folder: str):
-        self.__output_folder = output_folder
+    def __init__(self, output_folder: str | Path):
         self.__cache = dict()
         self.__cache_ids = Queue()
         self.__max_cache_size = 10  # TODO: get this from config
 
-        Path(output_folder).mkdir(parents=True, exist_ok=True)
+        self.__output_folder: Path = (
+            output_folder if isinstance(output_folder, Path) else Path(output_folder)
+        )
+        self.__thumbnails_folder = self.__output_folder / "thumbnails"
 
-        # TODO: don't hard-code. get/save/delete should maybe take subpath?
-        for image_type in ImageType:
-            Path(os.path.join(output_folder, image_type)).mkdir(
-                parents=True, exist_ok=True
-            )
-            Path(os.path.join(output_folder, image_type, "thumbnails")).mkdir(
-                parents=True, exist_ok=True
-            )
+        # Validate required output folders at launch
+        self.__validate_storage_folders()
 
-    def get(self, image_type: ImageType, image_name: str) -> PILImageType:
+    def get(self, image_name: str) -> PILImageType:
         try:
-            image_path = self.get_path(image_type, image_name)
+            image_path = self.get_path(image_name)
+
             cache_item = self.__get_cache(image_path)
             if cache_item:
                 return cache_item
@@ -117,13 +110,13 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def save(
         self,
         image: PILImageType,
-        image_type: ImageType,
         image_name: str,
         metadata: Optional[ImageMetadata] = None,
         thumbnail_size: int = 256,
     ) -> None:
         try:
-            image_path = self.get_path(image_type, image_name)
+            self.__validate_storage_folders()
+            image_path = self.get_path(image_name)
 
             if metadata is not None:
                 pnginfo = PngImagePlugin.PngInfo()
@@ -133,7 +126,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 image.save(image_path, "PNG")
 
             thumbnail_name = get_thumbnail_name(image_name)
-            thumbnail_path = self.get_path(image_type, thumbnail_name, thumbnail=True)
+            thumbnail_path = self.get_path(thumbnail_name, thumbnail=True)
             thumbnail_image = make_thumbnail(image, thumbnail_size)
             thumbnail_image.save(thumbnail_path)
 
@@ -142,20 +135,19 @@ class DiskImageFileStorage(ImageFileStorageBase):
         except Exception as e:
             raise ImageFileSaveException from e
 
-    def delete(self, image_type: ImageType, image_name: str) -> None:
+    def delete(self, image_name: str) -> None:
         try:
-            basename = os.path.basename(image_name)
-            image_path = self.get_path(image_type, basename)
+            image_path = self.get_path(image_name)
 
-            if os.path.exists(image_path):
+            if image_path.exists():
                 send2trash(image_path)
             if image_path in self.__cache:
                 del self.__cache[image_path]
 
             thumbnail_name = get_thumbnail_name(image_name)
-            thumbnail_path = self.get_path(image_type, thumbnail_name, True)
+            thumbnail_path = self.get_path(thumbnail_name, True)
 
-            if os.path.exists(thumbnail_path):
+            if thumbnail_path.exists():
                 send2trash(thumbnail_path)
             if thumbnail_path in self.__cache:
                 del self.__cache[thumbnail_path]
@@ -163,36 +155,30 @@ class DiskImageFileStorage(ImageFileStorageBase):
             raise ImageFileDeleteException from e
 
     # TODO: make this a bit more flexible for e.g. cloud storage
-    def get_path(
-        self, image_type: ImageType, image_name: str, thumbnail: bool = False
-    ) -> str:
-        # strip out any relative path shenanigans
-        basename = os.path.basename(image_name)
+    def get_path(self, image_name: str, thumbnail: bool = False) -> Path:
+        path = self.__output_folder / image_name
 
         if thumbnail:
-            thumbnail_name = get_thumbnail_name(basename)
-            path = os.path.join(
-                self.__output_folder, image_type, "thumbnails", thumbnail_name
-            )
-        else:
-            path = os.path.join(self.__output_folder, image_type, basename)
+            thumbnail_name = get_thumbnail_name(image_name)
+            path = self.__thumbnails_folder / thumbnail_name
 
-        abspath = os.path.abspath(path)
+        return path
 
-        return abspath
-
-    def validate_path(self, path: str) -> bool:
+    def validate_path(self, path: str | Path) -> bool:
         """Validates the path given for an image or thumbnail."""
-        try:
-            os.stat(path)
-            return True
-        except:
-            return False
+        path = path if isinstance(path, Path) else Path(path)
+        return path.exists()
 
-    def __get_cache(self, image_name: str) -> PILImageType | None:
+    def __validate_storage_folders(self) -> None:
+        """Checks if the required output folders exist and create them if they don't"""
+        folders: list[Path] = [self.__output_folder, self.__thumbnails_folder]
+        for folder in folders:
+            folder.mkdir(parents=True, exist_ok=True)
+
+    def __get_cache(self, image_name: Path) -> PILImageType | None:
         return None if image_name not in self.__cache else self.__cache[image_name]
 
-    def __set_cache(self, image_name: str, image: PILImageType):
+    def __set_cache(self, image_name: Path, image: PILImageType):
         if not image_name in self.__cache:
             self.__cache[image_name] = image
             self.__cache_ids.put(

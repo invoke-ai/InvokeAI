@@ -1,15 +1,15 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAISelect from 'common/components/IAISelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { setBoundingBoxScaleMethod } from 'features/canvas/store/canvasSlice';
 import {
-  BoundingBoxScale,
   BOUNDING_BOX_SCALES_DICT,
+  BoundingBoxScale,
 } from 'features/canvas/store/canvasTypes';
 
-import { ChangeEvent, memo } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
@@ -30,16 +30,14 @@ const ParamScaleBeforeProcessing = () => {
 
   const { t } = useTranslation();
 
-  const handleChangeBoundingBoxScaleMethod = (
-    e: ChangeEvent<HTMLSelectElement>
-  ) => {
-    dispatch(setBoundingBoxScaleMethod(e.target.value as BoundingBoxScale));
+  const handleChangeBoundingBoxScaleMethod = (v: string) => {
+    dispatch(setBoundingBoxScaleMethod(v as BoundingBoxScale));
   };
 
   return (
-    <IAISelect
+    <IAIMantineSelect
       label={t('parameters.scaleBeforeProcessing')}
-      validValues={BOUNDING_BOX_SCALES_DICT}
+      data={BOUNDING_BOX_SCALES_DICT}
       value={boundingBoxScale}
       onChange={handleChangeBoundingBoxScaleMethod}
     />

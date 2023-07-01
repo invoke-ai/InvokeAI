@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 
 pretrained_model_url = (
     "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
@@ -15,16 +15,16 @@ pretrained_model_url = (
 
 class CodeFormerRestoration:
     def __init__(
-        self, codeformer_dir="models/codeformer", codeformer_model_path="codeformer.pth"
+        self, codeformer_dir="./models/core/face_restoration/codeformer", codeformer_model_path="codeformer.pth"
     ) -> None:
 
-        self.globals = get_invokeai_config()
+        self.globals = InvokeAIAppConfig.get_config()
         codeformer_dir = self.globals.root_dir / codeformer_dir
         self.model_path = codeformer_dir / codeformer_model_path
         self.codeformer_model_exists = self.model_path.exists()
 
         if not self.codeformer_model_exists:
-            logger.error("NOT FOUND: CodeFormer model not found at " + self.model_path)
+            logger.error(f"NOT FOUND: CodeFormer model not found at {self.model_path}")
         sys.path.append(os.path.abspath(codeformer_dir))
 
     def process(self, image, strength, device, seed=None, fidelity=0.75):
@@ -71,7 +71,7 @@ class CodeFormerRestoration:
                 upscale_factor=1,
                 use_parse=True,
                 device=device,
-                model_rootpath = self.globals.root_dir / "gfpgan" / "weights"
+                model_rootpath = self.globals.model_path / 'core/face_restoration/gfpgan/weights'
             )
             face_helper.clean_all()
             face_helper.read_image(bgr_image_array)

@@ -1,8 +1,7 @@
 // Grid drawing adapted from https://longviewcoder.com/2021/12/08/konva-a-better-grid/
 
-import { useToken } from '@chakra-ui/react';
+import { useColorMode, useToken } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { isEqual, range } from 'lodash-es';
@@ -24,14 +23,14 @@ const selector = createSelector(
 );
 
 const IAICanvasGrid = () => {
-  const currentTheme = useAppSelector(
-    (state: RootState) => state.ui.currentTheme
-  );
   const { stageScale, stageCoordinates, stageDimensions } =
     useAppSelector(selector);
+  const { colorMode } = useColorMode();
   const [gridLines, setGridLines] = useState<ReactNode[]>([]);
-
-  const [gridLineColor] = useToken('colors', ['gridLineColor']);
+  const [darkGridLineColor, lightGridLineColor] = useToken('colors', [
+    'base.800',
+    'base.200',
+  ]);
 
   const unscale = useCallback(
     (value: number) => {
@@ -89,7 +88,7 @@ const IAICanvasGrid = () => {
         x={fullRect.x1 + i * 64}
         y={fullRect.y1}
         points={[0, 0, 0, ySize]}
-        stroke={gridLineColor}
+        stroke={colorMode === 'dark' ? darkGridLineColor : lightGridLineColor}
         strokeWidth={1}
       />
     ));
@@ -99,7 +98,7 @@ const IAICanvasGrid = () => {
         x={fullRect.x1}
         y={fullRect.y1 + i * 64}
         points={[0, 0, xSize, 0]}
-        stroke={gridLineColor}
+        stroke={colorMode === 'dark' ? darkGridLineColor : lightGridLineColor}
         strokeWidth={1}
       />
     ));
@@ -109,9 +108,10 @@ const IAICanvasGrid = () => {
     stageScale,
     stageCoordinates,
     stageDimensions,
-    currentTheme,
     unscale,
-    gridLineColor,
+    colorMode,
+    darkGridLineColor,
+    lightGridLineColor,
   ]);
 
   return <Group>{gridLines}</Group>;

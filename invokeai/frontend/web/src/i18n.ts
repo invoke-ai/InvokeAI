@@ -3,6 +3,8 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import Backend from 'i18next-http-backend';
 import { initReactI18next } from 'react-i18next';
 
+// TODO: Disabled for IDE performance issues with our translation JSON
+// @ts-ignore
 import translationEN from '../public/locales/en.json';
 import { LOCALSTORAGE_PREFIX } from 'app/store/constants';
 

@@ -1,13 +1,12 @@
 import { initialCanvasState } from 'features/canvas/store/canvasSlice';
+import { initialControlNetState } from 'features/controlNet/store/controlNetSlice';
 import { initialGalleryState } from 'features/gallery/store/gallerySlice';
-import { initialResultsState } from 'features/gallery/store/resultsSlice';
-import { initialUploadsState } from 'features/gallery/store/uploadsSlice';
+import { initialImagesState } from 'features/gallery/store/imagesSlice';
 import { initialLightboxState } from 'features/lightbox/store/lightboxSlice';
 import { initialNodesState } from 'features/nodes/store/nodesSlice';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { initialPostprocessingState } from 'features/parameters/store/postprocessingSlice';
 import { initialConfigState } from 'features/system/store/configSlice';
-import { initialModelsState } from 'features/system/store/modelSlice';
 import { initialSystemState } from 'features/system/store/systemSlice';
 import { initialHotkeysState } from 'features/ui/store/hotkeysSlice';
 import { initialUIState } from 'features/ui/store/uiSlice';
@@ -21,15 +20,14 @@ const initialStates: {
   gallery: initialGalleryState,
   generation: initialGenerationState,
   lightbox: initialLightboxState,
-  models: initialModelsState,
   nodes: initialNodesState,
   postprocessing: initialPostprocessingState,
-  results: initialResultsState,
   system: initialSystemState,
   config: initialConfigState,
   ui: initialUIState,
-  uploads: initialUploadsState,
   hotkeys: initialHotkeysState,
+  images: initialImagesState,
+  controlNet: initialControlNetState,
 };
 
 export const unserialize: UnserializeFunction = (data, key) => {

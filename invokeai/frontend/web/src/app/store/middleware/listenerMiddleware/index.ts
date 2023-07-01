@@ -26,15 +26,15 @@ import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGaller
 import { addCanvasDownloadedAsImageListener } from './listeners/canvasDownloadedAsImage';
 import { addCanvasCopiedToClipboardListener } from './listeners/canvasCopiedToClipboard';
 import { addCanvasMergedListener } from './listeners/canvasMerged';
-import { addGeneratorProgressListener } from './listeners/socketio/generatorProgress';
-import { addGraphExecutionStateCompleteListener } from './listeners/socketio/graphExecutionStateComplete';
-import { addInvocationCompleteListener } from './listeners/socketio/invocationComplete';
-import { addInvocationErrorListener } from './listeners/socketio/invocationError';
-import { addInvocationStartedListener } from './listeners/socketio/invocationStarted';
-import { addSocketConnectedListener } from './listeners/socketio/socketConnected';
-import { addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
-import { addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
-import { addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
+import { addGeneratorProgressEventListener as addGeneratorProgressListener } from './listeners/socketio/socketGeneratorProgress';
+import { addGraphExecutionStateCompleteEventListener as addGraphExecutionStateCompleteListener } from './listeners/socketio/socketGraphExecutionStateComplete';
+import { addInvocationCompleteEventListener as addInvocationCompleteListener } from './listeners/socketio/socketInvocationComplete';
+import { addInvocationErrorEventListener as addInvocationErrorListener } from './listeners/socketio/socketInvocationError';
+import { addInvocationStartedEventListener as addInvocationStartedListener } from './listeners/socketio/socketInvocationStarted';
+import { addSocketConnectedEventListener as addSocketConnectedListener } from './listeners/socketio/socketConnected';
+import { addSocketDisconnectedEventListener as addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
+import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
+import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addSessionReadyToInvokeListener } from './listeners/sessionReadyToInvoke';
 import {
   addImageMetadataReceivedFulfilledListener,
@@ -60,13 +60,30 @@ import {
   addSessionCanceledRejectedListener,
 } from './listeners/sessionCanceled';
 import {
-  addReceivedResultImagesPageFulfilledListener,
-  addReceivedResultImagesPageRejectedListener,
-} from './listeners/receivedResultImagesPage';
+  addImageUpdatedFulfilledListener,
+  addImageUpdatedRejectedListener,
+} from './listeners/imageUpdated';
 import {
-  addReceivedUploadImagesPageFulfilledListener,
-  addReceivedUploadImagesPageRejectedListener,
-} from './listeners/receivedUploadImagesPage';
+  addReceivedPageOfImagesFulfilledListener,
+  addReceivedPageOfImagesRejectedListener,
+} from './listeners/receivedPageOfImages';
+import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
+import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
+import { addImageCategoriesChangedListener } from './listeners/imageCategoriesChanged';
+import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
+import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
+import { addUpdateImageUrlsOnConnectListener } from './listeners/updateImageUrlsOnConnect';
+import {
+  addImageAddedToBoardFulfilledListener,
+  addImageAddedToBoardRejectedListener,
+} from './listeners/imageAddedToBoard';
+import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
+import {
+  addImageRemovedFromBoardFulfilledListener,
+  addImageRemovedFromBoardRejectedListener,
+} from './listeners/imageRemovedFromBoard';
+import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
+import { addRequestedBoardImageDeletionListener } from './listeners/boardImagesDeleted';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -86,10 +103,21 @@ export type AppListenerEffect = ListenerEffect<
   AppDispatch
 >;
 
+/**
+ * The RTK listener middleware is a lightweight alternative sagas/observables.
+ *
+ * Most side effect logic should live in a listener.
+ */
+
 // Image uploaded
 addImageUploadedFulfilledListener();
 addImageUploadedRejectedListener();
 
+// Image updated
+addImageUpdatedFulfilledListener();
+addImageUpdatedRejectedListener();
+
+// Image selected
 addInitialImageSelectedListener();
 
 // Image deleted
@@ -97,6 +125,7 @@ addRequestedImageDeletionListener();
 addImageDeletedPendingListener();
 addImageDeletedFulfilledListener();
 addImageDeletedRejectedListener();
+addRequestedBoardImageDeletionListener();
 
 // Image metadata
 addImageMetadataReceivedFulfilledListener();
@@ -118,8 +147,22 @@ addCanvasSavedToGalleryListener();
 addCanvasDownloadedAsImageListener();
 addCanvasCopiedToClipboardListener();
 addCanvasMergedListener();
+addStagingAreaImageSavedListener();
+addCommitStagingAreaImageListener();
 
-// socketio
+/**
+ * Socket.IO Events - these handle SIO events directly and pass on internal application actions.
+ * We don't handle SIO events in slices via `extraReducers` because some of these events shouldn't
+ * actually be handled at all.
+ *
+ * For example, we don't want to respond to progress events for canceled sessions. To avoid
+ * duplicating the logic to determine if an event should be responded to, we handle all of that
+ * "is this session canceled?" logic in these listeners.
+ *
+ * The `socketGeneratorProgress` listener will then only dispatch the `appSocketGeneratorProgress`
+ * action if it should be handled by the rest of the application. It is this `appSocketGeneratorProgress`
+ * action that is handled by reducers in slices.
+ */
 addGeneratorProgressListener();
 addGraphExecutionStateCompleteListener();
 addInvocationCompleteListener();
@@ -145,8 +188,26 @@ addSessionCanceledPendingListener();
 addSessionCanceledFulfilledListener();
 addSessionCanceledRejectedListener();
 
-// Gallery pages
-addReceivedResultImagesPageFulfilledListener();
-addReceivedResultImagesPageRejectedListener();
-addReceivedUploadImagesPageFulfilledListener();
-addReceivedUploadImagesPageRejectedListener();
+// Fetching images
+addReceivedPageOfImagesFulfilledListener();
+addReceivedPageOfImagesRejectedListener();
+
+// Gallery
+addImageCategoriesChangedListener();
+
+// ControlNet
+addControlNetImageProcessedListener();
+addControlNetAutoProcessListener();
+
+// Update image URLs on connect
+// addUpdateImageUrlsOnConnectListener();
+
+// Boards
+addImageAddedToBoardFulfilledListener();
+addImageAddedToBoardRejectedListener();
+addImageRemovedFromBoardFulfilledListener();
+addImageRemovedFromBoardRejectedListener();
+addBoardIdSelectedListener();
+
+// Node schemas
+addReceivedOpenAPISchemaListener();

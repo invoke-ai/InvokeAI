@@ -1,5 +1,4 @@
 import {
-  ChakraProps,
   Flex,
   Heading,
   Modal,
@@ -13,19 +12,21 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
+import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAISelect from 'common/components/IAISelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import IAISwitch from 'common/components/IAISwitch';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import {
+  SystemState,
   consoleLogLevelChanged,
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
-  SystemState,
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
@@ -35,11 +36,16 @@ import {
 } from 'features/ui/store/uiSlice';
 import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash-es';
-import { ChangeEvent, cloneElement, ReactElement, useCallback } from 'react';
+import {
+  ChangeEvent,
+  PropsWithChildren,
+  ReactElement,
+  cloneElement,
+  useCallback,
+  useEffect,
+} from 'react';
 import { useTranslation } from 'react-i18next';
-import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
 import { LogLevelName } from 'roarr';
-import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
 import SettingsSchedulers from './SettingsSchedulers';
 
 const selector = createSelector(
@@ -77,22 +83,32 @@ const selector = createSelector(
   }
 );
 
-const modalSectionStyles: ChakraProps['sx'] = {
-  flexDirection: 'column',
-  gap: 2,
-  p: 4,
-  bg: 'base.900',
-  borderRadius: 'base',
+type ConfigOptions = {
+  shouldShowDeveloperSettings: boolean;
+  shouldShowResetWebUiText: boolean;
+  shouldShowBetaLayout: boolean;
 };
 
 type SettingsModalProps = {
   /* The button to open the Settings Modal */
   children: ReactElement;
+  config?: ConfigOptions;
 };
 
-const SettingsModal = ({ children }: SettingsModalProps) => {
+const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+
+  const shouldShowBetaLayout = config?.shouldShowBetaLayout ?? true;
+  const shouldShowDeveloperSettings =
+    config?.shouldShowDeveloperSettings ?? true;
+  const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
+
+  useEffect(() => {
+    if (!shouldShowDeveloperSettings) {
+      dispatch(shouldLogToConsoleChanged(false));
+    }
+  }, [shouldShowDeveloperSettings, dispatch]);
 
   const {
     isOpen: isSettingsModalOpen,
@@ -133,8 +149,8 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
   }, [onSettingsModalClose, onRefreshModalOpen]);
 
   const handleLogLevelChanged = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      dispatch(consoleLogLevelChanged(e.target.value as LogLevelName));
+    (v: string) => {
+      dispatch(consoleLogLevelChanged(v as LogLevelName));
     },
     [dispatch]
   );
@@ -159,12 +175,12 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
         isCentered
       >
         <ModalOverlay />
-        <ModalContent paddingInlineEnd={4}>
+        <ModalContent>
           <ModalHeader>{t('common.settingsLabel')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <Flex sx={{ gap: 4, flexDirection: 'column' }}>
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.general')}</Heading>
                 <IAISwitch
                   label={t('settings.confirmOnDelete')}
@@ -173,14 +189,14 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                     dispatch(setShouldConfirmOnDelete(e.target.checked))
                   }
                 />
-              </Flex>
+              </StyledFlex>
 
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.generation')}</Heading>
                 <SettingsSchedulers />
-              </Flex>
+              </StyledFlex>
 
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.ui')}</Heading>
                 <IAISwitch
                   label={t('settings.displayHelpIcons')}
@@ -189,13 +205,15 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                     dispatch(setShouldDisplayGuides(e.target.checked))
                   }
                 />
-                <IAISwitch
-                  label={t('settings.useCanvasBeta')}
-                  isChecked={shouldUseCanvasBetaLayout}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
-                  }
-                />
+                {shouldShowBetaLayout && (
+                  <IAISwitch
+                    label={t('settings.useCanvasBeta')}
+                    isChecked={shouldUseCanvasBetaLayout}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
+                    }
+                  />
+                )}
                 <IAISwitch
                   label={t('settings.useSlidersForAll')}
                   isChecked={shouldUseSliders}
@@ -219,41 +237,45 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
                     )
                   }
                 />
-              </Flex>
+              </StyledFlex>
 
-              <Flex sx={modalSectionStyles}>
-                <Heading size="sm">{t('settings.developer')}</Heading>
-                <IAISwitch
-                  label={t('settings.shouldLogToConsole')}
-                  isChecked={shouldLogToConsole}
-                  onChange={handleLogToConsoleChanged}
-                />
-                <IAISelect
-                  horizontal
-                  spaceEvenly
-                  isDisabled={!shouldLogToConsole}
-                  label={t('settings.consoleLogLevel')}
-                  onChange={handleLogLevelChanged}
-                  value={consoleLogLevel}
-                  validValues={VALID_LOG_LEVELS.concat()}
-                />
-                <IAISwitch
-                  label={t('settings.enableImageDebugging')}
-                  isChecked={enableImageDebugging}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setEnableImageDebugging(e.target.checked))
-                  }
-                />
-              </Flex>
+              {shouldShowDeveloperSettings && (
+                <StyledFlex>
+                  <Heading size="sm">{t('settings.developer')}</Heading>
+                  <IAISwitch
+                    label={t('settings.shouldLogToConsole')}
+                    isChecked={shouldLogToConsole}
+                    onChange={handleLogToConsoleChanged}
+                  />
+                  <IAIMantineSelect
+                    disabled={!shouldLogToConsole}
+                    label={t('settings.consoleLogLevel')}
+                    onChange={handleLogLevelChanged}
+                    value={consoleLogLevel}
+                    data={VALID_LOG_LEVELS.concat()}
+                  />
+                  <IAISwitch
+                    label={t('settings.enableImageDebugging')}
+                    isChecked={enableImageDebugging}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(setEnableImageDebugging(e.target.checked))
+                    }
+                  />
+                </StyledFlex>
+              )}
 
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.resetWebUI')}</Heading>
                 <IAIButton colorScheme="error" onClick={handleClickResetWebUI}>
                   {t('settings.resetWebUI')}
                 </IAIButton>
-                <Text>{t('settings.resetWebUIDesc1')}</Text>
-                <Text>{t('settings.resetWebUIDesc2')}</Text>
-              </Flex>
+                {shouldShowResetWebUiText && (
+                  <>
+                    <Text>{t('settings.resetWebUIDesc1')}</Text>
+                    <Text>{t('settings.resetWebUIDesc2')}</Text>
+                  </>
+                )}
+              </StyledFlex>
             </Flex>
           </ModalBody>
 
@@ -289,3 +311,19 @@ const SettingsModal = ({ children }: SettingsModalProps) => {
 };
 
 export default SettingsModal;
+
+const StyledFlex = (props: PropsWithChildren) => {
+  return (
+    <Flex
+      layerStyle="second"
+      sx={{
+        flexDirection: 'column',
+        gap: 2,
+        p: 4,
+        borderRadius: 'base',
+      }}
+    >
+      {props.children}
+    </Flex>
+  );
+};

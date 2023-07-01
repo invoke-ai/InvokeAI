@@ -7,7 +7,7 @@ import React, {
 } from 'react';
 import { Provider } from 'react-redux';
 import { store } from 'app/store/store';
-import { OpenAPI } from 'services/api';
+// import { OpenAPI } from 'services/api/types';
 
 import Loading from '../../common/components/Loading/Loading';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
@@ -16,6 +16,15 @@ import { PartialAppConfig } from 'app/types/invokeai';
 import '../../i18n';
 import { socketMiddleware } from 'services/events/middleware';
 import { Middleware } from '@reduxjs/toolkit';
+import ImageDndContext from './ImageDnd/ImageDndContext';
+import {
+  DeleteImageContext,
+  DeleteImageContextProvider,
+} from 'app/contexts/DeleteImageContext';
+import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
+import { AddImageToBoardContextProvider } from '../contexts/AddImageToBoardContext';
+import { $authToken, $baseUrl } from 'services/api/client';
+import { DeleteBoardImagesContextProvider } from '../contexts/DeleteBoardImagesContext';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -40,12 +49,12 @@ const InvokeAIUI = ({
   useEffect(() => {
     // configure API client token
     if (token) {
-      OpenAPI.TOKEN = token;
+      $authToken.set(token);
     }
 
     // configure API client base url
     if (apiUrl) {
-      OpenAPI.BASE = apiUrl;
+      $baseUrl.set(apiUrl);
     }
 
     // reset dynamically added middlewares
@@ -62,6 +71,12 @@ const InvokeAIUI = ({
     } else {
       addMiddleware(socketMiddleware());
     }
+
+    return () => {
+      // Reset the API client token and base url on unmount
+      $baseUrl.set(undefined);
+      $authToken.set(undefined);
+    };
   }, [apiUrl, token, middleware]);
 
   return (
@@ -69,11 +84,19 @@ const InvokeAIUI = ({
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
-            <App
-              config={config}
-              headerComponent={headerComponent}
-              setIsReady={setIsReady}
-            />
+            <ImageDndContext>
+              <DeleteImageContextProvider>
+                <AddImageToBoardContextProvider>
+                  <DeleteBoardImagesContextProvider>
+                    <App
+                      config={config}
+                      headerComponent={headerComponent}
+                      setIsReady={setIsReady}
+                    />
+                  </DeleteBoardImagesContextProvider>
+                </AddImageToBoardContextProvider>
+              </DeleteImageContextProvider>
+            </ImageDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>
       </Provider>

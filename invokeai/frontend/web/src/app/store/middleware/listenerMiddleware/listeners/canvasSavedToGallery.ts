@@ -1,16 +1,17 @@
 import { canvasSavedToGallery } from 'features/canvas/store/actions';
 import { startAppListening } from '..';
 import { log } from 'app/logging/useLogger';
-import { imageUploaded } from 'services/thunks/image';
+import { imageUploaded } from 'services/api/thunks/image';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
+import { imageUpserted } from 'features/gallery/store/imagesSlice';
 
 const moduleLog = log.child({ namespace: 'canvasSavedToGalleryListener' });
 
 export const addCanvasSavedToGalleryListener = () => {
   startAppListening({
     actionCreator: canvasSavedToGallery,
-    effect: async (action, { dispatch, getState }) => {
+    effect: async (action, { dispatch, getState, take }) => {
       const state = getState();
 
       const blob = await getBaseLayerBlob(state);
@@ -27,13 +28,28 @@ export const addCanvasSavedToGalleryListener = () => {
         return;
       }
 
-      dispatch(
+      const imageUploadedRequest = dispatch(
         imageUploaded({
-          formData: {
-            file: new File([blob], 'mergedCanvas.png', { type: 'image/png' }),
+          file: new File([blob], 'savedCanvas.png', {
+            type: 'image/png',
+          }),
+          image_category: 'general',
+          is_intermediate: false,
+          postUploadAction: {
+            type: 'TOAST_CANVAS_SAVED_TO_GALLERY',
           },
         })
       );
+
+      const [{ payload: uploadedImageDTO }] = await take(
+        (
+          uploadedImageAction
+        ): uploadedImageAction is ReturnType<typeof imageUploaded.fulfilled> =>
+          imageUploaded.fulfilled.match(uploadedImageAction) &&
+          uploadedImageAction.meta.requestId === imageUploadedRequest.requestId
+      );
+
+      dispatch(imageUpserted(uploadedImageDTO));
     },
   });
 };

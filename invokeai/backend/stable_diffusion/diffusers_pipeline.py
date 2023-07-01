@@ -16,14 +16,13 @@ from accelerate.utils import set_seed
 import psutil
 import torch
 import torchvision.transforms as T
-from compel import EmbeddingsProvider
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.controlnet import ControlNetModel, ControlNetOutput
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
     StableDiffusionPipeline,
 )
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_controlnet import MultiControlNetModel
+from diffusers.pipelines.controlnet import MultiControlNetModel
 
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import (
     StableDiffusionImg2ImgPipeline,
@@ -40,7 +39,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from typing_extensions import ParamSpec
 
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 from ..util import CPU_DEVICE, normalize_device
 from .diffusion import (
     AttentionMapSaver,
@@ -48,7 +47,6 @@ from .diffusion import (
     PostprocessingSettings,
 )
 from .offloading import FullyLoadedModelGroup, LazilyLoadedModelGroup, ModelGroup
-from .textual_inversion_manager import TextualInversionManager
 
 @dataclass
 class PipelineIntermediateState:
@@ -75,10 +73,10 @@ class AddsMaskLatents:
     initial_image_latents: torch.Tensor
 
     def __call__(
-        self, latents: torch.Tensor, t: torch.Tensor, text_embeddings: torch.Tensor
+        self, latents: torch.Tensor, t: torch.Tensor, text_embeddings: torch.Tensor, **kwargs,
     ) -> torch.Tensor:
         model_input = self.add_mask_channels(latents)
-        return self.forward(model_input, t, text_embeddings)
+        return self.forward(model_input, t, text_embeddings, **kwargs)
 
     def add_mask_channels(self, latents):
         batch_size = latents.size(0)
@@ -217,16 +215,18 @@ class GeneratorToCallbackinator(Generic[ParamType, ReturnType, CallbackType]):
 @dataclass
 class ControlNetData:
     model: ControlNetModel = Field(default=None)
-    image_tensor: torch.Tensor= Field(default=None)
-    weight: float = Field(default=1.0)
+    image_tensor: torch.Tensor = Field(default=None)
+    weight: Union[float, List[float]] = Field(default=1.0)
     begin_step_percent: float = Field(default=0.0)
     end_step_percent: float = Field(default=1.0)
+    control_mode: str = Field(default="balanced")
+
 
 @dataclass(frozen=True)
 class ConditioningData:
     unconditioned_embeddings: torch.Tensor
     text_embeddings: torch.Tensor
-    guidance_scale: float
+    guidance_scale: Union[float, List[float]]
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
     `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
@@ -317,6 +317,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         requires_safety_checker: bool = False,
         precision: str = "float32",
         control_model: ControlNetModel = None,
+        execution_device: Optional[torch.device] = None,
     ):
         super().__init__(
             vae,
@@ -341,22 +342,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             # control_model=control_model,
         )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(
-            self.unet, self._unet_forward, is_running_diffusers=True
-        )
-        use_full_precision = precision == "float32" or precision == "autocast"
-        self.textual_inversion_manager = TextualInversionManager(
-            tokenizer=self.tokenizer,
-            text_encoder=self.text_encoder,
-            full_precision=use_full_precision,
-        )
-        # InvokeAI's interface for text embeddings and whatnot
-        self.embeddings_provider = EmbeddingsProvider(
-            tokenizer=self.tokenizer,
-            text_encoder=self.text_encoder,
-            textual_inversion_manager=self.textual_inversion_manager,
+            self.unet, self._unet_forward
         )
 
-        self._model_group = FullyLoadedModelGroup(self.unet.device)
+        self._model_group = FullyLoadedModelGroup(execution_device or self.unet.device)
         self._model_group.install(*self._submodels)
         self.control_model = control_model
 
@@ -364,7 +353,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
-        config = get_invokeai_config()
+        config = InvokeAIAppConfig.get_config()
         if (
             torch.cuda.is_available()
             and is_xformers_available()
@@ -403,50 +392,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     self.enable_attention_slicing(slice_size="max")
                 else:
                     self.disable_attention_slicing()
-
-    def enable_offload_submodels(self, device: torch.device):
-        """
-        Offload each submodel when it's not in use.
-
-        Useful for low-vRAM situations where the size of the model in memory is a big chunk of
-        the total available resource, and you want to free up as much for inference as possible.
-
-        This requires more moving parts and may add some delay as the U-Net is swapped out for the
-        VAE and vice-versa.
-        """
-        models = self._submodels
-        if self._model_group is not None:
-            self._model_group.uninstall(*models)
-        group = LazilyLoadedModelGroup(device)
-        group.install(*models)
-        self._model_group = group
-
-    def disable_offload_submodels(self):
-        """
-        Leave all submodels loaded.
-
-        Appropriate for cases where the size of the model in memory is small compared to the memory
-        required for inference. Avoids the delay and complexity of shuffling the submodels to and
-        from the GPU.
-        """
-        models = self._submodels
-        if self._model_group is not None:
-            self._model_group.uninstall(*models)
-        group = FullyLoadedModelGroup(self._model_group.execution_device)
-        group.install(*models)
-        self._model_group = group
-
-    def offload_all(self):
-        """Offload all this pipeline's models to CPU."""
-        self._model_group.offload_current()
-
-    def ready(self):
-        """
-        Ready this pipeline's models.
-
-        i.e. preload them to the GPU if appropriate.
-        """
-        self._model_group.ready()
 
     def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
         # overridden method; types match the superclass.
@@ -656,40 +601,68 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
-        latent_model_input = self.scheduler.scale_model_input(latents, timestep)
+        unet_latent_input = self.scheduler.scale_model_input(latents, timestep)
 
         # default is no controlnet, so set controlnet processing output to None
         down_block_res_samples, mid_block_res_sample = None, None
 
         if control_data is not None:
-            if conditioning_data.guidance_scale > 1.0:
-                # expand the latents input to control model if doing classifier free guidance
-                #    (which I think for now is always true, there is conditional elsewhere that stops execution if
-                #     classifier_free_guidance is <= 1.0 ?)
-                latent_control_input = torch.cat([latent_model_input] * 2)
-            else:
-                latent_control_input = latent_model_input
             # control_data should be type List[ControlNetData]
             # this loop covers both ControlNet (one ControlNetData in list)
             #      and MultiControlNet (multiple ControlNetData in list)
             for i, control_datum in enumerate(control_data):
-                # print("controlnet", i, "==>", type(control_datum))
+                control_mode = control_datum.control_mode
+                # soft_injection and cfg_injection are the two ControlNet control_mode booleans
+                #     that are combined at higher level to make control_mode enum
+                #  soft_injection determines whether to do per-layer re-weighting adjustment (if True)
+                #     or default weighting (if False)
+                soft_injection = (control_mode == "more_prompt" or control_mode == "more_control")
+                #  cfg_injection = determines whether to apply ControlNet to only the conditional (if True)
+                #      or the default both conditional and unconditional (if False)
+                cfg_injection = (control_mode == "more_control" or control_mode == "unbalanced")
+
                 first_control_step = math.floor(control_datum.begin_step_percent * total_step_count)
                 last_control_step = math.ceil(control_datum.end_step_percent * total_step_count)
                 # only apply controlnet if current step is within the controlnet's begin/end step range
                 if step_index >= first_control_step and step_index <= last_control_step:
-                    # print("running controlnet", i, "for step", step_index)
+
+                    if cfg_injection:
+                        control_latent_input = unet_latent_input
+                    else:
+                        # expand the latents input to control model if doing classifier free guidance
+                        #    (which I think for now is always true, there is conditional elsewhere that stops execution if
+                        #     classifier_free_guidance is <= 1.0 ?)
+                        control_latent_input = torch.cat([unet_latent_input] * 2)
+
+                    if cfg_injection:  # only applying ControlNet to conditional instead of in unconditioned
+                        encoder_hidden_states = torch.cat([conditioning_data.unconditioned_embeddings])
+                    else:
+                        encoder_hidden_states = torch.cat([conditioning_data.unconditioned_embeddings,
+                                                           conditioning_data.text_embeddings])
+                    if isinstance(control_datum.weight, list):
+                        # if controlnet has multiple weights, use the weight for the current step
+                        controlnet_weight = control_datum.weight[step_index]
+                    else:
+                        # if controlnet has a single weight, use it for all steps
+                        controlnet_weight = control_datum.weight
+
+                    # controlnet(s) inference
                     down_samples, mid_sample = control_datum.model(
-                        sample=latent_control_input,
+                        sample=control_latent_input,
                         timestep=timestep,
-                        encoder_hidden_states=torch.cat([conditioning_data.unconditioned_embeddings,
-                                                         conditioning_data.text_embeddings]),
+                        encoder_hidden_states=encoder_hidden_states,
                         controlnet_cond=control_datum.image_tensor,
-                        conditioning_scale=control_datum.weight,
-                        # cross_attention_kwargs,
-                        guess_mode=False,
+                        conditioning_scale=controlnet_weight, # controlnet specific, NOT the guidance scale
+                        guess_mode=soft_injection, # this is still called guess_mode in diffusers ControlNetModel
                         return_dict=False,
                     )
+                    if cfg_injection:
+                        # Inferred ControlNet only for the conditional batch.
+                        # To apply the output of ControlNet to both the unconditional and conditional batches,
+                        #   add 0 to the unconditional batch to keep it unchanged.
+                        down_samples = [torch.cat([torch.zeros_like(d), d]) for d in down_samples]
+                        mid_sample = torch.cat([torch.zeros_like(mid_sample), mid_sample])
+
                     if down_block_res_samples is None and mid_block_res_sample is None:
                         down_block_res_samples, mid_block_res_sample = down_samples, mid_sample
                     else:
@@ -702,11 +675,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # predict the noise residual
         noise_pred = self.invokeai_diffuser.do_diffusion_step(
-            latent_model_input,
-            t,
-            conditioning_data.unconditioned_embeddings,
-            conditioning_data.text_embeddings,
-            conditioning_data.guidance_scale,
+            x=unet_latent_input,
+            sigma=t,
+            unconditioning=conditioning_data.unconditioned_embeddings,
+            conditioning=conditioning_data.text_embeddings,
+            unconditional_guidance_scale=conditioning_data.guidance_scale,
             step_index=step_index,
             total_step_count=total_step_count,
             down_block_additional_residuals=down_block_res_samples,  # from controlnet(s)
@@ -983,25 +956,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             device = self._model_group.device_for(self.safety_checker)
         return super().run_safety_checker(image, device, dtype)
 
-    @torch.inference_mode()
-    def get_learned_conditioning(
-        self, c: List[List[str]], *, return_tokens=True, fragment_weights=None
-    ):
-        """
-        Compatibility function for invokeai.models.diffusion.ddpm.LatentDiffusion.
-        """
-        return self.embeddings_provider.get_embeddings_for_weighted_prompt_fragments(
-            text_batch=c,
-            fragment_weights_batch=fragment_weights,
-            should_return_tokens=return_tokens,
-            device=self._model_group.device_for(self.unet),
-        )
-
-    @property
-    def channels(self) -> int:
-        """Compatible with DiffusionWrapper"""
-        return self.unet.config.in_channels
-
     def decode_latents(self, latents):
         # Explicit call to get the vae loaded, since `decode` isn't the forward method.
         self._model_group.load(self.vae)
@@ -1018,8 +972,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
     # Copied from diffusers pipeline_stable_diffusion_controlnet.py
     # Returns torch.Tensor of shape (batch_size, 3, height, width)
+    @staticmethod
     def prepare_control_image(
-        self,
         image,
         # FIXME: need to fix hardwiring of width and height, change to basing on latents dimensions?
         # latents,
@@ -1030,6 +984,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         device="cuda",
         dtype=torch.float16,
         do_classifier_free_guidance=True,
+        control_mode="balanced"
     ):
 
         if not isinstance(image, torch.Tensor):
@@ -1060,6 +1015,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             repeat_by = num_images_per_prompt
         image = image.repeat_interleave(repeat_by, dim=0)
         image = image.to(device=device, dtype=dtype)
-        if do_classifier_free_guidance:
+        cfg_injection = (control_mode == "more_control" or control_mode == "unbalanced")
+        if do_classifier_free_guidance and not cfg_injection:
             image = torch.cat([image] * 2)
         return image

@@ -7,18 +7,18 @@ import torch
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
+from invokeai.app.services.config import InvokeAIAppConfig
 
 class GFPGAN:
     def __init__(self, gfpgan_model_path="models/gfpgan/GFPGANv1.4.pth") -> None:
-        self.globals = get_invokeai_config()
+        self.globals = InvokeAIAppConfig.get_config()
         if not os.path.isabs(gfpgan_model_path):
             gfpgan_model_path = self.globals.root_dir / gfpgan_model_path
         self.model_path = gfpgan_model_path
         self.gfpgan_model_exists = os.path.isfile(self.model_path)
 
         if not self.gfpgan_model_exists:
-            logger.error("NOT FOUND: GFPGAN model not found at " + self.model_path)
+            logger.error(f"NOT FOUND: GFPGAN model not found at {self.model_path}")
             return None
 
     def model_exists(self):

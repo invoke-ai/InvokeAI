@@ -1,19 +1,22 @@
 from typing import Literal, Optional, Union
 from pydantic import BaseModel, Field
+from contextlib import ExitStack
+import re
 
-from invokeai.app.invocations.util.choose_model import choose_model
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
+from .model import ClipField
 
-from ...backend.util.devices import choose_torch_device, torch_dtype
+from ...backend.util.devices import torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
-from ...backend.stable_diffusion.textual_inversion_manager import TextualInversionManager
+from ...backend.model_management import BaseModelType, ModelType, SubModelType
+from ...backend.model_management.lora import ModelPatcher
 
 from compel import Compel
 from compel.prompt_parser import (
     Blend,
     CrossAttentionControlSubstitute,
     FlattenedPrompt,
-    Fragment,
+    Fragment, Conjunction,
 )
 
 
@@ -39,7 +42,7 @@ class CompelInvocation(BaseInvocation):
     type: Literal["compel"] = "compel"
 
     prompt: str = Field(default="", description="Prompt")
-    model: str = Field(default="", description="Model to use")
+    clip: ClipField = Field(None, description="Clip to use")
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -55,87 +58,90 @@ class CompelInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> CompelOutput:
 
-        # TODO: load without model
-        model = choose_model(context.services.model_manager, self.model)
-        pipeline = model["model"]
-        tokenizer = pipeline.tokenizer
-        text_encoder = pipeline.text_encoder
-
-        # TODO: global? input?
-        #use_full_precision = precision == "float32" or precision == "autocast"
-        #use_full_precision = False
-
-        # TODO: redo TI when separate model loding implemented
-        #textual_inversion_manager = TextualInversionManager(
-        #    tokenizer=tokenizer,
-        #    text_encoder=text_encoder,
-        #    full_precision=use_full_precision,
-        #)
-
-        def load_huggingface_concepts(concepts: list[str]):
-            pipeline.textual_inversion_manager.load_huggingface_concepts(concepts)
-
-        # apply the concepts library to the prompt
-        prompt_str = pipeline.textual_inversion_manager.hf_concepts_library.replace_concepts_with_triggers(
-            self.prompt,
-            lambda concepts: load_huggingface_concepts(concepts),
-            pipeline.textual_inversion_manager.get_all_trigger_strings(),
+        tokenizer_info = context.services.model_manager.get_model(
+            **self.clip.tokenizer.dict(),
         )
-
-        # lazy-load any deferred textual inversions.
-        # this might take a couple of seconds the first time a textual inversion is used.
-        pipeline.textual_inversion_manager.create_deferred_token_ids_for_any_trigger_terms(
-            prompt_str
+        text_encoder_info = context.services.model_manager.get_model(
+            **self.clip.text_encoder.dict(),
         )
+        with tokenizer_info as orig_tokenizer,\
+             text_encoder_info as text_encoder:
 
-        compel = Compel(
-            tokenizer=tokenizer,
-            text_encoder=text_encoder,
-            textual_inversion_manager=pipeline.textual_inversion_manager,
-            dtype_for_device_getter=torch_dtype,
-            truncate_long_prompts=True, # TODO:
-        )
+            loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
-        # TODO: support legacy blend?
+            ti_list = []
+            for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
+                name = trigger[1:-1]
+                try:
+                    ti_list.append(
+                        context.services.model_manager.get_model(
+                            model_name=name,
+                            base_model=self.clip.text_encoder.base_model,
+                            model_type=ModelType.TextualInversion,
+                        ).context.model
+                    )
+                except Exception:
+                    #print(e)
+                    #import traceback
+                    #print(traceback.format_exc())
+                    print(f"Warn: trigger: \"{trigger}\" not found")
 
-        conjunction = Compel.parse_prompt_string(prompt_str)
-        prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
+            with ModelPatcher.apply_lora_text_encoder(text_encoder, loras),\
+                 ModelPatcher.apply_ti(orig_tokenizer, text_encoder, ti_list) as (tokenizer, ti_manager):
 
-        if context.services.configuration.log_tokenization:
-            log_tokenization_for_prompt_object(prompt, tokenizer)
+                compel = Compel(
+                    tokenizer=tokenizer,
+                    text_encoder=text_encoder,
+                    textual_inversion_manager=ti_manager,
+                    dtype_for_device_getter=torch_dtype,
+                    truncate_long_prompts=True, # TODO:
+                )
+                
+                conjunction = Compel.parse_prompt_string(self.prompt)
+                prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
 
-        c, options = compel.build_conditioning_tensor_for_prompt_object(prompt)
+                if context.services.configuration.log_tokenization:
+                    log_tokenization_for_prompt_object(prompt, tokenizer)
 
-        # TODO: long prompt support
-        #if not self.truncate_long_prompts:
-        #    [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
+                c, options = compel.build_conditioning_tensor_for_prompt_object(prompt)
+                
+                # TODO: long prompt support
+                #if not self.truncate_long_prompts:
+                #    [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
+                ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
+                    tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
+                    cross_attention_control_args=options.get("cross_attention_control", None),
+                )
+                
+            conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
 
-        ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
-            tokens_count_including_eos_bos=get_max_token_count(tokenizer, prompt),
-            cross_attention_control_args=options.get("cross_attention_control", None),
-        )
+            # TODO: hacky but works ;D maybe rename latents somehow?
+            context.services.latents.save(conditioning_name, (c, ec))
 
-        conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
-
-        # TODO: hacky but works ;D maybe rename latents somehow?
-        context.services.latents.save(conditioning_name, (c, ec))
-
-        return CompelOutput(
-            conditioning=ConditioningField(
-                conditioning_name=conditioning_name,
-            ),
-        )
+            return CompelOutput(
+                conditioning=ConditioningField(
+                    conditioning_name=conditioning_name,
+                ),
+            )
 
 
 def get_max_token_count(
-    tokenizer, prompt: Union[FlattenedPrompt, Blend], truncate_if_too_long=False
+    tokenizer, prompt: Union[FlattenedPrompt, Blend, Conjunction], truncate_if_too_long=False
 ) -> int:
     if type(prompt) is Blend:
         blend: Blend = prompt
         return max(
             [
-                get_max_token_count(tokenizer, c, truncate_if_too_long)
-                for c in blend.prompts
+                get_max_token_count(tokenizer, p, truncate_if_too_long)
+                for p in blend.prompts
+            ]
+        )
+    elif type(prompt) is Conjunction:
+        conjunction: Conjunction = prompt
+        return sum(
+            [
+                get_max_token_count(tokenizer, p, truncate_if_too_long)
+                for p in conjunction.prompts
             ]
         )
     else:
@@ -168,6 +174,22 @@ def get_tokens_for_prompt_object(
         max_tokens_length = tokenizer.model_max_length - 2  # typically 75
         tokens = tokens[0:max_tokens_length]
     return tokens
+
+
+def log_tokenization_for_conjunction(
+    c: Conjunction, tokenizer, display_label_prefix=None
+):
+    display_label_prefix = display_label_prefix or ""
+    for i, p in enumerate(c.prompts):
+        if len(c.prompts)>1:
+            this_display_label_prefix = f"{display_label_prefix}(conjunction part {i + 1}, weight={c.weights[i]})"
+        else:
+            this_display_label_prefix = display_label_prefix
+        log_tokenization_for_prompt_object(
+            p,
+            tokenizer,
+            display_label_prefix=this_display_label_prefix
+        )
 
 
 def log_tokenization_for_prompt_object(

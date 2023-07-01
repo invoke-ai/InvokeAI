@@ -11,3 +11,7 @@ export const canvasDownloadedAsImage = createAction(
 );
 
 export const canvasMerged = createAction('canvas/canvasMerged');
+
+export const stagingAreaImageSaved = createAction<{ imageName: string }>(
+  'canvas/stagingAreaImageSaved'
+);

@@ -13,22 +13,16 @@ const InvokeAILogoComponent = () => {
       <Image
         src={InvokeAILogoImage}
         alt="invoke-ai-logo"
-        w="32px"
-        h="32px"
-        minW="32px"
-        minH="32px"
-        userSelect="none"
-      />
-      <Flex
-        gap={3}
-        display={{
-          base: 'inherit',
-          sm: 'none',
-          md: 'inherit',
+        sx={{
+          w: '32px',
+          h: '32px',
+          minW: '32px',
+          minH: '32px',
           userSelect: 'none',
         }}
-      >
-        <Text fontSize="xl">
+      />
+      <Flex sx={{ gap: 3 }}>
+        <Text sx={{ fontSize: 'xl', userSelect: 'none' }}>
           invoke <strong>ai</strong>
         </Text>
         <Text

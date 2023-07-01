@@ -1,49 +1,58 @@
-import { Scheduler } from 'app/constants';
-import { RootState } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
+import { SCHEDULER_LABEL_MAP, SCHEDULER_NAMES } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAICustomSelect from 'common/components/IAICustomSelect';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setScheduler } from 'features/parameters/store/generationSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
+import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const selector = createSelector(
+  [uiSelector, generationSelector],
+  (ui, generation) => {
+    const { scheduler } = generation;
+    const { favoriteSchedulers: enabledSchedulers } = ui;
+
+    const data = SCHEDULER_NAMES.map((schedulerName) => ({
+      value: schedulerName,
+      label: SCHEDULER_LABEL_MAP[schedulerName as SchedulerParam],
+      group: enabledSchedulers.includes(schedulerName)
+        ? 'Favorites'
+        : undefined,
+    })).sort((a, b) => a.label.localeCompare(b.label));
+
+    return {
+      scheduler,
+      data,
+    };
+  },
+  defaultSelectorOptions
+);
+
 const ParamScheduler = () => {
-  const scheduler = useAppSelector(
-    (state: RootState) => state.generation.scheduler
-  );
-
-  const activeTabName = useAppSelector(activeTabNameSelector);
-
-  const schedulers = useAppSelector((state: RootState) => state.ui.schedulers);
-
-  const img2imgSchedulers = schedulers.filter((scheduler) => {
-    return !['dpmpp_2s'].includes(scheduler);
-  });
-
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const { scheduler, data } = useAppSelector(selector);
 
   const handleChange = useCallback(
-    (v: string | null | undefined) => {
+    (v: string | null) => {
       if (!v) {
         return;
       }
-      dispatch(setScheduler(v as Scheduler));
+      dispatch(setScheduler(v as SchedulerParam));
     },
     [dispatch]
   );
 
   return (
-    <IAICustomSelect
+    <IAIMantineSelect
       label={t('parameters.scheduler')}
-      selectedItem={scheduler}
-      setSelectedItem={handleChange}
-      items={
-        ['img2img', 'unifiedCanvas'].includes(activeTabName)
-          ? img2imgSchedulers
-          : schedulers
-      }
-      withCheckIcon
+      value={scheduler}
+      data={data}
+      onChange={handleChange}
     />
   );
 };

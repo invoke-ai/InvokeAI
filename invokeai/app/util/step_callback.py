@@ -1,5 +1,5 @@
-from invokeai.app.api.models.images import ProgressImage
 from invokeai.app.models.exceptions import CanceledException
+from invokeai.app.models.image import ProgressImage
 from ..invocations.baseinvocation import InvocationContext
 from ...backend.util.util import image_to_dataURL
 from ...backend.generator.base import Generator

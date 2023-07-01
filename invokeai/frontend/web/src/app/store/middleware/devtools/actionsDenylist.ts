@@ -7,5 +7,6 @@ export const actionsDenylist = [
   'canvas/setBoundingBoxDimensions',
   'canvas/setIsDrawing',
   'canvas/addPointToCurrentLine',
-  'socket/generatorProgress',
+  'socket/socketGeneratorProgress',
+  'socket/appSocketGeneratorProgress',
 ];

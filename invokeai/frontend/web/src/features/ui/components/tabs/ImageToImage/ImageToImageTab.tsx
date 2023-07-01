@@ -1,14 +1,17 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { memo, useCallback, useRef } from 'react';
-import { Panel, PanelGroup } from 'react-resizable-panels';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import ResizeHandle from '../ResizeHandle';
-import ImageToImageTabParameters from './ImageToImageTabParameters';
-import TextToImageTabMain from '../TextToImage/TextToImageTabMain';
-import { ImperativePanelGroupHandle } from 'react-resizable-panels';
-import ParametersPinnedWrapper from '../../ParametersPinnedWrapper';
 import InitialImageDisplay from 'features/parameters/components/Parameters/ImageToImage/InitialImageDisplay';
+import { memo, useCallback, useRef } from 'react';
+import {
+  ImperativePanelGroupHandle,
+  Panel,
+  PanelGroup,
+} from 'react-resizable-panels';
+import ParametersPinnedWrapper from '../../ParametersPinnedWrapper';
+import ResizeHandle from '../ResizeHandle';
+import TextToImageTabMain from '../TextToImage/TextToImageTabMain';
+import ImageToImageTabParameters from './ImageToImageTabParameters';
 
 const ImageToImageTab = () => {
   const dispatch = useAppDispatch();

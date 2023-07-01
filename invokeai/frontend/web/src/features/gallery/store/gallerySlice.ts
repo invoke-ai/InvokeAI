@@ -1,20 +1,16 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import {
-  receivedResultImagesPage,
-  receivedUploadImagesPage,
-} from '../../../services/thunks/gallery';
-import { ImageDTO } from 'services/api';
+import { imageUpserted } from './imagesSlice';
 
 type GalleryImageObjectFitType = 'contain' | 'cover';
 
 export interface GalleryState {
-  selectedImage?: ImageDTO;
+  selectedImage?: string;
   galleryImageMinimumWidth: number;
   galleryImageObjectFit: GalleryImageObjectFitType;
   shouldAutoSwitchToNewImages: boolean;
   shouldUseSingleGalleryColumn: boolean;
-  currentCategory: 'results' | 'uploads';
+  galleryView: 'images' | 'assets' | 'boards';
 }
 
 export const initialGalleryState: GalleryState = {
@@ -22,14 +18,14 @@ export const initialGalleryState: GalleryState = {
   galleryImageObjectFit: 'cover',
   shouldAutoSwitchToNewImages: true,
   shouldUseSingleGalleryColumn: false,
-  currentCategory: 'results',
+  galleryView: 'images',
 };
 
 export const gallerySlice = createSlice({
   name: 'gallery',
   initialState: initialGalleryState,
   reducers: {
-    imageSelected: (state, action: PayloadAction<ImageDTO | undefined>) => {
+    imageSelected: (state, action: PayloadAction<string | undefined>) => {
       state.selectedImage = action.payload;
       // TODO: if the user selects an image, disable the auto switch?
       // state.shouldAutoSwitchToNewImages = false;
@@ -46,52 +42,36 @@ export const gallerySlice = createSlice({
     setShouldAutoSwitchToNewImages: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitchToNewImages = action.payload;
     },
-    setCurrentCategory: (
-      state,
-      action: PayloadAction<'results' | 'uploads'>
-    ) => {
-      state.currentCategory = action.payload;
-    },
     setShouldUseSingleGalleryColumn: (
       state,
       action: PayloadAction<boolean>
     ) => {
       state.shouldUseSingleGalleryColumn = action.payload;
     },
+    setGalleryView: (
+      state,
+      action: PayloadAction<'images' | 'assets' | 'boards'>
+    ) => {
+      state.galleryView = action.payload;
+    },
   },
-  extraReducers(builder) {
-    builder.addCase(receivedResultImagesPage.fulfilled, (state, action) => {
-      // rehydrate selectedImage URL when results list comes in
-      // solves case when outdated URL is in local storage
-      const selectedImage = state.selectedImage;
-      if (selectedImage) {
-        const selectedImageInResults = action.payload.items.find(
-          (image) => image.image_name === selectedImage.image_name
-        );
-
-        if (selectedImageInResults) {
-          selectedImage.image_url = selectedImageInResults.image_url;
-          selectedImage.thumbnail_url = selectedImageInResults.thumbnail_url;
-          state.selectedImage = selectedImage;
-        }
+  extraReducers: (builder) => {
+    builder.addCase(imageUpserted, (state, action) => {
+      if (
+        state.shouldAutoSwitchToNewImages &&
+        action.payload.image_category === 'general'
+      ) {
+        state.selectedImage = action.payload.image_name;
       }
     });
-    builder.addCase(receivedUploadImagesPage.fulfilled, (state, action) => {
-      // rehydrate selectedImage URL when results list comes in
-      // solves case when outdated URL is in local storage
-      const selectedImage = state.selectedImage;
-      if (selectedImage) {
-        const selectedImageInResults = action.payload.items.find(
-          (image) => image.image_name === selectedImage.image_name
-        );
+    // builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+    //   const { image_name, image_url, thumbnail_url } = action.payload;
 
-        if (selectedImageInResults) {
-          selectedImage.image_url = selectedImageInResults.image_url;
-          selectedImage.thumbnail_url = selectedImageInResults.thumbnail_url;
-          state.selectedImage = selectedImage;
-        }
-      }
-    });
+    //   if (state.selectedImage?.image_name === image_name) {
+    //     state.selectedImage.image_url = image_url;
+    //     state.selectedImage.thumbnail_url = thumbnail_url;
+    //   }
+    // });
   },
 });
 
@@ -101,7 +81,7 @@ export const {
   setGalleryImageObjectFit,
   setShouldAutoSwitchToNewImages,
   setShouldUseSingleGalleryColumn,
-  setCurrentCategory,
+  setGalleryView,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

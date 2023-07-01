@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { TransformComponent, useTransformContext } from 'react-zoom-pan-pinch';
-import { useGetUrl } from 'common/util/getUrl';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 
 type ReactPanZoomProps = {
   image: ImageDTO;
@@ -23,7 +22,6 @@ export default function ReactPanZoomImage({
   scaleY,
 }: ReactPanZoomProps) {
   const { centerView } = useTransformContext();
-  const { getUrl } = useGetUrl();
 
   return (
     <TransformComponent
@@ -37,7 +35,7 @@ export default function ReactPanZoomImage({
           transform: `rotate(${rotation}deg) scaleX(${scaleX})  scaleY(${scaleY})`,
           width: '100%',
         }}
-        src={getUrl(image.image_url)}
+        src={image.image_url}
         alt={alt}
         ref={ref}
         className={styleClass ? styleClass : ''}

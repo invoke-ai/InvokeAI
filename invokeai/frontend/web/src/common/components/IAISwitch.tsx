@@ -5,6 +5,7 @@ import {
   FormLabelProps,
   Switch,
   SwitchProps,
+  Tooltip,
 } from '@chakra-ui/react';
 import { memo } from 'react';
 
@@ -13,6 +14,7 @@ interface Props extends SwitchProps {
   width?: string | number;
   formControlProps?: FormControlProps;
   formLabelProps?: FormLabelProps;
+  tooltip?: string;
 }
 
 /**
@@ -25,22 +27,35 @@ const IAISwitch = (props: Props) => {
     width = 'auto',
     formControlProps,
     formLabelProps,
+    tooltip,
     ...rest
   } = props;
   return (
-    <FormControl
-      isDisabled={isDisabled}
-      width={width}
-      display="flex"
-      gap={4}
-      alignItems="center"
-      {...formControlProps}
-    >
-      <FormLabel my={1} flexGrow={1} {...formLabelProps}>
-        {label}
-      </FormLabel>
-      <Switch {...rest} />
-    </FormControl>
+    <Tooltip label={tooltip} hasArrow placement="top" isDisabled={!tooltip}>
+      <FormControl
+        isDisabled={isDisabled}
+        width={width}
+        display="flex"
+        gap={4}
+        alignItems="center"
+        {...formControlProps}
+      >
+        {label && (
+          <FormLabel
+            my={1}
+            flexGrow={1}
+            sx={{
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
+              ...formLabelProps?.sx,
+            }}
+            {...formLabelProps}
+          >
+            {label}
+          </FormLabel>
+        )}
+        <Switch {...rest} />
+      </FormControl>
+    </Tooltip>
   );
 };
 

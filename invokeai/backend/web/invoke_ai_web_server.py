@@ -1277,13 +1277,14 @@ class InvokeAIWebServer:
                 eventlet.sleep(0)
 
                 parsed_prompt, _ = get_prompt_structure(generation_parameters["prompt"])
-                tokens = (
-                    None
-                    if type(parsed_prompt) is Blend
-                    else get_tokens_for_prompt_object(
-                        self.generate.model.tokenizer, parsed_prompt
+                with self.generate.model_context as model:
+                    tokens = (
+                        None
+                        if type(parsed_prompt) is Blend
+                        else get_tokens_for_prompt_object(
+                                model.tokenizer, parsed_prompt
+                        )
                     )
-                )
                 attention_maps_image_base64_url = (
                     None
                     if attention_maps_image is None

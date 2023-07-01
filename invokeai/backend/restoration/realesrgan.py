@@ -6,8 +6,8 @@ from PIL import Image
 from PIL.Image import Image as ImageType
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
-config = get_invokeai_config()
+from invokeai.app.services.config import InvokeAIAppConfig
+config = InvokeAIAppConfig.get_config()
 
 class ESRGAN:
     def __init__(self, bg_tile_size=400) -> None:
@@ -30,8 +30,8 @@ class ESRGAN:
             upscale=4,
             act_type="prelu",
         )
-        model_path = config.root_dir / "models/realesrgan/realesr-general-x4v3.pth"
-        wdn_model_path = config.root_dir / "models/realesrgan/realesr-general-wdn-x4v3.pth"
+        model_path = config.models_path / "core/upscaling/realesrgan/realesr-general-x4v3.pth"
+        wdn_model_path = config.models_path / "core/upscaling/realesrgan/realesr-general-wdn-x4v3.pth"
         scale = 4
 
         bg_upsampler = RealESRGANer(

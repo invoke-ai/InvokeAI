@@ -1,35 +1,31 @@
 import { UseToastOptions } from '@chakra-ui/react';
-import { PayloadAction, isAnyOf } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import * as InvokeAI from 'app/types/invokeai';
-import {
-  generatorProgress,
-  graphExecutionStateComplete,
-  invocationComplete,
-  invocationError,
-  invocationStarted,
-  socketConnected,
-  socketDisconnected,
-  socketSubscribed,
-  socketUnsubscribed,
-} from 'services/events/actions';
 
-import { ProgressImage } from 'services/events/types';
-import { makeToast } from '../../../app/components/Toaster';
-import {
-  sessionCanceled,
-  sessionCreated,
-  sessionInvoked,
-} from 'services/thunks/session';
-import { receivedModels } from 'services/thunks/model';
-import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
-import { LogLevelName } from 'roarr';
 import { InvokeLogLevel } from 'app/logging/useLogger';
-import { TFuncKey } from 'i18next';
-import { t } from 'i18next';
 import { userInvoked } from 'app/store/actions';
+import { TFuncKey, t } from 'i18next';
+import { LogLevelName } from 'roarr';
+import {
+  appSocketConnected,
+  appSocketDisconnected,
+  appSocketGeneratorProgress,
+  appSocketGraphExecutionStateComplete,
+  appSocketInvocationComplete,
+  appSocketInvocationError,
+  appSocketInvocationStarted,
+  appSocketSubscribed,
+  appSocketUnsubscribed,
+} from 'services/events/actions';
+import { ProgressImage } from 'services/events/types';
+import { imageUploaded } from 'services/api/thunks/image';
+import {
+  isAnySessionRejected,
+  sessionCanceled,
+} from 'services/api/thunks/session';
+import { makeToast } from '../../../app/components/Toaster';
 import { LANGUAGES } from '../components/LanguagePicker';
-import { imageUploaded } from 'services/thunks/image';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -99,6 +95,7 @@ export interface SystemState {
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
+  boardIdToAddTo?: string;
 }
 
 export const initialSystemState: SystemState = {
@@ -227,22 +224,24 @@ export const systemSlice = createSlice({
     /**
      * Socket Subscribed
      */
-    builder.addCase(socketSubscribed, (state, action) => {
+    builder.addCase(appSocketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
+      state.boardIdToAddTo = action.payload.boardId;
       state.canceledSession = '';
     });
 
     /**
      * Socket Unsubscribed
      */
-    builder.addCase(socketUnsubscribed, (state) => {
+    builder.addCase(appSocketUnsubscribed, (state) => {
       state.sessionId = null;
+      state.boardIdToAddTo = undefined;
     });
 
     /**
      * Socket Connected
      */
-    builder.addCase(socketConnected, (state) => {
+    builder.addCase(appSocketConnected, (state) => {
       state.isConnected = true;
       state.isCancelable = true;
       state.isProcessing = false;
@@ -257,7 +256,7 @@ export const systemSlice = createSlice({
     /**
      * Socket Disconnected
      */
-    builder.addCase(socketDisconnected, (state) => {
+    builder.addCase(appSocketDisconnected, (state) => {
       state.isConnected = false;
       state.isProcessing = false;
       state.isCancelable = true;
@@ -272,7 +271,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Started
      */
-    builder.addCase(invocationStarted, (state) => {
+    builder.addCase(appSocketInvocationStarted, (state) => {
       state.isCancelable = true;
       state.isProcessing = true;
       state.currentStatusHasSteps = false;
@@ -286,7 +285,7 @@ export const systemSlice = createSlice({
     /**
      * Generator Progress
      */
-    builder.addCase(generatorProgress, (state, action) => {
+    builder.addCase(appSocketGeneratorProgress, (state, action) => {
       const { step, total_steps, progress_image } = action.payload.data;
 
       state.isProcessing = true;
@@ -303,7 +302,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Complete
      */
-    builder.addCase(invocationComplete, (state, action) => {
+    builder.addCase(appSocketInvocationComplete, (state, action) => {
       const { data } = action.payload;
 
       // state.currentIteration = 0;
@@ -322,7 +321,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Error
      */
-    builder.addCase(invocationError, (state) => {
+    builder.addCase(appSocketInvocationError, (state) => {
       state.isProcessing = false;
       state.isCancelable = true;
       // state.currentIteration = 0;
@@ -339,7 +338,20 @@ export const systemSlice = createSlice({
     });
 
     /**
-     * Session Invoked - PENDING
+     * Graph Execution State Complete
+     */
+    builder.addCase(appSocketGraphExecutionStateComplete, (state) => {
+      state.isProcessing = false;
+      state.isCancelable = false;
+      state.isCancelScheduled = false;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.statusTranslationKey = 'common.statusConnected';
+      state.progressImage = null;
+    });
+
+    /**
+     * User Invoked
      */
 
     builder.addCase(userInvoked, (state) => {
@@ -353,7 +365,7 @@ export const systemSlice = createSlice({
      * Session Canceled - FULFILLED
      */
     builder.addCase(sessionCanceled.fulfilled, (state, action) => {
-      state.canceledSession = action.meta.arg.sessionId;
+      state.canceledSession = action.meta.arg.session_id;
       state.isProcessing = false;
       state.isCancelable = false;
       state.isCancelScheduled = false;
@@ -368,28 +380,9 @@ export const systemSlice = createSlice({
     });
 
     /**
-     * Session Canceled
-     */
-    builder.addCase(graphExecutionStateComplete, (state) => {
-      state.isProcessing = false;
-      state.isCancelable = false;
-      state.isCancelScheduled = false;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.statusTranslationKey = 'common.statusConnected';
-    });
-
-    /**
-     * Received available models from the backend
-     */
-    builder.addCase(receivedModels.fulfilled, (state) => {
-      state.wereModelsReceived = true;
-    });
-
-    /**
      * OpenAPI schema was parsed
      */
-    builder.addCase(parsedOpenAPISchema, (state) => {
+    builder.addCase(nodeTemplatesBuilt, (state) => {
       state.wasSchemaParsed = true;
     });
 
@@ -461,8 +454,3 @@ export const {
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
-
-const isAnySessionRejected = isAnyOf(
-  sessionCreated.rejected,
-  sessionInvoked.rejected
-);

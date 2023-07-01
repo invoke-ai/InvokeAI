@@ -1,21 +1,20 @@
 import { Flex } from '@chakra-ui/react';
 import InitialImagePreview from './InitialImagePreview';
-import InitialImageButtons from 'common/components/InitialImageButtons';
 
 const InitialImageDisplay = () => {
   return (
     <Flex
+      layerStyle={'first'}
       sx={{
         position: 'relative',
         flexDirection: 'column',
         height: '100%',
         width: '100%',
         rowGap: 4,
-        borderRadius: 'base',
         alignItems: 'center',
         justifyContent: 'center',
-        bg: 'base.850',
         p: 4,
+        borderRadius: 'base',
       }}
     >
       <Flex
@@ -28,7 +27,6 @@ const InitialImageDisplay = () => {
           gap: 4,
         }}
       >
-        <InitialImageButtons />
         <InitialImagePreview />
       </Flex>
     </Flex>

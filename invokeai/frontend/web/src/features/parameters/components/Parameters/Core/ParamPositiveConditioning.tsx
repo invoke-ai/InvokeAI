@@ -4,7 +4,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
 
 import { createSelector } from '@reduxjs/toolkit';
-import { readinessSelector } from 'app/selectors/readinessSelector';
 import {
   GenerationState,
   clampSymmetrySteps,
@@ -17,6 +16,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { userInvoked } from 'app/store/actions';
 import IAITextarea from 'common/components/IAITextarea';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
 const promptInputSelector = createSelector(
   [(state: RootState) => state.generation, activeTabNameSelector],
@@ -39,7 +39,7 @@ const promptInputSelector = createSelector(
 const ParamPositiveConditioning = () => {
   const dispatch = useAppDispatch();
   const { prompt, activeTabName } = useAppSelector(promptInputSelector);
-  const { isReady } = useAppSelector(readinessSelector);
+  const isReady = useIsReadyToInvoke();
 
   const promptRef = useRef<HTMLTextAreaElement>(null);
 
@@ -70,19 +70,17 @@ const ParamPositiveConditioning = () => {
 
   return (
     <Box>
-      <FormControl
-        isInvalid={prompt.length === 0 || Boolean(prompt.match(/^[\s\r\n]+$/))}
-      >
+      <FormControl>
         <IAITextarea
           id="prompt"
           name="prompt"
-          placeholder={t('parameters.promptPlaceholder')}
+          placeholder={t('parameters.positivePromptPlaceholder')}
           value={prompt}
           onChange={handleChangePrompt}
           onKeyDown={handleKeyDown}
           resize="vertical"
           ref={promptRef}
-          minH={{ base: 20, lg: 40 }}
+          minH={32}
         />
       </FormControl>
     </Box>

@@ -15,10 +15,7 @@ InvokeAI:
     conf_path: configs/models.yaml
     legacy_conf_dir: configs/stable-diffusion
     outdir: outputs
-    embedding_dir: embeddings
-    lora_dir: loras
-    autoconvert_dir: null
-    gfpgan_model_dir: models/gfpgan/GFPGANv1.4.pth
+    autoimport_dir: null
   Models:
     model: stable-diffusion-1.5
     embeddings: true
@@ -51,18 +48,32 @@ in INVOKEAI_ROOT. You can replace supersede this by providing any
 OmegaConf dictionary object initialization time:
 
  omegaconf = OmegaConf.load('/tmp/init.yaml')
- conf = InvokeAIAppConfig(conf=omegaconf)
+ conf = InvokeAIAppConfig()
+ conf.parse_args(conf=omegaconf)
 
-By default, InvokeAIAppConfig will parse the contents of `sys.argv` at
-initialization time. You may pass a list of strings in the optional
+InvokeAIAppConfig.parse_args() will parse the contents of `sys.argv`
+at initialization time. You may pass a list of strings in the optional
 `argv` argument to use instead of the system argv:
 
- conf = InvokeAIAppConfig(arg=['--xformers_enabled'])
+ conf.parse_args(argv=['--xformers_enabled'])
 
-It is also possible to set a value at initialization time. This value
-has highest priority.
+It is also possible to set a value at initialization time. However, if
+you call parse_args() it may be overwritten.
 
  conf = InvokeAIAppConfig(xformers_enabled=True)
+ conf.parse_args(argv=['--no-xformers'])
+ conf.xformers_enabled
+ # False
+
+
+To avoid this, use `get_config()` to retrieve the application-wide
+configuration object. This will retain any properties set at object
+creation time:
+
+ conf = InvokeAIAppConfig.get_config(xformers_enabled=True)
+ conf.parse_args(argv=['--no-xformers'])
+ conf.xformers_enabled
+ # True
 
 Any setting can be overwritten by setting an environment variable of
 form: "INVOKEAI_<setting>", as in:
@@ -76,18 +87,23 @@ Order of precedence (from highest):
    4) config file options
    5) pydantic defaults
 
-Typical usage:
+Typical usage at the top level file:
 
  from invokeai.app.services.config import InvokeAIAppConfig
- from invokeai.invocations.generate import TextToImageInvocation
 
  # get global configuration and print its nsfw_checker value
- conf = InvokeAIAppConfig()
+ conf = InvokeAIAppConfig.get_config()
+ conf.parse_args()
  print(conf.nsfw_checker)
 
- # get the text2image invocation and print its step value
- text2image = TextToImageInvocation()
- print(text2image.steps)
+Typical usage in a backend module:
+
+ from invokeai.app.services.config import InvokeAIAppConfig
+
+ # get global configuration and print its nsfw_checker value
+ conf = InvokeAIAppConfig.get_config()
+ print(conf.nsfw_checker)
+
 
 Computed properties:
 
@@ -103,10 +119,11 @@ a Path object:
  lora_path          - path to the LoRA directory
 
 In most cases, you will want to create a single InvokeAIAppConfig
-object for the entire application. The get_invokeai_config() function
+object for the entire application. The InvokeAIAppConfig.get_config() function
 does this:
 
-  config = get_invokeai_config()
+  config = InvokeAIAppConfig.get_config()
+  config.parse_args()   # read values from the command line/config file
   print(config.root)
 
 # Subclassing
@@ -140,23 +157,22 @@ two configs are kept in separate sections of the config file:
         legacy_conf_dir: configs/stable-diffusion
         outdir: outputs
      ...
+
 '''
+from __future__ import annotations
 import argparse
 import pydoc
-import typing
 import os
 import sys
 from argparse import ArgumentParser
 from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
 from pydantic import BaseSettings, Field, parse_obj_as
-from typing import Any, ClassVar, Dict, List, Literal, Type, Union, get_origin, get_type_hints, get_args
+from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path('invokeai.yaml')
+DB_FILE   = Path('invokeai.db')
 LEGACY_INIT_FILE = Path('invokeai.init')
-
-# This global stores a singleton InvokeAIAppConfig configuration object
-global_config = None
 
 class InvokeAISettings(BaseSettings):
     '''
@@ -168,7 +184,7 @@ class InvokeAISettings(BaseSettings):
 
     def parse_args(self, argv: list=sys.argv[1:]):
         parser = self.get_parser()
-        opt, _ = parser.parse_known_args(argv)
+        opt = parser.parse_args(argv)
         for name in self.__fields__:
             if name not in self._excluded():
                 setattr(self, name, getattr(opt,name))
@@ -330,6 +346,9 @@ the command-line client (recommended for experts only), or
 can be changed by editing the file "INVOKEAI_ROOT/invokeai.yaml" or by
 setting environment variables INVOKEAI_<setting>.
      '''
+    singleton_config: ClassVar[InvokeAIAppConfig] = None
+    singleton_init: ClassVar[Dict] = None
+    
     #fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
     host                : str = Field(default="127.0.0.1", description="IP address to bind to", category='Web Server')
@@ -348,54 +367,71 @@ setting environment variables INVOKEAI_<setting>.
 
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
     free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
-    max_loaded_models   : int = Field(default=2, gt=0, description="Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
+    max_loaded_models   : int = Field(default=3, gt=0, description="Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
     precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='float16',description='Floating point precision', category='Memory/Performance')
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
-
+    tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
 
     root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
-    autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.', category='Paths')
+    autoimport_dir      : Path = Field(default='autoimport/main', description='Path to a directory of models files to be imported on startup.', category='Paths')
+    lora_dir            : Path = Field(default='autoimport/lora', description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', category='Paths')
+    embedding_dir       : Path = Field(default='autoimport/embedding', description='Path to a directory of Textual Inversion embeddings to be imported on startup.', category='Paths')
+    controlnet_dir      : Path = Field(default='autoimport/controlnet', description='Path to a directory of ControlNet embeddings to be imported on startup.', category='Paths')
     conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
-    embedding_dir       : Path = Field(default='embeddings', description='Path to InvokeAI textual inversion aembeddings directory', category='Paths')
-    gfpgan_model_dir    : Path = Field(default="./models/gfpgan/GFPGANv1.4.pth", description='Path to GFPGAN models directory.', category='Paths')
+    models_dir          : Path = Field(default='models', description='Path to the models directory', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
-    lora_dir            : Path = Field(default='loras', description='Path to InvokeAI LoRA model directory', category='Paths')
+    db_dir              : Path = Field(default='databases', description='Path to InvokeAI databases directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
-
+    
     model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
-    embeddings          : bool = Field(default=True, description='Load contents of embeddings directory', category='Models')
+    
+    log_handlers        : List[str] = Field(default=["console"], description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>"', category="Logging")
+    # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
+    log_format          : Literal[tuple(['plain','color','syslog','legacy'])] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
+    log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="debug", description="Emit logging messages at this level or  higher", category="Logging")
     #fmt: on
 
-    def __init__(self, conf: DictConfig = None, argv: List[str]=None, **kwargs):
+    def parse_args(self, argv: List[str]=None, conf: DictConfig = None, clobber=False):
         '''
-        Initialize InvokeAIAppconfig.
+        Update settings with contents of init file, environment, and 
+        command-line settings.
         :param conf: alternate Omegaconf dictionary object
         :param argv: aternate sys.argv list
-        :param **kwargs: attributes to initialize with
+        :param clobber: ovewrite any initialization parameters passed during initialization
         '''
-        super().__init__(**kwargs)
-
         # Set the runtime root directory. We parse command-line switches here
         # in order to pick up the --root_dir option.
-        self.parse_args(argv)
+        super().parse_args(argv)
         if conf is None:
             try:
                 conf = OmegaConf.load(self.root_dir / INIT_FILE)
             except:
                 pass
         InvokeAISettings.initconf = conf
-
+        
         # parse args again in order to pick up settings in configuration file
-        self.parse_args(argv)
+        super().parse_args(argv)
 
-        # restore initialization values
-        hints = get_type_hints(self)
-        for k in kwargs:
-            setattr(self,k,parse_obj_as(hints[k],kwargs[k]))
+        if self.singleton_init and not clobber:
+            hints = get_type_hints(self.__class__)
+            for k in self.singleton_init:
+                setattr(self,k,parse_obj_as(hints[k],self.singleton_init[k]))
 
+    @classmethod
+    def get_config(cls,**kwargs)->InvokeAIAppConfig:
+        '''
+        This returns a singleton InvokeAIAppConfig configuration object.
+        '''
+        if cls.singleton_config is None \
+           or type(cls.singleton_config)!=cls \
+           or (kwargs and cls.singleton_init != kwargs):
+            cls.singleton_config = cls(**kwargs)
+            cls.singleton_init = kwargs
+        return cls.singleton_config
+        
     @property
     def root_path(self)->Path:
         '''
@@ -417,11 +453,25 @@ setting environment variables INVOKEAI_<setting>.
         return (self.root_path / partial_path).resolve()
 
     @property
+    def init_file_path(self)->Path:
+        '''
+        Path to invokeai.yaml
+        '''
+        return self._resolve(INIT_FILE)
+
+    @property
     def output_path(self)->Path:
         '''
         Path to defaults outputs directory.
         '''
         return self._resolve(self.outdir)
+
+    @property
+    def db_path(self)->Path:
+        '''
+        Path to the invokeai.db file.
+        '''
+        return self._resolve(self.db_dir) / DB_FILE
 
     @property
     def model_conf_path(self)->Path:
@@ -438,32 +488,11 @@ setting environment variables INVOKEAI_<setting>.
         return self._resolve(self.legacy_conf_dir)
 
     @property
-    def cache_dir(self)->Path:
-        '''
-        Path to the global cache directory for HuggingFace hub-managed models
-        '''
-        return self.models_dir / "hub"
-
-    @property
-    def models_dir(self)->Path:
+    def models_path(self)->Path:
         '''
         Path to the models directory
         '''
-        return self._resolve("models")
-
-    @property
-    def embedding_path(self)->Path:
-        '''
-        Path to the textual inversion embeddings directory.
-        '''
-        return self._resolve(self.embedding_dir) if self.embedding_dir else None
-
-    @property
-    def lora_path(self)->Path:
-        '''
-        Path to the LoRA models directory.
-        '''
-        return self._resolve(self.lora_dir) if self.lora_dir else None
+        return self._resolve(self.models_dir)
 
     @property
     def autoconvert_path(self)->Path:
@@ -471,13 +500,6 @@ setting environment variables INVOKEAI_<setting>.
         Path to the directory containing models to be imported automatically at startup.
         '''
         return self._resolve(self.autoconvert_dir) if self.autoconvert_dir else None
-
-    @property
-    def gfpgan_model_path(self)->Path:
-        '''
-        Path to the GFPGAN model.
-        '''
-        return self._resolve(self.gfpgan_model_dir) if self.gfpgan_model_dir else None
 
     # the following methods support legacy calls leftover from the Globals era
     @property
@@ -513,11 +535,8 @@ class PagingArgumentParser(argparse.ArgumentParser):
         text = self.format_help()
         pydoc.pager(text)
 
-def get_invokeai_config(cls:Type[InvokeAISettings]=InvokeAIAppConfig,**kwargs)->InvokeAIAppConfig:
+def get_invokeai_config(**kwargs)->InvokeAIAppConfig:
     '''
-    This returns a singleton InvokeAIAppConfig configuration object.
+    Legacy function which returns InvokeAIAppConfig.get_config()
     '''
-    global global_config
-    if global_config is None or type(global_config)!=cls:
-        global_config = cls(**kwargs)
-    return global_config
+    return InvokeAIAppConfig.get_config(**kwargs)

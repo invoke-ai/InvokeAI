@@ -1,21 +1,36 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional, cast
+from typing import Generic, Optional, TypeVar, cast
 import sqlite3
 import threading
 from typing import Optional, Union
 
+from pydantic import BaseModel, Field
+from pydantic.generics import GenericModel
+
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.models.image import (
     ImageCategory,
-    ImageType,
+    ResourceOrigin,
 )
 from invokeai.app.services.models.image_record import (
     ImageRecord,
     ImageRecordChanges,
     deserialize_image_record,
 )
-from invokeai.app.services.item_storage import PaginatedResults
+
+T = TypeVar("T", bound=BaseModel)
+
+
+class OffsetPaginatedResults(GenericModel, Generic[T]):
+    """Offset-paginated results"""
+
+    # fmt: off
+    items: list[T] = Field(description="Items")
+    offset: int = Field(description="Offset from which to retrieve items")
+    limit: int = Field(description="Limit of items to get")
+    total: int = Field(description="Total number of items in result")
+    # fmt: on
 
 
 # TODO: Should these excpetions subclass existing python exceptions?
@@ -46,7 +61,7 @@ class ImageRecordStorageBase(ABC):
     # TODO: Implement an `update()` method
 
     @abstractmethod
-    def get(self, image_type: ImageType, image_name: str) -> ImageRecord:
+    def get(self, image_name: str) -> ImageRecord:
         """Gets an image record."""
         pass
 
@@ -54,7 +69,6 @@ class ImageRecordStorageBase(ABC):
     def update(
         self,
         image_name: str,
-        image_type: ImageType,
         changes: ImageRecordChanges,
     ) -> None:
         """Updates an image record."""
@@ -63,26 +77,33 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get_many(
         self,
-        image_type: ImageType,
-        image_category: ImageCategory,
-        page: int = 0,
-        per_page: int = 10,
-    ) -> PaginatedResults[ImageRecord]:
+        offset: int = 0,
+        limit: int = 10,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+    ) -> OffsetPaginatedResults[ImageRecord]:
         """Gets a page of image records."""
         pass
 
     # TODO: The database has a nullable `deleted_at` column, currently unused.
     # Should we implement soft deletes? Would need coordination with ImageFileStorage.
     @abstractmethod
-    def delete(self, image_type: ImageType, image_name: str) -> None:
+    def delete(self, image_name: str) -> None:
         """Deletes an image record."""
+        pass
+
+    @abstractmethod
+    def delete_many(self, image_names: list[str]) -> None:
+        """Deletes many image records."""
         pass
 
     @abstractmethod
     def save(
         self,
         image_name: str,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         image_category: ImageCategory,
         width: int,
         height: int,
@@ -94,6 +115,11 @@ class ImageRecordStorageBase(ABC):
         """Saves an image record."""
         pass
 
+    @abstractmethod
+    def get_most_recent_image_for_board(self, board_id: str) -> ImageRecord | None:
+        """Gets the most recent image for a board."""
+        pass
+
 
 class SqliteImageRecordStorage(ImageRecordStorageBase):
     _filename: str
@@ -103,7 +129,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def __init__(self, filename: str) -> None:
         super().__init__()
-
         self._filename = filename
         self._conn = sqlite3.connect(filename, check_same_thread=False)
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
@@ -121,7 +146,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._lock.release()
 
     def _create_tables(self) -> None:
-        """Creates the tables for the `images` database."""
+        """Creates the `images` table."""
 
         # Create the `images` table.
         self._cursor.execute(
@@ -129,7 +154,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             CREATE TABLE IF NOT EXISTS images (
                 image_name TEXT NOT NULL PRIMARY KEY,
                 -- This is an enum in python, unrestricted string here for flexibility
-                image_type TEXT NOT NULL,
+                image_origin TEXT NOT NULL,
                 -- This is an enum in python, unrestricted string here for flexibility
                 image_category TEXT NOT NULL,
                 width INTEGER NOT NULL,
@@ -138,9 +163,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 node_id TEXT,
                 metadata TEXT,
                 is_intermediate BOOLEAN DEFAULT FALSE,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                board_id TEXT,
+                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Soft delete, currently unused
                 deleted_at DATETIME
             );
@@ -155,7 +181,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         )
         self._cursor.execute(
             """--sql
-            CREATE INDEX IF NOT EXISTS idx_images_image_type ON images(image_type);
+            CREATE INDEX IF NOT EXISTS idx_images_image_origin ON images(image_origin);
             """
         )
         self._cursor.execute(
@@ -176,13 +202,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             AFTER UPDATE
             ON images FOR EACH ROW
             BEGIN
-                UPDATE images SET updated_at = current_timestamp
+                UPDATE images SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
                     WHERE image_name = old.image_name;
             END;
             """
         )
 
-    def get(self, image_type: ImageType, image_name: str) -> Union[ImageRecord, None]:
+    def get(self, image_name: str) -> Union[ImageRecord, None]:
         try:
             self._lock.acquire()
 
@@ -209,7 +235,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
     def update(
         self,
         image_name: str,
-        image_type: ImageType,
         changes: ImageRecordChanges,
     ) -> None:
         try:
@@ -224,7 +249,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     """,
                     (changes.image_category, image_name),
                 )
-            
+
             # Change the session associated with the image
             if changes.session_id is not None:
                 self._cursor.execute(
@@ -235,6 +260,18 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     """,
                     (changes.session_id, image_name),
                 )
+
+            # Change the image's `is_intermediate`` flag
+            if changes.is_intermediate is not None:
+                self._cursor.execute(
+                    f"""--sql
+                    UPDATE images
+                    SET is_intermediate = ?
+                    WHERE image_name = ?;
+                    """,
+                    (changes.is_intermediate, image_name),
+                )
+
             self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()
@@ -244,50 +281,99 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def get_many(
         self,
-        image_type: ImageType,
-        image_category: ImageCategory,
-        page: int = 0,
-        per_page: int = 10,
-    ) -> PaginatedResults[ImageRecord]:
+        offset: int = 0,
+        limit: int = 10,
+        image_origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+    ) -> OffsetPaginatedResults[ImageRecord]:
         try:
             self._lock.acquire()
 
-            self._cursor.execute(
-                f"""--sql
-                SELECT * FROM images
-                WHERE image_type = ? AND image_category = ?
-                ORDER BY created_at DESC
-                LIMIT ? OFFSET ?;
-                """,
-                (image_type.value, image_category.value, per_page, page * per_page),
-            )
+            # Manually build two queries - one for the count, one for the records
+            count_query = """--sql
+            SELECT COUNT(*)
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE 1=1
+            """
 
+            images_query = """--sql
+            SELECT images.*
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE 1=1
+            """
+
+            query_conditions = ""
+            query_params = []
+
+            if image_origin is not None:
+                query_conditions += """--sql
+                AND images.image_origin = ?
+                """
+                query_params.append(image_origin.value)
+
+            if categories is not None:
+                # Convert the enum values to unique list of strings
+                category_strings = list(map(lambda c: c.value, set(categories)))
+                # Create the correct length of placeholders
+                placeholders = ",".join("?" * len(category_strings))
+
+                query_conditions += f"""--sql
+                AND images.image_category IN ( {placeholders} )
+                """
+
+                # Unpack the included categories into the query params
+                for c in category_strings:
+                    query_params.append(c)
+
+            if is_intermediate is not None:
+                query_conditions += """--sql
+                AND images.is_intermediate = ?
+                """
+
+                query_params.append(is_intermediate)
+
+            if board_id is not None:
+                query_conditions += """--sql
+                AND board_images.board_id = ?
+                """
+
+                query_params.append(board_id)
+
+            query_pagination = """--sql
+            ORDER BY images.created_at DESC LIMIT ? OFFSET ?
+            """
+
+            # Final images query with pagination
+            images_query += query_conditions + query_pagination + ";"
+            # Add all the parameters
+            images_params = query_params.copy()
+            images_params.append(limit)
+            images_params.append(offset)
+            # Build the list of images, deserializing each row
+            self._cursor.execute(images_query, images_params)
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
-
             images = list(map(lambda r: deserialize_image_record(dict(r)), result))
 
-            self._cursor.execute(
-                """--sql
-                SELECT count(*) FROM images
-                WHERE image_type = ? AND image_category = ?
-                """,
-                (image_type.value, image_category.value),
-            )
-
-            count = self._cursor.fetchone()[0]
+            # Set up and execute the count query, without pagination
+            count_query += query_conditions + ";"
+            count_params = query_params.copy()
+            self._cursor.execute(count_query, count_params)
+            count = cast(int, self._cursor.fetchone()[0])
         except sqlite3.Error as e:
             self._conn.rollback()
             raise e
         finally:
             self._lock.release()
 
-        pageCount = int(count / per_page) + 1
-
-        return PaginatedResults(
-            items=images, page=page, pages=pageCount, per_page=per_page, total=count
+        return OffsetPaginatedResults(
+            items=images, offset=offset, limit=limit, total=count
         )
 
-    def delete(self, image_type: ImageType, image_name: str) -> None:
+    def delete(self, image_name: str) -> None:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -304,10 +390,29 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         finally:
             self._lock.release()
 
+    def delete_many(self, image_names: list[str]) -> None:
+        try:
+            placeholders = ",".join("?" for _ in image_names)
+
+            self._lock.acquire()
+
+            # Construct the SQLite query with the placeholders
+            query = f"DELETE FROM images WHERE image_name IN ({placeholders})"
+
+            # Execute the query with the list of IDs as parameters
+            self._cursor.execute(query, image_names)
+
+            self._conn.commit()
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordDeleteException from e
+        finally:
+            self._lock.release()
+
     def save(
         self,
         image_name: str,
-        image_type: ImageType,
+        image_origin: ResourceOrigin,
         image_category: ImageCategory,
         session_id: Optional[str],
         width: int,
@@ -325,7 +430,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """--sql
                 INSERT OR IGNORE INTO images (
                     image_name,
-                    image_type,
+                    image_origin,
                     image_category,
                     width,
                     height,
@@ -338,7 +443,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """,
                 (
                     image_name,
-                    image_type.value,
+                    image_origin.value,
                     image_category.value,
                     width,
                     height,
@@ -367,3 +472,28 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordSaveException from e
         finally:
             self._lock.release()
+
+    def get_most_recent_image_for_board(
+        self, board_id: str
+    ) -> Union[ImageRecord, None]:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                SELECT images.*
+                FROM images
+                JOIN board_images ON images.image_name = board_images.image_name
+                WHERE board_images.board_id = ?
+                ORDER BY images.created_at DESC
+                LIMIT 1;
+                """,
+                (board_id,),
+            )
+
+            result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
+        finally:
+            self._lock.release()
+        if result is None:
+            return None
+
+        return deserialize_image_record(dict(result))

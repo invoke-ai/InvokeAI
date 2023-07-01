@@ -10,7 +10,7 @@ import {
 } from '@chakra-ui/react';
 
 import IAIButton from 'common/components/IAIButton';
-import IAICheckbox from 'common/components/IAICheckbox';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIInput from 'common/components/IAIInput';
 import IAINumberInput from 'common/components/IAINumberInput';
 import React from 'react';
@@ -74,12 +74,12 @@ export default function AddCheckpointModel() {
   return (
     <VStack gap={2} alignItems="flex-start">
       <Flex columnGap={4}>
-        <IAICheckbox
+        <IAISimpleCheckbox
           isChecked={!addManually}
           label={t('modelManager.scanForModels')}
           onChange={() => setAddmanually(!addManually)}
         />
-        <IAICheckbox
+        <IAISimpleCheckbox
           label={t('modelManager.addManually')}
           isChecked={addManually}
           onChange={() => setAddmanually(!addManually)}

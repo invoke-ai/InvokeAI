@@ -9,6 +9,10 @@ import { gallerySelector } from '../store/gallerySelectors';
 import { RootState } from 'app/store/store';
 import { imageSelected } from '../store/gallerySlice';
 import { useHotkeys } from 'react-hotkeys-hook';
+import {
+  selectFilteredImagesAsObject,
+  selectFilteredImagesIds,
+} from '../store/imagesSlice';
 
 const nextPrevButtonTriggerAreaStyles: ChakraProps['sx'] = {
   height: '100%',
@@ -21,9 +25,14 @@ const nextPrevButtonStyles: ChakraProps['sx'] = {
 };
 
 export const nextPrevImageButtonsSelector = createSelector(
-  [(state: RootState) => state, gallerySelector],
-  (state, gallery) => {
-    const { selectedImage, currentCategory } = gallery;
+  [
+    (state: RootState) => state,
+    gallerySelector,
+    selectFilteredImagesAsObject,
+    selectFilteredImagesIds,
+  ],
+  (state, gallery, filteredImagesAsObject, filteredImageIds) => {
+    const { selectedImage } = gallery;
 
     if (!selectedImage) {
       return {
@@ -32,29 +41,29 @@ export const nextPrevImageButtonsSelector = createSelector(
       };
     }
 
-    const currentImageIndex = state[currentCategory].ids.findIndex(
-      (i) => i === selectedImage.image_name
+    const currentImageIndex = filteredImageIds.findIndex(
+      (i) => i === selectedImage
     );
 
     const nextImageIndex = clamp(
       currentImageIndex + 1,
       0,
-      state[currentCategory].ids.length - 1
+      filteredImageIds.length - 1
     );
 
     const prevImageIndex = clamp(
       currentImageIndex - 1,
       0,
-      state[currentCategory].ids.length - 1
+      filteredImageIds.length - 1
     );
 
-    const nextImageId = state[currentCategory].ids[nextImageIndex];
-    const prevImageId = state[currentCategory].ids[prevImageIndex];
+    const nextImageId = filteredImageIds[nextImageIndex];
+    const prevImageId = filteredImageIds[prevImageIndex];
 
-    const nextImage = state[currentCategory].entities[nextImageId];
-    const prevImage = state[currentCategory].entities[prevImageId];
+    const nextImage = filteredImagesAsObject[nextImageId];
+    const prevImage = filteredImagesAsObject[prevImageId];
 
-    const imagesLength = state[currentCategory].ids.length;
+    const imagesLength = filteredImageIds.length;
 
     return {
       isOnFirstImage: currentImageIndex === 0,
@@ -62,6 +71,8 @@ export const nextPrevImageButtonsSelector = createSelector(
         !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
       nextImage,
       prevImage,
+      nextImageId,
+      prevImageId,
     };
   },
   {
@@ -75,7 +86,7 @@ const NextPrevImageButtons = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { isOnFirstImage, isOnLastImage, nextImage, prevImage } =
+  const { isOnFirstImage, isOnLastImage, nextImageId, prevImageId } =
     useAppSelector(nextPrevImageButtonsSelector);
 
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =
@@ -90,19 +101,19 @@ const NextPrevImageButtons = () => {
   }, []);
 
   const handlePrevImage = useCallback(() => {
-    dispatch(imageSelected(prevImage));
-  }, [dispatch, prevImage]);
+    dispatch(imageSelected(prevImageId));
+  }, [dispatch, prevImageId]);
 
   const handleNextImage = useCallback(() => {
-    dispatch(imageSelected(nextImage));
-  }, [dispatch, nextImage]);
+    dispatch(imageSelected(nextImageId));
+  }, [dispatch, nextImageId]);
 
   useHotkeys(
     'left',
     () => {
       handlePrevImage();
     },
-    [prevImage]
+    [prevImageId]
   );
 
   useHotkeys(
@@ -110,7 +121,7 @@ const NextPrevImageButtons = () => {
     () => {
       handleNextImage();
     },
-    [nextImage]
+    [nextImageId]
   );
 
   return (

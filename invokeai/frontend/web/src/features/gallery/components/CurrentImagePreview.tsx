@@ -1,20 +1,20 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useGetUrl } from 'common/util/getUrl';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { isEqual } from 'lodash-es';
 
 import { gallerySelector } from '../store/gallerySelectors';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
-import { DragEvent, memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { systemSelector } from 'features/system/store/systemSelectors';
-import ImageFallbackSpinner from './ImageFallbackSpinner';
-import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
-import { configSelector } from '../../system/store/configSelectors';
-import { useAppToaster } from 'app/components/Toaster';
 import { imageSelected } from '../store/gallerySlice';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { ImageDTO } from 'services/api/types';
+import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 export const imagesSelector = createSelector(
   [uiSelector, gallerySelector, systemSelector],
@@ -29,7 +29,7 @@ export const imagesSelector = createSelector(
     return {
       shouldShowImageDetails,
       shouldHidePreview,
-      image: selectedImage,
+      selectedImage,
       progressImage,
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
@@ -45,48 +45,39 @@ export const imagesSelector = createSelector(
 const CurrentImagePreview = () => {
   const {
     shouldShowImageDetails,
-    image,
-    shouldHidePreview,
+    selectedImage,
     progressImage,
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
-  const { shouldFetchImages } = useAppSelector(configSelector);
-  const { getUrl } = useGetUrl();
-  const toaster = useAppToaster();
+
+  const {
+    currentData: image,
+    isLoading,
+    isError,
+    isSuccess,
+  } = useGetImageDTOQuery(selectedImage ?? skipToken);
+
   const dispatch = useAppDispatch();
 
-  const handleDragStart = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      if (!image) {
+  const handleDrop = useCallback(
+    (droppedImage: ImageDTO) => {
+      if (droppedImage.image_name === image?.image_name) {
         return;
       }
-      e.dataTransfer.setData('invokeai/imageName', image.image_name);
-      e.dataTransfer.setData('invokeai/imageType', image.image_type);
-      e.dataTransfer.effectAllowed = 'move';
+      dispatch(imageSelected(droppedImage.image_name));
     },
-    [image]
+    [dispatch, image?.image_name]
   );
-
-  const handleError = useCallback(() => {
-    dispatch(imageSelected());
-    if (shouldFetchImages) {
-      toaster({
-        title: 'Something went wrong, please refresh',
-        status: 'error',
-        isClosable: true,
-      });
-    }
-  }, [dispatch, toaster, shouldFetchImages]);
 
   return (
     <Flex
       sx={{
-        width: '100%',
-        height: '100%',
-        position: 'relative',
+        width: 'full',
+        height: 'full',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
       }}
     >
       {progressImage && shouldShowProgressInViewer ? (
@@ -94,10 +85,11 @@ const CurrentImagePreview = () => {
           src={progressImage.dataURL}
           width={progressImage.width}
           height={progressImage.height}
+          draggable={false}
           sx={{
             objectFit: 'contain',
-            maxWidth: '100%',
-            maxHeight: '100%',
+            maxWidth: 'full',
+            maxHeight: 'full',
             height: 'auto',
             position: 'absolute',
             borderRadius: 'base',
@@ -105,34 +97,21 @@ const CurrentImagePreview = () => {
           }}
         />
       ) : (
-        image && (
-          <>
-            <Image
-              src={getUrl(image.image_url)}
-              fallbackStrategy="beforeLoadOrError"
-              fallback={<ImageFallbackSpinner />}
-              onDragStart={handleDragStart}
-              sx={{
-                objectFit: 'contain',
-                maxWidth: '100%',
-                maxHeight: '100%',
-                height: 'auto',
-                position: 'absolute',
-                borderRadius: 'base',
-              }}
-              onError={handleError}
-            />
-            <ImageMetadataOverlay image={image} />
-          </>
-        )
+        <IAIDndImage
+          image={image}
+          onDrop={handleDrop}
+          fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
+          isUploadDisabled={true}
+          fitContainer
+        />
       )}
-      {shouldShowImageDetails && image && 'metadata' in image && (
+      {shouldShowImageDetails && image && (
         <Box
           sx={{
             position: 'absolute',
             top: '0',
-            width: '100%',
-            height: '100%',
+            width: 'full',
+            height: 'full',
             borderRadius: 'base',
             overflow: 'scroll',
           }}
@@ -140,7 +119,19 @@ const CurrentImagePreview = () => {
           <ImageMetadataViewer image={image} />
         </Box>
       )}
-      {!shouldShowImageDetails && <NextPrevImageButtons />}
+      {!shouldShowImageDetails && image && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '0',
+            width: 'full',
+            height: 'full',
+            pointerEvents: 'none',
+          }}
+        >
+          <NextPrevImageButtons />
+        </Box>
+      )}
     </Flex>
   );
 };

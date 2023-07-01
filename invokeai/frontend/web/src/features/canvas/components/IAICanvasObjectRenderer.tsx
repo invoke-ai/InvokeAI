@@ -1,6 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useGetUrl } from 'common/util/getUrl';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { isEqual } from 'lodash-es';
@@ -33,7 +32,6 @@ const selector = createSelector(
 
 const IAICanvasObjectRenderer = () => {
   const { objects } = useAppSelector(selector);
-  const { getUrl } = useGetUrl();
 
   if (!objects) return null;
 
@@ -41,14 +39,7 @@ const IAICanvasObjectRenderer = () => {
     <Group name="outpainting-objects" listening={false}>
       {objects.map((obj, i) => {
         if (isCanvasBaseImage(obj)) {
-          return (
-            <IAICanvasImage
-              key={i}
-              x={obj.x}
-              y={obj.y}
-              url={getUrl(obj.image.image_url)}
-            />
-          );
+          return <IAICanvasImage key={i} canvasImage={obj} />;
         } else if (isCanvasBaseLine(obj)) {
           const line = (
             <Line

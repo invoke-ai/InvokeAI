@@ -15,7 +15,7 @@ const ParamInfillCollapse = () => {
 
   return (
     <IAICollapse
-      label={t('parameters.boundingBoxHeader')}
+      label={t('parameters.infillScalingHeader')}
       isOpen={isOpen}
       onToggle={onToggle}
     >
