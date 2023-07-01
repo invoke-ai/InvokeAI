@@ -200,7 +200,11 @@ const InvokeTabs = () => {
               onResize={handleResizeGallery}
               id="gallery"
               order={3}
-              defaultSize={galleryMinSizePct}
+              defaultSize={
+                galleryMinSizePct > DEFAULT_GALLERY_PCT
+                  ? galleryMinSizePct
+                  : DEFAULT_GALLERY_PCT
+              }
               minSize={galleryMinSizePct}
               maxSize={50}
             >
