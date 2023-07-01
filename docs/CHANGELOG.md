@@ -4,6 +4,236 @@ title: Changelog
 
 # :octicons-log-16: **Changelog**
 
+## v2.3.5 <small>(22 May 2023)</small>
+
+This release (along with the post1 and post2 follow-on releases) expands support for additional LoRA and LyCORIS models, upgrades diffusers versions, and fixes a few bugs.
+
+### LoRA and LyCORIS Support Improvement
+
+    A number of LoRA/LyCORIS fine-tune files (those which alter the text encoder as well as the unet model) were not having the desired effect in InvokeAI. This bug has now been fixed. Full documentation of LoRA support is available at InvokeAI LoRA Support.
+    Previously, InvokeAI did not distinguish between LoRA/LyCORIS models based on Stable Diffusion v1.5 vs those based on v2.0 and 2.1, leading to a crash when an incompatible model was loaded. This has now been fixed. In addition, the web pulldown menus for LoRA and Textual Inversion selection have been enhanced to show only those files that are compatible with the currently-selected Stable Diffusion model.
+    Support for the newer LoKR LyCORIS files has been added.
+
+### Library Updates and Speed/Reproducibility Advancements
+The major enhancement in this version is that NVIDIA users no longer need to decide between speed and reproducibility. Previously, if you activated the Xformers library, you would see improvements in speed and memory usage, but multiple images generated with the same seed and other parameters would be slightly different from each other. This is no longer the case. Relative to 2.3.5 you will see improved performance when running without Xformers, and even better performance when Xformers is activated. In both cases, images generated with the same settings will be identical.
+
+Here are the new library versions:
+Library 	Version
+Torch 	2.0.0
+Diffusers 	0.16.1
+Xformers 	0.0.19
+Compel 	1.1.5
+Other Improvements
+
+### Performance Improvements
+
+    When a model is loaded for the first time, InvokeAI calculates its checksum for incorporation into the PNG metadata. This process could take up to a minute on network-mounted disks and WSL mounts. This release noticeably speeds up the process.
+
+### Bug Fixes
+
+    The "import models from directory" and "import from URL" functionality in the console-based model installer has now been fixed.
+    When running the WebUI, we have reduced the number of times that InvokeAI reaches out to HuggingFace to fetch the list of embeddable Textual Inversion models. We have also caught and fixed a problem with the updater not correctly detecting when another instance of the updater is running 
+
+
+## v2.3.4 <small>(7 April 2023)</small>
+
+What's New in 2.3.4
+
+This features release adds support for LoRA (Low-Rank Adaptation) and LyCORIS (Lora beYond Conventional) models, as well as some minor bug fixes.
+### LoRA and LyCORIS Support
+
+LoRA files contain fine-tuning weights that enable particular styles, subjects or concepts to be applied to generated images. LyCORIS files are an extended variant of LoRA. InvokeAI supports the most common LoRA/LyCORIS format, which ends in the suffix .safetensors. You will find numerous LoRA and LyCORIS models for download at Civitai, and a small but growing number at Hugging Face. Full documentation of LoRA support is available at InvokeAI LoRA Support.( Pre-release note: this page will only be available after release)
+
+To use LoRA/LyCORIS models in InvokeAI:
+
+    Download the .safetensors files of your choice and place in /path/to/invokeai/loras. This directory was not present in earlier version of InvokeAI but will be created for you the first time you run the command-line or web client. You can also create the directory manually.
+
+    Add withLora(lora-file,weight) to your prompts. The weight is optional and will default to 1.0. A few examples, assuming that a LoRA file named loras/sushi.safetensors is present:
+
+family sitting at dinner table eating sushi withLora(sushi,0.9)
+family sitting at dinner table eating sushi withLora(sushi, 0.75)
+family sitting at dinner table eating sushi withLora(sushi)
+
+Multiple withLora() prompt fragments are allowed. The weight can be arbitrarily large, but the useful range is roughly 0.5 to 1.0. Higher weights make the LoRA's influence stronger. Negative weights are also allowed, which can lead to some interesting effects.
+
+    Generate as you usually would! If you find that the image is too "crisp" try reducing the overall CFG value or reducing individual LoRA weights. As is the case with all fine-tunes, you'll get the best results when running the LoRA on top of the model similar to, or identical with, the one that was used during the LoRA's training. Don't try to load a SD 1.x-trained LoRA into a SD 2.x model, and vice versa. This will trigger a non-fatal error message and generation will not proceed.
+
+    You can change the location of the loras directory by passing the --lora_directory option to `invokeai.
+
+### New WebUI LoRA and Textual Inversion Buttons
+
+This version adds two new web interface buttons for inserting LoRA and Textual Inversion triggers into the prompt as shown in the screenshot below.
+
+Clicking on one or the other of the buttons will bring up a menu of available LoRA/LyCORIS or Textual Inversion trigger terms. Select a menu item to insert the properly-formatted withLora() or <textual-inversion> prompt fragment into the positive prompt. The number in parentheses indicates the number of trigger terms currently in the prompt. You may click the button again and deselect the LoRA or trigger to remove it from the prompt, or simply edit the prompt directly.
+
+Currently terms are inserted into the positive prompt textbox only. However, some textual inversion embeddings are designed to be used with negative prompts. To move a textual inversion trigger into the negative prompt, simply cut and paste it.
+
+By default the Textual Inversion menu only shows locally installed models found at startup time in /path/to/invokeai/embeddings. However, InvokeAI has the ability to dynamically download and install additional Textual Inversion embeddings from the HuggingFace Concepts Library. You may choose to display the most popular of these (with five or more likes) in the Textual Inversion menu by going to Settings and turning on "Show Textual Inversions from HF Concepts Library." When this option is activated, the locally-installed TI embeddings will be shown first, followed by uninstalled terms from Hugging Face. See The Hugging Face Concepts Library and Importing Textual Inversion files for more information.
+### Minor features and fixes
+
+This release changes model switching behavior so that the command-line and Web UIs save the last model used and restore it the next time they are launched. It also improves the behavior of the installer so that the pip utility is kept up to date.
+  
+### Known Bugs in 2.3.4
+
+These are known bugs in the release.
+
+    The Ancestral DPMSolverMultistepScheduler (k_dpmpp_2a) sampler is not yet implemented for diffusers models and will disappear from the WebUI Sampler menu when a diffusers model is selected.
+    Windows Defender will sometimes raise Trojan or backdoor alerts for the codeformer.pth face restoration model, as well as the CIDAS/clipseg and runwayml/stable-diffusion-v1.5 models. These are false positives and can be safely ignored. InvokeAI performs a malware scan on all models as they are loaded. For additional security, you should use safetensors models whenever they are available.
+
+
+## v2.3.3 <small>(28 March 2023)</small>
+
+This is a bugfix and minor feature release.
+### Bugfixes
+
+Since version 2.3.2 the following bugs have been fixed:
+Bugs
+
+    When using legacy checkpoints with an external VAE, the VAE file is now scanned for malware prior to loading. Previously only the main model weights file was scanned.
+    Textual inversion will select an appropriate batchsize based on whether xformers is active, and will default to xformers enabled if the library is detected.
+    The batch script log file names have been fixed to be compatible with Windows.
+    Occasional corruption of the .next_prefix file (which stores the next output file name in sequence) on Windows systems is now detected and corrected.
+    Support loading of legacy config files that have no personalization (textual inversion) section.
+    An infinite loop when opening the developer's console from within the invoke.sh script has been corrected.
+    Documentation fixes, including a recipe for detecting and fixing problems with the AMD GPU ROCm driver.
+
+Enhancements
+
+    It is now possible to load and run several community-contributed SD-2.0 based models, including the often-requested "Illuminati" model.
+    The "NegativePrompts" embedding file, and others like it, can now be loaded by placing it in the InvokeAI embeddings directory.
+    If no --model is specified at launch time, InvokeAI will remember the last model used and restore it the next time it is launched.
+    On Linux systems, the invoke.sh launcher now uses a prettier console-based interface. To take advantage of it, install the dialog package using your package manager (e.g. sudo apt install dialog).
+    When loading legacy models (safetensors/ckpt) you can specify a custom config file and/or a VAE by placing like-named files in the same directory as the model following this example:
+
+my-favorite-model.ckpt
+my-favorite-model.yaml
+my-favorite-model.vae.pt      # or my-favorite-model.vae.safetensors
+
+### Known Bugs in 2.3.3
+
+These are known bugs in the release.
+
+    The Ancestral DPMSolverMultistepScheduler (k_dpmpp_2a) sampler is not yet implemented for diffusers models and will disappear from the WebUI Sampler menu when a diffusers model is selected.
+    Windows Defender will sometimes raise Trojan or backdoor alerts for the codeformer.pth face restoration model, as well as the CIDAS/clipseg and runwayml/stable-diffusion-v1.5 models. These are false positives and can be safely ignored. InvokeAI performs a malware scan on all models as they are loaded. For additional security, you should use safetensors models whenever they are available.
+
+
+## v2.3.2 <small>(11 March 2023)</small>
+This is a bugfix and minor feature release.
+
+### Bugfixes
+
+Since version 2.3.1 the following bugs have been fixed:
+
+    Black images appearing for potential NSFW images when generating with legacy checkpoint models and both --no-nsfw_checker and --ckpt_convert turned on.
+    Black images appearing when generating from models fine-tuned on Stable-Diffusion-2-1-base. When importing V2-derived models, you may be asked to select whether the model was derived from a "base" model (512 pixels) or the 768-pixel SD-2.1 model.
+    The "Use All" button was not restoring the Hi-Res Fix setting on the WebUI
+    When using the model installer console app, models failed to import correctly when importing from directories with spaces in their names. A similar issue with the output directory was also fixed.
+    Crashes that occurred during model merging.
+    Restore previous naming of Stable Diffusion base and 768 models.
+    Upgraded to latest versions of diffusers, transformers, safetensors and accelerate libraries upstream. We hope that this will fix the assertion NDArray > 2**32 issue that MacOS users have had when generating images larger than 768x768 pixels. Please report back.
+
+As part of the upgrade to diffusers, the location of the diffusers-based models has changed from models/diffusers to models/hub. When you launch InvokeAI for the first time, it will prompt you to OK a one-time move. This should be quick and harmless, but if you have modified your models/diffusers directory in some way, for example using symlinks, you may wish to cancel the migration and make appropriate adjustments.
+New "Invokeai-batch" script
+
+### Invoke AI Batch
+2.3.2 introduces a new command-line only script called invokeai-batch that can be used to generate hundreds of images from prompts and settings that vary systematically. This can be used to try the same prompt across multiple combinations of models, steps, CFG settings and so forth. It also allows you to template prompts and generate a combinatorial list like:
+
+a shack in the mountains, photograph
+a shack in the mountains, watercolor
+a shack in the mountains, oil painting
+a chalet in the mountains, photograph
+a chalet in the mountains, watercolor
+a chalet in the mountains, oil painting
+a shack in the desert, photograph
+...
+
+If you have a system with multiple GPUs, or a single GPU with lots of VRAM, you can parallelize generation across the combinatorial set, reducing wait times and using your system's resources efficiently (make sure you have good GPU cooling).
+
+To try invokeai-batch out. Launch the "developer's console" using the invoke launcher script, or activate the invokeai virtual environment manually. From the console, give the command invokeai-batch --help in order to learn how the script works and create your first template file for dynamic prompt generation.
+
+
+### Known Bugs in 2.3.2
+
+These are known bugs in the release.
+
+    The Ancestral DPMSolverMultistepScheduler (k_dpmpp_2a) sampler is not yet implemented for diffusers models and will disappear from the WebUI Sampler menu when a diffusers model is selected.
+    Windows Defender will sometimes raise a Trojan alert for the codeformer.pth face restoration model. As far as we have been able to determine, this is a false positive and can be safely whitelisted.
+
+
+## v2.3.1 <small>(22 February 2023)</small>
+This is primarily a bugfix release, but it does provide several new features that will improve the user experience.
+
+### Enhanced support for model management
+
+InvokeAI now makes it convenient to add, remove and modify models. You can individually import models that are stored on your local system, scan an entire folder and its subfolders for models and import them automatically, and even directly import models from the internet by providing their download URLs. You also have the option of designating a local folder to scan for new models each time InvokeAI is restarted.
+
+There are three ways of accessing the model management features:
+
+    From the WebUI, click on the cube to the right of the model selection menu. This will bring up a form that allows you to import models individually from your local disk or scan a directory for models to import.
+
+    Using the Model Installer App
+
+Choose option (5) download and install models from the invoke launcher script to start a new console-based application for model management. You can use this to select from a curated set of starter models, or import checkpoint, safetensors, and diffusers models from a local disk or the internet. The example below shows importing two checkpoint URLs from popular SD sites and a HuggingFace diffusers model using its Repository ID. It also shows how to designate a folder to be scanned at startup time for new models to import.
+
+Command-line users can start this app using the command invokeai-model-install.
+
+    Using the Command Line Client (CLI)
+
+The !install_model and !convert_model commands have been enhanced to allow entering of URLs and local directories to scan and import. The first command installs .ckpt and .safetensors files as-is. The second one converts them into the faster diffusers format before installation.
+
+Internally InvokeAI is able to probe the contents of a .ckpt or .safetensors file to distinguish among v1.x, v2.x and inpainting models. This means that you do not need to include "inpaint" in your model names to use an inpainting model. Note that Stable Diffusion v2.x models will be autoconverted into a diffusers model the first time you use it.
+
+Please see INSTALLING MODELS for more information on model management.
+
+### An Improved Installer Experience
+
+The installer now launches a console-based UI for setting and changing commonly-used startup options:
+
+After selecting the desired options, the installer installs several support models needed by InvokeAI's face reconstruction and upscaling features and then launches the interface for selecting and installing models shown earlier. At any time, you can edit the startup options by launching invoke.sh/invoke.bat and entering option (6) change InvokeAI startup options
+
+Command-line users can launch the new configure app using invokeai-configure.
+
+This release also comes with a renewed updater. To do an update without going through a whole reinstallation, launch invoke.sh or invoke.bat and choose option (9) update InvokeAI . This will bring you to a screen that prompts you to update to the latest released version, to the most current development version, or any released or unreleased version you choose by selecting the tag or branch of the desired version.
+
+Command-line users can run this interface by typing invokeai-configure
+
+### Image Symmetry Options
+
+There are now features to generate horizontal and vertical symmetry during generation. The way these work is to wait until a selected step in the generation process and then to turn on a mirror image effect. In addition to generating some cool images, you can also use this to make side-by-side comparisons of how an image will look with more or fewer steps. Access this option from the WebUI by selecting Symmetry from the image generation settings, or within the CLI by using the options --h_symmetry_time_pct and --v_symmetry_time_pct (these can be abbreviated to --h_sym and --v_sym like all other options).
+
+### A New Unified Canvas Look
+
+This release introduces a beta version of the WebUI Unified Canvas. To try it out, open up the settings dialogue in the WebUI (gear icon) and select Use Canvas Beta Layout:
+
+Refresh the screen and go to to Unified Canvas (left side of screen, third icon from the top). The new layout is designed to provide more space to work in and to keep the image controls close to the image itself:
+
+Model conversion and merging within the WebUI
+
+The WebUI now has an intuitive interface for model merging, as well as for permanent conversion of models from legacy .ckpt/.safetensors formats into diffusers format. These options are also available directly from the invoke.sh/invoke.bat scripts.
+An easier way to contribute translations to the WebUI
+
+We have migrated our translation efforts to Weblate, a FOSS translation product. Maintaining the growing project's translations is now far simpler for the maintainers and community. Please review our brief translation guide for more information on how to contribute.
+Numerous internal bugfixes and performance issues
+
+### Bug Fixes
+This releases quashes multiple bugs that were reported in 2.3.0. Major internal changes include upgrading to diffusers 0.13.0, and using the compel library for prompt parsing. See Detailed Change Log for a detailed list of bugs caught and squished.
+Summary of InvokeAI command line scripts (all accessible via the launcher menu)
+Command 	Description
+invokeai 	Command line interface
+invokeai --web 	Web interface
+invokeai-model-install 	Model installer with console forms-based front end
+invokeai-ti --gui 	Textual inversion, with a console forms-based front end
+invokeai-merge --gui 	Model merging, with a console forms-based front end
+invokeai-configure 	Startup configuration; can also be used to reinstall support models
+invokeai-update 	InvokeAI software updater
+
+### Known Bugs in 2.3.1
+
+These are known bugs in the release.
+    MacOS users generating 768x768 pixel images or greater using diffusers models may experience a hard crash with assertion NDArray > 2**32 This appears to be an issu...
+
+
+
 ## v2.3.0 <small>(15 January 2023)</small>
 
 **Transition to diffusers
@@ -264,7 +494,7 @@ sections describe what's new for InvokeAI.
   [Manual Installation](installation/020_INSTALL_MANUAL.md).
 - The ability to save frequently-used startup options (model to load, steps,
   sampler, etc) in a `.invokeai` file. See
-  [Client](features/CLI.md)
+  [Client](deprecated/CLI.md)
 - Support for AMD GPU cards (non-CUDA) on Linux machines.
 - Multiple bugs and edge cases squashed.
 
@@ -387,7 +617,7 @@ sections describe what's new for InvokeAI.
 - `dream.py` script renamed `invoke.py`. A `dream.py` script wrapper remains for
   backward compatibility.
 - Completely new WebGUI - launch with `python3 scripts/invoke.py --web`
-- Support for [inpainting](features/INPAINTING.md) and
+- Support for [inpainting](deprecated/INPAINTING.md) and
   [outpainting](features/OUTPAINTING.md)
 - img2img runs on all k\* samplers
 - Support for
@@ -399,7 +629,7 @@ sections describe what's new for InvokeAI.
   using facial reconstruction, ESRGAN upscaling, outcropping (similar to DALL-E
   infinite canvas), and "embiggen" upscaling. See the `!fix` command.
 - New `--hires` option on `invoke>` line allows
-  [larger images to be created without duplicating elements](features/CLI.md#this-is-an-example-of-txt2img),
+  [larger images to be created without duplicating elements](deprecated/CLI.md#this-is-an-example-of-txt2img),
   at the cost of some performance.
 - New `--perlin` and `--threshold` options allow you to add and control
   variation during image generation (see
@@ -408,7 +638,7 @@ sections describe what's new for InvokeAI.
   of images and tweaking of previous settings.
 - Command-line completion in `invoke.py` now works on Windows, Linux and Mac
   platforms.
-- Improved [command-line completion behavior](features/CLI.md) New commands
+- Improved [command-line completion behavior](deprecated/CLI.md) New commands
   added:
   - List command-line history with `!history`
   - Search command-line history with `!search`
