@@ -2,10 +2,13 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { modelIdToVAEModelField } from '../modelIdToVAEModelField';
 import {
+  IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   INPAINT,
+  INPAINT_GRAPH,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
+  TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
 } from './constants';
 
@@ -24,10 +27,7 @@ export const addVAEToGraph = (
     };
   }
 
-  if (
-    graph.id === 'text_to_image_graph' ||
-    graph.id === 'image_to_image_graph'
-  ) {
+  if (graph.id === TEXT_TO_IMAGE_GRAPH || graph.id === IMAGE_TO_IMAGE_GRAPH) {
     graph.edges.push({
       source: {
         node_id: vaeId === 'auto' ? MAIN_MODEL_LOADER : VAE_LOADER,
@@ -40,7 +40,7 @@ export const addVAEToGraph = (
     });
   }
 
-  if (graph.id === 'image_to_image_graph') {
+  if (graph.id === IMAGE_TO_IMAGE_GRAPH) {
     graph.edges.push({
       source: {
         node_id: vaeId === 'auto' ? MAIN_MODEL_LOADER : VAE_LOADER,
@@ -53,7 +53,7 @@ export const addVAEToGraph = (
     });
   }
 
-  if (graph.id === 'inpaint_graph') {
+  if (graph.id === INPAINT_GRAPH) {
     graph.edges.push({
       source: {
         node_id: vaeId === 'auto' ? MAIN_MODEL_LOADER : VAE_LOADER,
