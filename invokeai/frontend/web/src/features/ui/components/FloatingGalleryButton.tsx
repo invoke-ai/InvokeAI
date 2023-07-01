@@ -1,22 +1,26 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { useTranslation } from 'react-i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { setShouldShowGallery } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
-import { MdPhotoLibrary } from 'react-icons/md';
-import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { MdPhotoLibrary } from 'react-icons/md';
+import { InvokeTabName } from '../store/tabMap';
+import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
 
 const floatingGalleryButtonSelector = createSelector(
   [activeTabNameSelector, uiSelector],
   (activeTabName, ui) => {
     const { shouldPinGallery, shouldShowGallery } = ui;
+    const noGalleryTabs: InvokeTabName[] = ['modelmanager'];
 
     return {
       shouldPinGallery,
-      shouldShowGalleryButton: !shouldShowGallery,
+      shouldShowGalleryButton: noGalleryTabs.includes(activeTabName)
+        ? false
+        : !shouldShowGallery,
     };
   },
   { memoizeOptions: { resultEqualityCheck: isEqual } }
