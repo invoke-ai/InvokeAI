@@ -46,21 +46,6 @@ export default function InvokeButton(props: InvokeButton) {
   return (
     <Box style={{ flexGrow: 4 }} position="relative">
       <Box style={{ position: 'relative' }}>
-        {!isReady && (
-          <Box
-            style={{
-              position: 'absolute',
-              bottom: '0',
-              left: '0',
-              right: '0',
-              height: '100%',
-              overflow: 'clip',
-              borderRadius: 4,
-            }}
-          >
-            <ProgressBar />
-          </Box>
-        )}
         {iconButton ? (
           <IAIIconButton
             aria-label={t('parameters.invoke')}
@@ -91,6 +76,20 @@ export default function InvokeButton(props: InvokeButton) {
           >
             Invoke
           </IAIButton>
+        )}
+        {!isReady && (
+          <Box
+            style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '15%',
+              overflow: 'clip',
+            }}
+          >
+            <ProgressBar />
+          </Box>
         )}
       </Box>
     </Box>
