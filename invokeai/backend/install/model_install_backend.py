@@ -189,7 +189,7 @@ class ModelInstall(object):
         # A little hack to allow nested routines to retrieve info on the requested ID
         self.current_id = model_path_id_or_url
         path = Path(model_path_id_or_url)
-
+        
         try:
             # checkpoint file, or similar
             if path.is_file():
@@ -205,7 +205,7 @@ class ModelInstall(object):
                     self.heuristic_install(child, models_installed=models_installed)
 
             # huggingface repo
-            elif len(str(path).split('/')) == 2:
+            elif len(str(model_path_id_or_url).split('/')) == 2:
                 models_installed.add(self._install_repo(str(path)))
 
             # a URL
