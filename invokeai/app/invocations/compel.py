@@ -56,6 +56,7 @@ class CompelInvocation(BaseInvocation):
             },
         }
 
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CompelOutput:
 
         tokenizer_info = context.services.model_manager.get_model(
