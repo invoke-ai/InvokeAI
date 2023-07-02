@@ -46,6 +46,22 @@ export default function InvokeButton(props: InvokeButton) {
   return (
     <Box style={{ flexGrow: 4 }} position="relative">
       <Box style={{ position: 'relative' }}>
+        {!isReady && (
+          <Box
+            borderRadius="base"
+            style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '100%',
+              overflow: 'clip',
+            }}
+            {...rest}
+          >
+            <ProgressBar />
+          </Box>
+        )}
         {iconButton ? (
           <IAIIconButton
             aria-label={t('parameters.invoke')}
@@ -59,6 +75,12 @@ export default function InvokeButton(props: InvokeButton) {
             tooltipProps={{ placement: 'top' }}
             colorScheme="accent"
             id="invoke-button"
+            _disabled={{
+              background: 'none',
+              _hover: {
+                background: 'none',
+              },
+            }}
             {...rest}
           />
         ) : (
@@ -72,24 +94,16 @@ export default function InvokeButton(props: InvokeButton) {
             colorScheme="accent"
             id="invoke-button"
             fontWeight={700}
+            _disabled={{
+              background: 'none',
+              _hover: {
+                background: 'none',
+              },
+            }}
             {...rest}
           >
             Invoke
           </IAIButton>
-        )}
-        {!isReady && (
-          <Box
-            style={{
-              position: 'absolute',
-              bottom: '0',
-              left: '0',
-              right: '0',
-              height: '15%',
-              overflow: 'clip',
-            }}
-          >
-            <ProgressBar />
-          </Box>
         )}
       </Box>
     </Box>
