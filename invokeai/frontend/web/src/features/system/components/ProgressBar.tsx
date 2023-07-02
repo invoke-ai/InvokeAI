@@ -35,6 +35,7 @@ const ProgressBar = () => {
       aria-label={t('accessibility.invokeProgressBar')}
       isIndeterminate={isProcessing && !currentStatusHasSteps}
       height="full"
+      colorScheme="accent"
     />
   );
 };
