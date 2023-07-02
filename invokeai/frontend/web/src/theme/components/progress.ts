@@ -21,6 +21,7 @@ const invokeAIFilledTrack = defineStyle((_props) => ({
 const invokeAITrack = defineStyle((_props) => {
   return {
     bg: 'none',
+    borderBottomRadius: '5px',
   };
 });
 
