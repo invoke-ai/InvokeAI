@@ -206,7 +206,7 @@ class ModelInstall(object):
 
             # huggingface repo
             elif len(str(model_path_id_or_url).split('/')) == 2:
-                models_installed.add(self._install_repo(str(path)))
+                models_installed.add(self._install_repo(str(model_path_id_or_url)))
 
             # a URL
             elif model_path_id_or_url.startswith(("http:", "https:", "ftp:")):
