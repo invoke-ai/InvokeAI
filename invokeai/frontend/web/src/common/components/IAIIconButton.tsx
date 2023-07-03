@@ -29,7 +29,7 @@ const IAIIconButton = forwardRef((props: IAIIconButtonProps, forwardedRef) => {
       <IconButton
         ref={forwardedRef}
         role={role}
-        aria-checked={isChecked !== undefined ? isChecked : undefined}
+        colorScheme={isChecked ? 'accent' : 'base'}
         {...rest}
       />
     </Tooltip>

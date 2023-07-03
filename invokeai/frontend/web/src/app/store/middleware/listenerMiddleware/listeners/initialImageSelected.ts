@@ -4,7 +4,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { startAppListening } from '..';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { makeToast } from 'app/components/Toaster';
-import { selectImagesById } from 'features/gallery/store/imagesSlice';
+import { selectImagesById } from 'features/gallery/store/gallerySlice';
 import { isImageDTO } from 'services/api/guards';
 
 export const addInitialImageSelectedListener = () => {

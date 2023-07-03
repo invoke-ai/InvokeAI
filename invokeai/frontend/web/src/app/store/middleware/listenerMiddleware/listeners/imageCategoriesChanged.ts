@@ -3,8 +3,8 @@ import { startAppListening } from '..';
 import { receivedPageOfImages } from 'services/api/thunks/image';
 import {
   imageCategoriesChanged,
-  selectFilteredImagesAsArray,
-} from 'features/gallery/store/imagesSlice';
+  selectFilteredImages,
+} from 'features/gallery/store/gallerySlice';
 
 const moduleLog = log.child({ namespace: 'gallery' });
 
@@ -13,7 +13,7 @@ export const addImageCategoriesChangedListener = () => {
     actionCreator: imageCategoriesChanged,
     effect: (action, { getState, dispatch }) => {
       const state = getState();
-      const filteredImagesCount = selectFilteredImagesAsArray(state).length;
+      const filteredImagesCount = selectFilteredImages(state).length;
 
       if (!filteredImagesCount) {
         dispatch(
