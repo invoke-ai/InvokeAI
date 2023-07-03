@@ -14,6 +14,8 @@ export const RESIZE = 'resize_image';
 export const INPAINT = 'inpaint';
 export const CONTROL_NET_COLLECT = 'control_net_collect';
 export const DYNAMIC_PROMPT = 'dynamic_prompt';
+export const IMAGE_COLLECTION = 'image_collection';
+export const IMAGE_COLLECTION_ITERATE = 'image_collection_iterate';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';

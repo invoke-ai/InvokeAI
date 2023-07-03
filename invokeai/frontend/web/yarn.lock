@@ -5309,7 +5309,7 @@ open@^8.4.0:
     is-docker "^2.1.1"
     is-wsl "^2.2.0"
 
-openapi-fetch@^0.4.0:
+openapi-fetch@0.4.0:
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/openapi-fetch/-/openapi-fetch-0.4.0.tgz#45c368321ba6c15bc2e168e7dc3fbf322e9cca6d"
   integrity sha512-4lzZtH5J1ZH9EXfmpcmKi0gOgjy0hc6BAcucAdCmLHY6jZopMeGP51vD3Cd4rE1nTFMfJzmYDc8ar0+364gBVw==

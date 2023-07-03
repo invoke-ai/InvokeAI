@@ -58,6 +58,7 @@ export type LatentsToLatentsInvocation = N<'LatentsToLatentsInvocation'>;
 export type ImageToLatentsInvocation = N<'ImageToLatentsInvocation'>;
 export type LatentsToImageInvocation = N<'LatentsToImageInvocation'>;
 export type PipelineModelLoaderInvocation = N<'PipelineModelLoaderInvocation'>;
+export type ImageCollectionInvocation = N<'ImageCollectionInvocation'>;
 
 // ControlNet Nodes
 export type ControlNetInvocation = N<'ControlNetInvocation'>;

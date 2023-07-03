@@ -4,7 +4,7 @@ import { log } from 'app/logging/useLogger';
 import { imageUploaded } from 'services/api/thunks/image';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
-import { imageUpserted } from 'features/gallery/store/imagesSlice';
+import { imageUpserted } from 'features/gallery/store/gallerySlice';
 
 const moduleLog = log.child({ namespace: 'canvasSavedToGalleryListener' });
 
