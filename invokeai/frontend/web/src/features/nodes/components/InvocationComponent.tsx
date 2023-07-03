@@ -30,7 +30,7 @@ const InvocationComponentWrapper = (props: InvocationComponentWrapperProps) => {
         position: 'relative',
         borderRadius: 'md',
         minWidth: NODE_MIN_WIDTH,
-        boxShadow: props.selected
+        shadow: props.selected
           ? `${nodeSelectedOutline}, ${nodeShadow}`
           : `${nodeShadow}`,
       }}

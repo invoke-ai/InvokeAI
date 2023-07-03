@@ -7,7 +7,7 @@ import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generic, List, Optional, Type, TypeVar, Union
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 import einops
 import PIL.Image
@@ -17,12 +17,11 @@ import psutil
 import torch
 import torchvision.transforms as T
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
-from diffusers.models.controlnet import ControlNetModel, ControlNetOutput
+from diffusers.models.controlnet import ControlNetModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
     StableDiffusionPipeline,
 )
-from diffusers.pipelines.controlnet import MultiControlNetModel
 
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import (
     StableDiffusionImg2ImgPipeline,
@@ -46,7 +45,7 @@ from .diffusion import (
     InvokeAIDiffuserComponent,
     PostprocessingSettings,
 )
-from .offloading import FullyLoadedModelGroup, LazilyLoadedModelGroup, ModelGroup
+from .offloading import FullyLoadedModelGroup, ModelGroup
 
 @dataclass
 class PipelineIntermediateState:
@@ -105,7 +104,7 @@ class AddsMaskGuidance:
     _debug: Optional[Callable] = None
 
     def __call__(
-        self, step_output: BaseOutput | SchedulerOutput, t: torch.Tensor, conditioning
+        self, step_output: Union[BaseOutput, SchedulerOutput], t: torch.Tensor, conditioning
     ) -> BaseOutput:
         output_class = step_output.__class__  # We'll create a new one with masked data.
 

@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from queue import Queue
 
 from pydantic import BaseModel, Field
-
+from typing import Optional
 
 class InvocationQueueItem(BaseModel):
     graph_execution_state_id: str = Field(description="The ID of the graph execution state")
@@ -22,7 +22,7 @@ class InvocationQueueABC(ABC):
         pass
 
     @abstractmethod
-    def put(self, item: InvocationQueueItem | None) -> None:
+    def put(self, item: Optional[InvocationQueueItem]) -> None:
         pass
 
     @abstractmethod
@@ -57,7 +57,7 @@ class MemoryInvocationQueue(InvocationQueueABC):
 
         return item
 
-    def put(self, item: InvocationQueueItem | None) -> None:
+    def put(self, item: Optional[InvocationQueueItem]) -> None:
         self.__queue.put(item)
 
     def cancel(self, graph_execution_state_id: str) -> None:

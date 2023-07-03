@@ -19,6 +19,7 @@ import { tabsTheme } from './components/tabs';
 import { textTheme } from './components/text';
 import { textareaTheme } from './components/textarea';
 import { tooltipTheme } from './components/tooltip';
+import { skeletonTheme } from './components/skeleton';
 
 export const theme: ThemeOverride = {
   config: {
@@ -68,6 +69,11 @@ export const theme: ThemeOverride = {
       working: `0 0 7px var(--invokeai-colors-working-400)`,
       error: `0 0 7px var(--invokeai-colors-error-400)`,
     },
+    selected: {
+      light:
+        '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
+      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
+    },
     nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-base-500)`,
   },
   colors: InvokeAIColors,
@@ -82,6 +88,7 @@ export const theme: ThemeOverride = {
     Switch: switchTheme,
     NumberInput: numberInputTheme,
     Select: selectTheme,
+    Skeleton: skeletonTheme,
     Slider: sliderTheme,
     Popover: popoverTheme,
     Modal: modalTheme,

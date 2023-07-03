@@ -38,8 +38,7 @@ import {
   FaShare,
   FaShareAlt,
 } from 'react-icons/fa';
-import { gallerySelector } from '../store/gallerySelectors';
-import { useCallback, useContext } from 'react';
+import { useCallback } from 'react';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
@@ -49,22 +48,15 @@ import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceR
 import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
 import { useAppToaster } from 'app/components/Toaster';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { DeleteImageContext } from 'app/contexts/DeleteImageContext';
-import { DeleteImageButton } from './DeleteImageModal';
-import { selectImagesById } from '../store/imagesSlice';
-import { RootState } from 'app/store/store';
+import { stateSelector } from 'app/store/store';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
+import { DeleteImageButton } from 'features/imageDeletion/components/DeleteImageButton';
 
 const currentImageButtonsSelector = createSelector(
-  [
-    (state: RootState) => state,
-    systemSelector,
-    gallerySelector,
-    postprocessingSelector,
-    uiSelector,
-    lightboxSelector,
-    activeTabNameSelector,
-  ],
-  (state, system, gallery, postprocessing, ui, lightbox, activeTabName) => {
+  [stateSelector, activeTabNameSelector],
+  ({ gallery, system, postprocessing, ui, lightbox }, activeTabName) => {
     const {
       isProcessing,
       isConnected,
@@ -84,9 +76,7 @@ const currentImageButtonsSelector = createSelector(
       shouldShowProgressInViewer,
     } = ui;
 
-    const imageDTO = selectImagesById(state, gallery.selectedImage ?? '');
-
-    const { selectedImage } = gallery;
+    const lastSelectedImage = gallery.selection[gallery.selection.length - 1];
 
     return {
       canDeleteImage: isConnected && !isProcessing,
@@ -97,16 +87,13 @@ const currentImageButtonsSelector = createSelector(
       isESRGANAvailable,
       upscalingLevel,
       facetoolStrength,
-      shouldDisableToolbarButtons: Boolean(progressImage) || !selectedImage,
+      shouldDisableToolbarButtons: Boolean(progressImage) || !lastSelectedImage,
       shouldShowImageDetails,
       activeTabName,
       isLightboxOpen,
       shouldHidePreview,
-      image: imageDTO,
-      seed: imageDTO?.metadata?.seed,
-      prompt: imageDTO?.metadata?.positive_conditioning,
-      negativePrompt: imageDTO?.metadata?.negative_conditioning,
       shouldShowProgressInViewer,
+      lastSelectedImage,
     };
   },
   {
@@ -132,7 +119,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     isLightboxOpen,
     activeTabName,
     shouldHidePreview,
-    image,
+    lastSelectedImage,
     shouldShowProgressInViewer,
   } = useAppSelector(currentImageButtonsSelector);
 
@@ -147,7 +134,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const { recallBothPrompts, recallSeed, recallAllParameters } =
     useRecallParameters();
 
-  const { onDelete } = useContext(DeleteImageContext);
+  const { currentData: image } = useGetImageDTOQuery(
+    lastSelectedImage ?? skipToken
+  );
 
   // const handleCopyImage = useCallback(async () => {
   //   if (!image?.url) {
@@ -248,8 +237,11 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   }, []);
 
   const handleDelete = useCallback(() => {
-    onDelete(image);
-  }, [image, onDelete]);
+    if (!image) {
+      return;
+    }
+    dispatch(imageToDeleteSelected(image));
+  }, [dispatch, image]);
 
   useHotkeys(
     'Shift+U',
@@ -371,7 +363,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         }}
         {...props}
       >
-        <ButtonGroup isAttached={true}>
+        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
           <IAIPopover
             triggerComponent={
               <IAIIconButton
@@ -444,11 +436,12 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               }
               isChecked={isLightboxOpen}
               onClick={handleLightBox}
+              isDisabled={shouldDisableToolbarButtons}
             />
           )}
         </ButtonGroup>
 
-        <ButtonGroup isAttached={true}>
+        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
           <IAIIconButton
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
@@ -478,7 +471,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         {(isUpscalingEnabled || isFaceRestoreEnabled) && (
-          <ButtonGroup isAttached={true}>
+          <ButtonGroup
+            isAttached={true}
+            isDisabled={shouldDisableToolbarButtons}
+          >
             {isFaceRestoreEnabled && (
               <IAIPopover
                 triggerComponent={
@@ -543,7 +539,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           </ButtonGroup>
         )}
 
-        <ButtonGroup isAttached={true}>
+        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
           <IAIIconButton
             icon={<FaCode />}
             tooltip={`${t('parameters.info')} (I)`}
@@ -553,7 +549,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           />
         </ButtonGroup>
 
-        <ButtonGroup isAttached={true}>
+        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
           <IAIIconButton
             aria-label={t('settings.displayInProgress')}
             tooltip={t('settings.displayInProgress')}
@@ -564,7 +560,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         <ButtonGroup isAttached={true}>
-          <DeleteImageButton onClick={handleDelete} />
+          <DeleteImageButton
+            onClick={handleDelete}
+            isDisabled={shouldDisableToolbarButtons}
+          />
         </ButtonGroup>
       </Flex>
     </>

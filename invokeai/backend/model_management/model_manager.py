@@ -306,7 +306,6 @@ class ModelManager(object):
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
         """
-
         self.config_path = None
         if isinstance(config, (str, Path)):
             self.config_path = Path(config)
@@ -423,7 +422,7 @@ class ModelManager(object):
         if submodel_type is not None and hasattr(model_config, submodel_type):
             override_path = getattr(model_config, submodel_type)
             if override_path:
-                model_path = override_path
+                model_path = self.app_config.root_path / override_path
                 model_type = submodel_type
                 submodel_type = None
                 model_class = MODEL_CLASSES[base_model][model_type]
@@ -431,6 +430,7 @@ class ModelManager(object):
         # TODO: path
         # TODO: is it accurate to use path as id
         dst_convert_path = self._get_model_cache_path(model_path)
+
         model_path = model_class.convert_if_required(
             base_model=base_model,
             model_path=str(model_path), # TODO: refactor str/Path types logic

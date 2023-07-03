@@ -4,6 +4,7 @@ from contextlib import nullcontext
 
 import torch
 from torch import autocast
+from typing import Union
 from invokeai.app.services.config import InvokeAIAppConfig
 
 CPU_DEVICE = torch.device("cpu")
@@ -49,7 +50,7 @@ def choose_autocast(precision):
     return nullcontext
 
 
-def normalize_device(device: str | torch.device) -> torch.device:
+def normalize_device(device: Union[str, torch.device]) -> torch.device:
     """Ensure device has a device index defined, if appropriate."""
     device = torch.device(device)
     if device.index is None:

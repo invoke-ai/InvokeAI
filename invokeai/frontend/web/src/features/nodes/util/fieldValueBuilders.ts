@@ -44,6 +44,10 @@ export const buildInputFieldValue = (
       fieldValue.value = undefined;
     }
 
+    if (template.type === 'image_collection') {
+      fieldValue.value = [];
+    }
+
     if (template.type === 'latents') {
       fieldValue.value = undefined;
     }
