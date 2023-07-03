@@ -4,6 +4,7 @@ export const tabMap = [
   // 'generate',
   'unifiedCanvas',
   'nodes',
+  'batch',
   // 'postprocessing',
   // 'training',
 ] as const;

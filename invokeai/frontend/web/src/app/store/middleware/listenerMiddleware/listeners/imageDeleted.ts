@@ -1,18 +1,21 @@
-import { requestedImageDeletion } from 'features/gallery/store/actions';
 import { startAppListening } from '..';
 import { imageDeleted } from 'services/api/thunks/image';
 import { log } from 'app/logging/useLogger';
 import { clamp } from 'lodash-es';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
 import {
+  imageSelected,
   imageRemoved,
   selectImagesIds,
-} from 'features/gallery/store/imagesSlice';
+} from 'features/gallery/store/gallerySlice';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { api } from 'services/api';
+import {
+  imageDeletionConfirmed,
+  isModalOpenChanged,
+} from 'features/imageDeletion/store/imageDeletionSlice';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -21,16 +24,19 @@ const moduleLog = log.child({ namespace: 'image' });
  */
 export const addRequestedImageDeletionListener = () => {
   startAppListening({
-    actionCreator: requestedImageDeletion,
+    actionCreator: imageDeletionConfirmed,
     effect: async (action, { dispatch, getState, condition }) => {
-      const { image, imageUsage } = action.payload;
+      const { imageDTO, imageUsage } = action.payload;
 
-      const { image_name } = image;
+      dispatch(isModalOpenChanged(false));
+
+      const { image_name } = imageDTO;
 
       const state = getState();
-      const selectedImage = state.gallery.selectedImage;
+      const lastSelectedImage =
+        state.gallery.selection[state.gallery.selection.length - 1];
 
-      if (selectedImage === image_name) {
+      if (lastSelectedImage === image_name) {
         const ids = selectImagesIds(state);
 
         const deletedImageIndex = ids.findIndex(
@@ -50,7 +56,7 @@ export const addRequestedImageDeletionListener = () => {
         if (newSelectedImageId) {
           dispatch(imageSelected(newSelectedImageId as string));
         } else {
-          dispatch(imageSelected());
+          dispatch(imageSelected(null));
         }
       }
 
@@ -88,7 +94,7 @@ export const addRequestedImageDeletionListener = () => {
 
       if (wasImageDeleted) {
         dispatch(
-          api.util.invalidateTags([{ type: 'Board', id: image.board_id }])
+          api.util.invalidateTags([{ type: 'Board', id: imageDTO.board_id }])
         );
       }
     },

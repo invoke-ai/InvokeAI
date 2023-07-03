@@ -1,10 +1,8 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { boardsApi } from 'services/api/endpoints/boards';
 
 type BoardsState = {
   searchText: string;
-  selectedBoardId?: string;
   updateBoardModalOpen: boolean;
 };
 
@@ -17,9 +15,6 @@ const boardsSlice = createSlice({
   name: 'boards',
   initialState: initialBoardsState,
   reducers: {
-    boardIdSelected: (state, action: PayloadAction<string | undefined>) => {
-      state.selectedBoardId = action.payload;
-    },
     setBoardSearchText: (state, action: PayloadAction<string>) => {
       state.searchText = action.payload;
     },
@@ -27,19 +22,9 @@ const boardsSlice = createSlice({
       state.updateBoardModalOpen = action.payload;
     },
   },
-  extraReducers: (builder) => {
-    builder.addMatcher(
-      boardsApi.endpoints.deleteBoard.matchFulfilled,
-      (state, action) => {
-        if (action.meta.arg.originalArgs === state.selectedBoardId) {
-          state.selectedBoardId = undefined;
-        }
-      }
-    );
-  },
 });
 
-export const { boardIdSelected, setBoardSearchText, setUpdateBoardModalOpen } =
+export const { setBoardSearchText, setUpdateBoardModalOpen } =
   boardsSlice.actions;
 
 export const boardsSelector = (state: RootState) => state.boards;

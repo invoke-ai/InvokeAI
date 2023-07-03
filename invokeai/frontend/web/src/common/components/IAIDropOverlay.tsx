@@ -62,7 +62,7 @@ export const IAIDropOverlay = (props: Props) => {
             w: 'full',
             h: 'full',
             opacity: 1,
-            borderWidth: 2,
+            borderWidth: 3,
             borderColor: isOver
               ? mode('base.50', 'base.200')(colorMode)
               : mode('base.100', 'base.500')(colorMode),
@@ -78,10 +78,10 @@ export const IAIDropOverlay = (props: Props) => {
             sx={{
               fontSize: '2xl',
               fontWeight: 600,
-              transform: isOver ? 'scale(1.1)' : 'scale(1)',
+              transform: isOver ? 'scale(1.02)' : 'scale(1)',
               color: isOver
-                ? mode('base.100', 'base.100')(colorMode)
-                : mode('base.200', 'base.500')(colorMode),
+                ? mode('base.50', 'base.50')(colorMode)
+                : mode('base.100', 'base.200')(colorMode),
               transitionProperty: 'common',
               transitionDuration: '0.1s',
             }}

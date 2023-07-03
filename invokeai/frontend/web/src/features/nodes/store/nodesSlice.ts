@@ -16,6 +16,7 @@ import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { InvocationTemplate, InvocationValue } from '../types/types';
 import { RgbaColor } from 'react-colorful';
 import { RootState } from 'app/store/store';
+import { cloneDeep, isArray, uniq, uniqBy } from 'lodash-es';
 
 export type NodesState = {
   nodes: Node<InvocationValue>[];
@@ -62,7 +63,14 @@ const nodesSlice = createSlice({
       action: PayloadAction<{
         nodeId: string;
         fieldName: string;
-        value: string | number | boolean | ImageField | RgbaColor | undefined;
+        value:
+          | string
+          | number
+          | boolean
+          | ImageField
+          | RgbaColor
+          | undefined
+          | ImageField[];
       }>
     ) => {
       const { nodeId, fieldName, value } = action.payload;
@@ -71,6 +79,35 @@ const nodesSlice = createSlice({
       if (nodeIndex > -1) {
         state.nodes[nodeIndex].data.inputs[fieldName].value = value;
       }
+    },
+    imageCollectionFieldValueChanged: (
+      state,
+      action: PayloadAction<{
+        nodeId: string;
+        fieldName: string;
+        value: ImageField[];
+      }>
+    ) => {
+      const { nodeId, fieldName, value } = action.payload;
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+
+      if (nodeIndex === -1) {
+        return;
+      }
+
+      const currentValue = cloneDeep(
+        state.nodes[nodeIndex].data.inputs[fieldName].value
+      );
+
+      if (!currentValue) {
+        state.nodes[nodeIndex].data.inputs[fieldName].value = value;
+        return;
+      }
+
+      state.nodes[nodeIndex].data.inputs[fieldName].value = uniqBy(
+        (currentValue as ImageField[]).concat(value),
+        'image_name'
+      );
     },
     shouldShowGraphOverlayChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGraphOverlay = action.payload;
@@ -103,6 +140,7 @@ export const {
   shouldShowGraphOverlayChanged,
   nodeTemplatesBuilt,
   nodeEditorReset,
+  imageCollectionFieldValueChanged,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

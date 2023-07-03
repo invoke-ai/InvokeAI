@@ -23,7 +23,7 @@ const ModelSelect = () => {
     (state: RootState) => state.generation.model
   );
 
-  const { data: pipelineModels } = useListModelsQuery({
+  const { data: pipelineModels, isLoading } = useListModelsQuery({
     model_type: 'main',
   });
 
@@ -65,6 +65,8 @@ const ModelSelect = () => {
   );
 
   useEffect(() => {
+    // If the selected model is not in the list of models, select the first one
+    // Handles first-run setting of models, and the user deleting the previously-selected model
     if (selectedModelId && pipelineModels?.ids.includes(selectedModelId)) {
       return;
     }
@@ -78,13 +80,21 @@ const ModelSelect = () => {
     handleChangeModel(firstModel);
   }, [handleChangeModel, pipelineModels?.ids, selectedModelId]);
 
-  return (
+  return isLoading ? (
+    <IAIMantineSelect
+      label={t('modelManager.model')}
+      placeholder="Loading..."
+      disabled={true}
+      data={[]}
+    />
+  ) : (
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={t('modelManager.model')}
       value={selectedModelId}
-      placeholder="Pick one"
+      placeholder={data.length > 0 ? 'Select a model' : 'No models detected!'}
       data={data}
+      error={data.length === 0}
       onChange={handleChangeModel}
     />
   );
