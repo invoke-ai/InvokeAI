@@ -217,13 +217,13 @@ const ImageContextMenu = ({ image, children }: Props) => {
                   {t('parameters.sendToUnifiedCanvas')}
                 </MenuItem>
               )}
-              <MenuItem
+              {/* <MenuItem
                 icon={<FaFolder />}
                 isDisabled={isInBatch}
                 onClickCapture={handleAddToBatch}
               >
                 Add to Batch
-              </MenuItem>
+              </MenuItem> */}
               <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
                 {image.board_id ? 'Change Board' : 'Add to Board'}
               </MenuItem>
@@ -252,12 +252,12 @@ const ImageContextMenu = ({ image, children }: Props) => {
               >
                 Move Selection to Board
               </MenuItem>
-              <MenuItem
+              {/* <MenuItem
                 icon={<FaFolderPlus />}
                 onClickCapture={handleAddSelectionToBatch}
               >
                 Add Selection to Batch
-              </MenuItem>
+              </MenuItem> */}
               <MenuItem
                 sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
                 icon={<FaTrash />}
