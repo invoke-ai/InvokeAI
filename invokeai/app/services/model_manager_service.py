@@ -136,6 +136,29 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
+    def heuristic_import(self,
+                         items_to_import: Set[str],
+                         prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
+                         )->Dict[str, AddModelResult]:
+        '''Import a list of paths, repo_ids or URLs. Returns the set of
+        successfully imported items.
+        :param items_to_import: Set of strings corresponding to models to be imported.
+        :param prediction_type_helper: A callback that receives the Path of a Stable Diffusion 2 checkpoint model and returns a SchedulerPredictionType.
+
+        The prediction type helper is necessary to distinguish between
+        models based on Stable Diffusion 2 Base (requiring
+        SchedulerPredictionType.Epsilson) and Stable Diffusion 768
+        (requiring SchedulerPredictionType.VPrediction). It is
+        generally impossible to do this programmatically, so the
+        prediction_type_helper usually asks the user to choose.
+
+        The result is a set of successfully installed models. Each element
+        of the set is a dict corresponding to the newly-created OmegaConf stanza for
+        that model.
+        '''
+        pass
+
+    @abstractmethod
     def commit(self, conf_file: Path = None) -> None:
         """
         Write current configuration out to the indicated file.
@@ -361,3 +384,24 @@ class ModelManagerService(ModelManagerServiceBase):
     def logger(self):
         return self.mgr.logger
         
+    def heuristic_import(self,
+                         items_to_import: Set[str],
+                         prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
+                         )->Dict[str, AddModelResult]:
+        '''Import a list of paths, repo_ids or URLs. Returns the set of
+        successfully imported items.
+        :param items_to_import: Set of strings corresponding to models to be imported.
+        :param prediction_type_helper: A callback that receives the Path of a Stable Diffusion 2 checkpoint model and returns a SchedulerPredictionType.
+
+        The prediction type helper is necessary to distinguish between
+        models based on Stable Diffusion 2 Base (requiring
+        SchedulerPredictionType.Epsilson) and Stable Diffusion 768
+        (requiring SchedulerPredictionType.VPrediction). It is
+        generally impossible to do this programmatically, so the
+        prediction_type_helper usually asks the user to choose.
+
+        The result is a set of successfully installed models. Each element
+        of the set is a dict corresponding to the newly-created OmegaConf stanza for
+        that model.
+        '''
+        return self.mgr.heuristic_import(items_to_import, prediction_type_helper)        
