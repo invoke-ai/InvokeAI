@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box, ChakraProps } from '@chakra-ui/react';
 import { userInvoked } from 'app/store/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
@@ -14,6 +14,16 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
 
+const IN_PROGRESS_STYLES: ChakraProps['sx'] = {
+  _disabled: {
+    bg: 'none',
+    cursor: 'not-allowed',
+    _hover: {
+      bg: 'none',
+    },
+  },
+};
+
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {
   iconButton?: boolean;
@@ -24,6 +34,7 @@ export default function InvokeButton(props: InvokeButton) {
   const dispatch = useAppDispatch();
   const isReady = useIsReadyToInvoke();
   const activeTabName = useAppSelector(activeTabNameSelector);
+  const isProcessing = useAppSelector((state) => state.system.isProcessing);
 
   const handleInvoke = useCallback(() => {
     dispatch(clampSymmetrySteps());
@@ -69,19 +80,16 @@ export default function InvokeButton(props: InvokeButton) {
             icon={<FaPlay />}
             isDisabled={!isReady}
             onClick={handleInvoke}
-            flexGrow={1}
-            w="100%"
             tooltip={t('parameters.invoke')}
             tooltipProps={{ placement: 'top' }}
             colorScheme="accent"
             id="invoke-button"
-            _disabled={{
-              background: 'none',
-              _hover: {
-                background: 'none',
-              },
-            }}
             {...rest}
+            sx={{
+              w: 'full',
+              flexGrow: 1,
+              ...(isProcessing ? IN_PROGRESS_STYLES : {}),
+            }}
           />
         ) : (
           <IAIButton
@@ -89,18 +97,15 @@ export default function InvokeButton(props: InvokeButton) {
             type="submit"
             isDisabled={!isReady}
             onClick={handleInvoke}
-            flexGrow={1}
-            w="100%"
             colorScheme="accent"
             id="invoke-button"
-            fontWeight={700}
-            _disabled={{
-              background: 'none',
-              _hover: {
-                background: 'none',
-              },
-            }}
             {...rest}
+            sx={{
+              w: 'full',
+              flexGrow: 1,
+              fontWeight: 700,
+              ...(isProcessing ? IN_PROGRESS_STYLES : {}),
+            }}
           >
             Invoke
           </IAIButton>

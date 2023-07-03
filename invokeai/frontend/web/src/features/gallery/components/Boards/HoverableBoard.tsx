@@ -15,10 +15,9 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback, useContext } from 'react';
 import { FaFolder, FaTrash } from 'react-icons/fa';
 import { ContextMenu } from 'chakra-ui-contextmenu';
-import { BoardDTO, ImageDTO } from 'services/api/types';
-import { IAINoImageFallback } from 'common/components/IAIImageFallback';
-import { boardIdSelected } from 'features/gallery/store/boardSlice';
-import { useAddImageToBoardMutation } from 'services/api/endpoints/boardImages';
+import { BoardDTO } from 'services/api/types';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import {
   useDeleteBoardMutation,
   useUpdateBoardMutation,
@@ -26,12 +25,15 @@ import {
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { useDroppable } from '@dnd-kit/core';
 import { AnimatePresence } from 'framer-motion';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
-import { SelectedItemOverlay } from '../SelectedItemOverlay';
 import { DeleteBoardImagesContext } from '../../../../app/contexts/DeleteBoardImagesContext';
 import { mode } from 'theme/util/mode';
+import {
+  MoveBoardDropData,
+  isValidDrop,
+  useDroppable,
+} from 'app/components/ImageDnd/typesafeDnd';
 
 interface HoverableBoardProps {
   board: BoardDTO;
@@ -61,9 +63,6 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
   const [deleteBoard, { isLoading: isDeleteBoardLoading }] =
     useDeleteBoardMutation();
 
-  const [addImageToBoard, { isLoading: isAddImageToBoardLoading }] =
-    useAddImageToBoardMutation();
-
   const handleUpdateBoardName = (newBoardName: string) => {
     updateBoard({ board_id, changes: { board_name: newBoardName } });
   };
@@ -77,29 +76,19 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
     onClickDeleteBoardImages(board);
   }, [board, onClickDeleteBoardImages]);
 
-  const handleDrop = useCallback(
-    (droppedImage: ImageDTO) => {
-      if (droppedImage.board_id === board_id) {
-        return;
-      }
-      addImageToBoard({ board_id, image_name: droppedImage.image_name });
-    },
-    [addImageToBoard, board_id]
-  );
+  const droppableData: MoveBoardDropData = {
+    id: board_id,
+    actionType: 'MOVE_BOARD',
+    context: { boardId: board_id },
+  };
 
-  const {
-    isOver,
-    setNodeRef,
-    active: isDropActive,
-  } = useDroppable({
+  const { isOver, setNodeRef, active } = useDroppable({
     id: `board_droppable_${board_id}`,
-    data: {
-      handleDrop,
-    },
+    data: droppableData,
   });
 
   return (
-    <Box sx={{ touchAction: 'none' }}>
+    <Box sx={{ touchAction: 'none', height: 'full' }}>
       <ContextMenu<HTMLDivElement>
         menuProps={{ size: 'sm', isLazy: true }}
         renderMenu={() => (
@@ -148,13 +137,25 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
                 w: 'full',
                 aspectRatio: '1/1',
                 overflow: 'hidden',
+                shadow: isSelected ? 'selected.light' : undefined,
+                _dark: { shadow: isSelected ? 'selected.dark' : undefined },
+                flexShrink: 0,
               }}
             >
               {board.cover_image_name && coverImage?.image_url && (
                 <Image src={coverImage?.image_url} draggable={false} />
               )}
               {!(board.cover_image_name && coverImage?.image_url) && (
-                <IAINoImageFallback iconProps={{ boxSize: 8 }} as={FaFolder} />
+                <IAINoContentFallback
+                  boxSize={8}
+                  icon={FaFolder}
+                  sx={{
+                    border: '2px solid var(--invokeai-colors-base-200)',
+                    _dark: {
+                      border: '2px solid var(--invokeai-colors-base-800)',
+                    },
+                  }}
+                />
               )}
               <Flex
                 sx={{
@@ -167,14 +168,20 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
                 <Badge variant="solid">{board.image_count}</Badge>
               </Flex>
               <AnimatePresence>
-                {isSelected && <SelectedItemOverlay />}
-              </AnimatePresence>
-              <AnimatePresence>
-                {isDropActive && <IAIDropOverlay isOver={isOver} />}
+                {isValidDrop(droppableData, active) && (
+                  <IAIDropOverlay isOver={isOver} />
+                )}
               </AnimatePresence>
             </Flex>
 
-            <Box sx={{ width: 'full' }}>
+            <Flex
+              sx={{
+                width: 'full',
+                height: 'full',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
               <Editable
                 defaultValue={board_name}
                 submitOnBlur={false}
@@ -204,7 +211,7 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
                   }}
                 />
               </Editable>
-            </Box>
+            </Flex>
           </Flex>
         )}
       </ContextMenu>

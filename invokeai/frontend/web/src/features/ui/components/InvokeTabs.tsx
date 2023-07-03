@@ -32,11 +32,12 @@ import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent
 import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
 import NodesTab from './tabs/Nodes/NodesTab';
-import { FaFont, FaImage } from 'react-icons/fa';
+import { FaFont, FaImage, FaLayerGroup } from 'react-icons/fa';
 import ResizeHandle from './tabs/ResizeHandle';
 import ImageTab from './tabs/ImageToImage/ImageToImageTab';
 import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
 import { useMinimumPanelSize } from '../hooks/useMinimumPanelSize';
+import BatchTab from './tabs/Batch/BatchTab';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -64,6 +65,11 @@ const tabs: InvokeTabInfo[] = [
     id: 'nodes',
     icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <NodesTab />,
+  },
+  {
+    id: 'batch',
+    icon: <Icon as={FaLayerGroup} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
+    content: <BatchTab />,
   },
 ];
 

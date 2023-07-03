@@ -7,10 +7,10 @@ const invokeAI = defineStyle((props) => {
 
   if (c === 'base') {
     const _disabled = {
-      bg: mode('base.200', 'base.700')(props),
-      color: mode('base.500', 'base.150')(props),
+      bg: mode('base.150', 'base.700')(props),
+      color: mode('base.500', 'base.500')(props),
       svg: {
-        fill: mode('base.500', 'base.150')(props),
+        fill: mode('base.500', 'base.500')(props),
       },
       opacity: 1,
     };
@@ -30,7 +30,6 @@ const invokeAI = defineStyle((props) => {
           'drop-shadow(0px 0px 0.3rem var(--invokeai-colors-base-800))'
         )(props),
       },
-      _disabled,
       _hover: {
         bg: mode('base.300', 'base.500')(props),
         color: mode('base.900', 'base.50')(props),
@@ -39,34 +38,16 @@ const invokeAI = defineStyle((props) => {
         },
         _disabled,
       },
-      _checked: {
-        bg: mode('accent.400', 'accent.600')(props),
-        color: mode('base.50', 'base.100')(props),
-        svg: {
-          fill: mode(`${c}.50`, `${c}.100`)(props),
-          filter: mode(
-            `drop-shadow(0px 0px 0.3rem var(--invokeai-colors-${c}-600))`,
-            `drop-shadow(0px 0px 0.3rem var(--invokeai-colors-${c}-800))`
-          )(props),
-        },
-        _disabled,
-        _hover: {
-          bg: mode('accent.500', 'accent.500')(props),
-          color: mode('white', 'base.50')(props),
-          svg: {
-            fill: mode('white', 'base.50')(props),
-          },
-          _disabled,
-        },
-      },
+      _disabled,
     };
   }
 
   const _disabled = {
-    bg: mode(`${c}.200`, `${c}.700`)(props),
-    color: mode(`${c}.100`, `${c}.150`)(props),
+    bg: mode(`${c}.250`, `${c}.700`)(props),
+    color: mode(`${c}.50`, `${c}.500`)(props),
     svg: {
-      fill: mode(`${c}.100`, `${c}.150`)(props),
+      fill: mode(`${c}.50`, `${c}.500`)(props),
+      filter: 'unset',
     },
     opacity: 1,
     filter: mode(undefined, 'saturate(65%)')(props),
@@ -78,7 +59,7 @@ const invokeAI = defineStyle((props) => {
     borderRadius: 'base',
     textShadow: mode(
       `0 0 0.3rem var(--invokeai-colors-${c}-600)`,
-      `0 0 0.3rem var(--invokeai-colors-${c}-900)`
+      `0 0 0.3rem var(--invokeai-colors-${c}-800)`
     )(props),
     svg: {
       fill: mode(`base.50`, `base.100`)(props),
@@ -95,26 +76,6 @@ const invokeAI = defineStyle((props) => {
         fill: mode('white', `base.50`)(props),
       },
       _disabled,
-    },
-    _checked: {
-      bg: mode('accent.400', 'accent.600')(props),
-      color: mode('base.50', 'base.100')(props),
-      svg: {
-        fill: mode(`base.50`, `base.100`)(props),
-        filter: mode(
-          `drop-shadow(0px 0px 0.3rem var(--invokeai-colors-${c}-600))`,
-          `drop-shadow(0px 0px 0.3rem var(--invokeai-colors-${c}-800))`
-        )(props),
-      },
-      _disabled,
-      _hover: {
-        bg: mode('accent.500', 'accent.500')(props),
-        color: mode('white', 'base.50')(props),
-        svg: {
-          fill: mode('white', 'base.50')(props),
-        },
-        _disabled,
-      },
     },
   };
 });

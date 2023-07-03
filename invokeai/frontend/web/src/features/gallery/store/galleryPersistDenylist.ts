@@ -1,8 +1,15 @@
-import { GalleryState } from './gallerySlice';
+import { initialGalleryState } from './gallerySlice';
 
 /**
  * Gallery slice persist denylist
  */
-export const galleryPersistDenylist: (keyof GalleryState)[] = [
-  'shouldAutoSwitchToNewImages',
+export const galleryPersistDenylist: (keyof typeof initialGalleryState)[] = [
+  'selection',
+  'entities',
+  'ids',
+  'isLoading',
+  'limit',
+  'offset',
+  'selectedBoardId',
+  'total',
 ];

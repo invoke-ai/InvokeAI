@@ -11,18 +11,18 @@ import { rememberEnhancer, rememberReducer } from 'redux-remember';
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import controlNetReducer from 'features/controlNet/store/controlNetSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
-import imagesReducer from 'features/gallery/store/imagesSlice';
 import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import systemReducer from 'features/system/store/systemSlice';
-// import sessionReducer from 'features/system/store/sessionSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 import boardsReducer from 'features/gallery/store/boardSlice';
 import configReducer from 'features/system/store/configSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import uiReducer from 'features/ui/store/uiSlice';
 import dynamicPromptsReducer from 'features/dynamicPrompts/store/slice';
+import batchReducer from 'features/batch/store/batchSlice';
+import imageDeletionReducer from 'features/imageDeletion/store/imageDeletionSlice';
 
 import { listenerMiddleware } from './middleware/listenerMiddleware';
 
@@ -45,11 +45,11 @@ const allReducers = {
   config: configReducer,
   ui: uiReducer,
   hotkeys: hotkeysReducer,
-  images: imagesReducer,
   controlNet: controlNetReducer,
   boards: boardsReducer,
-  // session: sessionReducer,
   dynamicPrompts: dynamicPromptsReducer,
+  batch: batchReducer,
+  imageDeletion: imageDeletionReducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -68,6 +68,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'ui',
   'controlNet',
   'dynamicPrompts',
+  'batch',
   // 'boards',
   // 'hotkeys',
   // 'config',

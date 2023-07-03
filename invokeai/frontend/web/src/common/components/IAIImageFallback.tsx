@@ -1,73 +1,82 @@
 import {
   As,
+  ChakraProps,
   Flex,
-  FlexProps,
   Icon,
-  IconProps,
+  Skeleton,
   Spinner,
-  SpinnerProps,
-  useColorMode,
+  StyleProps,
+  Text,
 } from '@chakra-ui/react';
 import { FaImage } from 'react-icons/fa';
-import { mode } from 'theme/util/mode';
+import { ImageDTO } from 'services/api/types';
 
-type Props = FlexProps & {
-  spinnerProps?: SpinnerProps;
-};
+type Props = { image: ImageDTO | undefined };
 
-export const IAIImageLoadingFallback = (props: Props) => {
-  const { spinnerProps, ...rest } = props;
-  const { sx, ...restFlexProps } = rest;
-  const { colorMode } = useColorMode();
+export const IAILoadingImageFallback = (props: Props) => {
+  if (props.image) {
+    return (
+      <Skeleton
+        sx={{
+          w: `${props.image.width}px`,
+          h: 'auto',
+          objectFit: 'contain',
+          aspectRatio: `${props.image.width}/${props.image.height}`,
+        }}
+      />
+    );
+  }
+
   return (
     <Flex
       sx={{
-        bg: mode('base.200', 'base.900')(colorMode),
         opacity: 0.7,
         w: 'full',
         h: 'full',
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 'base',
-        ...sx,
+        bg: 'base.200',
+        _dark: {
+          bg: 'base.900',
+        },
       }}
-      {...restFlexProps}
     >
-      <Spinner size="xl" {...spinnerProps} />
+      <Spinner size="xl" />
     </Flex>
   );
 };
 
 type IAINoImageFallbackProps = {
-  flexProps?: FlexProps;
-  iconProps?: IconProps;
-  as?: As;
+  label?: string;
+  icon?: As;
+  boxSize?: StyleProps['boxSize'];
+  sx?: ChakraProps['sx'];
 };
 
-export const IAINoImageFallback = (props: IAINoImageFallbackProps) => {
-  const { sx: flexSx, ...restFlexProps } = props.flexProps ?? { sx: {} };
-  const { sx: iconSx, ...restIconProps } = props.iconProps ?? { sx: {} };
-  const { colorMode } = useColorMode();
+export const IAINoContentFallback = (props: IAINoImageFallbackProps) => {
+  const { icon = FaImage, boxSize = 16 } = props;
 
   return (
     <Flex
       sx={{
-        bg: mode('base.200', 'base.900')(colorMode),
-        opacity: 0.7,
         w: 'full',
         h: 'full',
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 'base',
-        ...flexSx,
+        flexDir: 'column',
+        gap: 2,
+        userSelect: 'none',
+        color: 'base.700',
+        _dark: {
+          color: 'base.500',
+        },
+        ...props.sx,
       }}
-      {...restFlexProps}
     >
-      <Icon
-        as={props.as ?? FaImage}
-        sx={{ color: mode('base.700', 'base.500')(colorMode), ...iconSx }}
-        {...restIconProps}
-      />
+      <Icon as={icon} boxSize={boxSize} opacity={0.7} />
+      {props.label && <Text textAlign="center">{props.label}</Text>}
     </Flex>
   );
 };
