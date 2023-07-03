@@ -132,7 +132,7 @@ class BoardImagesService(BoardImagesServiceABC):
 
 
 def board_record_to_dto(
-    board_record: BoardRecord, cover_image_name: Union[str, None], image_count: int
+    board_record: BoardRecord, cover_image_name: str | None, image_count: int
 ) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(

@@ -1,6 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import argparse
+import os
 import re
 import shlex
 import sys
@@ -347,7 +348,7 @@ def invoke_cli():
 
                 # Parse invocation
                 command: CliCommand = None # type:ignore
-                system_graph: Union[LibraryGraph,None] = None
+                system_graph: LibraryGraph|None = None
                 if args['type'] in system_graph_names:
                     system_graph = next(filter(lambda g: g.name == args['type'], system_graphs))
                     invocation = GraphInvocation(graph=system_graph.graph, id=str(current_id))

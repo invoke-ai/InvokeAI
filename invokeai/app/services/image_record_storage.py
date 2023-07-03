@@ -116,7 +116,7 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_most_recent_image_for_board(self, board_id: str) -> Union[ImageRecord, None]:
+    def get_most_recent_image_for_board(self, board_id: str) -> ImageRecord | None:
         """Gets the most recent image for a board."""
         pass
 

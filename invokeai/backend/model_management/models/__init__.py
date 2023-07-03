@@ -68,11 +68,7 @@ def get_model_config_enums():
     enums = list()
 
     for model_config in MODEL_CONFIGS:
-
-        if hasattr(inspect,'get_annotations'):
-            fields = inspect.get_annotations(model_config)
-        else:
-            fields = model_config.__annotations__
+        fields = inspect.get_annotations(model_config)
         try:
             field = fields["model_format"]
         except:

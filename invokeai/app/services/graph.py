@@ -3,6 +3,7 @@
 import copy
 import itertools
 import uuid
+from types import NoneType
 from typing import (
     Annotated,
     Any,
@@ -25,8 +26,6 @@ from ..invocations.baseinvocation import (
     InvocationContext,
 )
 
-# in 3.10 this would be "from types import NoneType"
-NoneType = type(None)
 
 class EdgeConnection(BaseModel):
     node_id: str = Field(description="The id of the node for this edge connection")
@@ -847,7 +846,7 @@ class GraphExecutionState(BaseModel):
             ]
         }
 
-    def next(self) -> Union[BaseInvocation, None]:
+    def next(self) -> BaseInvocation | None:
         """Gets the next node ready to execute."""
 
         # TODO: enable multiple nodes to execute simultaneously by tracking currently executing nodes
