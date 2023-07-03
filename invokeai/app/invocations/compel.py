@@ -2,6 +2,7 @@ from typing import Literal, Optional, Union
 from pydantic import BaseModel, Field
 from contextlib import ExitStack
 import re
+import torch
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 from .model import ClipField
@@ -56,6 +57,7 @@ class CompelInvocation(BaseInvocation):
             },
         }
 
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CompelOutput:
 
         tokenizer_info = context.services.model_manager.get_model(
