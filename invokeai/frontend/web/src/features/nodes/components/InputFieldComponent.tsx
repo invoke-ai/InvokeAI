@@ -16,6 +16,7 @@ import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
 import ColorInputFieldComponent from './fields/ColorInputFieldComponent';
 import ItemInputFieldComponent from './fields/ItemInputFieldComponent';
+import ImageCollectionInputFieldComponent from './fields/ImageCollectionInputFieldComponent';
 
 type InputFieldComponentProps = {
   nodeId: string;
@@ -184,6 +185,16 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'item' && template.type === 'item') {
     return (
       <ItemInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'image_collection' && template.type === 'image_collection') {
+    return (
+      <ImageCollectionInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}

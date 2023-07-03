@@ -3,24 +3,19 @@ import {
   createMultiStyleConfigHelpers,
   defineStyle,
 } from '@chakra-ui/styled-system';
+import { mode } from '@chakra-ui/theme-tools';
 
 const { defineMultiStyleConfig, definePartsStyle } =
   createMultiStyleConfigHelpers(parts.keys);
 
 const invokeAIFilledTrack = defineStyle((_props) => ({
-  bg: 'accent.600',
-  // TODO: the animation is nice but looks weird bc it is substantially longer than each step
-  // so we get to 100% long before it finishes
-  // transition: 'width 0.2s ease-in-out',
-  _indeterminate: {
-    bgGradient:
-      'linear(to-r, transparent 0%, accent.600 50%, transparent 100%);',
-  },
+  bg: 'accentAlpha.500',
 }));
 
 const invokeAITrack = defineStyle((_props) => {
+  const { colorScheme: c } = _props;
   return {
-    bg: 'none',
+    bg: mode(`${c}.200`, `${c}.700`)(_props),
   };
 });
 
