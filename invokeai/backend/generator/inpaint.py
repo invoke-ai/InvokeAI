@@ -4,11 +4,10 @@ invokeai.backend.generator.inpaint descends from .generator
 from __future__ import annotations
 
 import math
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 
 import cv2
 import numpy as np
-import PIL
 import torch
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
@@ -76,7 +75,7 @@ class Inpaint(Img2Img):
         return im_patched
 
     def tile_fill_missing(
-        self, im: Image.Image, tile_size: int = 16, seed: Union[int, None] = None
+        self, im: Image.Image, tile_size: int = 16, seed: Optional[int] = None
     ) -> Image.Image:
         # Only fill if there's an alpha layer
         if im.mode != "RGBA":

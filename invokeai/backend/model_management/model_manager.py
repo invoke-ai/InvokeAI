@@ -306,7 +306,6 @@ class ModelManager(object):
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
         """
-
         self.config_path = None
         if isinstance(config, (str, Path)):
             self.config_path = Path(config)

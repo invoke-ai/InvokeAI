@@ -1,21 +1,18 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from contextlib import ExitStack
 from typing import List, Literal, Optional, Union
 
 import einops
 
 from pydantic import BaseModel, Field, validator
 import torch
-from diffusers import ControlNetModel, DPMSolverMultistepScheduler
+from diffusers import ControlNetModel
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.schedulers import SchedulerMixin as Scheduler
 
-from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
-from ...backend.image_util.seamless import configure_model_padding
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ConditioningData, ControlNetData, StableDiffusionGeneratorPipeline,
@@ -546,7 +543,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     type: Literal["i2l"] = "i2l"
 
     # Inputs
-    image: Union[ImageField, None] = Field(description="The image to encode")
+    image: Optional[ImageField] = Field(description="The image to encode")
     vae: VaeField = Field(default=None, description="Vae submodel")
     tiled: bool = Field(default=False, description="Encode latents by overlaping tiles(less memory consumption)")
 
