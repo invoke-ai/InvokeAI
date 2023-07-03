@@ -1,11 +1,11 @@
 import { requestedBoardImagesDeletion } from 'features/gallery/store/actions';
 import { startAppListening } from '..';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
 import {
+  imageSelected,
   imagesRemoved,
   selectImagesAll,
   selectImagesById,
-} from 'features/gallery/store/imagesSlice';
+} from 'features/gallery/store/gallerySlice';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
@@ -22,12 +22,15 @@ export const addRequestedBoardImageDeletionListener = () => {
       const { board_id } = board;
 
       const state = getState();
-      const selectedImage = state.gallery.selectedImage
-        ? selectImagesById(state, state.gallery.selectedImage)
+      const selectedImageName =
+        state.gallery.selection[state.gallery.selection.length - 1];
+
+      const selectedImage = selectedImageName
+        ? selectImagesById(state, selectedImageName)
         : undefined;
 
       if (selectedImage && selectedImage.board_id === board_id) {
-        dispatch(imageSelected());
+        dispatch(imageSelected(null));
       }
 
       // We need to reset the features where the board images are in use - none of these work if their image(s) don't exist

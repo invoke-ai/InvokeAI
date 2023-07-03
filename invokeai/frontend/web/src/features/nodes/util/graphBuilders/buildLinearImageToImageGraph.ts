@@ -1,7 +1,9 @@
 import { RootState } from 'app/store/store';
 import {
+  ImageCollectionInvocation,
   ImageResizeInvocation,
   ImageToLatentsInvocation,
+  IterateInvocation,
 } from 'services/api/types';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { log } from 'app/logging/useLogger';
@@ -15,6 +17,8 @@ import {
   IMAGE_TO_LATENTS,
   LATENTS_TO_LATENTS,
   RESIZE,
+  IMAGE_COLLECTION,
+  IMAGE_COLLECTION_ITERATE,
 } from './constants';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
@@ -42,6 +46,15 @@ export const buildLinearImageToImageGraph = (
     height,
   } = state.generation;
 
+  const {
+    isEnabled: isBatchEnabled,
+    imageNames: batchImageNames,
+    asInitialImage,
+  } = state.batch;
+
+  const shouldBatch =
+    isBatchEnabled && batchImageNames.length > 0 && asInitialImage;
+
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -51,7 +64,7 @@ export const buildLinearImageToImageGraph = (
    * the `fit` param. These are added to the graph at the end.
    */
 
-  if (!initialImage) {
+  if (!initialImage && !shouldBatch) {
     moduleLog.error('No initial image found in state');
     throw new Error('No initial image found in state');
   }
@@ -271,6 +284,41 @@ export const buildLinearImageToImageGraph = (
       destination: {
         node_id: NOISE,
         field: 'height',
+      },
+    });
+  }
+
+  if (isBatchEnabled && asInitialImage && batchImageNames.length > 0) {
+    // we are going to connect an iterate up to the init image
+    delete (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image;
+
+    const imageCollection: ImageCollectionInvocation = {
+      id: IMAGE_COLLECTION,
+      type: 'image_collection',
+      images: batchImageNames.map((image_name) => ({ image_name })),
+    };
+
+    const imageCollectionIterate: IterateInvocation = {
+      id: IMAGE_COLLECTION_ITERATE,
+      type: 'iterate',
+    };
+
+    graph.nodes[IMAGE_COLLECTION] = imageCollection;
+    graph.nodes[IMAGE_COLLECTION_ITERATE] = imageCollectionIterate;
+
+    graph.edges.push({
+      source: { node_id: IMAGE_COLLECTION, field: 'collection' },
+      destination: {
+        node_id: IMAGE_COLLECTION_ITERATE,
+        field: 'collection',
+      },
+    });
+
+    graph.edges.push({
+      source: { node_id: IMAGE_COLLECTION_ITERATE, field: 'item' },
+      destination: {
+        node_id: IMAGE_TO_LATENTS,
+        field: 'image',
       },
     });
   }

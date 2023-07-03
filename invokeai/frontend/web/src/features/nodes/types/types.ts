@@ -66,7 +66,8 @@ export type FieldType =
   | 'model'
   | 'array'
   | 'item'
-  | 'color';
+  | 'color'
+  | 'image_collection';
 
 /**
  * An input field is persisted across reloads as part of the user's local state.
@@ -92,7 +93,8 @@ export type InputFieldValue =
   | ModelInputFieldValue
   | ArrayInputFieldValue
   | ItemInputFieldValue
-  | ColorInputFieldValue;
+  | ColorInputFieldValue
+  | ImageCollectionInputFieldValue;
 
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
@@ -116,7 +118,8 @@ export type InputFieldTemplate =
   | ModelInputFieldTemplate
   | ArrayInputFieldTemplate
   | ItemInputFieldTemplate
-  | ColorInputFieldTemplate;
+  | ColorInputFieldTemplate
+  | ImageCollectionInputFieldTemplate;
 
 /**
  * An output field is persisted across as part of the user's local state.
@@ -215,6 +218,11 @@ export type ImageInputFieldValue = FieldValueBase & {
   value?: ImageField;
 };
 
+export type ImageCollectionInputFieldValue = FieldValueBase & {
+  type: 'image_collection';
+  value?: ImageField[];
+};
+
 export type ModelInputFieldValue = FieldValueBase & {
   type: 'model';
   value?: string;
@@ -282,6 +290,11 @@ export type ImageInputFieldTemplate = InputFieldTemplateBase & {
   type: 'image';
 };
 
+export type ImageCollectionInputFieldTemplate = InputFieldTemplateBase & {
+  default: ImageField[];
+  type: 'image_collection';
+};
+
 export type LatentsInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'latents';
@@ -333,7 +346,7 @@ export type TypeHints = {
 };
 
 export type InvocationSchemaExtra = {
-  output: OpenAPIV3.SchemaObject; // the output of the invocation
+  output: OpenAPIV3.ReferenceObject; // the output of the invocation
   ui?: {
     tags?: string[];
     type_hints?: TypeHints;

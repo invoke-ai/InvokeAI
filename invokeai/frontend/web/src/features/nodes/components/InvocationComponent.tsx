@@ -30,7 +30,7 @@ const InvocationComponentWrapper = (props: InvocationComponentWrapperProps) => {
         position: 'relative',
         borderRadius: 'md',
         minWidth: NODE_MIN_WIDTH,
-        boxShadow: props.selected
+        shadow: props.selected
           ? `${nodeSelectedOutline}, ${nodeShadow}`
           : `${nodeShadow}`,
       }}
@@ -72,7 +72,14 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
     return (
       <InvocationComponentWrapper selected={selected}>
         <Flex sx={{ alignItems: 'center', justifyContent: 'center' }}>
-          <Icon color="base.400" boxSize={32} as={FaExclamationCircle}></Icon>
+          <Icon
+            as={FaExclamationCircle}
+            sx={{
+              boxSize: 32,
+              color: 'base.600',
+              _dark: { color: 'base.400' },
+            }}
+          ></Icon>
           <IAINodeResizer />
         </Flex>
       </InvocationComponentWrapper>
@@ -86,8 +93,9 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
         sx={{
           flexDirection: 'column',
           borderBottomRadius: 'md',
-          bg: 'base.800',
           py: 2,
+          bg: 'base.200',
+          _dark: { bg: 'base.800' },
         }}
       >
         <IAINodeOutputs nodeId={nodeId} outputs={outputs} template={template} />

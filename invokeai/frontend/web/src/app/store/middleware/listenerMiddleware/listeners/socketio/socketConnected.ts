@@ -14,11 +14,11 @@ export const addSocketConnectedEventListener = () => {
 
       moduleLog.debug({ timestamp }, 'Connected');
 
-      const { nodes, config, images } = getState();
+      const { nodes, config, gallery } = getState();
 
       const { disabledTabs } = config;
 
-      if (!images.ids.length) {
+      if (!gallery.ids.length) {
         dispatch(
           receivedPageOfImages({
             categories: ['general'],

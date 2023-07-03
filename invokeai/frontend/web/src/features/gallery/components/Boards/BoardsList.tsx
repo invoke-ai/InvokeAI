@@ -2,6 +2,7 @@ import {
   Collapse,
   Flex,
   Grid,
+  GridItem,
   IconButton,
   Input,
   InputGroup,
@@ -10,10 +11,7 @@ import {
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import {
-  boardsSelector,
-  setBoardSearchText,
-} from 'features/gallery/store/boardSlice';
+import { setBoardSearchText } from 'features/gallery/store/boardSlice';
 import { memo, useState } from 'react';
 import HoverableBoard from './HoverableBoard';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
@@ -21,11 +19,13 @@ import AddBoardButton from './AddBoardButton';
 import AllImagesBoard from './AllImagesBoard';
 import { CloseIcon } from '@chakra-ui/icons';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
+import { stateSelector } from 'app/store/store';
 
 const selector = createSelector(
-  [boardsSelector],
-  (boardsState) => {
-    const { selectedBoardId, searchText } = boardsState;
+  [stateSelector],
+  ({ boards, gallery }) => {
+    const { searchText } = boards;
+    const { selectedBoardId } = gallery;
     return { selectedBoardId, searchText };
   },
   defaultSelectorOptions
@@ -62,13 +62,13 @@ const BoardsList = (props: Props) => {
   return (
     <Collapse in={isOpen} animateOpacity>
       <Flex
+        layerStyle={'first'}
         sx={{
           flexDir: 'column',
           gap: 2,
-          bg: 'base.800',
-          borderRadius: 'base',
           p: 2,
           mt: 2,
+          borderRadius: 'base',
         }}
       >
         <Flex sx={{ gap: 2, alignItems: 'center' }}>
@@ -109,20 +109,24 @@ const BoardsList = (props: Props) => {
           <Grid
             className="list-container"
             sx={{
-              gap: 2,
-              gridTemplateRows: '5.5rem 5.5rem',
+              gridTemplateRows: '6.5rem 6.5rem',
               gridAutoFlow: 'column dense',
-              gridAutoColumns: '4rem',
+              gridAutoColumns: '5rem',
             }}
           >
-            {!searchMode && <AllImagesBoard isSelected={!selectedBoardId} />}
+            {!searchMode && (
+              <GridItem sx={{ p: 1.5 }}>
+                <AllImagesBoard isSelected={!selectedBoardId} />
+              </GridItem>
+            )}
             {filteredBoards &&
               filteredBoards.map((board) => (
-                <HoverableBoard
-                  key={board.board_id}
-                  board={board}
-                  isSelected={selectedBoardId === board.board_id}
-                />
+                <GridItem key={board.board_id} sx={{ p: 1.5 }}>
+                  <HoverableBoard
+                    board={board}
+                    isSelected={selectedBoardId === board.board_id}
+                  />
+                </GridItem>
               ))}
           </Grid>
         </OverlayScrollbarsComponent>

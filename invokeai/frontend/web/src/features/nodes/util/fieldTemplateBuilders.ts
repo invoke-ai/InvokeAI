@@ -23,6 +23,7 @@ import {
   OutputFieldTemplate,
   TypeHints,
   FieldType,
+  ImageCollectionInputFieldTemplate,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -181,6 +182,21 @@ const buildImageInputFieldTemplate = ({
   const template: ImageInputFieldTemplate = {
     ...baseField,
     type: 'image',
+    inputRequirement: 'always',
+    inputKind: 'any',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildImageCollectionInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ImageCollectionInputFieldTemplate => {
+  const template: ImageCollectionInputFieldTemplate = {
+    ...baseField,
+    type: 'image_collection',
     inputRequirement: 'always',
     inputKind: 'any',
     default: schemaObject.default ?? undefined,
@@ -349,11 +365,21 @@ export const getFieldType = (
 
   if (typeHints && name in typeHints) {
     rawFieldType = typeHints[name];
-  } else if (!schemaObject.type && schemaObject.allOf) {
-    // if schemaObject has no type, then it should have one of allOf
-    rawFieldType =
-      (schemaObject.allOf[0] as OpenAPIV3.SchemaObject).title ??
-      'Missing Field Type';
+  } else if (!schemaObject.type) {
+    // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
+    if (schemaObject.allOf) {
+      rawFieldType = refObjectToFieldType(
+        schemaObject.allOf![0] as OpenAPIV3.ReferenceObject
+      );
+    } else if (schemaObject.anyOf) {
+      rawFieldType = refObjectToFieldType(
+        schemaObject.anyOf![0] as OpenAPIV3.ReferenceObject
+      );
+    } else if (schemaObject.oneOf) {
+      rawFieldType = refObjectToFieldType(
+        schemaObject.oneOf![0] as OpenAPIV3.ReferenceObject
+      );
+    }
   } else if (schemaObject.enum) {
     rawFieldType = 'enum';
   } else if (schemaObject.type) {
@@ -389,6 +415,10 @@ export const buildInputFieldTemplate = (
 
   if (['image'].includes(fieldType)) {
     return buildImageInputFieldTemplate({ schemaObject, baseField });
+  }
+
+  if (['image_collection'].includes(fieldType)) {
+    return buildImageCollectionInputFieldTemplate({ schemaObject, baseField });
   }
   if (['latents'].includes(fieldType)) {
     return buildLatentsInputFieldTemplate({ schemaObject, baseField });

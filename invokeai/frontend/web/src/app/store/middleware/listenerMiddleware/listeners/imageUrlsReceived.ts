@@ -1,7 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
 import { imageUrlsReceived } from 'services/api/thunks/image';
-import { imageUpdatedOne } from 'features/gallery/store/imagesSlice';
+import { imageUpdatedOne } from 'features/gallery/store/gallerySlice';
 
 const moduleLog = log.child({ namespace: 'image' });
 

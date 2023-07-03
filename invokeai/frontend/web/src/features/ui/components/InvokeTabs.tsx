@@ -32,10 +32,12 @@ import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent
 import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
 import NodesTab from './tabs/Nodes/NodesTab';
-import { FaFont, FaImage } from 'react-icons/fa';
+import { FaFont, FaImage, FaLayerGroup } from 'react-icons/fa';
 import ResizeHandle from './tabs/ResizeHandle';
 import ImageTab from './tabs/ImageToImage/ImageToImageTab';
 import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
+import { useMinimumPanelSize } from '../hooks/useMinimumPanelSize';
+import BatchTab from './tabs/Batch/BatchTab';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -64,6 +66,11 @@ const tabs: InvokeTabInfo[] = [
     icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <NodesTab />,
   },
+  // {
+  //   id: 'batch',
+  //   icon: <Icon as={FaLayerGroup} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
+  //   content: <BatchTab />,
+  // },
 ];
 
 const enabledTabsSelector = createSelector(
@@ -77,6 +84,9 @@ const enabledTabsSelector = createSelector(
     memoizeOptions: { resultEqualityCheck: isEqual },
   }
 );
+
+const MIN_GALLERY_WIDTH = 300;
+const DEFAULT_GALLERY_PCT = 20;
 
 const InvokeTabs = () => {
   const activeTab = useAppSelector(activeTabIndexSelector);
@@ -150,6 +160,9 @@ const InvokeTabs = () => {
     [enabledTabs]
   );
 
+  const { ref: galleryPanelRef, minSizePct: galleryMinSizePct } =
+    useMinimumPanelSize(MIN_GALLERY_WIDTH, DEFAULT_GALLERY_PCT, 'app');
+
   return (
     <Tabs
       defaultIndex={activeTab}
@@ -175,6 +188,7 @@ const InvokeTabs = () => {
         <AuxiliaryProgressIndicator />
       </TabList>
       <PanelGroup
+        id="app"
         autoSaveId="app"
         direction="horizontal"
         style={{ height: '100%', width: '100%' }}
@@ -188,11 +202,16 @@ const InvokeTabs = () => {
           <>
             <ResizeHandle />
             <Panel
+              ref={galleryPanelRef}
               onResize={handleResizeGallery}
               id="gallery"
               order={3}
-              defaultSize={10}
-              minSize={10}
+              defaultSize={
+                galleryMinSizePct > DEFAULT_GALLERY_PCT
+                  ? galleryMinSizePct
+                  : DEFAULT_GALLERY_PCT
+              }
+              minSize={galleryMinSizePct}
               maxSize={50}
             >
               <ImageGalleryContent />

@@ -2,11 +2,12 @@ import { startAppListening } from '..';
 import { imageUploaded } from 'services/api/thunks/image';
 import { addToast } from 'features/system/store/systemSlice';
 import { log } from 'app/logging/useLogger';
-import { imageUpserted } from 'features/gallery/store/imagesSlice';
+import { imageUpserted } from 'features/gallery/store/gallerySlice';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
+import { imageAddedToBatch } from 'features/batch/store/batchSlice';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -68,6 +69,11 @@ export const addImageUploadedFulfilledListener = () => {
 
       if (postUploadAction?.type === 'TOAST_UPLOADED') {
         dispatch(addToast({ title: 'Image Uploaded', status: 'success' }));
+        return;
+      }
+
+      if (postUploadAction?.type === 'ADD_TO_BATCH') {
+        dispatch(imageAddedToBatch(image.image_name));
         return;
       }
     },

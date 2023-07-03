@@ -1,48 +1,34 @@
-import { Flex, Text } from '@chakra-ui/react';
+import { Flex, useColorMode } from '@chakra-ui/react';
 import { FaImages } from 'react-icons/fa';
-import { boardIdSelected } from '../../store/boardSlice';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { useDispatch } from 'react-redux';
-import { IAINoImageFallback } from 'common/components/IAIImageFallback';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { AnimatePresence } from 'framer-motion';
-import { SelectedItemOverlay } from '../SelectedItemOverlay';
-import { useCallback } from 'react';
-import { ImageDTO } from 'services/api/types';
-import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
-import { useDroppable } from '@dnd-kit/core';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
+import { mode } from 'theme/util/mode';
+import {
+  MoveBoardDropData,
+  isValidDrop,
+  useDroppable,
+} from 'app/components/ImageDnd/typesafeDnd';
 
 const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
   const dispatch = useDispatch();
+  const { colorMode } = useColorMode();
 
   const handleAllImagesBoardClick = () => {
     dispatch(boardIdSelected());
   };
 
-  const [removeImageFromBoard, { isLoading }] =
-    useRemoveImageFromBoardMutation();
+  const droppableData: MoveBoardDropData = {
+    id: 'all-images-board',
+    actionType: 'MOVE_BOARD',
+    context: { boardId: null },
+  };
 
-  const handleDrop = useCallback(
-    (droppedImage: ImageDTO) => {
-      if (!droppedImage.board_id) {
-        return;
-      }
-      removeImageFromBoard({
-        board_id: droppedImage.board_id,
-        image_name: droppedImage.image_name,
-      });
-    },
-    [removeImageFromBoard]
-  );
-
-  const {
-    isOver,
-    setNodeRef,
-    active: isDropActive,
-  } = useDroppable({
+  const { isOver, setNodeRef, active } = useDroppable({
     id: `board_droppable_all_images`,
-    data: {
-      handleDrop,
-    },
+    data: droppableData,
   });
 
   return (
@@ -56,10 +42,10 @@ const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
         h: 'full',
         borderRadius: 'base',
       }}
-      onClick={handleAllImagesBoardClick}
     >
       <Flex
         ref={setNodeRef}
+        onClick={handleAllImagesBoardClick}
         sx={{
           position: 'relative',
           justifyContent: 'center',
@@ -67,25 +53,39 @@ const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
           borderRadius: 'base',
           w: 'full',
           aspectRatio: '1/1',
+          overflow: 'hidden',
+          shadow: isSelected ? 'selected.light' : undefined,
+          _dark: { shadow: isSelected ? 'selected.dark' : undefined },
+          flexShrink: 0,
         }}
       >
-        <IAINoImageFallback iconProps={{ boxSize: 8 }} as={FaImages} />
+        <IAINoContentFallback
+          boxSize={8}
+          icon={FaImages}
+          sx={{
+            border: '2px solid var(--invokeai-colors-base-200)',
+            _dark: { border: '2px solid var(--invokeai-colors-base-800)' },
+          }}
+        />
         <AnimatePresence>
-          {isSelected && <SelectedItemOverlay />}
-        </AnimatePresence>
-        <AnimatePresence>
-          {isDropActive && <IAIDropOverlay isOver={isOver} />}
+          {isValidDrop(droppableData, active) && (
+            <IAIDropOverlay isOver={isOver} />
+          )}
         </AnimatePresence>
       </Flex>
-      <Text
+      <Flex
         sx={{
-          color: isSelected ? 'base.50' : 'base.200',
+          h: 'full',
+          alignItems: 'center',
+          color: isSelected
+            ? mode('base.900', 'base.50')(colorMode)
+            : mode('base.700', 'base.200')(colorMode),
           fontWeight: isSelected ? 600 : undefined,
           fontSize: 'xs',
         }}
       >
         All Images
-      </Text>
+      </Flex>
     </Flex>
   );
 };

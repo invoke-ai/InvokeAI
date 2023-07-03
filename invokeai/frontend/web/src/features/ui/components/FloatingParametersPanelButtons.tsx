@@ -19,6 +19,7 @@ import { FaSlidersH } from 'react-icons/fa';
 const floatingButtonStyles: ChakraProps['sx'] = {
   borderStartStartRadius: 0,
   borderEndStartRadius: 0,
+  shadow: '2xl',
 };
 
 export const floatingParametersPanelButtonSelector = createSelector(

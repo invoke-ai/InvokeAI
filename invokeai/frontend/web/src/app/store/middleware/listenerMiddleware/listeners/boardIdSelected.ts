@@ -1,12 +1,14 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
-import { boardIdSelected } from 'features/gallery/store/boardSlice';
-import { selectImagesAll } from 'features/gallery/store/imagesSlice';
+import {
+  imageSelected,
+  selectImagesAll,
+  boardIdSelected,
+} from 'features/gallery/store/gallerySlice';
 import {
   IMAGES_PER_PAGE,
   receivedPageOfImages,
 } from 'services/api/thunks/image';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { boardsApi } from 'services/api/endpoints/boards';
 
 const moduleLog = log.child({ namespace: 'boards' });
@@ -28,7 +30,7 @@ export const addBoardIdSelectedListener = () => {
         return;
       }
 
-      const { categories } = state.images;
+      const { categories } = state.gallery;
 
       const filteredImages = allImages.filter((i) => {
         const isInCategory = categories.includes(i.image_category);
@@ -47,7 +49,7 @@ export const addBoardIdSelectedListener = () => {
         return;
       }
 
-      dispatch(imageSelected(board.cover_image_name));
+      dispatch(imageSelected(board.cover_image_name ?? null));
 
       // if we haven't loaded one full page of images from this board, load more
       if (
@@ -77,7 +79,7 @@ export const addBoardIdSelected_changeSelectedImage_listener = () => {
         return;
       }
 
-      const { categories } = state.images;
+      const { categories } = state.gallery;
 
       const filteredImages = selectImagesAll(state).filter((i) => {
         const isInCategory = categories.includes(i.image_category);

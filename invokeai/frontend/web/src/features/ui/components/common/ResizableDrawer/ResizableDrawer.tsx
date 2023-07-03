@@ -6,6 +6,7 @@ import {
   useOutsideClick,
   useTheme,
   SlideDirection,
+  useColorMode,
 } from '@chakra-ui/react';
 import {
   Resizable,
@@ -21,6 +22,7 @@ import {
   getSlideDirection,
   getStyles,
 } from './util';
+import { mode } from 'theme/util/mode';
 
 type ResizableDrawerProps = ResizableProps & {
   children: ReactNode;
@@ -64,7 +66,7 @@ const ResizableDrawer = ({
   sx = {},
 }: ResizableDrawerProps) => {
   const langDirection = useTheme().direction as LangDirection;
-
+  const { colorMode } = useColorMode();
   const outsideClickRef = useRef<HTMLDivElement>(null);
 
   const defaultWidth = useMemo(
@@ -160,11 +162,11 @@ const ResizableDrawer = ({
           handleStyles={handleStyles}
           {...minMaxDimensions}
           sx={{
-            borderColor: 'base.800',
+            borderColor: mode('base.200', 'base.800')(colorMode),
             p: 4,
-            bg: 'base.900',
+            bg: mode('base.100', 'base.900')(colorMode),
             height: 'full',
-            boxShadow: '0 0 4rem 0 rgba(0, 0, 0, 0.8)',
+            shadow: isOpen ? 'dark-lg' : undefined,
             ...containerStyles,
             ...sx,
           }}

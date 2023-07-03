@@ -14,8 +14,12 @@ import UnifiedCanvasToolbarBeta from './UnifiedCanvasBeta/UnifiedCanvasToolbarBe
 import UnifiedCanvasToolSettingsBeta from './UnifiedCanvasBeta/UnifiedCanvasToolSettingsBeta';
 import { ImageDTO } from 'services/api/types';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { useDroppable } from '@dnd-kit/core';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
+import {
+  CanvasInitialImageDropData,
+  isValidDrop,
+  useDroppable,
+} from 'app/components/ImageDnd/typesafeDnd';
 
 const selector = createSelector(
   [canvasSelector, uiSelector],
@@ -30,18 +34,16 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
+const droppableData: CanvasInitialImageDropData = {
+  id: 'canvas-intial-image',
+  actionType: 'SET_CANVAS_INITIAL_IMAGE',
+};
+
 const UnifiedCanvasContent = () => {
   const dispatch = useAppDispatch();
 
   const { doesCanvasNeedScaling, shouldUseCanvasBetaLayout } =
     useAppSelector(selector);
-
-  const onDrop = useCallback(
-    (droppedImage: ImageDTO) => {
-      dispatch(setInitialCanvasImage(droppedImage));
-    },
-    [dispatch]
-  );
 
   const {
     isOver,
@@ -49,9 +51,7 @@ const UnifiedCanvasContent = () => {
     active,
   } = useDroppable({
     id: 'unifiedCanvas',
-    data: {
-      handleDrop: onDrop,
-    },
+    data: droppableData,
   });
 
   useLayoutEffect(() => {
@@ -67,14 +67,14 @@ const UnifiedCanvasContent = () => {
   if (shouldUseCanvasBetaLayout) {
     return (
       <Box
+        layerStyle="first"
         ref={setDroppableRef}
         tabIndex={0}
         sx={{
           w: 'full',
           h: 'full',
-          borderRadius: 'base',
-          bg: 'base.850',
           p: 4,
+          borderRadius: 'base',
         }}
       >
         <Flex
@@ -97,7 +97,12 @@ const UnifiedCanvasContent = () => {
             <UnifiedCanvasToolSettingsBeta />
             <Box sx={{ w: 'full', h: 'full', position: 'relative' }}>
               {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
-              {active && <IAIDropOverlay isOver={isOver} />}
+              {isValidDrop(droppableData, active) && (
+                <IAIDropOverlay
+                  isOver={isOver}
+                  label="Set Canvas Initial Image"
+                />
+              )}
             </Box>
           </Flex>
         </Flex>
@@ -110,11 +115,11 @@ const UnifiedCanvasContent = () => {
       ref={setDroppableRef}
       tabIndex={-1}
       sx={{
+        layerStyle: 'first',
         w: 'full',
         h: 'full',
-        borderRadius: 'base',
-        bg: 'base.850',
         p: 4,
+        borderRadius: 'base',
       }}
     >
       <Flex
@@ -139,7 +144,12 @@ const UnifiedCanvasContent = () => {
         >
           <Box sx={{ w: 'full', h: 'full', position: 'relative' }}>
             {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
-            {active && <IAIDropOverlay isOver={isOver} />}
+            {isValidDrop(droppableData, active) && (
+              <IAIDropOverlay
+                isOver={isOver}
+                label="Set Canvas Initial Image"
+              />
+            )}
           </Box>
         </Flex>
       </Flex>
