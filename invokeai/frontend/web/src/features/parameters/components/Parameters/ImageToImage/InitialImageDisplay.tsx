@@ -114,7 +114,7 @@ const InitialImageDisplay = () => {
           Initial Image
         </Text>
         <Spacer />
-        <IAIButton
+        {/* <IAIButton
           tooltip={useBatchAsInitialImage ? 'Disable Batch' : 'Enable Batch'}
           aria-label={useBatchAsInitialImage ? 'Disable Batch' : 'Enable Batch'}
           leftIcon={<FaLayerGroup />}
@@ -122,7 +122,7 @@ const InitialImageDisplay = () => {
           onClick={handleClickUseBatch}
         >
           {useBatchAsInitialImage ? 'Batch' : 'Single'}
-        </IAIButton>
+        </IAIButton> */}
         <IAIIconButton
           tooltip={
             useBatchAsInitialImage ? 'Upload to Batch' : 'Upload Initial Image'
@@ -146,7 +146,8 @@ const InitialImageDisplay = () => {
           isDisabled={isResetButtonDisabled}
         />
       </Flex>
-      {useBatchAsInitialImage ? <BatchImageContainer /> : <InitialImage />}
+      <InitialImage />
+      {/* {useBatchAsInitialImage ? <BatchImageContainer /> : <InitialImage />} */}
       <input {...getUploadInputProps()} />
     </Flex>
   );
