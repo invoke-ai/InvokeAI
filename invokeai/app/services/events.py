@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Any
+from typing import Any, Union
 from invokeai.app.models.image import ProgressImage
 from invokeai.app.util.misc import get_timestamp
 from invokeai.app.services.model_manager_service import BaseModelType, ModelType, SubModelType, ModelInfo
@@ -28,7 +28,7 @@ class EventServiceBase:
         graph_execution_state_id: str,
         node: dict,
         source_node_id: str,
-        progress_image: ProgressImage | None,
+        progress_image: Union[ProgressImage, None],
         step: int,
         total_steps: int,
     ) -> None:

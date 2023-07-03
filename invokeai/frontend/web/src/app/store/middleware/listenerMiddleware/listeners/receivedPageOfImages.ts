@@ -2,6 +2,7 @@ import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
 import { serializeError } from 'serialize-error';
 import { receivedPageOfImages } from 'services/api/thunks/image';
+import { imagesApi } from 'services/api/endpoints/images';
 
 const moduleLog = log.child({ namespace: 'gallery' });
 
@@ -9,11 +10,17 @@ export const addReceivedPageOfImagesFulfilledListener = () => {
   startAppListening({
     actionCreator: receivedPageOfImages.fulfilled,
     effect: (action, { getState, dispatch }) => {
-      const page = action.payload;
+      const { items } = action.payload;
       moduleLog.debug(
         { data: { payload: action.payload } },
-        `Received ${page.items.length} images`
+        `Received ${items.length} images`
       );
+
+      items.forEach((image) => {
+        dispatch(
+          imagesApi.util.upsertQueryData('getImageDTO', image.image_name, image)
+        );
+      });
     },
   });
 };

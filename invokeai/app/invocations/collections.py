@@ -4,13 +4,16 @@ from typing import Literal
 
 import numpy as np
 from pydantic import Field, validator
+from invokeai.app.models.image import ImageField
 
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
 from .baseinvocation import (
     BaseInvocation,
+    InvocationConfig,
     InvocationContext,
     BaseInvocationOutput,
+    UIConfig,
 )
 
 
@@ -22,6 +25,7 @@ class IntCollectionOutput(BaseInvocationOutput):
     # Outputs
     collection: list[int] = Field(default=[], description="The int collection")
 
+
 class FloatCollectionOutput(BaseInvocationOutput):
     """A collection of floats"""
 
@@ -29,6 +33,18 @@ class FloatCollectionOutput(BaseInvocationOutput):
 
     # Outputs
     collection: list[float] = Field(default=[], description="The float collection")
+
+
+class ImageCollectionOutput(BaseInvocationOutput):
+    """A collection of images"""
+
+    type: Literal["image_collection"] = "image_collection"
+
+    # Outputs
+    collection: list[ImageField] = Field(default=[], description="The output images")
+
+    class Config:
+        schema_extra = {"required": ["type", "collection"]}
 
 
 class RangeInvocation(BaseInvocation):
@@ -92,3 +108,27 @@ class RandomRangeInvocation(BaseInvocation):
         return IntCollectionOutput(
             collection=list(rng.integers(low=self.low, high=self.high, size=self.size))
         )
+
+
+class ImageCollectionInvocation(BaseInvocation):
+    """Load a collection of images and provide it as output."""
+
+    # fmt: off
+    type: Literal["image_collection"] = "image_collection"
+
+    # Inputs
+    images: list[ImageField] = Field(
+        default=[], description="The image collection to load"
+    )
+    # fmt: on
+    def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
+        return ImageCollectionOutput(collection=self.images)
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "type_hints": {
+                    "images": "image_collection",
+                }
+            },
+        }

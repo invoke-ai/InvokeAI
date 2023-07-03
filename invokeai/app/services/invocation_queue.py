@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from queue import Queue
 
 from pydantic import BaseModel, Field
+from typing import Union
 
 
 class InvocationQueueItem(BaseModel):
@@ -22,7 +23,7 @@ class InvocationQueueABC(ABC):
         pass
 
     @abstractmethod
-    def put(self, item: InvocationQueueItem | None) -> None:
+    def put(self, item: Union[InvocationQueueItem, None]) -> None:
         pass
 
     @abstractmethod
@@ -57,7 +58,7 @@ class MemoryInvocationQueue(InvocationQueueABC):
 
         return item
 
-    def put(self, item: InvocationQueueItem | None) -> None:
+    def put(self, item: Union[InvocationQueueItem, None]) -> None:
         self.__queue.put(item)
 
     def cancel(self, graph_execution_state_id: str) -> None:

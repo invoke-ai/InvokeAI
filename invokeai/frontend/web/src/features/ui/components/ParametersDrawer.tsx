@@ -71,7 +71,15 @@ const ParametersDrawer = () => {
       onClose={handleClosePanel}
     >
       <Flex
-        sx={{ flexDir: 'column', h: 'full', w: PARAMETERS_PANEL_WIDTH, gap: 2 }}
+        sx={{
+          flexDir: 'column',
+          h: 'full',
+          w: PARAMETERS_PANEL_WIDTH,
+          gap: 2,
+          position: 'relative',
+          flexShrink: 0,
+          overflowY: 'auto',
+        }}
       >
         <Flex
           paddingTop={1.5}
@@ -82,9 +90,16 @@ const ParametersDrawer = () => {
           <InvokeAILogoComponent />
           <PinParametersPanelButton />
         </Flex>
-        <OverlayScrollable>
-          <Flex sx={{ flexDir: 'column', gap: 2 }}>{drawerContent}</Flex>
-        </OverlayScrollable>
+        <Flex
+          sx={{
+            gap: 2,
+            flexDirection: 'column',
+            h: 'full',
+            w: 'full',
+          }}
+        >
+          {drawerContent}
+        </Flex>
       </Flex>
     </ResizableDrawer>
   );
