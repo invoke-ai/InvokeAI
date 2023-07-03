@@ -8,7 +8,6 @@ from PIL.Image import Image as PILImageType
 from PIL import Image, PngImagePlugin
 from send2trash import send2trash
 
-from invokeai.app.models.image import ResourceOrigin
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
@@ -175,7 +174,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
 
-    def __get_cache(self, image_name: Path) -> Union[PILImageType, None]:
+    def __get_cache(self, image_name: Path) -> Optional[PILImageType]:
         return None if image_name not in self.__cache else self.__cache[image_name]
 
     def __set_cache(self, image_name: Path, image: PILImageType):

@@ -61,8 +61,6 @@ def get_input_field(node: BaseInvocation, field: str) -> Any:
     node_input_field = node_inputs.get(field) or None
     return node_input_field
 
-from typing import Optional, Union, List, get_args
-
 def is_union_subtype(t1, t2):
     t1_args = get_args(t1)
     t2_args = get_args(t2)
@@ -847,7 +845,7 @@ class GraphExecutionState(BaseModel):
             ]
         }
 
-    def next(self) -> Union[BaseInvocation, None]:
+    def next(self) -> Optional[BaseInvocation]:
         """Gets the next node ready to execute."""
 
         # TODO: enable multiple nodes to execute simultaneously by tracking currently executing nodes

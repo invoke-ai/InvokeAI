@@ -88,7 +88,7 @@ class ImageUrlsDTO(BaseModel):
 class ImageDTO(ImageRecord, ImageUrlsDTO):
     """Deserialized image record, enriched for the frontend."""
 
-    board_id: Union[str, None] = Field(
+    board_id: Optional[str] = Field(
         description="The id of the board the image belongs to, if one exists."
     )
     """The id of the board the image belongs to, if one exists."""
@@ -96,7 +96,7 @@ class ImageDTO(ImageRecord, ImageUrlsDTO):
 
 
 def image_record_to_dto(
-    image_record: ImageRecord, image_url: str, thumbnail_url: str, board_id: Union[str, None]
+    image_record: ImageRecord, image_url: str, thumbnail_url: str, board_id: Optional[str]
 ) -> ImageDTO:
     """Converts an image record to an image DTO."""
     return ImageDTO(

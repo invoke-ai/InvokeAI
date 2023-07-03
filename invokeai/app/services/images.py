@@ -370,7 +370,7 @@ class ImageService(ImageServiceABC):
 
     def _get_metadata(
         self, session_id: Optional[str] = None, node_id: Optional[str] = None
-    ) -> Union[ImageMetadata, None]:
+    ) -> Optional[ImageMetadata]:
         """Get the metadata for a node."""
         metadata = None
 

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from diffusers import ModelMixin, ConfigMixin
 from pathlib import Path
-from typing import Callable, Literal, Union, Dict
+from typing import Callable, Literal, Union, Dict, Optional
 from picklescan.scanner import scan_file_path
 
 from .models import (
@@ -64,7 +64,7 @@ class ModelProbe(object):
     @classmethod
     def probe(cls,
               model_path: Path,
-              model: Union[Dict, ModelMixin] = None,
+              model: Optional[Union[Dict, ModelMixin]],
               prediction_type_helper: Callable[[Path],SchedulerPredictionType] = None)->ModelProbeInfo:
         '''
         Probe the model at model_path and return sufficient information about it

@@ -1,6 +1,5 @@
 from typing import Literal, Optional, Union
 from pydantic import BaseModel, Field
-from contextlib import ExitStack
 import re
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
@@ -8,7 +7,7 @@ from .model import ClipField
 
 from ...backend.util.devices import torch_dtype
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
-from ...backend.model_management import BaseModelType, ModelType, SubModelType
+from ...backend.model_management import ModelType
 from ...backend.model_management.lora import ModelPatcher
 
 from compel import Compel

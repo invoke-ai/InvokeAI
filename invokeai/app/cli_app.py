@@ -5,7 +5,7 @@ import re
 import shlex
 import sys
 import time
-from typing import Union, get_type_hints
+from typing import Union, get_type_hints, Optional
 
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import Field
@@ -347,7 +347,7 @@ def invoke_cli():
 
                 # Parse invocation
                 command: CliCommand = None # type:ignore
-                system_graph: Union[LibraryGraph,None] = None
+                system_graph: Optional[LibraryGraph] = None
                 if args['type'] in system_graph_names:
                     system_graph = next(filter(lambda g: g.name == args['type'], system_graphs))
                     invocation = GraphInvocation(graph=system_graph.graph, id=str(current_id))

@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 
-from typing import Literal, Union, get_args
+from typing import Literal, Optional, get_args
 
 import numpy as np
 import math
@@ -68,7 +68,7 @@ def get_tile_images(image: np.ndarray, width=8, height=8):
 
 
 def tile_fill_missing(
-    im: Image.Image, tile_size: int = 16, seed: Union[int, None] = None
+    im: Image.Image, tile_size: int = 16, seed: Optional[int] = None
 ) -> Image.Image:
     # Only fill if there's an alpha layer
     if im.mode != "RGBA":
@@ -125,7 +125,7 @@ class InfillColorInvocation(BaseInvocation):
     """Infills transparent areas of an image with a solid color"""
 
     type: Literal["infill_rgba"] = "infill_rgba"
-    image: Union[ImageField, None] = Field(
+    image: Optional[ImageField] = Field(
         default=None, description="The image to infill"
     )
     color: ColorField = Field(
@@ -162,7 +162,7 @@ class InfillTileInvocation(BaseInvocation):
 
     type: Literal["infill_tile"] = "infill_tile"
 
-    image: Union[ImageField, None] = Field(
+    image: Optional[ImageField] = Field(
         default=None, description="The image to infill"
     )
     tile_size: int = Field(default=32, ge=1, description="The tile size (px)")
@@ -202,7 +202,7 @@ class InfillPatchMatchInvocation(BaseInvocation):
 
     type: Literal["infill_patchmatch"] = "infill_patchmatch"
 
-    image: Union[ImageField, None] = Field(
+    image: Optional[ImageField] = Field(
         default=None, description="The image to infill"
     )
 
