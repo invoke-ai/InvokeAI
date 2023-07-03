@@ -203,8 +203,8 @@ class Inpaint(Img2Img):
         cfg_scale,
         ddim_eta,
         conditioning,
-        init_image: Image.Image | torch.FloatTensor,
-        mask_image: Image.Image | torch.FloatTensor,
+        init_image: Union[Image.Image, torch.FloatTensor],
+        mask_image: Union[Image.Image, torch.FloatTensor],
         strength: float,
         mask_blur_radius: int = 8,
         # Seam settings - when 0, doesn't fill seam

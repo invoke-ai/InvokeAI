@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 from PIL.Image import Image as PILImageType
 from PIL import Image, PngImagePlugin
@@ -80,7 +80,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
     __cache: Dict[Path, PILImageType]
     __max_cache_size: int
 
-    def __init__(self, output_folder: str | Path):
+    def __init__(self, output_folder: Union[str, Path]):
         self.__cache = dict()
         self.__cache_ids = Queue()
         self.__max_cache_size = 10  # TODO: get this from config
@@ -164,7 +164,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
         return path
 
-    def validate_path(self, path: str | Path) -> bool:
+    def validate_path(self, path: Union[str, Path]) -> bool:
         """Validates the path given for an image or thumbnail."""
         path = path if isinstance(path, Path) else Path(path)
         return path.exists()
@@ -175,7 +175,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
 
-    def __get_cache(self, image_name: Path) -> PILImageType | None:
+    def __get_cache(self, image_name: Path) -> Union[PILImageType, None]:
         return None if image_name not in self.__cache else self.__cache[image_name]
 
     def __set_cache(self, image_name: Path, image: PILImageType):
