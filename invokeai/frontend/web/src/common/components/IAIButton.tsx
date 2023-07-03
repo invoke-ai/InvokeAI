@@ -15,10 +15,25 @@ export interface IAIButtonProps extends ButtonProps {
 }
 
 const IAIButton = forwardRef((props: IAIButtonProps, forwardedRef) => {
-  const { children, tooltip = '', tooltipProps, isChecked, ...rest } = props;
+  const {
+    children,
+    tooltip = '',
+    tooltipProps: { placement = 'top', hasArrow = true, ...tooltipProps } = {},
+    isChecked,
+    ...rest
+  } = props;
   return (
-    <Tooltip label={tooltip} {...tooltipProps}>
-      <Button ref={forwardedRef} aria-checked={isChecked} {...rest}>
+    <Tooltip
+      label={tooltip}
+      placement={placement}
+      hasArrow={hasArrow}
+      {...tooltipProps}
+    >
+      <Button
+        ref={forwardedRef}
+        colorScheme={isChecked ? 'accent' : 'base'}
+        {...rest}
+      >
         {children}
       </Button>
     </Tooltip>

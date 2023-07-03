@@ -8,7 +8,7 @@ import { controlNetSelector } from 'features/controlNet/store/controlNetSlice';
 import { forEach, uniqBy } from 'lodash-es';
 import { imageUrlsReceived } from 'services/api/thunks/image';
 import { log } from 'app/logging/useLogger';
-import { selectImagesEntities } from 'features/gallery/store/imagesSlice';
+import { selectImagesEntities } from 'features/gallery/store/gallerySlice';
 
 const moduleLog = log.child({ namespace: 'images' });
 
@@ -36,7 +36,7 @@ const selectAllUsedImages = createSelector(
     nodes.nodes.forEach((node) => {
       forEach(node.data.inputs, (input) => {
         if (input.type === 'image' && input.value) {
-          allUsedImages.push(input.value);
+          allUsedImages.push(input.value.image_name);
         }
       });
     });

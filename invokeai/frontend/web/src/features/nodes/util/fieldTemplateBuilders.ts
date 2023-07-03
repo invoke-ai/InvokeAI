@@ -23,6 +23,7 @@ import {
   OutputFieldTemplate,
   TypeHints,
   FieldType,
+  ImageCollectionInputFieldTemplate,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -181,6 +182,21 @@ const buildImageInputFieldTemplate = ({
   const template: ImageInputFieldTemplate = {
     ...baseField,
     type: 'image',
+    inputRequirement: 'always',
+    inputKind: 'any',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildImageCollectionInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ImageCollectionInputFieldTemplate => {
+  const template: ImageCollectionInputFieldTemplate = {
+    ...baseField,
+    type: 'image_collection',
     inputRequirement: 'always',
     inputKind: 'any',
     default: schemaObject.default ?? undefined,
@@ -399,6 +415,10 @@ export const buildInputFieldTemplate = (
 
   if (['image'].includes(fieldType)) {
     return buildImageInputFieldTemplate({ schemaObject, baseField });
+  }
+
+  if (['image_collection'].includes(fieldType)) {
+    return buildImageCollectionInputFieldTemplate({ schemaObject, baseField });
   }
   if (['latents'].includes(fieldType)) {
     return buildLatentsInputFieldTemplate({ schemaObject, baseField });
