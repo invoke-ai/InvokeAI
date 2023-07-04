@@ -1,28 +1,29 @@
 import { Box, Icon, Skeleton } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { TypesafeDraggableData } from 'app/components/ImageDnd/typesafeDnd';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { FaExclamationCircle } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { MouseEvent, memo, useCallback, useMemo } from 'react';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIDndImage from 'common/components/IAIDndImage';
 import {
   batchImageRangeEndSelected,
   batchImageSelected,
   batchImageSelectionToggled,
   imageRemovedFromBatch,
 } from 'features/batch/store/batchSlice';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { createSelector } from '@reduxjs/toolkit';
-import { RootState, stateSelector } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { TypesafeDraggableData } from 'app/components/ImageDnd/typesafeDnd';
+import { MouseEvent, memo, useCallback, useMemo } from 'react';
+import { FaExclamationCircle } from 'react-icons/fa';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
-const isSelectedSelector = createSelector(
-  [stateSelector, (state: RootState, imageName: string) => imageName],
-  (state, imageName) => ({
-    selection: state.batch.selection,
-    isSelected: state.batch.selection.includes(imageName),
-  }),
-  defaultSelectorOptions
-);
+const makeSelector = (image_name: string) =>
+  createSelector(
+    [stateSelector],
+    (state) => ({
+      selection: state.batch.selection,
+      isSelected: state.batch.selection.includes(image_name),
+    }),
+    defaultSelectorOptions
+  );
 
 type BatchImageProps = {
   imageName: string;
@@ -37,9 +38,12 @@ const BatchImage = (props: BatchImageProps) => {
   } = useGetImageDTOQuery(props.imageName);
   const dispatch = useAppDispatch();
 
-  const { isSelected, selection } = useAppSelector((state) =>
-    isSelectedSelector(state, props.imageName)
+  const selector = useMemo(
+    () => makeSelector(props.imageName),
+    [props.imageName]
   );
+
+  const { isSelected, selection } = useAppSelector(selector);
 
   const handleClickRemove = useCallback(() => {
     dispatch(imageRemovedFromBatch(props.imageName));
