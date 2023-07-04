@@ -53,6 +53,10 @@ from .services.processor import DefaultInvocationProcessor
 from .services.restoration_services import RestorationServices
 from .services.sqlite import SqliteItemStorage
 
+import torch
+if torch.backends.mps.is_available():
+    import invokeai.backend.util.mps_fixes
+
 
 class CliCommand(BaseModel):
     command: Union[BaseCommand.get_commands() + BaseInvocation.get_invocations()] = Field(discriminator="type")  # type: ignore

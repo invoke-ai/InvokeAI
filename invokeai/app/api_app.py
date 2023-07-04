@@ -28,6 +28,10 @@ from .api.routers import sessions, models, images, boards, board_images
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
 
+import torch
+if torch.backends.mps.is_available():
+    import invokeai.backend.util.mps_fixes
+    
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
 app = FastAPI(title="Invoke AI", docs_url=None, redoc_url=None)
