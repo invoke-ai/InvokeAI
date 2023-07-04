@@ -66,16 +66,16 @@ const tabs: InvokeTabInfo[] = [
     icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <NodesTab />,
   },
-  // {
-  //   id: 'batch',
-  //   icon: <Icon as={FaLayerGroup} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
-  //   content: <BatchTab />,
-  // },
   {
     id: 'modelManager',
     icon: <Icon as={FaCube} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <ModelManagerTab />,
   },
+  // {
+  //   id: 'batch',
+  //   icon: <Icon as={FaLayerGroup} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
+  //   content: <BatchTab />,
+  // },
 ];
 
 const enabledTabsSelector = createSelector(
