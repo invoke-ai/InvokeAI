@@ -1,6 +1,6 @@
-import { ModelsList } from 'services/api/types';
 import { EntityState, createEntityAdapter } from '@reduxjs/toolkit';
 import { keyBy } from 'lodash-es';
+import { ModelsList } from 'services/api/types';
 
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
 import { paths } from '../schema';
@@ -24,11 +24,9 @@ export const modelsApi = api.injectEndpoints({
     listModels: build.query<EntityState<ModelConfig>, ListModelsArg>({
       query: (arg) => ({ url: 'models/', params: arg }),
       providesTags: (result, error, arg) => {
-        // any list of boards
         const tags: ApiFullTagDescription[] = [{ id: 'Model', type: LIST_TAG }];
 
         if (result) {
-          // and individual tags for each board
           tags.push(
             ...result.ids.map((id) => ({
               type: 'Model' as const,

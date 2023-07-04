@@ -65,6 +65,7 @@ export type FieldType =
   | 'control'
   | 'model'
   | 'vae_model'
+  | 'lora_model'
   | 'array'
   | 'item'
   | 'color'
@@ -93,6 +94,7 @@ export type InputFieldValue =
   | EnumInputFieldValue
   | ModelInputFieldValue
   | VaeModelInputFieldValue
+  | LoRAModelInputFieldValue
   | ArrayInputFieldValue
   | ItemInputFieldValue
   | ColorInputFieldValue
@@ -119,6 +121,7 @@ export type InputFieldTemplate =
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
   | VaeModelInputFieldTemplate
+  | LoRAModelInputFieldTemplate
   | ArrayInputFieldTemplate
   | ItemInputFieldTemplate
   | ColorInputFieldTemplate
@@ -236,6 +239,11 @@ export type VaeModelInputFieldValue = FieldValueBase & {
   value?: string;
 };
 
+export type LoRAModelInputFieldValue = FieldValueBase & {
+  type: 'lora_model';
+  value?: string;
+};
+
 export type ArrayInputFieldValue = FieldValueBase & {
   type: 'array';
   value?: (string | number)[];
@@ -348,6 +356,11 @@ export type ModelInputFieldTemplate = InputFieldTemplateBase & {
 export type VaeModelInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'vae_model';
+};
+
+export type LoRAModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
+  type: 'lora_model';
 };
 
 export type ArrayInputFieldTemplate = InputFieldTemplateBase & {

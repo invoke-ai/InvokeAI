@@ -12,6 +12,7 @@ import ImageCollectionInputFieldComponent from './fields/ImageCollectionInputFie
 import ImageInputFieldComponent from './fields/ImageInputFieldComponent';
 import ItemInputFieldComponent from './fields/ItemInputFieldComponent';
 import LatentsInputFieldComponent from './fields/LatentsInputFieldComponent';
+import LoRAModelInputFieldComponent from './fields/LoRAModelInputFieldComponent';
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
@@ -156,6 +157,16 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'vae_model' && template.type === 'vae_model') {
     return (
       <VaeModelInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'lora_model' && template.type === 'lora_model') {
+    return (
+      <LoRAModelInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}
