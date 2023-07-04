@@ -820,6 +820,10 @@ class ModelManager(object):
         The result is a set of successfully installed models. Each element
         of the set is a dict corresponding to the newly-created OmegaConf stanza for
         that model.
+
+        May return the following exceptions:
+        - KeyError   - one or more of the items to import is not a valid path, repo_id or URL
+        - ValueError - a corresponding model already exists
         '''
         # avoid circular import here
         from invokeai.backend.install.model_install_backend import ModelInstall
@@ -829,11 +833,7 @@ class ModelManager(object):
                                  prediction_type_helper = prediction_type_helper,
                                  model_manager = self)
         for thing in items_to_import:
-            try:
-                installed = installer.heuristic_import(thing)
-                successfully_installed.update(installed)
-            except Exception as e:
-                self.logger.warning(f'{thing} could not be imported: {str(e)}')
-                
+            installed = installer.heuristic_import(thing)
+            successfully_installed.update(installed)
         self.commit()                
         return successfully_installed

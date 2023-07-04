@@ -116,33 +116,41 @@ async def update_model(
     responses= {
         201: {"description" : "The model imported successfully"},
         404: {"description" : "The model could not be found"},
+        409: {"description" : "There is already a model corresponding to this path or repo_id"},
     },
     status_code=201,
     response_model=ImportModelResponse
 )
 async def import_model(
-        name: str = Query(description="A model path, repo_id or URL to import"),
-        prediction_type: Optional[Literal['v_prediction','epsilon','sample']] = Query(description='Prediction type for SDv2 checkpoint files', default="v_prediction"),
+        name: str = Body(description="A model path, repo_id or URL to import"),
+        prediction_type: Optional[Literal['v_prediction','epsilon','sample']] = \
+                Body(description='Prediction type for SDv2 checkpoint files', default="v_prediction"),
 ) -> ImportModelResponse:
     """ Add a model using its local path, repo_id, or remote URL """
+    
     items_to_import = {name}
     prediction_types = { x.value: x for x in SchedulerPredictionType }
     logger = ApiDependencies.invoker.services.logger
-    
-    installed_models = ApiDependencies.invoker.services.model_manager.heuristic_import(
-        items_to_import = items_to_import,
-        prediction_type_helper = lambda x: prediction_types.get(prediction_type)
-    )
-    if info := installed_models.get(name):
-        logger.info(f'Successfully imported {name}, got {info}')
-        return ImportModelResponse(
-            name = name,
-            info = info,
-            status = "success",
+
+    try:
+        installed_models = ApiDependencies.invoker.services.model_manager.heuristic_import(
+            items_to_import = items_to_import,
+            prediction_type_helper = lambda x: prediction_types.get(prediction_type)
         )
-    else:
-        logger.error(f'Model {name} not imported')
-        raise HTTPException(status_code=404, detail=f'Model {name} not found')
+        if info := installed_models.get(name):
+            logger.info(f'Successfully imported {name}, got {info}')
+            return ImportModelResponse(
+                name = name,
+                info = info,
+                status = "success",
+        )
+    except KeyError as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=409, detail=str(e))
+        
 
 @models_router.delete(
     "/{model_name}",
