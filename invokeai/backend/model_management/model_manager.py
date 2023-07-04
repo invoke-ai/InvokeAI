@@ -612,6 +612,7 @@ class ModelManager(object):
                 self.cache.uncache_model(cache_id)
 
         self.models[model_key] = model_config
+        self.commit()
         return AddModelResult(
             name = model_name,
             model_type = model_type,

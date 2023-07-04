@@ -318,6 +318,7 @@ class ModelManagerService(ModelManagerServiceBase):
         with an assertion error if provided attributes are incorrect or 
         the model name is missing. Call commit() to write changes to disk.
         """
+        self.logger.debug(f'add/update model {model_name}')        
         return self.mgr.add_model(model_name, base_model, model_type, model_attributes, clobber)
 
 
@@ -332,6 +333,7 @@ class ModelManagerService(ModelManagerServiceBase):
         then the underlying weight file or diffusers directory will be deleted 
         as well. Call commit() to write to disk.
         """
+        self.logger.debug(f'delete model {model_name}')
         self.mgr.del_model(model_name, base_model, model_type)
 
 

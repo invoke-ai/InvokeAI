@@ -205,7 +205,7 @@ class ModelInstall(object):
                 self.heuristic_import(child, models_installed=models_installed)
 
         # huggingface repo
-        elif str(model_path_id_or_url).split('/') == 2:
+        elif len(str(model_path_id_or_url).split('/')) == 2:
             models_installed.update({str(model_path_id_or_url): self._install_repo(str(model_path_id_or_url))})
 
         # a URL
