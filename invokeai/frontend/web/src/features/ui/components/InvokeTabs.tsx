@@ -72,7 +72,7 @@ const tabs: InvokeTabInfo[] = [
   //   content: <BatchTab />,
   // },
   {
-    id: 'modelmanager',
+    id: 'modelManager',
     icon: <Icon as={FaCube} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <ModelManagerTab />,
   },
@@ -92,6 +92,7 @@ const enabledTabsSelector = createSelector(
 
 const MIN_GALLERY_WIDTH = 300;
 const DEFAULT_GALLERY_PCT = 20;
+export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager'];
 
 const InvokeTabs = () => {
   const activeTab = useAppSelector(activeTabIndexSelector);
@@ -100,8 +101,6 @@ const InvokeTabs = () => {
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
   );
-
-  const noGalleryTabs: InvokeTabName[] = ['modelmanager'];
 
   const { shouldPinGallery, shouldPinParametersPanel, shouldShowGallery } =
     useAppSelector((state: RootState) => state.ui);
@@ -207,7 +206,7 @@ const InvokeTabs = () => {
         </Panel>
         {shouldPinGallery &&
           shouldShowGallery &&
-          !noGalleryTabs.includes(activeTabName) && (
+          !NO_GALLERY_TABS.includes(activeTabName) && (
             <>
               <ResizeHandle />
               <Panel

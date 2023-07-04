@@ -7,18 +7,17 @@ import { isEqual } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdPhotoLibrary } from 'react-icons/md';
-import { InvokeTabName } from '../store/tabMap';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
+import { NO_GALLERY_TABS } from './InvokeTabs';
 
 const floatingGalleryButtonSelector = createSelector(
   [activeTabNameSelector, uiSelector],
   (activeTabName, ui) => {
     const { shouldPinGallery, shouldShowGallery } = ui;
-    const noGalleryTabs: InvokeTabName[] = ['modelmanager'];
 
     return {
       shouldPinGallery,
-      shouldShowGalleryButton: noGalleryTabs.includes(activeTabName)
+      shouldShowGalleryButton: NO_GALLERY_TABS.includes(activeTabName)
         ? false
         : !shouldShowGallery,
     };

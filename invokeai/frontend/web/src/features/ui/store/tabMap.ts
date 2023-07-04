@@ -7,7 +7,7 @@ export const tabMap = [
   'batch',
   // 'postprocessing',
   // 'training',
-  'modelmanager',
+  'modelManager',
 ] as const;
 
 export type InvokeTabName = (typeof tabMap)[number];

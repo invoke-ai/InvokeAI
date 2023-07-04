@@ -5,7 +5,7 @@ import AddModelsPanel from './subpanels/AddModelsPanel';
 import MergeModelsPanel from './subpanels/MergeModelsPanel';
 import ModelManagerPanel from './subpanels/ModelManagerPanel';
 
-type ModelManagerTabName = 'modelmanager' | 'add_models' | 'merge_models';
+type ModelManagerTabName = 'modelManager' | 'addModels' | 'mergeModels';
 
 type ModelManagerTabInfo = {
   id: ModelManagerTabName;
@@ -15,57 +15,57 @@ type ModelManagerTabInfo = {
 
 const modelManagerTabs: ModelManagerTabInfo[] = [
   {
-    id: 'modelmanager',
+    id: 'modelManager',
     label: i18n.t('modelManager.modelManager'),
     content: <ModelManagerPanel />,
   },
   {
-    id: 'add_models',
+    id: 'addModels',
     label: i18n.t('modelManager.addModel'),
     content: <AddModelsPanel />,
   },
   {
-    id: 'merge_models',
+    id: 'mergeModels',
     label: i18n.t('modelManager.mergeModels'),
     content: <MergeModelsPanel />,
   },
 ];
 
-const ModelManagerTab = () => {
-  const renderTabsList = () => {
-    const modelManagerTabListsToRender: ReactNode[] = [];
-    modelManagerTabs.forEach((modelManagerTab) => {
-      modelManagerTabListsToRender.push(
-        <Tab key={modelManagerTab.id}>{modelManagerTab.label}</Tab>
-      );
-    });
-
-    return (
-      <TabList
-        sx={{
-          w: '100%',
-          color: 'base.200',
-          flexDirection: 'row',
-          borderBottomWidth: 2,
-          borderColor: 'accent.700',
-        }}
-      >
-        {modelManagerTabListsToRender}
-      </TabList>
+const renderTabsList = () => {
+  const modelManagerTabListsToRender: ReactNode[] = [];
+  modelManagerTabs.forEach((modelManagerTab) => {
+    modelManagerTabListsToRender.push(
+      <Tab key={modelManagerTab.id}>{modelManagerTab.label}</Tab>
     );
-  };
+  });
 
-  const renderTabPanels = () => {
-    const modelManagerTabPanelsToRender: ReactNode[] = [];
-    modelManagerTabs.forEach((modelManagerTab) => {
-      modelManagerTabPanelsToRender.push(
-        <TabPanel key={modelManagerTab.id}>{modelManagerTab.content}</TabPanel>
-      );
-    });
+  return (
+    <TabList
+      sx={{
+        w: '100%',
+        color: 'base.200',
+        flexDirection: 'row',
+        borderBottomWidth: 2,
+        borderColor: 'accent.700',
+      }}
+    >
+      {modelManagerTabListsToRender}
+    </TabList>
+  );
+};
 
-    return <TabPanels sx={{ p: 2 }}>{modelManagerTabPanelsToRender}</TabPanels>;
-  };
+const renderTabPanels = () => {
+  const modelManagerTabPanelsToRender: ReactNode[] = [];
+  modelManagerTabs.forEach((modelManagerTab) => {
+    modelManagerTabPanelsToRender.push(
+      <TabPanel key={modelManagerTab.id}>{modelManagerTab.content}</TabPanel>
+    );
+  });
 
+  return <TabPanels sx={{ p: 2 }}>{modelManagerTabPanelsToRender}</TabPanels>;
+};
+
+const ModelManagerTab = () => {
   return (
     <Tabs
       isLazy
