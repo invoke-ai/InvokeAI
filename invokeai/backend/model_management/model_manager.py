@@ -546,10 +546,7 @@ class ModelManager(object):
         model_cfg = self.models.pop(model_key, None)
 
         if model_cfg is None:
-            self.logger.error(
-                f"Unknown model {model_key}"
-            )
-            return
+            raise KeyError(f"Unknown model {model_key}")
 
         # note: it not garantie to release memory(model can has other references)
         cache_ids = self.cache_keys.pop(model_key, [])

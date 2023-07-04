@@ -2,7 +2,7 @@
 
 from typing import Literal, Optional, Union
 
-from fastapi import Query, Body
+from fastapi import Query, Body, Path
 from fastapi.routing import APIRouter, HTTPException
 from pydantic import BaseModel, Field, parse_obj_as
 from ..dependencies import ApiDependencies
@@ -153,7 +153,7 @@ async def import_model(
         
 
 @models_router.delete(
-    "/{model_name}",
+    "/{base_model}/{model_type}/{model_name}",
     operation_id="del_model",
     responses={
         204: {
@@ -164,24 +164,27 @@ async def import_model(
         }
     },
 )
-async def delete_model(model_name: str) -> None:
+async def delete_model(
+        base_model: BaseModelType = Path(default='sd-1', description="Base model"),
+        model_type: ModelType = Path(default='main', description="The type of model"),
+        model_name: str = Path(default=None, description="model name"),
+) -> None:
     """Delete Model"""
-    model_names = ApiDependencies.invoker.services.model_manager.model_names()
     logger = ApiDependencies.invoker.services.logger
-    model_exists = model_name in model_names
-
-    # check if model exists
-    logger.info(f"Checking for model {model_name}...")
-           
-    if model_exists:
-        logger.info(f"Deleting Model: {model_name}")
-        ApiDependencies.invoker.services.model_manager.del_model(model_name, delete_files=True)
-        logger.info(f"Model Deleted: {model_name}")
-        raise HTTPException(status_code=204, detail=f"Model '{model_name}' deleted successfully")
     
-    else:
-        logger.error("Model not found")
+    try:
+        ApiDependencies.invoker.services.model_manager.del_model(model_name,
+                                                                 base_model = base_model,
+                                                                 model_type = model_type
+                                                                 )
+        logger.info(f"Deleted model: {model_name}")
+        raise HTTPException(status_code=204, detail=f"Model '{model_name}' deleted successfully")
+    except KeyError:
+        logger.error(f"Model not found: {model_name}")
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
+    else:
+        logger.info(f"Model deleted: {model_name}")
+        raise HTTPException(status_code=204, detail=f"Model '{model_name}' deleted successfully")
     
 
             # @socketio.on("convertToDiffusers")
