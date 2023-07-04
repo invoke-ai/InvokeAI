@@ -3,6 +3,7 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
   LATENTS_TO_IMAGE,
@@ -156,6 +157,8 @@ export const buildCanvasTextToImageGraph = (
       },
     ],
   };
+
+  addLoRAsToGraph(graph, state, TEXT_TO_LATENTS);
 
   // Add VAE
   addVAEToGraph(graph, state);

@@ -35,7 +35,9 @@ export type ModelType = S<'ModelType'>;
 export type BaseModelType = S<'BaseModelType'>;
 export type MainModelField = S<'MainModelField'>;
 export type VAEModelField = S<'VAEModelField'>;
+export type LoRAModelField = S<'LoRAModelField'>;
 export type ModelsList = S<'ModelsList'>;
+export type LoRAModelConfig = S<'LoRAModelConfig'>;
 
 // Graphs
 export type Graph = S<'Graph'>;
@@ -60,6 +62,7 @@ export type ImageToLatentsInvocation = N<'ImageToLatentsInvocation'>;
 export type LatentsToImageInvocation = N<'LatentsToImageInvocation'>;
 export type ImageCollectionInvocation = N<'ImageCollectionInvocation'>;
 export type MainModelLoaderInvocation = N<'MainModelLoaderInvocation'>;
+export type LoraLoaderInvocation = N<'LoraLoaderInvocation'>;
 
 // ControlNet Nodes
 export type ControlNetInvocation = N<'ControlNetInvocation'>;

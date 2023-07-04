@@ -9,6 +9,7 @@ import {
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
   IMAGE_TO_IMAGE_GRAPH,
@@ -251,6 +252,8 @@ export const buildCanvasImageToImageGraph = (
       },
     });
   }
+
+  addLoRAsToGraph(graph, state, LATENTS_TO_LATENTS);
 
   // Add VAE
   addVAEToGraph(graph, state);
