@@ -1,17 +1,18 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
+import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
+import { modelIdToMainModelField } from '../modelIdToMainModelField';
+import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addVAEToGraph } from './addVAEToGraph';
 import {
   LATENTS_TO_IMAGE,
-  PIPELINE_MODEL_LOADER,
+  MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
   TEXT_TO_IMAGE_GRAPH,
   TEXT_TO_LATENTS,
 } from './constants';
-import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
-import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 
 export const buildLinearTextToImageGraph = (
   state: RootState
@@ -27,7 +28,7 @@ export const buildLinearTextToImageGraph = (
     height,
   } = state.generation;
 
-  const model = modelIdToPipelineModelField(modelId);
+  const model = modelIdToMainModelField(modelId);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -65,9 +66,9 @@ export const buildLinearTextToImageGraph = (
         scheduler,
         steps,
       },
-      [PIPELINE_MODEL_LOADER]: {
-        type: 'pipeline_model_loader',
-        id: PIPELINE_MODEL_LOADER,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         model,
       },
       [LATENTS_TO_IMAGE]: {
@@ -98,7 +99,7 @@ export const buildLinearTextToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -108,7 +109,7 @@ export const buildLinearTextToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -118,7 +119,7 @@ export const buildLinearTextToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
@@ -134,16 +135,6 @@ export const buildLinearTextToImageGraph = (
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: PIPELINE_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'vae',
         },
       },
       {
@@ -158,6 +149,9 @@ export const buildLinearTextToImageGraph = (
       },
     ],
   };
+
+  // Add Custom VAE Support
+  addVAEToGraph(graph, state);
 
   // add dynamic prompts, mutating `graph`
   addDynamicPromptsToGraph(graph, state);

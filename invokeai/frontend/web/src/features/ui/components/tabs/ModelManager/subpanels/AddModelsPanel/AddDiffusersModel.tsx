@@ -66,7 +66,7 @@ export default function AddDiffusersModel() {
   };
 
   return (
-    <Flex>
+    <Flex overflow="scroll" maxHeight={window.innerHeight - 270}>
       <Formik
         initialValues={addModelFormValues}
         onSubmit={addModelFormSubmitHandler}

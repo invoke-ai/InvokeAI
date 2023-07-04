@@ -3,20 +3,21 @@ import { memo } from 'react';
 import { InputFieldTemplate, InputFieldValue } from '../types/types';
 import ArrayInputFieldComponent from './fields/ArrayInputFieldComponent';
 import BooleanInputFieldComponent from './fields/BooleanInputFieldComponent';
-import EnumInputFieldComponent from './fields/EnumInputFieldComponent';
-import ImageInputFieldComponent from './fields/ImageInputFieldComponent';
-import LatentsInputFieldComponent from './fields/LatentsInputFieldComponent';
-import ConditioningInputFieldComponent from './fields/ConditioningInputFieldComponent';
-import UNetInputFieldComponent from './fields/UNetInputFieldComponent';
 import ClipInputFieldComponent from './fields/ClipInputFieldComponent';
-import VaeInputFieldComponent from './fields/VaeInputFieldComponent';
+import ColorInputFieldComponent from './fields/ColorInputFieldComponent';
+import ConditioningInputFieldComponent from './fields/ConditioningInputFieldComponent';
 import ControlInputFieldComponent from './fields/ControlInputFieldComponent';
+import EnumInputFieldComponent from './fields/EnumInputFieldComponent';
+import ImageCollectionInputFieldComponent from './fields/ImageCollectionInputFieldComponent';
+import ImageInputFieldComponent from './fields/ImageInputFieldComponent';
+import ItemInputFieldComponent from './fields/ItemInputFieldComponent';
+import LatentsInputFieldComponent from './fields/LatentsInputFieldComponent';
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
-import ColorInputFieldComponent from './fields/ColorInputFieldComponent';
-import ItemInputFieldComponent from './fields/ItemInputFieldComponent';
-import ImageCollectionInputFieldComponent from './fields/ImageCollectionInputFieldComponent';
+import UNetInputFieldComponent from './fields/UNetInputFieldComponent';
+import VaeInputFieldComponent from './fields/VaeInputFieldComponent';
+import VaeModelInputFieldComponent from './fields/VaeModelInputFieldComponent';
 
 type InputFieldComponentProps = {
   nodeId: string;
@@ -145,6 +146,16 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'model' && template.type === 'model') {
     return (
       <ModelInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'vae_model' && template.type === 'vae_model') {
+    return (
+      <VaeModelInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}

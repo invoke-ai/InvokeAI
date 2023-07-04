@@ -33,7 +33,8 @@ export type OffsetPaginatedResults_ImageDTO_ =
 // Models
 export type ModelType = S<'ModelType'>;
 export type BaseModelType = S<'BaseModelType'>;
-export type PipelineModelField = S<'PipelineModelField'>;
+export type MainModelField = S<'MainModelField'>;
+export type VAEModelField = S<'VAEModelField'>;
 export type ModelsList = S<'ModelsList'>;
 
 // Graphs
@@ -57,8 +58,8 @@ export type TextToLatentsInvocation = N<'TextToLatentsInvocation'>;
 export type LatentsToLatentsInvocation = N<'LatentsToLatentsInvocation'>;
 export type ImageToLatentsInvocation = N<'ImageToLatentsInvocation'>;
 export type LatentsToImageInvocation = N<'LatentsToImageInvocation'>;
-export type PipelineModelLoaderInvocation = N<'PipelineModelLoaderInvocation'>;
 export type ImageCollectionInvocation = N<'ImageCollectionInvocation'>;
+export type MainModelLoaderInvocation = N<'MainModelLoaderInvocation'>;
 
 // ControlNet Nodes
 export type ControlNetInvocation = N<'ControlNetInvocation'>;

@@ -1,20 +1,21 @@
-import { memo } from 'react';
 import { Box, Flex, useDisclosure } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { uiSelector } from 'features/ui/store/uiSelectors';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
-import ParamSteps from 'features/parameters/components/Parameters/Core/ParamSteps';
-import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
-import ParamWidth from 'features/parameters/components/Parameters/Core/ParamWidth';
-import ParamHeight from 'features/parameters/components/Parameters/Core/ParamHeight';
-import ImageToImageStrength from 'features/parameters/components/Parameters/ImageToImage/ImageToImageStrength';
-import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
-import ParamSchedulerAndModel from 'features/parameters/components/Parameters/Core/ParamSchedulerAndModel';
-import ParamSeedFull from 'features/parameters/components/Parameters/Seed/ParamSeedFull';
 import IAICollapse from 'common/components/IAICollapse';
+import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
+import ParamHeight from 'features/parameters/components/Parameters/Core/ParamHeight';
+import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
+import ParamModelandVAE from 'features/parameters/components/Parameters/Core/ParamModelandVAE';
+import ParamScheduler from 'features/parameters/components/Parameters/Core/ParamScheduler';
+import ParamSteps from 'features/parameters/components/Parameters/Core/ParamSteps';
+import ParamWidth from 'features/parameters/components/Parameters/Core/ParamWidth';
+import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
+import ImageToImageStrength from 'features/parameters/components/Parameters/ImageToImage/ImageToImageStrength';
+import ParamSeedFull from 'features/parameters/components/Parameters/Seed/ParamSeedFull';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
+import { uiSelector } from 'features/ui/store/uiSelectors';
+import { memo } from 'react';
 
 const selector = createSelector(
   [uiSelector, generationSelector],
@@ -41,7 +42,7 @@ const ImageToImageTabCoreParameters = () => {
       >
         {shouldUseSliders ? (
           <>
-            <ParamSchedulerAndModel />
+            <ParamModelandVAE />
             <Box pt={2}>
               <ParamSeedFull />
             </Box>
@@ -58,7 +59,8 @@ const ImageToImageTabCoreParameters = () => {
               <ParamSteps />
               <ParamCFGScale />
             </Flex>
-            <ParamSchedulerAndModel />
+            <ParamModelandVAE />
+            <ParamScheduler />
             <Box pt={2}>
               <ParamSeedFull />
             </Box>

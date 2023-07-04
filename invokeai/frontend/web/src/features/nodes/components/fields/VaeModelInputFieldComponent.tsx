@@ -1,39 +1,46 @@
 import { SelectItem } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  ModelInputFieldTemplate,
-  ModelInputFieldValue,
+  VaeModelInputFieldTemplate,
+  VaeModelInputFieldValue,
 } from 'features/nodes/types/types';
-
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
-import { forEach, isString } from 'lodash-es';
+import { forEach } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 
-const ModelInputFieldComponent = (
-  props: FieldComponentProps<ModelInputFieldValue, ModelInputFieldTemplate>
+const VaeModelInputFieldComponent = (
+  props: FieldComponentProps<
+    VaeModelInputFieldValue,
+    VaeModelInputFieldTemplate
+  >
 ) => {
   const { nodeId, field } = props;
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { data: mainModels } = useListModelsQuery({
-    model_type: 'main',
+  const { data: vaeModels } = useListModelsQuery({
+    model_type: 'vae',
   });
 
+  const selectedModel = useMemo(
+    () => vaeModels?.entities[field.value ?? vaeModels.ids[0]],
+    [vaeModels?.entities, vaeModels?.ids, field.value]
+  );
+
   const data = useMemo(() => {
-    if (!mainModels) {
+    if (!vaeModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(mainModels.entities, (model, id) => {
+    forEach(vaeModels.entities, (model, id) => {
       if (!model) {
         return;
       }
@@ -46,12 +53,7 @@ const ModelInputFieldComponent = (
     });
 
     return data;
-  }, [mainModels]);
-
-  const selectedModel = useMemo(
-    () => mainModels?.entities[field.value ?? mainModels.ids[0]],
-    [mainModels?.entities, mainModels?.ids, field.value]
-  );
+  }, [vaeModels]);
 
   const handleValueChanged = useCallback(
     (v: string | null) => {
@@ -71,18 +73,11 @@ const ModelInputFieldComponent = (
   );
 
   useEffect(() => {
-    if (field.value && mainModels?.ids.includes(field.value)) {
+    if (field.value && vaeModels?.ids.includes(field.value)) {
       return;
     }
-
-    const firstModel = mainModels?.ids[0];
-
-    if (!isString(firstModel)) {
-      return;
-    }
-
-    handleValueChanged(firstModel);
-  }, [field.value, handleValueChanged, mainModels?.ids]);
+    handleValueChanged('auto');
+  }, [field.value, handleValueChanged, vaeModels?.ids]);
 
   return (
     <IAIMantineSelect
@@ -99,4 +94,4 @@ const ModelInputFieldComponent = (
   );
 };
 
-export default memo(ModelInputFieldComponent);
+export default memo(VaeModelInputFieldComponent);

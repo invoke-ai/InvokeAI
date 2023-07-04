@@ -14,6 +14,7 @@ import {
   SeedParam,
   StepsParam,
   StrengthParam,
+  VAEParam,
   WidthParam,
 } from './parameterZodSchemas';
 
@@ -47,6 +48,7 @@ export interface GenerationState {
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
   model: ModelParam;
+  vae: VAEParam;
   shouldUseSeamless: boolean;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
@@ -81,6 +83,7 @@ export const initialGenerationState: GenerationState = {
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
   model: '',
+  vae: '',
   shouldUseSeamless: false,
   seamlessXAxis: true,
   seamlessYAxis: true,
@@ -216,6 +219,9 @@ export const generationSlice = createSlice({
     modelSelected: (state, action: PayloadAction<string>) => {
       state.model = action.payload;
     },
+    vaeSelected: (state, action: PayloadAction<string>) => {
+      state.vae = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -260,6 +266,7 @@ export const {
   setVerticalSymmetrySteps,
   initialImageChanged,
   modelSelected,
+  vaeSelected,
   setShouldUseNoiseSettings,
   setSeamless,
   setSeamlessXAxis,

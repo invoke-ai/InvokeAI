@@ -1,11 +1,12 @@
-from typing import Literal, Optional, Union, List
-from pydantic import BaseModel, Field
 import copy
+from typing import List, Literal, Optional
 
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
+from pydantic import BaseModel, Field
 
-from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.model_management import BaseModelType, ModelType, SubModelType
+from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
+                             InvocationConfig, InvocationContext)
+
 
 class ModelInfo(BaseModel):
     model_name: str = Field(description="Info to load submodel")
@@ -30,7 +31,6 @@ class VaeField(BaseModel):
     # TODO: better naming?
     vae: ModelInfo = Field(description="Info to load vae submodel")
 
-
 class ModelLoaderOutput(BaseInvocationOutput):
     """Model loader output"""
 
@@ -43,25 +43,26 @@ class ModelLoaderOutput(BaseInvocationOutput):
     #fmt: on
 
 
-class PipelineModelField(BaseModel):
-    """Pipeline model field"""
+class MainModelField(BaseModel):
+    """Main model field"""
 
     model_name: str = Field(description="Name of the model")
     base_model: BaseModelType = Field(description="Base model")
 
 
-class PipelineModelLoaderInvocation(BaseInvocation):
-    """Loads a pipeline model, outputting its submodels."""
+class MainModelLoaderInvocation(BaseInvocation):
+    """Loads a main model, outputting its submodels."""
 
-    type: Literal["pipeline_model_loader"] = "pipeline_model_loader"
+    type: Literal["main_model_loader"] = "main_model_loader"
 
-    model: PipelineModelField = Field(description="The model to load")
+    model: MainModelField = Field(description="The model to load")
     # TODO: precision?
 
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "Model Loader",
                 "tags": ["model", "loader"],
                 "type_hints": {
                   "model": "model"
@@ -175,6 +176,14 @@ class LoraLoaderInvocation(BaseInvocation):
     unet: Optional[UNetField] = Field(description="UNet model for applying lora")
     clip: Optional[ClipField] = Field(description="Clip model for applying lora")
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Lora Loader",
+                "tags": ["lora", "loader"],
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> LoraLoaderOutput:
 
         # TODO: ui rewrite
@@ -221,3 +230,56 @@ class LoraLoaderInvocation(BaseInvocation):
 
         return output
 
+class VAEModelField(BaseModel):
+    """Vae model field"""
+
+    model_name: str = Field(description="Name of the model")
+    base_model: BaseModelType = Field(description="Base model")
+
+class VaeLoaderOutput(BaseInvocationOutput):
+    """Model loader output"""
+
+    #fmt: off
+    type: Literal["vae_loader_output"] = "vae_loader_output"
+
+    vae: VaeField = Field(default=None, description="Vae model")
+    #fmt: on
+
+class VaeLoaderInvocation(BaseInvocation):
+    """Loads a VAE model, outputting a VaeLoaderOutput"""
+    type: Literal["vae_loader"] = "vae_loader"
+    
+    vae_model: VAEModelField = Field(description="The VAE to load")
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "VAE Loader",
+                "tags": ["vae", "loader"],
+                "type_hints": {
+                  "vae_model": "vae_model"
+                }
+            },
+        }
+        
+    def invoke(self, context: InvocationContext) -> VaeLoaderOutput:
+        base_model = self.vae_model.base_model
+        model_name = self.vae_model.model_name
+        model_type = ModelType.Vae
+
+        if not context.services.model_manager.model_exists(
+                base_model=base_model,
+                model_name=model_name,
+                model_type=model_type,
+        ):
+            raise Exception(f"Unkown vae name: {model_name}!")
+        return VaeLoaderOutput(
+            vae=VaeField(
+                vae = ModelInfo(
+                    model_name = model_name,
+                    base_model = base_model,
+                    model_type = model_type,
+                )
+            )
+        )

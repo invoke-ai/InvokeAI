@@ -64,6 +64,7 @@ export type FieldType =
   | 'vae'
   | 'control'
   | 'model'
+  | 'vae_model'
   | 'array'
   | 'item'
   | 'color'
@@ -91,6 +92,7 @@ export type InputFieldValue =
   | ControlInputFieldValue
   | EnumInputFieldValue
   | ModelInputFieldValue
+  | VaeModelInputFieldValue
   | ArrayInputFieldValue
   | ItemInputFieldValue
   | ColorInputFieldValue
@@ -116,6 +118,7 @@ export type InputFieldTemplate =
   | ControlInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
+  | VaeModelInputFieldTemplate
   | ArrayInputFieldTemplate
   | ItemInputFieldTemplate
   | ColorInputFieldTemplate
@@ -228,6 +231,11 @@ export type ModelInputFieldValue = FieldValueBase & {
   value?: string;
 };
 
+export type VaeModelInputFieldValue = FieldValueBase & {
+  type: 'vae_model';
+  value?: string;
+};
+
 export type ArrayInputFieldValue = FieldValueBase & {
   type: 'array';
   value?: (string | number)[];
@@ -305,6 +313,21 @@ export type ConditioningInputFieldTemplate = InputFieldTemplateBase & {
   type: 'conditioning';
 };
 
+export type UNetInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'unet';
+};
+
+export type ClipInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'clip';
+};
+
+export type VaeInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'vae';
+};
+
 export type ControlInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
   type: 'control';
@@ -320,6 +343,11 @@ export type EnumInputFieldTemplate = InputFieldTemplateBase & {
 export type ModelInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'model';
+};
+
+export type VaeModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
+  type: 'vae_model';
 };
 
 export type ArrayInputFieldTemplate = InputFieldTemplateBase & {

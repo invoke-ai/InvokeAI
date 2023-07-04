@@ -1,10 +1,11 @@
-import { Graph } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
-import { cloneDeep, omit, reduce } from 'lodash-es';
 import { RootState } from 'app/store/store';
 import { InputFieldValue } from 'features/nodes/types/types';
+import { cloneDeep, omit, reduce } from 'lodash-es';
+import { Graph } from 'services/api/types';
 import { AnyInvocation } from 'services/events/types';
-import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
+import { v4 as uuidv4 } from 'uuid';
+import { modelIdToMainModelField } from '../modelIdToMainModelField';
+import { modelIdToVAEModelField } from '../modelIdToVAEModelField';
 
 /**
  * We need to do special handling for some fields
@@ -27,7 +28,13 @@ export const parseFieldValue = (field: InputFieldValue) => {
 
   if (field.type === 'model') {
     if (field.value) {
-      return modelIdToPipelineModelField(field.value);
+      return modelIdToMainModelField(field.value);
+    }
+  }
+
+  if (field.type === 'vae_model') {
+    if (field.value) {
+      return modelIdToVAEModelField(field.value);
     }
   }
 
