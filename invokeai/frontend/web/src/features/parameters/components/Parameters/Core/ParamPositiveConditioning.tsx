@@ -11,12 +11,15 @@ import {
 } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 
+import { userInvoked } from 'app/store/actions';
+import IAIIconButton from 'common/components/IAIIconButton';
+import IAITextarea from 'common/components/IAITextarea';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
+import { toggleEmbeddingPicker } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { userInvoked } from 'app/store/actions';
-import IAITextarea from 'common/components/IAITextarea';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
+import { BiCode } from 'react-icons/bi';
 
 const promptInputSelector = createSelector(
   [(state: RootState) => state.generation, activeTabNameSelector],
@@ -68,8 +71,21 @@ const ParamPositiveConditioning = () => {
     [dispatch, activeTabName, isReady]
   );
 
+  const shouldShowEmbeddingPicker = useAppSelector(
+    (state: RootState) => state.ui.shouldShowEmbeddingPicker
+  );
+
   return (
     <Box>
+      <IAIIconButton
+        size="xs"
+        aria-label="Toggle Embedding Picker"
+        tooltip="Toggle Embedding Picker"
+        icon={<BiCode />}
+        sx={{ position: 'absolute', top: 8, right: 2, zIndex: 2 }}
+        isChecked={shouldShowEmbeddingPicker}
+        onClick={() => dispatch(toggleEmbeddingPicker())}
+      ></IAIIconButton>
       <FormControl>
         <IAITextarea
           id="prompt"

@@ -17,9 +17,9 @@ const UnifiedCanvasParameters = () => {
     <>
       <ParamPositiveConditioning />
       <ParamNegativeConditioning />
+      <ParamEmbeddingCollapse />
       <ProcessButtons />
       <UnifiedCanvasCoreParameters />
-      <ParamEmbeddingCollapse />
       <ParamLoraCollapse />
       <ParamDynamicPromptsCollapse />
       <ParamControlNetCollapse />
