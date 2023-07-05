@@ -480,7 +480,7 @@ class ModelManager(object):
         """
         model_key = self.create_key(model_name, base_model, model_type)
         if model_key in self.models:
-            return self.models[model_key].dict(exclude_defaults=True)
+            return self.models[model_key].dict(exclude_defaults=True, exclude={"error"})
         else:
             return None # TODO: None or empty dict on not found
 

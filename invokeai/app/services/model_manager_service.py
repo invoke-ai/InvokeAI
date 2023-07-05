@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import torch
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Union, Callable, List, Set, Dict, Tuple, types, TYPE_CHECKING
+from typing import Optional, Union, Callable, List, Tuple, TYPE_CHECKING
+from types import ModuleType
 
 from invokeai.backend.model_management.model_manager import (
     ModelManager,
@@ -16,9 +16,11 @@ from invokeai.backend.model_management.model_manager import (
     AddModelResult,
     SchedulerPredictionType,
 )
+
+import torch
 from invokeai.app.models.exceptions import CanceledException
-from .config import InvokeAIAppConfig
 from ...backend.util import choose_precision, choose_torch_device
+from .config import InvokeAIAppConfig
 
 if TYPE_CHECKING:
     from ..invocations.baseinvocation import BaseInvocation, InvocationContext
@@ -31,7 +33,7 @@ class ModelManagerServiceBase(ABC):
     def __init__(
         self,
         config: InvokeAIAppConfig,
-        logger: types.ModuleType,
+        logger: ModuleType,
     ):
         """
         Initialize with the path to the models.yaml config file. 
@@ -123,6 +125,24 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
+    def update_model(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        model_attributes: dict,
+    ) -> AddModelResult:
+        """
+        Update the named model with a dictionary of attributes. Will fail with a
+        KeyErrorException if the name does not already exist.
+
+        On a successful update, the config will be changed in memory. Will fail 
+        with an assertion error if provided attributes are incorrect or 
+        the model name is missing. Call commit() to write changes to disk.
+        """
+        pass
+    
+    @abstractmethod
     def del_model(
         self,
         model_name: str,
@@ -159,9 +179,9 @@ class ModelManagerServiceBase(ABC):
 
     @abstractmethod
     def heuristic_import(self,
-                         items_to_import: Set[str],
-                         prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
-                         )->Dict[str, AddModelResult]:
+                         items_to_import: set[str],
+                         prediction_type_helper: Optional[Callable[[Path],SchedulerPredictionType]]=None,
+                         )->dict[str, AddModelResult]:
         '''Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.
         :param items_to_import: Set of strings corresponding to models to be imported.
@@ -181,7 +201,7 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def commit(self, conf_file: Path = None) -> None:
+    def commit(self, conf_file: Optional[Path] = None) -> None:
         """
         Write current configuration out to the indicated file.
         If no conf_file is provided, then replaces the
@@ -195,7 +215,7 @@ class ModelManagerService(ModelManagerServiceBase):
     def __init__(
         self,
         config: InvokeAIAppConfig,
-        logger: types.ModuleType,
+        logger: ModuleType,
     ):
         """
         Initialize with the path to the models.yaml config file. 
@@ -343,7 +363,25 @@ class ModelManagerService(ModelManagerServiceBase):
         self.logger.debug(f'add/update model {model_name}')        
         return self.mgr.add_model(model_name, base_model, model_type, model_attributes, clobber)
 
-
+    def update_model(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        model_attributes: dict,
+    ) -> AddModelResult:
+        """
+        Update the named model with a dictionary of attributes. Will fail with a
+        KeyError exception if the name does not already exist.
+        On a successful update, the config will be changed in memory. Will fail 
+        with an assertion error if provided attributes are incorrect or 
+        the model name is missing. Call commit() to write changes to disk.
+        """
+        self.logger.debug(f'update model {model_name}')
+        if not self.model_exists(model_name, base_model, model_type):
+            raise KeyError(f"Unknown model {model_name}")
+        return self.add_model(model_name, base_model, model_type, model_attributes, clobber=True)
+    
     def del_model(
         self,
         model_name: str,
@@ -429,9 +467,9 @@ class ModelManagerService(ModelManagerServiceBase):
         return self.mgr.logger
         
     def heuristic_import(self,
-                         items_to_import: Set[str],
-                         prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
-                         )->Dict[str, AddModelResult]:
+                         items_to_import: set[str],
+                         prediction_type_helper: Optional[Callable[[Path],SchedulerPredictionType]]=None,
+                         )->dict[str, AddModelResult]:
         '''Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.
         :param items_to_import: Set of strings corresponding to models to be imported.
