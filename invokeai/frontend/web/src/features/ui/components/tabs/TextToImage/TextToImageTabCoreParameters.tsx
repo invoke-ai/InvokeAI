@@ -1,5 +1,6 @@
-import { Box, Flex, useDisclosure } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
@@ -11,25 +12,30 @@ import ParamScheduler from 'features/parameters/components/Parameters/Core/Param
 import ParamSteps from 'features/parameters/components/Parameters/Core/ParamSteps';
 import ParamWidth from 'features/parameters/components/Parameters/Core/ParamWidth';
 import ParamSeedFull from 'features/parameters/components/Parameters/Seed/ParamSeedFull';
-import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 const selector = createSelector(
-  uiSelector,
-  (ui) => {
+  stateSelector,
+  ({ ui, generation }) => {
     const { shouldUseSliders } = ui;
+    const { shouldRandomizeSeed } = generation;
 
-    return { shouldUseSliders };
+    const activeLabel = !shouldRandomizeSeed ? 'Manual Seed' : undefined;
+
+    return { shouldUseSliders, activeLabel };
   },
   defaultSelectorOptions
 );
 
 const TextToImageTabCoreParameters = () => {
-  const { shouldUseSliders } = useAppSelector(selector);
-  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
+  const { shouldUseSliders, activeLabel } = useAppSelector(selector);
 
   return (
-    <IAICollapse label={'General'} isOpen={isOpen} onToggle={onToggle}>
+    <IAICollapse
+      label={'General'}
+      activeLabel={activeLabel}
+      defaultIsOpen={true}
+    >
       <Flex
         sx={{
           flexDirection: 'column',
