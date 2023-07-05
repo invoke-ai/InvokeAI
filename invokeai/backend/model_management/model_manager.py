@@ -651,7 +651,7 @@ class ModelManager(object):
                                )
         checkpoint_path = self.app_config.root_path / info["path"]
         old_diffusers_path = self.app_config.models_path / model.location
-        new_diffusers_path = self.app_config.models_path / base_model / model_type / model_name
+        new_diffusers_path = self.app_config.models_path / base_model.value / model_type.value / model_name
         if new_diffusers_path.exists():
             raise ValueError(f"A diffusers model already exists at {new_path}")
 
