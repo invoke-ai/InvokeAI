@@ -219,11 +219,11 @@ class MigrateTo3(object):
             repo_id = 'openai/clip-vit-large-patch14'
             self._migrate_pretrained(CLIPTokenizer,
                                      repo_id= repo_id,
-                                     dest= target_dir / 'clip-vit-large-patch14' / 'tokenizer',
+                                     dest= target_dir / 'clip-vit-large-patch14',
                                      **kwargs)
             self._migrate_pretrained(CLIPTextModel,
                                      repo_id = repo_id,
-                                     dest = target_dir / 'clip-vit-large-patch14' / 'text_encoder',
+                                     dest = target_dir / 'clip-vit-large-patch14',
                                      **kwargs)
 
             # sd-2
