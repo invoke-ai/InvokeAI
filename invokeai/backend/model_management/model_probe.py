@@ -78,7 +78,6 @@ class ModelProbe(object):
             format_type = 'diffusers' if model_path.is_dir() else 'checkpoint'
         else:
             format_type = 'diffusers' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
-
         model_info = None
         try:
             model_type = cls.get_model_type_from_folder(model_path, model) \
@@ -105,7 +104,7 @@ class ModelProbe(object):
                                      ) else 512,
             )
         except Exception:
-            return None
+            raise
 
         return model_info
 
