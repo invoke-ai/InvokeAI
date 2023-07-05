@@ -3,27 +3,29 @@ import { OpenAPIV3 } from 'openapi-types';
 import { FIELD_TYPE_MAP } from '../types/constants';
 import { isSchemaObject } from '../types/typeGuards';
 import {
-  BooleanInputFieldTemplate,
-  EnumInputFieldTemplate,
-  FloatInputFieldTemplate,
-  ImageInputFieldTemplate,
-  IntegerInputFieldTemplate,
-  LatentsInputFieldTemplate,
-  ConditioningInputFieldTemplate,
-  UNetInputFieldTemplate,
-  ClipInputFieldTemplate,
-  VaeInputFieldTemplate,
-  ControlInputFieldTemplate,
-  StringInputFieldTemplate,
-  ModelInputFieldTemplate,
   ArrayInputFieldTemplate,
-  ItemInputFieldTemplate,
+  BooleanInputFieldTemplate,
+  ClipInputFieldTemplate,
   ColorInputFieldTemplate,
-  InputFieldTemplateBase,
-  OutputFieldTemplate,
-  TypeHints,
+  ConditioningInputFieldTemplate,
+  ControlInputFieldTemplate,
+  EnumInputFieldTemplate,
   FieldType,
+  FloatInputFieldTemplate,
   ImageCollectionInputFieldTemplate,
+  ImageInputFieldTemplate,
+  InputFieldTemplateBase,
+  IntegerInputFieldTemplate,
+  ItemInputFieldTemplate,
+  LatentsInputFieldTemplate,
+  LoRAModelInputFieldTemplate,
+  ModelInputFieldTemplate,
+  OutputFieldTemplate,
+  StringInputFieldTemplate,
+  TypeHints,
+  UNetInputFieldTemplate,
+  VaeInputFieldTemplate,
+  VaeModelInputFieldTemplate,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -167,6 +169,36 @@ const buildModelInputFieldTemplate = ({
   const template: ModelInputFieldTemplate = {
     ...baseField,
     type: 'model',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildVaeModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): VaeModelInputFieldTemplate => {
+  const template: VaeModelInputFieldTemplate = {
+    ...baseField,
+    type: 'vae_model',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildLoRAModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): LoRAModelInputFieldTemplate => {
+  const template: LoRAModelInputFieldTemplate = {
+    ...baseField,
+    type: 'lora_model',
     inputRequirement: 'always',
     inputKind: 'direct',
     default: schemaObject.default ?? undefined,
@@ -440,6 +472,12 @@ export const buildInputFieldTemplate = (
   }
   if (['model'].includes(fieldType)) {
     return buildModelInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['vae_model'].includes(fieldType)) {
+    return buildVaeModelInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['lora_model'].includes(fieldType)) {
+    return buildLoRAModelInputFieldTemplate({ schemaObject, baseField });
   }
   if (['enum'].includes(fieldType)) {
     return buildEnumInputFieldTemplate({ schemaObject, baseField });

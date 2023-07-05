@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploader from 'common/components/ImageUploader';
 import GalleryDrawer from 'features/gallery/components/GalleryPanel';
+import DeleteImageModal from 'features/imageDeletion/components/DeleteImageModal';
 import Lightbox from 'features/lightbox/components/Lightbox';
 import SiteHeader from 'features/system/components/SiteHeader';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -15,11 +16,10 @@ import InvokeTabs from 'features/ui/components/InvokeTabs';
 import ParametersDrawer from 'features/ui/components/ParametersDrawer';
 import i18n from 'i18n';
 import { ReactNode, memo, useEffect } from 'react';
+import DeleteBoardImagesModal from '../../features/gallery/components/Boards/DeleteBoardImagesModal';
+import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
-import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
-import DeleteBoardImagesModal from '../../features/gallery/components/Boards/DeleteBoardImagesModal';
-import DeleteImageModal from 'features/imageDeletion/components/DeleteImageModal';
 
 const DEFAULT_CONFIG = {};
 

@@ -14,6 +14,7 @@ import {
   SeedParam,
   StepsParam,
   StrengthParam,
+  VAEParam,
   WidthParam,
 } from './parameterZodSchemas';
 
@@ -47,7 +48,7 @@ export interface GenerationState {
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
   model: ModelParam;
-  shouldUseSeamless: boolean;
+  vae: VAEParam;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
 }
@@ -81,9 +82,9 @@ export const initialGenerationState: GenerationState = {
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
   model: '',
-  shouldUseSeamless: false,
-  seamlessXAxis: true,
-  seamlessYAxis: true,
+  vae: '',
+  seamlessXAxis: false,
+  seamlessYAxis: false,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -140,9 +141,6 @@ export const generationSlice = createSlice({
     },
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
-    },
-    setSeamless: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseSeamless = action.payload;
     },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessXAxis = action.payload;
@@ -216,6 +214,9 @@ export const generationSlice = createSlice({
     modelSelected: (state, action: PayloadAction<string>) => {
       state.model = action.payload;
     },
+    vaeSelected: (state, action: PayloadAction<string>) => {
+      state.vae = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -260,8 +261,8 @@ export const {
   setVerticalSymmetrySteps,
   initialImageChanged,
   modelSelected,
+  vaeSelected,
   setShouldUseNoiseSettings,
-  setSeamless,
   setSeamlessXAxis,
   setSeamlessYAxis,
 } = generationSlice.actions;
