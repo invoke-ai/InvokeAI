@@ -22,7 +22,7 @@ const ParamLora = (props: Props) => {
   );
 
   const handleReset = useCallback(() => {
-    dispatch(loraWeightChanged({ id: lora.id, weight: 1 }));
+    dispatch(loraWeightChanged({ id: lora.id, weight: 0.75 }));
   }, [dispatch, lora.id]);
 
   const handleRemoveLora = useCallback(() => {

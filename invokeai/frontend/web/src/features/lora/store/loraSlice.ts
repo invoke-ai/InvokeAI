@@ -8,7 +8,7 @@ export type Lora = {
 };
 
 export const defaultLoRAConfig: Omit<Lora, 'id' | 'name'> = {
-  weight: 1,
+  weight: 0.75,
 };
 
 export type LoraState = {
