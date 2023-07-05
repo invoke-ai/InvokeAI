@@ -9,16 +9,14 @@ import IAISlider from 'common/components/IAISlider';
 import { pickBy } from 'lodash-es';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 export default function MergeModelsPanel() {
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
 
-  const { data } = useListModelsQuery({
-    model_type: 'main',
-  });
+  const { data } = useGetMainModelsQuery();
 
   const diffusersModels = pickBy(
     data?.entities,

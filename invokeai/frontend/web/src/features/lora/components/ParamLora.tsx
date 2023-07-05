@@ -16,18 +16,18 @@ const ParamLora = (props: Props) => {
 
   const handleChange = useCallback(
     (v: number) => {
-      dispatch(loraWeightChanged({ name: lora.name, weight: v }));
+      dispatch(loraWeightChanged({ id: lora.id, weight: v }));
     },
-    [dispatch, lora.name]
+    [dispatch, lora.id]
   );
 
   const handleReset = useCallback(() => {
-    dispatch(loraWeightChanged({ name: lora.name, weight: 1 }));
-  }, [dispatch, lora.name]);
+    dispatch(loraWeightChanged({ id: lora.id, weight: 1 }));
+  }, [dispatch, lora.id]);
 
   const handleRemoveLora = useCallback(() => {
-    dispatch(loraRemoved(lora.name));
-  }, [dispatch, lora.name]);
+    dispatch(loraRemoved(lora.id));
+  }, [dispatch, lora.id]);
 
   return (
     <Flex sx={{ gap: 2.5, alignItems: 'flex-end' }}>

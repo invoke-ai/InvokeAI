@@ -6,7 +6,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
 import { forEach } from 'lodash-es';
 import { forwardRef, useCallback, useMemo } from 'react';
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 import { loraAdded } from '../store/loraSlice';
 
 type LoraSelectItem = {
@@ -26,7 +26,7 @@ const selector = createSelector(
 const ParamLoraSelect = () => {
   const dispatch = useAppDispatch();
   const { loras } = useAppSelector(selector);
-  const { data: lorasQueryData } = useListModelsQuery({ model_type: 'lora' });
+  const { data: lorasQueryData } = useGetLoRAModelsQuery();
 
   const data = useMemo(() => {
     if (!lorasQueryData) {
@@ -52,9 +52,13 @@ const ParamLoraSelect = () => {
 
   const handleChange = useCallback(
     (v: string[]) => {
-      v[0] && dispatch(loraAdded(v[0]));
+      const loraEntity = lorasQueryData?.entities[v[0]];
+      if (!loraEntity) {
+        return;
+      }
+      v[0] && dispatch(loraAdded(loraEntity));
     },
-    [dispatch]
+    [dispatch, lorasQueryData?.entities]
   );
 
   return (
