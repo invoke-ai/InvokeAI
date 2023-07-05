@@ -1,4 +1,8 @@
 import { Box, ChakraProps, Flex, Heading, Image } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { memo } from 'react';
 import { TypesafeDraggableData } from './typesafeDnd';
 
@@ -28,7 +32,24 @@ const STYLES: ChakraProps['sx'] = {
   },
 };
 
+const selector = createSelector(
+  stateSelector,
+  (state) => {
+    const gallerySelectionCount = state.gallery.selection.length;
+    const batchSelectionCount = state.batch.selection.length;
+
+    return {
+      gallerySelectionCount,
+      batchSelectionCount,
+    };
+  },
+  defaultSelectorOptions
+);
+
 const DragPreview = (props: OverlayDragImageProps) => {
+  const { gallerySelectionCount, batchSelectionCount } =
+    useAppSelector(selector);
+
   if (!props.dragData) {
     return;
   }
@@ -57,7 +78,7 @@ const DragPreview = (props: OverlayDragImageProps) => {
     );
   }
 
-  if (props.dragData.payloadType === 'IMAGE_NAMES') {
+  if (props.dragData.payloadType === 'BATCH_SELECTION') {
     return (
       <Flex
         sx={{
@@ -70,7 +91,26 @@ const DragPreview = (props: OverlayDragImageProps) => {
           ...STYLES,
         }}
       >
-        <Heading>{props.dragData.payload.imageNames.length}</Heading>
+        <Heading>{batchSelectionCount}</Heading>
+        <Heading size="sm">Images</Heading>
+      </Flex>
+    );
+  }
+
+  if (props.dragData.payloadType === 'GALLERY_SELECTION') {
+    return (
+      <Flex
+        sx={{
+          cursor: 'none',
+          userSelect: 'none',
+          position: 'relative',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDir: 'column',
+          ...STYLES,
+        }}
+      >
+        <Heading>{gallerySelectionCount}</Heading>
         <Heading size="sm">Images</Heading>
       </Flex>
     );

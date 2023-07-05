@@ -1,37 +1,39 @@
 import { Flex } from '@chakra-ui/react';
-import { useTranslation } from 'react-i18next';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { RootState } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
-import { memo } from 'react';
-import { ParamHiresStrength } from './ParamHiresStrength';
-import { setHiresFix } from 'features/parameters/store/postprocessingSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ParamHiresStrength } from './ParamHiresStrength';
+import { ParamHiresToggle } from './ParamHiresToggle';
+
+const selector = createSelector(
+  stateSelector,
+  (state) => {
+    const activeLabel = state.postprocessing.hiresFix ? 'Enabled' : undefined;
+
+    return { activeLabel };
+  },
+  defaultSelectorOptions
+);
 
 const ParamHiresCollapse = () => {
   const { t } = useTranslation();
-  const hiresFix = useAppSelector(
-    (state: RootState) => state.postprocessing.hiresFix
-  );
+  const { activeLabel } = useAppSelector(selector);
 
   const isHiresEnabled = useFeatureStatus('hires').isFeatureEnabled;
-
-  const dispatch = useAppDispatch();
-
-  const handleToggle = () => dispatch(setHiresFix(!hiresFix));
 
   if (!isHiresEnabled) {
     return null;
   }
 
   return (
-    <IAICollapse
-      label={t('parameters.hiresOptim')}
-      isOpen={hiresFix}
-      onToggle={handleToggle}
-      withSwitch
-    >
+    <IAICollapse label={t('parameters.hiresOptim')} activeLabel={activeLabel}>
       <Flex sx={{ gap: 2, flexDirection: 'column' }}>
+        <ParamHiresToggle />
         <ParamHiresStrength />
       </Flex>
     </IAICollapse>

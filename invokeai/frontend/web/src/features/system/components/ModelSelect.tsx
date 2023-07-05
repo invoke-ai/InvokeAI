@@ -8,7 +8,7 @@ import { modelSelected } from 'features/parameters/store/generationSlice';
 import { SelectItem } from '@mantine/core';
 import { RootState } from 'app/store/store';
 import { forEach, isString } from 'lodash-es';
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 export const MODEL_TYPE_MAP = {
   'sd-1': 'Stable Diffusion 1.x',
@@ -23,9 +23,7 @@ const ModelSelect = () => {
     (state: RootState) => state.generation.model
   );
 
-  const { data: mainModels, isLoading } = useListModelsQuery({
-    model_type: 'main',
-  });
+  const { data: mainModels, isLoading } = useGetMainModelsQuery();
 
   const data = useMemo(() => {
     if (!mainModels) {

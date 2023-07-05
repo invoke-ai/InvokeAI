@@ -1,35 +1,45 @@
-import { useTranslation } from 'react-i18next';
 import { Box, Flex } from '@chakra-ui/react';
-import IAICollapse from 'common/components/IAICollapse';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setSeamless } from 'features/parameters/store/generationSlice';
-import { memo } from 'react';
 import { createSelector } from '@reduxjs/toolkit';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
+import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAICollapse from 'common/components/IAICollapse';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import ParamSeamlessXAxis from './ParamSeamlessXAxis';
 import ParamSeamlessYAxis from './ParamSeamlessYAxis';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+
+const getActiveLabel = (seamlessXAxis: boolean, seamlessYAxis: boolean) => {
+  if (seamlessXAxis && seamlessYAxis) {
+    return 'X & Y';
+  }
+
+  if (seamlessXAxis) {
+    return 'X';
+  }
+
+  if (seamlessYAxis) {
+    return 'Y';
+  }
+};
 
 const selector = createSelector(
   generationSelector,
   (generation) => {
-    const { shouldUseSeamless, seamlessXAxis, seamlessYAxis } = generation;
+    const { seamlessXAxis, seamlessYAxis } = generation;
 
-    return { shouldUseSeamless, seamlessXAxis, seamlessYAxis };
+    const activeLabel = getActiveLabel(seamlessXAxis, seamlessYAxis);
+    return { activeLabel };
   },
   defaultSelectorOptions
 );
 
 const ParamSeamlessCollapse = () => {
   const { t } = useTranslation();
-  const { shouldUseSeamless } = useAppSelector(selector);
+  const { activeLabel } = useAppSelector(selector);
 
   const isSeamlessEnabled = useFeatureStatus('seamless').isFeatureEnabled;
-
-  const dispatch = useAppDispatch();
-
-  const handleToggle = () => dispatch(setSeamless(!shouldUseSeamless));
 
   if (!isSeamlessEnabled) {
     return null;
@@ -38,9 +48,7 @@ const ParamSeamlessCollapse = () => {
   return (
     <IAICollapse
       label={t('parameters.seamlessTiling')}
-      isOpen={shouldUseSeamless}
-      onToggle={handleToggle}
-      withSwitch
+      activeLabel={activeLabel}
     >
       <Flex sx={{ gap: 5 }}>
         <Box flexGrow={1}>

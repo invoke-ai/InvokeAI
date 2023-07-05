@@ -1,4 +1,4 @@
-import { Box, Flex, useDisclosure } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
@@ -21,19 +21,25 @@ const selector = createSelector(
   [uiSelector, generationSelector],
   (ui, generation) => {
     const { shouldUseSliders } = ui;
-    const { shouldFitToWidthHeight } = generation;
+    const { shouldFitToWidthHeight, shouldRandomizeSeed } = generation;
 
-    return { shouldUseSliders, shouldFitToWidthHeight };
+    const activeLabel = !shouldRandomizeSeed ? 'Manual Seed' : undefined;
+
+    return { shouldUseSliders, shouldFitToWidthHeight, activeLabel };
   },
   defaultSelectorOptions
 );
 
 const ImageToImageTabCoreParameters = () => {
-  const { shouldUseSliders, shouldFitToWidthHeight } = useAppSelector(selector);
-  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
+  const { shouldUseSliders, shouldFitToWidthHeight, activeLabel } =
+    useAppSelector(selector);
 
   return (
-    <IAICollapse label={'General'} isOpen={isOpen} onToggle={onToggle}>
+    <IAICollapse
+      label={'General'}
+      activeLabel={activeLabel}
+      defaultIsOpen={true}
+    >
       <Flex
         sx={{
           flexDirection: 'column',

@@ -1,25 +1,22 @@
-import { memo, useCallback, useMemo, useState } from 'react';
-import { ImageDTO } from 'services/api/types';
-import {
-  ControlNetConfig,
-  controlNetImageChanged,
-  controlNetSelector,
-} from '../store/controlNetSlice';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { Box, Flex, SystemStyleObject } from '@chakra-ui/react';
-import IAIDndImage from 'common/components/IAIDndImage';
 import { createSelector } from '@reduxjs/toolkit';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { IAILoadingImageFallback } from 'common/components/IAIImageFallback';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { FaUndo } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'app/components/ImageDnd/typesafeDnd';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { IAILoadingImageFallback } from 'common/components/IAIImageFallback';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/thunks/image';
+import {
+  ControlNetConfig,
+  controlNetImageChanged,
+  controlNetSelector,
+} from '../store/controlNetSlice';
 
 const selector = createSelector(
   controlNetSelector,
@@ -83,15 +80,14 @@ const ControlNetImagePreview = (props: Props) => {
     }
   }, [controlImage, controlNetId]);
 
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(() => {
-    if (controlNetId) {
-      return {
-        id: controlNetId,
-        actionType: 'SET_CONTROLNET_IMAGE',
-        context: { controlNetId },
-      };
-    }
-  }, [controlNetId]);
+  const droppableData = useMemo<TypesafeDroppableData | undefined>(
+    () => ({
+      id: controlNetId,
+      actionType: 'SET_CONTROLNET_IMAGE',
+      context: { controlNetId },
+    }),
+    [controlNetId]
+  );
 
   const postUploadAction = useMemo<PostUploadAction>(
     () => ({ type: 'SET_CONTROLNET_IMAGE', controlNetId }),

@@ -33,13 +33,13 @@ class ModelManagerServiceBase(ABC):
         logger: types.ModuleType,
     ):
         """
-        Initialize with the path to the models.yaml config file. 
+        Initialize with the path to the models.yaml config file.
         Optional parameters are the torch device type, precision, max_models,
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
         """
         pass
-    
+
     @abstractmethod
     def get_model(
         self,
@@ -50,8 +50,8 @@ class ModelManagerServiceBase(ABC):
         node: Optional[BaseInvocation] = None,
         context: Optional[InvocationContext] = None,
     ) -> ModelInfo:
-        """Retrieve the indicated model with name and type. 
-        submodel can be used to get a part (such as the vae) 
+        """Retrieve the indicated model with name and type.
+        submodel can be used to get a part (such as the vae)
         of a diffusers pipeline."""
         pass
 
@@ -115,8 +115,8 @@ class ModelManagerServiceBase(ABC):
         """
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
-        On a successful update, the config will be changed in memory. Will fail 
-        with an assertion error if provided attributes are incorrect or 
+        On a successful update, the config will be changed in memory. Will fail
+        with an assertion error if provided attributes are incorrect or
         the model name is missing. Call commit() to write changes to disk.
         """
         pass
@@ -129,8 +129,8 @@ class ModelManagerServiceBase(ABC):
         model_type: ModelType,
     ):
         """
-        Delete the named model from configuration. If delete_files is true, 
-        then the underlying weight file or diffusers directory will be deleted 
+        Delete the named model from configuration. If delete_files is true,
+        then the underlying weight file or diffusers directory will be deleted
         as well. Call commit() to write to disk.
         """
         pass
@@ -176,7 +176,7 @@ class ModelManagerService(ModelManagerServiceBase):
         logger: types.ModuleType,
     ):
         """
-        Initialize with the path to the models.yaml config file. 
+        Initialize with the path to the models.yaml config file.
         Optional parameters are the torch device type, precision, max_models,
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
@@ -205,6 +205,8 @@ class ModelManagerService(ModelManagerServiceBase):
         max_cache_size = config.max_cache_size \
             if hasattr(config,'max_cache_size') \
                else config.max_loaded_models * 2.5
+
+        logger.debug(f"Maximum RAM cache size: {max_cache_size} GiB")
 
         sequential_offload = config.sequential_guidance
 
@@ -261,7 +263,7 @@ class ModelManagerService(ModelManagerServiceBase):
                 submodel=submodel,
                 model_info=model_info
             )
-            
+
         return model_info
 
     def model_exists(
@@ -314,8 +316,8 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
-        On a successful update, the config will be changed in memory. Will fail 
-        with an assertion error if provided attributes are incorrect or 
+        On a successful update, the config will be changed in memory. Will fail
+        with an assertion error if provided attributes are incorrect or
         the model name is missing. Call commit() to write changes to disk.
         """
         return self.mgr.add_model(model_name, base_model, model_type, model_attributes, clobber)
@@ -328,8 +330,8 @@ class ModelManagerService(ModelManagerServiceBase):
         model_type: ModelType,
     ):
         """
-        Delete the named model from configuration. If delete_files is true, 
-        then the underlying weight file or diffusers directory will be deleted 
+        Delete the named model from configuration. If delete_files is true,
+        then the underlying weight file or diffusers directory will be deleted
         as well. Call commit() to write to disk.
         """
         self.mgr.del_model(model_name, base_model, model_type)
@@ -383,7 +385,7 @@ class ModelManagerService(ModelManagerServiceBase):
     @property
     def logger(self):
         return self.mgr.logger
-        
+
     def heuristic_import(self,
                          items_to_import: Set[str],
                          prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
@@ -404,4 +406,4 @@ class ModelManagerService(ModelManagerServiceBase):
         of the set is a dict corresponding to the newly-created OmegaConf stanza for
         that model.
         '''
-        return self.mgr.heuristic_import(items_to_import, prediction_type_helper)        
+        return self.mgr.heuristic_import(items_to_import, prediction_type_helper)
