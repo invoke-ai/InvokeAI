@@ -23,6 +23,7 @@ import { stateSelector } from 'app/store/store';
 import {
   imageDeletionConfirmed,
   imageToDeleteCleared,
+  isModalOpenChanged,
   selectImageUsage,
 } from '../store/imageDeletionSlice';
 
@@ -63,6 +64,7 @@ const DeleteImageModal = () => {
 
   const handleClose = useCallback(() => {
     dispatch(imageToDeleteCleared());
+    dispatch(isModalOpenChanged(false));
   }, [dispatch]);
 
   const handleDelete = useCallback(() => {
