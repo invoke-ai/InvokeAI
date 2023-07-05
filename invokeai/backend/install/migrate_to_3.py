@@ -228,6 +228,7 @@ class MigrateTo3(object):
             self._migrate_pretrained(CLIPTextModel,
                                      repo_id = repo_id,
                                      dest = target_dir / 'clip-vit-large-patch14',
+                                     force = True,
                                      **kwargs)
 
             # sd-2
@@ -291,21 +292,21 @@ class MigrateTo3(object):
     def _model_probe_to_path(self, info: ModelProbeInfo)->Path:
         return Path(self.dest_models, info.base_type.value, info.model_type.value)
 
-    def _migrate_pretrained(self, model_class, repo_id: str, dest: Path, **kwargs):
-        if dest.exists():
+    def _migrate_pretrained(self, model_class, repo_id: str, dest: Path, force:bool=False, **kwargs):
+        if dest.exists() and not force:
             logger.info(f'Skipping existing {dest}')
             return
         model = model_class.from_pretrained(repo_id, **kwargs)
-        self._save_pretrained(model, dest)
+        self._save_pretrained(model, dest, overwrite=force)
 
-    def _save_pretrained(self, model, dest: Path):
-        if dest.exists():
-            logger.info(f'Skipping existing {dest}')
-            return
+    def _save_pretrained(self, model, dest: Path, overwrite: bool=False):
         model_name = dest.name
-        download_path = dest.with_name(f'{model_name}.downloading')
-        model.save_pretrained(download_path, safe_serialization=True)
-        download_path.replace(dest)
+        if overwrite:
+            model.save_pretrained(dest, safe_serialization=True)
+        else:
+            download_path = dest.with_name(f'{model_name}.downloading')
+            model.save_pretrained(download_path, safe_serialization=True)
+            download_path.replace(dest)
 
     def _download_vae(self, repo_id: str, subfolder:str=None)->Path:
         vae = AutoencoderKL.from_pretrained(repo_id, cache_dir=self.root_directory / 'models/hub', subfolder=subfolder)
@@ -573,8 +574,10 @@ script, which will perform a full upgrade in place."""
 
     dest_directory = args.dest_directory
     assert dest_directory.is_dir(), f"{dest_directory} is not a valid directory"
-    assert (dest_directory / 'models').is_dir(), f"{dest_directory} does not contain a 'models' subdirectory"
-    assert (dest_directory / 'invokeai.yaml').exists(), f"{dest_directory} does not contain an InvokeAI init file."
+
+    # TODO: revisit
+    # assert (dest_directory / 'models').is_dir(), f"{dest_directory} does not contain a 'models' subdirectory"
+    # assert (dest_directory / 'invokeai.yaml').exists(), f"{dest_directory} does not contain an InvokeAI init file."
 
     do_migrate(root_directory,dest_directory)
 
