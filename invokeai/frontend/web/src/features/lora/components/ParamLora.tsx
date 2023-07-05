@@ -35,13 +35,14 @@ const ParamLora = (props: Props) => {
         label={lora.name}
         value={lora.weight}
         onChange={handleChange}
-        min={0}
-        max={1}
+        min={-1}
+        max={2}
         step={0.01}
         withInput
         withReset
         handleReset={handleReset}
         withSliderMarks
+        sliderMarks={[-1, 0, 1, 2]}
       />
       <IAIIconButton
         size="sm"
