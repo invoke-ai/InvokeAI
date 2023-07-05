@@ -47,7 +47,7 @@ def add_parsers(
     commands: list[type],
     command_field: str = "type",
     exclude_fields: list[str] = ["id", "type"],
-    add_arguments: Union[Callable[[argparse.ArgumentParser], None],None] = None
+    add_arguments: Optional[Callable[[argparse.ArgumentParser], None]] = None
     ):
     """Adds parsers for each command to the subparsers"""
 
