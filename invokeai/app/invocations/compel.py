@@ -8,6 +8,7 @@ from compel.prompt_parser import (Blend, Conjunction,
                                   FlattenedPrompt, Fragment)
 from ...backend.util.devices import torch_dtype
 from ...backend.model_management import ModelType
+from ...backend.model_management.models import ModelNotFoundException
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
@@ -83,10 +84,10 @@ class CompelInvocation(BaseInvocation):
                         model_type=ModelType.TextualInversion,
                     ).context.model
                 )
-            except Exception:
+            except ModelNotFoundException:
                 # print(e)
                 #import traceback
-                # print(traceback.format_exc())
+                #print(traceback.format_exc())
                 print(f"Warn: trigger: \"{trigger}\" not found")
 
         with ModelPatcher.apply_lora_text_encoder(text_encoder_info.context.model, _lora_loader()),\

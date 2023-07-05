@@ -655,6 +655,9 @@ class TextualInversionModel:
         else:
             result.embedding = next(iter(state_dict.values()))
 
+            if len(result.embedding.shape) == 1:
+                result.embedding = result.embedding.unsqueeze(0)
+
             if not isinstance(result.embedding, torch.Tensor):
                 raise ValueError(f"Invalid embeddings file: {file_path.name}")
 
