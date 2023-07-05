@@ -249,7 +249,7 @@ from .model_cache import ModelCache, ModelLocker
 from .models import (
     BaseModelType, ModelType, SubModelType,
     ModelError, SchedulerPredictionType, MODEL_CLASSES,
-    ModelConfigBase,
+    ModelConfigBase, ModelNotFoundException,
     )
 
 # We are only starting to number the config file with release 3.
@@ -409,7 +409,7 @@ class ModelManager(object):
         if model_key not in self.models:
             self.scan_models_directory(base_model=base_model, model_type=model_type)
             if model_key not in self.models:
-                raise Exception(f"Model not found - {model_key}")
+                raise ModelNotFoundException(f"Model not found - {model_key}")
 
         model_config = self.models[model_key]
         model_path = self.app_config.root_path / model_config.path
@@ -421,7 +421,7 @@ class ModelManager(object):
 
             else:
                 self.models.pop(model_key, None)
-                raise Exception(f"Model not found - {model_key}")
+                raise ModelNotFoundException(f"Model not found - {model_key}")
 
         # vae/movq override
         # TODO: 
