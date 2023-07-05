@@ -3,35 +3,34 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
+import { isControlNetEnabledToggled } from 'features/controlNet/store/controlNetSlice';
 import { useCallback } from 'react';
-import { combinatorialToggled } from '../store/slice';
 
 const selector = createSelector(
   stateSelector,
   (state) => {
-    const { combinatorial, isEnabled } = state.dynamicPrompts;
+    const { isEnabled } = state.controlNet;
 
-    return { combinatorial, isDisabled: !isEnabled };
+    return { isEnabled };
   },
   defaultSelectorOptions
 );
 
-const ParamDynamicPromptsCombinatorial = () => {
-  const { combinatorial, isDisabled } = useAppSelector(selector);
+const ParamControlNetFeatureToggle = () => {
+  const { isEnabled } = useAppSelector(selector);
   const dispatch = useAppDispatch();
 
   const handleChange = useCallback(() => {
-    dispatch(combinatorialToggled());
+    dispatch(isControlNetEnabledToggled());
   }, [dispatch]);
 
   return (
     <IAISwitch
-      isDisabled={isDisabled}
-      label="Combinatorial Generation"
-      isChecked={combinatorial}
+      label="Enable ControlNet"
+      isChecked={isEnabled}
       onChange={handleChange}
     />
   );
 };
 
-export default ParamDynamicPromptsCombinatorial;
+export default ParamControlNetFeatureToggle;
