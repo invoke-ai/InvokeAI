@@ -22,6 +22,11 @@ class ImportModelResponse(BaseModel):
     info: AddModelResult = Field(description="The model info")
     status: str = Field(description="The status of the API response")
 
+class ConvertModelResponse(BaseModel):
+    name: str = Field(description="The name of the imported model")
+    info: AddModelResult = Field(description="The model info")
+    status: str = Field(description="The status of the API response")
+    
 class ModelsList(BaseModel):
     models: list[Union[tuple(OPENAPI_MODEL_CONFIGS)]]
 

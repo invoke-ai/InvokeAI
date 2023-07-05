@@ -5,8 +5,7 @@ from __future__ import annotations
 import torch
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Union, Callable, List, Tuple, types, TYPE_CHECKING
-from dataclasses import dataclass
+from typing import Optional, Union, Callable, List, Set, Dict, Tuple, types, TYPE_CHECKING
 
 from invokeai.backend.model_management.model_manager import (
     ModelManager,
@@ -14,6 +13,8 @@ from invokeai.backend.model_management.model_manager import (
     ModelType,
     SubModelType,
     ModelInfo,
+    AddModelResult,
+    SchedulerPredictionType,
 )
 from invokeai.app.models.exceptions import CanceledException
 from .config import InvokeAIAppConfig
@@ -111,7 +112,7 @@ class ModelManagerServiceBase(ABC):
         model_type: ModelType,
         model_attributes: dict,
         clobber: bool = False
-    ) -> None:
+    ) -> AddModelResult:
         """
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
@@ -132,6 +133,27 @@ class ModelManagerServiceBase(ABC):
         Delete the named model from configuration. If delete_files is true, 
         then the underlying weight file or diffusers directory will be deleted 
         as well. Call commit() to write to disk.
+        """
+        pass
+
+    @abstractmethod
+    def convert_model(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: Union[ModelType.Main,ModelType.Vae],
+    ) -> AddModelResult:
+        """
+        Convert a checkpoint file into a diffusers folder, deleting the cached
+        version and deleting the original checkpoint file if it is in the models
+        directory.
+        :param model_name: Name of the model to convert
+        :param base_model: Base model type
+        :param model_type: Type of model ['vae' or 'main']
+
+        This will raise a ValueError unless the model is not a checkpoint. It will
+        also raise a ValueError in the event that there is a similarly-named diffusers
+        directory already in place.
         """
         pass
 
@@ -336,6 +358,26 @@ class ModelManagerService(ModelManagerServiceBase):
         self.logger.debug(f'delete model {model_name}')
         self.mgr.del_model(model_name, base_model, model_type)
 
+    def convert_model(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: Union[ModelType.Main,ModelType.Vae],
+    ) -> AddModelResult:
+        """
+        Convert a checkpoint file into a diffusers folder, deleting the cached
+        version and deleting the original checkpoint file if it is in the models
+        directory.
+        :param model_name: Name of the model to convert
+        :param base_model: Base model type
+        :param model_type: Type of model ['vae' or 'main']
+
+        This will raise a ValueError unless the model is not a checkpoint. It will
+        also raise a ValueError in the event that there is a similarly-named diffusers
+        directory already in place.
+        """
+        self.logger.debug(f'convert model {model_name}')        
+        return self.mgr.convert_model(model_name, base_model, model_type)
 
     def commit(self, conf_file: Optional[Path]=None):
         """

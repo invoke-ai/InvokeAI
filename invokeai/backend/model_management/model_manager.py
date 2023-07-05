@@ -234,7 +234,7 @@ import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List, Tuple, Union, Dict, Set, Callable, types
-from shutil import rmtree
+from shutil import rmtree, move
 
 import torch
 from omegaconf import OmegaConf
@@ -620,6 +620,60 @@ class ModelManager(object):
             config = model_config,
         )
 
+    def convert_model (
+            self,
+            model_name: str,
+            base_model: BaseModelType,
+            model_type: Union[ModelType.Main,ModelType.Vae],
+    ) -> AddModelResult:
+        '''
+        Convert a checkpoint file into a diffusers folder, deleting the cached
+        version and deleting the original checkpoint file if it is in the models
+        directory.
+        :param model_name: Name of the model to convert
+        :param base_model: Base model type
+        :param model_type: Type of model ['vae' or 'main']
+
+        This will raise a ValueError unless the model is a checkpoint.
+        '''
+        info = self.model_info(model_name, base_model, model_type)
+        if info["model_format"] != "checkpoint":
+            raise ValueError(f"not a checkpoint format model: {model_name}")
+
+        # We are taking advantage of a side effect of get_model() that converts check points
+        # into cached diffusers directories stored at `location`. It doesn't matter
+        # what submodeltype we request here, so we get the smallest.
+        submodel = {"submodel_type": SubModelType.Tokenizer} if model_type==ModelType.Main else {}
+        model = self.get_model(model_name,
+                               base_model,
+                               model_type,
+                               **submodel,
+                               )
+        checkpoint_path = self.app_config.root_path / info["path"]
+        old_diffusers_path = self.app_config.models_path / model.location
+        new_diffusers_path = self.app_config.models_path / base_model / model_type / model_name
+        if new_diffusers_path.exists():
+            raise ValueError(f"A diffusers model already exists at {new_path}")
+
+        try:
+            move(old_diffusers_path,new_diffusers_path)
+            info["model_format"] = "diffusers"
+            info["path"] = str(new_diffusers_path.relative_to(self.app_config.root_path))
+            info.pop('config')
+
+            result = self.add_model(model_name, base_model, model_type,
+                                    model_attributes = info,
+                                    clobber=True)
+        except:
+            # something went wrong, so don't leave dangling diffusers model in directory or it will cause a duplicate model error!
+            rmtree(new_diffusers_path)
+            raise
+        
+        if checkpoint_path.exists() and checkpoint_path.is_relative_to(self.app_config.models_path):
+            checkpoint_path.unlink()
+        
+        return result
+    
     def search_models(self, search_folder):
         self.logger.info(f"Finding Models In: {search_folder}")
         models_folder_ckpt = Path(search_folder).glob("**/*.ckpt")
