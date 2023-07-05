@@ -31,6 +31,7 @@ const imageDeletion = createSlice({
     },
     imageToDeleteCleared: (state) => {
       state.imageToDelete = null;
+      state.isModalOpen = false;
     },
   },
 });

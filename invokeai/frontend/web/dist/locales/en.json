@@ -24,16 +24,13 @@
     },
     "common": {
         "hotkeysLabel": "Hotkeys",
-        "themeLabel": "Theme",
+        "darkMode": "Dark Mode",
+        "lightMode": "Light Mode",
         "languagePickerLabel": "Language",
         "reportBugLabel": "Report Bug",
         "githubLabel": "Github",
         "discordLabel": "Discord",
         "settingsLabel": "Settings",
-        "darkTheme": "Dark",
-        "lightTheme": "Light",
-        "greenTheme": "Green",
-        "oceanTheme": "Ocean",
         "langArabic": "العربية",
         "langEnglish": "English",
         "langDutch": "Nederlands",
@@ -55,6 +52,7 @@
         "unifiedCanvas": "Unified Canvas",
         "linear": "Linear",
         "nodes": "Node Editor",
+        "modelmanager": "Model Manager",
         "postprocessing": "Post Processing",
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
         "postProcessing": "Post Processing",
@@ -336,6 +334,7 @@
     "modelManager": {
         "modelManager": "Model Manager",
         "model": "Model",
+        "vae": "VAE",
         "allModels": "All Models",
         "checkpointModels": "Checkpoints",
         "diffusersModels": "Diffusers",
@@ -351,6 +350,7 @@
         "scanForModels": "Scan For Models",
         "addManually": "Add Manually",
         "manual": "Manual",
+        "baseModel": "Base Model",
         "name": "Name",
         "nameValidationMsg": "Enter a name for your model",
         "description": "Description",
@@ -363,6 +363,7 @@
         "repoIDValidationMsg": "Online repository of your model",
         "vaeLocation": "VAE Location",
         "vaeLocationValidationMsg": "Path to where your VAE is located.",
+        "variant": "Variant",
         "vaeRepoID": "VAE Repo ID",
         "vaeRepoIDValidationMsg": "Online repository of your VAE",
         "width": "Width",
@@ -524,7 +525,8 @@
         "initialImage": "Initial Image",
         "showOptionsPanel": "Show Options Panel",
         "hidePreview": "Hide Preview",
-        "showPreview": "Show Preview"
+        "showPreview": "Show Preview",
+        "controlNetControlMode": "Control Mode"
     },
     "settings": {
         "models": "Models",
@@ -547,7 +549,8 @@
         "general": "General",
         "generation": "Generation",
         "ui": "User Interface",
-        "availableSchedulers": "Available Schedulers"
+        "favoriteSchedulers": "Favorite Schedulers",
+        "favoriteSchedulersPlaceholder": "No schedulers favorited"
     },
     "toast": {
         "serverError": "Server Error",

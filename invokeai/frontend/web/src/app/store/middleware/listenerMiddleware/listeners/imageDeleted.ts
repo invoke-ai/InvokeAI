@@ -1,21 +1,21 @@
-import { startAppListening } from '..';
-import { imageDeleted } from 'services/api/thunks/image';
 import { log } from 'app/logging/useLogger';
-import { clamp } from 'lodash-es';
-import {
-  imageSelected,
-  imageRemoved,
-  selectImagesIds,
-} from 'features/gallery/store/gallerySlice';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
-import { api } from 'services/api';
+import {
+  imageRemoved,
+  imageSelected,
+  selectFilteredImages,
+} from 'features/gallery/store/gallerySlice';
 import {
   imageDeletionConfirmed,
   isModalOpenChanged,
 } from 'features/imageDeletion/store/imageDeletionSlice';
+import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import { clamp } from 'lodash-es';
+import { api } from 'services/api';
+import { imageDeleted } from 'services/api/thunks/image';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -37,7 +37,9 @@ export const addRequestedImageDeletionListener = () => {
         state.gallery.selection[state.gallery.selection.length - 1];
 
       if (lastSelectedImage === image_name) {
-        const ids = selectImagesIds(state);
+        const filteredImages = selectFilteredImages(state);
+
+        const ids = filteredImages.map((i) => i.image_name);
 
         const deletedImageIndex = ids.findIndex(
           (result) => result.toString() === image_name

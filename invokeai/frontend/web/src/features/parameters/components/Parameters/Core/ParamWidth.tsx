@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAISlider from 'common/components/IAISlider';
-import { IAIFullSliderProps } from 'common/components/IAISlider';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAISlider, { IAIFullSliderProps } from 'common/components/IAISlider';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setWidth } from 'features/parameters/store/generationSlice';
 import { configSelector } from 'features/system/store/configSelectors';
@@ -26,7 +26,8 @@ const selector = createSelector(
       inputMax,
       step,
     };
-  }
+  },
+  defaultSelectorOptions
 );
 
 type ParamWidthProps = Omit<IAIFullSliderProps, 'label' | 'value' | 'onChange'>;

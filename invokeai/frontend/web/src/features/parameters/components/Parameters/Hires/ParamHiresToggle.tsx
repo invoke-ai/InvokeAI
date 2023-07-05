@@ -23,7 +23,6 @@ export const ParamHiresToggle = () => {
   return (
     <IAISwitch
       label={t('parameters.hiresOptim')}
-      fontSize="md"
       isChecked={hiresFix}
       onChange={handleChangeHiresFix}
     />

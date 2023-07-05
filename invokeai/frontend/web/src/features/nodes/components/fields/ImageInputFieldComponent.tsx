@@ -7,18 +7,16 @@ import {
 } from 'features/nodes/types/types';
 import { memo, useCallback, useMemo } from 'react';
 
-import { FieldComponentProps } from './types';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api/types';
 import { Flex } from '@chakra-ui/react';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
-  NodesImageDropData,
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'app/components/ImageDnd/typesafeDnd';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/thunks/image';
+import { FieldComponentProps } from './types';
 
 const ImageInputFieldComponent = (
   props: FieldComponentProps<ImageInputFieldValue, ImageInputFieldTemplate>
@@ -33,23 +31,6 @@ const ImageInputFieldComponent = (
     isError,
     isSuccess,
   } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
-
-  const handleDrop = useCallback(
-    ({ image_name }: ImageDTO) => {
-      if (field.value?.image_name === image_name) {
-        return;
-      }
-
-      dispatch(
-        fieldValueChanged({
-          nodeId,
-          fieldName: field.name,
-          value: { image_name },
-        })
-      );
-    },
-    [dispatch, field.name, field.value, nodeId]
-  );
 
   const handleReset = useCallback(() => {
     dispatch(
@@ -71,15 +52,14 @@ const ImageInputFieldComponent = (
     }
   }, [field.name, imageDTO, nodeId]);
 
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(() => {
-    if (imageDTO) {
-      return {
-        id: `node-${nodeId}-${field.name}`,
-        actionType: 'SET_NODES_IMAGE',
-        context: { nodeId, fieldName: field.name },
-      };
-    }
-  }, [field.name, imageDTO, nodeId]);
+  const droppableData = useMemo<TypesafeDroppableData | undefined>(
+    () => ({
+      id: `node-${nodeId}-${field.name}`,
+      actionType: 'SET_NODES_IMAGE',
+      context: { nodeId, fieldName: field.name },
+    }),
+    [field.name, nodeId]
+  );
 
   const postUploadAction = useMemo<PostUploadAction>(
     () => ({
