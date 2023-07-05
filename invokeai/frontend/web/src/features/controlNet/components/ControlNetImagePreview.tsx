@@ -80,15 +80,14 @@ const ControlNetImagePreview = (props: Props) => {
     }
   }, [controlImage, controlNetId]);
 
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(() => {
-    if (controlNetId) {
-      return {
-        id: controlNetId,
-        actionType: 'SET_CONTROLNET_IMAGE',
-        context: { controlNetId },
-      };
-    }
-  }, [controlNetId]);
+  const droppableData = useMemo<TypesafeDroppableData | undefined>(
+    () => ({
+      id: controlNetId,
+      actionType: 'SET_CONTROLNET_IMAGE',
+      context: { controlNetId },
+    }),
+    [controlNetId]
+  );
 
   const postUploadAction = useMemo<PostUploadAction>(
     () => ({ type: 'SET_CONTROLNET_IMAGE', controlNetId }),
