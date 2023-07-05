@@ -49,8 +49,6 @@ export const addLoRAsToGraph = (
       '_'
     )}`;
 
-    console.log(lastLoraNodeId, currentLoraNodeId, currentLoraIndex, loraField);
-
     const loraLoaderNode: LoraLoaderInvocation = {
       type: 'lora_loader',
       id: currentLoraNodeId,
