@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional, Tuple
+
 from pydantic import BaseModel, Field
 
 from invokeai.app.util.metaenum import MetaEnum
@@ -88,3 +89,21 @@ class ProgressImage(BaseModel):
     width: int = Field(description="The effective width of the image in pixels")
     height: int = Field(description="The effective height of the image in pixels")
     dataURL: str = Field(description="The image data as a b64 data URL")
+
+
+class DeleteManyImagesResult(BaseModel):
+    """The result of a delete many image operation."""
+
+    deleted_images: list[str] = Field(
+        description="The names of the images that were successfully deleted"
+    )
+
+
+class AddManyImagesToBoardResult(BaseModel):
+    """The result of an add many images to board operation."""
+
+    board_id: str = Field(description="The id of the board the images were added to")
+    added_images: list[str] = Field(
+        description="The names of the images that were successfully added"
+    )
+    total: int = Field(description="The total number of images on the board")

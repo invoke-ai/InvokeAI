@@ -1,8 +1,8 @@
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
-from invokeai.app.services.board_record_storage import BoardRecord, BoardChanges
+
+from invokeai.app.models.image import AddManyImagesToBoardResult
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.models.board_record import BoardDTO
 from invokeai.app.services.models.image_record import ImageDTO
 
 from ..dependencies import ApiDependencies
@@ -24,11 +24,14 @@ async def create_board_image(
 ):
     """Creates a board_image"""
     try:
-        result = ApiDependencies.invoker.services.board_images.add_image_to_board(board_id=board_id, image_name=image_name)
+        result = ApiDependencies.invoker.services.board_images.add_image_to_board(
+            board_id=board_id, image_name=image_name
+        )
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to add to board")
-    
+
+
 @board_images_router.delete(
     "/",
     operation_id="remove_board_image",
@@ -43,11 +46,12 @@ async def remove_board_image(
 ):
     """Deletes a board_image"""
     try:
-        result = ApiDependencies.invoker.services.board_images.remove_image_from_board(board_id=board_id, image_name=image_name)
+        result = ApiDependencies.invoker.services.board_images.remove_image_from_board(
+            board_id=board_id, image_name=image_name
+        )
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to update board")
-
 
 
 @board_images_router.get(
@@ -67,3 +71,27 @@ async def list_board_images(
     )
     return results
 
+
+@board_images_router.patch(
+    "/{board_id}/images",
+    operation_id="create_multiple_board_images",
+    responses={
+        201: {"description": "The images were added to the board successfully"},
+        207: {
+            "description": "Some images were added to the board successfully, but others failed"
+        },
+    },
+    status_code=201,
+)
+async def create_multiple_board_images(
+    board_id: str = Path(description="The id of the board"),
+    image_names: list[str] = Body(
+        description="The names of the images to add to the board"
+    ),
+) -> AddManyImagesToBoardResult:
+    """Add many images to a board"""
+
+    results = ApiDependencies.invoker.services.board_images.add_many_images_to_board(
+        board_id, image_names
+    )
+    return results

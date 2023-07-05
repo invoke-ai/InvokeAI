@@ -1,20 +1,18 @@
 import io
 from typing import Optional
-from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadFile
-from fastapi.routing import APIRouter
+
+from fastapi import (Body, HTTPException, Path, Query, Request, Response,
+                     UploadFile)
 from fastapi.responses import FileResponse
+from fastapi.routing import APIRouter
 from PIL import Image
-from invokeai.app.models.image import (
-    ImageCategory,
-    ResourceOrigin,
-)
+
+from invokeai.app.models.image import (DeleteManyImagesResult, ImageCategory,
+                                       ResourceOrigin)
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.models.image_record import (
-    ImageDTO,
-    ImageRecordChanges,
-    ImageUrlsDTO,
-)
-from invokeai.app.services.item_storage import PaginatedResults
+from invokeai.app.services.models.image_record import (ImageDTO,
+                                                       ImageRecordChanges,
+                                                       ImageUrlsDTO)
 
 from ..dependencies import ApiDependencies
 
@@ -239,3 +237,19 @@ async def list_images_with_metadata(
     )
 
     return image_dtos
+
+
+@images_router.post(
+    "/delete",
+    operation_id="delete_many_images",
+    response_model=DeleteManyImagesResult,
+)
+async def delete_many_images(
+    image_names: list[str] = Body(description="The names of the images to delete"),
+) -> DeleteManyImagesResult:
+    """Deletes many images"""
+
+    try:
+        return ApiDependencies.invoker.services.images.delete_many(image_names)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete images")

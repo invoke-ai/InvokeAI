@@ -1,37 +1,28 @@
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from logging import Logger
-from typing import Optional, TYPE_CHECKING, Union
-from PIL.Image import Image as PILImageType
+from typing import TYPE_CHECKING, Optional, Union
 
-from invokeai.app.models.image import (
-    ImageCategory,
-    ResourceOrigin,
-    InvalidImageCategoryException,
-    InvalidOriginException,
-)
+from PIL.Image import Image as PILImageType
+from pydantic import BaseModel, Field
+
+from invokeai.app.models.image import (DeleteManyImagesResult, ImageCategory,
+                                       InvalidImageCategoryException,
+                                       InvalidOriginException, ResourceOrigin)
 from invokeai.app.models.metadata import ImageMetadata
-from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
-from invokeai.app.services.image_record_storage import (
-    ImageRecordDeleteException,
-    ImageRecordNotFoundException,
-    ImageRecordSaveException,
-    ImageRecordStorageBase,
-    OffsetPaginatedResults,
-)
-from invokeai.app.services.models.image_record import (
-    ImageRecord,
-    ImageDTO,
-    ImageRecordChanges,
-    image_record_to_dto,
-)
+from invokeai.app.services.board_image_record_storage import \
+    BoardImageRecordStorageBase
 from invokeai.app.services.image_file_storage import (
-    ImageFileDeleteException,
-    ImageFileNotFoundException,
-    ImageFileSaveException,
-    ImageFileStorageBase,
-)
+    ImageFileDeleteException, ImageFileNotFoundException,
+    ImageFileSaveException, ImageFileStorageBase)
+from invokeai.app.services.image_record_storage import (
+    ImageRecordDeleteException, ImageRecordNotFoundException,
+    ImageRecordSaveException, ImageRecordStorageBase, OffsetPaginatedResults)
 from invokeai.app.services.item_storage import ItemStorageABC, PaginatedResults
 from invokeai.app.services.metadata import MetadataServiceBase
+from invokeai.app.services.models.image_record import (ImageDTO, ImageRecord,
+                                                       ImageRecordChanges,
+                                                       image_record_to_dto)
 from invokeai.app.services.resource_name import NameServiceBase
 from invokeai.app.services.urls import UrlServiceBase
 
@@ -110,6 +101,11 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def delete(self, image_name: str):
         """Deletes an image."""
+        pass
+
+    @abstractmethod
+    def delete_many(self, image_names: list[str]) -> DeleteManyImagesResult:
+        """Deletes many images."""
         pass
 
     @abstractmethod
@@ -345,6 +341,24 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self._services.logger.error("Problem deleting image record and file")
             raise e
+
+    def delete_many(self, image_names: list[str]) -> DeleteManyImagesResult:
+        deleted_images: list[str] = []
+        for image_name in image_names:
+            try:
+                self._services.image_files.delete(image_name)
+                self._services.image_records.delete(image_name)
+                deleted_images.append(image_name)
+            except ImageRecordDeleteException:
+                self._services.logger.error(f"Failed to delete image record")
+                deleted_images.append(image_name)
+            except ImageFileDeleteException:
+                self._services.logger.error(f"Failed to delete image file")
+                deleted_images.append(image_name)
+            except Exception as e:
+                self._services.logger.error("Problem deleting image record and file")
+                deleted_images.append(image_name)
+        return DeleteManyImagesResult(deleted_images=deleted_images)
 
     def delete_images_on_board(self, board_id: str):
         try:

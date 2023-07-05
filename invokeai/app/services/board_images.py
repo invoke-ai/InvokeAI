@@ -7,12 +7,16 @@ from invokeai.app.services.board_record_storage import (
     BoardRecordStorageBase,
 )
 
-from invokeai.app.services.image_record_storage import (
-    ImageRecordStorageBase,
-    OffsetPaginatedResults,
-)
+from invokeai.app.models.image import AddManyImagesToBoardResult
+from invokeai.app.services.board_image_record_storage import \
+    BoardImageRecordStorageBase
+from invokeai.app.services.board_record_storage import (BoardRecord,
+                                                        BoardRecordStorageBase)
+from invokeai.app.services.image_record_storage import (ImageRecordStorageBase,
+                                                        OffsetPaginatedResults)
 from invokeai.app.services.models.board_record import BoardDTO
-from invokeai.app.services.models.image_record import ImageDTO, image_record_to_dto
+from invokeai.app.services.models.image_record import (ImageDTO,
+                                                       image_record_to_dto)
 from invokeai.app.services.urls import UrlServiceBase
 
 
@@ -25,7 +29,16 @@ class BoardImagesServiceABC(ABC):
         board_id: str,
         image_name: str,
     ) -> None:
-        """Adds an image to a board."""
+        """Adds an image to a board. If the image is on a different board, it is removed from that board."""
+        pass
+
+    @abstractmethod
+    def add_many_images_to_board(
+        self,
+        board_id: str,
+        image_names: list[str],
+    ) -> AddManyImagesToBoardResult:
+        """Adds many images to a board. If an image is on a different board, it is removed from that board."""
         pass
 
     @abstractmethod
@@ -91,6 +104,28 @@ class BoardImagesService(BoardImagesServiceABC):
     ) -> None:
         self._services.board_image_records.add_image_to_board(board_id, image_name)
 
+    def add_many_images_to_board(
+        self,
+        board_id: str,
+        image_names: list[str],
+    ) -> AddManyImagesToBoardResult:
+        added_images: list[str] = []
+
+        for image_name in image_names:
+            try:
+                self._services.board_image_records.add_image_to_board(
+                    board_id, image_name
+                )
+                added_images.append(image_name)
+            except Exception as e:
+                self._services.logger.exception(e)
+
+        total = self._services.board_image_records.get_image_count_for_board(board_id)
+
+        return AddManyImagesToBoardResult(
+            board_id=board_id, added_images=added_images, total=total
+        )
+
     def remove_image_from_board(
         self,
         board_id: str,
@@ -136,7 +171,7 @@ def board_record_to_dto(
 ) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
-        **board_record.dict(exclude={'cover_image_name'}),
+        **board_record.dict(exclude={"cover_image_name"}),
         cover_image_name=cover_image_name,
         image_count=image_count,
     )
