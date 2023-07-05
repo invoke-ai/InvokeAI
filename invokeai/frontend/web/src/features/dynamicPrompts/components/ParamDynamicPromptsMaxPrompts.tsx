@@ -1,25 +1,31 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAISlider from 'common/components/IAISlider';
-import { maxPromptsChanged, maxPromptsReset } from '../store/slice';
 import { createSelector } from '@reduxjs/toolkit';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { useCallback } from 'react';
 import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAISlider from 'common/components/IAISlider';
+import { useCallback } from 'react';
+import { maxPromptsChanged, maxPromptsReset } from '../store/slice';
 
 const selector = createSelector(
   stateSelector,
   (state) => {
-    const { maxPrompts, combinatorial } = state.dynamicPrompts;
+    const { maxPrompts, combinatorial, isEnabled } = state.dynamicPrompts;
     const { min, sliderMax, inputMax } =
       state.config.sd.dynamicPrompts.maxPrompts;
 
-    return { maxPrompts, min, sliderMax, inputMax, combinatorial };
+    return {
+      maxPrompts,
+      min,
+      sliderMax,
+      inputMax,
+      isDisabled: !isEnabled || !combinatorial,
+    };
   },
   defaultSelectorOptions
 );
 
 const ParamDynamicPromptsMaxPrompts = () => {
-  const { maxPrompts, min, sliderMax, inputMax, combinatorial } =
+  const { maxPrompts, min, sliderMax, inputMax, isDisabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
 
@@ -37,7 +43,7 @@ const ParamDynamicPromptsMaxPrompts = () => {
   return (
     <IAISlider
       label="Max Prompts"
-      isDisabled={!combinatorial}
+      isDisabled={isDisabled}
       min={min}
       max={sliderMax}
       value={maxPrompts}
