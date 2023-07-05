@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { clamp, isEqual } from 'lodash-es';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
+import { FaAngleLeft, FaAngleRight, FaRedo } from 'react-icons/fa';
 import { stateSelector } from 'app/store/store';
 import {
   imageSelected,
@@ -12,6 +12,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { selectFilteredImages } from 'features/gallery/store/gallerySlice';
+import { receivedPageOfImages } from 'services/api/thunks/image';
 
 const nextPrevButtonTriggerAreaStyles: ChakraProps['sx'] = {
   height: '100%',
@@ -102,6 +103,14 @@ const NextPrevImageButtons = () => {
     nextImageId && dispatch(imageSelected(nextImageId));
   }, [dispatch, nextImageId]);
 
+  const handleLoadMoreImages = useCallback(() => {
+    dispatch(
+      receivedPageOfImages({
+        is_intermediate: false,
+      })
+    );
+  }, [dispatch]);
+
   useHotkeys(
     'left',
     () => {
@@ -160,6 +169,16 @@ const NextPrevImageButtons = () => {
             icon={<FaAngleRight size={64} />}
             variant="unstyled"
             onClick={handleNextImage}
+            boxSize={16}
+            sx={nextPrevButtonStyles}
+          />
+        )}
+        {shouldShowNextPrevButtons && isOnLastImage && (
+          <IconButton
+            aria-label={t('accessibility.loadMore')}
+            icon={<FaRedo size={42} />}
+            variant="unstyled"
+            onClick={handleLoadMoreImages}
             boxSize={16}
             sx={nextPrevButtonStyles}
           />
