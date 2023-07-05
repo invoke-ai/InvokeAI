@@ -22,10 +22,10 @@ export const makeSelector = (image_name: string) =>
     [stateSelector],
     ({ gallery }) => {
       const isSelected = gallery.selection.includes(image_name);
-      const selection = gallery.selection;
+      const selectionCount = gallery.selection.length;
       return {
         isSelected,
-        selection,
+        selectionCount,
       };
     },
     defaultSelectorOptions
@@ -44,7 +44,7 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const localSelector = useMemo(() => makeSelector(image_name), [image_name]);
 
-  const { isSelected, selection } = useAppSelector(localSelector);
+  const { isSelected, selectionCount } = useAppSelector(localSelector);
 
   const dispatch = useAppDispatch();
 
@@ -75,11 +75,10 @@ const GalleryImage = (props: HoverableImageProps) => {
   );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (selection.length > 1) {
+    if (selectionCount > 1) {
       return {
         id: 'gallery-image',
-        payloadType: 'IMAGE_NAMES',
-        payload: { imageNames: selection },
+        payloadType: 'GALLERY_SELECTION',
       };
     }
 
@@ -90,7 +89,7 @@ const GalleryImage = (props: HoverableImageProps) => {
         payload: { imageDTO },
       };
     }
-  }, [imageDTO, selection]);
+  }, [imageDTO, selectionCount]);
 
   return (
     <Box sx={{ w: 'full', h: 'full', touchAction: 'none' }}>

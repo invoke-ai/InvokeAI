@@ -19,7 +19,7 @@ const makeSelector = (image_name: string) =>
   createSelector(
     [stateSelector],
     (state) => ({
-      selection: state.batch.selection,
+      selectionCount: state.batch.selection.length,
       isSelected: state.batch.selection.includes(image_name),
     }),
     defaultSelectorOptions
@@ -43,7 +43,7 @@ const BatchImage = (props: BatchImageProps) => {
     [props.imageName]
   );
 
-  const { isSelected, selection } = useAppSelector(selector);
+  const { isSelected, selectionCount } = useAppSelector(selector);
 
   const handleClickRemove = useCallback(() => {
     dispatch(imageRemovedFromBatch(props.imageName));
@@ -63,13 +63,10 @@ const BatchImage = (props: BatchImageProps) => {
   );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (selection.length > 1) {
+    if (selectionCount > 1) {
       return {
         id: 'batch',
-        payloadType: 'IMAGE_NAMES',
-        payload: {
-          imageNames: selection,
-        },
+        payloadType: 'BATCH_SELECTION',
       };
     }
 
@@ -80,7 +77,7 @@ const BatchImage = (props: BatchImageProps) => {
         payload: { imageDTO },
       };
     }
-  }, [imageDTO, selection]);
+  }, [imageDTO, selectionCount]);
 
   if (isError) {
     return <Icon as={FaExclamationCircle} />;
