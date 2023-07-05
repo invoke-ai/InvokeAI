@@ -97,6 +97,7 @@ const ParamPositiveConditioning = () => {
           resize="vertical"
           ref={promptRef}
           minH={32}
+          paddingRight={8}
         />
       </FormControl>
     </Box>
