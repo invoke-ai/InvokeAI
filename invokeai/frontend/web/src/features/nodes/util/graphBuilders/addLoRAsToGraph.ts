@@ -42,8 +42,8 @@ export const addLoRAsToGraph = (
   let currentLoraIndex = 0;
 
   forEach(loras, (lora) => {
-    const { name, weight } = lora;
-    const loraField = modelIdToLoRAModelField(name);
+    const { id, name, weight } = lora;
+    const loraField = modelIdToLoRAModelField(id);
     const currentLoraNodeId = `${LORA_LOADER}_${loraField.model_name.replace(
       '.',
       '_'
