@@ -285,7 +285,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 # MultiControlNetModel has been refactored out, just need list[ControlNetData]
         return control_data
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)
 
@@ -369,7 +369,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             },
         }
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)
         latent = context.services.latents.get(self.latents.latents_name)
@@ -461,7 +461,7 @@ class LatentsToImageInvocation(BaseInvocation):
             },
         }
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
@@ -599,7 +599,7 @@ class ImageToLatentsInvocation(BaseInvocation):
             },
         }
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         # image = context.services.images.get(
         #     self.image.image_type, self.image.image_name

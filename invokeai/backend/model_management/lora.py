@@ -526,7 +526,7 @@ class ModelPatcher:
     ):
         original_weights = dict()
         try:
-            with torch.inference_mode():
+            with torch.no_grad():
                 for lora, lora_weight in loras:
                     #assert lora.device.type == "cpu"
                     for layer_key, layer in lora.layers.items():
@@ -552,7 +552,7 @@ class ModelPatcher:
             yield # wait for context manager exit
 
         finally:
-            with torch.inference_mode():
+            with torch.no_grad():
                 for module_key, weight in original_weights.items():
                     model.get_submodule(module_key).weight.copy_(weight)
 
