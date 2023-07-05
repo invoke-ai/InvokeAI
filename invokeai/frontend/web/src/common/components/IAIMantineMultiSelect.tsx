@@ -49,6 +49,8 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
             borderWidth: '2px',
             borderColor: mode(base200, base800)(colorMode),
             color: mode(base900, base100)(colorMode),
+            paddingTop: 6,
+            paddingBottom: 6,
             paddingRight: 24,
             fontWeight: 600,
             '&:hover': { borderColor: mode(base300, base600)(colorMode) },
