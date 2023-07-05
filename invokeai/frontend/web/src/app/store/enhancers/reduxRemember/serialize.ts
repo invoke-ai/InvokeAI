@@ -20,10 +20,8 @@ const serializationDenylist: {
   nodes: nodesPersistDenylist,
   postprocessing: postprocessingPersistDenylist,
   system: systemPersistDenylist,
-  // config: configPersistDenyList,
   ui: uiPersistDenylist,
   controlNet: controlNetDenylist,
-  // hotkeys: hotkeysPersistDenylist,
 };
 
 export const serialize: SerializeFunction = (data, key) => {

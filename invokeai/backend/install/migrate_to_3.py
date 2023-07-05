@@ -76,6 +76,10 @@ class MigrateTo3(object):
         Create a unique name for a model for use within models.yaml.
         '''
         done = False
+        
+        # some model names have slashes in them, which really screws things up
+        name = name.replace('/','_')
+        
         key = ModelManager.create_key(name,info.base_type,info.model_type)
         unique_name = key
         counter = 1
@@ -219,11 +223,11 @@ class MigrateTo3(object):
             repo_id = 'openai/clip-vit-large-patch14'
             self._migrate_pretrained(CLIPTokenizer,
                                      repo_id= repo_id,
-                                     dest= target_dir / 'clip-vit-large-patch14' / 'tokenizer',
+                                     dest= target_dir / 'clip-vit-large-patch14',
                                      **kwargs)
             self._migrate_pretrained(CLIPTextModel,
                                      repo_id = repo_id,
-                                     dest = target_dir / 'clip-vit-large-patch14' / 'text_encoder',
+                                     dest = target_dir / 'clip-vit-large-patch14',
                                      **kwargs)
 
             # sd-2

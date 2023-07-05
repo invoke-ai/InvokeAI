@@ -10,12 +10,10 @@ import {
 } from '@chakra-ui/react';
 
 import IAIButton from 'common/components/IAIButton';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIInput from 'common/components/IAIInput';
 import IAINumberInput from 'common/components/IAINumberInput';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import React from 'react';
-
-import SearchModels from './SearchModels';
 
 // import { addNewModel } from 'app/socketio/actions';
 
@@ -24,12 +22,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { Field, Formik } from 'formik';
 import { useTranslation } from 'react-i18next';
 
-import type { InvokeModelConfigProps } from 'app/types/invokeai';
 import type { RootState } from 'app/store/store';
-import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
-import type { FieldInputProps, FormikProps } from 'formik';
+import type { InvokeModelConfigProps } from 'app/types/invokeai';
 import IAIForm from 'common/components/IAIForm';
 import { IAIFormItemWrapper } from 'common/components/IAIForms/IAIFormItemWrapper';
+import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
+import type { FieldInputProps, FormikProps } from 'formik';
+import SearchModels from './SearchModels';
 
 const MIN_MODEL_SIZE = 64;
 const MAX_MODEL_SIZE = 2048;

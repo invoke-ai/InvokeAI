@@ -1,24 +1,23 @@
 import { createAction } from '@reduxjs/toolkit';
-import { startAppListening } from '../';
-import { log } from 'app/logging/useLogger';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'app/components/ImageDnd/typesafeDnd';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import { log } from 'app/logging/useLogger';
 import {
   imageAddedToBatch,
   imagesAddedToBatch,
 } from 'features/batch/store/batchSlice';
-import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
+import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import {
   fieldValueChanged,
   imageCollectionFieldValueChanged,
 } from 'features/nodes/store/nodesSlice';
-import { boardsApi } from 'services/api/endpoints/boards';
+import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { boardImagesApi } from 'services/api/endpoints/boardImages';
+import { startAppListening } from '../';
 
 const moduleLog = log.child({ namespace: 'dnd' });
 
@@ -33,6 +32,7 @@ export const addImageDroppedListener = () => {
     effect: (action, { dispatch, getState }) => {
       const { activeData, overData } = action.payload;
       const { actionType } = overData;
+      const state = getState();
 
       // set current image
       if (
@@ -64,9 +64,9 @@ export const addImageDroppedListener = () => {
       // add multiple images to batch
       if (
         actionType === 'ADD_TO_BATCH' &&
-        activeData.payloadType === 'IMAGE_NAMES'
+        activeData.payloadType === 'GALLERY_SELECTION'
       ) {
-        dispatch(imagesAddedToBatch(activeData.payload.imageNames));
+        dispatch(imagesAddedToBatch(state.gallery.selection));
       }
 
       // set control image
@@ -128,14 +128,14 @@ export const addImageDroppedListener = () => {
       // set multiple nodes images (multiple images handler)
       if (
         actionType === 'SET_MULTI_NODES_IMAGE' &&
-        activeData.payloadType === 'IMAGE_NAMES'
+        activeData.payloadType === 'GALLERY_SELECTION'
       ) {
         const { fieldName, nodeId } = overData.context;
         dispatch(
           imageCollectionFieldValueChanged({
             nodeId,
             fieldName,
-            value: activeData.payload.imageNames.map((image_name) => ({
+            value: state.gallery.selection.map((image_name) => ({
               image_name,
             })),
           })

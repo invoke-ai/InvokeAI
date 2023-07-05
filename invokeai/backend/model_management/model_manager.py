@@ -233,14 +233,14 @@ import hashlib
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, List, Tuple, Union, Set, Callable, types
+from typing import Optional, List, Tuple, Union, Dict, Set, Callable, types
 from shutil import rmtree
 
 import torch
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -249,7 +249,7 @@ from .model_cache import ModelCache, ModelLocker
 from .models import (
     BaseModelType, ModelType, SubModelType,
     ModelError, SchedulerPredictionType, MODEL_CLASSES,
-    ModelConfigBase,
+    ModelConfigBase, ModelNotFoundException,
     )
 
 # We are only starting to number the config file with release 3.
@@ -278,8 +278,13 @@ class InvalidModelError(Exception):
     "Raised when an invalid model is requested"
     pass
 
-MAX_CACHE_SIZE = 6.0  # GB
+class AddModelResult(BaseModel):
+    name: str = Field(description="The name of the model after import")
+    model_type: ModelType = Field(description="The type of model")
+    base_model: BaseModelType = Field(description="The base model")
+    config: ModelConfigBase = Field(description="The configuration of the model")
 
+MAX_CACHE_SIZE = 6.0  # GB
 
 class ConfigMeta(BaseModel):
     version: str
@@ -403,7 +408,7 @@ class ModelManager(object):
         if model_key not in self.models:
             self.scan_models_directory(base_model=base_model, model_type=model_type)
             if model_key not in self.models:
-                raise Exception(f"Model not found - {model_key}")
+                raise ModelNotFoundException(f"Model not found - {model_key}")
 
         model_config = self.models[model_key]
         model_path = self.app_config.root_path / model_config.path
@@ -415,14 +420,14 @@ class ModelManager(object):
 
             else:
                 self.models.pop(model_key, None)
-                raise Exception(f"Model not found - {model_key}")
+                raise ModelNotFoundException(f"Model not found - {model_key}")
 
         # vae/movq override
         # TODO: 
         if submodel_type is not None and hasattr(model_config, submodel_type):
             override_path = getattr(model_config, submodel_type)
             if override_path:
-                model_path = override_path
+                model_path = self.app_config.root_path / override_path
                 model_type = submodel_type
                 submodel_type = None
                 model_class = MODEL_CLASSES[base_model][model_type]
@@ -430,6 +435,7 @@ class ModelManager(object):
         # TODO: path
         # TODO: is it accurate to use path as id
         dst_convert_path = self._get_model_cache_path(model_path)
+
         model_path = model_class.convert_if_required(
             base_model=base_model,
             model_path=str(model_path), # TODO: refactor str/Path types logic
@@ -569,13 +575,16 @@ class ModelManager(object):
         model_type: ModelType,
         model_attributes: dict,
         clobber: bool = False,
-    ) -> None:
+    ) -> AddModelResult:
         """
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
         On a successful update, the config will be changed in memory and the
         method will return True. Will fail with an assertion error if provided
         attributes are incorrect or the model name is missing.
+
+        The returned dict has the same format as the dict returned by
+        model_info().
         """
 
         model_class = MODEL_CLASSES[base_model][model_type]
@@ -599,12 +608,18 @@ class ModelManager(object):
                     old_model_cache.unlink()
 
             # remove in-memory cache
-            # note: it not garantie to release memory(model can has other references)
+            # note: it not guaranteed to release memory(model can has other references)
             cache_ids = self.cache_keys.pop(model_key, [])
             for cache_id in cache_ids:
                 self.cache.uncache_model(cache_id)
 
         self.models[model_key] = model_config
+        return AddModelResult(
+            name = model_name,
+            model_type = model_type,
+            base_model = base_model,
+            config = model_config,
+        )
 
     def search_models(self, search_folder):
         self.logger.info(f"Finding Models In: {search_folder}")
@@ -715,19 +730,19 @@ class ModelManager(object):
 
                             if model_path.is_relative_to(self.app_config.root_path):
                                 model_path = model_path.relative_to(self.app_config.root_path)
-                                try:
-                                    model_config: ModelConfigBase = model_class.probe_config(str(model_path))
-                                    self.models[model_key] = model_config
-                                    new_models_found = True
-                                except NotImplementedError as e:
-                                    self.logger.warning(e)
+                            try:
+                                model_config: ModelConfigBase = model_class.probe_config(str(model_path))
+                                self.models[model_key] = model_config
+                                new_models_found = True
+                            except NotImplementedError as e:
+                                self.logger.warning(e)
 
         imported_models = self.autoimport()
 
         if (new_models_found or imported_models) and self.config_path:
             self.commit()
 
-    def autoimport(self)->set[Path]:
+    def autoimport(self)->Dict[str, AddModelResult]:
         '''
         Scan the autoimport directory (if defined) and import new models, delete defunct models.
         '''
@@ -740,7 +755,6 @@ class ModelManager(object):
                                  prediction_type_helper = ask_user_for_prediction_type,
                                  )
         
-        installed = set()
         scanned_dirs = set()
         
         config = self.app_config
@@ -754,13 +768,14 @@ class ModelManager(object):
                 continue
 
             self.logger.info(f'Scanning {autodir} for models to import')
+            installed = dict()
         
             autodir = self.app_config.root_path / autodir
             if not autodir.exists():
                 continue
 
             items_scanned = 0
-            new_models_found = set()
+            new_models_found = dict()
             
             for root, dirs, files in os.walk(autodir):
                 items_scanned += len(dirs) + len(files)
@@ -770,7 +785,7 @@ class ModelManager(object):
                         scanned_dirs.add(path)
                         continue
                     if any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin'}]):
-                        new_models_found.update(installer.heuristic_install(path))
+                        new_models_found.update(installer.heuristic_import(path))
                         scanned_dirs.add(path)
 
                 for f in files:
@@ -778,7 +793,7 @@ class ModelManager(object):
                     if path in known_paths or path.parent in scanned_dirs:
                         continue
                     if path.suffix in {'.ckpt','.bin','.pth','.safetensors','.pt'}:
-                        new_models_found.update(installer.heuristic_install(path))
+                        new_models_found.update(installer.heuristic_import(path))
 
             self.logger.info(f'Scanned {items_scanned} files and directories, imported {len(new_models_found)} models')
             installed.update(new_models_found)
@@ -788,7 +803,7 @@ class ModelManager(object):
     def heuristic_import(self,
                          items_to_import: Set[str],
                          prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
-                         )->Set[str]:
+                         )->Dict[str, AddModelResult]:
         '''Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.
         :param items_to_import: Set of strings corresponding to models to be imported.
@@ -801,17 +816,20 @@ class ModelManager(object):
         generally impossible to do this programmatically, so the
         prediction_type_helper usually asks the user to choose.
 
+        The result is a set of successfully installed models. Each element
+        of the set is a dict corresponding to the newly-created OmegaConf stanza for
+        that model.
         '''
         # avoid circular import here
         from invokeai.backend.install.model_install_backend import ModelInstall
-        successfully_installed = set()
+        successfully_installed = dict()
         
         installer = ModelInstall(config = self.app_config,
                                  prediction_type_helper = prediction_type_helper,
                                  model_manager = self)
         for thing in items_to_import:
             try:
-                installed = installer.heuristic_install(thing)
+                installed = installer.heuristic_import(thing)
                 successfully_installed.update(installed)
             except Exception as e:
                 self.logger.warning(f'{thing} could not be imported: {str(e)}')

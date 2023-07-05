@@ -136,6 +136,15 @@ export const zModel = z.string();
  */
 export type ModelParam = z.infer<typeof zModel>;
 /**
+ * Zod schema for VAE parameter
+ * TODO: Make this a dynamically generated enum?
+ */
+export const zVAE = z.string();
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type VAEParam = z.infer<typeof zVAE>;
+/**
  * Validates/type-guards a value as a model parameter
  */
 export const isValidModel = (val: unknown): val is ModelParam =>
