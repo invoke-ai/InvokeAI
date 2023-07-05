@@ -97,6 +97,10 @@ class CoreMetadataService(MetadataServiceBase):
                 if dest_field == "noise":
                     for field in self._NOISE_FIELDS:
                         metadata[field] = source_node_dict.get(field)
+                # vae and unet
+                if dest_field == "unet":
+                    metadata["unet"] = source_node_dict.get("model").get("model_name")
+                    metadata["model"] = source_node_dict.get("model").get("model_name")
         return metadata
 
     def _build_metadata_from_graph(
