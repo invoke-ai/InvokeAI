@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 import argparse
-from typing import Any, Callable, Iterable, Literal, Union, get_args, get_origin, get_type_hints
+from typing import Any, Callable, Iterable, Literal, Optional, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel, Field
 import networkx as nx
 import matplotlib.pyplot as plt
