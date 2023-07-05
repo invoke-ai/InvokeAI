@@ -9,6 +9,7 @@ from typing import Literal, Optional, Union, List, Dict
 from PIL import Image
 from pydantic import BaseModel, Field, validator
 
+from ...backend.model_management import BaseModelType, ModelType
 from ..models.image import ImageField, ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
@@ -105,9 +106,15 @@ CONTROLNET_MODE_VALUES = Literal[tuple(["balanced", "more_prompt", "more_control
 # CONTROLNET_RESIZE_VALUES = Literal[tuple(["just_resize", "crop_resize", "fill_resize"])]
 
 
+class ControlNetModelField(BaseModel):
+    """ControlNet model field"""
+
+    model_name: str = Field(description="Name of the ControlNet model")
+    base_model: BaseModelType = Field(description="Base model")
+
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="The control image")
-    control_model: Optional[str] = Field(default=None, description="The ControlNet model to use")
+    control_model: Optional[ControlNetModelField] = Field(default=None, description="The ControlNet model to use")
     # control_weight: Optional[float] = Field(default=1, description="weight given to controlnet")
     control_weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(default=0, ge=0, le=1,
@@ -154,7 +161,7 @@ class ControlNetInvocation(BaseInvocation):
     type: Literal["controlnet"] = "controlnet"
     # Inputs
     image: ImageField = Field(default=None, description="The control image")
-    control_model: CONTROLNET_NAME_VALUES = Field(default="lllyasviel/sd-controlnet-canny",
+    control_model: ControlNetModelField = Field(default="lllyasviel/sd-controlnet-canny",
                                                   description="control model used")
     control_weight: Union[float, List[float]] = Field(default=1.0, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(default=0, ge=0, le=1,
@@ -182,7 +189,11 @@ class ControlNetInvocation(BaseInvocation):
         return ControlOutput(
             control=ControlField(
                 image=self.image,
-                control_model=self.control_model,
+                #control_model=self.control_model,
+                control_model=ControlNetModelField(
+                    model_name="canny",
+                    base_model=BaseModelType.StableDiffusion1,
+                ),
                 control_weight=self.control_weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
