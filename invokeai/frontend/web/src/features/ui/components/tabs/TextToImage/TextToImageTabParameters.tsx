@@ -1,15 +1,16 @@
+import ParamDynamicPromptsCollapse from 'features/dynamicPrompts/components/ParamDynamicPromptsCollapse';
+import ParamLoraCollapse from 'features/lora/components/ParamLoraCollapse';
+import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
+import ParamNegativeConditioning from 'features/parameters/components/Parameters/Core/ParamNegativeConditioning';
+import ParamPositiveConditioning from 'features/parameters/components/Parameters/Core/ParamPositiveConditioning';
+import ParamHiresCollapse from 'features/parameters/components/Parameters/Hires/ParamHiresCollapse';
+import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/ParamNoiseCollapse';
+import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
+import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
+import ParamVariationCollapse from 'features/parameters/components/Parameters/Variations/ParamVariationCollapse';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import { memo } from 'react';
-import ParamPositiveConditioning from 'features/parameters/components/Parameters/Core/ParamPositiveConditioning';
-import ParamNegativeConditioning from 'features/parameters/components/Parameters/Core/ParamNegativeConditioning';
-import ParamVariationCollapse from 'features/parameters/components/Parameters/Variations/ParamVariationCollapse';
-import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/ParamNoiseCollapse';
-import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
-import ParamHiresCollapse from 'features/parameters/components/Parameters/Hires/ParamHiresCollapse';
-import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
 import TextToImageTabCoreParameters from './TextToImageTabCoreParameters';
-import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
-import ParamDynamicPromptsCollapse from 'features/dynamicPrompts/components/ParamDynamicPromptsCollapse';
 
 const TextToImageTabParameters = () => {
   return (
@@ -18,6 +19,7 @@ const TextToImageTabParameters = () => {
       <ParamNegativeConditioning />
       <ProcessButtons />
       <TextToImageTabCoreParameters />
+      <ParamLoraCollapse />
       <ParamDynamicPromptsCollapse />
       <ParamControlNetCollapse />
       <ParamVariationCollapse />

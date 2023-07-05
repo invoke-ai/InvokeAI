@@ -1,37 +1,38 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setIterations } from 'features/parameters/store/generationSlice';
-import { configSelector } from 'features/system/store/configSelectors';
-import { hotkeysSelector } from 'features/ui/store/hotkeysSlice';
-import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createSelector([stateSelector], (state) => {
-  const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
-    state.config.sd.iterations;
-  const { iterations } = state.generation;
-  const { shouldUseSliders } = state.ui;
-  const isDisabled =
-    state.dynamicPrompts.isEnabled && state.dynamicPrompts.combinatorial;
+const selector = createSelector(
+  [stateSelector],
+  (state) => {
+    const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
+      state.config.sd.iterations;
+    const { iterations } = state.generation;
+    const { shouldUseSliders } = state.ui;
+    const isDisabled =
+      state.dynamicPrompts.isEnabled && state.dynamicPrompts.combinatorial;
 
-  const step = state.hotkeys.shift ? fineStep : coarseStep;
+    const step = state.hotkeys.shift ? fineStep : coarseStep;
 
-  return {
-    iterations,
-    initial,
-    min,
-    sliderMax,
-    inputMax,
-    step,
-    shouldUseSliders,
-    isDisabled,
-  };
-});
+    return {
+      iterations,
+      initial,
+      min,
+      sliderMax,
+      inputMax,
+      step,
+      shouldUseSliders,
+      isDisabled,
+    };
+  },
+  defaultSelectorOptions
+);
 
 const ParamIterations = () => {
   const {

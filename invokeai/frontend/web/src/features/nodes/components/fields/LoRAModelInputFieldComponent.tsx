@@ -7,13 +7,13 @@ import {
   VaeModelInputFieldValue,
 } from 'features/nodes/types/types';
 import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
-import { forEach } from 'lodash-es';
+import { forEach, isString } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
+import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 
-const VaeModelInputFieldComponent = (
+const LoRAModelInputFieldComponent = (
   props: FieldComponentProps<
     VaeModelInputFieldValue,
     VaeModelInputFieldTemplate
@@ -24,21 +24,21 @@ const VaeModelInputFieldComponent = (
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { data: vaeModels } = useGetVaeModelsQuery();
+  const { data: loraModels } = useGetLoRAModelsQuery();
 
   const selectedModel = useMemo(
-    () => vaeModels?.entities[field.value ?? vaeModels.ids[0]],
-    [vaeModels?.entities, vaeModels?.ids, field.value]
+    () => loraModels?.entities[field.value ?? loraModels.ids[0]],
+    [loraModels?.entities, loraModels?.ids, field.value]
   );
 
   const data = useMemo(() => {
-    if (!vaeModels) {
+    if (!loraModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(vaeModels.entities, (model, id) => {
+    forEach(loraModels.entities, (model, id) => {
       if (!model) {
         return;
       }
@@ -51,7 +51,7 @@ const VaeModelInputFieldComponent = (
     });
 
     return data;
-  }, [vaeModels]);
+  }, [loraModels]);
 
   const handleValueChanged = useCallback(
     (v: string | null) => {
@@ -71,11 +71,18 @@ const VaeModelInputFieldComponent = (
   );
 
   useEffect(() => {
-    if (field.value && vaeModels?.ids.includes(field.value)) {
+    if (field.value && loraModels?.ids.includes(field.value)) {
       return;
     }
-    handleValueChanged('auto');
-  }, [field.value, handleValueChanged, vaeModels?.ids]);
+
+    const firstLora = loraModels?.ids[0];
+
+    if (!isString(firstLora)) {
+      return;
+    }
+
+    handleValueChanged(firstLora);
+  }, [field.value, handleValueChanged, loraModels?.ids]);
 
   return (
     <IAIMantineSelect
@@ -92,4 +99,4 @@ const VaeModelInputFieldComponent = (
   );
 };
 
-export default memo(VaeModelInputFieldComponent);
+export default memo(LoRAModelInputFieldComponent);

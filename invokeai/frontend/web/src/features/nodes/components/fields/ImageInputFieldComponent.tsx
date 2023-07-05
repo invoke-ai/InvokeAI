@@ -7,18 +7,17 @@ import {
 } from 'features/nodes/types/types';
 import { memo, useCallback, useMemo } from 'react';
 
-import { FieldComponentProps } from './types';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api/types';
 import { Flex } from '@chakra-ui/react';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
-  NodesImageDropData,
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'app/components/ImageDnd/typesafeDnd';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/thunks/image';
+import { ImageDTO } from 'services/api/types';
+import { FieldComponentProps } from './types';
 
 const ImageInputFieldComponent = (
   props: FieldComponentProps<ImageInputFieldValue, ImageInputFieldTemplate>
