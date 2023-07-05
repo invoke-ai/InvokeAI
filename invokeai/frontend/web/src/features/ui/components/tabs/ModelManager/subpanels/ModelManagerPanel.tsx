@@ -2,15 +2,13 @@ import { Flex } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 import CheckpointModelEdit from './ModelManagerPanel/CheckpointModelEdit';
 import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
 
 export default function ModelManagerPanel() {
-  const { data: mainModels } = useListModelsQuery({
-    model_type: 'main',
-  });
+  const { data: mainModels } = useGetMainModelsQuery();
 
   const openModel = useAppSelector(
     (state: RootState) => state.system.openModel

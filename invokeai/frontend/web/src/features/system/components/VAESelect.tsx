@@ -6,7 +6,7 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 
 import { SelectItem } from '@mantine/core';
 import { forEach } from 'lodash-es';
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 
 import { RootState } from 'app/store/store';
 import { vaeSelected } from 'features/parameters/store/generationSlice';
@@ -16,9 +16,7 @@ const VAESelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { data: vaeModels } = useListModelsQuery({
-    model_type: 'vae',
-  });
+  const { data: vaeModels } = useGetVaeModelsQuery();
 
   const selectedModelId = useAppSelector(
     (state: RootState) => state.generation.vae

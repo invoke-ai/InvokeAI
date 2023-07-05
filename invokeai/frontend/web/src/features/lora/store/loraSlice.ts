@@ -1,11 +1,13 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
+import { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 
 export type Lora = {
+  id: string;
   name: string;
   weight: number;
 };
 
-export const defaultLoRAConfig: Omit<Lora, 'name'> = {
+export const defaultLoRAConfig: Omit<Lora, 'id' | 'name'> = {
   weight: 1,
 };
 
@@ -21,20 +23,20 @@ export const loraSlice = createSlice({
   name: 'lora',
   initialState: intialLoraState,
   reducers: {
-    loraAdded: (state, action: PayloadAction<string>) => {
-      const name = action.payload;
-      state.loras[name] = { name, ...defaultLoRAConfig };
+    loraAdded: (state, action: PayloadAction<LoRAModelConfigEntity>) => {
+      const { name, id } = action.payload;
+      state.loras[id] = { id, name, ...defaultLoRAConfig };
     },
     loraRemoved: (state, action: PayloadAction<string>) => {
-      const name = action.payload;
-      delete state.loras[name];
+      const id = action.payload;
+      delete state.loras[id];
     },
     loraWeightChanged: (
       state,
-      action: PayloadAction<{ name: string; weight: number }>
+      action: PayloadAction<{ id: string; weight: number }>
     ) => {
-      const { name, weight } = action.payload;
-      state.loras[name].weight = weight;
+      const { id, weight } = action.payload;
+      state.loras[id].weight = weight;
     },
   },
 });

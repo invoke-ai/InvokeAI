@@ -10,7 +10,7 @@ import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/component
 import { forEach, isString } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 
 const LoRAModelInputFieldComponent = (
@@ -24,9 +24,7 @@ const LoRAModelInputFieldComponent = (
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { data: loraModels } = useListModelsQuery({
-    model_type: 'lora',
-  });
+  const { data: loraModels } = useGetLoRAModelsQuery();
 
   const selectedModel = useMemo(
     () => loraModels?.entities[field.value ?? loraModels.ids[0]],
