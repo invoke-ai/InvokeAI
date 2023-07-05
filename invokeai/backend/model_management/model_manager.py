@@ -731,12 +731,12 @@ class ModelManager(object):
 
                             if model_path.is_relative_to(self.app_config.root_path):
                                 model_path = model_path.relative_to(self.app_config.root_path)
-                                try:
-                                    model_config: ModelConfigBase = model_class.probe_config(str(model_path))
-                                    self.models[model_key] = model_config
-                                    new_models_found = True
-                                except NotImplementedError as e:
-                                    self.logger.warning(e)
+                            try:
+                                model_config: ModelConfigBase = model_class.probe_config(str(model_path))
+                                self.models[model_key] = model_config
+                                new_models_found = True
+                            except NotImplementedError as e:
+                                self.logger.warning(e)
 
         imported_models = self.autoimport()
 
