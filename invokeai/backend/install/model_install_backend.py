@@ -223,7 +223,7 @@ class ModelInstall(object):
         try:
             model_result = None
             info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
-            model_name = path.stem if info.format=='checkpoint' else path.name
+            model_name = path.stem if path.is_file() else path.name
             if self.mgr.model_exists(model_name, info.base_type, info.model_type):
                 raise ValueError(f'A model named "{model_name}" is already installed.')
             attributes = self._make_attributes(path,info)
