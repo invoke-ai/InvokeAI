@@ -8,6 +8,7 @@ import {
   RangeOfSizeInvocation,
 } from 'services/api/types';
 import { modelIdToMainModelField } from '../modelIdToMainModelField';
+import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
   INPAINT,
@@ -193,6 +194,8 @@ export const buildCanvasInpaintGraph = (
       },
     ],
   };
+
+  addLoRAsToGraph(graph, state, INPAINT);
 
   // Add VAE
   addVAEToGraph(graph, state);
