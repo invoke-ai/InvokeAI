@@ -64,8 +64,8 @@ class ModelProbe(object):
     @classmethod
     def probe(cls,
               model_path: Path,
-              model: Union[Dict, ModelMixin] = None,
-              prediction_type_helper: Callable[[Path],SchedulerPredictionType] = None)->ModelProbeInfo:
+              model: Optional[Union[Dict, ModelMixin]] = None,
+              prediction_type_helper: Optional[Callable[[Path],SchedulerPredictionType]] = None)->ModelProbeInfo:
         '''
         Probe the model at model_path and return sufficient information about it
         to place it somewhere in the models directory hierarchy. If the model is

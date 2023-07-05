@@ -276,16 +276,16 @@ class ModelInstall(object):
                         location = self._download_hf_model(repo_id, files, staging)
                         break
                     elif f'learned_embeds.{suffix}' in files:
-                        location = self._download_hf_model(repo_id, ['learned_embeds.suffix'], staging)
+                        location = self._download_hf_model(repo_id, [f'learned_embeds.{suffix}'], staging)
                         break
             if not location:
                 logger.warning(f'Could not determine type of repo {repo_id}. Skipping install.')
-                return
-            
+                return {}
+
             info = ModelProbe().heuristic_probe(location, self.prediction_helper)
             if not info:
                 logger.warning(f'Could not probe {location}. Skipping install.')
-                return
+                return {}
             dest = self.config.models_path / info.base_type.value / info.model_type.value / self._get_model_name(repo_id,location)
             if dest.exists():
                 shutil.rmtree(dest)
