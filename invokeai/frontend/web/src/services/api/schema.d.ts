@@ -157,6 +157,13 @@ export type paths = {
      */
     get: operations["get_image_urls"];
   };
+  "/api/v1/images/delete": {
+    /**
+     * Delete Many Images 
+     * @description Deletes many images
+     */
+    post: operations["delete_many_images"];
+  };
   "/api/v1/boards/": {
     /**
      * List Boards 
@@ -5204,6 +5211,31 @@ export type operations = {
       200: {
         content: {
           "application/json": components["schemas"]["ImageUrlsDTO"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Delete Many Images 
+   * @description Deletes many images
+   */
+  delete_many_images: {
+    requestBody: {
+      content: {
+        "application/json": (string)[];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DeleteManyImagesResult"];
         };
       };
       /** @description Validation Error */

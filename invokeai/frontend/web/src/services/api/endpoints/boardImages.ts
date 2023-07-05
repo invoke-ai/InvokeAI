@@ -1,5 +1,6 @@
+import { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
 import { OffsetPaginatedResults_ImageDTO_ } from 'services/api/types';
-import { api } from '..';
+import { ApiFullTagDescription, LIST_TAG, api } from '..';
 import { paths } from '../schema';
 import { imagesApi } from './images';
 
@@ -9,6 +10,9 @@ type ListBoardImagesArg =
 
 type AddImageToBoardArg =
   paths['/api/v1/board_images/']['post']['requestBody']['content']['application/json'];
+
+type AddManyImagesToBoardArg =
+  paths['/api/v1/board_images/{board_id}/images']['patch']['requestBody']['content']['application/json'];
 
 type RemoveImageFromBoardArg =
   paths['/api/v1/board_images/']['delete']['requestBody']['content']['application/json'];
@@ -56,6 +60,45 @@ export const boardImagesApi = api.injectEndpoints({
           await queryFulfilled;
         } catch {
           patchResult.undo();
+        }
+      },
+    }),
+
+    addManyImagesToBoard: build.mutation<
+      string[],
+      { board_id: string; image_names: string[] }
+    >({
+      query: ({ board_id, image_names }) => ({
+        url: `board_images/${board_id}/images`,
+        method: 'PATCH',
+        body: image_names,
+      }),
+      invalidatesTags: (result, error, arg) => {
+        const tags: ApiFullTagDescription[] = [
+          { type: 'Board', id: arg.board_id },
+          { type: 'Board', id: LIST_TAG },
+        ];
+        return tags;
+      },
+      async onQueryStarted(
+        { image_names, board_id },
+        { dispatch, queryFulfilled }
+      ) {
+        const patches: PatchCollection[] = [];
+
+        image_names.forEach((n) => {
+          const patchResult = dispatch(
+            imagesApi.util.updateQueryData('getImageDTO', n, (draft) => {
+              Object.assign(draft, { board_id });
+            })
+          );
+          patches.push(patchResult);
+        });
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patches.forEach((p) => p.undo());
         }
       },
     }),
