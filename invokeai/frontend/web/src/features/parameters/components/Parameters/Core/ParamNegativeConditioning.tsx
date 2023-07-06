@@ -6,6 +6,7 @@ import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
 import { setNegativePrompt } from 'features/parameters/store/generationSlice';
 import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 const ParamNegativeConditioning = () => {
@@ -32,9 +33,14 @@ const ParamNegativeConditioning = () => {
     [onOpen]
   );
 
-  const handleSelect = useCallback(
+  const handleSelectEmbedding = useCallback(
     (v: string) => {
-      const caret = promptRef.current?.selectionStart;
+      if (!promptRef.current) {
+        return;
+      }
+
+      // this is where we insert the TI trigger
+      const caret = promptRef.current.selectionStart;
 
       if (caret === undefined) {
         return;
@@ -47,11 +53,22 @@ const ParamNegativeConditioning = () => {
       }
 
       newPrompt += `${v}>`;
+
+      // we insert the cursor after the `>`
+      const finalCaretPos = newPrompt.length;
+
       newPrompt += negativePrompt.slice(caret);
 
-      dispatch(setNegativePrompt(newPrompt));
+      // must flush dom updates else selection gets reset
+      flushSync(() => {
+        dispatch(setNegativePrompt(newPrompt));
+      });
+
+      // set the caret position to just after the TI trigger promptRef.current.selectionStart = finalCaretPos;
+      promptRef.current.selectionEnd = finalCaretPos;
+      onClose();
     },
-    [dispatch, negativePrompt]
+    [dispatch, onClose, negativePrompt]
   );
 
   return (
@@ -59,7 +76,7 @@ const ParamNegativeConditioning = () => {
       <ParamEmbeddingPopover
         isOpen={isOpen}
         onClose={onClose}
-        onSelect={handleSelect}
+        onSelect={handleSelectEmbedding}
       >
         <IAITextarea
           id="negativePrompt"

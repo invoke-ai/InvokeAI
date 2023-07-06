@@ -17,6 +17,7 @@ import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
 import { isEqual } from 'lodash-es';
+import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
@@ -45,7 +46,6 @@ const ParamPositiveConditioning = () => {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { t } = useTranslation();
-
   const handleChangePrompt = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       dispatch(setPositivePrompt(e.target.value));
@@ -59,6 +59,45 @@ const ParamPositiveConditioning = () => {
       promptRef.current?.focus();
     },
     []
+  );
+
+  const handleSelectEmbedding = useCallback(
+    (v: string) => {
+      if (!promptRef.current) {
+        return;
+      }
+
+      // this is where we insert the TI trigger
+      const caret = promptRef.current.selectionStart;
+
+      if (caret === undefined) {
+        return;
+      }
+
+      let newPrompt = prompt.slice(0, caret);
+
+      if (newPrompt[newPrompt.length - 1] !== '<') {
+        newPrompt += '<';
+      }
+
+      newPrompt += `${v}>`;
+
+      // we insert the cursor after the `>`
+      const finalCaretPos = newPrompt.length;
+
+      newPrompt += prompt.slice(caret);
+
+      // must flush dom updates else selection gets reset
+      flushSync(() => {
+        dispatch(setPositivePrompt(newPrompt));
+      });
+
+      // set the caret position to just after the TI trigger
+      promptRef.current.selectionStart = finalCaretPos;
+      promptRef.current.selectionEnd = finalCaretPos;
+      onClose();
+    },
+    [dispatch, onClose, prompt]
   );
 
   const handleKeyDown = useCallback(
@@ -75,27 +114,10 @@ const ParamPositiveConditioning = () => {
     [isReady, dispatch, activeTabName, onOpen]
   );
 
-  const handleSelect = useCallback(
-    (v: string) => {
-      const caret = promptRef.current?.selectionStart;
-
-      if (caret === undefined) {
-        return;
-      }
-
-      let newPrompt = prompt.slice(0, caret);
-
-      if (newPrompt[newPrompt.length - 1] !== '<') {
-        newPrompt += '<';
-      }
-
-      newPrompt += `${v}>`;
-      newPrompt += prompt.slice(caret);
-
-      dispatch(setPositivePrompt(newPrompt));
-    },
-    [dispatch, prompt]
-  );
+  // const handleSelect = (e: MouseEvent<HTMLTextAreaElement>) => {
+  //   const target = e.target as HTMLTextAreaElement;
+  // setCaret({ start: target.selectionStart, end: target.selectionEnd });
+  // };
 
   return (
     <Box>
@@ -103,7 +125,7 @@ const ParamPositiveConditioning = () => {
         <ParamEmbeddingPopover
           isOpen={isOpen}
           onClose={onClose}
-          onSelect={handleSelect}
+          onSelect={handleSelectEmbedding}
         >
           <IAITextarea
             id="prompt"

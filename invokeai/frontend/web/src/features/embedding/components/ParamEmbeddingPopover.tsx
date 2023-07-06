@@ -68,17 +68,26 @@ const ParamEmbeddingPopover = (props: Props) => {
   return (
     <Popover
       initialFocusRef={inputRef}
-      returnFocusOnClose={true}
       isOpen={isOpen}
       onClose={onClose}
       placement="bottom"
       openDelay={0}
       closeDelay={0}
+      closeOnBlur={true}
+      returnFocusOnClose={true}
     >
       <PopoverTrigger>{children}</PopoverTrigger>
-      <PopoverContent sx={{ p: 0, top: -1, shadow: 'dark-lg' }}>
+      <PopoverContent
+        sx={{
+          p: 0,
+          top: -1,
+          shadow: 'dark-lg',
+          bg: 'accent.300',
+          _dark: { bg: 'accent.400' },
+        }}
+      >
         <PopoverBody
-          sx={{ p: 1, w: `calc(${PARAMETERS_PANEL_WIDTH} - 2rem )` }}
+          sx={{ p: 0.5, w: `calc(${PARAMETERS_PANEL_WIDTH} - 2rem )` }}
         >
           <IAIMantineMultiSelect
             inputRef={inputRef}
