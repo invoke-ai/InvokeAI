@@ -116,7 +116,7 @@ class StableDiffusion1Model(DiffusersModel):
                 version=BaseModelType.StableDiffusion1,
                 model_config=config,
                 output_path=output_path,
-            )
+           )
         else:
             return model_path
 

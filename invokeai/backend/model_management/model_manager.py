@@ -234,7 +234,7 @@ import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List, Tuple, Union, Dict, Set, Callable, types
-from shutil import rmtree
+from shutil import rmtree, move
 
 import torch
 from omegaconf import OmegaConf
@@ -279,7 +279,7 @@ class InvalidModelError(Exception):
     pass
 
 class AddModelResult(BaseModel):
-    name: str = Field(description="The name of the model after import")
+    name: str = Field(description="The name of the model after installation")
     model_type: ModelType = Field(description="The type of model")
     base_model: BaseModelType = Field(description="The base model")
     config: ModelConfigBase = Field(description="The configuration of the model")
@@ -490,17 +490,32 @@ class ModelManager(object):
         """
         return [(self.parse_key(x)) for x in self.models.keys()]
 
+    def list_model(
+            self,
+            model_name: str,
+            base_model: BaseModelType,
+            model_type: ModelType,
+    ) -> dict:
+        """
+        Returns a dict describing one installed model, using
+        the combined format of the list_models() method.
+        """
+        models = self.list_models(base_model,model_type,model_name)
+        return models[0] if models else None
+
     def list_models(
         self,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
+        model_name: Optional[str] = None,
     ) -> list[dict]:
         """
         Return a list of models.
         """
 
+        model_keys = [self.create_key(model_name, base_model, model_type)] if model_name else sorted(self.models, key=str.casefold)
         models = []
-        for model_key in sorted(self.models, key=str.casefold):
+        for model_key in model_keys:
             model_config = self.models[model_key]
 
             cur_model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
@@ -545,10 +560,7 @@ class ModelManager(object):
         model_cfg = self.models.pop(model_key, None)
 
         if model_cfg is None:
-            self.logger.error(
-                f"Unknown model {model_key}"
-            )
-            return
+            raise KeyError(f"Unknown model {model_key}")
 
         # note: it not garantie to release memory(model can has other references)
         cache_ids = self.cache_keys.pop(model_key, [])
@@ -614,6 +626,7 @@ class ModelManager(object):
                 self.cache.uncache_model(cache_id)
 
         self.models[model_key] = model_config
+        self.commit()
         return AddModelResult(
             name = model_name,
             model_type = model_type,
@@ -621,6 +634,60 @@ class ModelManager(object):
             config = model_config,
         )
 
+    def convert_model (
+            self,
+            model_name: str,
+            base_model: BaseModelType,
+            model_type: Union[ModelType.Main,ModelType.Vae],
+    ) -> AddModelResult:
+        '''
+        Convert a checkpoint file into a diffusers folder, deleting the cached
+        version and deleting the original checkpoint file if it is in the models
+        directory.
+        :param model_name: Name of the model to convert
+        :param base_model: Base model type
+        :param model_type: Type of model ['vae' or 'main']
+
+        This will raise a ValueError unless the model is a checkpoint.
+        '''
+        info = self.model_info(model_name, base_model, model_type)
+        if info["model_format"] != "checkpoint":
+            raise ValueError(f"not a checkpoint format model: {model_name}")
+
+        # We are taking advantage of a side effect of get_model() that converts check points
+        # into cached diffusers directories stored at `location`. It doesn't matter
+        # what submodeltype we request here, so we get the smallest.
+        submodel = {"submodel_type": SubModelType.Tokenizer} if model_type==ModelType.Main else {}
+        model = self.get_model(model_name,
+                               base_model,
+                               model_type,
+                               **submodel,
+                               )
+        checkpoint_path = self.app_config.root_path / info["path"]
+        old_diffusers_path = self.app_config.models_path / model.location
+        new_diffusers_path = self.app_config.models_path / base_model.value / model_type.value / model_name
+        if new_diffusers_path.exists():
+            raise ValueError(f"A diffusers model already exists at {new_diffusers_path}")
+
+        try:
+            move(old_diffusers_path,new_diffusers_path)
+            info["model_format"] = "diffusers"
+            info["path"] = str(new_diffusers_path.relative_to(self.app_config.root_path))
+            info.pop('config')
+
+            result = self.add_model(model_name, base_model, model_type,
+                                    model_attributes = info,
+                                    clobber=True)
+        except:
+            # something went wrong, so don't leave dangling diffusers model in directory or it will cause a duplicate model error!
+            rmtree(new_diffusers_path)
+            raise
+        
+        if checkpoint_path.exists() and checkpoint_path.is_relative_to(self.app_config.models_path):
+            checkpoint_path.unlink()
+        
+        return result
+    
     def search_models(self, search_folder):
         self.logger.info(f"Finding Models In: {search_folder}")
         models_folder_ckpt = Path(search_folder).glob("**/*.ckpt")
@@ -821,6 +888,10 @@ class ModelManager(object):
         The result is a set of successfully installed models. Each element
         of the set is a dict corresponding to the newly-created OmegaConf stanza for
         that model.
+
+        May return the following exceptions:
+        - KeyError   - one or more of the items to import is not a valid path, repo_id or URL
+        - ValueError - a corresponding model already exists
         '''
         # avoid circular import here
         from invokeai.backend.install.model_install_backend import ModelInstall
@@ -830,11 +901,7 @@ class ModelManager(object):
                                  prediction_type_helper = prediction_type_helper,
                                  model_manager = self)
         for thing in items_to_import:
-            try:
-                installed = installer.heuristic_import(thing)
-                successfully_installed.update(installed)
-            except Exception as e:
-                self.logger.warning(f'{thing} could not be imported: {str(e)}')
-                
+            installed = installer.heuristic_import(thing)
+            successfully_installed.update(installed)
         self.commit()                
         return successfully_installed
