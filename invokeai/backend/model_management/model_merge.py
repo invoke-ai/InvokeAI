@@ -15,14 +15,13 @@ from typing import List, Union
 
 import invokeai.backend.util.logging as logger
 
-from invokeai.app.services.config import InvokeAIAppConfig
 from ...backend.model_management import ModelManager, ModelType, BaseModelType, ModelVariantType, AddModelResult
 
 class MergeInterpolationMethod(str, Enum):
+    WeightedSum = "weighted_sum"
     Sigmoid = "sigmoid"
     InvSigmoid = "inv_sigmoid"
     AddDifference = "add_difference"
-    WeightedSum = "weighted_sum"
 
 class ModelMerger(object):
     def __init__(self, manager: ModelManager):
@@ -97,15 +96,18 @@ class ModelMerger(object):
         
         for mod in model_names:
             info = self.manager.list_model(mod, base_model=base_model, model_type=ModelType.Main)
-            assert info, f"model {mod}, base_model {base_model}, is unknown"
+            assert info,                                f"model {mod}, base_model {base_model}, is unknown"
             assert info["model_format"] == "diffusers", f"{mod} is not a diffusers model. It must be optimized before merging"
-            assert info["variant"] == "normal", (f"{mod} is a {info['variant']} model, which cannot currently be merged")
+            assert info["variant"] == "normal",         f"{mod} is a {info['variant']} model, which cannot currently be merged"
+            assert len(model_names) <= 2 or \
+                interp==MergeInterpolationMethod.AddDifference, "When merging three models, only the 'add_difference' merge method is supported"
             # pick up the first model's vae
             if mod == model_names[0]:
                 vae = info.get("vae")
             model_paths.extend([config.root_path / info["path"]])
 
         merge_method = None if interp == 'weighted_sum' else MergeInterpolationMethod(interp)
+        logger.debug(f'interp = {interp}, merge_method={merge_method}')
         merged_pipe = self.merge_diffusion_models(
            model_paths, alpha, merge_method, force, **kwargs
         )

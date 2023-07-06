@@ -204,12 +204,12 @@ async def convert_model(
     response_model = MergeModelResponse,
 )
 async def merge_models(
-        base_model: BaseModelType = Path(description="Base model"),
-        model_names: List[str] = Body(description="model name", min_items=2, max_items=3),
-        merged_model_name: Optional[str] = Body(description = "Name of destination model"),
-        alpha: Optional[float] = Body(description = "Alpha weighting strength to apply to 2d and 3d models", default=0.5),
-        interp: Union[MergeInterpolationMethod, None] = Body(description = "Interpolation method"),
-        force: Optional[bool] = Body(description = "Force merging of models created with different versions of diffusers", default=False),
+        base_model: BaseModelType                  = Path(description="Base model"),
+        model_names: List[str]                     = Body(description="model name", min_items=2, max_items=3),
+        merged_model_name: Optional[str]           = Body(description="Name of destination model"),
+        alpha: Optional[float]                     = Body(description="Alpha weighting strength to apply to 2d and 3d models", default=0.5),
+        interp: Optional[MergeInterpolationMethod] = Body(description="Interpolation method"),
+        force: Optional[bool]                      = Body(description="Force merging of models created with different versions of diffusers", default=False),
 ) -> MergeModelResponse:
     """Convert a checkpoint model into a diffusers model"""
     logger = ApiDependencies.invoker.services.logger
