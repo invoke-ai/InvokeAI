@@ -100,8 +100,6 @@ class ModelCache(object):
         :param sha_chunksize: Chunksize to use when calculating sha256 model hash
         '''
         #max_cache_size = 9999
-        execution_device = torch.device('cuda')
-
         self.model_infos: Dict[str, ModelBase] = dict()
         self.lazy_offloading = lazy_offloading
         #self.sequential_offload: bool=sequential_offload

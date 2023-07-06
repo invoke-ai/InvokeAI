@@ -1,34 +1,35 @@
 import { Box } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { MouseEvent, memo, useCallback, useMemo } from 'react';
-import { FaTrash } from 'react-icons/fa';
-import { useTranslation } from 'react-i18next';
 import { createSelector } from '@reduxjs/toolkit';
-import { ImageDTO } from 'services/api/types';
 import { TypesafeDraggableData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
-import ImageContextMenu from './ImageContextMenu';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
+import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
+import { MouseEvent, memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FaTrash } from 'react-icons/fa';
+import { ImageDTO } from 'services/api/types';
 import {
   imageRangeEndSelected,
   imageSelected,
   imageSelectionToggled,
 } from '../store/gallerySlice';
-import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
+import ImageContextMenu from './ImageContextMenu';
 
-export const selector = createSelector(
-  [stateSelector, (state, { image_name }: ImageDTO) => image_name],
-  ({ gallery }, image_name) => {
-    const isSelected = gallery.selection.includes(image_name);
-    const selection = gallery.selection;
-    return {
-      isSelected,
-      selection,
-    };
-  },
-  defaultSelectorOptions
-);
+export const makeSelector = (image_name: string) =>
+  createSelector(
+    [stateSelector],
+    ({ gallery }) => {
+      const isSelected = gallery.selection.includes(image_name);
+      const selectionCount = gallery.selection.length;
+      return {
+        isSelected,
+        selectionCount,
+      };
+    },
+    defaultSelectorOptions
+  );
 
 interface HoverableImageProps {
   imageDTO: ImageDTO;
@@ -38,12 +39,12 @@ interface HoverableImageProps {
  * Gallery image component with delete/use all/use seed buttons on hover.
  */
 const GalleryImage = (props: HoverableImageProps) => {
-  const { isSelected, selection } = useAppSelector((state) =>
-    selector(state, props.imageDTO)
-  );
-
   const { imageDTO } = props;
   const { image_url, thumbnail_url, image_name } = imageDTO;
+
+  const localSelector = useMemo(() => makeSelector(image_name), [image_name]);
+
+  const { isSelected, selectionCount } = useAppSelector(localSelector);
 
   const dispatch = useAppDispatch();
 
@@ -74,11 +75,10 @@ const GalleryImage = (props: HoverableImageProps) => {
   );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (selection.length > 1) {
+    if (selectionCount > 1) {
       return {
         id: 'gallery-image',
-        payloadType: 'IMAGE_NAMES',
-        payload: { imageNames: selection },
+        payloadType: 'GALLERY_SELECTION',
       };
     }
 
@@ -89,7 +89,7 @@ const GalleryImage = (props: HoverableImageProps) => {
         payload: { imageDTO },
       };
     }
-  }, [imageDTO, selection]);
+  }, [imageDTO, selectionCount]);
 
   return (
     <Box sx={{ w: 'full', h: 'full', touchAction: 'none' }}>

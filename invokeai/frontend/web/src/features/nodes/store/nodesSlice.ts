@@ -1,5 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { RootState } from 'app/store/store';
+import { cloneDeep, uniqBy } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
+import { RgbaColor } from 'react-colorful';
 import {
   addEdge,
   applyEdgeChanges,
@@ -11,12 +14,9 @@ import {
   NodeChange,
   OnConnectStartParams,
 } from 'reactflow';
-import { ImageField } from 'services/api/types';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import { ImageField } from 'services/api/types';
 import { InvocationTemplate, InvocationValue } from '../types/types';
-import { RgbaColor } from 'react-colorful';
-import { RootState } from 'app/store/store';
-import { cloneDeep, isArray, uniq, uniqBy } from 'lodash-es';
 
 export type NodesState = {
   nodes: Node<InvocationValue>[];

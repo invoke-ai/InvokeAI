@@ -1,27 +1,33 @@
-import { useTranslation } from 'react-i18next';
 import { Flex } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
-import ParamPerlinNoise from './ParamPerlinNoise';
-import ParamNoiseThreshold from './ParamNoiseThreshold';
-import { RootState } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setShouldUseNoiseSettings } from 'features/parameters/store/generationSlice';
-import { memo } from 'react';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import ParamNoiseThreshold from './ParamNoiseThreshold';
+import { ParamNoiseToggle } from './ParamNoiseToggle';
+import ParamPerlinNoise from './ParamPerlinNoise';
+
+const selector = createSelector(
+  stateSelector,
+  (state) => {
+    const { shouldUseNoiseSettings } = state.generation;
+    return {
+      activeLabel: shouldUseNoiseSettings ? 'Enabled' : undefined,
+    };
+  },
+  defaultSelectorOptions
+);
 
 const ParamNoiseCollapse = () => {
   const { t } = useTranslation();
 
   const isNoiseEnabled = useFeatureStatus('noise').isFeatureEnabled;
 
-  const shouldUseNoiseSettings = useAppSelector(
-    (state: RootState) => state.generation.shouldUseNoiseSettings
-  );
-
-  const dispatch = useAppDispatch();
-
-  const handleToggle = () =>
-    dispatch(setShouldUseNoiseSettings(!shouldUseNoiseSettings));
+  const { activeLabel } = useAppSelector(selector);
 
   if (!isNoiseEnabled) {
     return null;
@@ -30,11 +36,10 @@ const ParamNoiseCollapse = () => {
   return (
     <IAICollapse
       label={t('parameters.noiseSettings')}
-      isOpen={shouldUseNoiseSettings}
-      onToggle={handleToggle}
-      withSwitch
+      activeLabel={activeLabel}
     >
       <Flex sx={{ gap: 2, flexDirection: 'column' }}>
+        <ParamNoiseToggle />
         <ParamPerlinNoise />
         <ParamNoiseThreshold />
       </Flex>

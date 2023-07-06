@@ -4,6 +4,7 @@ import { cloneDeep, omit, reduce } from 'lodash-es';
 import { Graph } from 'services/api/types';
 import { AnyInvocation } from 'services/events/types';
 import { v4 as uuidv4 } from 'uuid';
+import { modelIdToLoRAModelField } from '../modelIdToLoRAName';
 import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import { modelIdToVAEModelField } from '../modelIdToVAEModelField';
 
@@ -35,6 +36,12 @@ export const parseFieldValue = (field: InputFieldValue) => {
   if (field.type === 'vae_model') {
     if (field.value) {
       return modelIdToVAEModelField(field.value);
+    }
+  }
+
+  if (field.type === 'lora_model') {
+    if (field.value) {
+      return modelIdToLoRAModelField(field.value);
     }
   }
 

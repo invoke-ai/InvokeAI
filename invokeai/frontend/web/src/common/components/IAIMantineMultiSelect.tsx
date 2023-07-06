@@ -61,7 +61,7 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
             '&:focus-within': {
               borderColor: mode(accent200, accent600)(colorMode),
             },
-            '&:disabled': {
+            '&[data-disabled]': {
               backgroundColor: mode(base300, base700)(colorMode),
               color: mode(base600, base400)(colorMode),
             },

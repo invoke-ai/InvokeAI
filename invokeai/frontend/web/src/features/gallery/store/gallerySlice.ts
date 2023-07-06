@@ -7,7 +7,6 @@ import {
 import { RootState } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { dateComparator } from 'common/util/dateComparator';
-import { imageDeletionConfirmed } from 'features/imageDeletion/store/imageDeletionSlice';
 import { keyBy, uniq } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import {
@@ -173,11 +172,6 @@ export const gallerySlice = createSlice({
       state.offset = offset;
       state.limit = limit;
       state.total = total;
-    });
-    builder.addCase(imageDeletionConfirmed, (state, action) => {
-      // Image deleted
-      const { image_name } = action.payload.imageDTO;
-      imagesAdapter.removeOne(state, image_name);
     });
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
       const { image_name, image_url, thumbnail_url } = action.payload;

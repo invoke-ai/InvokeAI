@@ -18,6 +18,7 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   VaeField: 'vae',
   model: 'model',
   vae_model: 'vae_model',
+  lora_model: 'lora_model',
   array: 'array',
   item: 'item',
   ColorField: 'color',
@@ -120,7 +121,13 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
   vae_model: {
     color: 'teal',
     colorCssVar: getColorTokenCssVariable('teal'),
-    title: 'Model',
+    title: 'VAE',
+    description: 'Models are models.',
+  },
+  lora_model: {
+    color: 'teal',
+    colorCssVar: getColorTokenCssVariable('teal'),
+    title: 'LoRA',
     description: 'Models are models.',
   },
   array: {

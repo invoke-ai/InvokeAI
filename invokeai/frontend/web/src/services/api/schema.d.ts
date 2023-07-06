@@ -2691,6 +2691,19 @@ export type components = {
       error?: components["schemas"]["ModelError"];
     };
     /**
+     * LoRAModelField 
+     * @description LoRA model field
+     */
+    LoRAModelField: {
+      /**
+       * Model Name 
+       * @description Name of the LoRA model
+       */
+      model_name: string;
+      /** @description Base model */
+      base_model: components["schemas"]["BaseModelType"];
+    };
+    /**
      * LoRAModelFormat 
      * @description An enumeration. 
      * @enum {string}
@@ -2766,10 +2779,10 @@ export type components = {
        */
       type?: "lora_loader";
       /**
-       * Lora Name 
+       * Lora 
        * @description Lora model name
        */
-      lora_name: string;
+      lora?: components["schemas"]["LoRAModelField"];
       /**
        * Weight 
        * @description With what weight to apply lora 
@@ -3115,7 +3128,7 @@ export type components = {
     /** ModelsList */
     ModelsList: {
       /** Models */
-      models: (components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"])[];
+      models: (components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"])[];
     };
     /**
      * MultiplyInvocation 
@@ -4449,17 +4462,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;

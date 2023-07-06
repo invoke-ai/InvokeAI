@@ -10,7 +10,7 @@ import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/component
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 
 const VaeModelInputFieldComponent = (
@@ -24,9 +24,7 @@ const VaeModelInputFieldComponent = (
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { data: vaeModels } = useListModelsQuery({
-    model_type: 'vae',
-  });
+  const { data: vaeModels } = useGetVaeModelsQuery();
 
   const selectedModel = useMemo(
     () => vaeModels?.entities[field.value ?? vaeModels.ids[0]],
