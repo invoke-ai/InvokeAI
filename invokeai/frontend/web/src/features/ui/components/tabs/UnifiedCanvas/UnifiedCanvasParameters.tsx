@@ -1,5 +1,4 @@
 import ParamDynamicPromptsCollapse from 'features/dynamicPrompts/components/ParamDynamicPromptsCollapse';
-import ParamEmbeddingCollapse from 'features/embedding/components/ParamEmbeddingCollapse';
 import ParamLoraCollapse from 'features/lora/components/ParamLoraCollapse';
 import ParamInfillAndScalingCollapse from 'features/parameters/components/Parameters/Canvas/InfillAndScaling/ParamInfillAndScalingCollapse';
 import ParamSeamCorrectionCollapse from 'features/parameters/components/Parameters/Canvas/SeamCorrection/ParamSeamCorrectionCollapse';
@@ -17,7 +16,6 @@ const UnifiedCanvasParameters = () => {
     <>
       <ParamPositiveConditioning />
       <ParamNegativeConditioning />
-      <ParamEmbeddingCollapse />
       <ProcessButtons />
       <UnifiedCanvasCoreParameters />
       <ParamLoraCollapse />

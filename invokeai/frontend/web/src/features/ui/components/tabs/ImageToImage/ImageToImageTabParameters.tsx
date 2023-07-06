@@ -1,5 +1,4 @@
 import ParamDynamicPromptsCollapse from 'features/dynamicPrompts/components/ParamDynamicPromptsCollapse';
-import ParamEmbeddingCollapse from 'features/embedding/components/ParamEmbeddingCollapse';
 import ParamLoraCollapse from 'features/lora/components/ParamLoraCollapse';
 import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
 import ParamNegativeConditioning from 'features/parameters/components/Parameters/Core/ParamNegativeConditioning';
@@ -17,7 +16,6 @@ const ImageToImageTabParameters = () => {
     <>
       <ParamPositiveConditioning />
       <ParamNegativeConditioning />
-      <ParamEmbeddingCollapse />
       <ProcessButtons />
       <ImageToImageTabCoreParameters />
       <ParamLoraCollapse />

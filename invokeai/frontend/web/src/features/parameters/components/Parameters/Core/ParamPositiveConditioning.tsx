@@ -1,4 +1,4 @@
-import { Box, FormControl } from '@chakra-ui/react';
+import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
@@ -12,14 +12,13 @@ import {
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 
 import { userInvoked } from 'app/store/actions';
-import IAIIconButton from 'common/components/IAIIconButton';
 import IAITextarea from 'common/components/IAITextarea';
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
-import { toggleEmbeddingPicker } from 'features/ui/store/uiSlice';
+import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
+import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
 import { isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { BiCode } from 'react-icons/bi';
 
 const promptInputSelector = createSelector(
   [(state: RootState) => state.generation, activeTabNameSelector],
@@ -43,14 +42,16 @@ const ParamPositiveConditioning = () => {
   const dispatch = useAppDispatch();
   const { prompt, activeTabName } = useAppSelector(promptInputSelector);
   const isReady = useIsReadyToInvoke();
-
   const promptRef = useRef<HTMLTextAreaElement>(null);
-
+  const { isOpen, onClose, onOpen } = useDisclosure();
   const { t } = useTranslation();
 
-  const handleChangePrompt = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    dispatch(setPositivePrompt(e.target.value));
-  };
+  const handleChangePrompt = useCallback(
+    (e: ChangeEvent<HTMLTextAreaElement>) => {
+      dispatch(setPositivePrompt(e.target.value));
+    },
+    [dispatch]
+  );
 
   useHotkeys(
     'alt+a',
@@ -67,39 +68,67 @@ const ParamPositiveConditioning = () => {
         dispatch(clampSymmetrySteps());
         dispatch(userInvoked(activeTabName));
       }
+      if (e.key === '<') {
+        onOpen();
+      }
     },
-    [dispatch, activeTabName, isReady]
+    [isReady, dispatch, activeTabName, onOpen]
   );
 
-  const shouldShowEmbeddingPicker = useAppSelector(
-    (state: RootState) => state.ui.shouldShowEmbeddingPicker
+  const handleSelect = useCallback(
+    (v: string) => {
+      const caret = promptRef.current?.selectionStart;
+
+      if (caret === undefined) {
+        return;
+      }
+
+      let newPrompt = prompt.slice(0, caret);
+
+      if (newPrompt[newPrompt.length - 1] !== '<') {
+        newPrompt += '<';
+      }
+
+      newPrompt += `${v}>`;
+      newPrompt += prompt.slice(caret);
+
+      dispatch(setPositivePrompt(newPrompt));
+    },
+    [dispatch, prompt]
   );
 
   return (
     <Box>
-      <IAIIconButton
-        size="xs"
-        aria-label="Toggle Embedding Picker"
-        tooltip="Toggle Embedding Picker"
-        icon={<BiCode />}
-        sx={{ position: 'absolute', top: 8, right: 2, zIndex: 2 }}
-        isChecked={shouldShowEmbeddingPicker}
-        onClick={() => dispatch(toggleEmbeddingPicker())}
-      ></IAIIconButton>
       <FormControl>
-        <IAITextarea
-          id="prompt"
-          name="prompt"
-          placeholder={t('parameters.positivePromptPlaceholder')}
-          value={prompt}
-          onChange={handleChangePrompt}
-          onKeyDown={handleKeyDown}
-          resize="vertical"
-          ref={promptRef}
-          minH={32}
-          paddingRight={8}
-        />
+        <ParamEmbeddingPopover
+          isOpen={isOpen}
+          onClose={onClose}
+          onSelect={handleSelect}
+        >
+          <IAITextarea
+            id="prompt"
+            name="prompt"
+            ref={promptRef}
+            value={prompt}
+            placeholder={t('parameters.positivePromptPlaceholder')}
+            onChange={handleChangePrompt}
+            onKeyDown={handleKeyDown}
+            resize="vertical"
+            minH={32}
+          />
+        </ParamEmbeddingPopover>
       </FormControl>
+      {!isOpen && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 6,
+            insetInlineEnd: 0,
+          }}
+        >
+          <AddEmbeddingButton onClick={onOpen} />
+        </Box>
+      )}
     </Box>
   );
 };
