@@ -51,6 +51,7 @@ export interface GenerationState {
   vae: VAEParam;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
+  clipSkip: number;
 }
 
 export const initialGenerationState: GenerationState = {
@@ -85,6 +86,7 @@ export const initialGenerationState: GenerationState = {
   vae: '',
   seamlessXAxis: false,
   seamlessYAxis: false,
+  clipSkip: 0,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -217,6 +219,9 @@ export const generationSlice = createSlice({
     vaeSelected: (state, action: PayloadAction<string>) => {
       state.vae = action.payload;
     },
+    setClipSkip: (state, action: PayloadAction<number>) => {
+      state.clipSkip = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -265,6 +270,7 @@ export const {
   setShouldUseNoiseSettings,
   setSeamlessXAxis,
   setSeamlessYAxis,
+  setClipSkip,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

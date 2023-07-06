@@ -11,6 +11,7 @@ import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
+  CLIP_SKIP,
   INPAINT,
   INPAINT_GRAPH,
   ITERATE,
@@ -49,6 +50,7 @@ export const buildCanvasInpaintGraph = (
     seamStrength,
     tileSize,
     infillMethod,
+    clipSkip,
   } = state.generation;
 
   // The bounding box determines width and height, not the width and height params
@@ -108,6 +110,11 @@ export const buildCanvasInpaintGraph = (
         id: MAIN_MODEL_LOADER,
         model,
       },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
+      },
       [RANGE_OF_SIZE]: {
         type: 'range_of_size',
         id: RANGE_OF_SIZE,
@@ -122,6 +129,46 @@ export const buildCanvasInpaintGraph = (
       },
     },
     edges: [
+      {
+        source: {
+          node_id: MAIN_MODEL_LOADER,
+          field: 'unet',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'unet',
+        },
+      },
+      {
+        source: {
+          node_id: MAIN_MODEL_LOADER,
+          field: 'clip',
+        },
+        destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
       {
         source: {
           node_id: NEGATIVE_CONDITIONING,
@@ -140,36 +187,6 @@ export const buildCanvasInpaintGraph = (
         destination: {
           node_id: INPAINT,
           field: 'positive_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'clip',
-        },
-        destination: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'clip',
-        },
-        destination: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'unet',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'unet',
         },
       },
       {

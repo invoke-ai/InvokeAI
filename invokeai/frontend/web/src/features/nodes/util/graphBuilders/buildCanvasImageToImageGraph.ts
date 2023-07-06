@@ -12,6 +12,7 @@ import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
+  CLIP_SKIP,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
@@ -40,6 +41,7 @@ export const buildCanvasImageToImageGraph = (
     scheduler,
     steps,
     img2imgStrength: strength,
+    clipSkip,
     iterations,
     seed,
     shouldRandomizeSeed,
@@ -82,6 +84,11 @@ export const buildCanvasImageToImageGraph = (
         id: MAIN_MODEL_LOADER,
         model,
       },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
+      },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
@@ -110,13 +117,23 @@ export const buildCanvasImageToImageGraph = (
           field: 'clip',
         },
         destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
           node_id: POSITIVE_CONDITIONING,
           field: 'clip',
         },
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
