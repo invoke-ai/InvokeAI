@@ -1,13 +1,14 @@
 import { Flex, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { RootState, stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
 import { forEach } from 'lodash-es';
-import { forwardRef, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 import { loraAdded } from '../store/loraSlice';
+import IAIMantineSelectItemWithTooltip from '../../../common/components/IAIMantineSelectItemWithTooltip';
 
 type LoraSelectItem = {
   label: string;
@@ -28,6 +29,10 @@ const ParamLoraSelect = () => {
   const { loras } = useAppSelector(selector);
   const { data: lorasQueryData } = useGetLoRAModelsQuery();
 
+  const currentMainModel = useAppSelector(
+    (state: RootState) => state.generation.model
+  );
+
   const data = useMemo(() => {
     if (!lorasQueryData) {
       return [];
@@ -43,12 +48,15 @@ const ParamLoraSelect = () => {
       data.push({
         value: id,
         label: lora.name,
-        description: lora.description,
+        description: 'This is a lora',
+        ...(currentMainModel?.base_model !== lora.base_model
+          ? { disabled: true, tooltip: 'Incompatible base model' }
+          : {}),
       });
     });
 
     return data;
-  }, [loras, lorasQueryData]);
+  }, [loras, lorasQueryData, currentMainModel?.base_model]);
 
   const handleChange = useCallback(
     (v: string[]) => {
@@ -78,7 +86,7 @@ const ParamLoraSelect = () => {
       data={data}
       maxDropdownHeight={400}
       nothingFound="No matching LoRAs"
-      itemComponent={SelectItem}
+      itemComponent={IAIMantineSelectItemWithTooltip}
       disabled={data.length === 0}
       filter={(value, selected, item: LoraSelectItem) =>
         item.label.toLowerCase().includes(value.toLowerCase().trim()) ||
@@ -88,30 +96,5 @@ const ParamLoraSelect = () => {
     />
   );
 };
-
-interface ItemProps extends React.ComponentPropsWithoutRef<'div'> {
-  value: string;
-  label: string;
-  description?: string;
-}
-
-const SelectItem = forwardRef<HTMLDivElement, ItemProps>(
-  ({ label, description, ...others }: ItemProps, ref) => {
-    return (
-      <div ref={ref} {...others}>
-        <div>
-          <Text>{label}</Text>
-          {description && (
-            <Text size="xs" color="base.600">
-              {description}
-            </Text>
-          )}
-        </div>
-      </div>
-    );
-  }
-);
-
-SelectItem.displayName = 'SelectItem';
 
 export default ParamLoraSelect;

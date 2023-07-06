@@ -49,7 +49,7 @@ export interface GenerationState {
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
   model: ModelParam;
-  vae: ModelParam;
+  vae: VAEParam;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
   clipSkip: number;
@@ -84,7 +84,7 @@ export const initialGenerationState: GenerationState = {
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
   model: null,
-  vae: null,
+  vae: '',
   seamlessXAxis: false,
   seamlessYAxis: false,
   clipSkip: 0,
@@ -224,8 +224,7 @@ export const generationSlice = createSlice({
       state.model = { id: action.payload, base_model, name, type };
     },
     vaeSelected: (state, action: PayloadAction<string>) => {
-      const [base_model, type, name] = action.payload.split('/');
-      state.vae = { id: action.payload, base_model, name, type };
+      state.vae = action.payload;
     },
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;

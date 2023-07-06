@@ -8,15 +8,12 @@ import {
 } from '@chakra-ui/react';
 import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
 import { forEach } from 'lodash-es';
-import {
-  PropsWithChildren,
-  forwardRef,
-  useCallback,
-  useMemo,
-  useRef,
-} from 'react';
+import { PropsWithChildren, useCallback, useMemo, useRef } from 'react';
 import { useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
+import { RootState } from '../../../app/store/store';
+import { useAppSelector } from '../../../app/store/storeHooks';
+import IAIMantineSelectItemWithTooltip from '../../../common/components/IAIMantineSelectItemWithTooltip';
 
 type EmbeddingSelectItem = {
   label: string;
@@ -35,6 +32,10 @@ const ParamEmbeddingPopover = (props: Props) => {
   const { data: embeddingQueryData } = useGetTextualInversionModelsQuery();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const currentMainModel = useAppSelector(
+    (state: RootState) => state.generation.model
+  );
+
   const data = useMemo(() => {
     if (!embeddingQueryData) {
       return [];
@@ -49,11 +50,14 @@ const ParamEmbeddingPopover = (props: Props) => {
         value: embedding.name,
         label: embedding.name,
         description: embedding.description,
+        ...(currentMainModel?.base_model !== embedding.base_model
+          ? { disabled: true, tooltip: 'Incompatible base model' }
+          : {}),
       });
     });
 
     return data;
-  }, [embeddingQueryData]);
+  }, [embeddingQueryData, currentMainModel?.base_model]);
 
   const handleChange = useCallback(
     (v: string[]) => {
@@ -108,7 +112,7 @@ const ParamEmbeddingPopover = (props: Props) => {
               data={data}
               maxDropdownHeight={400}
               nothingFound="No Matching Embeddings"
-              itemComponent={SelectItem}
+              itemComponent={IAIMantineSelectItemWithTooltip}
               disabled={data.length === 0}
               filter={(value, selected, item: EmbeddingSelectItem) =>
                 item.label.toLowerCase().includes(value.toLowerCase().trim()) ||
@@ -124,28 +128,3 @@ const ParamEmbeddingPopover = (props: Props) => {
 };
 
 export default ParamEmbeddingPopover;
-
-interface ItemProps extends React.ComponentPropsWithoutRef<'div'> {
-  value: string;
-  label: string;
-  description?: string;
-}
-
-const SelectItem = forwardRef<HTMLDivElement, ItemProps>(
-  ({ label, description, ...others }: ItemProps, ref) => {
-    return (
-      <div ref={ref} {...others}>
-        <div>
-          <Text>{label}</Text>
-          {description && (
-            <Text size="xs" color="base.600">
-              {description}
-            </Text>
-          )}
-        </div>
-      </div>
-    );
-  }
-);
-
-SelectItem.displayName = 'SelectItem';
