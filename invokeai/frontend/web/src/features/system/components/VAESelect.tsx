@@ -18,7 +18,7 @@ const VAESelect = () => {
 
   const { data: vaeModels } = useGetVaeModelsQuery();
 
-  const selectedModelId = useAppSelector(
+  const currentModel = useAppSelector(
     (state: RootState) => state.generation.vae
   );
 
@@ -51,8 +51,8 @@ const VAESelect = () => {
   }, [vaeModels]);
 
   const selectedModel = useMemo(
-    () => vaeModels?.entities[selectedModelId],
-    [vaeModels?.entities, selectedModelId]
+    () => vaeModels?.entities[currentModel?.id || ''],
+    [vaeModels?.entities, currentModel]
   );
 
   const handleChangeModel = useCallback(
@@ -66,17 +66,17 @@ const VAESelect = () => {
   );
 
   useEffect(() => {
-    if (selectedModelId && vaeModels?.ids.includes(selectedModelId)) {
+    if (currentModel?.id && vaeModels?.ids.includes(currentModel?.id)) {
       return;
     }
     handleChangeModel('auto');
-  }, [handleChangeModel, vaeModels?.ids, selectedModelId]);
+  }, [handleChangeModel, vaeModels?.ids, currentModel?.id]);
 
   return (
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={t('modelManager.vae')}
-      value={selectedModelId}
+      value={currentModel?.id}
       placeholder="Pick one"
       data={data}
       onChange={handleChangeModel}

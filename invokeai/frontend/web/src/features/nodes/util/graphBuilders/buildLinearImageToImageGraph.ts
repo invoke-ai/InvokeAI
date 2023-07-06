@@ -38,7 +38,7 @@ export const buildLinearImageToImageGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: modelId,
+    model: currentModel,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -73,7 +73,7 @@ export const buildLinearImageToImageGraph = (
     throw new Error('No initial image found in state');
   }
 
-  const model = modelIdToMainModelField(modelId);
+  const model = modelIdToMainModelField(currentModel?.id || '');
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {

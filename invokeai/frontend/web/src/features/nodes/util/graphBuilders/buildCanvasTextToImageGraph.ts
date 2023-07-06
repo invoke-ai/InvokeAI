@@ -25,7 +25,7 @@ export const buildCanvasTextToImageGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: modelId,
+    model: currentModel,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -38,7 +38,7 @@ export const buildCanvasTextToImageGraph = (
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const model = modelIdToMainModelField(modelId);
+  const model = modelIdToMainModelField(currentModel?.id || '');
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the

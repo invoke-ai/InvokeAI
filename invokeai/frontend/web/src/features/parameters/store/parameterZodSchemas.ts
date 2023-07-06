@@ -130,20 +130,21 @@ export const isValidHeight = (val: unknown): val is HeightParam =>
  * Zod schema for model parameter
  * TODO: Make this a dynamically generated enum?
  */
-export const zModel = z.string();
+const zModel = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+  base_model: z.string(),
+});
+
 /**
  * Type alias for model parameter, inferred from its zod schema
  */
-export type ModelParam = z.infer<typeof zModel>;
-/**
- * Zod schema for VAE parameter
- * TODO: Make this a dynamically generated enum?
- */
-export const zVAE = z.string();
+export type ModelParam = z.infer<typeof zModel> | null;
 /**
  * Type alias for model parameter, inferred from its zod schema
  */
-export type VAEParam = z.infer<typeof zVAE>;
+export type VAEParam = z.infer<typeof zModel> | null;
 /**
  * Validates/type-guards a value as a model parameter
  */

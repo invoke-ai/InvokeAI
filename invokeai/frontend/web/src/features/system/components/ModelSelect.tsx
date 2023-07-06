@@ -19,7 +19,7 @@ const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const selectedModelId = useAppSelector(
+  const currentModel = useAppSelector(
     (state: RootState) => state.generation.model
   );
 
@@ -48,8 +48,8 @@ const ModelSelect = () => {
   }, [mainModels]);
 
   const selectedModel = useMemo(
-    () => mainModels?.entities[selectedModelId],
-    [mainModels?.entities, selectedModelId]
+    () => mainModels?.entities[currentModel?.id || ''],
+    [mainModels?.entities, currentModel]
   );
 
   const handleChangeModel = useCallback(
@@ -63,10 +63,6 @@ const ModelSelect = () => {
   );
 
   useEffect(() => {
-    if (selectedModelId && mainModels?.ids.includes(selectedModelId)) {
-      return;
-    }
-
     const firstModel = mainModels?.ids[0];
 
     if (!isString(firstModel)) {
@@ -74,7 +70,7 @@ const ModelSelect = () => {
     }
 
     handleChangeModel(firstModel);
-  }, [handleChangeModel, mainModels?.ids, selectedModelId]);
+  }, [handleChangeModel, mainModels?.ids]);
 
   return isLoading ? (
     <IAIMantineSelect
@@ -87,7 +83,7 @@ const ModelSelect = () => {
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={t('modelManager.model')}
-      value={selectedModelId}
+      value={selectedModel?.id}
       placeholder={data.length > 0 ? 'Select a model' : 'No models detected!'}
       data={data}
       error={data.length === 0}
