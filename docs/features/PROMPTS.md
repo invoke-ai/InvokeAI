@@ -331,6 +331,11 @@ For example, the following prompts could be generated from the above Dynamic Pro
     A cottage in winter designed in style2, style3
     And many more!
 
+When the `Combinatorial` setting is on, Invoke will disable the "Images" selection, and generate every combination up until the setting for Max Prompts is reached.
+When the `Combinatorial` setting is off, Invoke will randomly generate combinations up until the setting for Images has been reached.
+
+
+
 ### Tips and Tricks for Using Dynamic Prompts
 
 Below are some useful strategies for creating Dynamic Prompts:
