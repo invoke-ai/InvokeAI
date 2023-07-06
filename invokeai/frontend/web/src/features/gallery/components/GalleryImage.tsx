@@ -23,11 +23,10 @@ export const makeSelector = (image_name: string) =>
     ({ gallery }) => {
       const isSelected = gallery.selection.includes(image_name);
       const selectionCount = gallery.selection.length;
-      const galleryImageMinimumWidth = gallery.galleryImageMinimumWidth;
+
       return {
         isSelected,
         selectionCount,
-        galleryImageMinimumWidth,
       };
     },
     defaultSelectorOptions
@@ -46,8 +45,7 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const localSelector = useMemo(() => makeSelector(image_name), [image_name]);
 
-  const { isSelected, selectionCount, galleryImageMinimumWidth } =
-    useAppSelector(localSelector);
+  const { isSelected, selectionCount } = useAppSelector(localSelector);
 
   const dispatch = useAppDispatch();
 
@@ -116,13 +114,11 @@ const GalleryImage = (props: HoverableImageProps) => {
               draggableData={draggableData}
               isSelected={isSelected}
               minSize={0}
-              onClickReset={
-                galleryImageMinimumWidth > 60 ? handleDelete : undefined
-              }
+              onClickReset={handleDelete}
               resetIcon={<FaTrash />}
               resetTooltip="Delete image"
               imageSx={{ w: 'full', h: 'full' }}
-              withResetIcon
+              // withResetIcon // removed bc it's too easy to accidentally delete images
               isDropDisabled={true}
               isUploadDisabled={true}
             />
