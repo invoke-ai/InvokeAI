@@ -430,13 +430,13 @@ to allow InvokeAI to download restricted styles & subjects from the "Concept Lib
             max_height=len(PRECISION_CHOICES) + 1,
             scroll_exit=True,
         )
-        self.max_loaded_models = self.add_widget_intelligent(
+        self.max_cache_size = self.add_widget_intelligent(
             IntTitleSlider,
-            name="Number of models to cache in CPU memory (each will use 2-4 GB!)",
-            value=old_opts.max_loaded_models,
-            out_of=10,
-            lowest=1,
-            begin_entry_at=4,
+            name="Size of the RAM cache used for fast model switching (GB)",
+            value=old_opts.max_cache_size,
+            out_of=20,
+            lowest=3,
+            begin_entry_at=6,
             scroll_exit=True,
         )
         self.nextrely += 1
@@ -539,7 +539,7 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
                 "outdir",
                 "nsfw_checker",
                 "free_gpu_mem",
-                "max_loaded_models",
+                "max_cache_size",
                 "xformers_enabled",
                 "always_use_cpu",
         ]:
@@ -555,9 +555,6 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
         new_opts.license_acceptance = self.license_acceptance.value
         new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
         
-        # widget library workaround to make max_loaded_models an int rather than a float
-        new_opts.max_loaded_models = int(new_opts.max_loaded_models)
-
         return new_opts
 
 
