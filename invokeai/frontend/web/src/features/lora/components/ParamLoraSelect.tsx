@@ -1,4 +1,4 @@
-import { Text } from '@chakra-ui/react';
+import { Flex, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -60,6 +60,16 @@ const ParamLoraSelect = () => {
     },
     [dispatch, lorasQueryData?.entities]
   );
+
+  if (lorasQueryData?.ids.length === 0) {
+    return (
+      <Flex sx={{ justifyContent: 'center', p: 2 }}>
+        <Text sx={{ fontSize: 'sm', color: 'base.500', _dark: 'base.700' }}>
+          No LoRAs Loaded
+        </Text>
+      </Flex>
+    );
+  }
 
   return (
     <IAIMantineMultiSelect

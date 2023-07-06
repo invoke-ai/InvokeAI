@@ -4,7 +4,12 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import IAISlider from 'common/components/IAISlider';
 import { memo, useCallback } from 'react';
 import { FaTrash } from 'react-icons/fa';
-import { Lora, loraRemoved, loraWeightChanged } from '../store/loraSlice';
+import {
+  Lora,
+  loraRemoved,
+  loraWeightChanged,
+  loraWeightReset,
+} from '../store/loraSlice';
 
 type Props = {
   lora: Lora;
@@ -22,7 +27,7 @@ const ParamLora = (props: Props) => {
   );
 
   const handleReset = useCallback(() => {
-    dispatch(loraWeightChanged({ id: lora.id, weight: 1 }));
+    dispatch(loraWeightReset(lora.id));
   }, [dispatch, lora.id]);
 
   const handleRemoveLora = useCallback(() => {
