@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from pydantic import Field
 from typing import Optional, Union, Callable, List, Tuple, TYPE_CHECKING
 from types import ModuleType
 
-from invokeai.backend.model_management.model_manager import (
+from invokeai.backend.model_management import (
     ModelManager,
     BaseModelType,
     ModelType,
@@ -15,7 +16,10 @@ from invokeai.backend.model_management.model_manager import (
     ModelInfo,
     AddModelResult,
     SchedulerPredictionType,
+    ModelMerger,
+    MergeInterpolationMethod,
 )
+
 
 import torch
 from invokeai.app.models.exceptions import CanceledException
@@ -207,6 +211,26 @@ class ModelManagerServiceBase(ABC):
         '''
         pass
 
+    @abstractmethod
+    def merge_models(
+            self,
+            model_names: List[str] = Field(default=None, min_items=2, max_items=3, description="List of model names to merge"),
+            base_model: Union[BaseModelType,str] = Field(default=None, description="Base model shared by all models to be merged"),
+            merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
+            alpha: Optional[float] = 0.5,
+            interp: Optional[MergeInterpolationMethod] = None,
+            force: Optional[bool] = False,
+    ) -> AddModelResult:
+        """
+        Merge two to three diffusrs pipeline models and save as a new model.
+        :param model_names: List of 2-3 models to merge
+        :param base_model: Base model to use for all models
+        :param merged_model_name: Name of destination merged model
+        :param alpha: Alpha strength to apply to 2d and 3d model
+        :param interp: Interpolation method. None (default) 
+        """
+        pass
+    
     @abstractmethod
     def commit(self, conf_file: Optional[Path] = None) -> None:
         """
@@ -501,3 +525,31 @@ class ModelManagerService(ModelManagerServiceBase):
         that model.
         '''
         return self.mgr.heuristic_import(items_to_import, prediction_type_helper)        
+
+    def merge_models(
+            self,
+            model_names: List[str] = Field(default=None, min_items=2, max_items=3, description="List of model names to merge"),
+            base_model: Union[BaseModelType,str] = Field(default=None, description="Base model shared by all models to be merged"),
+            merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
+            alpha: Optional[float] = 0.5,
+            interp: Optional[MergeInterpolationMethod] = None,
+            force: Optional[bool] = False,
+    ) -> AddModelResult:
+        """
+        Merge two to three diffusrs pipeline models and save as a new model.
+        :param model_names: List of 2-3 models to merge
+        :param base_model: Base model to use for all models
+        :param merged_model_name: Name of destination merged model
+        :param alpha: Alpha strength to apply to 2d and 3d model
+        :param interp: Interpolation method. None (default) 
+        """
+        merger = ModelMerger(self.mgr)
+        return merger.merge_diffusion_models_and_save(
+            model_names = model_names,
+            base_model = base_model,
+            merged_model_name = merged_model_name,
+            alpha = alpha,
+            interp = interp,
+            force = force,
+        )
+            
