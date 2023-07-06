@@ -1,4 +1,5 @@
 import {
+  Flex,
   Popover,
   PopoverBody,
   PopoverContent,
@@ -82,28 +83,40 @@ const ParamEmbeddingPopover = (props: Props) => {
           p: 0,
           top: -1,
           shadow: 'dark-lg',
-          bg: 'accent.300',
-          _dark: { bg: 'accent.400' },
+          borderColor: 'accent.300',
+          borderWidth: '2px',
+          borderStyle: 'solid',
+          _dark: { borderColor: 'accent.400' },
         }}
       >
         <PopoverBody
-          sx={{ p: 0.5, w: `calc(${PARAMETERS_PANEL_WIDTH} - 2rem )` }}
+          sx={{ p: 0, w: `calc(${PARAMETERS_PANEL_WIDTH} - 2rem )` }}
         >
-          <IAIMantineMultiSelect
-            inputRef={inputRef}
-            placeholder={data.length === 0 ? 'No Embeddings' : 'Add Embedding'}
-            value={[]}
-            data={data}
-            maxDropdownHeight={400}
-            nothingFound="No matching Embeddings"
-            itemComponent={SelectItem}
-            disabled={data.length === 0}
-            filter={(value, selected, item: EmbeddingSelectItem) =>
-              item.label.toLowerCase().includes(value.toLowerCase().trim()) ||
-              item.value.toLowerCase().includes(value.toLowerCase().trim())
-            }
-            onChange={handleChange}
-          />
+          {data.length === 0 ? (
+            <Flex sx={{ justifyContent: 'center', p: 2 }}>
+              <Text
+                sx={{ fontSize: 'sm', color: 'base.500', _dark: 'base.700' }}
+              >
+                No Embeddings Loaded
+              </Text>
+            </Flex>
+          ) : (
+            <IAIMantineMultiSelect
+              inputRef={inputRef}
+              placeholder={'Add Embedding'}
+              value={[]}
+              data={data}
+              maxDropdownHeight={400}
+              nothingFound="No Matching Embeddings"
+              itemComponent={SelectItem}
+              disabled={data.length === 0}
+              filter={(value, selected, item: EmbeddingSelectItem) =>
+                item.label.toLowerCase().includes(value.toLowerCase().trim()) ||
+                item.value.toLowerCase().includes(value.toLowerCase().trim())
+              }
+              onChange={handleChange}
+            />
+          )}
         </PopoverBody>
       </PopoverContent>
     </Popover>
