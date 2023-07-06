@@ -26,7 +26,7 @@ class MergeInterpolationMethod(str, Enum):
 def merge_diffusion_models(
         model_paths: List[Path],
         alpha: float = 0.5,
-        interp: InterpolationMethod = None,
+        interp: MergeInterpolationMethod = None,
         force: bool = False,
         **kwargs,
 ) -> DiffusionPipeline:
@@ -67,7 +67,7 @@ def merge_diffusion_models_and_save (
         merged_model_name: str,
         config: InvokeAIAppConfig,
         alpha: float = 0.5,
-        interp: InterpolationMethod = None,
+        interp: MergeInterpolationMethod = None,
         force: bool = False,
         **kwargs,
 ):

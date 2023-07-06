@@ -76,13 +76,7 @@ class ModelManagerServiceBase(ABC):
     def model_info(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
         """
         Given a model name returns a dict-like (OmegaConf) object describing it.
-        """
-        pass
-
-    @abstractmethod
-    def model_names(self) -> List[Tuple[str, BaseModelType, ModelType]]:
-        """
-        Returns a list of all the model names known.
+        Uses the exact format as the omegaconf stanza.
         """
         pass
 
@@ -104,7 +98,20 @@ class ModelManagerServiceBase(ABC):
         }
         """
         pass
+    
+    @abstractmethod
+    def list_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
+        """
+        Return information about the model using the same format as list_models()
+        """
+        pass
 
+    @abstractmethod
+    def model_names(self) -> List[Tuple[str, BaseModelType, ModelType]]:
+        """
+        Returns a list of all the model names known.
+        """
+        pass
 
     @abstractmethod
     def add_model(
@@ -339,11 +346,18 @@ class ModelManagerService(ModelManagerServiceBase):
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None
     ) -> list[dict]:
-    # ) -> dict:
         """
         Return a list of models.
         """
         return self.mgr.list_models(base_model, model_type)
+
+    def list_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
+        """
+        Return information about the model using the same format as list_models()
+        """
+        return self.mgr.list_model(model_name=model_name,
+                                   base_model=base_model,
+                                   model_type=model_type)
 
     def add_model(
         self,

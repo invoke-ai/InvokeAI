@@ -480,7 +480,7 @@ class ModelManager(object):
         """
         model_key = self.create_key(model_name, base_model, model_type)
         if model_key in self.models:
-            return self.models[model_key].dict(exclude_defaults=True, exclude={"error"})
+            return self.models[model_key].dict(exclude_defaults=True)
         else:
             return None # TODO: None or empty dict on not found
 
@@ -491,17 +491,32 @@ class ModelManager(object):
         """
         return [(self.parse_key(x)) for x in self.models.keys()]
 
+    def list_model(
+            self,
+            model_name: str,
+            base_model: BaseModelType,
+            model_type: ModelType,
+    )->dict:
+        """
+        Returns a dict describing one installed model, using
+        the combined format of the list_models() method.
+        """
+        models = self.list_models(base_model,model_type,model_name)
+        return models[0] if models else None
+
     def list_models(
         self,
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
+        model_name: Optional[str] = None,
     ) -> list[dict]:
         """
         Return a list of models.
         """
 
+        model_keys = [self.create_key(model_name, base_model, model_type)] if model_name else sorted(self.models, key=str.casefold)
         models = []
-        for model_key in sorted(self.models, key=str.casefold):
+        for model_key in model_keys:
             model_config = self.models[model_key]
 
             cur_model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
@@ -653,7 +668,7 @@ class ModelManager(object):
         old_diffusers_path = self.app_config.models_path / model.location
         new_diffusers_path = self.app_config.models_path / base_model.value / model_type.value / model_name
         if new_diffusers_path.exists():
-            raise ValueError(f"A diffusers model already exists at {new_path}")
+            raise ValueError(f"A diffusers model already exists at {new_diffusers_path}")
 
         try:
             move(old_diffusers_path,new_diffusers_path)

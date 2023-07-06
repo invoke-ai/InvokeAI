@@ -1,16 +1,15 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) and 2023 Kent Keirsey (https://github.com/hipsterusername)
+# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654), 2023 Kent Keirsey (https://github.com/hipsterusername), 2024 Lincoln Stein
+
 
 from typing import Literal, Optional, Union
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field, parse_obj_as
+from pydantic import BaseModel, parse_obj_as
 from starlette.exceptions import HTTPException
 
 from invokeai.backend import BaseModelType, ModelType
-from invokeai.backend.model_management import AddModelResult
 from invokeai.backend.model_management.models import (
-    MODEL_CONFIGS,
     OPENAPI_MODEL_CONFIGS,
     SchedulerPredictionType
 )
@@ -19,13 +18,9 @@ from ..dependencies import ApiDependencies
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
 
-class UpdateModelResponse(BaseModel):
-    model_name: str = Field(description="The name of the new model")
-    info: Union[tuple(MODEL_CONFIGS)] = Field(description="The model info")
-
-class ImportModelResponse(BaseModel):
-    location: str = Field(description="The path, repo_id or URL of the imported model")
-    info: AddModelResult = Field(description="The model info")
+UpdateModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
+ImportModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
+ConvertModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 
 class ModelsList(BaseModel):
     models: list[Union[tuple(OPENAPI_MODEL_CONFIGS)]]
@@ -62,7 +57,7 @@ async def update_model(
         base_model: BaseModelType = Path(default='sd-1', description="Base model"),
         model_type: ModelType = Path(default='main', description="The type of model"),
         model_name: str = Path(default=None, description="model name"),
-        info: Union[tuple(MODEL_CONFIGS)]  = Body(description="Model configuration"),
+        info: Union[tuple(OPENAPI_MODEL_CONFIGS)]  = Body(description="Model configuration"),
 ) -> UpdateModelResponse:
     """ Add Model """
     try:
@@ -72,14 +67,12 @@ async def update_model(
             model_type=model_type,
             model_attributes=info.dict()
         )
-        model_response = UpdateModelResponse(
-            model_name = model_name,
-            info = ApiDependencies.invoker.services.model_manager.model_info(
-                model_name=model_name,
-                base_model=base_model,
-                model_type=model_type,
-            )
+        model_raw = ApiDependencies.invoker.services.model_manager.list_model(
+            model_name=model_name,
+            base_model=base_model,
+            model_type=model_type,
         )
+        model_response = parse_obj_as(UpdateModelResponse, model_raw)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -122,10 +115,13 @@ async def import_model(
             raise HTTPException(status_code=424)
         
         logger.info(f'Successfully imported {location}, got {info}')
-        return ImportModelResponse(
-                location = location,
-                info = info,
+        model_raw = ApiDependencies.invoker.services.model_manager.list_model(
+            model_name=info.name,
+            base_model=info.base_model,
+            model_type=info.model_type
         )
+        return parse_obj_as(ImportModelResponse, model_raw)
+    
     except KeyError as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
@@ -165,7 +161,7 @@ async def delete_model(
         logger.error(f"Model not found: {model_name}")
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
 
-@models_router.patch(
+@models_router.put(
     "/convert/{base_model}/{model_type}/{model_name}",
     operation_id="convert_model",
     responses={
@@ -174,26 +170,30 @@ async def delete_model(
         404: { "description": "Model not found"  },
     },
     status_code = 200,
-    response_model = Union[tuple(MODEL_CONFIGS)],
+    response_model = Union[tuple(OPENAPI_MODEL_CONFIGS)],
 )
 async def convert_model(
         base_model: BaseModelType = Path(description="Base model"),
         model_type: ModelType = Path(description="The type of model"),
         model_name: str = Path(description="model name"),
-) -> Union[tuple(MODEL_CONFIGS)]:
+) -> ConvertModelResponse:
     """Convert a checkpoint model into a diffusers model"""
     logger = ApiDependencies.invoker.services.logger
     try:
         logger.info(f"Converting model: {model_name}")
-        result = ApiDependencies.invoker.services.model_manager.convert_model(model_name,
+        ApiDependencies.invoker.services.model_manager.convert_model(model_name,
+                                                                     base_model = base_model,
+                                                                     model_type = model_type
+                                                                     )
+        model_raw = ApiDependencies.invoker.services.model_manager.list_model(model_name,
                                                                               base_model = base_model,
-                                                                              model_type = model_type
-                                                                              )
+                                                                              model_type = model_type)
+        response = parse_obj_as(ConvertModelResponse, model_raw)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return result.config
+    return response
         
         # @socketio.on("mergeDiffusersModels")
         # def merge_diffusers_models(model_merge_info: dict):
