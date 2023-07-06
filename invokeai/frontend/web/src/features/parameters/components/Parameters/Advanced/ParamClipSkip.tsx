@@ -1,6 +1,6 @@
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAINumberInput from 'common/components/IAINumberInput';
+import IAISlider from 'common/components/IAISlider';
 import { setClipSkip } from 'features/parameters/store/generationSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,8 +20,12 @@ export default function ParamClipSkip() {
     [dispatch]
   );
 
+  const handleClipSkipReset = useCallback(() => {
+    dispatch(setClipSkip(0));
+  }, [dispatch]);
+
   return (
-    <IAINumberInput
+    <IAISlider
       label={t('parameters.clipSkip')}
       aria-label={t('parameters.clipSkip')}
       min={0}
@@ -29,6 +33,11 @@ export default function ParamClipSkip() {
       step={1}
       value={clipSkip}
       onChange={handleClipSkipChange}
+      withSliderMarks
+      sliderMarks={[0, 1, 2, 3, 5, 10, 15, 25, 30]}
+      withInput
+      withReset
+      handleReset={handleClipSkipReset}
     />
   );
 }
