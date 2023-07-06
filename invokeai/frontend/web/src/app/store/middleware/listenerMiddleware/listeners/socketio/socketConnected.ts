@@ -1,6 +1,5 @@
 import { log } from 'app/logging/useLogger';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
-import { receivedPageOfImages } from 'services/api/thunks/image';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { startAppListening } from '../..';
 
@@ -14,18 +13,9 @@ export const addSocketConnectedEventListener = () => {
 
       moduleLog.debug({ timestamp }, 'Connected');
 
-      const { nodes, config, gallery } = getState();
+      const { nodes, config } = getState();
 
       const { disabledTabs } = config;
-
-      if (!gallery.ids.length) {
-        dispatch(
-          receivedPageOfImages({
-            categories: ['general'],
-            is_intermediate: false,
-          })
-        );
-      }
 
       if (!nodes.schema && !disabledTabs.includes('nodes')) {
         dispatch(receivedOpenAPISchema());
