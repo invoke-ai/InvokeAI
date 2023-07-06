@@ -34,7 +34,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+# dist/
 downloads/
 eggs/
 .eggs/
@@ -202,7 +202,7 @@ checkpoints
 .DS_Store
 
 # Let the frontend manage its own gitignore
-!invokeai/frontend/web/*
+# !invokeai/frontend/web/*
 
 # Scratch folder
 .scratch/
