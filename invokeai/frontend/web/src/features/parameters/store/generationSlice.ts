@@ -16,7 +16,6 @@ import {
   SeedParam,
   StepsParam,
   StrengthParam,
-  VAEParam,
   WidthParam,
 } from './parameterZodSchemas';
 
@@ -50,7 +49,7 @@ export interface GenerationState {
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
   model: ModelParam;
-  vae: VAEParam;
+  vae: ModelParam;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
   clipSkip: number;
@@ -84,8 +83,8 @@ export const initialGenerationState: GenerationState = {
   shouldUseSymmetry: false,
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
-  model: '',
-  vae: '',
+  model: null,
+  vae: null,
   seamlessXAxis: false,
   seamlessYAxis: false,
   clipSkip: 0,
@@ -216,16 +215,17 @@ export const generationSlice = createSlice({
       state.initialImage = { imageName: image_name, width, height };
     },
     modelSelected: (state, action: PayloadAction<string>) => {
-      state.model = action.payload;
+      const [base_model, type, name] = action.payload.split('/');
 
       // Clamp ClipSkip Based On Selected Model
-      const clipSkipMax =
-        clipSkipMap[action.payload.split('/')[0] as keyof typeof clipSkipMap]
-          .maxClip;
-      state.clipSkip = clamp(state.clipSkip, 0, clipSkipMax);
+      const { maxClip } = clipSkipMap[base_model as keyof typeof clipSkipMap];
+      state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+
+      state.model = { id: action.payload, base_model, name, type };
     },
     vaeSelected: (state, action: PayloadAction<string>) => {
-      state.vae = action.payload;
+      const [base_model, type, name] = action.payload.split('/');
+      state.vae = { id: action.payload, base_model, name, type };
     },
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
@@ -235,7 +235,13 @@ export const generationSlice = createSlice({
     builder.addCase(configChanged, (state, action) => {
       const defaultModel = action.payload.sd?.defaultModel;
       if (defaultModel && !state.model) {
-        state.model = defaultModel;
+        const [base_model, model_type, model_name] = defaultModel.split('/');
+        state.model = {
+          id: defaultModel,
+          name: model_name,
+          type: model_type,
+          base_model: base_model,
+        };
       }
     });
     builder.addCase(setShouldShowAdvancedOptions, (state, action) => {
