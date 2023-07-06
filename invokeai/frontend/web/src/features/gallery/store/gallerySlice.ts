@@ -79,6 +79,9 @@ export const gallerySlice = createSlice({
     imageUpdatedOne: (state, action: PayloadAction<Update<ImageDTO>>) => {
       imagesAdapter.updateOne(state, action.payload);
     },
+    imageUpdatedMany: (state, action: PayloadAction<Update<ImageDTO>[]>) => {
+      imagesAdapter.updateMany(state, action.payload);
+    },
     imageRemoved: (state, action: PayloadAction<string>) => {
       imagesAdapter.removeOne(state, action.payload);
     },
@@ -206,6 +209,7 @@ export const {
 export const {
   imageUpserted,
   imageUpdatedOne,
+  imageUpdatedMany,
   imageRemoved,
   imagesRemoved,
   imageCategoriesChanged,

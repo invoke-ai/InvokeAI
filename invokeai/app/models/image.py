@@ -107,3 +107,11 @@ class AddManyImagesToBoardResult(BaseModel):
         description="The names of the images that were successfully added"
     )
     total: int = Field(description="The total number of images on the board")
+
+
+class RemoveManyImagesFromBoardResult(BaseModel):
+    """The result of a remove many images from their boards operation."""
+
+    removed_images: list[str] = Field(
+        description="The names of the images that were successfully removed from their boards"
+    )

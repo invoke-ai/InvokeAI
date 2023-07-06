@@ -1,13 +1,13 @@
-from abc import ABC, abstractmethod
 import sqlite3
 import threading
 from typing import Optional, cast
 
+from ABC import abstractmethod
+
+from invokeai.app.services.board_record_storage import BoardRecord
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.image_record import (
-    ImageRecord,
-    deserialize_image_record,
-)
+    ImageRecord, deserialize_image_record)
 
 
 class BoardImageRecordStorageBase(ABC):
@@ -25,7 +25,6 @@ class BoardImageRecordStorageBase(ABC):
     @abstractmethod
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
         """Removes an image from a board."""
@@ -154,7 +153,6 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
 
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
         try:
@@ -162,9 +160,9 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             self._cursor.execute(
                 """--sql
                 DELETE FROM board_images
-                WHERE board_id = ? AND image_name = ?;
+                WHERE image_name = ?;
                 """,
-                (board_id, image_name),
+                (image_name,),
             )
             self._conn.commit()
         except sqlite3.Error as e:

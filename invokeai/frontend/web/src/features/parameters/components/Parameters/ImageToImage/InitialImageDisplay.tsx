@@ -1,22 +1,22 @@
 import { Flex, Spacer, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { useCallback, useMemo } from 'react';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { FaLayerGroup, FaUndo, FaUpload } from 'react-icons/fa';
-import useImageUploader from 'common/hooks/useImageUploader';
-import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import IAIButton from 'common/components/IAIButton';
 import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIButton from 'common/components/IAIButton';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import useImageUploader from 'common/hooks/useImageUploader';
+import BatchImageContainer from 'features/batch/components/BatchImageContainer';
 import {
   asInitialImageToggled,
   batchReset,
 } from 'features/batch/store/batchSlice';
-import BatchImageContainer from 'features/batch/components/BatchImageContainer';
+import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import { useCallback, useMemo } from 'react';
+import { FaLayerGroup, FaUndo, FaUpload } from 'react-icons/fa';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/thunks/image';
 import InitialImage from './InitialImage';
 
@@ -114,7 +114,7 @@ const InitialImageDisplay = () => {
           Initial Image
         </Text>
         <Spacer />
-        {/* <IAIButton
+        <IAIButton
           tooltip={useBatchAsInitialImage ? 'Disable Batch' : 'Enable Batch'}
           aria-label={useBatchAsInitialImage ? 'Disable Batch' : 'Enable Batch'}
           leftIcon={<FaLayerGroup />}
@@ -122,7 +122,7 @@ const InitialImageDisplay = () => {
           onClick={handleClickUseBatch}
         >
           {useBatchAsInitialImage ? 'Batch' : 'Single'}
-        </IAIButton> */}
+        </IAIButton>
         <IAIIconButton
           tooltip={
             useBatchAsInitialImage ? 'Upload to Batch' : 'Upload Initial Image'
@@ -146,8 +146,7 @@ const InitialImageDisplay = () => {
           isDisabled={isResetButtonDisabled}
         />
       </Flex>
-      <InitialImage />
-      {/* {useBatchAsInitialImage ? <BatchImageContainer /> : <InitialImage />} */}
+      {useBatchAsInitialImage ? <BatchImageContainer /> : <InitialImage />}
       <input {...getUploadInputProps()} />
     </Flex>
   );

@@ -216,6 +216,13 @@ export type paths = {
     /** Get Version */
     get: operations["app_version"];
   };
+  "/api/v1/board_images/images": {
+    /**
+     * Delete Multiple Board Images 
+     * @description Remove many images from their boards, if they have one
+     */
+    post: operations["delete_multiple_board_images"];
+  };
 };
 
 export type webhooks = Record<string, never>;
@@ -4433,17 +4440,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -5421,7 +5428,7 @@ export type operations = {
   remove_board_image: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_remove_board_image"];
+        "application/json": string;
       };
     };
     responses: {

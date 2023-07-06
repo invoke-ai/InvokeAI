@@ -24,7 +24,7 @@ import { isEqual } from 'lodash-es';
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaCube, FaFont, FaImage } from 'react-icons/fa';
+import { FaCube, FaFont, FaImage, FaLayerGroup } from 'react-icons/fa';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 import { useMinimumPanelSize } from '../hooks/useMinimumPanelSize';
@@ -32,6 +32,7 @@ import {
   activeTabIndexSelector,
   activeTabNameSelector,
 } from '../store/uiSelectors';
+import BatchTab from './tabs/Batch/BatchTab';
 import ImageTab from './tabs/ImageToImage/ImageToImageTab';
 import ModelManagerTab from './tabs/ModelManager/ModelManagerTab';
 import NodesTab from './tabs/Nodes/NodesTab';
@@ -78,11 +79,11 @@ const tabs: InvokeTabInfo[] = [
     icon: <Icon as={FaCube} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <ModelManagerTab />,
   },
-  // {
-  //   id: 'batch',
-  //   icon: <Icon as={FaLayerGroup} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
-  //   content: <BatchTab />,
-  // },
+  {
+    id: 'batch',
+    icon: <Icon as={FaLayerGroup} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
+    content: <BatchTab />,
+  },
 ];
 
 const enabledTabsSelector = createSelector(

@@ -17,6 +17,9 @@ type AddManyImagesToBoardArg =
 type RemoveImageFromBoardArg =
   paths['/api/v1/board_images/']['delete']['requestBody']['content']['application/json'];
 
+type RemoveManyBoardImagesArg =
+  paths['/api/v1/board_images/images']['post']['requestBody']['content']['application/json'];
+
 export const boardImagesApi = api.injectEndpoints({
   endpoints: (build) => ({
     /**
@@ -104,18 +107,15 @@ export const boardImagesApi = api.injectEndpoints({
     }),
 
     removeImageFromBoard: build.mutation<void, RemoveImageFromBoardArg>({
-      query: ({ board_id, image_name }) => ({
+      query: (image_name) => ({
         url: `board_images/`,
         method: 'DELETE',
-        body: { board_id, image_name },
+        body: image_name,
       }),
       invalidatesTags: (result, error, arg) => [
-        { type: 'Board', id: arg.board_id },
+        { type: 'Board', id: LIST_TAG },
       ],
-      async onQueryStarted(
-        { image_name, ...patch },
-        { dispatch, queryFulfilled }
-      ) {
+      async onQueryStarted(image_name, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           imagesApi.util.updateQueryData('getImageDTO', image_name, (draft) => {
             Object.assign(draft, { board_id: null });
@@ -125,6 +125,35 @@ export const boardImagesApi = api.injectEndpoints({
           await queryFulfilled;
         } catch {
           patchResult.undo();
+        }
+      },
+    }),
+
+    removeManyImagesFromBoard: build.mutation<void, RemoveManyBoardImagesArg>({
+      query: (image_names) => ({
+        url: `board_images/images`,
+        method: 'POST',
+        body: image_names,
+      }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'Board', id: LIST_TAG },
+      ],
+      async onQueryStarted(image_names, { dispatch, queryFulfilled }) {
+        const patches: PatchCollection[] = [];
+
+        image_names.forEach((n) => {
+          const patchResult = dispatch(
+            imagesApi.util.updateQueryData('getImageDTO', n, (draft) => {
+              Object.assign(draft, { board_id: null });
+            })
+          );
+          patches.push(patchResult);
+        });
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patches.forEach((p) => p.undo());
         }
       },
     }),

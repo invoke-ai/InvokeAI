@@ -1,7 +1,8 @@
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 
-from invokeai.app.models.image import AddManyImagesToBoardResult
+from invokeai.app.models.image import (AddManyImagesToBoardResult,
+                                       RemoveManyImagesFromBoardResult)
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.image_record import ImageDTO
 
@@ -41,13 +42,14 @@ async def create_board_image(
     status_code=201,
 )
 async def remove_board_image(
-    board_id: str = Body(description="The id of the board"),
-    image_name: str = Body(description="The name of the image to remove"),
+    image_name: str = Body(
+        description="The name of the image to remove from its board"
+    ),
 ):
     """Deletes a board_image"""
     try:
         result = ApiDependencies.invoker.services.board_images.remove_image_from_board(
-            board_id=board_id, image_name=image_name
+            image_name=image_name
         )
         return result
     except Exception as e:
@@ -77,9 +79,6 @@ async def list_board_images(
     operation_id="create_multiple_board_images",
     responses={
         201: {"description": "The images were added to the board successfully"},
-        207: {
-            "description": "Some images were added to the board successfully, but others failed"
-        },
     },
     status_code=201,
 )
@@ -93,5 +92,28 @@ async def create_multiple_board_images(
 
     results = ApiDependencies.invoker.services.board_images.add_many_images_to_board(
         board_id, image_names
+    )
+    return results
+
+
+@board_images_router.post(
+    "/images",
+    operation_id="delete_multiple_board_images",
+    responses={
+        201: {"description": "The images were removed from their boards successfully"},
+    },
+    status_code=201,
+)
+async def delete_multiple_board_images(
+    image_names: list[str] = Body(
+        description="The names of the images to remove from their boards, if they have one"
+    ),
+) -> RemoveManyImagesFromBoardResult:
+    """Remove many images from their boards, if they have one"""
+
+    results = (
+        ApiDependencies.invoker.services.board_images.remove_many_images_from_board(
+            image_names
+        )
     )
     return results

@@ -7,7 +7,8 @@ from invokeai.app.services.board_record_storage import (
     BoardRecordStorageBase,
 )
 
-from invokeai.app.models.image import AddManyImagesToBoardResult
+from invokeai.app.models.image import (AddManyImagesToBoardResult,
+                                       RemoveManyImagesFromBoardResult)
 from invokeai.app.services.board_image_record_storage import \
     BoardImageRecordStorageBase
 from invokeai.app.services.board_record_storage import (BoardRecord,
@@ -44,10 +45,17 @@ class BoardImagesServiceABC(ABC):
     @abstractmethod
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
-        """Removes an image from a board."""
+        """Removes an image from its board."""
+        pass
+
+    @abstractmethod
+    def remove_many_images_from_board(
+        self,
+        image_names: list[str],
+    ) -> RemoveManyImagesFromBoardResult:
+        """Removes many images from their board, if they had one."""
         pass
 
     @abstractmethod
@@ -128,10 +136,26 @@ class BoardImagesService(BoardImagesServiceABC):
 
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
-        self._services.board_image_records.remove_image_from_board(board_id, image_name)
+        self._services.board_image_records.remove_image_from_board(image_name)
+
+    def remove_many_images_from_board(
+        self,
+        image_names: list[str],
+    ) -> RemoveManyImagesFromBoardResult:
+        removed_images: list[str] = []
+
+        for image_name in image_names:
+            try:
+                self._services.board_image_records.remove_image_from_board(image_name)
+                removed_images.append(image_name)
+            except Exception as e:
+                self._services.logger.exception(e)
+
+        return RemoveManyImagesFromBoardResult(
+            removed_images=removed_images,
+        )
 
     def get_images_for_board(
         self,

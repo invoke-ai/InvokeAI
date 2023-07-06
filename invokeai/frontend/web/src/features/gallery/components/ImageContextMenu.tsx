@@ -21,7 +21,13 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaExpand, FaFolder, FaShare, FaTrash } from 'react-icons/fa';
+import {
+  FaExpand,
+  FaFolder,
+  FaFolderPlus,
+  FaShare,
+  FaTrash,
+} from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
 import { ImageDTO } from 'services/api/types';
@@ -127,8 +133,16 @@ const ImageContextMenu = ({ image, children }: Props) => {
     if (!image.board_id) {
       return;
     }
-    removeFromBoard({ board_id: image.board_id, image_name: image.image_name });
+    removeFromBoard(image.image_name);
   }, [image.board_id, image.image_name, removeFromBoard]);
+
+  const handleAddSelectionToBoard = useCallback(() => {
+    onClickAddToBoard(image);
+  }, [image, onClickAddToBoard]);
+
+  const handleRemoveSelectionFromBoard = useCallback(() => {
+    removeFromBoard(image.image_name);
+  }, [image.image_name, removeFromBoard]);
 
   const handleOpenInNewTab = () => {
     window.open(image.image_url, '_blank');
@@ -212,13 +226,13 @@ const ImageContextMenu = ({ image, children }: Props) => {
                   {t('parameters.sendToUnifiedCanvas')}
                 </MenuItem>
               )}
-              {/* <MenuItem
+              <MenuItem
                 icon={<FaFolder />}
                 isDisabled={isInBatch}
                 onClickCapture={handleAddToBatch}
               >
                 Add to Batch
-              </MenuItem> */}
+              </MenuItem>
               <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
                 {image.board_id ? 'Change Board' : 'Add to Board'}
               </MenuItem>
@@ -247,12 +261,12 @@ const ImageContextMenu = ({ image, children }: Props) => {
               >
                 Move Selection to Board
               </MenuItem>
-              {/* <MenuItem
+              <MenuItem
                 icon={<FaFolderPlus />}
                 onClickCapture={handleAddSelectionToBatch}
               >
                 Add Selection to Batch
-              </MenuItem> */}
+              </MenuItem>
               <MenuItem
                 sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
                 icon={<FaTrash />}

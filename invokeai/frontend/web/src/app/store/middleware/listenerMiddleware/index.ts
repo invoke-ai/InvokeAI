@@ -7,6 +7,7 @@ import {
 } from '@reduxjs/toolkit';
 
 import type { AppDispatch, RootState } from '../../store';
+import { addBoardListeners } from './listeners/addBoardListeners';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 import { addAppStartedListener } from './listeners/appStarted';
 import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
@@ -18,10 +19,6 @@ import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGaller
 import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
 import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
 import {
-  addImageAddedToBoardFulfilledListener,
-  addImageAddedToBoardRejectedListener,
-} from './listeners/imageAddedToBoard';
-import {
   addImageDeletedFulfilledListener,
   addImageDeletedPendingListener,
   addImageDeletedRejectedListener,
@@ -32,10 +29,6 @@ import {
   addImageMetadataReceivedFulfilledListener,
   addImageMetadataReceivedRejectedListener,
 } from './listeners/imageMetadataReceived';
-import {
-  addImageRemovedFromBoardFulfilledListener,
-  addImageRemovedFromBoardRejectedListener,
-} from './listeners/imageRemovedFromBoard';
 import { addImageToDeleteSelectedListener } from './listeners/imageToDeleteSelected';
 import {
   addImageUpdatedFulfilledListener,
@@ -204,10 +197,7 @@ addControlNetAutoProcessListener();
 // addUpdateImageUrlsOnConnectListener();
 
 // Boards
-addImageAddedToBoardFulfilledListener();
-addImageAddedToBoardRejectedListener();
-addImageRemovedFromBoardFulfilledListener();
-addImageRemovedFromBoardRejectedListener();
+addBoardListeners();
 addBoardIdSelectedListener();
 
 // Node schemas
