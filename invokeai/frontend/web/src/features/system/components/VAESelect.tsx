@@ -11,6 +11,7 @@ import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 import { RootState } from 'app/store/store';
 import { vaeSelected } from 'features/parameters/store/generationSlice';
 import { MODEL_TYPE_MAP } from './ModelSelect';
+import IAIMantineSelectItemWithTooltip from '../../../common/components/IAIMantineSelectItemWithTooltip';
 
 const VAESelect = () => {
   const dispatch = useAppDispatch();
@@ -18,7 +19,11 @@ const VAESelect = () => {
 
   const { data: vaeModels } = useGetVaeModelsQuery();
 
-  const currentModel = useAppSelector(
+  const currentMainModel = useAppSelector(
+    (state: RootState) => state.generation.model
+  );
+
+  const selectedVae = useAppSelector(
     (state: RootState) => state.generation.vae
   );
 
@@ -44,15 +49,18 @@ const VAESelect = () => {
         value: id,
         label: model.name,
         group: MODEL_TYPE_MAP[model.base_model],
+        ...(currentMainModel?.base_model !== model.base_model
+          ? { disabled: true, tooltip: 'Incompatible base model' }
+          : {}),
       });
     });
 
     return data;
-  }, [vaeModels]);
+  }, [vaeModels, currentMainModel?.base_model]);
 
-  const selectedModel = useMemo(
-    () => vaeModels?.entities[currentModel?.id || ''],
-    [vaeModels?.entities, currentModel]
+  const selectedVaeModel = useMemo(
+    () => vaeModels?.entities[selectedVae],
+    [vaeModels?.entities, selectedVae]
   );
 
   const handleChangeModel = useCallback(
@@ -66,17 +74,18 @@ const VAESelect = () => {
   );
 
   useEffect(() => {
-    if (currentModel?.id && vaeModels?.ids.includes(currentModel?.id)) {
+    if (selectedVae && vaeModels?.ids.includes(selectedVae)) {
       return;
     }
     handleChangeModel('auto');
-  }, [handleChangeModel, vaeModels?.ids, currentModel?.id]);
+  }, [handleChangeModel, vaeModels?.ids, selectedVae]);
 
   return (
     <IAIMantineSelect
-      tooltip={selectedModel?.description}
+      itemComponent={IAIMantineSelectItemWithTooltip}
+      tooltip={selectedVaeModel?.description}
       label={t('modelManager.vae')}
-      value={currentModel?.id}
+      value={selectedVae}
       placeholder="Pick one"
       data={data}
       onChange={handleChangeModel}

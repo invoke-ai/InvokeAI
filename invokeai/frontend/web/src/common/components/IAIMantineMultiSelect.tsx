@@ -32,7 +32,7 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
   const { colorMode } = useColorMode();
 
   return (
-    <Tooltip label={tooltip} placement="top" hasArrow>
+    <Tooltip label={tooltip} placement="top" hasArrow isOpen={true}>
       <MultiSelect
         ref={inputRef}
         searchable={searchable}
