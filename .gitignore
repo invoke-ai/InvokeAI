@@ -79,6 +79,7 @@ cov.xml
 .pytest.ini
 cover/
 junit/
+notes/
 
 # Translations
 *.mo
@@ -201,8 +202,11 @@ checkpoints
 # If it's a Mac
 .DS_Store
 
+invokeai/frontend/yarn.lock
+invokeai/frontend/node_modules
+
 # Let the frontend manage its own gitignore
-# !invokeai/frontend/web/*
+!invokeai/frontend/web/*
 
 # Scratch folder
 .scratch/
