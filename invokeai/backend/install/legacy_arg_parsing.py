@@ -4,6 +4,8 @@ import argparse
 import shlex
 from argparse import ArgumentParser
 
+# note that this includes both old sampler names and new scheduler names
+# in order to be able to parse both 2.0 and 3.0-pre-nodes versions of invokeai.init
 SAMPLER_CHOICES = [
     "ddim",
     "ddpm",
@@ -27,6 +29,15 @@ SAMPLER_CHOICES = [
     "dpmpp_sde",
     "dpmpp_sde_k",
     "unipc",
+    "k_dpm_2_a",
+    "k_dpm_2",
+    "k_dpmpp_2_a",
+    "k_dpmpp_2",
+    "k_euler_a",
+    "k_euler",
+    "k_heun",
+    "k_lms",
+    "plms",
 ]
 
 PRECISION_CHOICES = [

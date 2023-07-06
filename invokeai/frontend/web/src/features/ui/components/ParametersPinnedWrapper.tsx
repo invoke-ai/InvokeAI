@@ -42,18 +42,10 @@ const ParametersPinnedWrapper = (props: ParametersPinnedWrapperProps) => {
           h: 'full',
           w: 'full',
           position: 'absolute',
+          overflowY: 'auto',
         }}
       >
-        <OverlayScrollable>
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              gap: 2,
-            }}
-          >
-            {props.children}
-          </Flex>
-        </OverlayScrollable>
+        {props.children}
       </Flex>
 
       <PinParametersPanelButton

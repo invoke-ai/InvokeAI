@@ -10,12 +10,15 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   boolean: 'boolean',
   enum: 'enum',
   ImageField: 'image',
+  image_collection: 'image_collection',
   LatentsField: 'latents',
   ConditioningField: 'conditioning',
   UNetField: 'unet',
   ClipField: 'clip',
   VaeField: 'vae',
   model: 'model',
+  vae_model: 'vae_model',
+  lora_model: 'lora_model',
   array: 'array',
   item: 'item',
   ColorField: 'color',
@@ -30,9 +33,6 @@ const COLOR_TOKEN_VALUE = 500;
 const getColorTokenCssVariable = (color: string) =>
   `var(--invokeai-colors-${color}-${COLOR_TOKEN_VALUE})`;
 
-// @ts-ignore
-// @ts-ignore
-// @ts-ignore
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
   integer: {
     color: 'red',
@@ -69,6 +69,12 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     colorCssVar: getColorTokenCssVariable('purple'),
     title: 'Image',
     description: 'Images may be passed between nodes.',
+  },
+  image_collection: {
+    color: 'purple',
+    colorCssVar: getColorTokenCssVariable('purple'),
+    title: 'Image Collection',
+    description: 'A collection of images.',
   },
   latents: {
     color: 'pink',
@@ -110,6 +116,18 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'teal',
     colorCssVar: getColorTokenCssVariable('teal'),
     title: 'Model',
+    description: 'Models are models.',
+  },
+  vae_model: {
+    color: 'teal',
+    colorCssVar: getColorTokenCssVariable('teal'),
+    title: 'VAE',
+    description: 'Models are models.',
+  },
+  lora_model: {
+    color: 'teal',
+    colorCssVar: getColorTokenCssVariable('teal'),
+    title: 'LoRA',
     description: 'Models are models.',
   },
   array: {

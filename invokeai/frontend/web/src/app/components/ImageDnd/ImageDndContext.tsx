@@ -1,8 +1,5 @@
 import {
-  DndContext,
-  DragEndEvent,
   DragOverlay,
-  DragStartEvent,
   MouseSensor,
   TouchSensor,
   pointerWithin,
@@ -10,33 +7,45 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { PropsWithChildren, memo, useCallback, useState } from 'react';
-import OverlayDragImage from './OverlayDragImage';
-import { ImageDTO } from 'services/api/types';
-import { isImageDTO } from 'services/api/guards';
+import DragPreview from './DragPreview';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { AnimatePresence, motion } from 'framer-motion';
+import {
+  DndContext,
+  DragEndEvent,
+  DragStartEvent,
+  TypesafeDraggableData,
+} from './typesafeDnd';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { imageDropped } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
 
 type ImageDndContextProps = PropsWithChildren;
 
 const ImageDndContext = (props: ImageDndContextProps) => {
-  const [draggedImage, setDraggedImage] = useState<ImageDTO | null>(null);
+  const [activeDragData, setActiveDragData] =
+    useState<TypesafeDraggableData | null>(null);
+
+  const dispatch = useAppDispatch();
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const dragData = event.active.data.current;
-    if (dragData && 'image' in dragData && isImageDTO(dragData.image)) {
-      setDraggedImage(dragData.image);
+    const activeData = event.active.data.current;
+    if (!activeData) {
+      return;
     }
+    setActiveDragData(activeData);
   }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      const handleDrop = event.over?.data.current?.handleDrop;
-      if (handleDrop && typeof handleDrop === 'function' && draggedImage) {
-        handleDrop(draggedImage);
+      const activeData = event.active.data.current;
+      const overData = event.over?.data.current;
+      if (!activeData || !overData) {
+        return;
       }
-      setDraggedImage(null);
+      dispatch(imageDropped({ overData, activeData }));
+      setActiveDragData(null);
     },
-    [draggedImage]
+    [dispatch]
   );
 
   const mouseSensor = useSensor(MouseSensor, {
@@ -46,6 +55,7 @@ const ImageDndContext = (props: ImageDndContextProps) => {
   const touchSensor = useSensor(TouchSensor, {
     activationConstraint: { delay: 150, tolerance: 5 },
   });
+
   // TODO: Use KeyboardSensor - needs composition of multiple collisionDetection algos
   // Alternatively, fix `rectIntersection` collection detection to work with the drag overlay
   // (currently the drag element collision rect is not correctly calculated)
@@ -63,7 +73,7 @@ const ImageDndContext = (props: ImageDndContextProps) => {
       {props.children}
       <DragOverlay dropAnimation={null} modifiers={[snapCenterToCursor]}>
         <AnimatePresence>
-          {draggedImage && (
+          {activeDragData && (
             <motion.div
               layout
               key="overlay-drag-image"
@@ -77,7 +87,7 @@ const ImageDndContext = (props: ImageDndContextProps) => {
                 transition: { duration: 0.1 },
               }}
             >
-              <OverlayDragImage image={draggedImage} />
+              <DragPreview dragData={activeDragData} />
             </motion.div>
           )}
         </AnimatePresence>

@@ -5,15 +5,15 @@ import { useDeleteBoardMutation } from '../../services/api/endpoints/boards';
 import { defaultSelectorOptions } from '../store/util/defaultMemoizeOptions';
 import { createSelector } from '@reduxjs/toolkit';
 import { some } from 'lodash-es';
-import { canvasSelector } from '../../features/canvas/store/canvasSelectors';
-import { controlNetSelector } from '../../features/controlNet/store/controlNetSlice';
-import { selectImagesById } from '../../features/gallery/store/imagesSlice';
-import { nodesSelector } from '../../features/nodes/store/nodesSlice';
-import { generationSelector } from '../../features/parameters/store/generationSelectors';
+import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { controlNetSelector } from 'features/controlNet/store/controlNetSlice';
+import { selectImagesById } from 'features/gallery/store/gallerySlice';
+import { nodesSelector } from 'features/nodes/store/nodesSlice';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { RootState } from '../store/store';
 import { useAppDispatch, useAppSelector } from '../store/storeHooks';
 import { ImageUsage } from './DeleteImageContext';
-import { requestedBoardImagesDeletion } from '../../features/gallery/store/actions';
+import { requestedBoardImagesDeletion } from 'features/gallery/store/actions';
 
 export const selectBoardImagesUsage = createSelector(
   [

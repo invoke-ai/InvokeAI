@@ -1,35 +1,33 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { uiSelector } from 'features/ui/store/uiSelectors';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
+import {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'app/components/ImageDnd/typesafeDnd';
+import { stateSelector } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySlice';
 import { isEqual } from 'lodash-es';
-
-import { gallerySelector } from '../store/gallerySelectors';
+import { memo, useMemo } from 'react';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
-import { memo, useCallback } from 'react';
-import { systemSelector } from 'features/system/store/systemSelectors';
-import { imageSelected } from '../store/gallerySlice';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api/types';
-import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 export const imagesSelector = createSelector(
-  [uiSelector, gallerySelector, systemSelector],
-  (ui, gallery, system) => {
+  [stateSelector, selectLastSelectedImage],
+  ({ ui, system }, lastSelectedImage) => {
     const {
       shouldShowImageDetails,
       shouldHidePreview,
       shouldShowProgressInViewer,
     } = ui;
-    const { selectedImage } = gallery;
     const { progressImage, shouldAntialiasProgressImage } = system;
     return {
       shouldShowImageDetails,
       shouldHidePreview,
-      selectedImage,
+      imageName: lastSelectedImage,
       progressImage,
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
@@ -45,29 +43,35 @@ export const imagesSelector = createSelector(
 const CurrentImagePreview = () => {
   const {
     shouldShowImageDetails,
-    selectedImage,
+    imageName,
     progressImage,
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
 
   const {
-    currentData: image,
+    currentData: imageDTO,
     isLoading,
     isError,
     isSuccess,
-  } = useGetImageDTOQuery(selectedImage ?? skipToken);
+  } = useGetImageDTOQuery(imageName ?? skipToken);
 
-  const dispatch = useAppDispatch();
+  const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
+    if (imageDTO) {
+      return {
+        id: 'current-image',
+        payloadType: 'IMAGE_DTO',
+        payload: { imageDTO },
+      };
+    }
+  }, [imageDTO]);
 
-  const handleDrop = useCallback(
-    (droppedImage: ImageDTO) => {
-      if (droppedImage.image_name === image?.image_name) {
-        return;
-      }
-      dispatch(imageSelected(droppedImage.image_name));
-    },
-    [dispatch, image?.image_name]
+  const droppableData = useMemo<TypesafeDroppableData | undefined>(
+    () => ({
+      id: 'current-image',
+      actionType: 'SET_CURRENT_IMAGE',
+    }),
+    []
   );
 
   return (
@@ -98,14 +102,15 @@ const CurrentImagePreview = () => {
         />
       ) : (
         <IAIDndImage
-          image={image}
-          onDrop={handleDrop}
-          fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
+          imageDTO={imageDTO}
+          droppableData={droppableData}
+          draggableData={draggableData}
           isUploadDisabled={true}
           fitContainer
+          dropLabel="Set as Current Image"
         />
       )}
-      {shouldShowImageDetails && image && (
+      {shouldShowImageDetails && imageDTO && (
         <Box
           sx={{
             position: 'absolute',
@@ -116,10 +121,10 @@ const CurrentImagePreview = () => {
             overflow: 'scroll',
           }}
         >
-          <ImageMetadataViewer image={image} />
+          <ImageMetadataViewer image={imageDTO} />
         </Box>
       )}
-      {!shouldShowImageDetails && image && (
+      {!shouldShowImageDetails && imageDTO && (
         <Box
           sx={{
             position: 'absolute',

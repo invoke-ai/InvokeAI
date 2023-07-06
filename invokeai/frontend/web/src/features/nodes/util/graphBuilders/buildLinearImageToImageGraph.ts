@@ -1,24 +1,30 @@
+import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
+import { NonNullableGraph } from 'features/nodes/types/types';
 import {
+  ImageCollectionInvocation,
   ImageResizeInvocation,
   ImageToLatentsInvocation,
+  IterateInvocation,
 } from 'services/api/types';
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { log } from 'app/logging/useLogger';
+import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
+import { modelIdToMainModelField } from '../modelIdToMainModelField';
+import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addVAEToGraph } from './addVAEToGraph';
 import {
+  IMAGE_COLLECTION,
+  IMAGE_COLLECTION_ITERATE,
+  IMAGE_TO_IMAGE_GRAPH,
+  IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
-  PIPELINE_MODEL_LOADER,
+  LATENTS_TO_LATENTS,
+  MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  IMAGE_TO_IMAGE_GRAPH,
-  IMAGE_TO_LATENTS,
-  LATENTS_TO_LATENTS,
   RESIZE,
 } from './constants';
-import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
-import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
@@ -42,6 +48,15 @@ export const buildLinearImageToImageGraph = (
     height,
   } = state.generation;
 
+  const {
+    isEnabled: isBatchEnabled,
+    imageNames: batchImageNames,
+    asInitialImage,
+  } = state.batch;
+
+  const shouldBatch =
+    isBatchEnabled && batchImageNames.length > 0 && asInitialImage;
+
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -51,12 +66,12 @@ export const buildLinearImageToImageGraph = (
    * the `fit` param. These are added to the graph at the end.
    */
 
-  if (!initialImage) {
+  if (!initialImage && !shouldBatch) {
     moduleLog.error('No initial image found in state');
     throw new Error('No initial image found in state');
   }
 
-  const model = modelIdToPipelineModelField(modelId);
+  const model = modelIdToMainModelField(modelId);
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
@@ -76,9 +91,9 @@ export const buildLinearImageToImageGraph = (
         type: 'noise',
         id: NOISE,
       },
-      [PIPELINE_MODEL_LOADER]: {
-        type: 'pipeline_model_loader',
-        id: PIPELINE_MODEL_LOADER,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         model,
       },
       [LATENTS_TO_IMAGE]: {
@@ -105,7 +120,7 @@ export const buildLinearImageToImageGraph = (
     edges: [
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -115,22 +130,12 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
           node_id: NEGATIVE_CONDITIONING,
           field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: PIPELINE_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'vae',
         },
       },
       {
@@ -163,19 +168,10 @@ export const buildLinearImageToImageGraph = (
           field: 'noise',
         },
       },
+
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'vae',
-        },
-      },
-      {
-        source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
@@ -274,6 +270,46 @@ export const buildLinearImageToImageGraph = (
       },
     });
   }
+
+  if (isBatchEnabled && asInitialImage && batchImageNames.length > 0) {
+    // we are going to connect an iterate up to the init image
+    delete (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image;
+
+    const imageCollection: ImageCollectionInvocation = {
+      id: IMAGE_COLLECTION,
+      type: 'image_collection',
+      images: batchImageNames.map((image_name) => ({ image_name })),
+    };
+
+    const imageCollectionIterate: IterateInvocation = {
+      id: IMAGE_COLLECTION_ITERATE,
+      type: 'iterate',
+    };
+
+    graph.nodes[IMAGE_COLLECTION] = imageCollection;
+    graph.nodes[IMAGE_COLLECTION_ITERATE] = imageCollectionIterate;
+
+    graph.edges.push({
+      source: { node_id: IMAGE_COLLECTION, field: 'collection' },
+      destination: {
+        node_id: IMAGE_COLLECTION_ITERATE,
+        field: 'collection',
+      },
+    });
+
+    graph.edges.push({
+      source: { node_id: IMAGE_COLLECTION_ITERATE, field: 'item' },
+      destination: {
+        node_id: IMAGE_TO_LATENTS,
+        field: 'image',
+      },
+    });
+  }
+
+  addLoRAsToGraph(graph, state, LATENTS_TO_LATENTS);
+
+  // Add VAE
+  addVAEToGraph(graph, state);
 
   // add dynamic prompts, mutating `graph`
   addDynamicPromptsToGraph(graph, state);

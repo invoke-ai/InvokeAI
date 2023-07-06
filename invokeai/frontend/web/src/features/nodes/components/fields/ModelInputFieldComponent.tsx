@@ -6,13 +6,13 @@ import {
   ModelInputFieldValue,
 } from 'features/nodes/types/types';
 
-import { memo, useCallback, useEffect, useMemo } from 'react';
-import { FieldComponentProps } from './types';
-import { forEach, isString } from 'lodash-es';
-import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
+import { forEach, isString } from 'lodash-es';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { FieldComponentProps } from './types';
 
 const ModelInputFieldComponent = (
   props: FieldComponentProps<ModelInputFieldValue, ModelInputFieldTemplate>
@@ -22,18 +22,16 @@ const ModelInputFieldComponent = (
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { data: pipelineModels } = useListModelsQuery({
-    model_type: 'main',
-  });
+  const { data: mainModels } = useGetMainModelsQuery();
 
   const data = useMemo(() => {
-    if (!pipelineModels) {
+    if (!mainModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(pipelineModels.entities, (model, id) => {
+    forEach(mainModels.entities, (model, id) => {
       if (!model) {
         return;
       }
@@ -46,11 +44,11 @@ const ModelInputFieldComponent = (
     });
 
     return data;
-  }, [pipelineModels]);
+  }, [mainModels]);
 
   const selectedModel = useMemo(
-    () => pipelineModels?.entities[field.value ?? pipelineModels.ids[0]],
-    [pipelineModels?.entities, pipelineModels?.ids, field.value]
+    () => mainModels?.entities[field.value ?? mainModels.ids[0]],
+    [mainModels?.entities, mainModels?.ids, field.value]
   );
 
   const handleValueChanged = useCallback(
@@ -71,18 +69,18 @@ const ModelInputFieldComponent = (
   );
 
   useEffect(() => {
-    if (field.value && pipelineModels?.ids.includes(field.value)) {
+    if (field.value && mainModels?.ids.includes(field.value)) {
       return;
     }
 
-    const firstModel = pipelineModels?.ids[0];
+    const firstModel = mainModels?.ids[0];
 
     if (!isString(firstModel)) {
       return;
     }
 
     handleValueChanged(firstModel);
-  }, [field.value, handleValueChanged, pipelineModels?.ids]);
+  }, [field.value, handleValueChanged, mainModels?.ids]);
 
   return (
     <IAIMantineSelect

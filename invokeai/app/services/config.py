@@ -228,10 +228,10 @@ class InvokeAISettings(BaseSettings):
         upcase_environ = dict()
         for key,value in os.environ.items():
             upcase_environ[key.upper()] = value
-        
+
         fields = cls.__fields__
         cls.argparse_groups = {}
-        
+
         for name, field in fields.items():
             if name not in cls._excluded():
                 current_default = field.default
@@ -348,7 +348,7 @@ setting environment variables INVOKEAI_<setting>.
      '''
     singleton_config: ClassVar[InvokeAIAppConfig] = None
     singleton_init: ClassVar[Dict] = None
-    
+
     #fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
     host                : str = Field(default="127.0.0.1", description="IP address to bind to", category='Web Server')
@@ -367,7 +367,8 @@ setting environment variables INVOKEAI_<setting>.
 
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
     free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
-    max_loaded_models   : int = Field(default=3, gt=0, description="Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
+    max_loaded_models   : int = Field(default=3, gt=0, description="(DEPRECATED: use max_cache_size) Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
+    max_cache_size      : float = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching", category='Memory/Performance')
     precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='float16',description='Floating point precision', category='Memory/Performance')
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
@@ -385,9 +386,9 @@ setting environment variables INVOKEAI_<setting>.
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
-    
+
     model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
-    
+
     log_handlers        : List[str] = Field(default=["console"], description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>"', category="Logging")
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
     log_format          : Literal[tuple(['plain','color','syslog','legacy'])] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
@@ -396,7 +397,7 @@ setting environment variables INVOKEAI_<setting>.
 
     def parse_args(self, argv: List[str]=None, conf: DictConfig = None, clobber=False):
         '''
-        Update settings with contents of init file, environment, and 
+        Update settings with contents of init file, environment, and
         command-line settings.
         :param conf: alternate Omegaconf dictionary object
         :param argv: aternate sys.argv list
@@ -411,7 +412,7 @@ setting environment variables INVOKEAI_<setting>.
             except:
                 pass
         InvokeAISettings.initconf = conf
-        
+
         # parse args again in order to pick up settings in configuration file
         super().parse_args(argv)
 
@@ -431,7 +432,7 @@ setting environment variables INVOKEAI_<setting>.
             cls.singleton_config = cls(**kwargs)
             cls.singleton_init = kwargs
         return cls.singleton_config
-        
+
     @property
     def root_path(self)->Path:
         '''

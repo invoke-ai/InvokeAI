@@ -1,20 +1,15 @@
-import { Flex, useDisclosure } from '@chakra-ui/react';
-import { useTranslation } from 'react-i18next';
+import { Flex } from '@chakra-ui/react';
 import IAICollapse from 'common/components/IAICollapse';
 import { memo } from 'react';
-import ParamBoundingBoxWidth from './ParamBoundingBoxWidth';
+import { useTranslation } from 'react-i18next';
 import ParamBoundingBoxHeight from './ParamBoundingBoxHeight';
+import ParamBoundingBoxWidth from './ParamBoundingBoxWidth';
 
 const ParamBoundingBoxCollapse = () => {
   const { t } = useTranslation();
-  const { isOpen, onToggle } = useDisclosure();
 
   return (
-    <IAICollapse
-      label={t('parameters.boundingBoxHeader')}
-      isOpen={isOpen}
-      onToggle={onToggle}
-    >
+    <IAICollapse label={t('parameters.boundingBoxHeader')}>
       <Flex sx={{ gap: 2, flexDirection: 'column' }}>
         <ParamBoundingBoxWidth />
         <ParamBoundingBoxHeight />

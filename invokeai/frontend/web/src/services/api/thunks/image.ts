@@ -1,6 +1,6 @@
 import queryString from 'query-string';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { selectImagesAll } from 'features/gallery/store/imagesSlice';
+import { selectImagesAll } from 'features/gallery/store/gallerySlice';
 import { size } from 'lodash-es';
 import { paths } from 'services/api/schema';
 import { $client } from 'services/api/client';
@@ -112,6 +112,10 @@ type UploadedToastAction = {
   type: 'TOAST_UPLOADED';
 };
 
+type AddToBatchAction = {
+  type: 'ADD_TO_BATCH';
+};
+
 export type PostUploadAction =
   | ControlNetAction
   | InitialImageAction
@@ -119,12 +123,12 @@ export type PostUploadAction =
   | CanvasInitialImageAction
   | CanvasMergedAction
   | CanvasSavedToGalleryAction
-  | UploadedToastAction;
+  | UploadedToastAction
+  | AddToBatchAction;
 
 type UploadImageArg =
   paths['/api/v1/images/']['post']['parameters']['query'] & {
     file: File;
-    // file: paths['/api/v1/images/']['post']['requestBody']['content']['multipart/form-data']['file'];
     postUploadAction?: PostUploadAction;
   };
 
@@ -284,8 +288,7 @@ export const receivedPageOfImages = createAppAsyncThunk<
   const { get } = $client.get();
 
   const state = getState();
-  const { categories } = state.images;
-  const { selectedBoardId } = state.boards;
+  const { categories, selectedBoardId } = state.gallery;
 
   const images = selectImagesAll(state).filter((i) => {
     const isInCategory = categories.includes(i.image_category);

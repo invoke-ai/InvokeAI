@@ -81,6 +81,13 @@ export type paths = {
      */
     post: operations["update_model"];
   };
+  "/api/v1/models/import": {
+    /**
+     * Import Model 
+     * @description Add a model using its local path, repo_id, or remote URL
+     */
+    post: operations["import_model"];
+  };
   "/api/v1/models/{model_name}": {
     /**
      * Delete Model 
@@ -226,6 +233,23 @@ export type components = {
        * @default 0
        */
       b?: number;
+    };
+    /** AddModelResult */
+    AddModelResult: {
+      /**
+       * Name 
+       * @description The name of the model after import
+       */
+      name: string;
+      /** @description The type of model */
+      model_type: components["schemas"]["ModelType"];
+      /** @description The base model */
+      base_model: components["schemas"]["BaseModelType"];
+      /**
+       * Config 
+       * @description The configuration of the model
+       */
+      config: components["schemas"]["ModelConfigBase"];
     };
     /**
      * BaseModelType 
@@ -650,7 +674,7 @@ export type components = {
       end_step_percent: number;
       /**
        * Control Mode 
-       * @description The contorl mode to use 
+       * @description The control mode to use 
        * @default balanced 
        * @enum {string}
        */
@@ -1030,7 +1054,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes?: {
-        [key: string]: (components["schemas"]["LoadImageInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["PipelineModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ParamIntInvocation"] | components["schemas"]["ParamFloatInvocation"] | components["schemas"]["TextToLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["UpscaleInvocation"] | components["schemas"]["RestoreFaceInvocation"] | components["schemas"]["InpaintInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LatentsToLatentsInvocation"]) | undefined;
+        [key: string]: (components["schemas"]["LoadImageInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ParamIntInvocation"] | components["schemas"]["ParamFloatInvocation"] | components["schemas"]["TextToLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["UpscaleInvocation"] | components["schemas"]["RestoreFaceInvocation"] | components["schemas"]["InpaintInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["LatentsToLatentsInvocation"]) | undefined;
       };
       /**
        * Edges 
@@ -1073,7 +1097,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: (components["schemas"]["ImageOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["PromptOutput"] | components["schemas"]["PromptCollectionOutput"] | components["schemas"]["CompelOutput"] | components["schemas"]["IntOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["IntCollectionOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["CollectInvocationOutput"]) | undefined;
+        [key: string]: (components["schemas"]["ImageOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["VaeLoaderOutput"] | components["schemas"]["PromptOutput"] | components["schemas"]["PromptCollectionOutput"] | components["schemas"]["CompelOutput"] | components["schemas"]["IntOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["IntCollectionOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["CollectInvocationOutput"]) | undefined;
       };
       /**
        * Errors 
@@ -1275,6 +1299,53 @@ export type components = {
        * @enum {string}
        */
       channel?: "A" | "R" | "G" | "B";
+    };
+    /**
+     * ImageCollectionInvocation 
+     * @description Load a collection of images and provide it as output.
+     */
+    ImageCollectionInvocation: {
+      /**
+       * Id 
+       * @description The id of this node. Must be unique among all nodes.
+       */
+      id: string;
+      /**
+       * Is Intermediate 
+       * @description Whether or not this node is an intermediate node. 
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Type 
+       * @default image_collection 
+       * @enum {string}
+       */
+      type?: "image_collection";
+      /**
+       * Images 
+       * @description The image collection to load 
+       * @default []
+       */
+      images?: (components["schemas"]["ImageField"])[];
+    };
+    /**
+     * ImageCollectionOutput 
+     * @description A collection of images
+     */
+    ImageCollectionOutput: {
+      /**
+       * Type 
+       * @default image_collection 
+       * @enum {string}
+       */
+      type: "image_collection";
+      /**
+       * Collection 
+       * @description The output images 
+       * @default []
+       */
+      collection: (components["schemas"]["ImageField"])[];
     };
     /**
      * ImageConvertInvocation 
@@ -1928,6 +1999,24 @@ export type components = {
        */
       thumbnail_url: string;
     };
+    /** ImportModelResponse */
+    ImportModelResponse: {
+      /**
+       * Name 
+       * @description The name of the imported model
+       */
+      name: string;
+      /**
+       * Info 
+       * @description The model info
+       */
+      info: components["schemas"]["AddModelResult"];
+      /**
+       * Status 
+       * @description The status of the API response
+       */
+      status: string;
+    };
     /**
      * InfillColorInvocation 
      * @description Infills transparent areas of an image with a solid color
@@ -2441,6 +2530,64 @@ export type components = {
       strength?: number;
     };
     /**
+     * LeresImageProcessorInvocation 
+     * @description Applies leres processing to image
+     */
+    LeresImageProcessorInvocation: {
+      /**
+       * Id 
+       * @description The id of this node. Must be unique among all nodes.
+       */
+      id: string;
+      /**
+       * Is Intermediate 
+       * @description Whether or not this node is an intermediate node. 
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Type 
+       * @default leres_image_processor 
+       * @enum {string}
+       */
+      type?: "leres_image_processor";
+      /**
+       * Image 
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
+      /**
+       * Thr A 
+       * @description Leres parameter `thr_a` 
+       * @default 0
+       */
+      thr_a?: number;
+      /**
+       * Thr B 
+       * @description Leres parameter `thr_b` 
+       * @default 0
+       */
+      thr_b?: number;
+      /**
+       * Boost 
+       * @description Whether to use boost mode 
+       * @default false
+       */
+      boost?: boolean;
+      /**
+       * Detect Resolution 
+       * @description The pixel resolution for detection 
+       * @default 512
+       */
+      detect_resolution?: number;
+      /**
+       * Image Resolution 
+       * @description The pixel resolution for the output image 
+       * @default 512
+       */
+      image_resolution?: number;
+    };
+    /**
      * LineartAnimeImageProcessorInvocation 
      * @description Applies line art anime processing to image
      */
@@ -2544,6 +2691,19 @@ export type components = {
       error?: components["schemas"]["ModelError"];
     };
     /**
+     * LoRAModelField 
+     * @description LoRA model field
+     */
+    LoRAModelField: {
+      /**
+       * Model Name 
+       * @description Name of the LoRA model
+       */
+      model_name: string;
+      /** @description Base model */
+      base_model: components["schemas"]["BaseModelType"];
+    };
+    /**
      * LoRAModelFormat 
      * @description An enumeration. 
      * @enum {string}
@@ -2619,10 +2779,10 @@ export type components = {
        */
       type?: "lora_loader";
       /**
-       * Lora Name 
+       * Lora 
        * @description Lora model name
        */
-      lora_name: string;
+      lora?: components["schemas"]["LoRAModelField"];
       /**
        * Weight 
        * @description With what weight to apply lora 
@@ -2661,6 +2821,47 @@ export type components = {
        * @description Tokenizer and text_encoder submodels
        */
       clip?: components["schemas"]["ClipField"];
+    };
+    /**
+     * MainModelField 
+     * @description Main model field
+     */
+    MainModelField: {
+      /**
+       * Model Name 
+       * @description Name of the model
+       */
+      model_name: string;
+      /** @description Base model */
+      base_model: components["schemas"]["BaseModelType"];
+    };
+    /**
+     * MainModelLoaderInvocation 
+     * @description Loads a main model, outputting its submodels.
+     */
+    MainModelLoaderInvocation: {
+      /**
+       * Id 
+       * @description The id of this node. Must be unique among all nodes.
+       */
+      id: string;
+      /**
+       * Is Intermediate 
+       * @description Whether or not this node is an intermediate node. 
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Type 
+       * @default main_model_loader 
+       * @enum {string}
+       */
+      type?: "main_model_loader";
+      /**
+       * Model 
+       * @description The model to load
+       */
+      model: components["schemas"]["MainModelField"];
     };
     /**
      * MaskFromAlphaInvocation 
@@ -2855,6 +3056,16 @@ export type components = {
        */
       thr_d?: number;
     };
+    /** ModelConfigBase */
+    ModelConfigBase: {
+      /** Path */
+      path: string;
+      /** Description */
+      description?: string;
+      /** Model Format */
+      model_format?: string;
+      error?: components["schemas"]["ModelError"];
+    };
     /**
      * ModelError 
      * @description An enumeration. 
@@ -2907,7 +3118,7 @@ export type components = {
      * @description An enumeration. 
      * @enum {string}
      */
-    ModelType: "pipeline" | "vae" | "lora" | "controlnet" | "embedding";
+    ModelType: "main" | "vae" | "lora" | "controlnet" | "embedding";
     /**
      * ModelVariantType 
      * @description An enumeration. 
@@ -2917,7 +3128,7 @@ export type components = {
     /** ModelsList */
     ModelsList: {
       /** Models */
-      models: (components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"])[];
+      models: (components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"])[];
     };
     /**
      * MultiplyInvocation 
@@ -2993,12 +3204,6 @@ export type components = {
        * @default 512
        */
       height?: number;
-      /**
-       * Perlin 
-       * @description The amount of perlin noise to add to the noise 
-       * @default 0
-       */
-      perlin?: number;
       /**
        * Use Cpu 
        * @description Use CPU for noise generation (for reproducible results across platforms) 
@@ -3311,47 +3516,6 @@ export type components = {
        * @default false
        */
       scribble?: boolean;
-    };
-    /**
-     * PipelineModelField 
-     * @description Pipeline model field
-     */
-    PipelineModelField: {
-      /**
-       * Model Name 
-       * @description Name of the model
-       */
-      model_name: string;
-      /** @description Base model */
-      base_model: components["schemas"]["BaseModelType"];
-    };
-    /**
-     * PipelineModelLoaderInvocation 
-     * @description Loads a pipeline model, outputting its submodels.
-     */
-    PipelineModelLoaderInvocation: {
-      /**
-       * Id 
-       * @description The id of this node. Must be unique among all nodes.
-       */
-      id: string;
-      /**
-       * Is Intermediate 
-       * @description Whether or not this node is an intermediate node. 
-       * @default false
-       */
-      is_intermediate?: boolean;
-      /**
-       * Type 
-       * @default pipeline_model_loader 
-       * @enum {string}
-       */
-      type?: "pipeline_model_loader";
-      /**
-       * Model 
-       * @description The model to load
-       */
-      model: components["schemas"]["PipelineModelField"];
     };
     /**
      * PromptCollectionOutput 
@@ -3697,11 +3861,33 @@ export type components = {
       antialias?: boolean;
     };
     /**
-     * SchedulerPredictionType 
-     * @description An enumeration. 
-     * @enum {string}
+     * SegmentAnythingProcessorInvocation 
+     * @description Applies segment anything processing to image
      */
-    SchedulerPredictionType: "epsilon" | "v_prediction" | "sample";
+    SegmentAnythingProcessorInvocation: {
+      /**
+       * Id 
+       * @description The id of this node. Must be unique among all nodes.
+       */
+      id: string;
+      /**
+       * Is Intermediate 
+       * @description Whether or not this node is an intermediate node. 
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Type 
+       * @default segment_anything_processor 
+       * @enum {string}
+       */
+      type?: "segment_anything_processor";
+      /**
+       * Image 
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
+    };
     /**
      * ShowImageInvocation 
      * @description Displays a provided image, and passes it forward in the pipeline.
@@ -3739,7 +3925,7 @@ export type components = {
        * Type 
        * @enum {string}
        */
-      type: "pipeline";
+      type: "main";
       /** Path */
       path: string;
       /** Description */
@@ -3753,7 +3939,7 @@ export type components = {
       /** Vae */
       vae?: string;
       /** Config */
-      config?: string;
+      config: string;
       variant: components["schemas"]["ModelVariantType"];
     };
     /** StableDiffusion1ModelDiffusersConfig */
@@ -3765,7 +3951,7 @@ export type components = {
        * Type 
        * @enum {string}
        */
-      type: "pipeline";
+      type: "main";
       /** Path */
       path: string;
       /** Description */
@@ -3789,7 +3975,7 @@ export type components = {
        * Type 
        * @enum {string}
        */
-      type: "pipeline";
+      type: "main";
       /** Path */
       path: string;
       /** Description */
@@ -3803,11 +3989,8 @@ export type components = {
       /** Vae */
       vae?: string;
       /** Config */
-      config?: string;
+      config: string;
       variant: components["schemas"]["ModelVariantType"];
-      prediction_type: components["schemas"]["SchedulerPredictionType"];
-      /** Upcast Attention */
-      upcast_attention: boolean;
     };
     /** StableDiffusion2ModelDiffusersConfig */
     StableDiffusion2ModelDiffusersConfig: {
@@ -3818,7 +4001,7 @@ export type components = {
        * Type 
        * @enum {string}
        */
-      type: "pipeline";
+      type: "main";
       /** Path */
       path: string;
       /** Description */
@@ -3832,9 +4015,6 @@ export type components = {
       /** Vae */
       vae?: string;
       variant: components["schemas"]["ModelVariantType"];
-      prediction_type: components["schemas"]["SchedulerPredictionType"];
-      /** Upcast Attention */
-      upcast_attention: boolean;
     };
     /**
      * StepParamEasingInvocation 
@@ -4044,6 +4224,40 @@ export type components = {
       model_format: null;
       error?: components["schemas"]["ModelError"];
     };
+    /**
+     * TileResamplerProcessorInvocation 
+     * @description Base class for invocations that preprocess images for ControlNet
+     */
+    TileResamplerProcessorInvocation: {
+      /**
+       * Id 
+       * @description The id of this node. Must be unique among all nodes.
+       */
+      id: string;
+      /**
+       * Is Intermediate 
+       * @description Whether or not this node is an intermediate node. 
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Type 
+       * @default tile_image_processor 
+       * @enum {string}
+       */
+      type?: "tile_image_processor";
+      /**
+       * Image 
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
+      /**
+       * Down Sampling Rate 
+       * @description Down sampling rate 
+       * @default 1
+       */
+      down_sampling_rate?: number;
+    };
     /** UNetField */
     UNetField: {
       /**
@@ -4103,6 +4317,19 @@ export type components = {
        */
       level?: 2 | 4;
     };
+    /**
+     * VAEModelField 
+     * @description Vae model field
+     */
+    VAEModelField: {
+      /**
+       * Model Name 
+       * @description Name of the model
+       */
+      model_name: string;
+      /** @description Base model */
+      base_model: components["schemas"]["BaseModelType"];
+    };
     /** VaeField */
     VaeField: {
       /**
@@ -4110,6 +4337,51 @@ export type components = {
        * @description Info to load vae submodel
        */
       vae: components["schemas"]["ModelInfo"];
+    };
+    /**
+     * VaeLoaderInvocation 
+     * @description Loads a VAE model, outputting a VaeLoaderOutput
+     */
+    VaeLoaderInvocation: {
+      /**
+       * Id 
+       * @description The id of this node. Must be unique among all nodes.
+       */
+      id: string;
+      /**
+       * Is Intermediate 
+       * @description Whether or not this node is an intermediate node. 
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Type 
+       * @default vae_loader 
+       * @enum {string}
+       */
+      type?: "vae_loader";
+      /**
+       * Vae Model 
+       * @description The VAE to load
+       */
+      vae_model: components["schemas"]["VAEModelField"];
+    };
+    /**
+     * VaeLoaderOutput 
+     * @description Model loader output
+     */
+    VaeLoaderOutput: {
+      /**
+       * Type 
+       * @default vae_loader_output 
+       * @enum {string}
+       */
+      type?: "vae_loader_output";
+      /**
+       * Vae 
+       * @description Vae model
+       */
+      vae?: components["schemas"]["VaeField"];
     };
     /** VaeModelConfig */
     VaeModelConfig: {
@@ -4190,17 +4462,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -4311,7 +4583,7 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["LoadImageInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["PipelineModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ParamIntInvocation"] | components["schemas"]["ParamFloatInvocation"] | components["schemas"]["TextToLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["UpscaleInvocation"] | components["schemas"]["RestoreFaceInvocation"] | components["schemas"]["InpaintInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LatentsToLatentsInvocation"];
+        "application/json": components["schemas"]["LoadImageInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ParamIntInvocation"] | components["schemas"]["ParamFloatInvocation"] | components["schemas"]["TextToLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["UpscaleInvocation"] | components["schemas"]["RestoreFaceInvocation"] | components["schemas"]["InpaintInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["LatentsToLatentsInvocation"];
       };
     };
     responses: {
@@ -4348,7 +4620,7 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["LoadImageInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["PipelineModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ParamIntInvocation"] | components["schemas"]["ParamFloatInvocation"] | components["schemas"]["TextToLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["UpscaleInvocation"] | components["schemas"]["RestoreFaceInvocation"] | components["schemas"]["InpaintInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LatentsToLatentsInvocation"];
+        "application/json": components["schemas"]["LoadImageInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ParamIntInvocation"] | components["schemas"]["ParamFloatInvocation"] | components["schemas"]["TextToLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["UpscaleInvocation"] | components["schemas"]["RestoreFaceInvocation"] | components["schemas"]["InpaintInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["LatentsToLatentsInvocation"];
       };
     };
     responses: {
@@ -4584,6 +4856,36 @@ export type operations = {
           "application/json": unknown;
         };
       };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Import Model 
+   * @description Add a model using its local path, repo_id, or remote URL
+   */
+  import_model: {
+    parameters: {
+      query: {
+        /** @description A model path, repo_id or URL to import */
+        name: string;
+        /** @description Prediction type for SDv2 checkpoint files */
+        prediction_type?: "v_prediction" | "epsilon" | "sample";
+      };
+    };
+    responses: {
+      /** @description The model imported successfully */
+      201: {
+        content: {
+          "application/json": components["schemas"]["ImportModelResponse"];
+        };
+      };
+      /** @description The model could not be found */
+      404: never;
       /** @description Validation Error */
       422: {
         content: {
@@ -4947,6 +5249,10 @@ export type operations = {
    */
   delete_board: {
     parameters: {
+      query?: {
+        /** @description Permanently delete all images on the board */
+        include_images?: boolean;
+      };
       path: {
         /** @description The id of board to delete */
         board_id: string;

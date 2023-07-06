@@ -8,7 +8,7 @@ The cache returns context manager generators designed to load the
 model into the GPU within the context, and unload outside the
 context. Use like this:
 
-   cache = ModelCache(max_models_cached=6)
+   cache = ModelCache(max_cache_size=7.5)
    with cache.get_model('runwayml/stable-diffusion-1-5') as SD1,
           cache.get_model('stabilityai/stable-diffusion-2') as SD2:
        do_something_in_GPU(SD1,SD2)
@@ -91,7 +91,7 @@ class ModelCache(object):
         logger: types.ModuleType = logger
     ):
         '''
-        :param max_models: Maximum number of models to cache in CPU RAM [4]
+        :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
         :param execution_device: Torch device to load active model into [torch.device('cuda')]
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
         :param precision: Precision for loaded models [torch.float16]
@@ -100,8 +100,6 @@ class ModelCache(object):
         :param sha_chunksize: Chunksize to use when calculating sha256 model hash
         '''
         #max_cache_size = 9999
-        execution_device = torch.device('cuda')
-
         self.model_infos: Dict[str, ModelBase] = dict()
         self.lazy_offloading = lazy_offloading
         #self.sequential_offload: bool=sequential_offload
@@ -128,16 +126,6 @@ class ModelCache(object):
             key += f":{submodel_type}"
         return key
 
-    #def get_model(
-    #    self,
-    #    repo_id_or_path: Union[str, Path],
-    #    model_type: ModelType = ModelType.Diffusers,
-    #    subfolder: Path = None,
-    #    submodel: ModelType = None,
-    #    revision: str = None,
-    #    attach_model_part: Tuple[ModelType, str] = (None, None),
-    #    gpu_load: bool = True,
-    #) -> ModelLocker:  # ?? what does it return
     def _get_model_info(
         self,
         model_path: str,
