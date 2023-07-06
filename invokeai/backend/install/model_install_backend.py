@@ -196,8 +196,11 @@ class ModelInstall(object):
             models_installed.update({str(path):self._install_path(path)})
 
         # folders style or similar
-        elif path.is_dir() and any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin'}]):
-            models_installed.update({str(path): self._install_path(path)})
+        elif path.is_dir() and any([(path/x).exists() for x in \
+                                   {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}
+                                   ]
+                                  ):
+                models_installed.update(self._install_path(path))
 
         # recursive scan
         elif path.is_dir():

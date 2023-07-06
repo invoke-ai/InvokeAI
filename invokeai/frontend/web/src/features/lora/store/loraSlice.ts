@@ -8,7 +8,7 @@ export type Lora = {
 };
 
 export const defaultLoRAConfig: Omit<Lora, 'id' | 'name'> = {
-  weight: 1,
+  weight: 0.75,
 };
 
 export type LoraState = {
@@ -38,9 +38,14 @@ export const loraSlice = createSlice({
       const { id, weight } = action.payload;
       state.loras[id].weight = weight;
     },
+    loraWeightReset: (state, action: PayloadAction<string>) => {
+      const id = action.payload;
+      state.loras[id].weight = defaultLoRAConfig.weight;
+    },
   },
 });
 
-export const { loraAdded, loraRemoved, loraWeightChanged } = loraSlice.actions;
+export const { loraAdded, loraRemoved, loraWeightChanged, loraWeightReset } =
+  loraSlice.actions;
 
 export default loraSlice.reducer;

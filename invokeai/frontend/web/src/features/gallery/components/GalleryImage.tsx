@@ -23,6 +23,7 @@ export const makeSelector = (image_name: string) =>
     ({ gallery }) => {
       const isSelected = gallery.selection.includes(image_name);
       const selectionCount = gallery.selection.length;
+
       return {
         isSelected,
         selectionCount,
@@ -117,7 +118,7 @@ const GalleryImage = (props: HoverableImageProps) => {
               resetIcon={<FaTrash />}
               resetTooltip="Delete image"
               imageSx={{ w: 'full', h: 'full' }}
-              withResetIcon
+              // withResetIcon // removed bc it's too easy to accidentally delete images
               isDropDisabled={true}
               isUploadDisabled={true}
             />
