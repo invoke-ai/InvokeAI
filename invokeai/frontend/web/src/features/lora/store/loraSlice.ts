@@ -31,6 +31,9 @@ export const loraSlice = createSlice({
       const id = action.payload;
       delete state.loras[id];
     },
+    lorasCleared: (state, action: PayloadAction<>) => {
+      state.loras = {};
+    },
     loraWeightChanged: (
       state,
       action: PayloadAction<{ id: string; weight: number }>
@@ -45,7 +48,12 @@ export const loraSlice = createSlice({
   },
 });
 
-export const { loraAdded, loraRemoved, loraWeightChanged, loraWeightReset } =
-  loraSlice.actions;
+export const {
+  loraAdded,
+  loraRemoved,
+  loraWeightChanged,
+  loraWeightReset,
+  lorasCleared,
+} = loraSlice.actions;
 
 export default loraSlice.reducer;

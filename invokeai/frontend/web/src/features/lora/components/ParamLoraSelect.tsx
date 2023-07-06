@@ -48,7 +48,7 @@ const ParamLoraSelect = () => {
       data.push({
         value: id,
         label: lora.name,
-        description: 'This is a lora',
+        description: lora.description,
         ...(currentMainModel?.base_model !== lora.base_model
           ? { disabled: true, tooltip: 'Incompatible base model' }
           : {}),
