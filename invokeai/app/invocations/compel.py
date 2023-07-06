@@ -44,7 +44,6 @@ class CompelInvocation(BaseInvocation):
 
     prompt: str = Field(default="", description="Prompt")
     clip: ClipField = Field(None, description="Clip to use")
-    clip_skip: int = Field(0, description="Layers to skip in text_encoder")
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -96,7 +95,7 @@ class CompelInvocation(BaseInvocation):
 
         with ModelPatcher.apply_lora_text_encoder(text_encoder_info.context.model, _lora_loader()),\
                 ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (tokenizer, ti_manager),\
-                ModelPatcher.apply_clip_skip(text_encoder_info.context.model, self.clip_skip),\
+                ModelPatcher.apply_clip_skip(text_encoder_info.context.model, self.clip.skipped_layers),\
                 text_encoder_info as text_encoder:
 
             compel = Compel(
@@ -134,6 +133,24 @@ class CompelInvocation(BaseInvocation):
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
             ),
+        )
+
+class ClipSkipInvocationOutput(BaseInvocationOutput):
+    """Clip skip node output"""
+    type: Literal["clip_skip_output"] = "clip_skip_output"
+    clip: ClipField = Field(None, description="Clip with skipped layers")
+
+class ClipSkipInvocation(BaseInvocation):
+    """Skip layers in clip text_encoder model."""
+    type: Literal["clip_skip"] = "clip_skip"
+
+    clip: ClipField = Field(None, description="Clip to use")
+    skipped_layers: int = Field(0, description="Number of layers to skip in text_encoder")
+
+    def invoke(self, context: InvocationContext) -> ClipSkipInvocationOutput:
+        self.clip.skipped_layers += self.skipped_layers
+        return ClipSkipInvocationOutput(
+            clip=self.clip,
         )
 
 
