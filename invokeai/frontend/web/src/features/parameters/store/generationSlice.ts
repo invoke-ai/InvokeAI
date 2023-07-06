@@ -223,6 +223,9 @@ export const generationSlice = createSlice({
 
       state.model = { id: action.payload, base_model, name, type };
     },
+    modelChanged: (state, action: PayloadAction<ModelParam>) => {
+      state.model = action.payload;
+    },
     vaeSelected: (state, action: PayloadAction<string>) => {
       state.vae = action.payload;
     },
@@ -282,7 +285,7 @@ export const {
   setHorizontalSymmetrySteps,
   setVerticalSymmetrySteps,
   initialImageChanged,
-  modelSelected,
+  modelChanged,
   vaeSelected,
   setShouldUseNoiseSettings,
   setSeamlessXAxis,

@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { modelSelected } from 'features/parameters/store/generationSlice';
 
 import { SelectItem } from '@mantine/core';
 import { RootState } from 'app/store/store';
 import { forEach, isString } from 'lodash-es';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { modelSelected } from '../../parameters/store/actions';
 
 export const MODEL_TYPE_MAP = {
   'sd-1': 'Stable Diffusion 1.x',
