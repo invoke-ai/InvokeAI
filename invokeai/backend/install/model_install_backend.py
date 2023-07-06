@@ -197,10 +197,10 @@ class ModelInstall(object):
 
         # folders style or similar
         elif path.is_dir() and any([(path/x).exists() for x in \
-                                   {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}
-                                   ]
-                                  ):
-                models_installed.update(self._install_path(path))
+                                    {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}
+                                    ]
+                                   ):
+            models_installed.update(self._install_path(path))
 
         # recursive scan
         elif path.is_dir():
@@ -223,7 +223,6 @@ class ModelInstall(object):
     # install a model from a local path. The optional info parameter is there to prevent
     # the model from being probed twice in the event that it has already been probed.
     def _install_path(self, path: Path, info: ModelProbeInfo=None)->AddModelResult:
-        model_result = None
         info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
         if not info:
             logger.warning(f'Unable to parse format of {path}')

@@ -4,15 +4,12 @@ import copy
 from contextlib import contextmanager
 from typing import Optional, Dict, Tuple, Any, Union, List
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union, List
 
 import torch
 from compel.embeddings_provider import BaseTextualInversionManager
 from diffusers.models import UNet2DConditionModel
 from safetensors.torch import load_file
-from diffusers.models import UNet2DConditionModel
 from transformers import CLIPTextModel, CLIPTokenizer
-from torch.utils.hooks import RemovableHandle
 
 class LoRALayerBase:
     #rank: Optional[int]
