@@ -1,28 +1,28 @@
-from typing import Literal, Optional, Union
-from pydantic import BaseModel, Field
-from contextlib import ExitStack
 import re
+from contextlib import ExitStack
+from typing import List, Literal, Optional, Union
+
 import torch
+from compel import Compel
+from compel.prompt_parser import (Blend, Conjunction,
+                                  CrossAttentionControlSubstitute,
+                                  FlattenedPrompt, Fragment)
+from pydantic import BaseModel, Field
 
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
-from .model import ClipField
-
-from ...backend.util.devices import torch_dtype
-from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
+from ...backend.model_management.models import ModelNotFoundException
 from ...backend.model_management import BaseModelType, ModelType, SubModelType
 from ...backend.model_management.lora import ModelPatcher
-
-from compel import Compel
-from compel.prompt_parser import (
-    Blend,
-    CrossAttentionControlSubstitute,
-    FlattenedPrompt,
-    Fragment, Conjunction,
-)
+from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
+from ...backend.util.devices import torch_dtype
+from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
+                             InvocationConfig, InvocationContext)
+from .model import ClipField
 
 
 class ConditioningField(BaseModel):
-    conditioning_name: Optional[str] = Field(default=None, description="The name of conditioning data")
+    conditioning_name: Optional[str] = Field(
+        default=None, description="The name of conditioning data")
+
     class Config:
         schema_extra = {"required": ["conditioning_name"]}
 
@@ -52,84 +52,92 @@ class CompelInvocation(BaseInvocation):
                 "title": "Prompt (Compel)",
                 "tags": ["prompt", "compel"],
                 "type_hints": {
-                  "model": "model"
+                    "model": "model"
                 }
             },
         }
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CompelOutput:
-
         tokenizer_info = context.services.model_manager.get_model(
             **self.clip.tokenizer.dict(),
         )
         text_encoder_info = context.services.model_manager.get_model(
             **self.clip.text_encoder.dict(),
         )
-        with tokenizer_info as orig_tokenizer,\
-             text_encoder_info as text_encoder:
 
-            loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
+        def _lora_loader():
+            for lora in self.clip.loras:
+                lora_info = context.services.model_manager.get_model(
+                    **lora.dict(exclude={"weight"}))
+                yield (lora_info.context.model, lora.weight)
+                del lora_info
+            return
 
-            ti_list = []
-            for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
-                name = trigger[1:-1]
-                try:
-                    ti_list.append(
-                        context.services.model_manager.get_model(
-                            model_name=name,
-                            base_model=self.clip.text_encoder.base_model,
-                            model_type=ModelType.TextualInversion,
-                        ).context.model
-                    )
-                except Exception:
-                    #print(e)
-                    #import traceback
-                    #print(traceback.format_exc())
-                    print(f"Warn: trigger: \"{trigger}\" not found")
+        #loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
-            with ModelPatcher.apply_lora_text_encoder(text_encoder, loras),\
-                 ModelPatcher.apply_ti(orig_tokenizer, text_encoder, ti_list) as (tokenizer, ti_manager):
-
-                compel = Compel(
-                    tokenizer=tokenizer,
-                    text_encoder=text_encoder,
-                    textual_inversion_manager=ti_manager,
-                    dtype_for_device_getter=torch_dtype,
-                    truncate_long_prompts=True, # TODO:
+        ti_list = []
+        for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
+            name = trigger[1:-1]
+            try:
+                ti_list.append(
+                    context.services.model_manager.get_model(
+                        model_name=name,
+                        base_model=self.clip.text_encoder.base_model,
+                        model_type=ModelType.TextualInversion,
+                    ).context.model
                 )
-                
-                conjunction = Compel.parse_prompt_string(self.prompt)
-                prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
+            except ModelNotFoundException:
+                # print(e)
+                #import traceback
+                #print(traceback.format_exc())
+                print(f"Warn: trigger: \"{trigger}\" not found")
 
-                if context.services.configuration.log_tokenization:
-                    log_tokenization_for_prompt_object(prompt, tokenizer)
+        with ModelPatcher.apply_lora_text_encoder(text_encoder_info.context.model, _lora_loader()),\
+                ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (tokenizer, ti_manager),\
+                text_encoder_info as text_encoder:
 
-                c, options = compel.build_conditioning_tensor_for_prompt_object(prompt)
-                
-                # TODO: long prompt support
-                #if not self.truncate_long_prompts:
-                #    [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
-                ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
-                    tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
-                    cross_attention_control_args=options.get("cross_attention_control", None),
-                )
-                
-            conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
-
-            # TODO: hacky but works ;D maybe rename latents somehow?
-            context.services.latents.save(conditioning_name, (c, ec))
-
-            return CompelOutput(
-                conditioning=ConditioningField(
-                    conditioning_name=conditioning_name,
-                ),
+            compel = Compel(
+                tokenizer=tokenizer,
+                text_encoder=text_encoder,
+                textual_inversion_manager=ti_manager,
+                dtype_for_device_getter=torch_dtype,
+                truncate_long_prompts=True,  # TODO:
             )
+
+            conjunction = Compel.parse_prompt_string(self.prompt)
+            prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
+
+            if context.services.configuration.log_tokenization:
+                log_tokenization_for_prompt_object(prompt, tokenizer)
+
+            c, options = compel.build_conditioning_tensor_for_prompt_object(
+                prompt)
+
+            # TODO: long prompt support
+            # if not self.truncate_long_prompts:
+            #    [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
+            ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
+                tokens_count_including_eos_bos=get_max_token_count(
+                    tokenizer, conjunction),
+                cross_attention_control_args=options.get(
+                    "cross_attention_control", None),)
+
+        conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
+
+        # TODO: hacky but works ;D maybe rename latents somehow?
+        context.services.latents.save(conditioning_name, (c, ec))
+
+        return CompelOutput(
+            conditioning=ConditioningField(
+                conditioning_name=conditioning_name,
+            ),
+        )
 
 
 def get_max_token_count(
-    tokenizer, prompt: Union[FlattenedPrompt, Blend, Conjunction], truncate_if_too_long=False
-) -> int:
+        tokenizer, prompt: Union[FlattenedPrompt, Blend, Conjunction],
+        truncate_if_too_long=False) -> int:
     if type(prompt) is Blend:
         blend: Blend = prompt
         return max(
@@ -148,13 +156,13 @@ def get_max_token_count(
         )
     else:
         return len(
-            get_tokens_for_prompt_object(tokenizer, prompt, truncate_if_too_long)
-        )
+            get_tokens_for_prompt_object(
+                tokenizer, prompt, truncate_if_too_long))
 
 
 def get_tokens_for_prompt_object(
     tokenizer, parsed_prompt: FlattenedPrompt, truncate_if_too_long=True
-) -> [str]:
+) -> List[str]:
     if type(parsed_prompt) is Blend:
         raise ValueError(
             "Blend is not supported here - you need to get tokens for each of its .children"
@@ -183,7 +191,7 @@ def log_tokenization_for_conjunction(
 ):
     display_label_prefix = display_label_prefix or ""
     for i, p in enumerate(c.prompts):
-        if len(c.prompts)>1:
+        if len(c.prompts) > 1:
             this_display_label_prefix = f"{display_label_prefix}(conjunction part {i + 1}, weight={c.weights[i]})"
         else:
             this_display_label_prefix = display_label_prefix
@@ -238,7 +246,8 @@ def log_tokenization_for_prompt_object(
             )
 
 
-def log_tokenization_for_text(text, tokenizer, display_label=None, truncate_if_too_long=False):
+def log_tokenization_for_text(
+        text, tokenizer, display_label=None, truncate_if_too_long=False):
     """shows how the prompt is tokenized
     # usually tokens have '</w>' to indicate end-of-word,
     # but for readability it has been replaced with ' '

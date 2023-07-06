@@ -18,6 +18,7 @@ import {
   IntegerInputFieldTemplate,
   ItemInputFieldTemplate,
   LatentsInputFieldTemplate,
+  LoRAModelInputFieldTemplate,
   ModelInputFieldTemplate,
   OutputFieldTemplate,
   StringInputFieldTemplate,
@@ -183,6 +184,21 @@ const buildVaeModelInputFieldTemplate = ({
   const template: VaeModelInputFieldTemplate = {
     ...baseField,
     type: 'vae_model',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildLoRAModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): LoRAModelInputFieldTemplate => {
+  const template: LoRAModelInputFieldTemplate = {
+    ...baseField,
+    type: 'lora_model',
     inputRequirement: 'always',
     inputKind: 'direct',
     default: schemaObject.default ?? undefined,
@@ -459,6 +475,9 @@ export const buildInputFieldTemplate = (
   }
   if (['vae_model'].includes(fieldType)) {
     return buildVaeModelInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['lora_model'].includes(fieldType)) {
+    return buildLoRAModelInputFieldTemplate({ schemaObject, baseField });
   }
   if (['enum'].includes(fieldType)) {
     return buildEnumInputFieldTemplate({ schemaObject, baseField });

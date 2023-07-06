@@ -9,6 +9,7 @@ export const RANGE_OF_SIZE = 'range_of_size';
 export const ITERATE = 'iterate';
 export const MAIN_MODEL_LOADER = 'main_model_loader';
 export const VAE_LOADER = 'vae_loader';
+export const LORA_LOADER = 'lora_loader';
 export const IMAGE_TO_LATENTS = 'image_to_latents';
 export const LATENTS_TO_LATENTS = 'latents_to_latents';
 export const RESIZE = 'resize_image';

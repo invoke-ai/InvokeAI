@@ -27,17 +27,13 @@ class ModelsList(BaseModel):
     models: list[Union[tuple(OPENAPI_MODEL_CONFIGS)]]
 
 @models_router.get(
-    "/{base_model}/{model_type}",
+    "/",
     operation_id="list_models",
     responses={200: {"model": ModelsList }},
 )
 async def list_models(
-    base_model: Optional[BaseModelType] = Path(
-        default=None, description="Base model"
-    ),
-    model_type: Optional[ModelType] = Path(
-        default=None, description="The type of model to get"
-    ),
+    base_model: Optional[BaseModelType] = Query(default=None, description="Base model"),
+    model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
 ) -> ModelsList:
     """Gets a list of models"""
     models_raw = ApiDependencies.invoker.services.model_manager.list_models(base_model, model_type)
@@ -55,10 +51,10 @@ async def list_models(
     response_model = UpdateModelResponse,
 )
 async def update_model(
-        base_model: BaseModelType = Path(default='sd-1', description="Base model"),
-        model_type: ModelType = Path(default='main', description="The type of model"),
-        model_name: str = Path(default=None, description="model name"),
-        info: Union[tuple(OPENAPI_MODEL_CONFIGS)]  = Body(description="Model configuration"),
+        base_model: BaseModelType = Path(description="Base model"),
+        model_type: ModelType = Path(description="The type of model"),
+        model_name: str = Path(description="model name"),
+        info: Union[tuple(OPENAPI_MODEL_CONFIGS)] = Body(description="Model configuration"),
 ) -> UpdateModelResponse:
     """ Add Model """
     try:

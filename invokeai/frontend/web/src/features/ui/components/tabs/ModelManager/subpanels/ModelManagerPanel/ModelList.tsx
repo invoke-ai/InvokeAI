@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { ChangeEvent, ReactNode } from 'react';
 import React, { useMemo, useState, useTransition } from 'react';
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 function ModelFilterButton({
   label,
@@ -36,9 +36,7 @@ function ModelFilterButton({
 }
 
 const ModelList = () => {
-  const { data: mainModels } = useListModelsQuery({
-    model_type: 'main',
-  });
+  const { data: mainModels } = useGetMainModelsQuery();
 
   const [renderModelList, setRenderModelList] = React.useState<boolean>(false);
 

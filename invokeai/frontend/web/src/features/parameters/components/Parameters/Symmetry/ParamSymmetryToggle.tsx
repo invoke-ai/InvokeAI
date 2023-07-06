@@ -12,6 +12,7 @@ export default function ParamSymmetryToggle() {
 
   return (
     <IAISwitch
+      label="Enable Symmetry"
       isChecked={shouldUseSymmetry}
       onChange={(e) => dispatch(setShouldUseSymmetry(e.target.checked))}
     />

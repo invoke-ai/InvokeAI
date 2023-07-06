@@ -236,7 +236,6 @@ class ModelInstall(object):
                                   )
 
     def _install_url(self, url: str)->AddModelResult:
-        # copy to a staging area, probe, import and delete
         with TemporaryDirectory(dir=self.config.models_path) as staging:
             location = download_with_resume(url,Path(staging))
             if not location:

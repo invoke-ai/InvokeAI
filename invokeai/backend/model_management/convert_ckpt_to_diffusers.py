@@ -29,7 +29,7 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
 from .model_manager import ModelManager
-from .model_cache import ModelCache
+from picklescan.scanner import scan_file_path
 from .models import BaseModelType, ModelVariantType
 
 try:
@@ -1014,7 +1014,10 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
             checkpoint = load_file(checkpoint_path)
         else:
             if scan_needed:
-                ModelCache.scan_model(checkpoint_path, checkpoint_path)
+                # scan model
+                scan_result = scan_file_path(checkpoint_path)
+                if scan_result.infected_files != 0:
+                    raise "The model {checkpoint_path} is potentially infected by malware. Aborting import."
             checkpoint = torch.load(checkpoint_path)
 
         # sometimes there is a state_dict key and sometimes not

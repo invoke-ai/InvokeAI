@@ -10,6 +10,7 @@ import {
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
   IMAGE_COLLECTION,
@@ -304,6 +305,9 @@ export const buildLinearImageToImageGraph = (
       },
     });
   }
+
+  addLoRAsToGraph(graph, state, LATENTS_TO_LATENTS);
+
   // Add VAE
   addVAEToGraph(graph, state);
 

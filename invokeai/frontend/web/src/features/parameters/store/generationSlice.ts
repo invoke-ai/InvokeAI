@@ -49,7 +49,6 @@ export interface GenerationState {
   verticalSymmetrySteps: number;
   model: ModelParam;
   vae: VAEParam;
-  shouldUseSeamless: boolean;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
 }
@@ -84,9 +83,8 @@ export const initialGenerationState: GenerationState = {
   verticalSymmetrySteps: 0,
   model: '',
   vae: '',
-  shouldUseSeamless: false,
-  seamlessXAxis: true,
-  seamlessYAxis: true,
+  seamlessXAxis: false,
+  seamlessYAxis: false,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -143,9 +141,6 @@ export const generationSlice = createSlice({
     },
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
-    },
-    setSeamless: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseSeamless = action.payload;
     },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessXAxis = action.payload;
@@ -268,7 +263,6 @@ export const {
   modelSelected,
   vaeSelected,
   setShouldUseNoiseSettings,
-  setSeamless,
   setSeamlessXAxis,
   setSeamlessYAxis,
 } = generationSlice.actions;
