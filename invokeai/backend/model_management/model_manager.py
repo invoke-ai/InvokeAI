@@ -279,7 +279,7 @@ class InvalidModelError(Exception):
     pass
 
 class AddModelResult(BaseModel):
-    name: str = Field(description="The name of the model after import")
+    name: str = Field(description="The name of the model after installation")
     model_type: ModelType = Field(description="The type of model")
     base_model: BaseModelType = Field(description="The base model")
     config: ModelConfigBase = Field(description="The configuration of the model")
@@ -496,7 +496,7 @@ class ModelManager(object):
             model_name: str,
             base_model: BaseModelType,
             model_type: ModelType,
-    )->dict:
+    ) -> dict:
         """
         Returns a dict describing one installed model, using
         the combined format of the list_models() method.
