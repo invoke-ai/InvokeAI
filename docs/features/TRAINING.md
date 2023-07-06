@@ -1,9 +1,10 @@
 ---
-title: Textual-Inversion
+title: Training
 ---
 
-# :material-file-document: Textual Inversion
+# :material-file-document: Training
 
+# Textual Inversion Training
 ## **Personalizing Text-to-Image Generation**
 
 You may personalize the generated images to provide your own styles or objects
@@ -257,16 +258,6 @@ invokeai-ti \
        --mixed_precision=fp16 \
        --only_save_embeds
 ```
-
-## Using Embeddings
-
-After training completes, the resultant embeddings will be saved into your `$INVOKEAI_ROOT/embeddings/<trigger word>/learned_embeds.bin`.
-
-These will be automatically loaded when you start InvokeAI.
-
-Add the trigger word, surrounded by angle brackets, to use that embedding. For example, if your trigger word was `terence`, use `<terence>` in prompts. This is the same syntax used by the HuggingFace concepts library.
-
-**Note:** `.pt` embeddings do not require the angle brackets.
 
 ## Troubleshooting
 
