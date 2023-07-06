@@ -222,7 +222,10 @@ class ModelInstall(object):
     def _install_path(self, path: Path, info: ModelProbeInfo=None)->AddModelResult:
         model_result = None
         info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
-        model_name = path.stem if info.format=='checkpoint' else path.name
+        if not info:
+            logger.warning(f'Unable to parse format of {path}')
+            return None
+        model_name = path.stem if info.format == "checkpoint" else path.name
         if self.mgr.model_exists(model_name, info.base_type, info.model_type):
             raise ValueError(f'A model named "{model_name}" is already installed.')
         attributes = self._make_attributes(path,info)
