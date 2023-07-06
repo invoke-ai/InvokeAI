@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import copy
 from contextlib import contextmanager
+from typing import Optional, Dict, Tuple, Any, Union, List
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union, List
 
 import torch
 from compel.embeddings_provider import BaseTextualInversionManager
