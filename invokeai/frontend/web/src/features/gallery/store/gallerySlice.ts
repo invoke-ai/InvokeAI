@@ -158,7 +158,7 @@ export const gallerySlice = createSlice({
 
       imagesAdapter.upsertMany(state, transformedItems);
 
-      if (state.selection.length === 0) {
+      if (state.selection.length === 0 && items.length) {
         state.selection = [items[0].image_name];
       }
 
