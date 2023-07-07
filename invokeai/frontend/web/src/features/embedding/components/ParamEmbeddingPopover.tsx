@@ -6,20 +6,16 @@ import {
   PopoverTrigger,
   Text,
 } from '@chakra-ui/react';
+import { SelectItem } from '@mantine/core';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
+import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
+import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
 import { forEach } from 'lodash-es';
 import { PropsWithChildren, useCallback, useMemo, useRef } from 'react';
 import { useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
-import { RootState } from '../../../app/store/store';
-import { useAppSelector } from '../../../app/store/storeHooks';
-import IAIMantineSelectItemWithTooltip from '../../../common/components/IAIMantineSelectItemWithTooltip';
-
-type EmbeddingSelectItem = {
-  label: string;
-  value: string;
-  description?: string;
-};
 
 type Props = PropsWithChildren & {
   onSelect: (v: string) => void;
@@ -41,22 +37,27 @@ const ParamEmbeddingPopover = (props: Props) => {
       return [];
     }
 
-    const data: EmbeddingSelectItem[] = [];
+    const data: SelectItem[] = [];
 
     forEach(embeddingQueryData.entities, (embedding, _) => {
-      if (!embedding) return;
+      if (!embedding) {
+        return;
+      }
+
+      const disabled = currentMainModel?.base_model !== embedding.base_model;
 
       data.push({
         value: embedding.name,
         label: embedding.name,
-        description: embedding.description,
-        ...(currentMainModel?.base_model !== embedding.base_model
-          ? { disabled: true, tooltip: 'Incompatible base model' }
-          : {}),
+        group: MODEL_TYPE_MAP[embedding.base_model],
+        disabled,
+        tooltip: disabled
+          ? `Incompatible base model: ${embedding.base_model}`
+          : undefined,
       });
     });
 
-    return data;
+    return data.sort((a, b) => (a.disabled && !b.disabled ? 1 : -1));
   }, [embeddingQueryData, currentMainModel?.base_model]);
 
   const handleChange = useCallback(
@@ -114,8 +115,10 @@ const ParamEmbeddingPopover = (props: Props) => {
               nothingFound="No Matching Embeddings"
               itemComponent={IAIMantineSelectItemWithTooltip}
               disabled={data.length === 0}
-              filter={(value, selected, item: EmbeddingSelectItem) =>
-                item.label.toLowerCase().includes(value.toLowerCase().trim()) ||
+              filter={(value, selected, item: SelectItem) =>
+                item.label
+                  ?.toLowerCase()
+                  .includes(value.toLowerCase().trim()) ||
                 item.value.toLowerCase().includes(value.toLowerCase().trim())
               }
               onChange={handleChange}

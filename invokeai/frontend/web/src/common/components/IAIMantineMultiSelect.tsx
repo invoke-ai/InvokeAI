@@ -66,6 +66,7 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
             '&[data-disabled]': {
               backgroundColor: mode(base300, base700)(colorMode),
               color: mode(base600, base400)(colorMode),
+              cursor: 'not-allowed',
             },
           },
           value: {
@@ -107,6 +108,10 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
                 backgroundColor: mode(accent500, accent500)(colorMode),
                 color: mode('white', base50)(colorMode),
               },
+            },
+            '&[data-disabled]': {
+              color: mode(base500, base600)(colorMode),
+              cursor: 'not-allowed',
             },
           },
           rightSection: {

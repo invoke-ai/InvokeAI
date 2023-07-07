@@ -1,11 +1,12 @@
+import { makeToast } from 'app/components/Toaster';
+import { modelSelected } from 'features/parameters/store/actions';
 import {
   modelChanged,
   vaeSelected,
 } from 'features/parameters/store/generationSlice';
+import { zMainModel } from 'features/parameters/store/parameterZodSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { startAppListening } from '..';
-import { modelSelected } from 'features/parameters/store/actions';
-import { makeToast } from 'app/components/Toaster';
 import { lorasCleared } from '../../../../../features/lora/store/loraSlice';
 
 export const addModelSelectedListener = () => {
@@ -24,12 +25,18 @@ export const addModelSelectedListener = () => {
             })
           )
         );
-        dispatch(vaeSelected('auto'));
+        dispatch(vaeSelected(null));
         dispatch(lorasCleared());
         // TODO: controlnet cleared
       }
 
-      dispatch(modelChanged({ id: action.payload, base_model, name, type }));
+      const newModel = zMainModel.parse({
+        id: action.payload,
+        base_model,
+        name,
+      });
+
+      dispatch(modelChanged(newModel));
     },
   });
 };

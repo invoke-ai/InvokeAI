@@ -9,14 +9,16 @@ import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
 import {
   CfgScaleParam,
   HeightParam,
-  ModelParam,
+  MainModelParam,
   NegativePromptParam,
   PositivePromptParam,
   SchedulerParam,
   SeedParam,
   StepsParam,
   StrengthParam,
+  VaeModelParam,
   WidthParam,
+  zMainModel,
 } from './parameterZodSchemas';
 
 export interface GenerationState {
@@ -48,8 +50,8 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: ModelParam;
-  vae: VAEParam;
+  model: MainModelParam | null;
+  vae: VaeModelParam | null;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
   clipSkip: number;
@@ -84,7 +86,7 @@ export const initialGenerationState: GenerationState = {
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
   model: null,
-  vae: '',
+  vae: null,
   seamlessXAxis: false,
   seamlessYAxis: false,
   clipSkip: 0,
@@ -221,12 +223,17 @@ export const generationSlice = createSlice({
       const { maxClip } = clipSkipMap[base_model as keyof typeof clipSkipMap];
       state.clipSkip = clamp(state.clipSkip, 0, maxClip);
 
-      state.model = { id: action.payload, base_model, name, type };
+      state.model = zMainModel.parse({
+        id: action.payload,
+        base_model,
+        name,
+        type,
+      });
     },
-    modelChanged: (state, action: PayloadAction<ModelParam>) => {
+    modelChanged: (state, action: PayloadAction<MainModelParam>) => {
       state.model = action.payload;
     },
-    vaeSelected: (state, action: PayloadAction<string>) => {
+    vaeSelected: (state, action: PayloadAction<VaeModelParam | null>) => {
       state.vae = action.payload;
     },
     setClipSkip: (state, action: PayloadAction<number>) => {
@@ -236,14 +243,14 @@ export const generationSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
       const defaultModel = action.payload.sd?.defaultModel;
+
       if (defaultModel && !state.model) {
         const [base_model, model_type, model_name] = defaultModel.split('/');
-        state.model = {
+        state.model = zMainModel.parse({
           id: defaultModel,
           name: model_name,
-          type: model_type,
-          base_model: base_model,
-        };
+          base_model,
+        });
       }
     });
     builder.addCase(setShouldShowAdvancedOptions, (state, action) => {

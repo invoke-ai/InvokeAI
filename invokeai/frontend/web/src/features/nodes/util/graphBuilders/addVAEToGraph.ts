@@ -19,7 +19,7 @@ export const addVAEToGraph = (
   const { vae } = state.generation;
   const vae_model = modelIdToVAEModelField(vae?.id || '');
 
-  const isAutoVae = vae?.id === 'auto';
+  const isAutoVae = !vae;
 
   if (!isAutoVae) {
     graph.nodes[VAE_LOADER] = {
