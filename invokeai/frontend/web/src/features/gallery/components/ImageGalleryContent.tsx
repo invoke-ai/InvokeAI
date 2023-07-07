@@ -185,11 +185,12 @@ const ImageGalleryContent = () => {
   useEffect(() => {
     dispatch(
       receivedPageOfImages({
-        categories: ['general'],
+        categories,
         is_intermediate: false,
       })
     );
-  }, [dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleClickImagesCategory = useCallback(() => {
     dispatch(imageCategoriesChanged(IMAGE_CATEGORIES));
