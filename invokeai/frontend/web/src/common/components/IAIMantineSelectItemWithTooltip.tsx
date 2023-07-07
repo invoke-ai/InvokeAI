@@ -1,37 +1,28 @@
-import { Tooltip, Text } from '@mantine/core';
+import { Box, Tooltip } from '@chakra-ui/react';
+import { Text } from '@mantine/core';
 import { forwardRef, memo } from 'react';
 
 interface ItemProps extends React.ComponentPropsWithoutRef<'div'> {
   label: string;
   description?: string;
   tooltip?: string;
+  disabled?: boolean;
 }
 
 const IAIMantineSelectItemWithTooltip = forwardRef<HTMLDivElement, ItemProps>(
-  ({ label, tooltip, description, ...others }: ItemProps, ref) => (
-    <div ref={ref} {...others}>
-      {tooltip ? (
-        <Tooltip.Floating label={tooltip}>
-          <div>
-            <Text>{label}</Text>
-            {description && (
-              <Text size="xs" color="base.600">
-                {description}
-              </Text>
-            )}
-          </div>
-        </Tooltip.Floating>
-      ) : (
-        <div>
+  ({ label, tooltip, description, disabled, ...others }: ItemProps, ref) => (
+    <Tooltip label={tooltip} placement="top" hasArrow>
+      <Box ref={ref} {...others}>
+        <Box>
           <Text>{label}</Text>
           {description && (
             <Text size="xs" color="base.600">
               {description}
             </Text>
           )}
-        </div>
-      )}
-    </div>
+        </Box>
+      </Box>
+    </Tooltip>
   )
 );
 

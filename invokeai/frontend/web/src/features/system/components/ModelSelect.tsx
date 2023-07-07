@@ -6,9 +6,9 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 
 import { SelectItem } from '@mantine/core';
 import { RootState } from 'app/store/store';
+import { modelSelected } from 'features/parameters/store/actions';
 import { forEach, isString } from 'lodash-es';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
-import { modelSelected } from '../../parameters/store/actions';
 
 export const MODEL_TYPE_MAP = {
   'sd-1': 'Stable Diffusion 1.x',
@@ -63,6 +63,16 @@ const ModelSelect = () => {
   );
 
   useEffect(() => {
+    if (isLoading) {
+      // return early here to avoid resetting model selection before we've loaded the available models
+      return;
+    }
+
+    if (selectedModel && mainModels?.ids.includes(selectedModel?.id)) {
+      // the selected model is an available model, no need to change it
+      return;
+    }
+
     const firstModel = mainModels?.ids[0];
 
     if (!isString(firstModel)) {
@@ -70,7 +80,7 @@ const ModelSelect = () => {
     }
 
     handleChangeModel(firstModel);
-  }, [handleChangeModel, mainModels?.ids]);
+  }, [handleChangeModel, isLoading, mainModels?.ids, selectedModel]);
 
   return isLoading ? (
     <IAIMantineSelect
