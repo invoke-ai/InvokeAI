@@ -126,29 +126,63 @@ export type HeightParam = z.infer<typeof zHeight>;
 export const isValidHeight = (val: unknown): val is HeightParam =>
   zHeight.safeParse(val).success;
 
+const zBaseModel = z.enum(['sd-1', 'sd-2']);
+
+export type BaseModelParam = z.infer<typeof zBaseModel>;
+
 /**
  * Zod schema for model parameter
  * TODO: Make this a dynamically generated enum?
  */
-export const zModel = z.string();
+export const zMainModel = z.object({
+  id: z.string(),
+  name: z.string(),
+  base_model: zBaseModel,
+});
+
 /**
  * Type alias for model parameter, inferred from its zod schema
  */
-export type ModelParam = z.infer<typeof zModel>;
-/**
- * Zod schema for VAE parameter
- * TODO: Make this a dynamically generated enum?
- */
-export const zVAE = z.string();
-/**
- * Type alias for model parameter, inferred from its zod schema
- */
-export type VAEParam = z.infer<typeof zVAE>;
+export type MainModelParam = z.infer<typeof zMainModel>;
 /**
  * Validates/type-guards a value as a model parameter
  */
-export const isValidModel = (val: unknown): val is ModelParam =>
-  zModel.safeParse(val).success;
+export const isValidMainModel = (val: unknown): val is MainModelParam =>
+  zMainModel.safeParse(val).success;
+/**
+ * Zod schema for VAE parameter
+ */
+export const zVaeModel = z.object({
+  id: z.string(),
+  name: z.string(),
+  base_model: zBaseModel,
+});
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type VaeModelParam = z.infer<typeof zVaeModel>;
+/**
+ * Validates/type-guards a value as a model parameter
+ */
+export const isValidVaeModel = (val: unknown): val is VaeModelParam =>
+  zVaeModel.safeParse(val).success;
+/**
+ * Zod schema for LoRA
+ */
+export const zLoRAModel = z.object({
+  id: z.string(),
+  name: z.string(),
+  base_model: zBaseModel,
+});
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type LoRAModelParam = z.infer<typeof zLoRAModel>;
+/**
+ * Validates/type-guards a value as a model parameter
+ */
+export const isValidLoRAModel = (val: unknown): val is LoRAModelParam =>
+  zLoRAModel.safeParse(val).success;
 
 /**
  * Zod schema for l2l strength parameter

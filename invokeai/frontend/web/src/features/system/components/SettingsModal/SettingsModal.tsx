@@ -30,6 +30,7 @@ import {
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
+  setShouldShowAdvancedOptions,
   setShouldShowProgressInViewer,
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
@@ -64,6 +65,7 @@ const selector = createSelector(
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
       shouldShowProgressInViewer,
+      shouldShowAdvancedOptions,
     } = ui;
 
     return {
@@ -76,6 +78,7 @@ const selector = createSelector(
       consoleLogLevel,
       shouldLogToConsole,
       shouldAntialiasProgressImage,
+      shouldShowAdvancedOptions,
     };
   },
   {
@@ -87,6 +90,7 @@ type ConfigOptions = {
   shouldShowDeveloperSettings: boolean;
   shouldShowResetWebUiText: boolean;
   shouldShowBetaLayout: boolean;
+  shouldShowAdvancedOptionsSettings: boolean;
 };
 
 type SettingsModalProps = {
@@ -103,6 +107,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowDeveloperSettings =
     config?.shouldShowDeveloperSettings ?? true;
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
+  const shouldShowAdvancedOptionsSettings =
+    config?.shouldShowAdvancedOptionsSettings ?? true;
 
   useEffect(() => {
     if (!shouldShowDeveloperSettings) {
@@ -132,6 +138,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     consoleLogLevel,
     shouldLogToConsole,
     shouldAntialiasProgressImage,
+    shouldShowAdvancedOptions,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -189,6 +196,15 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     dispatch(setShouldConfirmOnDelete(e.target.checked))
                   }
                 />
+                {shouldShowAdvancedOptionsSettings && (
+                  <IAISwitch
+                    label={t('settings.showAdvancedOptions')}
+                    isChecked={shouldShowAdvancedOptions}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(setShouldShowAdvancedOptions(e.target.checked))
+                    }
+                  />
+                )}
               </StyledFlex>
 
               <StyledFlex>
