@@ -32,7 +32,7 @@ def get_noise(
     perlin: float = 0.0,
 ):
     """Generate noise for a given image size."""
-    noise_device_type = "cpu" if (use_cpu or device.type == "mps") else device.type
+    noise_device_type = "cpu" if use_cpu else device.type
 
     # limit noise to only the diffusion image channels, not the mask channels
     input_channels = min(latent_channels, 4)
