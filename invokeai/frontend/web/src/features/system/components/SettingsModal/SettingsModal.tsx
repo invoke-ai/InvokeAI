@@ -90,6 +90,7 @@ type ConfigOptions = {
   shouldShowDeveloperSettings: boolean;
   shouldShowResetWebUiText: boolean;
   shouldShowBetaLayout: boolean;
+  shouldShowAdvancedOptionsSettings: boolean;
 };
 
 type SettingsModalProps = {
@@ -106,6 +107,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowDeveloperSettings =
     config?.shouldShowDeveloperSettings ?? true;
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
+  const shouldShowAdvancedOptionsSettings =
+    config?.shouldShowAdvancedOptionsSettings ?? true;
 
   useEffect(() => {
     if (!shouldShowDeveloperSettings) {
@@ -193,13 +196,15 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     dispatch(setShouldConfirmOnDelete(e.target.checked))
                   }
                 />
-                <IAISwitch
-                  label={t('settings.showAdvancedOptions')}
-                  isChecked={shouldShowAdvancedOptions}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldShowAdvancedOptions(e.target.checked))
-                  }
-                />
+                {shouldShowAdvancedOptionsSettings && (
+                  <IAISwitch
+                    label={t('settings.showAdvancedOptions')}
+                    isChecked={shouldShowAdvancedOptions}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(setShouldShowAdvancedOptions(e.target.checked))
+                    }
+                  />
+                )}
               </StyledFlex>
 
               <StyledFlex>
