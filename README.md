@@ -1,8 +1,11 @@
 <div align="center">
 
-![project logo](https://github.com/invoke-ai/InvokeAI/raw/main/docs/assets/invoke_ai_banner.png)
+![project hero](https://github.com/invoke-ai/InvokeAI/assets/31807370/1a917d94-e099-4fa1-a70f-7dd8d0691018)
 
-# InvokeAI: A Stable Diffusion Toolkit
+# Invoke AI - Generative AI for Professional Creatives
+## Image Generation for Stable Diffusion, Custom-Trained Models, and more. 
+  Learn more about us and get started instantly at [invoke.ai](https://invoke.ai)
+
 
 [![discord badge]][discord link]
 
@@ -33,32 +36,32 @@
 
 </div>
 
-_**Note: The UI is not fully functional on `main`. If you need a stable UI based on `main`, use the `pre-nodes` tag while we [migrate to a new backend](https://github.com/invoke-ai/InvokeAI/discussions/3246).**_
+_**Note: This is an alpha release. Bugs are expected and not all
+features are fully implemented. Please use the GitHub [Issues
+pages](https://github.com/invoke-ai/InvokeAI/issues?q=is%3Aissue+is%3Aopen)
+to report unexpected problems. Also note that InvokeAI root directory
+which contains models, outputs and configuration files, has changed
+between the 2.x and 3.x release. If you wish to use your v2.3 root
+directory with v3.0, please follow the directions in [Migrating a 2.3
+root directory to 3.0](#migrating-to-3).**_
 
-InvokeAI is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. InvokeAI offers an industry leading Web Interface, interactive Command Line Interface, and also serves as the foundation for multiple commercial products.
+InvokeAI is a leading creative engine built to empower professionals
+and enthusiasts alike. Generate and create stunning visual media using
+the latest AI-driven technologies. InvokeAI offers an industry leading
+Web Interface, interactive Command Line Interface, and also serves as
+the foundation for multiple commercial products.
 
-**Quick links**: [[How to Install](https://invoke-ai.github.io/InvokeAI/#installation)] [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a href="https://invoke-ai.github.io/InvokeAI/">Documentation and Tutorials</a>] [<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas & Q&A</a>]
-
-_Note: InvokeAI is rapidly evolving. Please use the
-[Issues](https://github.com/invoke-ai/InvokeAI/issues) tab to report bugs and make feature
-requests. Be sure to use the provided templates. They will help us diagnose issues faster._
-
-## FOR DEVELOPERS - MIGRATING TO THE 3.0.0 MODELS FORMAT
-
-The models directory and models.yaml have changed. To migrate to the
-new layout, please follow this recipe:
-
-1. Run `python scripts/migrate_models_to_3.0.py <path_to_root_directory>
-
-2. This will create a new models directory named `models-3.0` and a
-   new config directory named `models.yaml-3.0`, both in the current
-   working directory. If you prefer to name them something else, pass
-   the `--dest-directory` and/or `--dest-yaml` arguments.
-
-3. Check that the new models directory and yaml file look ok.
-
-4. Replace the existing directory and file, keeping backup copies just in
-case.
+**Quick links**: [[How to
+  Install](https://invoke-ai.github.io/InvokeAI/#installation)] [<a
+  href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a
+  href="https://invoke-ai.github.io/InvokeAI/">Documentation and
+  Tutorials</a>] [<a
+  href="https://github.com/invoke-ai/InvokeAI/">Code and
+  Downloads</a>] [<a
+  href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>]
+  [<a
+  href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion,
+  Ideas & Q&A</a>]
 
 <div align="center">
 
@@ -68,21 +71,29 @@ case.
 
 ## Table of Contents
 
-1. [Quick Start](#getting-started-with-invokeai)
-2. [Installation](#detailed-installation-instructions)
-3. [Hardware Requirements](#hardware-requirements)
-4. [Features](#features)
-5. [Latest Changes](#latest-changes)
-6. [Troubleshooting](#troubleshooting)
-7. [Contributing](#contributing)
-8. [Contributors](#contributors)
-9. [Support](#support)
-10. [Further Reading](#further-reading)
+Table of Contents 📝
 
-## Getting Started with InvokeAI
+**Getting Started**
+1. 🏁 [Quick Start](#quick-start) 
+3. 🖥️ [Hardware Requirements](#hardware-requirements) 
+
+**More About Invoke**
+1. 🌟 [Features](#features) 
+2. 📣 [Latest Changes](#latest-changes) 
+3. 🛠️ [Troubleshooting](#troubleshooting) 
+
+**Supporting the Project**
+1. 🤝 [Contributing](#contributing) 
+2. 👥 [Contributors](#contributors) 
+3. 💕 [Support](#support) 
+
+## Quick Start
 
 For full installation and upgrade instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
+
+If upgrading from version 2.3, please read [Migrating a 2.3 root
+directory to 3.0](#migrating-to-3) first.
 
 ### Automatic Installer (suggested for 1st time users)
 
@@ -92,9 +103,8 @@ For full installation and upgrade instructions, please see:
 
 3. Unzip the file.
 
-4. If you are on Windows, double-click on the `install.bat` script. On
-macOS, open a Terminal window, drag the file `install.sh` from Finder
-into the Terminal, and press return. On Linux, run `install.sh`.
+4. **Windows:** double-click on the `install.bat` script. **macOS:** Open a Terminal window, drag the file `install.sh` from Finder
+into the Terminal, and press return. **Linux:** run `install.sh`.
 
 5. You'll be asked to confirm the location of the folder in which
 to install InvokeAI and its image generation model files. Pick a
@@ -120,7 +130,7 @@ and go to http://localhost:9090.
 
 10. Type `banana sushi` in the box on the top left and click `Invoke`
 
-### Command-Line Installation (for users familiar with Terminals)
+### Command-Line Installation (for developers and users familiar with Terminals)
 
 You must have Python 3.9 or 3.10 installed on your machine. Earlier or later versions are
 not supported.
@@ -196,13 +206,94 @@ not supported.
 Be sure to activate the virtual environment each time before re-launching InvokeAI,
 using `source .venv/bin/activate` or `.venv\Scripts\activate`.
 
-### Detailed Installation Instructions
+## Detailed Installation Instructions
 
 This fork is supported across Linux, Windows and Macintosh. Linux
 users can use either an Nvidia-based card (with CUDA support) or an
 AMD card (using the ROCm driver). For full installation and upgrade
 instructions, please see:
 [InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/INSTALL_SOURCE/)
+
+<a name="migrating-to-3"></a>
+### Migrating a v2.3 InvokeAI root directory
+
+The InvokeAI root directory is where the InvokeAI startup file,
+installed models, and generated images are stored. It is ordinarily
+named `invokeai` and located in your home directory. The contents and
+layout of this directory has changed between versions 2.3 and 3.0 and
+cannot be used directly.
+
+We currently recommend that you use the installer to create a new root
+directory named differently from the 2.3 one, e.g. `invokeai-3` and
+then use a migration script to copy your 2.3 models into the new
+location. However, if you choose, you can upgrade this directory in
+place.  This section gives both recipes.
+
+#### Creating a new root directory and migrating old models
+
+This is the safer recipe because it leaves your old root directory in
+place to fall back on.
+
+1. Follow the instructions above to create and install InvokeAI in a
+directory that has a different name from the 2.3 invokeai directory.
+In this example, we will use "invokeai-3"
+
+2. When you are prompted to select models to install, select a minimal
+set of models, such as stable-diffusion-v1.5 only.
+
+3. After installation is complete launch `invokeai.sh` (Linux/Mac) or
+`invokeai.bat` and select option 8 "Open the developers console". This
+will take you to the command line.
+
+4. Issue the command `invokeai-migrate3 --from /path/to/v2.3-root --to
+/path/to/invokeai-3-root`. Provide the correct `--from` and `--to`
+paths for your v2.3 and v3.0 root directories respectively.
+
+This will copy and convert your old models from 2.3 format to 3.0
+format and create a new `models` directory in the 3.0 directory. The
+old models directory (which contains the models selected at install
+time) will be renamed `models.orig` and can be deleted once you have
+confirmed that the migration was successful.
+
+#### Migrating in place
+
+For the adventurous, you may do an in-place upgrade from 2.3 to 3.0
+without touching the command line. The recipe is as follows>
+
+1. Launch the InvokeAI launcher script in your current v2.3 root directory.
+
+2. Select option [9] "Update InvokeAI" to bring up the updater dialog.
+
+3a. During the alpha release phase, select option [3] and manually
+enter the tag name `v3.0.0+a2`.
+
+3b. Once 3.0 is released, select option [1] to upgrade to the latest release.
+
+4. Once the upgrade is finished you will be returned to the launcher
+menu. Select option [7] "Re-run the configure script to fix a broken
+install or to complete a major upgrade".
+
+This will run the configure script against the v2.3 directory and
+update it to the 3.0 format. The following files will be replaced:
+
+  - The invokeai.init file, replaced by invokeai.yaml
+  - The models directory
+  - The configs/models.yaml model index
+  
+The original versions of these files will be saved with the suffix
+".orig" appended to the end. Once you have confirmed that the upgrade
+worked, you can safely remove these files. Alternatively you can
+restore a working v2.3 directory by removing the new files and
+restoring the ".orig" files' original names.
+
+#### Migration Caveats
+
+The migration script will migrate your invokeai settings and models,
+including textual inversion models, LoRAs and merges that you may have
+installed previously. However it does **not** migrate the generated
+images stored in your 2.3-format outputs directory. The released
+version of 3.0 is expected to have an interface for importing an
+entire directory of image files as a batch.
 
 ## Hardware Requirements
 
@@ -222,13 +313,9 @@ We do not recommend the GTX 1650 or 1660 series video cards. They are
 unable to run in half-precision mode and do not have sufficient VRAM
 to render 512x512 images.
 
-### Memory
+**Memory** - At least 12 GB Main Memory RAM.
 
-- At least 12 GB Main Memory RAM.
-
-### Disk
-
-- At least 12 GB of free disk space for the machine learning model, Python, and all its dependencies.
+**Disk** - At least 12 GB of free disk space for the machine learning model, Python, and all its dependencies.
 
 ## Features
 
@@ -244,7 +331,7 @@ The Unified Canvas is a fully integrated canvas implementation with support for 
 
 ### *Advanced Prompt Syntax*
 
-InvokeAI's advanced prompt syntax allows for token weighting, cross-attention control, and prompt blending, allowing for fine-tuned tweaking of your invocations and exploration of the latent space.
+Invoke AI's advanced prompt syntax allows for token weighting, cross-attention control, and prompt blending, allowing for fine-tuned tweaking of your invocations and exploration of the latent space. 
 
 ### *Command Line Interface*
 
@@ -254,16 +341,12 @@ For users utilizing a terminal-based environment, or who want to take advantage 
 
 - *Support for both ckpt and diffusers models*
 - *SD 2.0, 2.1 support*
-- *Noise Control & Tresholding*
-- *Popular Sampler Support*
 - *Upscaling & Face Restoration Tools*
 - *Embedding Manager & Support*
 - *Model Manager & Support*
-
-### Coming Soon
-
-- *Node-Based Architecture & UI*
-- And more...
+- *Node-Based Architecture*
+- *Node-Based Plug-&-Play UI (Beta)*
+- *Boards & Gallery Management
 
 ### Latest Changes
 
@@ -271,12 +354,12 @@ For our latest changes, view our [Release
 Notes](https://github.com/invoke-ai/InvokeAI/releases) and the
 [CHANGELOG](docs/CHANGELOG.md).
 
-## Troubleshooting
+### Troubleshooting
 
 Please check out our **[Q&A](https://invoke-ai.github.io/InvokeAI/help/TROUBLESHOOT/#faq)** to get solutions for common installation
 problems and other issues.
 
-## Contributing
+## 🤝 Contributing
 
 Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code
 cleanup, testing, or code reviews, is very much encouraged to do so.
@@ -295,13 +378,11 @@ to become part of our community.
 
 Welcome to InvokeAI!
 
-### Contributors
+### 👥 Contributors
 
 This fork is a combined effort of various people from across the world.
 [Check out the list of all these amazing people](https://invoke-ai.github.io/InvokeAI/other/CONTRIBUTORS/). We thank them for
 their time, hard work and effort.
-
-Thanks to [Weblate](https://weblate.org/) for generously providing translation services to this project.
 
 ### Support
 

@@ -342,7 +342,9 @@ class ModelCache(object):
         for model_key, cache_entry in self._cached_models.items():
             if not cache_entry.locked and cache_entry.loaded:
                 self.logger.debug(f'Offloading {model_key} from {self.execution_device} into {self.storage_device}')
-                cache_entry.model.to(self.storage_device)
+                with VRAMUsage() as mem:
+                    cache_entry.model.to(self.storage_device)
+                self.logger.debug(f'GPU VRAM freed: {(mem.vram_used/GIG):.2f} GB')
         
     def _local_model_hash(self, model_path: Union[str, Path]) -> str:
         sha = hashlib.sha256()

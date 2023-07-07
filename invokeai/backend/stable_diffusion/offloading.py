@@ -4,7 +4,7 @@ import warnings
 import weakref
 from abc import ABCMeta, abstractmethod
 from collections.abc import MutableMapping
-from typing import Callable
+from typing import Callable, Union
 
 import torch
 from accelerate.utils import send_to_device
@@ -117,7 +117,7 @@ class LazilyLoadedModelGroup(ModelGroup):
     """
 
     _hooks: MutableMapping[torch.nn.Module, RemovableHandle]
-    _current_model_ref: Callable[[], torch.nn.Module | _NoModel]
+    _current_model_ref: Callable[[], Union[torch.nn.Module, _NoModel]]
 
     def __init__(self, execution_device: torch.device):
         super().__init__(execution_device)

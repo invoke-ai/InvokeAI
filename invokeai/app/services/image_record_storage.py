@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import Generic, Optional, TypeVar, cast
 import sqlite3
 import threading
-from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
@@ -116,7 +115,7 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_most_recent_image_for_board(self, board_id: str) -> ImageRecord | None:
+    def get_most_recent_image_for_board(self, board_id: str) -> Optional[ImageRecord]:
         """Gets the most recent image for a board."""
         pass
 
@@ -208,7 +207,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             """
         )
 
-    def get(self, image_name: str) -> Union[ImageRecord, None]:
+    def get(self, image_name: str) -> Optional[ImageRecord]:
         try:
             self._lock.acquire()
 
@@ -220,7 +219,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 (image_name,),
             )
 
-            result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
+            result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
         except sqlite3.Error as e:
             self._conn.rollback()
             raise ImageRecordNotFoundException from e
@@ -475,7 +474,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def get_most_recent_image_for_board(
         self, board_id: str
-    ) -> Union[ImageRecord, None]:
+    ) -> Optional[ImageRecord]:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -490,7 +489,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 (board_id,),
             )
 
-            result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
+            result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
         finally:
             self._lock.release()
         if result is None:

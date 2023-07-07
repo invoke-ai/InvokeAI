@@ -1,19 +1,16 @@
+from typing import Literal, Optional, Union, List
+from pydantic import BaseModel, Field
 import re
-from contextlib import ExitStack
-from typing import List, Literal, Optional, Union
-
 import torch
 from compel import Compel
 from compel.prompt_parser import (Blend, Conjunction,
                                   CrossAttentionControlSubstitute,
                                   FlattenedPrompt, Fragment)
-from pydantic import BaseModel, Field
-
+from ...backend.util.devices import torch_dtype
+from ...backend.model_management import ModelType
 from ...backend.model_management.models import ModelNotFoundException
-from ...backend.model_management import BaseModelType, ModelType, SubModelType
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
-from ...backend.util.devices import torch_dtype
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
 from .model import ClipField

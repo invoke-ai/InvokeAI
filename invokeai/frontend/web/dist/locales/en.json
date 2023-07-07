@@ -52,6 +52,7 @@
         "unifiedCanvas": "Unified Canvas",
         "linear": "Linear",
         "nodes": "Node Editor",
+        "batch": "Batch Manager",
         "modelmanager": "Model Manager",
         "postprocessing": "Post Processing",
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",

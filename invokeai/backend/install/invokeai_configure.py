@@ -45,6 +45,7 @@ from invokeai.app.services.config import (
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 from invokeai.frontend.install.widgets import (
+    SingleSelectColumns,
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
@@ -76,7 +77,7 @@ Weights_dir = "ldm/stable-diffusion-v1/"
 Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
 
-PRECISION_CHOICES = ['auto','float16','float32','autocast']
+PRECISION_CHOICES = ['auto','float16','float32']
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -359,9 +360,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             scroll_exit=True,
         )
         self.nextrely += 1
-        label = """If you have an account at HuggingFace you may optionally paste your access token here
-to allow InvokeAI to download restricted styles & subjects from the "Concept Library". See https://huggingface.co/settings/tokens.
-"""
+        label = """HuggingFace access token (OPTIONAL) for automatic model downloads. See https://huggingface.co/settings/tokens."""
         for line in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
                 npyscreen.FixedText,
@@ -423,6 +422,7 @@ to allow InvokeAI to download restricted styles & subjects from the "Concept Lib
         )
         self.precision = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
+            columns = 2,
             name="Precision",
             values=PRECISION_CHOICES,
             value=PRECISION_CHOICES.index(precision),

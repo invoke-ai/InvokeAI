@@ -264,6 +264,8 @@ class ModelManagerService(ModelManagerServiceBase):
         logger.debug(f'config file={config_file}')
 
         device = torch.device(choose_torch_device())
+        logger.debug(f'GPU device = {device}')
+
         precision = config.precision
         if precision == "auto":
             precision = choose_precision(device)
