@@ -8,6 +8,7 @@ import { setNegativePrompt } from 'features/parameters/store/generationSlice';
 import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const ParamNegativeConditioning = () => {
   const negativePrompt = useAppSelector(
@@ -71,6 +72,8 @@ const ParamNegativeConditioning = () => {
     [dispatch, onClose, negativePrompt]
   );
 
+  const isTiEmbeddingEnabled = useFeatureStatus('tiEmbedding').isFeatureEnabled;
+
   return (
     <FormControl>
       <ParamEmbeddingPopover
@@ -85,13 +88,13 @@ const ParamNegativeConditioning = () => {
           value={negativePrompt}
           placeholder={t('parameters.negativePromptPlaceholder')}
           onChange={handleChangePrompt}
-          onKeyDown={handleKeyDown}
           resize="vertical"
           fontSize="sm"
           minH={16}
+          {...(isTiEmbeddingEnabled && { onKeyDown: handleKeyDown })}
         />
       </ParamEmbeddingPopover>
-      {!isOpen && (
+      {!isOpen && isTiEmbeddingEnabled && (
         <Box
           sx={{
             position: 'absolute',

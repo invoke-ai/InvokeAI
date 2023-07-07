@@ -20,6 +20,7 @@ import { isEqual } from 'lodash-es';
 import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
+import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const promptInputSelector = createSelector(
   [(state: RootState) => state.generation, activeTabNameSelector],
@@ -114,6 +115,8 @@ const ParamPositiveConditioning = () => {
     [isReady, dispatch, activeTabName, onOpen]
   );
 
+  const isTiEmbeddingEnabled = useFeatureStatus('tiEmbedding').isFeatureEnabled;
+
   // const handleSelect = (e: MouseEvent<HTMLTextAreaElement>) => {
   //   const target = e.target as HTMLTextAreaElement;
   // setCaret({ start: target.selectionStart, end: target.selectionEnd });
@@ -134,13 +137,13 @@ const ParamPositiveConditioning = () => {
             value={prompt}
             placeholder={t('parameters.positivePromptPlaceholder')}
             onChange={handleChangePrompt}
-            onKeyDown={handleKeyDown}
             resize="vertical"
             minH={32}
+            {...(isTiEmbeddingEnabled && { onKeyDown: handleKeyDown })}
           />
         </ParamEmbeddingPopover>
       </FormControl>
-      {!isOpen && (
+      {!isOpen && isTiEmbeddingEnabled && (
         <Box
           sx={{
             position: 'absolute',
