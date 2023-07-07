@@ -101,6 +101,8 @@ const ParamPositiveConditioning = () => {
     [dispatch, onClose, prompt]
   );
 
+  const isTiEmbeddingEnabled = useFeatureStatus('tiEmbedding').isFeatureEnabled;
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && e.shiftKey === false && isReady) {
@@ -114,8 +116,6 @@ const ParamPositiveConditioning = () => {
     },
     [isReady, dispatch, activeTabName, onOpen, isTiEmbeddingEnabled]
   );
-
-  const isTiEmbeddingEnabled = useFeatureStatus('tiEmbedding').isFeatureEnabled;
 
   // const handleSelect = (e: MouseEvent<HTMLTextAreaElement>) => {
   //   const target = e.target as HTMLTextAreaElement;
