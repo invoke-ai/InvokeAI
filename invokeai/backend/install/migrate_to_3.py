@@ -293,6 +293,7 @@ class MigrateTo3(object):
             elif repo_id := vae.get('repo_id'):
                 if repo_id=='stabilityai/sd-vae-ft-mse':  # this guy is already downloaded
                     vae_path = 'models/core/convert/sd-vae-ft-mse'
+                    return vae_path
                 else:
                     vae_path = self._download_vae(repo_id, vae.get('subfolder'))
 
@@ -305,7 +306,10 @@ class MigrateTo3(object):
             info = ModelProbe().heuristic_probe(vae_path)
             dest = self._model_probe_to_path(info) / vae_path.name
             if not dest.exists():
-                self.copy_dir(vae_path,dest)
+                if vae_path.is_dir():
+                    self.copy_dir(vae_path,dest)
+                else:
+                    self.copy_file(vae_path,dest)
             vae_path = dest
 
         if vae_path.is_relative_to(self.dest_models):
