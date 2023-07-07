@@ -30,6 +30,7 @@ import {
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
+  setShouldShowAdvancedOptions,
   setShouldShowProgressInViewer,
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
@@ -64,6 +65,7 @@ const selector = createSelector(
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
       shouldShowProgressInViewer,
+      shouldShowAdvancedOptions,
     } = ui;
 
     return {
@@ -76,6 +78,7 @@ const selector = createSelector(
       consoleLogLevel,
       shouldLogToConsole,
       shouldAntialiasProgressImage,
+      shouldShowAdvancedOptions,
     };
   },
   {
@@ -132,6 +135,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     consoleLogLevel,
     shouldLogToConsole,
     shouldAntialiasProgressImage,
+    shouldShowAdvancedOptions,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -187,6 +191,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                   isChecked={shouldConfirmOnDelete}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     dispatch(setShouldConfirmOnDelete(e.target.checked))
+                  }
+                />
+                <IAISwitch
+                  label={t('settings.showAdvancedOptions')}
+                  isChecked={shouldShowAdvancedOptions}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setShouldShowAdvancedOptions(e.target.checked))
                   }
                 />
               </StyledFlex>

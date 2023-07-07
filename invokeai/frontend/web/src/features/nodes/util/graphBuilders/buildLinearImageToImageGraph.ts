@@ -13,6 +13,7 @@ import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
+  CLIP_SKIP,
   IMAGE_COLLECTION,
   IMAGE_COLLECTION_ITERATE,
   IMAGE_TO_IMAGE_GRAPH,
@@ -46,6 +47,7 @@ export const buildLinearImageToImageGraph = (
     shouldFitToWidthHeight,
     width,
     height,
+    clipSkip,
   } = state.generation;
 
   const {
@@ -77,6 +79,16 @@ export const buildLinearImageToImageGraph = (
   const graph: NonNullableGraph = {
     id: IMAGE_TO_IMAGE_GRAPH,
     nodes: {
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
+        model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
+      },
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
@@ -90,11 +102,6 @@ export const buildLinearImageToImageGraph = (
       [NOISE]: {
         type: 'noise',
         id: NOISE,
-      },
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
-        model,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -121,6 +128,26 @@ export const buildLinearImageToImageGraph = (
       {
         source: {
           node_id: MAIN_MODEL_LOADER,
+          field: 'unet',
+        },
+        destination: {
+          node_id: LATENTS_TO_LATENTS,
+          field: 'unet',
+        },
+      },
+      {
+        source: {
+          node_id: MAIN_MODEL_LOADER,
+          field: 'clip',
+        },
+        destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
@@ -130,7 +157,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
@@ -166,17 +193,6 @@ export const buildLinearImageToImageGraph = (
         destination: {
           node_id: LATENTS_TO_LATENTS,
           field: 'noise',
-        },
-      },
-
-      {
-        source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'unet',
-        },
-        destination: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'unet',
         },
       },
       {

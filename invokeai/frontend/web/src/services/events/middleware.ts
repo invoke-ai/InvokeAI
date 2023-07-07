@@ -1,18 +1,18 @@
 import { Middleware, MiddlewareAPI } from '@reduxjs/toolkit';
-import { io, Socket } from 'socket.io-client';
+import { Socket, io } from 'socket.io-client';
 
+import { AppThunkDispatch, RootState } from 'app/store/store';
+import { getTimestamp } from 'common/util/getTimestamp';
+import { sessionCreated } from 'services/api/thunks/session';
 import {
   ClientToServerEvents,
   ServerToClientEvents,
 } from 'services/events/types';
 import { socketSubscribed, socketUnsubscribed } from './actions';
-import { AppThunkDispatch, RootState } from 'app/store/store';
-import { getTimestamp } from 'common/util/getTimestamp';
-import { sessionCreated } from 'services/api/thunks/session';
 // import { OpenAPI } from 'services/api/types';
-import { setEventListeners } from 'services/events/util/setEventListeners';
 import { log } from 'app/logging/useLogger';
 import { $authToken, $baseUrl } from 'services/api/client';
+import { setEventListeners } from 'services/events/util/setEventListeners';
 
 const socketioLog = log.child({ namespace: 'socketio' });
 
@@ -88,7 +88,7 @@ export const socketMiddleware = () => {
           socketSubscribed({
             sessionId: sessionId,
             timestamp: getTimestamp(),
-            boardId: getState().boards.selectedBoardId,
+            boardId: getState().gallery.selectedBoardId,
           })
         );
       }

@@ -182,6 +182,15 @@ const ImageGalleryContent = () => {
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
 
+  useEffect(() => {
+    dispatch(
+      receivedPageOfImages({
+        categories: ['general'],
+        is_intermediate: false,
+      })
+    );
+  }, [dispatch]);
+
   const handleClickImagesCategory = useCallback(() => {
     dispatch(imageCategoriesChanged(IMAGE_CATEGORIES));
     dispatch(setGalleryView('images'));

@@ -78,7 +78,6 @@ class ModelProbe(object):
             format_type = 'diffusers' if model_path.is_dir() else 'checkpoint'
         else:
             format_type = 'diffusers' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
-
         model_info = None
         try:
             model_type = cls.get_model_type_from_folder(model_path, model) \
@@ -105,7 +104,7 @@ class ModelProbe(object):
                                      ) else 512,
             )
         except Exception:
-            return None
+            raise
 
         return model_info
 
@@ -127,6 +126,8 @@ class ModelProbe(object):
                 return ModelType.Vae
             elif any(key.startswith(v) for v in {"lora_te_", "lora_unet_"}):
                 return ModelType.Lora
+            elif any(key.endswith(v) for v in {"to_k_lora.up.weight", "to_q_lora.down.weight"}):
+                return ModelType.Lora
             elif any(key.startswith(v) for v in {"control_model", "input_blocks"}):
                 return ModelType.ControlNet
             elif key in {"emb_params", "string_to_param"}:
@@ -137,7 +138,7 @@ class ModelProbe(object):
             if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
                 return ModelType.TextualInversion
         
-        raise ValueError("Unable to determine model type")
+        raise ValueError(f"Unable to determine model type for {model_path}")
 
     @classmethod
     def get_model_type_from_folder(cls, folder_path: Path, model: ModelMixin)->ModelType:
@@ -167,7 +168,7 @@ class ModelProbe(object):
             return type
 
         # give up
-        raise ValueError("Unable to determine model type")
+        raise ValueError("Unable to determine model type for {folder_path}")
 
     @classmethod
     def _scan_and_load_checkpoint(cls,model_path: Path)->dict:

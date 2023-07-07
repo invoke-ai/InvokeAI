@@ -1,15 +1,16 @@
 import { Tooltip, useColorMode, useToken } from '@chakra-ui/react';
 import { MultiSelect, MultiSelectProps } from '@mantine/core';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
-import { memo } from 'react';
+import { RefObject, memo } from 'react';
 import { mode } from 'theme/util/mode';
 
 type IAIMultiSelectProps = MultiSelectProps & {
   tooltip?: string;
+  inputRef?: RefObject<HTMLInputElement>;
 };
 
 const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
-  const { searchable = true, tooltip, ...rest } = props;
+  const { searchable = true, tooltip, inputRef, ...rest } = props;
   const {
     base50,
     base100,
@@ -33,6 +34,7 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
       <MultiSelect
+        ref={inputRef}
         searchable={searchable}
         styles={() => ({
           label: {

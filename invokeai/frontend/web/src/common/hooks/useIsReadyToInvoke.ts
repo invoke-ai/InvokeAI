@@ -6,10 +6,15 @@ import { validateSeedWeights } from 'common/util/seedWeightPairs';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import {
+  modelsApi,
+  useGetMainModelsQuery,
+} from '../../services/api/endpoints/models';
 
 const readinessSelector = createSelector(
   [stateSelector, activeTabNameSelector],
-  ({ generation, system, batch }, activeTabName) => {
+  (state, activeTabName) => {
+    const { generation, system, batch } = state;
     const { shouldGenerateVariations, seedWeights, initialImage, seed } =
       generation;
 
@@ -30,6 +35,13 @@ const readinessSelector = createSelector(
     ) {
       isReady = false;
       reasonsWhyNotReady.push('No initial image selected');
+    }
+
+    const { isSuccess: mainModelsSuccessfullyLoaded } =
+      modelsApi.endpoints.getMainModels.select()(state);
+    if (!mainModelsSuccessfullyLoaded) {
+      isReady = false;
+      reasonsWhyNotReady.push('Models are not loaded');
     }
 
     // TODO: job queue
