@@ -1,10 +1,10 @@
 import { log } from 'app/logging/useLogger';
-import { startAppListening } from '..';
-import { receivedPageOfImages } from 'services/api/thunks/image';
 import {
   imageCategoriesChanged,
   selectFilteredImages,
 } from 'features/gallery/store/gallerySlice';
+import { receivedPageOfImages } from 'services/api/thunks/image';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'gallery' });
 
@@ -19,7 +19,7 @@ export const addImageCategoriesChangedListener = () => {
         dispatch(
           receivedPageOfImages({
             categories: action.payload,
-            board_id: state.boards.selectedBoardId,
+            board_id: state.gallery.selectedBoardId,
             is_intermediate: false,
           })
         );

@@ -14,9 +14,9 @@ import {
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAISlider from 'common/components/IAISlider';
 import {
   setGalleryImageMinimumWidth,
@@ -40,25 +40,25 @@ import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { FaImage, FaServer, FaWrench } from 'react-icons/fa';
 import GalleryImage from './GalleryImage';
 
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { ChevronUpIcon } from '@chakra-ui/icons';
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState, stateSelector } from 'app/store/store';
-import { VirtuosoGrid } from 'react-virtuoso';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
   imageCategoriesChanged,
-  shouldAutoSwitchChanged,
   selectFilteredImages,
+  shouldAutoSwitchChanged,
 } from 'features/gallery/store/gallerySlice';
-import { receivedPageOfImages } from 'services/api/thunks/image';
-import BoardsList from './Boards/BoardsList';
-import { ChevronUpIcon } from '@chakra-ui/icons';
+import { VirtuosoGrid } from 'react-virtuoso';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import { mode } from 'theme/util/mode';
+import { receivedPageOfImages } from 'services/api/thunks/image';
 import { ImageDTO } from 'services/api/types';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { mode } from 'theme/util/mode';
+import BoardsList from './Boards/BoardsList';
 
 const LOADING_IMAGE_ARRAY = Array(20).fill('loading');
 
@@ -181,16 +181,6 @@ const ImageGalleryContent = () => {
     }
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
-
-  useEffect(() => {
-    dispatch(
-      receivedPageOfImages({
-        categories,
-        is_intermediate: false,
-      })
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleClickImagesCategory = useCallback(() => {
     dispatch(imageCategoriesChanged(IMAGE_CATEGORIES));

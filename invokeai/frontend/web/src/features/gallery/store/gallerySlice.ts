@@ -169,7 +169,6 @@ export const gallerySlice = createSlice({
       }
 
       state.offset = offset;
-      state.limit = limit;
       state.total = total;
     });
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
