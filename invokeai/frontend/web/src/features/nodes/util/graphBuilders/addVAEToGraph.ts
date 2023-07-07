@@ -16,10 +16,12 @@ export const addVAEToGraph = (
   graph: NonNullableGraph,
   state: RootState
 ): void => {
-  const { vae: vaeId } = state.generation;
-  const vae_model = modelIdToVAEModelField(vaeId);
+  const { vae } = state.generation;
+  const vae_model = modelIdToVAEModelField(vae?.id || '');
 
-  if (vaeId !== 'auto') {
+  const isAutoVae = !vae;
+
+  if (!isAutoVae) {
     graph.nodes[VAE_LOADER] = {
       type: 'vae_loader',
       id: VAE_LOADER,
@@ -30,7 +32,7 @@ export const addVAEToGraph = (
   if (graph.id === TEXT_TO_IMAGE_GRAPH || graph.id === IMAGE_TO_IMAGE_GRAPH) {
     graph.edges.push({
       source: {
-        node_id: vaeId === 'auto' ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -43,7 +45,7 @@ export const addVAEToGraph = (
   if (graph.id === IMAGE_TO_IMAGE_GRAPH) {
     graph.edges.push({
       source: {
-        node_id: vaeId === 'auto' ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -56,7 +58,7 @@ export const addVAEToGraph = (
   if (graph.id === INPAINT_GRAPH) {
     graph.edges.push({
       source: {
-        node_id: vaeId === 'auto' ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {

@@ -6,6 +6,7 @@ import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
+  CLIP_SKIP,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
@@ -24,10 +25,11 @@ export const buildCanvasTextToImageGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: modelId,
+    model: currentModel,
     cfgScale: cfg_scale,
     scheduler,
     steps,
+    clipSkip,
     iterations,
     seed,
     shouldRandomizeSeed,
@@ -36,7 +38,7 @@ export const buildCanvasTextToImageGraph = (
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const model = modelIdToMainModelField(modelId);
+  const model = modelIdToMainModelField(currentModel?.id || '');
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -79,6 +81,11 @@ export const buildCanvasTextToImageGraph = (
         id: MAIN_MODEL_LOADER,
         model,
       },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
+      },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
@@ -111,13 +118,23 @@ export const buildCanvasTextToImageGraph = (
           field: 'clip',
         },
         destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
           node_id: POSITIVE_CONDITIONING,
           field: 'clip',
         },
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {

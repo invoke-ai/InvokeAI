@@ -1,11 +1,10 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
 
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  GenerationState,
   clampSymmetrySteps,
   setPositivePrompt,
 } from 'features/parameters/store/generationSlice';
@@ -20,12 +19,14 @@ import { isEqual } from 'lodash-es';
 import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
+import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const promptInputSelector = createSelector(
-  [(state: RootState) => state.generation, activeTabNameSelector],
-  (parameters: GenerationState, activeTabName) => {
+  [stateSelector, activeTabNameSelector],
+  ({ generation, ui }, activeTabName) => {
     return {
-      prompt: parameters.positivePrompt,
+      shouldPinParametersPanel: ui.shouldPinParametersPanel,
+      prompt: generation.positivePrompt,
       activeTabName,
     };
   },
@@ -41,7 +42,8 @@ const promptInputSelector = createSelector(
  */
 const ParamPositiveConditioning = () => {
   const dispatch = useAppDispatch();
-  const { prompt, activeTabName } = useAppSelector(promptInputSelector);
+  const { prompt, shouldPinParametersPanel, activeTabName } =
+    useAppSelector(promptInputSelector);
   const isReady = useIsReadyToInvoke();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
@@ -100,6 +102,8 @@ const ParamPositiveConditioning = () => {
     [dispatch, onClose, prompt]
   );
 
+  const isEmbeddingEnabled = useFeatureStatus('embedding').isFeatureEnabled;
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && e.shiftKey === false && isReady) {
@@ -107,11 +111,11 @@ const ParamPositiveConditioning = () => {
         dispatch(clampSymmetrySteps());
         dispatch(userInvoked(activeTabName));
       }
-      if (e.key === '<') {
+      if (isEmbeddingEnabled && e.key === '<') {
         onOpen();
       }
     },
-    [isReady, dispatch, activeTabName, onOpen]
+    [isReady, dispatch, activeTabName, onOpen, isEmbeddingEnabled]
   );
 
   // const handleSelect = (e: MouseEvent<HTMLTextAreaElement>) => {
@@ -120,7 +124,7 @@ const ParamPositiveConditioning = () => {
   // };
 
   return (
-    <Box>
+    <Box position="relative">
       <FormControl>
         <ParamEmbeddingPopover
           isOpen={isOpen}
@@ -140,11 +144,11 @@ const ParamPositiveConditioning = () => {
           />
         </ParamEmbeddingPopover>
       </FormControl>
-      {!isOpen && (
+      {!isOpen && isEmbeddingEnabled && (
         <Box
           sx={{
             position: 'absolute',
-            top: 6,
+            top: shouldPinParametersPanel ? 6 : 0,
             insetInlineEnd: 0,
           }}
         >

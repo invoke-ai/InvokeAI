@@ -1,8 +1,11 @@
+import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { isImageField } from 'services/api/guards';
+import { ImageDTO } from 'services/api/types';
+import { initialImageSelected, modelSelected } from '../store/actions';
 import {
-  modelSelected,
   setCfgScale,
   setHeight,
   setImg2imgStrength,
@@ -13,14 +16,10 @@ import {
   setSteps,
   setWidth,
 } from '../store/generationSlice';
-import { isImageField } from 'services/api/guards';
-import { initialImageSelected } from '../store/actions';
-import { useAppToaster } from 'app/components/Toaster';
-import { ImageDTO } from 'services/api/types';
 import {
   isValidCfgScale,
   isValidHeight,
-  isValidModel,
+  isValidMainModel,
   isValidNegativePrompt,
   isValidPositivePrompt,
   isValidScheduler,
@@ -159,11 +158,11 @@ export const useRecallParameters = () => {
    */
   const recallModel = useCallback(
     (model: unknown) => {
-      if (!isValidModel(model)) {
+      if (!isValidMainModel(model)) {
         parameterNotSetToast();
         return;
       }
-      dispatch(modelSelected(model));
+      dispatch(modelSelected(model?.id || ''));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -296,7 +295,7 @@ export const useRecallParameters = () => {
       if (isValidCfgScale(cfg_scale)) {
         dispatch(setCfgScale(cfg_scale));
       }
-      if (isValidModel(model)) {
+      if (isValidMainModel(model)) {
         dispatch(modelSelected(model));
       }
       if (isValidPositivePrompt(positive_conditioning)) {

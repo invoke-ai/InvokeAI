@@ -26,7 +26,7 @@ import {
 } from '@chakra-ui/react';
 import { clamp } from 'lodash-es';
 
-import { useTranslation } from 'react-i18next';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import {
   FocusEvent,
   memo,
@@ -36,9 +36,9 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
-import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 
 const SLIDER_MARK_STYLES: ChakraProps['sx'] = {
   mt: 1.5,
