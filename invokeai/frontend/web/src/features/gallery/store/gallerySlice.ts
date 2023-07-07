@@ -38,7 +38,7 @@ type AdditionaGalleryState = {
   selection: string[];
   shouldAutoSwitch: boolean;
   galleryImageMinimumWidth: number;
-  galleryView: 'images' | 'assets' | 'boards';
+  galleryView: 'images' | 'assets';
 };
 
 export const initialGalleryState =
@@ -65,6 +65,8 @@ export const gallerySlice = createSlice({
         action.payload.image_category === 'general'
       ) {
         state.selection = [action.payload.image_name];
+        state.galleryView = 'images';
+        state.categories = IMAGE_CATEGORIES;
       }
     },
     imageUpdatedOne: (state, action: PayloadAction<Update<ImageDTO>>) => {
@@ -128,10 +130,7 @@ export const gallerySlice = createSlice({
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
     },
-    setGalleryView: (
-      state,
-      action: PayloadAction<'images' | 'assets' | 'boards'>
-    ) => {
+    setGalleryView: (state, action: PayloadAction<'images' | 'assets'>) => {
       state.galleryView = action.payload;
     },
     boardIdSelected: (state, action: PayloadAction<string | undefined>) => {
