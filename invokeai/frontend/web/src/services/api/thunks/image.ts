@@ -156,7 +156,6 @@ export const imageUploaded = createAppAsyncThunk<
     is_intermediate,
     session_id,
   } = arg;
-  console.log({ file })
   const { post } = $client.get();
   const formData = new FormData();
   formData.append('file', file);
