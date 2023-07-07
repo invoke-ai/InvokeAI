@@ -168,7 +168,7 @@ class ModelProbe(object):
             return type
 
         # give up
-        raise ValueError("Unable to determine model type for {folder_path}")
+        raise ValueError(f"Unable to determine model type for {folder_path}")
 
     @classmethod
     def _scan_and_load_checkpoint(cls,model_path: Path)->dict:
