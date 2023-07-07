@@ -2,6 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
 import { configChanged } from 'features/system/store/configSlice';
+import { setShouldShowAdvancedOptions } from 'features/ui/store/uiSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 import {
@@ -229,6 +230,10 @@ export const generationSlice = createSlice({
       if (defaultModel && !state.model) {
         state.model = defaultModel;
       }
+    });
+    builder.addCase(setShouldShowAdvancedOptions, (state, action) => {
+      const advancedOptionsStatus = action.payload;
+      if (!advancedOptionsStatus) state.clipSkip = 0;
     });
   },
 });
