@@ -5,7 +5,7 @@ import { setClipSkip } from 'features/parameters/store/generationSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const clipSkipMap = {
+export const clipSkipMap = {
   'sd-1': {
     maxClip: 12,
     markers: [0, 1, 2, 3, 4, 8, 12],
