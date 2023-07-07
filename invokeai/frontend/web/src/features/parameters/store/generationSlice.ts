@@ -219,16 +219,16 @@ export const generationSlice = createSlice({
     modelSelected: (state, action: PayloadAction<string>) => {
       const [base_model, type, name] = action.payload.split('/');
 
-      // Clamp ClipSkip Based On Selected Model
-      const { maxClip } = clipSkipMap[base_model as keyof typeof clipSkipMap];
-      state.clipSkip = clamp(state.clipSkip, 0, maxClip);
-
       state.model = zMainModel.parse({
         id: action.payload,
         base_model,
         name,
         type,
       });
+
+      // Clamp ClipSkip Based On Selected Model
+      const { maxClip } = clipSkipMap[state.model.base_model];
+      state.clipSkip = clamp(state.clipSkip, 0, maxClip);
     },
     modelChanged: (state, action: PayloadAction<MainModelParam>) => {
       state.model = action.payload;

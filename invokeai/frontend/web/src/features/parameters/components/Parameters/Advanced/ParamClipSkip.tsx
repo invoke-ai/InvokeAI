@@ -2,7 +2,7 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { setClipSkip } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const clipSkipMap = {
@@ -21,9 +21,7 @@ export default function ParamClipSkip() {
     (state: RootState) => state.generation.clipSkip
   );
 
-  const selectedModelId = useAppSelector(
-    (state: RootState) => state.generation.model
-  ).split('/')[0];
+  const { model } = useAppSelector((state: RootState) => state.generation);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -39,19 +37,31 @@ export default function ParamClipSkip() {
     dispatch(setClipSkip(0));
   }, [dispatch]);
 
+  const max = useMemo(() => {
+    if (!model) {
+      return clipSkipMap['sd-1'].maxClip;
+    }
+    return clipSkipMap[model.base_model].maxClip;
+  }, [model]);
+
+  const sliderMarks = useMemo(() => {
+    if (!model) {
+      return clipSkipMap['sd-1'].markers;
+    }
+    return clipSkipMap[model.base_model].markers;
+  }, [model]);
+
   return (
     <IAISlider
       label={t('parameters.clipSkip')}
       aria-label={t('parameters.clipSkip')}
       min={0}
-      max={clipSkipMap[selectedModelId as keyof typeof clipSkipMap].maxClip}
+      max={max}
       step={1}
       value={clipSkip}
       onChange={handleClipSkipChange}
       withSliderMarks
-      sliderMarks={
-        clipSkipMap[selectedModelId as keyof typeof clipSkipMap].markers
-      }
+      sliderMarks={sliderMarks}
       withInput
       withReset
       handleReset={handleClipSkipReset}
