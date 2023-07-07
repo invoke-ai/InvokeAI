@@ -30,6 +30,7 @@ class UNetField(BaseModel):
 class ClipField(BaseModel):
     tokenizer: ModelInfo = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelInfo = Field(description="Info to load text_encoder submodel")
+    skipped_layers: int = Field(description="Number of skipped layers in text_encoder")
     loras: List[LoraInfo] = Field(description="Loras to apply on model loading")
 
 
@@ -154,6 +155,7 @@ class MainModelLoaderInvocation(BaseInvocation):
                     submodel=SubModelType.TextEncoder,
                 ),
                 loras=[],
+                skipped_layers=0,
             ),
             vae=VaeField(
                 vae=ModelInfo(

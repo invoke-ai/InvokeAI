@@ -2,6 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
 import { configChanged } from 'features/system/store/configSlice';
+import { setShouldShowAdvancedOptions } from 'features/ui/store/uiSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 import {
@@ -51,6 +52,7 @@ export interface GenerationState {
   vae: VAEParam;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
+  clipSkip: number;
 }
 
 export const initialGenerationState: GenerationState = {
@@ -85,6 +87,7 @@ export const initialGenerationState: GenerationState = {
   vae: '',
   seamlessXAxis: false,
   seamlessYAxis: false,
+  clipSkip: 0,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -217,6 +220,9 @@ export const generationSlice = createSlice({
     vaeSelected: (state, action: PayloadAction<string>) => {
       state.vae = action.payload;
     },
+    setClipSkip: (state, action: PayloadAction<number>) => {
+      state.clipSkip = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -224,6 +230,10 @@ export const generationSlice = createSlice({
       if (defaultModel && !state.model) {
         state.model = defaultModel;
       }
+    });
+    builder.addCase(setShouldShowAdvancedOptions, (state, action) => {
+      const advancedOptionsStatus = action.payload;
+      if (!advancedOptionsStatus) state.clipSkip = 0;
     });
   },
 });
@@ -265,6 +275,7 @@ export const {
   setShouldUseNoiseSettings,
   setSeamlessXAxis,
   setSeamlessYAxis,
+  setClipSkip,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;
