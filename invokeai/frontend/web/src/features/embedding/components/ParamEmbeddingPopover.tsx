@@ -16,17 +16,15 @@ import { forEach } from 'lodash-es';
 import { PropsWithChildren, useCallback, useMemo, useRef } from 'react';
 import { useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 type Props = PropsWithChildren & {
   onSelect: (v: string) => void;
   isOpen: boolean;
   onClose: () => void;
-  enabled?: boolean;
 };
 
 const ParamEmbeddingPopover = (props: Props) => {
-  const { onSelect, isOpen, onClose, children, enabled } = props;
+  const { onSelect, isOpen, onClose, children } = props;
   const { data: embeddingQueryData } = useGetTextualInversionModelsQuery();
   const inputRef = useRef<HTMLInputElement>(null);
 

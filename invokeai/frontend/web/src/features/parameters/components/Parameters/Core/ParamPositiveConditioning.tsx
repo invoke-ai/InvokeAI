@@ -108,11 +108,11 @@ const ParamPositiveConditioning = () => {
         dispatch(clampSymmetrySteps());
         dispatch(userInvoked(activeTabName));
       }
-      if (e.key === '<') {
+      if (isTiEmbeddingEnabled && e.key === '<') {
         onOpen();
       }
     },
-    [isReady, dispatch, activeTabName, onOpen]
+    [isReady, dispatch, activeTabName, onOpen, isTiEmbeddingEnabled]
   );
 
   const isTiEmbeddingEnabled = useFeatureStatus('tiEmbedding').isFeatureEnabled;
@@ -137,9 +137,9 @@ const ParamPositiveConditioning = () => {
             value={prompt}
             placeholder={t('parameters.positivePromptPlaceholder')}
             onChange={handleChangePrompt}
+            onKeyDown={handleKeyDown}
             resize="vertical"
             minH={32}
-            {...(isTiEmbeddingEnabled && { onKeyDown: handleKeyDown })}
           />
         </ParamEmbeddingPopover>
       </FormControl>
