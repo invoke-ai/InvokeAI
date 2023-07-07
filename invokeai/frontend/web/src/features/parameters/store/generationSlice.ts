@@ -5,6 +5,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { setShouldShowAdvancedOptions } from 'features/ui/store/uiSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
+import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
 import {
   CfgScaleParam,
   HeightParam,
@@ -216,6 +217,12 @@ export const generationSlice = createSlice({
     },
     modelSelected: (state, action: PayloadAction<string>) => {
       state.model = action.payload;
+
+      // Clamp ClipSkip Based On Selected Model
+      const clipSkipMax =
+        clipSkipMap[action.payload.split('/')[0] as keyof typeof clipSkipMap]
+          .maxClip;
+      state.clipSkip = clamp(state.clipSkip, 0, clipSkipMax);
     },
     vaeSelected: (state, action: PayloadAction<string>) => {
       state.vae = action.payload;

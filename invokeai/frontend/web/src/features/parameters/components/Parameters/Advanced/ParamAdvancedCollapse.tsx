@@ -11,7 +11,7 @@ const selector = createSelector(
   (state: RootState) => {
     const clipSkip = state.generation.clipSkip;
     return {
-      activeLabel: clipSkip > 0 ? `Clip Skip Active` : undefined,
+      activeLabel: clipSkip > 0 ? 'Clip Skip' : undefined,
     };
   },
   defaultSelectorOptions

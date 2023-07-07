@@ -4,6 +4,7 @@ import { forEach, size } from 'lodash-es';
 import { LoraLoaderInvocation } from 'services/api/types';
 import { modelIdToLoRAModelField } from '../modelIdToLoRAName';
 import {
+  CLIP_SKIP,
   LORA_LOADER,
   MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
@@ -27,13 +28,18 @@ export const addLoRAsToGraph = (
   const loraCount = size(loras);
 
   if (loraCount > 0) {
-    // remove any existing connections from main model loader, we need to insert the lora nodes
+    // Remove MAIN_MODEL_LOADER unet connection to feed it to LoRAs
     graph.edges = graph.edges.filter(
       (e) =>
         !(
           e.source.node_id === MAIN_MODEL_LOADER &&
-          ['unet', 'clip'].includes(e.source.field)
+          ['unet'].includes(e.source.field)
         )
+    );
+    // Remove CLIP_SKIP connections to conditionings to feed it through LoRAs
+    graph.edges = graph.edges.filter(
+      (e) =>
+        !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field))
     );
   }
 
@@ -73,7 +79,7 @@ export const addLoRAsToGraph = (
 
       graph.edges.push({
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
