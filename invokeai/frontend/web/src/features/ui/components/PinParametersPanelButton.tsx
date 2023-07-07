@@ -33,12 +33,21 @@ const PinParametersPanelButton = (props: PinParametersPanelButtonProps) => {
       variant="ghost"
       size="sm"
       sx={{
-        color: 'base.700',
+        color: 'base.500',
         _hover: {
-          color: 'base.550',
+          color: 'base.600',
         },
         _active: {
+          color: 'base.700',
+        },
+        _dark: {
           color: 'base.500',
+          _hover: {
+            color: 'base.400',
+          },
+          _active: {
+            color: 'base.300',
+          },
         },
         ...sx,
       }}
