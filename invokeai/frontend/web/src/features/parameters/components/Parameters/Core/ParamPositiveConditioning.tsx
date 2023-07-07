@@ -19,6 +19,7 @@ import { isEqual } from 'lodash-es';
 import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
+import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const promptInputSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -101,6 +102,8 @@ const ParamPositiveConditioning = () => {
     [dispatch, onClose, prompt]
   );
 
+  const isEmbeddingEnabled = useFeatureStatus('embedding').isFeatureEnabled;
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && e.shiftKey === false && isReady) {
@@ -108,11 +111,11 @@ const ParamPositiveConditioning = () => {
         dispatch(clampSymmetrySteps());
         dispatch(userInvoked(activeTabName));
       }
-      if (e.key === '<') {
+      if (isEmbeddingEnabled && e.key === '<') {
         onOpen();
       }
     },
-    [isReady, dispatch, activeTabName, onOpen]
+    [isReady, dispatch, activeTabName, onOpen, isEmbeddingEnabled]
   );
 
   // const handleSelect = (e: MouseEvent<HTMLTextAreaElement>) => {
@@ -141,7 +144,7 @@ const ParamPositiveConditioning = () => {
           />
         </ParamEmbeddingPopover>
       </FormControl>
-      {!isOpen && (
+      {!isOpen && isEmbeddingEnabled && (
         <Box
           sx={{
             position: 'absolute',
