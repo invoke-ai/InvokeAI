@@ -4,3 +4,5 @@ import { ImageDTO } from 'services/api/types';
 export const initialImageSelected = createAction<ImageDTO | string | undefined>(
   'generation/initialImageSelected'
 );
+
+export const modelSelected = createAction<string>('generation/modelSelected');

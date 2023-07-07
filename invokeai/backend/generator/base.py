@@ -21,7 +21,7 @@ from PIL import Image, ImageChops, ImageFilter
 from accelerate.utils import set_seed
 from diffusers import DiffusionPipeline
 from tqdm import trange
-from typing import Callable, List, Iterator, Optional, Type
+from typing import Callable, List, Iterator, Optional, Type, Union
 from dataclasses import dataclass, field
 from diffusers.schedulers import SchedulerMixin as Scheduler
 
@@ -178,7 +178,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
 # ------------------------------------
 class Img2Img(InvokeAIGenerator):
     def generate(self,
-               init_image: Image.Image | torch.FloatTensor,
+               init_image: Union[Image.Image, torch.FloatTensor],
                strength: float=0.75,
                **keyword_args
                )->Iterator[InvokeAIGeneratorOutput]:
@@ -195,7 +195,7 @@ class Img2Img(InvokeAIGenerator):
 # Takes all the arguments of Img2Img and adds the mask image and the seam/infill stuff
 class Inpaint(Img2Img):
     def generate(self,
-                 mask_image: Image.Image | torch.FloatTensor,
+                 mask_image: Union[Image.Image, torch.FloatTensor],
                  # Seam settings - when 0, doesn't fill seam
                  seam_size: int = 96,
                  seam_blur: int = 16,

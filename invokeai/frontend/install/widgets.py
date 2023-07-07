@@ -18,7 +18,7 @@ from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 
 # minimum size for UIs
 MIN_COLS = 130
-MIN_LINES = 40
+MIN_LINES = 45
 
 # -------------------------------------
 def set_terminal_size(columns: int, lines: int, launch_command: str=None):

@@ -11,6 +11,7 @@ from typing import List, Dict, Callable, Union, Set
 
 import requests
 from diffusers import StableDiffusionPipeline
+from diffusers import logging as dlogging
 from huggingface_hub import hf_hub_url, HfFolder, HfApi
 from omegaconf import OmegaConf
 from tqdm import tqdm
@@ -153,6 +154,9 @@ class ModelInstall(object):
         return defaults[0]
 
     def install(self, selections: InstallSelections):
+        verbosity = dlogging.get_verbosity()  # quench NSFW nags
+        dlogging.set_verbosity_error()
+
         job = 1
         jobs = len(selections.remove_models) + len(selections.install_models)
         
@@ -160,7 +164,10 @@ class ModelInstall(object):
         for key in selections.remove_models:
             name,base,mtype = self.mgr.parse_key(key)
             logger.info(f'Deleting {mtype} model {name} [{job}/{jobs}]')
-            self.mgr.del_model(name,base,mtype)
+            try:
+                self.mgr.del_model(name,base,mtype)
+            except FileNotFoundError as e:
+                logger.warning(e)
             job += 1
             
         # add requested models
@@ -171,7 +178,8 @@ class ModelInstall(object):
             except (ValueError, KeyError) as e:
                 logger.error(str(e))
             job += 1
-
+            
+        dlogging.set_verbosity(verbosity)
         self.mgr.commit()
 
     def heuristic_import(self,
@@ -190,7 +198,6 @@ class ModelInstall(object):
         # A little hack to allow nested routines to retrieve info on the requested ID
         self.current_id = model_path_id_or_url
         path = Path(model_path_id_or_url)
-
         # checkpoint file, or similar
         if path.is_file():
             models_installed.update({str(path):self._install_path(path)})
@@ -275,16 +282,16 @@ class ModelInstall(object):
                         location = self._download_hf_model(repo_id, files, staging)
                         break
                     elif f'learned_embeds.{suffix}' in files:
-                        location = self._download_hf_model(repo_id, ['learned_embeds.suffix'], staging)
+                        location = self._download_hf_model(repo_id, [f'learned_embeds.{suffix}'], staging)
                         break
             if not location:
                 logger.warning(f'Could not determine type of repo {repo_id}. Skipping install.')
-                return
-            
+                return {}
+
             info = ModelProbe().heuristic_probe(location, self.prediction_helper)
             if not info:
                 logger.warning(f'Could not probe {location}. Skipping install.')
-                return
+                return {}
             dest = self.config.models_path / info.base_type.value / info.model_type.value / self._get_model_name(repo_id,location)
             if dest.exists():
                 shutil.rmtree(dest)

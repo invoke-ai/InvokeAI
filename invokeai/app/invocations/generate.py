@@ -1,11 +1,10 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from functools import partial
-from typing import Literal, Optional, Union, get_args
+from typing import Literal, Optional, get_args
 
 import torch
-from diffusers import ControlNetModel
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from invokeai.app.models.image import (ColorField, ImageCategory, ImageField,
                                        ResourceOrigin)
@@ -18,7 +17,6 @@ from ..util.step_callback import stable_diffusion_step_callback
 from .baseinvocation import BaseInvocation, InvocationConfig, InvocationContext
 from .image import ImageOutput
 
-import re
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from .model import UNetField, VaeField
@@ -76,7 +74,7 @@ class InpaintInvocation(BaseInvocation):
     vae: VaeField = Field(default=None, description="Vae model")
 
     # Inputs
-    image: Union[ImageField, None] = Field(description="The input image")
+    image: Optional[ImageField] = Field(description="The input image")
     strength: float = Field(
         default=0.75, gt=0, le=1, description="The strength of the original image"
     )
@@ -86,7 +84,7 @@ class InpaintInvocation(BaseInvocation):
     )
 
     # Inputs
-    mask: Union[ImageField, None] = Field(description="The mask")
+    mask: Optional[ImageField] = Field(description="The mask")
     seam_size: int = Field(default=96, ge=1, description="The seam inpaint size (px)")
     seam_blur: int = Field(
         default=16, ge=0, description="The seam inpaint blur radius (px)"

@@ -8,6 +8,7 @@ import { size } from 'lodash-es';
 import { memo } from 'react';
 import ParamLoraList from './ParamLoraList';
 import ParamLoraSelect from './ParamLoraSelect';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   stateSelector,
@@ -22,6 +23,12 @@ const selector = createSelector(
 
 const ParamLoraCollapse = () => {
   const { activeLabel } = useAppSelector(selector);
+
+  const isLoraEnabled = useFeatureStatus('lora').isFeatureEnabled;
+
+  if (!isLoraEnabled) {
+    return null;
+  }
 
   return (
     <IAICollapse label={'LoRA'} activeLabel={activeLabel}>

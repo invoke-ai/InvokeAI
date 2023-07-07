@@ -86,6 +86,7 @@ import { addRequestedBoardImageDeletionListener } from './listeners/boardImagesD
 import { addSelectionAddedToBatchListener } from './listeners/selectionAddedToBatch';
 import { addImageDroppedListener } from './listeners/imageDropped';
 import { addImageToDeleteSelectedListener } from './listeners/imageToDeleteSelected';
+import { addModelSelectedListener } from './listeners/modelSelected';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -220,3 +221,6 @@ addSelectionAddedToBatchListener();
 
 // DND
 addImageDroppedListener();
+
+// Models
+addModelSelectedListener();

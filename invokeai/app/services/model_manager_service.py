@@ -264,6 +264,8 @@ class ModelManagerService(ModelManagerServiceBase):
         logger.debug(f'config file={config_file}')
 
         device = torch.device(choose_torch_device())
+        logger.debug(f'GPU device = {device}')
+
         precision = config.precision
         if precision == "auto":
             precision = choose_precision(device)
@@ -546,11 +548,15 @@ class ModelManagerService(ModelManagerServiceBase):
         :param interp: Interpolation method. None (default) 
         """
         merger = ModelMerger(self.mgr)
-        return merger.merge_diffusion_models_and_save(
-            model_names = model_names,
-            base_model = base_model,
-            merged_model_name = merged_model_name,
-            alpha = alpha,
-            interp = interp,
-            force = force,
-        )
+        try:
+            result = merger.merge_diffusion_models_and_save(
+                model_names = model_names,
+                base_model = base_model,
+                merged_model_name = merged_model_name,
+                alpha = alpha,
+                interp = interp,
+                force = force,
+            )
+        except AssertionError as e:
+            raise ValueError(e)
+        return result

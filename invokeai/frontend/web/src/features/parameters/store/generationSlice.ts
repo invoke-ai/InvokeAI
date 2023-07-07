@@ -2,20 +2,23 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
 import { configChanged } from 'features/system/store/configSlice';
+import { setShouldShowAdvancedOptions } from 'features/ui/store/uiSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
+import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
 import {
   CfgScaleParam,
   HeightParam,
-  ModelParam,
+  MainModelParam,
   NegativePromptParam,
   PositivePromptParam,
   SchedulerParam,
   SeedParam,
   StepsParam,
   StrengthParam,
-  VAEParam,
+  VaeModelParam,
   WidthParam,
+  zMainModel,
 } from './parameterZodSchemas';
 
 export interface GenerationState {
@@ -47,10 +50,11 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: ModelParam;
-  vae: VAEParam;
+  model: MainModelParam | null;
+  vae: VaeModelParam | null;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
+  clipSkip: number;
 }
 
 export const initialGenerationState: GenerationState = {
@@ -81,10 +85,11 @@ export const initialGenerationState: GenerationState = {
   shouldUseSymmetry: false,
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
-  model: '',
-  vae: '',
+  model: null,
+  vae: null,
   seamlessXAxis: false,
   seamlessYAxis: false,
+  clipSkip: 0,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -212,18 +217,45 @@ export const generationSlice = createSlice({
       state.initialImage = { imageName: image_name, width, height };
     },
     modelSelected: (state, action: PayloadAction<string>) => {
+      const [base_model, type, name] = action.payload.split('/');
+
+      state.model = zMainModel.parse({
+        id: action.payload,
+        base_model,
+        name,
+        type,
+      });
+
+      // Clamp ClipSkip Based On Selected Model
+      const { maxClip } = clipSkipMap[state.model.base_model];
+      state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+    },
+    modelChanged: (state, action: PayloadAction<MainModelParam>) => {
       state.model = action.payload;
     },
-    vaeSelected: (state, action: PayloadAction<string>) => {
+    vaeSelected: (state, action: PayloadAction<VaeModelParam | null>) => {
       state.vae = action.payload;
+    },
+    setClipSkip: (state, action: PayloadAction<number>) => {
+      state.clipSkip = action.payload;
     },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
       const defaultModel = action.payload.sd?.defaultModel;
+
       if (defaultModel && !state.model) {
-        state.model = defaultModel;
+        const [base_model, model_type, model_name] = defaultModel.split('/');
+        state.model = zMainModel.parse({
+          id: defaultModel,
+          name: model_name,
+          base_model,
+        });
       }
+    });
+    builder.addCase(setShouldShowAdvancedOptions, (state, action) => {
+      const advancedOptionsStatus = action.payload;
+      if (!advancedOptionsStatus) state.clipSkip = 0;
     });
   },
 });
@@ -260,11 +292,12 @@ export const {
   setHorizontalSymmetrySteps,
   setVerticalSymmetrySteps,
   initialImageChanged,
-  modelSelected,
+  modelChanged,
   vaeSelected,
   setShouldUseNoiseSettings,
   setSeamlessXAxis,
   setSeamlessYAxis,
+  setClipSkip,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

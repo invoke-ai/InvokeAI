@@ -65,39 +65,21 @@ find out what each concept is for, you can browse the
 [Hugging Face concepts library](https://huggingface.co/sd-concepts-library) and
 look at examples of what each concept produces.
 
-When you have an idea of a concept you wish to try, go to the command-line
-client (CLI) and type a `<` character and the beginning of the Hugging Face
-concept name you wish to load. Press ++tab++, and the CLI will show you all
-matching concepts. You can also type `<` and hit ++tab++ to get a listing of all
-~800 concepts, but be prepared to scroll up to see them all! If there is more
-than one match you can continue to type and ++tab++ until the concept is
-completed.
+To load concepts, you will need to open the Web UI's configuration
+dialogue and activate "Show Textual Inversions from HF Concepts
+Library". This will then add a list of HF Concepts to the dropdown
+"Add Textual Inversion" menu. Select the concept(s) of your choice and
+they will be incorporated into the positive prompt. A few concepts are
+designed for the negative prompt, in which case you can add them to
+the negative prompt box by select the down arrow icon next to the
+textual inversion menu.
 
-!!! example
-
-    if you type in `<x` and hit ++tab++, you'll be prompted with the completions:
-
-    ```py
-    <xatu2>        <xatu>         <xbh>          <xi>           <xidiversity>  <xioboma>      <xuna>         <xyz>
-    ```
-
-    Now type `id` and press ++tab++. It will be autocompleted to `<xidiversity>`
-    because this is a unique match.
-
-    Finish your prompt and generate as usual. You may include multiple concept terms
-    in the prompt.
-
-If you have never used this concept before, you will see a message that the TI
-model is being downloaded and installed. After this, the concept will be saved
-locally (in the `models/sd-concepts-library` directory) for future use.
-
-Several steps happen during downloading and installation, including a scan of
-the file for malicious code. Should any errors occur, you will be warned and the
-concept will fail to load. Generation will then continue treating the trigger
-term as a normal string of characters (e.g. as literal `<ghibli-face>`).
-
-You can also use `<concept-names>` in the WebGUI's prompt textbox. There is no
-autocompletion at this time.
+There are nearly 1000 HF concepts, more than will fit into a menu. For
+this reason we only show the most popular concepts (those which have
+received 5 or more likes). If you wish to use a concept that is not on
+the list, you may simply type its name surrounded by brackets. For
+example, to load the concept named "xidiversity", add `<xidiversity>`
+to the positive or negative prompt text.
 
 ## Installing your Own TI Files
 
@@ -112,18 +94,11 @@ At startup time, InvokeAI will scan the `embeddings` directory and load any TI
 files it finds there. At startup you will see a message similar to this one:
 
 ```bash
->> Current embedding manager terms: *, <HOI4-Leader>, <princess-knight>
+>> Current embedding manager terms: <HOI4-Leader>, <princess-knight>
 ```
 
-Note the `*` trigger term. This is a placeholder term that many early TI
-tutorials taught people to use rather than a more descriptive term.
-Unfortunately, if you have multiple TI files that all use this term, only the
-first one loaded will be triggered by use of the term.
-
-To avoid this problem, you can use the `merge_embeddings.py` script to merge two
-or more TI files together. If it encounters a collision of terms, the script
-will prompt you to select new terms that do not collide. See
-[Textual Inversion](TEXTUAL_INVERSION.md) for details.
+The terms you can use will appear in the "Add Textual Inversion"
+dropdown menu above the HF Concepts.
 
 ## Further Reading
 

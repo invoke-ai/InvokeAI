@@ -527,7 +527,8 @@
         "showOptionsPanel": "Show Options Panel",
         "hidePreview": "Hide Preview",
         "showPreview": "Show Preview",
-        "controlNetControlMode": "Control Mode"
+        "controlNetControlMode": "Control Mode",
+        "clipSkip": "Clip Skip"
     },
     "settings": {
         "models": "Models",
@@ -551,7 +552,8 @@
         "generation": "Generation",
         "ui": "User Interface",
         "favoriteSchedulers": "Favorite Schedulers",
-        "favoriteSchedulersPlaceholder": "No schedulers favorited"
+        "favoriteSchedulersPlaceholder": "No schedulers favorited",
+        "showAdvancedOptions": "Show Advanced Options"
     },
     "toast": {
         "serverError": "Server Error",

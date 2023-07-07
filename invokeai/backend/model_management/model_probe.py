@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from diffusers import ModelMixin, ConfigMixin
 from pathlib import Path
-from typing import Callable, Literal, Union, Dict
+from typing import Callable, Literal, Union, Dict, Optional
 from picklescan.scanner import scan_file_path
 
 from .models import (
@@ -64,8 +64,8 @@ class ModelProbe(object):
     @classmethod
     def probe(cls,
               model_path: Path,
-              model: Union[Dict, ModelMixin] = None,
-              prediction_type_helper: Callable[[Path],SchedulerPredictionType] = None)->ModelProbeInfo:
+              model: Optional[Union[Dict, ModelMixin]] = None,
+              prediction_type_helper: Optional[Callable[[Path],SchedulerPredictionType]] = None)->ModelProbeInfo:
         '''
         Probe the model at model_path and return sufficient information about it
         to place it somewhere in the models directory hierarchy. If the model is
@@ -168,7 +168,7 @@ class ModelProbe(object):
             return type
 
         # give up
-        raise ValueError("Unable to determine model type for {folder_path}")
+        raise ValueError(f"Unable to determine model type for {folder_path}")
 
     @classmethod
     def _scan_and_load_checkpoint(cls,model_path: Path)->dict:

@@ -1,18 +1,21 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
+import { LoRAModelParam } from 'features/parameters/store/parameterZodSchemas';
 import { LoRAModelConfigEntity } from 'services/api/endpoints/models';
+import { BaseModelType } from 'services/api/types';
 
 export type Lora = {
   id: string;
+  base_model: BaseModelType;
   name: string;
   weight: number;
 };
 
-export const defaultLoRAConfig: Omit<Lora, 'id' | 'name'> = {
+export const defaultLoRAConfig = {
   weight: 0.75,
 };
 
 export type LoraState = {
-  loras: Record<string, Lora>;
+  loras: Record<string, LoRAModelParam & { weight: number }>;
 };
 
 export const intialLoraState: LoraState = {
@@ -24,12 +27,15 @@ export const loraSlice = createSlice({
   initialState: intialLoraState,
   reducers: {
     loraAdded: (state, action: PayloadAction<LoRAModelConfigEntity>) => {
-      const { name, id } = action.payload;
-      state.loras[id] = { id, name, ...defaultLoRAConfig };
+      const { name, id, base_model } = action.payload;
+      state.loras[id] = { id, name, base_model, ...defaultLoRAConfig };
     },
     loraRemoved: (state, action: PayloadAction<string>) => {
       const id = action.payload;
       delete state.loras[id];
+    },
+    lorasCleared: (state) => {
+      state.loras = {};
     },
     loraWeightChanged: (
       state,
@@ -45,7 +51,12 @@ export const loraSlice = createSlice({
   },
 });
 
-export const { loraAdded, loraRemoved, loraWeightChanged, loraWeightReset } =
-  loraSlice.actions;
+export const {
+  loraAdded,
+  loraRemoved,
+  loraWeightChanged,
+  loraWeightReset,
+  lorasCleared,
+} = loraSlice.actions;
 
 export default loraSlice.reducer;

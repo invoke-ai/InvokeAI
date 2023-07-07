@@ -7,6 +7,7 @@ import IAICollapse from 'common/components/IAICollapse';
 import ParamDynamicPromptsCombinatorial from './ParamDynamicPromptsCombinatorial';
 import ParamDynamicPromptsToggle from './ParamDynamicPromptsEnabled';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   stateSelector,
@@ -20,6 +21,13 @@ const selector = createSelector(
 
 const ParamDynamicPromptsCollapse = () => {
   const { activeLabel } = useAppSelector(selector);
+
+  const isDynamicPromptingEnabled =
+    useFeatureStatus('dynamicPrompting').isFeatureEnabled;
+
+  if (!isDynamicPromptingEnabled) {
+    return null;
+  }
 
   return (
     <IAICollapse label="Dynamic Prompts" activeLabel={activeLabel}>

@@ -52,7 +52,7 @@ A typical example is:
  sd1_5 = mgr.get_model('stable-diffusion-v1-5',
                        model_type=ModelType.Main,
                        base_model=BaseModelType.StableDiffusion1,
-                       submodel_type=SubModelType.Unet)
+                       submodel_type=SubModelType.UNet)
  with sd1_5 as unet:
     run_some_inference(unet)
 
@@ -311,7 +311,6 @@ class ModelManager(object):
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
         """
-
         self.config_path = None
         if isinstance(config, (str, Path)):
             self.config_path = Path(config)
@@ -770,6 +769,7 @@ class ModelManager(object):
                     model_class = MODEL_CLASSES[cur_base_model][cur_model_type]
                     if model_class.save_to_config:
                         model_config.error = ModelError.NotFound
+                        self.models.pop(model_key, None)
                     else:
                         self.models.pop(model_key, None)
                 else:
