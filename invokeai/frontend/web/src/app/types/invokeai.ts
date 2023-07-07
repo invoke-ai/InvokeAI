@@ -107,7 +107,7 @@ export type SDFeature =
   | 'seamless'
   | 'hires'
   | 'lora'
-  | 'tiEmbedding'
+  | 'embedding'
   | 'vae';
 
 /**

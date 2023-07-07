@@ -72,7 +72,7 @@ const ParamNegativeConditioning = () => {
     [dispatch, onClose, negativePrompt]
   );
 
-  const isTiEmbeddingEnabled = useFeatureStatus('tiEmbedding').isFeatureEnabled;
+  const isEmbeddingEnabled = useFeatureStatus('embedding').isFeatureEnabled;
 
   return (
     <FormControl>
@@ -91,10 +91,10 @@ const ParamNegativeConditioning = () => {
           resize="vertical"
           fontSize="sm"
           minH={16}
-          {...(isTiEmbeddingEnabled && { onKeyDown: handleKeyDown })}
+          {...(isEmbeddingEnabled && { onKeyDown: handleKeyDown })}
         />
       </ParamEmbeddingPopover>
-      {!isOpen && isTiEmbeddingEnabled && (
+      {!isOpen && isEmbeddingEnabled && (
         <Box
           sx={{
             position: 'absolute',

@@ -102,7 +102,7 @@ const ParamPositiveConditioning = () => {
     [dispatch, onClose, prompt]
   );
 
-  const isTiEmbeddingEnabled = useFeatureStatus('tiEmbedding').isFeatureEnabled;
+  const isEmbeddingEnabled = useFeatureStatus('embedding').isFeatureEnabled;
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -111,11 +111,11 @@ const ParamPositiveConditioning = () => {
         dispatch(clampSymmetrySteps());
         dispatch(userInvoked(activeTabName));
       }
-      if (isTiEmbeddingEnabled && e.key === '<') {
+      if (isEmbeddingEnabled && e.key === '<') {
         onOpen();
       }
     },
-    [isReady, dispatch, activeTabName, onOpen, isTiEmbeddingEnabled]
+    [isReady, dispatch, activeTabName, onOpen, isEmbeddingEnabled]
   );
 
   // const handleSelect = (e: MouseEvent<HTMLTextAreaElement>) => {
@@ -144,7 +144,7 @@ const ParamPositiveConditioning = () => {
           />
         </ParamEmbeddingPopover>
       </FormControl>
-      {!isOpen && isTiEmbeddingEnabled && (
+      {!isOpen && isEmbeddingEnabled && (
         <Box
           sx={{
             position: 'absolute',
