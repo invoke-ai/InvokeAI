@@ -11,5 +11,7 @@ export const galleryPersistDenylist: (keyof typeof initialGalleryState)[] = [
   'limit',
   'offset',
   'selectedBoardId',
+  'categories',
+  'galleryView',
   'total',
 ];

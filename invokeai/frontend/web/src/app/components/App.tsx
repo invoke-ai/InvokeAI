@@ -1,5 +1,6 @@
 import { Flex, Grid, Portal } from '@chakra-ui/react';
 import { useLogger } from 'app/logging/useLogger';
+import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploader from 'common/components/ImageUploader';
@@ -45,6 +46,10 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
     log.info({ namespace: 'App', data: config }, 'Received config');
     dispatch(configChanged(config));
   }, [dispatch, config, log]);
+
+  useEffect(() => {
+    dispatch(appStarted());
+  }, [dispatch]);
 
   return (
     <>
