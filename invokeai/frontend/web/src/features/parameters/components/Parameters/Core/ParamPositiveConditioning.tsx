@@ -1,11 +1,10 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
 
 import { createSelector } from '@reduxjs/toolkit';
 import {
-  GenerationState,
   clampSymmetrySteps,
   setPositivePrompt,
 } from 'features/parameters/store/generationSlice';
@@ -22,10 +21,11 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
 const promptInputSelector = createSelector(
-  [(state: RootState) => state.generation, activeTabNameSelector],
-  (parameters: GenerationState, activeTabName) => {
+  [stateSelector, activeTabNameSelector],
+  ({ generation, ui }, activeTabName) => {
     return {
-      prompt: parameters.positivePrompt,
+      shouldPinParametersPanel: ui.shouldPinParametersPanel,
+      prompt: generation.positivePrompt,
       activeTabName,
     };
   },
@@ -41,7 +41,8 @@ const promptInputSelector = createSelector(
  */
 const ParamPositiveConditioning = () => {
   const dispatch = useAppDispatch();
-  const { prompt, activeTabName } = useAppSelector(promptInputSelector);
+  const { prompt, shouldPinParametersPanel, activeTabName } =
+    useAppSelector(promptInputSelector);
   const isReady = useIsReadyToInvoke();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
@@ -120,7 +121,7 @@ const ParamPositiveConditioning = () => {
   // };
 
   return (
-    <Box>
+    <Box position="relative">
       <FormControl>
         <ParamEmbeddingPopover
           isOpen={isOpen}
@@ -144,7 +145,7 @@ const ParamPositiveConditioning = () => {
         <Box
           sx={{
             position: 'absolute',
-            top: 6,
+            top: shouldPinParametersPanel ? 6 : 0,
             insetInlineEnd: 0,
           }}
         >

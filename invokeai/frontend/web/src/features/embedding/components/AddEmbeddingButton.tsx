@@ -1,6 +1,6 @@
 import IAIIconButton from 'common/components/IAIIconButton';
 import { memo } from 'react';
-import { BiCode } from 'react-icons/bi';
+import { FaCode } from 'react-icons/fa';
 
 type Props = {
   onClick: () => void;
@@ -13,15 +13,24 @@ const AddEmbeddingButton = (props: Props) => {
       size="sm"
       aria-label="Add Embedding"
       tooltip="Add Embedding"
-      icon={<BiCode />}
+      icon={<FaCode />}
       sx={{
         p: 2,
-        color: 'base.700',
+        color: 'base.500',
         _hover: {
-          color: 'base.550',
+          color: 'base.600',
         },
         _active: {
+          color: 'base.700',
+        },
+        _dark: {
           color: 'base.500',
+          _hover: {
+            color: 'base.400',
+          },
+          _active: {
+            color: 'base.300',
+          },
         },
       }}
       variant="link"
