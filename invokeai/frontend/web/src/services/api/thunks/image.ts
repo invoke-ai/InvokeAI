@@ -157,8 +157,6 @@ export const imageUploaded = createAppAsyncThunk<
     session_id,
   } = arg;
   const { post } = $client.get();
-  const formData = new FormData();
-  formData.append('file', file);
   const { data, error, response } = await post('/api/v1/images/', {
     params: {
       query: {
@@ -167,8 +165,12 @@ export const imageUploaded = createAppAsyncThunk<
         session_id,
       },
     },
-    // @ts-ignore
-    body: formData
+    body: { file },
+    bodySerializer: (body) => {
+      const formData = new FormData();
+      formData.append('file', body.file);
+      return formData;
+    },
   });
 
   if (error) {
@@ -215,7 +217,7 @@ export const imageDeleted = createAppAsyncThunk<
 
 type UpdateImageArg =
   paths['/api/v1/images/{image_name}']['patch']['requestBody']['content']['application/json'] &
-  paths['/api/v1/images/{image_name}']['patch']['parameters']['path'];
+    paths['/api/v1/images/{image_name}']['patch']['parameters']['path'];
 
 type UpdateImageResponse =
   paths['/api/v1/images/{image_name}']['patch']['responses']['200']['content']['application/json'];
