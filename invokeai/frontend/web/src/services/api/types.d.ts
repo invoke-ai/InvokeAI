@@ -8,6 +8,9 @@ type schemas = components['schemas'];
  */
 type TypeReq<T> = O.Required<T, 'type'>;
 
+// App Info
+export type AppVersion = components['schemas']['AppVersion'];
+
 // Images
 export type ImageDTO = components['schemas']['ImageDTO'];
 export type BoardDTO = components['schemas']['BoardDTO'];
