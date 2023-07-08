@@ -1,7 +1,9 @@
 import { Tooltip, useColorMode, useToken } from '@chakra-ui/react';
 import { Select, SelectProps } from '@mantine/core';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
-import { memo } from 'react';
+import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
+import { KeyboardEvent, memo, useCallback } from 'react';
 import { mode } from 'theme/util/mode';
 
 export type IAISelectDataType = {
@@ -16,6 +18,7 @@ type IAISelectProps = SelectProps & {
 
 const IAIMantineSelect = (props: IAISelectProps) => {
   const { searchable = true, tooltip, ...rest } = props;
+  const dispatch = useAppDispatch();
   const {
     base50,
     base100,
@@ -36,11 +39,31 @@ const IAIMantineSelect = (props: IAISelectProps) => {
 
   const { colorMode } = useColorMode();
 
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.shiftKey) {
+        dispatch(shiftKeyPressed(true));
+      }
+    },
+    [dispatch]
+  );
+
+  const handleKeyUp = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (!e.shiftKey) {
+        dispatch(shiftKeyPressed(false));
+      }
+    },
+    [dispatch]
+  );
+
   const [boxShadow] = useToken('shadows', ['dark-lg']);
 
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
       <Select
+        onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
         searchable={searchable}
         styles={() => ({
           label: {
