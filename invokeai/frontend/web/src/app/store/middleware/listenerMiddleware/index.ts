@@ -1,49 +1,67 @@
+import type { TypedAddListener, TypedStartListening } from '@reduxjs/toolkit';
 import {
-  createListenerMiddleware,
-  addListener,
-  ListenerEffect,
   AnyAction,
+  ListenerEffect,
+  addListener,
+  createListenerMiddleware,
 } from '@reduxjs/toolkit';
-import type { TypedStartListening, TypedAddListener } from '@reduxjs/toolkit';
 
-import type { RootState, AppDispatch } from '../../store';
-import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
+import type { AppDispatch, RootState } from '../../store';
+import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
+import { addAppStartedListener } from './listeners/appStarted';
+import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
+import { addRequestedBoardImageDeletionListener } from './listeners/boardImagesDeleted';
+import { addCanvasCopiedToClipboardListener } from './listeners/canvasCopiedToClipboard';
+import { addCanvasDownloadedAsImageListener } from './listeners/canvasDownloadedAsImage';
+import { addCanvasMergedListener } from './listeners/canvasMerged';
+import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGallery';
+import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
+import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
 import {
-  addImageUploadedFulfilledListener,
-  addImageUploadedRejectedListener,
-} from './listeners/imageUploaded';
+  addImageAddedToBoardFulfilledListener,
+  addImageAddedToBoardRejectedListener,
+} from './listeners/imageAddedToBoard';
 import {
   addImageDeletedFulfilledListener,
   addImageDeletedPendingListener,
   addImageDeletedRejectedListener,
   addRequestedImageDeletionListener,
 } from './listeners/imageDeleted';
-import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
-import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
-import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
-import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
-import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGallery';
-import { addCanvasDownloadedAsImageListener } from './listeners/canvasDownloadedAsImage';
-import { addCanvasCopiedToClipboardListener } from './listeners/canvasCopiedToClipboard';
-import { addCanvasMergedListener } from './listeners/canvasMerged';
-import { addGeneratorProgressEventListener as addGeneratorProgressListener } from './listeners/socketio/socketGeneratorProgress';
-import { addGraphExecutionStateCompleteEventListener as addGraphExecutionStateCompleteListener } from './listeners/socketio/socketGraphExecutionStateComplete';
-import { addInvocationCompleteEventListener as addInvocationCompleteListener } from './listeners/socketio/socketInvocationComplete';
-import { addInvocationErrorEventListener as addInvocationErrorListener } from './listeners/socketio/socketInvocationError';
-import { addInvocationStartedEventListener as addInvocationStartedListener } from './listeners/socketio/socketInvocationStarted';
-import { addSocketConnectedEventListener as addSocketConnectedListener } from './listeners/socketio/socketConnected';
-import { addSocketDisconnectedEventListener as addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
-import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
-import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
-import { addSessionReadyToInvokeListener } from './listeners/sessionReadyToInvoke';
+import { addImageDroppedListener } from './listeners/imageDropped';
 import {
   addImageMetadataReceivedFulfilledListener,
   addImageMetadataReceivedRejectedListener,
 } from './listeners/imageMetadataReceived';
 import {
+  addImageRemovedFromBoardFulfilledListener,
+  addImageRemovedFromBoardRejectedListener,
+} from './listeners/imageRemovedFromBoard';
+import { addImageToDeleteSelectedListener } from './listeners/imageToDeleteSelected';
+import {
+  addImageUpdatedFulfilledListener,
+  addImageUpdatedRejectedListener,
+} from './listeners/imageUpdated';
+import {
+  addImageUploadedFulfilledListener,
+  addImageUploadedRejectedListener,
+} from './listeners/imageUploaded';
+import {
   addImageUrlsReceivedFulfilledListener,
   addImageUrlsReceivedRejectedListener,
 } from './listeners/imageUrlsReceived';
+import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
+import { addModelSelectedListener } from './listeners/modelSelected';
+import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
+import {
+  addReceivedPageOfImagesFulfilledListener,
+  addReceivedPageOfImagesRejectedListener,
+} from './listeners/receivedPageOfImages';
+import { addSelectionAddedToBatchListener } from './listeners/selectionAddedToBatch';
+import {
+  addSessionCanceledFulfilledListener,
+  addSessionCanceledPendingListener,
+  addSessionCanceledRejectedListener,
+} from './listeners/sessionCanceled';
 import {
   addSessionCreatedFulfilledListener,
   addSessionCreatedPendingListener,
@@ -54,39 +72,21 @@ import {
   addSessionInvokedPendingListener,
   addSessionInvokedRejectedListener,
 } from './listeners/sessionInvoked';
-import {
-  addSessionCanceledFulfilledListener,
-  addSessionCanceledPendingListener,
-  addSessionCanceledRejectedListener,
-} from './listeners/sessionCanceled';
-import {
-  addImageUpdatedFulfilledListener,
-  addImageUpdatedRejectedListener,
-} from './listeners/imageUpdated';
-import {
-  addReceivedPageOfImagesFulfilledListener,
-  addReceivedPageOfImagesRejectedListener,
-} from './listeners/receivedPageOfImages';
+import { addSessionReadyToInvokeListener } from './listeners/sessionReadyToInvoke';
+import { addSocketConnectedEventListener as addSocketConnectedListener } from './listeners/socketio/socketConnected';
+import { addSocketDisconnectedEventListener as addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
+import { addGeneratorProgressEventListener as addGeneratorProgressListener } from './listeners/socketio/socketGeneratorProgress';
+import { addGraphExecutionStateCompleteEventListener as addGraphExecutionStateCompleteListener } from './listeners/socketio/socketGraphExecutionStateComplete';
+import { addInvocationCompleteEventListener as addInvocationCompleteListener } from './listeners/socketio/socketInvocationComplete';
+import { addInvocationErrorEventListener as addInvocationErrorListener } from './listeners/socketio/socketInvocationError';
+import { addInvocationStartedEventListener as addInvocationStartedListener } from './listeners/socketio/socketInvocationStarted';
+import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
+import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
-import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
-import { addImageCategoriesChangedListener } from './listeners/imageCategoriesChanged';
-import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
-import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
-import {
-  addImageAddedToBoardFulfilledListener,
-  addImageAddedToBoardRejectedListener,
-} from './listeners/imageAddedToBoard';
-import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
-import {
-  addImageRemovedFromBoardFulfilledListener,
-  addImageRemovedFromBoardRejectedListener,
-} from './listeners/imageRemovedFromBoard';
-import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
-import { addRequestedBoardImageDeletionListener } from './listeners/boardImagesDeleted';
-import { addSelectionAddedToBatchListener } from './listeners/selectionAddedToBatch';
-import { addImageDroppedListener } from './listeners/imageDropped';
-import { addImageToDeleteSelectedListener } from './listeners/imageToDeleteSelected';
-import { addModelSelectedListener } from './listeners/modelSelected';
+import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
+import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
+import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
+import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -196,9 +196,6 @@ addSessionCanceledRejectedListener();
 addReceivedPageOfImagesFulfilledListener();
 addReceivedPageOfImagesRejectedListener();
 
-// Gallery
-addImageCategoriesChangedListener();
-
 // ControlNet
 addControlNetImageProcessedListener();
 addControlNetAutoProcessListener();
@@ -224,3 +221,6 @@ addImageDroppedListener();
 
 // Models
 addModelSelectedListener();
+
+// app startup
+addAppStartedListener();
