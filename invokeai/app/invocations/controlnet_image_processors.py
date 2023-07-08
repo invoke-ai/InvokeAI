@@ -141,6 +141,7 @@ class ControlField(BaseModel):
             "ui": {
                 "type_hints": {
                     "control_weight": "float",
+                    "control_model": "controlnet_model",
                     # "control_weight": "number",
                 }
             }
