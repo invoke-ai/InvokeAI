@@ -9,7 +9,7 @@ import {
 import { SelectItem } from '@mantine/core';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
 import { forEach } from 'lodash-es';
@@ -61,12 +61,12 @@ const ParamEmbeddingPopover = (props: Props) => {
   }, [embeddingQueryData, currentMainModel?.base_model]);
 
   const handleChange = useCallback(
-    (v: string[]) => {
-      if (v.length === 0) {
+    (v: string | null) => {
+      if (!v) {
         return;
       }
 
-      onSelect(v[0]);
+      onSelect(v);
     },
     [onSelect]
   );
@@ -106,16 +106,16 @@ const ParamEmbeddingPopover = (props: Props) => {
               </Text>
             </Flex>
           ) : (
-            <IAIMantineMultiSelect
+            <IAIMantineSelect
               inputRef={inputRef}
+              autoFocus
               placeholder={'Add Embedding'}
-              value={[]}
+              value={null}
               data={data}
-              maxDropdownHeight={400}
-              nothingFound="No Matching Embeddings"
+              nothingFound="No matching Embeddings"
               itemComponent={IAIMantineSelectItemWithTooltip}
               disabled={data.length === 0}
-              filter={(value, selected, item: SelectItem) =>
+              filter={(value, item: SelectItem) =>
                 item.label
                   ?.toLowerCase()
                   .includes(value.toLowerCase().trim()) ||
