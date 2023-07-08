@@ -56,7 +56,7 @@ IF /I "%choice%" == "1" (
     call cmd /k
 ) ELSE IF /I "%choice%" == "9" (
    echo Running invokeai-update...
-   python .venv\Scripts\invokeai-update.exe %*
+   python -m invokeai.frontend.install.invokeai_update
 ) ELSE IF /I "%choice%" == "10" (
     echo Displaying command line help...
     python .venv\Scripts\invokeai.exe --help %*

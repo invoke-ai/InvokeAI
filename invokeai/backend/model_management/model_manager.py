@@ -853,16 +853,22 @@ class ModelManager(object):
                         scanned_dirs.add(path)
                         continue
                     if any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}]):
-                        new_models_found.update(installer.heuristic_import(path))
-                        scanned_dirs.add(path)
+                        try:
+                            new_models_found.update(installer.heuristic_import(path))
+                            scanned_dirs.add(path)
+                        except ValueError as e:
+                            self.logger.warning(str(e))
 
                 for f in files:
                     path = Path(root) / f
                     if path in known_paths or path.parent in scanned_dirs:
                         continue
                     if path.suffix in {'.ckpt','.bin','.pth','.safetensors','.pt'}:
-                        import_result = installer.heuristic_import(path)
-                        new_models_found.update(import_result)
+                        try:
+                            import_result = installer.heuristic_import(path)
+                            new_models_found.update(import_result)
+                        except ValueError as e:
+                            self.logger.warning(str(e))
 
             self.logger.info(f'Scanned {items_scanned} files and directories, imported {len(new_models_found)} models')
             installed.update(new_models_found)
