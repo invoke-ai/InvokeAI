@@ -19,6 +19,8 @@ import IAIPopover from 'common/components/IAIPopover';
 import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAISlider from 'common/components/IAISlider';
 import {
+  IMAGE_LIMIT,
+  INITIAL_IMAGE_LIMIT,
   setGalleryImageMinimumWidth,
   setGalleryView,
 } from 'features/gallery/store/gallerySlice';
@@ -60,8 +62,6 @@ import { ImageDTO } from 'services/api/types';
 import { mode } from 'theme/util/mode';
 import BoardsList from './Boards/BoardsList';
 
-const LOADING_IMAGE_ARRAY = Array(20).fill('loading');
-
 const selector = createSelector(
   [stateSelector, selectFilteredImages],
   (state, filteredImages) => {
@@ -73,13 +73,17 @@ const selector = createSelector(
       galleryImageMinimumWidth,
       galleryView,
       shouldAutoSwitch,
+      isInitialized,
     } = state.gallery;
     const { shouldPinGallery } = state.ui;
 
     const images = filteredImages as (ImageDTO | string)[];
+    const skeletonCount = !isInitialized ? INITIAL_IMAGE_LIMIT : IMAGE_LIMIT;
 
     return {
-      images: isLoading ? images.concat(LOADING_IMAGE_ARRAY) : images,
+      images: isLoading
+        ? images.concat(Array(skeletonCount).fill('loading'))
+        : images,
       allImagesTotal,
       isLoading,
       categories,
