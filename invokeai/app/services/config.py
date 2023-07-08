@@ -168,7 +168,7 @@ from argparse import ArgumentParser
 from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
 from pydantic import BaseSettings, Field, parse_obj_as
-from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
+from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path('invokeai.yaml')
 MODEL_CORE = Path('models/core')
@@ -269,8 +269,8 @@ class InvokeAISettings(BaseSettings):
         parser.add_parser(cls.cmd_name(), help=cls.__doc__)
 
     @classmethod
-    def _excluded(self)->List[str]:
-        return ['type','initconf']
+    def _excluded(self)->Set[str]:
+        return {'type','initconf','version'}
 
     class Config:
         env_file_encoding = 'utf-8'
