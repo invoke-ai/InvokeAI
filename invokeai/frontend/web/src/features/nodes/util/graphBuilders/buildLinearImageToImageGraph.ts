@@ -1,6 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
+import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   ImageCollectionInvocation,
   ImageResizeInvocation,
@@ -48,6 +49,8 @@ export const buildLinearImageToImageGraph = (
     width,
     height,
     clipSkip,
+    shouldUseCpuNoise,
+    shouldUseNoiseSettings,
   } = state.generation;
 
   const {
@@ -74,6 +77,10 @@ export const buildLinearImageToImageGraph = (
   }
 
   const model = modelIdToMainModelField(currentModel?.id || '');
+
+  const use_cpu = shouldUseNoiseSettings
+    ? shouldUseCpuNoise
+    : initialGenerationState.shouldUseCpuNoise;
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
@@ -102,6 +109,7 @@ export const buildLinearImageToImageGraph = (
       [NOISE]: {
         type: 'noise',
         id: NOISE,
+        use_cpu,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
