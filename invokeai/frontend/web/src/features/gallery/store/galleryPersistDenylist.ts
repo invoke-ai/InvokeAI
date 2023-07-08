@@ -14,4 +14,5 @@ export const galleryPersistDenylist: (keyof typeof initialGalleryState)[] = [
   'categories',
   'galleryView',
   'total',
+  'isInitialized',
 ];

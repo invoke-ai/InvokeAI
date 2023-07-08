@@ -28,6 +28,9 @@ export const ASSETS_CATEGORIES: ImageCategory[] = [
   'other',
 ];
 
+export const INITIAL_IMAGE_LIMIT = 100;
+export const IMAGE_LIMIT = 20;
+
 type AdditionaGalleryState = {
   offset: number;
   limit: number;
@@ -39,6 +42,7 @@ type AdditionaGalleryState = {
   shouldAutoSwitch: boolean;
   galleryImageMinimumWidth: number;
   galleryView: 'images' | 'assets';
+  isInitialized: boolean;
 };
 
 export const initialGalleryState =
@@ -50,8 +54,9 @@ export const initialGalleryState =
     categories: IMAGE_CATEGORIES,
     selection: [],
     shouldAutoSwitch: true,
-    galleryImageMinimumWidth: 64,
+    galleryImageMinimumWidth: 96,
     galleryView: 'images',
+    isInitialized: false,
   });
 
 export const gallerySlice = createSlice({
@@ -136,6 +141,9 @@ export const gallerySlice = createSlice({
     boardIdSelected: (state, action: PayloadAction<string | undefined>) => {
       state.selectedBoardId = action.payload;
     },
+    isInitializedChanged: (state, action: PayloadAction<boolean>) => {
+      state.isInitialized = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(receivedPageOfImages.pending, (state) => {
@@ -151,12 +159,7 @@ export const gallerySlice = createSlice({
 
       const { items, offset, limit, total } = action.payload;
 
-      const transformedItems = items.map((item) => ({
-        ...item,
-        isSelected: false,
-      }));
-
-      imagesAdapter.upsertMany(state, transformedItems);
+      imagesAdapter.upsertMany(state, items);
 
       if (state.selection.length === 0 && items.length) {
         state.selection = [items[0].image_name];
@@ -211,6 +214,7 @@ export const {
   setGalleryImageMinimumWidth,
   setGalleryView,
   boardIdSelected,
+  isInitializedChanged,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
