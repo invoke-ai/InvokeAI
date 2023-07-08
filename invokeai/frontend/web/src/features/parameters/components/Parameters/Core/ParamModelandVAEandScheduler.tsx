@@ -10,20 +10,19 @@ const ParamModelandVAEandScheduler = () => {
 
   return (
     <Flex gap={3} w="full" flexWrap={isVaeEnabled ? 'wrap' : 'nowrap'}>
+      <Box w="full">
+        <ModelSelect />
+      </Box>
       <Flex gap={3} w="full">
-        <Box w="full">
-          <ModelSelect />
-        </Box>
-
         {isVaeEnabled && (
           <Box w="full">
             <VAESelect />
           </Box>
         )}
+        <Box w="full">
+          <ParamScheduler />
+        </Box>
       </Flex>
-      <Box w="full">
-        <ParamScheduler />
-      </Box>
     </Flex>
   );
 };
