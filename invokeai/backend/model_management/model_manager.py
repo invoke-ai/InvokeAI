@@ -231,6 +231,7 @@ from __future__ import annotations
 import os
 import hashlib
 import textwrap
+import yaml
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List, Tuple, Union, Dict, Set, Callable, types
@@ -314,6 +315,9 @@ class ModelManager(object):
         self.config_path = None
         if isinstance(config, (str, Path)):
             self.config_path = Path(config)
+            if not self.config_path.exists():
+                logger.warning(f'The file {self.config_path} was not found. Initializing a new file')
+                self.initialize_model_config(self.config_path)
             config = OmegaConf.load(self.config_path)
 
         elif not isinstance(config, DictConfig):
@@ -385,6 +389,16 @@ class ModelManager(object):
 
     def _get_model_cache_path(self, model_path):
         return self.app_config.models_path / ".cache" / hashlib.md5(str(model_path).encode()).hexdigest()
+
+    @classmethod
+    def initialize_model_config(cls, config_path: Path):
+        """Create empty config file"""
+        with open(config_path,'w') as yaml_file:
+            yaml_file.write(yaml.dump({'__metadata__':
+                                       {'version':'3.0.0'}
+                                       }
+                                      )
+                            )
 
     def get_model(
         self,

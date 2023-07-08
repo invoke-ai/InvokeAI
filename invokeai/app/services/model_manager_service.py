@@ -258,9 +258,7 @@ class ModelManagerService(ModelManagerServiceBase):
             config_file = config.model_conf_path
         else:
             config_file = config.root_dir / "configs/models.yaml"
-        if not config_file.exists():
-            raise IOError(f"The file {config_file} could not be found.")
-
+            
         logger.debug(f'config file={config_file}')
 
         device = torch.device(choose_torch_device())
