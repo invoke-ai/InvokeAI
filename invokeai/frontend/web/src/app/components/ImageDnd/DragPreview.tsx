@@ -55,6 +55,7 @@ const DragPreview = (props: OverlayDragImageProps) => {
   }
 
   if (props.dragData.payloadType === 'IMAGE_DTO') {
+    const { thumbnail_url, width, height } = props.dragData.payload.imageDTO;
     return (
       <Box
         sx={{
@@ -72,7 +73,10 @@ const DragPreview = (props: OverlayDragImageProps) => {
           sx={{
             ...STYLES,
           }}
-          src={props.dragData.payload.imageDTO.thumbnail_url}
+          objectFit="contain"
+          src={thumbnail_url}
+          width={width}
+          height={height}
         />
       </Box>
     );
