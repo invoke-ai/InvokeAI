@@ -14,10 +14,19 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPastePropagation } from 'common/util/stopPastePropagation';
+import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
 import { clamp } from 'lodash-es';
 
-import { FocusEvent, memo, useEffect, useState } from 'react';
+import {
+  FocusEvent,
+  KeyboardEvent,
+  memo,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 
 const numberStringRegex = /^-?(0\.)?\.?$/;
 
@@ -59,6 +68,8 @@ const IAINumberInput = (props: Props) => {
     tooltipProps,
     ...rest
   } = props;
+
+  const dispatch = useAppDispatch();
 
   /**
    * Using a controlled input with a value that accepts decimals needs special
@@ -109,6 +120,24 @@ const IAINumberInput = (props: Props) => {
     onChange(clamped);
   };
 
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.shiftKey) {
+        dispatch(shiftKeyPressed(true));
+      }
+    },
+    [dispatch]
+  );
+
+  const handleKeyUp = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (!e.shiftKey) {
+        dispatch(shiftKeyPressed(false));
+      }
+    },
+    [dispatch]
+  );
+
   return (
     <Tooltip {...tooltipProps}>
       <FormControl
@@ -128,7 +157,11 @@ const IAINumberInput = (props: Props) => {
           {...rest}
           onPaste={stopPastePropagation}
         >
-          <NumberInputField {...numberInputFieldProps} />
+          <NumberInputField
+            {...numberInputFieldProps}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleKeyUp}
+          />
           {showStepper && (
             <NumberInputStepper>
               <NumberIncrementStepper {...numberInputStepperProps} />

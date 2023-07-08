@@ -1,6 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
+import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   ImageDTO,
   ImageResizeInvocation,
@@ -42,15 +43,18 @@ export const buildCanvasImageToImageGraph = (
     steps,
     img2imgStrength: strength,
     clipSkip,
-    iterations,
-    seed,
-    shouldRandomizeSeed,
+    shouldUseCpuNoise,
+    shouldUseNoiseSettings,
   } = state.generation;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
   const model = modelIdToMainModelField(currentModel?.id || '');
+
+  const use_cpu = shouldUseNoiseSettings
+    ? shouldUseCpuNoise
+    : initialGenerationState.shouldUseCpuNoise;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -78,6 +82,7 @@ export const buildCanvasImageToImageGraph = (
       [NOISE]: {
         type: 'noise',
         id: NOISE,
+        use_cpu,
       },
       [MAIN_MODEL_LOADER]: {
         type: 'main_model_loader',

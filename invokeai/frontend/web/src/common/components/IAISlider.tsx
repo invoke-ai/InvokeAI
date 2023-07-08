@@ -26,9 +26,12 @@ import {
 } from '@chakra-ui/react';
 import { clamp } from 'lodash-es';
 
+import { useAppDispatch } from 'app/store/storeHooks';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
+import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
 import {
   FocusEvent,
+  KeyboardEvent,
   memo,
   MouseEvent,
   useCallback,
@@ -56,7 +59,6 @@ export type IAIFullSliderProps = {
   withInput?: boolean;
   isInteger?: boolean;
   inputWidth?: string | number;
-  inputReadOnly?: boolean;
   withReset?: boolean;
   handleReset?: () => void;
   tooltipSuffix?: string;
@@ -90,7 +92,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
     withInput = false,
     isInteger = false,
     inputWidth = 16,
-    inputReadOnly = false,
     withReset = false,
     hideTooltip = false,
     isCompact = false,
@@ -109,7 +110,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
     sliderIAIIconButtonProps,
     ...rest
   } = props;
-
+  const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const [localInputValue, setLocalInputValue] = useState<
@@ -152,6 +153,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
   );
 
   const handleInputChange = useCallback((v: number | string) => {
+    console.log('input');
     setLocalInputValue(v);
   }, []);
 
@@ -167,6 +169,24 @@ const IAISlider = (props: IAIFullSliderProps) => {
       e.target.focus();
     }
   }, []);
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.shiftKey) {
+        dispatch(shiftKeyPressed(true));
+      }
+    },
+    [dispatch]
+  );
+
+  const handleKeyUp = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (!e.shiftKey) {
+        dispatch(shiftKeyPressed(false));
+      }
+    },
+    [dispatch]
+  );
 
   return (
     <FormControl
@@ -311,7 +331,8 @@ const IAISlider = (props: IAIFullSliderProps) => {
             {...sliderNumberInputProps}
           >
             <NumberInputField
-              readOnly={inputReadOnly}
+              onKeyDown={handleKeyDown}
+              onKeyUp={handleKeyUp}
               minWidth={inputWidth}
               {...sliderNumberInputFieldProps}
             />
