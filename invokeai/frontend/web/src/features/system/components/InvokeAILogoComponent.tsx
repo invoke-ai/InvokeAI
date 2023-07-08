@@ -1,12 +1,9 @@
-import { Flex, Text, Image } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { Flex, Image, Text } from '@chakra-ui/react';
 import InvokeAILogoImage from 'assets/images/logo.png';
+import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
 const InvokeAILogoComponent = () => {
-  const appVersion = useAppSelector(
-    (state: RootState) => state.system.app_version
-  );
+  const { data: appVersion } = useGetAppVersionQuery();
 
   return (
     <Flex alignItems="center" gap={3} ps={1}>
@@ -21,19 +18,23 @@ const InvokeAILogoComponent = () => {
           userSelect: 'none',
         }}
       />
-      <Flex sx={{ gap: 3 }}>
+      <Flex sx={{ gap: 3, alignItems: 'center' }}>
         <Text sx={{ fontSize: 'xl', userSelect: 'none' }}>
           invoke <strong>ai</strong>
         </Text>
-        <Text
-          sx={{
-            fontWeight: 300,
-            marginTop: 1,
-          }}
-          variant="subtext"
-        >
-          {appVersion}
-        </Text>
+        {appVersion && (
+          <Text
+            sx={{
+              fontWeight: 600,
+              marginTop: 1,
+              color: 'base.300',
+              fontSize: 14,
+            }}
+            variant="subtext"
+          >
+            {appVersion.version}
+          </Text>
+        )}
       </Flex>
     </Flex>
   );
