@@ -1,12 +1,17 @@
 import { Flex, Image, Text } from '@chakra-ui/react';
 import InvokeAILogoImage from 'assets/images/logo.png';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useRef } from 'react';
+import { useHoverDirty } from 'react-use';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
 const InvokeAILogoComponent = () => {
   const { data: appVersion } = useGetAppVersionQuery();
+  const ref = useRef(null);
+  const isHovered = useHoverDirty(ref);
 
   return (
-    <Flex alignItems="center" gap={3} ps={1}>
+    <Flex alignItems="center" gap={3} ps={1} ref={ref}>
       <Image
         src={InvokeAILogoImage}
         alt="invoke-ai-logo"
@@ -22,19 +27,36 @@ const InvokeAILogoComponent = () => {
         <Text sx={{ fontSize: 'xl', userSelect: 'none' }}>
           invoke <strong>ai</strong>
         </Text>
-        {appVersion && (
-          <Text
-            sx={{
-              fontWeight: 600,
-              marginTop: 1,
-              color: 'base.300',
-              fontSize: 14,
-            }}
-            variant="subtext"
-          >
-            {appVersion.version}
-          </Text>
-        )}
+        <AnimatePresence>
+          {isHovered && appVersion && (
+            <motion.div
+              key="statusText"
+              initial={{
+                opacity: 0,
+              }}
+              animate={{
+                opacity: 1,
+                transition: { duration: 0.15 },
+              }}
+              exit={{
+                opacity: 0,
+                transition: { delay: 0.8 },
+              }}
+            >
+              <Text
+                sx={{
+                  fontWeight: 600,
+                  marginTop: 1,
+                  color: 'base.300',
+                  fontSize: 14,
+                }}
+                variant="subtext"
+              >
+                {appVersion.version}
+              </Text>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Flex>
     </Flex>
   );
