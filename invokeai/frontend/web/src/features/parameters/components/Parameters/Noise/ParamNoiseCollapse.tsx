@@ -7,6 +7,7 @@ import IAICollapse from 'common/components/IAICollapse';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ParamCpuNoiseToggle } from './ParamCpuNoise';
 import ParamNoiseThreshold from './ParamNoiseThreshold';
 import { ParamNoiseToggle } from './ParamNoiseToggle';
 import ParamPerlinNoise from './ParamPerlinNoise';
@@ -40,6 +41,7 @@ const ParamNoiseCollapse = () => {
     >
       <Flex sx={{ gap: 2, flexDirection: 'column' }}>
         <ParamNoiseToggle />
+        <ParamCpuNoiseToggle />
         <ParamPerlinNoise />
         <ParamNoiseThreshold />
       </Flex>
