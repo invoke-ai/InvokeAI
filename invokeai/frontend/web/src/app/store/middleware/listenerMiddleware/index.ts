@@ -21,7 +21,6 @@ import {
   addImageAddedToBoardFulfilledListener,
   addImageAddedToBoardRejectedListener,
 } from './listeners/imageAddedToBoard';
-import { addImageCategoriesChangedListener } from './listeners/imageCategoriesChanged';
 import {
   addImageDeletedFulfilledListener,
   addImageDeletedPendingListener,
@@ -196,9 +195,6 @@ addSessionCanceledRejectedListener();
 // Fetching images
 addReceivedPageOfImagesFulfilledListener();
 addReceivedPageOfImagesRejectedListener();
-
-// Gallery
-addImageCategoriesChangedListener();
 
 // ControlNet
 addControlNetImageProcessedListener();
