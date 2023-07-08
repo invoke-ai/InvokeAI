@@ -56,7 +56,6 @@ export type IAIFullSliderProps = {
   withInput?: boolean;
   isInteger?: boolean;
   inputWidth?: string | number;
-  inputReadOnly?: boolean;
   withReset?: boolean;
   handleReset?: () => void;
   tooltipSuffix?: string;
@@ -90,7 +89,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
     withInput = false,
     isInteger = false,
     inputWidth = 16,
-    inputReadOnly = false,
     withReset = false,
     hideTooltip = false,
     isCompact = false,
@@ -152,6 +150,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
   );
 
   const handleInputChange = useCallback((v: number | string) => {
+    console.log('input');
     setLocalInputValue(v);
   }, []);
 
@@ -311,7 +310,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
             {...sliderNumberInputProps}
           >
             <NumberInputField
-              readOnly={inputReadOnly}
               minWidth={inputWidth}
               {...sliderNumberInputFieldProps}
             />

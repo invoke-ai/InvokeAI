@@ -51,7 +51,6 @@ const ParamDynamicPromptsMaxPrompts = () => {
       sliderNumberInputProps={{ max: inputMax }}
       withSliderMarks
       withInput
-      inputReadOnly
       withReset
       handleReset={handleReset}
     />
