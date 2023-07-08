@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, validator
 
 from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
+from invokeai.backend.model_management.models.base import ModelType
 
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
@@ -257,7 +258,7 @@ class TextToLatentsInvocation(BaseInvocation):
             control_models = []
             for control_info in control_list:
                 control_model = exit_stack.enter_context(
-                    context.model_manager.get_model(
+                    context.services.model_manager.get_model(
                         model_name=control_info.control_model.model_name,
                         model_type=ModelType.ControlNet,
                         base_model=control_info.control_model.base_model,
