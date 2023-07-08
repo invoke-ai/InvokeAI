@@ -36,6 +36,7 @@ type AdditionaGalleryState = {
   limit: number;
   total: number;
   isLoading: boolean;
+  isFetching: boolean;
   categories: ImageCategory[];
   selectedBoardId?: string;
   selection: string[];
@@ -51,6 +52,7 @@ export const initialGalleryState =
     limit: 0,
     total: 0,
     isLoading: true,
+    isFetching: true,
     categories: IMAGE_CATEGORIES,
     selection: [],
     shouldAutoSwitch: true,
@@ -141,19 +143,19 @@ export const gallerySlice = createSlice({
     boardIdSelected: (state, action: PayloadAction<string | undefined>) => {
       state.selectedBoardId = action.payload;
     },
-    isInitializedChanged: (state, action: PayloadAction<boolean>) => {
-      state.isInitialized = action.payload;
+    isLoadingChanged: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
     },
   },
   extraReducers: (builder) => {
     builder.addCase(receivedPageOfImages.pending, (state) => {
-      state.isLoading = true;
+      state.isFetching = true;
     });
     builder.addCase(receivedPageOfImages.rejected, (state) => {
-      state.isLoading = false;
+      state.isFetching = false;
     });
     builder.addCase(receivedPageOfImages.fulfilled, (state, action) => {
-      state.isLoading = false;
+      state.isFetching = false;
       const { board_id, categories, image_origin, is_intermediate } =
         action.meta.arg;
 
@@ -214,7 +216,7 @@ export const {
   setGalleryImageMinimumWidth,
   setGalleryView,
   boardIdSelected,
-  isInitializedChanged,
+  isLoadingChanged,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
