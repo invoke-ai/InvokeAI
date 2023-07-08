@@ -58,7 +58,6 @@ const ParamScaledHeight = () => {
       sliderNumberInputProps={{ max: 4096 }}
       withSliderMarks
       withInput
-      inputReadOnly
       withReset
       handleReset={handleResetScaledHeight}
     />

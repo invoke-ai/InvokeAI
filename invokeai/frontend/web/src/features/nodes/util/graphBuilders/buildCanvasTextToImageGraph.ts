@@ -1,5 +1,6 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
+import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
 import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
@@ -30,15 +31,18 @@ export const buildCanvasTextToImageGraph = (
     scheduler,
     steps,
     clipSkip,
-    iterations,
-    seed,
-    shouldRandomizeSeed,
+    shouldUseCpuNoise,
+    shouldUseNoiseSettings,
   } = state.generation;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
   const model = modelIdToMainModelField(currentModel?.id || '');
+
+  const use_cpu = shouldUseNoiseSettings
+    ? shouldUseCpuNoise
+    : initialGenerationState.shouldUseCpuNoise;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -68,6 +72,7 @@ export const buildCanvasTextToImageGraph = (
         id: NOISE,
         width,
         height,
+        use_cpu,
       },
       [TEXT_TO_LATENTS]: {
         type: 't2l',
