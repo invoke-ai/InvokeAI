@@ -325,11 +325,11 @@ class InvokeAISettings(BaseSettings):
                 help=field.field_info.description,
             )
 def _find_root()->Path:
-    venv = os.environ.get("VIRTUAL_ENV")
+    venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
         root = Path(os.environ.get("INVOKEAI_ROOT")).resolve()
-    elif any([Path(venv, '..', x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE, MODEL_CORE]]):
-        root = Path(venv, "..").resolve()
+    elif any([(venv.parent/x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE, MODEL_CORE]]):
+        root = (venv.parent).resolve()
     else:
         root = Path("~/invokeai").expanduser().resolve()
     return root
