@@ -26,9 +26,12 @@ import {
 } from '@chakra-ui/react';
 import { clamp } from 'lodash-es';
 
+import { useAppDispatch } from 'app/store/storeHooks';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
+import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
 import {
   FocusEvent,
+  KeyboardEvent,
   memo,
   MouseEvent,
   useCallback,
@@ -107,7 +110,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
     sliderIAIIconButtonProps,
     ...rest
   } = props;
-
+  const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const [localInputValue, setLocalInputValue] = useState<
@@ -166,6 +169,24 @@ const IAISlider = (props: IAIFullSliderProps) => {
       e.target.focus();
     }
   }, []);
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.shiftKey) {
+        dispatch(shiftKeyPressed(true));
+      }
+    },
+    [dispatch]
+  );
+
+  const handleKeyUp = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (!e.shiftKey) {
+        dispatch(shiftKeyPressed(false));
+      }
+    },
+    [dispatch]
+  );
 
   return (
     <FormControl
@@ -310,6 +331,8 @@ const IAISlider = (props: IAIFullSliderProps) => {
             {...sliderNumberInputProps}
           >
             <NumberInputField
+              onKeyDown={handleKeyDown}
+              onKeyUp={handleKeyUp}
               minWidth={inputWidth}
               {...sliderNumberInputFieldProps}
             />
