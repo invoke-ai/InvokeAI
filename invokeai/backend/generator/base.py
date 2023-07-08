@@ -570,28 +570,16 @@ class Generator:
         device = self.model.device
         # limit noise to only the diffusion image channels, not the mask channels
         input_channels = min(self.latent_channels, 4)
-        if self.use_mps_noise or device.type == "mps":
-            x = torch.randn(
-                [
-                    1,
-                    input_channels,
-                    height // self.downsampling_factor,
-                    width // self.downsampling_factor,
-                ],
-                dtype=self.torch_dtype(),
-                device="cpu",
-            ).to(device)
-        else:
-            x = torch.randn(
-                [
-                    1,
-                    input_channels,
-                    height // self.downsampling_factor,
-                    width // self.downsampling_factor,
-                ],
-                dtype=self.torch_dtype(),
-                device=device,
-            )
+        x = torch.randn(
+            [
+                1,
+                input_channels,
+                height // self.downsampling_factor,
+                width // self.downsampling_factor,
+            ],
+            dtype=self.torch_dtype(),
+            device=device,
+        )
         if self.perlin > 0.0:
             perlin_noise = self.get_perlin_noise(
                 width // self.downsampling_factor, height // self.downsampling_factor

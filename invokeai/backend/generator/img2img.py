@@ -88,10 +88,7 @@ class Img2Img(Generator):
 
     def get_noise_like(self, like: torch.Tensor):
         device = like.device
-        if device.type == "mps":
-            x = torch.randn_like(like, device="cpu").to(device)
-        else:
-            x = torch.randn_like(like, device=device)
+        x = torch.randn_like(like, device=device)
         if self.perlin > 0.0:
             shape = like.shape
             x = (1 - self.perlin) * x + self.perlin * self.get_perlin_noise(
