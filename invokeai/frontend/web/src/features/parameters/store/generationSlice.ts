@@ -55,6 +55,7 @@ export interface GenerationState {
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
   clipSkip: number;
+  shouldUseCpuNoise: boolean;
 }
 
 export const initialGenerationState: GenerationState = {
@@ -90,6 +91,7 @@ export const initialGenerationState: GenerationState = {
   seamlessXAxis: false,
   seamlessYAxis: false,
   clipSkip: 0,
+  shouldUseCpuNoise: true,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -239,6 +241,9 @@ export const generationSlice = createSlice({
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
+    shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldUseCpuNoise = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -298,6 +303,7 @@ export const {
   setSeamlessXAxis,
   setSeamlessYAxis,
   setClipSkip,
+  shouldUseCpuNoiseChanged,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;
