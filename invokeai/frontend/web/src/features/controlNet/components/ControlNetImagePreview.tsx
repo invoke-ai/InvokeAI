@@ -1,4 +1,4 @@
-import { Box, Flex, SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, Spinner, SystemStyleObject } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
@@ -8,7 +8,6 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
-import { IAILoadingImageFallback } from 'common/components/IAIImageFallback';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/thunks/image';
@@ -147,18 +146,28 @@ const ControlNetImagePreview = (props: Props) => {
         />
       </Box>
       {pendingControlImages.includes(controlNetId) && (
-        <Box
+        <Flex
           sx={{
             position: 'absolute',
             top: 0,
             insetInlineStart: 0,
             w: 'full',
             h: 'full',
-            objectFit: 'contain',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.8,
+            borderRadius: 'base',
+            bg: 'base.400',
+            _dark: {
+              bg: 'base.900',
+            },
           }}
         >
-          <IAILoadingImageFallback image={controlImage} />
-        </Box>
+          <Spinner
+            size="xl"
+            sx={{ color: 'base.100', _dark: { color: 'base.400' } }}
+          />
+        </Flex>
       )}
     </Flex>
   );
