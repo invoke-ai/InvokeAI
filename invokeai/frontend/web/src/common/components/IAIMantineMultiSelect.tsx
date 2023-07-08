@@ -59,6 +59,7 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
         onKeyDown={handleKeyDown}
         onKeyUp={handleKeyUp}
         searchable={searchable}
+        maxDropdownHeight={300}
         styles={() => ({
           label: {
             color: mode(base700, base300)(colorMode),
