@@ -389,6 +389,8 @@ setting environment variables INVOKEAI_<setting>.
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
     log_format          : Literal[tuple(['plain','color','syslog','legacy'])] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
     log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="debug", description="Emit logging messages at this level or  higher", category="Logging")
+
+    version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
     #fmt: on
 
     def parse_args(self, argv: List[str]=None, conf: DictConfig = None, clobber=False):
