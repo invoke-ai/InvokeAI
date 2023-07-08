@@ -20,7 +20,7 @@ echo 9. Update InvokeAI
 echo 10. Command-line help
 echo Q - Quit
 set /P choice="Please enter 1-10, Q: [2] "
-if not defined choice set choice=2
+if not defined choice set choice=1
 IF /I "%choice%" == "1" (
     echo Starting the InvokeAI browser-based UI..
     python .venv\Scripts\invokeai-web.exe %*
