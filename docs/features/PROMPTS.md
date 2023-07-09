@@ -301,5 +301,48 @@ summoning up the concept of some sort of scifi creature? Let's find out.
 Indeed, removing the word "hybrid" produces an image that is more like what we'd
 expect.
 
-In conclusion, prompt blending is great for exploring creative space,
-but takes some trial and error to achieve the desired effect.
+## Dynamic Prompts
+
+Dynamic Prompts are a powerful feature designed to produce a variety of prompts based on user-defined options. Using a special syntax, you can construct a prompt with multiple possibilities, and the system will automatically generate a series of permutations based on your settings. This is extremely beneficial for ideation, exploring various scenarios, or testing different concepts swiftly and efficiently.
+
+### Structure of a Dynamic Prompt
+
+A Dynamic Prompt comprises of regular text, supplemented with alternatives enclosed within curly braces {} and separated by a vertical bar |. For example: {option1|option2|option3}. The system will then select one of the options to include in the final prompt. This flexible system allows for options to be placed throughout the text as needed.
+
+Furthermore, Dynamic Prompts can designate multiple selections from a single group of options. This feature is triggered by prefixing the options with a numerical value followed by $$. For example, in {2$$option1|option2|option3}, the system will select two distinct options from the set.
+### Creating Dynamic Prompts
+
+To create a Dynamic Prompt, follow these steps:
+
+    Draft your sentence or phrase, identifying words or phrases with multiple possible options.
+    Encapsulate the different options within curly braces {}.
+    Within the braces, separate each option using a vertical bar |.
+    If you want to include multiple options from a single group, prefix with the desired number and $$.
+
+For instance: A {house|apartment|lodge|cottage} in {summer|winter|autumn|spring} designed in {2$$style1|style2|style3}.
+### How Dynamic Prompts Work
+
+Once a Dynamic Prompt is configured, the system generates an array of combinations using the options provided. Each group of options in curly braces is treated independently, with the system selecting one option from each group. For a prefixed set (e.g., 2$$), the system will select two distinct options.
+
+For example, the following prompts could be generated from the above Dynamic Prompt:
+
+    A house in summer designed in style1, style2
+    A lodge in autumn designed in style3, style1
+    A cottage in winter designed in style2, style3
+    And many more!
+
+When the `Combinatorial` setting is on, Invoke will disable the "Images" selection, and generate every combination up until the setting for Max Prompts is reached.
+When the `Combinatorial` setting is off, Invoke will randomly generate combinations up until the setting for Images has been reached.
+
+
+
+### Tips and Tricks for Using Dynamic Prompts
+
+Below are some useful strategies for creating Dynamic Prompts:
+
+    Utilize Dynamic Prompts to generate a wide spectrum of prompts, perfect for brainstorming and exploring diverse ideas.
+    Ensure that the options within a group are contextually relevant to the part of the sentence where they are used. For instance, group building types together, and seasons together.
+    Apply the 2$$ prefix when you want to incorporate more than one option from a single group. This becomes quite handy when mixing and matching different elements.
+    Experiment with different quantities for the prefix. For example, 3$$ will select three distinct options.
+    Be aware of coherence in your prompts. Although the system can generate all possible combinations, not all may semantically make sense. Therefore, carefully choose the options for each group.
+    Always review and fine-tune the generated prompts as needed. While Dynamic Prompts can help you generate a multitude of combinations, the final polishing and refining remain in your hands.

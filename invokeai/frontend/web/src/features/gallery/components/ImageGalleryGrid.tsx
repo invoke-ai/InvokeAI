@@ -57,6 +57,7 @@ const selector = createSelector(
       images,
       allImagesTotal,
       isLoading,
+      isFetching,
       categories,
       selectedBoardId,
     };
@@ -82,8 +83,14 @@ const ImageGalleryGrid = () => {
     },
   });
 
-  const { images, isLoading, allImagesTotal, categories, selectedBoardId } =
-    useAppSelector(selector);
+  const {
+    images,
+    isLoading,
+    isFetching,
+    allImagesTotal,
+    categories,
+    selectedBoardId,
+  } = useAppSelector(selector);
 
   const { selectedBoard } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => ({
@@ -176,7 +183,7 @@ const ImageGalleryGrid = () => {
         <IAIButton
           onClick={handleLoadMoreImages}
           isDisabled={!areMoreAvailable}
-          isLoading={isLoading}
+          isLoading={isFetching}
           loadingText="Loading"
           flexShrink={0}
         >
