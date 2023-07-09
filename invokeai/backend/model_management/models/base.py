@@ -21,6 +21,7 @@ class ModelNotFoundException(Exception):
 class BaseModelType(str, Enum):
     StableDiffusion1 = "sd-1"
     StableDiffusion2 = "sd-2"
+    StableDiffusionXL = "sdxl"
     #Kandinsky2_1 = "kandinsky-2.1"
 
 class ModelType(str, Enum):
@@ -33,7 +34,9 @@ class ModelType(str, Enum):
 class SubModelType(str, Enum):
     UNet = "unet"
     TextEncoder = "text_encoder"
+    TextEncoder2 = "text_encoder_2"
     Tokenizer = "tokenizer"
+    Tokenizer2 = "tokenizer_2"
     Vae = "vae"
     Scheduler = "scheduler"
     SafetyChecker = "safety_checker"
