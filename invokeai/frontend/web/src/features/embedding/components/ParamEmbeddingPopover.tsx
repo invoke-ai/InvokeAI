@@ -115,6 +115,7 @@ const ParamEmbeddingPopover = (props: Props) => {
               nothingFound="No matching Embeddings"
               itemComponent={IAIMantineSelectItemWithTooltip}
               disabled={data.length === 0}
+              onDropdownClose={onClose}
               filter={(value, item: SelectItem) =>
                 item.label
                   ?.toLowerCase()
