@@ -1,5 +1,4 @@
 import {
-  Box,
   ChakraProps,
   Flex,
   Icon,
@@ -10,9 +9,6 @@ import {
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
-  isValidDrop,
-  useDraggable,
-  useDroppable,
 } from 'app/components/ImageDnd/typesafeDnd';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
@@ -21,14 +17,13 @@ import {
 } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { AnimatePresence } from 'framer-motion';
-import { MouseEvent, ReactElement, SyntheticEvent, memo, useRef } from 'react';
+import { MouseEvent, ReactElement, SyntheticEvent, memo } from 'react';
 import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
 import { PostUploadAction } from 'services/api/thunks/image';
 import { ImageDTO } from 'services/api/types';
 import { mode } from 'theme/util/mode';
-import { v4 as uuidv4 } from 'uuid';
-import IAIDropOverlay from './IAIDropOverlay';
+import IAIDraggable from './IAIDraggable';
+import IAIDroppable from './IAIDroppable';
 
 type IAIDndImageProps = {
   imageDTO: ImageDTO | undefined;
@@ -144,30 +139,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             }}
           />
           {withMetadataOverlay && <ImageMetadataOverlay image={imageDTO} />}
-          {onClickReset && withResetIcon && (
-            <IAIIconButton
-              onClick={onClickReset}
-              aria-label={resetTooltip}
-              tooltip={resetTooltip}
-              icon={resetIcon}
-              size="sm"
-              variant="link"
-              sx={{
-                position: 'absolute',
-                top: 1,
-                insetInlineEnd: 1,
-                p: 0,
-                minW: 0,
-                svg: {
-                  transitionProperty: 'common',
-                  transitionDuration: 'normal',
-                  fill: 'base.100',
-                  _hover: { fill: 'base.50' },
-                  filter: resetIconShadow,
-                },
-              }}
-            />
-          )}
         </Flex>
       )}
       {!imageDTO && !isUploadDisabled && (
@@ -198,84 +169,44 @@ const IAIDndImage = (props: IAIDndImageProps) => {
         </>
       )}
       {!imageDTO && isUploadDisabled && noContentFallback}
-      <Droppable
+      <IAIDroppable
         data={droppableData}
         disabled={isDropDisabled}
         dropLabel={dropLabel}
       />
-      <Draggable
-        data={draggableData}
-        disabled={isDragDisabled || !imageDTO}
-        onClick={onClick}
-      />
+      {imageDTO && (
+        <IAIDraggable
+          data={draggableData}
+          disabled={isDragDisabled || !imageDTO}
+          onClick={onClick}
+        />
+      )}
+      {onClickReset && withResetIcon && imageDTO && (
+        <IAIIconButton
+          onClick={onClickReset}
+          aria-label={resetTooltip}
+          tooltip={resetTooltip}
+          icon={resetIcon}
+          size="sm"
+          variant="link"
+          sx={{
+            position: 'absolute',
+            top: 1,
+            insetInlineEnd: 1,
+            p: 0,
+            minW: 0,
+            svg: {
+              transitionProperty: 'common',
+              transitionDuration: 'normal',
+              fill: 'base.100',
+              _hover: { fill: 'base.50' },
+              filter: resetIconShadow,
+            },
+          }}
+        />
+      )}
     </Flex>
   );
 };
 
 export default memo(IAIDndImage);
-
-type DroppableProps = {
-  dropLabel?: string;
-  disabled?: boolean;
-  data?: TypesafeDroppableData;
-};
-
-const Droppable = memo((props: DroppableProps) => {
-  const { dropLabel, data, disabled } = props;
-  const dndId = useRef(uuidv4());
-
-  const { isOver, setNodeRef, active } = useDroppable({
-    id: dndId.current,
-    disabled,
-    data,
-  });
-
-  return (
-    <Box
-      ref={setNodeRef}
-      position="absolute"
-      w="full"
-      h="full"
-      pointerEvents="none"
-    >
-      <AnimatePresence>
-        {isValidDrop(data, active) && (
-          <IAIDropOverlay isOver={isOver} label={dropLabel} />
-        )}
-      </AnimatePresence>
-    </Box>
-  );
-});
-
-Droppable.displayName = 'Droppable';
-
-type DraggableProps = {
-  disabled?: boolean;
-  data?: TypesafeDraggableData;
-  onClick?: (event: MouseEvent<HTMLDivElement>) => void;
-};
-
-const Draggable = memo((props: DraggableProps) => {
-  const { data, disabled, onClick } = props;
-  const dndId = useRef(uuidv4());
-
-  const { attributes, listeners, setNodeRef } = useDraggable({
-    id: dndId.current,
-    disabled,
-    data,
-  });
-
-  return (
-    <Box
-      onClick={onClick}
-      ref={setNodeRef}
-      position="absolute"
-      w="full"
-      h="full"
-      {...attributes}
-      {...listeners}
-    />
-  );
-});
-
-Draggable.displayName = 'Draggable';

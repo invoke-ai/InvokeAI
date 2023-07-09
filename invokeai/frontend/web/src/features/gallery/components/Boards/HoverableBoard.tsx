@@ -12,28 +12,23 @@ import {
 } from '@chakra-ui/react';
 
 import { useAppDispatch } from 'app/store/storeHooks';
-import { memo, useCallback, useContext } from 'react';
-import { FaFolder, FaTrash } from 'react-icons/fa';
 import { ContextMenu } from 'chakra-ui-contextmenu';
-import { BoardDTO } from 'services/api/types';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { memo, useCallback, useContext, useMemo } from 'react';
+import { FaFolder, FaTrash } from 'react-icons/fa';
 import {
   useDeleteBoardMutation,
   useUpdateBoardMutation,
 } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { BoardDTO } from 'services/api/types';
 
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { AnimatePresence } from 'framer-motion';
-import IAIDropOverlay from 'common/components/IAIDropOverlay';
-import { DeleteBoardImagesContext } from '../../../../app/contexts/DeleteBoardImagesContext';
+import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
+import IAIDroppable from 'common/components/IAIDroppable';
 import { mode } from 'theme/util/mode';
-import {
-  MoveBoardDropData,
-  isValidDrop,
-  useDroppable,
-} from 'app/components/ImageDnd/typesafeDnd';
+import { DeleteBoardImagesContext } from '../../../../app/contexts/DeleteBoardImagesContext';
 
 interface HoverableBoardProps {
   board: BoardDTO;
@@ -76,16 +71,14 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
     onClickDeleteBoardImages(board);
   }, [board, onClickDeleteBoardImages]);
 
-  const droppableData: MoveBoardDropData = {
-    id: board_id,
-    actionType: 'MOVE_BOARD',
-    context: { boardId: board_id },
-  };
-
-  const { isOver, setNodeRef, active } = useDroppable({
-    id: `board_droppable_${board_id}`,
-    data: droppableData,
-  });
+  const droppableData: MoveBoardDropData = useMemo(
+    () => ({
+      id: board_id,
+      actionType: 'MOVE_BOARD',
+      context: { boardId: board_id },
+    }),
+    [board_id]
+  );
 
   return (
     <Box sx={{ touchAction: 'none', height: 'full' }}>
@@ -127,7 +120,6 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
             }}
           >
             <Flex
-              ref={setNodeRef}
               onClick={handleSelectBoard}
               sx={{
                 position: 'relative',
@@ -167,11 +159,7 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
               >
                 <Badge variant="solid">{board.image_count}</Badge>
               </Flex>
-              <AnimatePresence>
-                {isValidDrop(droppableData, active) && (
-                  <IAIDropOverlay isOver={isOver} />
-                )}
-              </AnimatePresence>
+              <IAIDroppable data={droppableData} />
             </Flex>
 
             <Flex

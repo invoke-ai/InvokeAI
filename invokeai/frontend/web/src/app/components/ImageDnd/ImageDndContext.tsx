@@ -6,18 +6,18 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import { snapCenterToCursor } from '@dnd-kit/modifiers';
+import { imageDropped } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { AnimatePresence, motion } from 'framer-motion';
 import { PropsWithChildren, memo, useCallback, useState } from 'react';
 import DragPreview from './DragPreview';
-import { snapCenterToCursor } from '@dnd-kit/modifiers';
-import { AnimatePresence, motion } from 'framer-motion';
 import {
   DndContext,
   DragEndEvent,
   DragStartEvent,
   TypesafeDraggableData,
 } from './typesafeDnd';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { imageDropped } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
 
 type ImageDndContextProps = PropsWithChildren;
 
@@ -49,11 +49,11 @@ const ImageDndContext = (props: ImageDndContextProps) => {
   );
 
   const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: { delay: 150, tolerance: 5 },
+    activationConstraint: { distance: 10 },
   });
 
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 150, tolerance: 5 },
+    activationConstraint: { distance: 10 },
   });
 
   // TODO: Use KeyboardSensor - needs composition of multiple collisionDetection algos

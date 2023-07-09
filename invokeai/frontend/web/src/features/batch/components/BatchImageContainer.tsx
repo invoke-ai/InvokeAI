@@ -1,11 +1,7 @@
 import { Box } from '@chakra-ui/react';
+import { AddToBatchDropData } from 'app/components/ImageDnd/typesafeDnd';
+import IAIDroppable from 'common/components/IAIDroppable';
 import BatchImageGrid from './BatchImageGrid';
-import IAIDropOverlay from 'common/components/IAIDropOverlay';
-import {
-  AddToBatchDropData,
-  isValidDrop,
-  useDroppable,
-} from 'app/components/ImageDnd/typesafeDnd';
 
 const droppableData: AddToBatchDropData = {
   id: 'batch',
@@ -13,17 +9,10 @@ const droppableData: AddToBatchDropData = {
 };
 
 const BatchImageContainer = () => {
-  const { isOver, setNodeRef, active } = useDroppable({
-    id: 'batch-manager',
-    data: droppableData,
-  });
-
   return (
-    <Box ref={setNodeRef} position="relative" w="full" h="full">
+    <Box position="relative" w="full" h="full">
       <BatchImageGrid />
-      {isValidDrop(droppableData, active) && (
-        <IAIDropOverlay isOver={isOver} label="Add to Batch" />
-      )}
+      <IAIDroppable data={droppableData} dropLabel="Add to Batch" />
     </Box>
   );
 };

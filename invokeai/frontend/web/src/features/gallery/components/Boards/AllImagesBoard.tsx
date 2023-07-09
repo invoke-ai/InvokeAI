@@ -1,16 +1,11 @@
 import { Flex, useColorMode } from '@chakra-ui/react';
-import { FaImages } from 'react-icons/fa';
-import { boardIdSelected } from 'features/gallery/store/gallerySlice';
-import { useDispatch } from 'react-redux';
+import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
+import IAIDroppable from 'common/components/IAIDroppable';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { AnimatePresence } from 'framer-motion';
-import IAIDropOverlay from 'common/components/IAIDropOverlay';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { FaImages } from 'react-icons/fa';
+import { useDispatch } from 'react-redux';
 import { mode } from 'theme/util/mode';
-import {
-  MoveBoardDropData,
-  isValidDrop,
-  useDroppable,
-} from 'app/components/ImageDnd/typesafeDnd';
 
 const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
   const dispatch = useDispatch();
@@ -26,11 +21,6 @@ const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
     context: { boardId: null },
   };
 
-  const { isOver, setNodeRef, active } = useDroppable({
-    id: `board_droppable_all_images`,
-    data: droppableData,
-  });
-
   return (
     <Flex
       sx={{
@@ -44,7 +34,6 @@ const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
       }}
     >
       <Flex
-        ref={setNodeRef}
         onClick={handleAllImagesBoardClick}
         sx={{
           position: 'relative',
@@ -67,11 +56,7 @@ const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
             _dark: { border: '2px solid var(--invokeai-colors-base-800)' },
           }}
         />
-        <AnimatePresence>
-          {isValidDrop(droppableData, active) && (
-            <IAIDropOverlay isOver={isOver} />
-          )}
-        </AnimatePresence>
+        <IAIDroppable data={droppableData} />
       </Flex>
       <Flex
         sx={{
