@@ -1,4 +1,4 @@
-import { Flex, Text } from '@chakra-ui/react';
+import { Flex, Spacer, Text } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
@@ -13,17 +13,32 @@ export default function ParamSize() {
   );
   return (
     <Flex
-      gap={2}
-      bg="base.900"
-      p={4}
-      borderRadius={4}
-      flexDirection="column"
-      w="100%"
+      sx={{
+        gap: 2,
+        p: 4,
+        borderRadius: 4,
+        flexDirection: 'column',
+        w: 'full',
+        bg: 'base.150',
+        _dark: {
+          bg: 'base.750',
+        },
+      }}
     >
       <Flex alignItems="center" gap={2}>
-        <Text fontSize={14} width="full" color="base.300">
+        <Text
+          sx={{
+            fontSize: 'sm',
+            width: 'full',
+            color: 'base.700',
+            _dark: {
+              color: 'base.300',
+            },
+          }}
+        >
           {t('parameters.aspectRatio')}
         </Text>
+        <Spacer />
         <ParamAspectRatio />
       </Flex>
       <Flex gap={2} flexDirection="column">
