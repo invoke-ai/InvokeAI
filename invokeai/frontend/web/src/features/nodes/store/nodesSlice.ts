@@ -121,8 +121,9 @@ const nodesSlice = createSlice({
     ) => {
       state.invocationTemplates = action.payload;
     },
-    nodeEditorReset: () => {
-      return { ...initialNodesState };
+    nodeEditorReset: (state) => {
+      state.nodes = [];
+      state.edges = [];
     },
     setEditorInstance: (state, action) => {
       state.editorInstance = action.payload;
