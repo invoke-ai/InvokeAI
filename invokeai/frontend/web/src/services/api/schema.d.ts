@@ -4445,17 +4445,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -5008,7 +5008,7 @@ export type operations = {
         categories?: (components["schemas"]["ImageCategory"])[];
         /** @description Whether to list intermediate images */
         is_intermediate?: boolean;
-        /** @description The board id to filter by */
+        /** @description The board id to filter by, provide 'none' for images without a board */
         board_id?: string;
         /** @description The page offset */
         offset?: number;
