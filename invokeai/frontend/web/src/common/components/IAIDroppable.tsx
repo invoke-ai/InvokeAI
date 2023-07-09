@@ -29,6 +29,8 @@ const IAIDroppable = (props: IAIDroppableProps) => {
     <Box
       ref={setNodeRef}
       position="absolute"
+      top={0}
+      insetInlineStart={0}
       w="full"
       h="full"
       pointerEvents="none"

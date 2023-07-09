@@ -29,6 +29,8 @@ const IAIDraggable = (props: IAIDraggableProps) => {
       position="absolute"
       w="full"
       h="full"
+      top={0}
+      insetInlineStart={0}
       {...attributes}
       {...listeners}
     />
