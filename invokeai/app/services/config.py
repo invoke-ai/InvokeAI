@@ -23,9 +23,10 @@ InvokeAI:
     xformers_enabled: false
     sequential_guidance: false
     precision: float16
-    max_loaded_models: 4
+    max_cache_size: 6
     always_use_cpu: false
     free_gpu_mem: false
+    reserve_gpu_mem: 1
   Features:
     nsfw_checker: true
     restore: true
@@ -365,6 +366,7 @@ setting environment variables INVOKEAI_<setting>.
     free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
     max_loaded_models   : int = Field(default=3, gt=0, description="(DEPRECATED: use max_cache_size) Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
     max_cache_size      : float = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching", category='Memory/Performance')
+    gpu_mem_reserved    : float = Field(default=1.75, ge=0, description="Amount of VRAM to reserve for use during generation", category='Memory/Performance')
     precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='float16',description='Floating point precision', category='Memory/Performance')
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')

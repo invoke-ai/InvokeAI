@@ -36,6 +36,9 @@ from .models import BaseModelType, ModelType, SubModelType, ModelBase
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
 DEFAULT_MAX_CACHE_SIZE = 6.0
 
+# amount of GPU memory to hold in reserve for use by generations (GB)
+DEFAULT_GPU_MEM_RESERVED= 1.75
+
 # actual size of a gig
 GIG = 1073741824
 
@@ -88,6 +91,7 @@ class ModelCache(object):
         sequential_offload: bool=False,
         lazy_offloading: bool=True,
         sha_chunksize: int = 16777216,
+        gpu_mem_reserved: float=DEFAULT_GPU_MEM_RESERVED,
         logger: types.ModuleType = logger
     ):
         '''
@@ -99,12 +103,11 @@ class ModelCache(object):
         :param sequential_offload: Conserve VRAM by loading and unloading each stage of the pipeline sequentially
         :param sha_chunksize: Chunksize to use when calculating sha256 model hash
         '''
-        #max_cache_size = 9999
         self.model_infos: Dict[str, ModelBase] = dict()
         self.lazy_offloading = lazy_offloading
-        #self.sequential_offload: bool=sequential_offload
         self.precision: torch.dtype=precision
-        self.max_cache_size: int=max_cache_size
+        self.max_cache_size: float=max_cache_size
+        self.gpu_mem_reserved: float=gpu_mem_reserved
         self.execution_device: torch.device=execution_device
         self.storage_device: torch.device=storage_device
         self.sha_chunksize=sha_chunksize
@@ -346,11 +349,13 @@ class ModelCache(object):
         self.logger.debug(f"After unloading: cached_models={len(self._cached_models)}")
 
     def _offload_unlocked_models(self, size_needed: int=0):
+        reserved = self.gpu_mem_reserved * GIG
         for model_key, cache_entry in sorted(self._cached_models.items(), key=lambda x:x[1].size):
             free_mem, used_mem = torch.cuda.mem_get_info()
-            self.logger.debug(f'Require {(size_needed/GIG):.2f}GB VRAM. Have {(free_mem/GIG):.2f}GB available.')
+            free_mem -= reserved
+            self.logger.debug(f'Require {(size_needed/GIG):.2f}GB VRAM. Have {(free_mem/GIG):.2f}GB available ({(reserved/GIG):.2f} reserved).')
             if free_mem > size_needed:
-                return
+                break
             if not cache_entry.locked and cache_entry.loaded:
                 self.logger.debug(f'Offloading {model_key} from {self.execution_device} into {self.storage_device}')
                 with VRAMUsage() as mem:
