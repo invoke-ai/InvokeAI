@@ -24,7 +24,23 @@ export const useBuildInvocation = () => {
   const flow = useReactFlow();
 
   return useCallback(
-    (type: AnyInvocationType) => {
+    (type: AnyInvocationType | 'progress_image') => {
+      if (type === 'progress_image') {
+        const { x, y } = flow.project({
+          x: window.innerWidth / 2.5,
+          y: window.innerHeight / 8,
+        });
+
+        const node: Node = {
+          id: 'progress_image',
+          type: 'progress_image',
+          position: { x: x, y: y },
+          data: {},
+        };
+
+        return node;
+      }
+
       const template = invocationTemplates[type];
 
       if (template === undefined) {
