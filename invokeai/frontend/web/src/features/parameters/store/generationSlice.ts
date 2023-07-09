@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
+import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { configChanged } from 'features/system/store/configSlice';
 import {
   setAspectRatio,
@@ -9,7 +10,6 @@ import {
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
-import { roundToEight } from '../components/Parameters/Core/ParamAspectRatio';
 import {
   CfgScaleParam,
   HeightParam,
