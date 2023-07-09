@@ -348,8 +348,8 @@ class ModelCache(object):
     def _offload_unlocked_models(self, size_needed: int=0):
         for model_key, cache_entry in sorted(self._cached_models.items(), key=lambda x:x[1].size):
             free_mem, used_mem = torch.cuda.mem_get_info()
-            self.logger.debug(f'Require {(size_needed/GIG):.2f}GB VRAM. Have {((free_mem-reserve)/GIG):.2f}GB available.')
-            if free_mem-reserve > size_needed:
+            self.logger.debug(f'Require {(size_needed/GIG):.2f}GB VRAM. Have {(free_mem/GIG):.2f}GB available.')
+            if free_mem > size_needed:
                 return
             if not cache_entry.locked and cache_entry.loaded:
                 self.logger.debug(f'Offloading {model_key} from {self.execution_device} into {self.storage_device}')
