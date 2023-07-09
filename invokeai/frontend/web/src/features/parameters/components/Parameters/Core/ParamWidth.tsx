@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider, { IAIFullSliderProps } from 'common/components/IAISlider';
+import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setHeight, setWidth } from 'features/parameters/store/generationSlice';
 import { configSelector } from 'features/system/store/configSelectors';
@@ -9,7 +10,6 @@ import { hotkeysSelector } from 'features/ui/store/hotkeysSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { roundToEight } from './ParamAspectRatio';
 
 const selector = createSelector(
   [generationSelector, hotkeysSelector, configSelector, uiSelector],
@@ -45,14 +45,20 @@ const ParamWidth = (props: ParamWidthProps) => {
   const handleChange = useCallback(
     (v: number) => {
       dispatch(setWidth(v));
-      if (aspectRatio) dispatch(setHeight(roundToEight(width / aspectRatio)));
+      if (aspectRatio) {
+        const newHeight = roundToMultiple(v / aspectRatio, 8);
+        dispatch(setHeight(newHeight));
+      }
     },
-    [dispatch, aspectRatio, width]
+    [dispatch, aspectRatio]
   );
 
   const handleReset = useCallback(() => {
     dispatch(setWidth(initial));
-    if (aspectRatio) dispatch(setHeight(roundToEight(initial / aspectRatio)));
+    if (aspectRatio) {
+      const newHeight = roundToMultiple(initial / aspectRatio, 8);
+      dispatch(setHeight(newHeight));
+    }
   }, [dispatch, initial, aspectRatio]);
 
   return (

@@ -268,7 +268,9 @@ export const generationSlice = createSlice({
     });
     builder.addCase(setAspectRatio, (state, action) => {
       const ratio = action.payload;
-      if (ratio) state.height = roundToEight(state.width / ratio);
+      if (ratio) {
+        state.height = roundToMultiple(state.width / ratio, 8);
+      }
     });
   },
 });
