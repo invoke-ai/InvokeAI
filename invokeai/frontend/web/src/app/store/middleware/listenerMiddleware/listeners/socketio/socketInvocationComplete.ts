@@ -1,15 +1,15 @@
-import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
-import { startAppListening } from '../..';
 import { log } from 'app/logging/useLogger';
+import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
+import { progressImageSet } from 'features/system/store/systemSlice';
+import { boardImagesApi } from 'services/api/endpoints/boardImages';
+import { isImageOutput } from 'services/api/guards';
+import { imageMetadataReceived } from 'services/api/thunks/image';
+import { sessionCanceled } from 'services/api/thunks/session';
 import {
   appSocketInvocationComplete,
   socketInvocationComplete,
 } from 'services/events/actions';
-import { imageMetadataReceived } from 'services/api/thunks/image';
-import { sessionCanceled } from 'services/api/thunks/session';
-import { isImageOutput } from 'services/api/guards';
-import { progressImageSet } from 'features/system/store/systemSlice';
-import { boardImagesApi } from 'services/api/endpoints/boardImages';
+import { startAppListening } from '../..';
 
 const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
@@ -61,7 +61,7 @@ export const addInvocationCompleteEventListener = () => {
 
         if (boardIdToAddTo && !imageDTO.is_intermediate) {
           dispatch(
-            boardImagesApi.endpoints.addImageToBoard.initiate({
+            boardImagesApi.endpoints.addBoardImage.initiate({
               board_id: boardIdToAddTo,
               image_name,
             })

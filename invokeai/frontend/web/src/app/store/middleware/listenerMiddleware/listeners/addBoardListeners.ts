@@ -1,4 +1,3 @@
-import { createAction } from '@reduxjs/toolkit';
 import { log } from 'app/logging/useLogger';
 import {
   imageUpdatedMany,
@@ -12,7 +11,7 @@ const moduleLog = log.child({ namespace: 'boards' });
 export const addBoardListeners = () => {
   // add image to board - fulfilled
   startAppListening({
-    matcher: boardImagesApi.endpoints.addImageToBoard.matchFulfilled,
+    matcher: boardImagesApi.endpoints.addBoardImage.matchFulfilled,
     effect: (action, { getState, dispatch }) => {
       const { board_id, image_name } = action.meta.arg.originalArgs;
 
@@ -32,7 +31,7 @@ export const addBoardListeners = () => {
 
   // add image to board - rejected
   startAppListening({
-    matcher: boardImagesApi.endpoints.addImageToBoard.matchRejected,
+    matcher: boardImagesApi.endpoints.addBoardImage.matchRejected,
     effect: (action, { getState, dispatch }) => {
       const { board_id, image_name } = action.meta.arg.originalArgs;
 
@@ -45,9 +44,9 @@ export const addBoardListeners = () => {
 
   // remove image from board - fulfilled
   startAppListening({
-    matcher: boardImagesApi.endpoints.removeImageFromBoard.matchFulfilled,
+    matcher: boardImagesApi.endpoints.deleteBoardImage.matchFulfilled,
     effect: (action, { getState, dispatch }) => {
-      const image_name = action.meta.arg.originalArgs;
+      const { image_name } = action.meta.arg.originalArgs;
 
       moduleLog.debug({ data: { image_name } }, 'Image removed from board');
 
@@ -62,7 +61,7 @@ export const addBoardListeners = () => {
 
   // remove image from board - rejected
   startAppListening({
-    matcher: boardImagesApi.endpoints.removeImageFromBoard.matchRejected,
+    matcher: boardImagesApi.endpoints.deleteBoardImage.matchRejected,
     effect: (action, { getState, dispatch }) => {
       const image_name = action.meta.arg.originalArgs;
 
@@ -73,61 +72,9 @@ export const addBoardListeners = () => {
     },
   });
 
-  // gallery selection added to board
-  startAppListening({
-    actionCreator: gallerySelectionAddedToBoard,
-    effect: (action, { getState, dispatch }) => {
-      const { board_id } = action.payload;
-      const image_names = getState().gallery.selection;
-      dispatch(
-        boardImagesApi.endpoints.addManyImagesToBoard.initiate({
-          board_id,
-          image_names,
-        })
-      );
-    },
-  });
-
-  // gallery selection removed from board
-  startAppListening({
-    actionCreator: gallerySelectionRemovedFromBoard,
-    effect: (action, { getState, dispatch }) => {
-      const image_names = getState().gallery.selection;
-      dispatch(
-        boardImagesApi.endpoints.removeManyImagesFromBoard.initiate(image_names)
-      );
-    },
-  });
-
-  // batch selection added to board
-  startAppListening({
-    actionCreator: batchSelectionAddedToBoard,
-    effect: (action, { getState, dispatch }) => {
-      const { board_id } = action.payload;
-      const image_names = getState().batch.selection;
-      dispatch(
-        boardImagesApi.endpoints.addManyImagesToBoard.initiate({
-          board_id,
-          image_names,
-        })
-      );
-    },
-  });
-
-  // batch selection removed from board
-  startAppListening({
-    actionCreator: batchSelectionRemovedFromBoard,
-    effect: (action, { getState, dispatch }) => {
-      const image_names = getState().batch.selection;
-      dispatch(
-        boardImagesApi.endpoints.removeManyImagesFromBoard.initiate(image_names)
-      );
-    },
-  });
-
   // many images added to board - fulfilled
   startAppListening({
-    matcher: boardImagesApi.endpoints.addManyImagesToBoard.matchFulfilled,
+    matcher: boardImagesApi.endpoints.addManyBoardImages.matchFulfilled,
     effect: (action, { getState, dispatch }) => {
       const { board_id, image_names } = action.meta.arg.originalArgs;
 
@@ -147,7 +94,7 @@ export const addBoardListeners = () => {
 
   // many images added to board - rejected
   startAppListening({
-    matcher: boardImagesApi.endpoints.addManyImagesToBoard.matchRejected,
+    matcher: boardImagesApi.endpoints.addManyBoardImages.matchRejected,
     effect: (action, { getState, dispatch }) => {
       const { board_id, image_names } = action.meta.arg.originalArgs;
 
@@ -160,9 +107,9 @@ export const addBoardListeners = () => {
 
   // remove many images from board - fulfilled
   startAppListening({
-    matcher: boardImagesApi.endpoints.removeManyImagesFromBoard.matchFulfilled,
+    matcher: boardImagesApi.endpoints.deleteManyBoardImages.matchFulfilled,
     effect: (action, { getState, dispatch }) => {
-      const image_names = action.meta.arg.originalArgs;
+      const { image_names } = action.meta.arg.originalArgs;
 
       moduleLog.debug({ data: { image_names } }, 'Images removed from board');
 
@@ -177,7 +124,7 @@ export const addBoardListeners = () => {
 
   // remove many images from board - rejected
   startAppListening({
-    matcher: boardImagesApi.endpoints.removeManyImagesFromBoard.matchRejected,
+    matcher: boardImagesApi.endpoints.deleteManyBoardImages.matchRejected,
     effect: (action, { getState, dispatch }) => {
       const image_names = action.meta.arg.originalArgs;
 
@@ -188,19 +135,3 @@ export const addBoardListeners = () => {
     },
   });
 };
-
-export const gallerySelectionAddedToBoard = createAction<{ board_id: string }>(
-  'boards/gallerySelectionAddedToBoard'
-);
-
-export const gallerySelectionRemovedFromBoard = createAction(
-  'boards/gallerySelectionAddedToBoard'
-);
-
-export const batchSelectionAddedToBoard = createAction<{
-  board_id: string;
-}>('boards/batchSelectionAddedToBoard');
-
-export const batchSelectionRemovedFromBoard = createAction(
-  'boards/batchSelectionAddedToBoard'
-);

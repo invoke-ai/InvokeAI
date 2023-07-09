@@ -29,7 +29,7 @@ import {
   FaTrash,
 } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
+import { useDeleteBoardImageMutation } from 'services/api/endpoints/boardImages';
 import { ImageDTO } from 'services/api/types';
 import { AddImageToBoardContext } from '../../../app/contexts/AddImageToBoardContext';
 import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
@@ -75,7 +75,7 @@ const ImageContextMenu = ({ image, children }: Props) => {
   const { recallBothPrompts, recallSeed, recallAllParameters } =
     useRecallParameters();
 
-  const [removeFromBoard] = useRemoveImageFromBoardMutation();
+  const [deleteBoardImage] = useDeleteBoardImageMutation();
 
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
@@ -133,16 +133,16 @@ const ImageContextMenu = ({ image, children }: Props) => {
     if (!image.board_id) {
       return;
     }
-    removeFromBoard(image.image_name);
-  }, [image.board_id, image.image_name, removeFromBoard]);
+    deleteBoardImage({ image_name: image.image_name });
+  }, [deleteBoardImage, image.board_id, image.image_name]);
 
   const handleAddSelectionToBoard = useCallback(() => {
     onClickAddToBoard(image);
   }, [image, onClickAddToBoard]);
 
   const handleRemoveSelectionFromBoard = useCallback(() => {
-    removeFromBoard(image.image_name);
-  }, [image.image_name, removeFromBoard]);
+    deleteBoardImage({ image_name: image.image_name });
+  }, [deleteBoardImage, image.image_name]);
 
   const handleOpenInNewTab = () => {
     window.open(image.image_url, '_blank');
@@ -255,11 +255,16 @@ const ImageContextMenu = ({ image, children }: Props) => {
           ) : (
             <>
               <MenuItem
-                isDisabled={true}
                 icon={<FaFolder />}
-                onClickCapture={handleAddToBoard}
+                onClickCapture={handleAddSelectionToBoard}
               >
                 Move Selection to Board
+              </MenuItem>
+              <MenuItem
+                icon={<FaFolder />}
+                onClickCapture={handleRemoveSelectionFromBoard}
+              >
+                Reset Board for Selection
               </MenuItem>
               <MenuItem
                 icon={<FaFolderPlus />}

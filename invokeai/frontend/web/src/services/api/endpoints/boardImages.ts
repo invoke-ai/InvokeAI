@@ -41,7 +41,7 @@ export const boardImagesApi = api.injectEndpoints({
      * Board Images Mutations
      */
 
-    addImageToBoard: build.mutation<void, AddImageToBoardArg>({
+    addBoardImage: build.mutation<void, AddImageToBoardArg>({
       query: ({ board_id, image_name }) => ({
         url: `board_images/`,
         method: 'POST',
@@ -67,7 +67,7 @@ export const boardImagesApi = api.injectEndpoints({
       },
     }),
 
-    addManyImagesToBoard: build.mutation<
+    addManyBoardImages: build.mutation<
       string[],
       { board_id: string; image_names: string[] }
     >({
@@ -106,7 +106,7 @@ export const boardImagesApi = api.injectEndpoints({
       },
     }),
 
-    removeImageFromBoard: build.mutation<void, RemoveImageFromBoardArg>({
+    deleteBoardImage: build.mutation<void, { image_name: string }>({
       query: (image_name) => ({
         url: `board_images/`,
         method: 'DELETE',
@@ -115,7 +115,7 @@ export const boardImagesApi = api.injectEndpoints({
       invalidatesTags: (result, error, arg) => [
         { type: 'Board', id: LIST_TAG },
       ],
-      async onQueryStarted(image_name, { dispatch, queryFulfilled }) {
+      async onQueryStarted({ image_name }, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
           imagesApi.util.updateQueryData('getImageDTO', image_name, (draft) => {
             Object.assign(draft, { board_id: null });
@@ -129,8 +129,8 @@ export const boardImagesApi = api.injectEndpoints({
       },
     }),
 
-    removeManyImagesFromBoard: build.mutation<void, RemoveManyBoardImagesArg>({
-      query: (image_names) => ({
+    deleteManyBoardImages: build.mutation<void, { image_names: string[] }>({
+      query: ({ image_names }) => ({
         url: `board_images/images`,
         method: 'POST',
         body: image_names,
@@ -138,7 +138,7 @@ export const boardImagesApi = api.injectEndpoints({
       invalidatesTags: (result, error, arg) => [
         { type: 'Board', id: LIST_TAG },
       ],
-      async onQueryStarted(image_names, { dispatch, queryFulfilled }) {
+      async onQueryStarted({ image_names }, { dispatch, queryFulfilled }) {
         const patches: PatchCollection[] = [];
 
         image_names.forEach((n) => {
@@ -161,7 +161,8 @@ export const boardImagesApi = api.injectEndpoints({
 });
 
 export const {
-  useAddImageToBoardMutation,
-  useRemoveImageFromBoardMutation,
-  useListBoardImagesQuery,
+  useAddBoardImageMutation,
+  useAddManyBoardImagesMutation,
+  useDeleteBoardImageMutation,
+  useDeleteManyBoardImagesMutation,
 } = boardImagesApi;

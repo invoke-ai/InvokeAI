@@ -1,7 +1,7 @@
 import { useDisclosure } from '@chakra-ui/react';
 import { PropsWithChildren, createContext, useCallback, useState } from 'react';
+import { useAddBoardImageMutation } from 'services/api/endpoints/boardImages';
 import { ImageDTO } from 'services/api/types';
-import { useAddImageToBoardMutation } from 'services/api/endpoints/boardImages';
 
 export type ImageUsage = {
   isInitialImage: boolean;
@@ -41,7 +41,7 @@ export const AddImageToBoardContextProvider = (props: Props) => {
   const [imageToMove, setImageToMove] = useState<ImageDTO>();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
-  const [addImageToBoard, result] = useAddImageToBoardMutation();
+  const [addImageToBoard, result] = useAddBoardImageMutation();
 
   // Clean up after deleting or dismissing the modal
   const closeAndClearImageToDelete = useCallback(() => {

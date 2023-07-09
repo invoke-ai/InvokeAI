@@ -18,12 +18,6 @@ import {
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { boardImagesApi } from 'services/api/endpoints/boardImages';
 import { startAppListening } from '../';
-import {
-  batchSelectionAddedToBoard,
-  batchSelectionRemovedFromBoard,
-  gallerySelectionAddedToBoard,
-  gallerySelectionRemovedFromBoard,
-} from './addBoardListeners';
 
 const moduleLog = log.child({ namespace: 'dnd' });
 
@@ -38,6 +32,11 @@ export const addImageDroppedListener = () => {
     effect: (action, { dispatch, getState }) => {
       const { activeData, overData } = action.payload;
       const state = getState();
+
+      moduleLog.debug(
+        { data: { activeData, overData } },
+        'Image or selection dropped'
+      );
 
       // set current image
       if (
@@ -157,7 +156,7 @@ export const addImageDroppedListener = () => {
         const { image_name } = activeData.payload.imageDTO;
         const { boardId } = overData.context;
         dispatch(
-          boardImagesApi.endpoints.addImageToBoard.initiate({
+          boardImagesApi.endpoints.addBoardImage.initiate({
             image_name,
             board_id: boardId,
           })
@@ -173,45 +172,70 @@ export const addImageDroppedListener = () => {
       ) {
         const { image_name } = activeData.payload.imageDTO;
         dispatch(
-          boardImagesApi.endpoints.removeImageFromBoard.initiate(image_name)
+          boardImagesApi.endpoints.deleteBoardImage.initiate({ image_name })
         );
       }
 
-      // add multiple images to board
+      // add gallery selection to board
       if (
         overData.actionType === 'MOVE_BOARD' &&
         activeData.payloadType === 'GALLERY_SELECTION' &&
         overData.context.boardId
       ) {
+        console.log('adding gallery selection to board');
         const board_id = overData.context.boardId;
-        dispatch(gallerySelectionAddedToBoard({ board_id }));
+        const image_names = state.gallery.selection;
+        dispatch(
+          boardImagesApi.endpoints.addManyBoardImages.initiate({
+            board_id,
+            image_names,
+          })
+        );
       }
 
+      // remove gallery selection from board
+      if (
+        overData.actionType === 'MOVE_BOARD' &&
+        activeData.payloadType === 'GALLERY_SELECTION' &&
+        overData.context.boardId === null
+      ) {
+        console.log('removing gallery selection to board');
+        const image_names = state.gallery.selection;
+        dispatch(
+          boardImagesApi.endpoints.deleteManyBoardImages.initiate({
+            image_names,
+          })
+        );
+      }
+
+      // add batch selection to board
       if (
         overData.actionType === 'MOVE_BOARD' &&
         activeData.payloadType === 'BATCH_SELECTION' &&
         overData.context.boardId
       ) {
         const board_id = overData.context.boardId;
-        dispatch(batchSelectionAddedToBoard({ board_id }));
+        const image_names = state.batch.selection;
+        dispatch(
+          boardImagesApi.endpoints.addManyBoardImages.initiate({
+            board_id,
+            image_names,
+          })
+        );
       }
 
-      // remove multiple images from board
-      if (
-        overData.actionType === 'MOVE_BOARD' &&
-        activeData.payloadType === 'GALLERY_SELECTION' &&
-        overData.context.boardId === null
-      ) {
-        dispatch(gallerySelectionRemovedFromBoard());
-      }
-
-      // remove multiple images from board
+      // remove batch selection from board
       if (
         overData.actionType === 'MOVE_BOARD' &&
         activeData.payloadType === 'BATCH_SELECTION' &&
         overData.context.boardId === null
       ) {
-        dispatch(batchSelectionRemovedFromBoard());
+        const image_names = state.batch.selection;
+        dispatch(
+          boardImagesApi.endpoints.deleteManyBoardImages.initiate({
+            image_names,
+          })
+        );
       }
     },
   });
