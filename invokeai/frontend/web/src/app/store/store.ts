@@ -96,10 +96,26 @@ export const store = configureStore({
       .concat(dynamicMiddlewares)
       .prepend(listenerMiddleware.middleware),
   devTools: {
-    actionsDenylist,
     actionSanitizer,
     stateSanitizer,
     trace: true,
+    predicate: (state, action) => {
+      // TODO: hook up to the log level param in system slice
+      // manually type state, cannot type the arg
+      // const typedState = state as ReturnType<typeof rootReducer>;
+
+      if (action.type.startsWith('api/')) {
+        // don't log api actions, with manual cache updates they are extremely noisy
+        return false;
+      }
+
+      if (actionsDenylist.includes(action.type)) {
+        // don't log other noisy actions
+        return false;
+      }
+
+      return true;
+    },
   },
 });
 
