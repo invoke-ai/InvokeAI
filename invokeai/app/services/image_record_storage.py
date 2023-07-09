@@ -329,11 +329,15 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_params.append(is_intermediate)
 
             if board_id is not None:
-                query_conditions += """--sql
-                AND board_images.board_id = ?
-                """
-
-                query_params.append(board_id)
+                if board_id == "none":
+                    query_conditions += """--sql
+                    AND board_images.board_id IS NULL
+                    """
+                else:
+                    query_conditions += """--sql
+                    AND board_images.board_id = ?
+                    """
+                    query_params.append(board_id)
 
             query_pagination = """--sql
             ORDER BY images.created_at DESC LIMIT ? OFFSET ?

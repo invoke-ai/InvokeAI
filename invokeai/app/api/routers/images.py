@@ -220,7 +220,7 @@ async def list_images_with_metadata(
         default=None, description="Whether to list intermediate images"
     ),
     board_id: Optional[str] = Query(
-        default=None, description="The board id to filter by"
+        default=None, description="The board id to filter by, provide 'none' for images without a board"
     ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
