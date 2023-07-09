@@ -93,7 +93,8 @@ export type AppFeature =
   | 'discordLink'
   | 'bugLink'
   | 'localization'
-  | 'consoleLogging';
+  | 'consoleLogging'
+  | 'dynamicPrompting';
 
 /**
  * A disable-able Stable Diffusion feature
@@ -104,7 +105,10 @@ export type SDFeature =
   | 'variation'
   | 'symmetry'
   | 'seamless'
-  | 'hires';
+  | 'hires'
+  | 'lora'
+  | 'embedding'
+  | 'vae';
 
 /**
  * Configuration options for the InvokeAI UI.

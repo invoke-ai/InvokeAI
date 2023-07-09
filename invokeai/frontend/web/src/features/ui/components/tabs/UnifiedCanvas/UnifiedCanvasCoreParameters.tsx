@@ -8,8 +8,7 @@ import ParamBoundingBoxHeight from 'features/parameters/components/Parameters/Ca
 import ParamBoundingBoxWidth from 'features/parameters/components/Parameters/Canvas/BoundingBox/ParamBoundingBoxWidth';
 import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
 import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
-import ParamModelandVAE from 'features/parameters/components/Parameters/Core/ParamModelandVAE';
-import ParamScheduler from 'features/parameters/components/Parameters/Core/ParamScheduler';
+import ParamModelandVAEandScheduler from 'features/parameters/components/Parameters/Core/ParamModelandVAEandScheduler';
 import ParamSteps from 'features/parameters/components/Parameters/Core/ParamSteps';
 import ImageToImageStrength from 'features/parameters/components/Parameters/ImageToImage/ImageToImageStrength';
 import ParamSeedFull from 'features/parameters/components/Parameters/Seed/ParamSeedFull';
@@ -45,7 +44,7 @@ const UnifiedCanvasCoreParameters = () => {
       >
         {shouldUseSliders ? (
           <>
-            <ParamModelandVAE />
+            <ParamModelandVAEandScheduler />
             <Box pt={2}>
               <ParamSeedFull />
             </Box>
@@ -62,8 +61,7 @@ const UnifiedCanvasCoreParameters = () => {
               <ParamSteps />
               <ParamCFGScale />
             </Flex>
-            <ParamModelandVAE />
-            <ParamScheduler />
+            <ParamModelandVAEandScheduler />
             <Box pt={2}>
               <ParamSeedFull />
             </Box>

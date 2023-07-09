@@ -24,10 +24,14 @@ logger = InvokeAILogger.getLogger(config=app_config)
 import invokeai.frontend.web as web_dir
 
 from .api.dependencies import ApiDependencies
-from .api.routers import sessions, models, images, boards, board_images
+from .api.routers import sessions, models, images, boards, board_images, app_info
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
 
+import torch
+if torch.backends.mps.is_available():
+    import invokeai.backend.util.mps_fixes
+    
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
 app = FastAPI(title="Invoke AI", docs_url=None, redoc_url=None)
@@ -81,6 +85,8 @@ app.include_router(images.images_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 
 app.include_router(board_images.board_images_router, prefix="/api")
+
+app.include_router(app_info.app_router, prefix='/api')
 
 # Build a custom OpenAPI to include all outputs
 # TODO: can outputs be included on metadata of invocation schemas somehow?

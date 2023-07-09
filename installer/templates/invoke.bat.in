@@ -14,7 +14,7 @@ echo 3. Run textual inversion training
 echo 4. Merge models (diffusers type only)
 echo 5. Download and install models
 echo 6. Change InvokeAI startup options
-echo 7. Re-run the configure script to fix a broken install
+echo 7. Re-run the configure script to fix a broken install or to complete a major upgrade
 echo 8. Open the developer console
 echo 9. Update InvokeAI
 echo 10. Command-line help

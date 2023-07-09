@@ -21,7 +21,7 @@ from PIL import Image, ImageChops, ImageFilter
 from accelerate.utils import set_seed
 from diffusers import DiffusionPipeline
 from tqdm import trange
-from typing import Callable, List, Iterator, Optional, Type
+from typing import Callable, List, Iterator, Optional, Type, Union
 from dataclasses import dataclass, field
 from diffusers.schedulers import SchedulerMixin as Scheduler
 
@@ -178,7 +178,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
 # ------------------------------------
 class Img2Img(InvokeAIGenerator):
     def generate(self,
-               init_image: Image.Image | torch.FloatTensor,
+               init_image: Union[Image.Image, torch.FloatTensor],
                strength: float=0.75,
                **keyword_args
                )->Iterator[InvokeAIGeneratorOutput]:
@@ -195,7 +195,7 @@ class Img2Img(InvokeAIGenerator):
 # Takes all the arguments of Img2Img and adds the mask image and the seam/infill stuff
 class Inpaint(Img2Img):
     def generate(self,
-                 mask_image: Image.Image | torch.FloatTensor,
+                 mask_image: Union[Image.Image, torch.FloatTensor],
                  # Seam settings - when 0, doesn't fill seam
                  seam_size: int = 96,
                  seam_blur: int = 16,
@@ -570,28 +570,16 @@ class Generator:
         device = self.model.device
         # limit noise to only the diffusion image channels, not the mask channels
         input_channels = min(self.latent_channels, 4)
-        if self.use_mps_noise or device.type == "mps":
-            x = torch.randn(
-                [
-                    1,
-                    input_channels,
-                    height // self.downsampling_factor,
-                    width // self.downsampling_factor,
-                ],
-                dtype=self.torch_dtype(),
-                device="cpu",
-            ).to(device)
-        else:
-            x = torch.randn(
-                [
-                    1,
-                    input_channels,
-                    height // self.downsampling_factor,
-                    width // self.downsampling_factor,
-                ],
-                dtype=self.torch_dtype(),
-                device=device,
-            )
+        x = torch.randn(
+            [
+                1,
+                input_channels,
+                height // self.downsampling_factor,
+                width // self.downsampling_factor,
+            ],
+            dtype=self.torch_dtype(),
+            device=device,
+        )
         if self.perlin > 0.0:
             perlin_noise = self.get_perlin_noise(
                 width // self.downsampling_factor, height // self.downsampling_factor

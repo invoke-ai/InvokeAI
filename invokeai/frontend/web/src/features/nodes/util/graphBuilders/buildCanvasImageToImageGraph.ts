@@ -1,6 +1,7 @@
 import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
+import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   ImageDTO,
   ImageResizeInvocation,
@@ -12,6 +13,7 @@ import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
+  CLIP_SKIP,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
@@ -35,20 +37,24 @@ export const buildCanvasImageToImageGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: modelId,
+    model: currentModel,
     cfgScale: cfg_scale,
     scheduler,
     steps,
     img2imgStrength: strength,
-    iterations,
-    seed,
-    shouldRandomizeSeed,
+    clipSkip,
+    shouldUseCpuNoise,
+    shouldUseNoiseSettings,
   } = state.generation;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const model = modelIdToMainModelField(modelId);
+  const model = modelIdToMainModelField(currentModel?.id || '');
+
+  const use_cpu = shouldUseNoiseSettings
+    ? shouldUseCpuNoise
+    : initialGenerationState.shouldUseCpuNoise;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -76,11 +82,17 @@ export const buildCanvasImageToImageGraph = (
       [NOISE]: {
         type: 'noise',
         id: NOISE,
+        use_cpu,
       },
       [MAIN_MODEL_LOADER]: {
         type: 'main_model_loader',
         id: MAIN_MODEL_LOADER,
         model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -110,13 +122,23 @@ export const buildCanvasImageToImageGraph = (
           field: 'clip',
         },
         destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
           node_id: POSITIVE_CONDITIONING,
           field: 'clip',
         },
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {

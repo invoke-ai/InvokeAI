@@ -1,12 +1,11 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import argparse
-import os
 import re
 import shlex
 import sys
 import time
-from typing import Union, get_type_hints
+from typing import Union, get_type_hints, Optional
 
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import Field
@@ -52,6 +51,10 @@ from .services.model_manager_service import ModelManagerService
 from .services.processor import DefaultInvocationProcessor
 from .services.restoration_services import RestorationServices
 from .services.sqlite import SqliteItemStorage
+
+import torch
+if torch.backends.mps.is_available():
+    import invokeai.backend.util.mps_fixes
 
 
 class CliCommand(BaseModel):
@@ -348,7 +351,7 @@ def invoke_cli():
 
                 # Parse invocation
                 command: CliCommand = None # type:ignore
-                system_graph: LibraryGraph|None = None
+                system_graph: Optional[LibraryGraph] = None
                 if args['type'] in system_graph_names:
                     system_graph = next(filter(lambda g: g.name == args['type'], system_graphs))
                     invocation = GraphInvocation(graph=system_graph.graph, id=str(current_id))

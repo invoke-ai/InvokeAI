@@ -1,6 +1,6 @@
 import sqlite3
 from threading import Lock
-from typing import Generic, TypeVar, Union, get_args
+from typing import Generic, TypeVar, Optional, Union, get_args
 
 from pydantic import BaseModel, parse_raw_as
 
@@ -63,7 +63,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             self._lock.release()
         self._on_changed(item)
 
-    def get(self, id: str) -> Union[T, None]:
+    def get(self, id: str) -> Optional[T]:
         try:
             self._lock.acquire()
             self._cursor.execute(

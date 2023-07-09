@@ -1,19 +1,17 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from contextlib import ExitStack
 from typing import List, Literal, Optional, Union
 
 import einops
 import torch
-from diffusers import ControlNetModel, DPMSolverMultistepScheduler
+from diffusers import ControlNetModel
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.schedulers import SchedulerMixin as Scheduler
 from pydantic import BaseModel, Field, validator
 
-from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
-from ...backend.image_util.seamless import configure_model_padding
+from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
@@ -23,7 +21,6 @@ from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import \
     PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import torch_dtype
-from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
 from .compel import ConditioningField
@@ -585,7 +582,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     type: Literal["i2l"] = "i2l"
 
     # Inputs
-    image: Union[ImageField, None] = Field(description="The image to encode")
+    image: Optional[ImageField] = Field(description="The image to encode")
     vae: VaeField = Field(default=None, description="Vae submodel")
     tiled: bool = Field(
         default=False,

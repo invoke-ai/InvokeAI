@@ -157,8 +157,6 @@ export const imageUploaded = createAppAsyncThunk<
     session_id,
   } = arg;
   const { post } = $client.get();
-  const formData = new FormData();
-  formData.append('file', file);
   const { data, error, response } = await post('/api/v1/images/', {
     params: {
       query: {
@@ -167,10 +165,12 @@ export const imageUploaded = createAppAsyncThunk<
         session_id,
       },
     },
-    // TODO: Proper handling of `multipart/form-data` is coming soon, will fix type issues
-    // https://github.com/drwpow/openapi-typescript/issues/1123
-    // @ts-ignore
-    body: formData,
+    body: { file },
+    bodySerializer: (body) => {
+      const formData = new FormData();
+      formData.append('file', body.file);
+      return formData;
+    },
   });
 
   if (error) {

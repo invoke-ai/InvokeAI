@@ -1,19 +1,16 @@
 import { Flex, Text } from '@chakra-ui/react';
+import { SelectItem } from '@mantine/core';
 import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { RootState, stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
+import { loraAdded } from 'features/lora/store/loraSlice';
+import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
 import { forEach } from 'lodash-es';
-import { forwardRef, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
-import { loraAdded } from '../store/loraSlice';
-
-type LoraSelectItem = {
-  label: string;
-  value: string;
-  description?: string;
-};
 
 const selector = createSelector(
   stateSelector,
@@ -28,35 +25,48 @@ const ParamLoraSelect = () => {
   const { loras } = useAppSelector(selector);
   const { data: lorasQueryData } = useGetLoRAModelsQuery();
 
+  const currentMainModel = useAppSelector(
+    (state: RootState) => state.generation.model
+  );
+
   const data = useMemo(() => {
     if (!lorasQueryData) {
       return [];
     }
 
-    const data: LoraSelectItem[] = [];
+    const data: SelectItem[] = [];
 
     forEach(lorasQueryData.entities, (lora, id) => {
       if (!lora || Boolean(id in loras)) {
         return;
       }
 
+      const disabled = currentMainModel?.base_model !== lora.base_model;
+
       data.push({
         value: id,
         label: lora.name,
-        description: lora.description,
+        disabled,
+        group: MODEL_TYPE_MAP[lora.base_model],
+        tooltip: disabled
+          ? `Incompatible base model: ${lora.base_model}`
+          : undefined,
       });
     });
 
-    return data;
-  }, [loras, lorasQueryData]);
+    return data.sort((a, b) => (a.disabled && !b.disabled ? 1 : -1));
+  }, [loras, lorasQueryData, currentMainModel?.base_model]);
 
   const handleChange = useCallback(
-    (v: string[]) => {
-      const loraEntity = lorasQueryData?.entities[v[0]];
+    (v: string | null | undefined) => {
+      if (!v) {
+        return;
+      }
+      const loraEntity = lorasQueryData?.entities[v];
       if (!loraEntity) {
         return;
       }
-      v[0] && dispatch(loraAdded(loraEntity));
+      dispatch(loraAdded(loraEntity));
     },
     [dispatch, lorasQueryData?.entities]
   );
@@ -72,46 +82,20 @@ const ParamLoraSelect = () => {
   }
 
   return (
-    <IAIMantineMultiSelect
+    <IAIMantineSelect
       placeholder={data.length === 0 ? 'All LoRAs added' : 'Add LoRA'}
-      value={[]}
+      value={null}
       data={data}
-      maxDropdownHeight={400}
       nothingFound="No matching LoRAs"
-      itemComponent={SelectItem}
+      itemComponent={IAIMantineSelectItemWithTooltip}
       disabled={data.length === 0}
-      filter={(value, selected, item: LoraSelectItem) =>
-        item.label.toLowerCase().includes(value.toLowerCase().trim()) ||
+      filter={(value, item: SelectItem) =>
+        item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
         item.value.toLowerCase().includes(value.toLowerCase().trim())
       }
       onChange={handleChange}
     />
   );
 };
-
-interface ItemProps extends React.ComponentPropsWithoutRef<'div'> {
-  value: string;
-  label: string;
-  description?: string;
-}
-
-const SelectItem = forwardRef<HTMLDivElement, ItemProps>(
-  ({ label, description, ...others }: ItemProps, ref) => {
-    return (
-      <div ref={ref} {...others}>
-        <div>
-          <Text>{label}</Text>
-          {description && (
-            <Text size="xs" color="base.600">
-              {description}
-            </Text>
-          )}
-        </div>
-      </div>
-    );
-  }
-);
-
-SelectItem.displayName = 'SelectItem';
 
 export default ParamLoraSelect;

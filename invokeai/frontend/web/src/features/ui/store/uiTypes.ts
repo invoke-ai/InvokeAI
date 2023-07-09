@@ -28,5 +28,6 @@ export interface UIState {
   shouldShowGallery: boolean;
   shouldShowProgressInViewer: boolean;
   shouldShowEmbeddingPicker: boolean;
+  shouldShowAdvancedOptions: boolean;
   favoriteSchedulers: SchedulerParam[];
 }

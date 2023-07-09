@@ -6,8 +6,7 @@ import IAICollapse from 'common/components/IAICollapse';
 import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
 import ParamHeight from 'features/parameters/components/Parameters/Core/ParamHeight';
 import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
-import ParamModelandVAE from 'features/parameters/components/Parameters/Core/ParamModelandVAE';
-import ParamScheduler from 'features/parameters/components/Parameters/Core/ParamScheduler';
+import ParamModelandVAEandScheduler from 'features/parameters/components/Parameters/Core/ParamModelandVAEandScheduler';
 import ParamSteps from 'features/parameters/components/Parameters/Core/ParamSteps';
 import ParamWidth from 'features/parameters/components/Parameters/Core/ParamWidth';
 import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
@@ -48,7 +47,7 @@ const ImageToImageTabCoreParameters = () => {
       >
         {shouldUseSliders ? (
           <>
-            <ParamModelandVAE />
+            <ParamModelandVAEandScheduler />
             <Box pt={2}>
               <ParamSeedFull />
             </Box>
@@ -65,8 +64,7 @@ const ImageToImageTabCoreParameters = () => {
               <ParamSteps />
               <ParamCFGScale />
             </Flex>
-            <ParamModelandVAE />
-            <ParamScheduler />
+            <ParamModelandVAEandScheduler />
             <Box pt={2}>
               <ParamSeedFull />
             </Box>

@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 import sqlite3
 import threading
-from typing import Union, cast
-from invokeai.app.services.board_record_storage import BoardRecord
+from typing import Optional, cast
 
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.image_record import (
@@ -44,7 +43,7 @@ class BoardImageRecordStorageBase(ABC):
     def get_board_for_image(
         self,
         image_name: str,
-    ) -> Union[str, None]:
+    ) -> Optional[str]:
         """Gets an image's board id, if it has one."""
         pass
 
@@ -215,7 +214,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
     def get_board_for_image(
         self,
         image_name: str,
-    ) -> Union[str, None]:
+    ) -> Optional[str]:
         try:
             self._lock.acquire()
             self._cursor.execute(

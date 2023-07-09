@@ -248,9 +248,6 @@ class InvokeAIDiffuserComponent:
             x_twice, sigma_twice, both_conditionings, **kwargs,
         )
         unconditioned_next_x, conditioned_next_x = both_results.chunk(2)
-        if conditioned_next_x.device.type == "mps":
-            # prevent a result filled with zeros. seems to be a torch bug.
-            conditioned_next_x = conditioned_next_x.clone()
         return unconditioned_next_x, conditioned_next_x
 
     def _apply_standard_conditioning_sequentially(
@@ -264,9 +261,6 @@ class InvokeAIDiffuserComponent:
         # low-memory sequential path
         unconditioned_next_x = self.model_forward_callback(x, sigma, unconditioning, **kwargs)
         conditioned_next_x = self.model_forward_callback(x, sigma, conditioning, **kwargs)
-        if conditioned_next_x.device.type == "mps":
-            # prevent a result filled with zeros. seems to be a torch bug.
-            conditioned_next_x = conditioned_next_x.clone()
         return unconditioned_next_x, conditioned_next_x
 
     # TODO: looks unused

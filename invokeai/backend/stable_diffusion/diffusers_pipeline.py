@@ -7,7 +7,7 @@ import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generic, List, Optional, Type, TypeVar, Union
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 import einops
 import PIL.Image
@@ -17,12 +17,11 @@ import psutil
 import torch
 import torchvision.transforms as T
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
-from diffusers.models.controlnet import ControlNetModel, ControlNetOutput
+from diffusers.models.controlnet import ControlNetModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
     StableDiffusionPipeline,
 )
-from diffusers.pipelines.controlnet import MultiControlNetModel
 
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import (
     StableDiffusionImg2ImgPipeline,
@@ -46,7 +45,7 @@ from .diffusion import (
     InvokeAIDiffuserComponent,
     PostprocessingSettings,
 )
-from .offloading import FullyLoadedModelGroup, LazilyLoadedModelGroup, ModelGroup
+from .offloading import FullyLoadedModelGroup, ModelGroup
 
 @dataclass
 class PipelineIntermediateState:
@@ -105,7 +104,7 @@ class AddsMaskGuidance:
     _debug: Optional[Callable] = None
 
     def __call__(
-        self, step_output: BaseOutput | SchedulerOutput, t: torch.Tensor, conditioning
+        self, step_output: Union[BaseOutput, SchedulerOutput], t: torch.Tensor, conditioning
     ) -> BaseOutput:
         output_class = step_output.__class__  # We'll create a new one with masked data.
 
@@ -361,37 +360,34 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         ):
             self.enable_xformers_memory_efficient_attention()
         else:
-            if torch.backends.mps.is_available():
-                # until pytorch #91617 is fixed, slicing is borked on MPS
-                # https://github.com/pytorch/pytorch/issues/91617
-                # fix is in https://github.com/kulinseth/pytorch/pull/222 but no idea when it will get merged to pytorch mainline.
-                pass
+            if self.device.type == "cpu" or self.device.type == "mps":
+                mem_free = psutil.virtual_memory().free
+            elif self.device.type == "cuda":
+                mem_free, _ = torch.cuda.mem_get_info(normalize_device(self.device))
             else:
-                if self.device.type == "cpu" or self.device.type == "mps":
-                    mem_free = psutil.virtual_memory().free
-                elif self.device.type == "cuda":
-                    mem_free, _ = torch.cuda.mem_get_info(normalize_device(self.device))
-                else:
-                    raise ValueError(f"unrecognized device {self.device}")
-                # input tensor of [1, 4, h/8, w/8]
-                # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
-                bytes_per_element_needed_for_baddbmm_duplication = (
-                    latents.element_size() + 4
-                )
-                max_size_required_for_baddbmm = (
-                    16
-                    * latents.size(dim=2)
-                    * latents.size(dim=3)
-                    * latents.size(dim=2)
-                    * latents.size(dim=3)
-                    * bytes_per_element_needed_for_baddbmm_duplication
-                )
-                if max_size_required_for_baddbmm > (
-                    mem_free * 3.0 / 4.0
-                ):  # 3.3 / 4.0 is from old Invoke code
-                    self.enable_attention_slicing(slice_size="max")
-                else:
-                    self.disable_attention_slicing()
+                raise ValueError(f"unrecognized device {self.device}")
+            # input tensor of [1, 4, h/8, w/8]
+            # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
+            bytes_per_element_needed_for_baddbmm_duplication = (
+                latents.element_size() + 4
+            )
+            max_size_required_for_baddbmm = (
+                16
+                * latents.size(dim=2)
+                * latents.size(dim=3)
+                * latents.size(dim=2)
+                * latents.size(dim=3)
+                * bytes_per_element_needed_for_baddbmm_duplication
+            )
+            if max_size_required_for_baddbmm > (
+                mem_free * 3.0 / 4.0
+            ):  # 3.3 / 4.0 is from old Invoke code
+                self.enable_attention_slicing(slice_size="max")
+            elif torch.backends.mps.is_available():
+                # diffusers recommends always enabling for mps
+                self.enable_attention_slicing(slice_size="max")
+            else:
+                self.disable_attention_slicing()
 
     def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
         # overridden method; types match the superclass.
@@ -917,20 +913,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def non_noised_latents_from_image(self, init_image, *, device: torch.device, dtype):
         init_image = init_image.to(device=device, dtype=dtype)
         with torch.inference_mode():
-            if device.type == "mps":
-                # workaround for torch MPS bug that has been fixed in https://github.com/kulinseth/pytorch/pull/222
-                # TODO remove this workaround once kulinseth#222 is merged to pytorch mainline
-                self.vae.to(CPU_DEVICE)
-                init_image = init_image.to(CPU_DEVICE)
-            else:
-                self._model_group.load(self.vae)
+            self._model_group.load(self.vae)
             init_latent_dist = self.vae.encode(init_image).latent_dist
             init_latents = init_latent_dist.sample().to(
                 dtype=dtype
             )  # FIXME: uses torch.randn. make reproducible!
-            if device.type == "mps":
-                self.vae.to(device)
-                init_latents = init_latents.to(device)
 
         init_latents = 0.18215 * init_latents
         return init_latents

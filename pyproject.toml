@@ -42,7 +42,7 @@ dependencies = [
   "controlnet-aux>=0.0.6",
   "timm==0.6.13",           # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
-  "diffusers[torch]~=0.17.1",
+  "diffusers[torch]~=0.18.1",
   "dnspython==2.2.1",
   "dynamicprompts",
   "easing-functions",
@@ -82,7 +82,7 @@ dependencies = [
   "test-tube>=0.7.5",
   "torch~=2.0.0",
   "torchvision>=0.14.1",
-  "torchmetrics",
+  "torchmetrics==0.11.4",
   "torchsde==0.2.5",
   "transformers~=4.30",
   "uvicorn[standard]==0.21.1",
@@ -112,7 +112,11 @@ dependencies = [
 "textual_inversion.py" = "invokeai.frontend.training:invokeai_textual_inversion"
 
 # shortcut commands to start cli and web
-"invokeai" = "invokeai.app.cli_app:invoke_cli"
+# "invokeai --web" will launch the web interface
+# "invokeai" will launch the CLI
+"invokeai" = "invokeai.frontend.legacy_launch_invokeai:main"
+
+# new shortcut to launch web interface
 "invokeai-web" = "invokeai.app.api_app:invoke_api"
 
 # full commands
@@ -148,7 +152,7 @@ version = { attr = "invokeai.version.__version__" }
 ]
 
 [tool.setuptools.package-data]
-"invokeai.assets.web" = ["**.png"]
+"invokeai.assets.web" = ["**.png","**.js","**.woff2","**.css"]
 "invokeai.backend" = ["**.png"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
 "invokeai.frontend.web.dist" = ["**"]

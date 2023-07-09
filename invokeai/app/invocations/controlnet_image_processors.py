@@ -6,7 +6,7 @@ from builtins import float, bool
 import cv2
 import numpy as np
 from typing import Literal, Optional, Union, List, Dict
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image
 from pydantic import BaseModel, Field, validator
 
 from ..models.image import ImageField, ImageCategory, ResourceOrigin
@@ -422,9 +422,9 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvoca
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
-    h: Union[int, None] = Field(default=512, ge=0, description="Content shuffle `h` parameter")
-    w: Union[int, None] = Field(default=512, ge=0, description="Content shuffle `w` parameter")
-    f: Union[int, None] = Field(default=256, ge=0, description="Content shuffle `f` parameter")
+    h: Optional[int] = Field(default=512, ge=0, description="Content shuffle `h` parameter")
+    w: Optional[int] = Field(default=512, ge=0, description="Content shuffle `w` parameter")
+    f: Optional[int] = Field(default=256, ge=0, description="Content shuffle `f` parameter")
     # fmt: on
 
     def run_processor(self, image):

@@ -9,4 +9,5 @@ export const actionsDenylist = [
   'canvas/addPointToCurrentLine',
   'socket/socketGeneratorProgress',
   'socket/appSocketGeneratorProgress',
+  'hotkeys/shiftKeyPressed',
 ];

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import copy
 from contextlib import contextmanager
+from typing import Optional, Dict, Tuple, Any, Union, List
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union, List
 
 import torch
 from compel.embeddings_provider import BaseTextualInversionManager
@@ -614,6 +614,24 @@ class ModelPatcher:
             if init_tokens_count and new_tokens_added:
                 text_encoder.resize_token_embeddings(init_tokens_count)
 
+
+    @classmethod
+    @contextmanager
+    def apply_clip_skip(
+        cls,
+        text_encoder: CLIPTextModel,
+        clip_skip: int,
+    ):
+        skipped_layers = []
+        try:
+            for i in range(clip_skip):
+                skipped_layers.append(text_encoder.text_model.encoder.layers.pop(-1))
+
+            yield
+
+        finally:
+            while len(skipped_layers) > 0:
+                text_encoder.text_model.encoder.layers.append(skipped_layers.pop())
 
 class TextualInversionModel:
     name: str

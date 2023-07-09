@@ -6,23 +6,16 @@ import {
   PopoverTrigger,
   Text,
 } from '@chakra-ui/react';
-import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
+import { SelectItem } from '@mantine/core';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
+import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
 import { forEach } from 'lodash-es';
-import {
-  PropsWithChildren,
-  forwardRef,
-  useCallback,
-  useMemo,
-  useRef,
-} from 'react';
+import { PropsWithChildren, useCallback, useMemo, useRef } from 'react';
 import { useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
-
-type EmbeddingSelectItem = {
-  label: string;
-  value: string;
-  description?: string;
-};
 
 type Props = PropsWithChildren & {
   onSelect: (v: string) => void;
@@ -35,33 +28,45 @@ const ParamEmbeddingPopover = (props: Props) => {
   const { data: embeddingQueryData } = useGetTextualInversionModelsQuery();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const currentMainModel = useAppSelector(
+    (state: RootState) => state.generation.model
+  );
+
   const data = useMemo(() => {
     if (!embeddingQueryData) {
       return [];
     }
 
-    const data: EmbeddingSelectItem[] = [];
+    const data: SelectItem[] = [];
 
     forEach(embeddingQueryData.entities, (embedding, _) => {
-      if (!embedding) return;
+      if (!embedding) {
+        return;
+      }
+
+      const disabled = currentMainModel?.base_model !== embedding.base_model;
 
       data.push({
         value: embedding.name,
         label: embedding.name,
-        description: embedding.description,
+        group: MODEL_TYPE_MAP[embedding.base_model],
+        disabled,
+        tooltip: disabled
+          ? `Incompatible base model: ${embedding.base_model}`
+          : undefined,
       });
     });
 
-    return data;
-  }, [embeddingQueryData]);
+    return data.sort((a, b) => (a.disabled && !b.disabled ? 1 : -1));
+  }, [embeddingQueryData, currentMainModel?.base_model]);
 
   const handleChange = useCallback(
-    (v: string[]) => {
-      if (v.length === 0) {
+    (v: string | null) => {
+      if (!v) {
         return;
       }
 
-      onSelect(v[0]);
+      onSelect(v);
     },
     [onSelect]
   );
@@ -101,17 +106,19 @@ const ParamEmbeddingPopover = (props: Props) => {
               </Text>
             </Flex>
           ) : (
-            <IAIMantineMultiSelect
+            <IAIMantineSelect
               inputRef={inputRef}
+              autoFocus
               placeholder={'Add Embedding'}
-              value={[]}
+              value={null}
               data={data}
-              maxDropdownHeight={400}
-              nothingFound="No Matching Embeddings"
-              itemComponent={SelectItem}
+              nothingFound="No matching Embeddings"
+              itemComponent={IAIMantineSelectItemWithTooltip}
               disabled={data.length === 0}
-              filter={(value, selected, item: EmbeddingSelectItem) =>
-                item.label.toLowerCase().includes(value.toLowerCase().trim()) ||
+              filter={(value, item: SelectItem) =>
+                item.label
+                  ?.toLowerCase()
+                  .includes(value.toLowerCase().trim()) ||
                 item.value.toLowerCase().includes(value.toLowerCase().trim())
               }
               onChange={handleChange}
@@ -124,28 +131,3 @@ const ParamEmbeddingPopover = (props: Props) => {
 };
 
 export default ParamEmbeddingPopover;
-
-interface ItemProps extends React.ComponentPropsWithoutRef<'div'> {
-  value: string;
-  label: string;
-  description?: string;
-}
-
-const SelectItem = forwardRef<HTMLDivElement, ItemProps>(
-  ({ label, description, ...others }: ItemProps, ref) => {
-    return (
-      <div ref={ref} {...others}>
-        <div>
-          <Text>{label}</Text>
-          {description && (
-            <Text size="xs" color="base.600">
-              {description}
-            </Text>
-          )}
-        </div>
-      </div>
-    );
-  }
-);
-
-SelectItem.displayName = 'SelectItem';

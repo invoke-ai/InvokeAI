@@ -1,7 +1,9 @@
 import { Tooltip, useColorMode, useToken } from '@chakra-ui/react';
 import { MultiSelect, MultiSelectProps } from '@mantine/core';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
-import { RefObject, memo } from 'react';
+import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
+import { KeyboardEvent, RefObject, memo, useCallback } from 'react';
 import { mode } from 'theme/util/mode';
 
 type IAIMultiSelectProps = MultiSelectProps & {
@@ -11,6 +13,7 @@ type IAIMultiSelectProps = MultiSelectProps & {
 
 const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
   const { searchable = true, tooltip, inputRef, ...rest } = props;
+  const dispatch = useAppDispatch();
   const {
     base50,
     base100,
@@ -31,11 +34,32 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
   const [boxShadow] = useToken('shadows', ['dark-lg']);
   const { colorMode } = useColorMode();
 
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.shiftKey) {
+        dispatch(shiftKeyPressed(true));
+      }
+    },
+    [dispatch]
+  );
+
+  const handleKeyUp = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (!e.shiftKey) {
+        dispatch(shiftKeyPressed(false));
+      }
+    },
+    [dispatch]
+  );
+
   return (
-    <Tooltip label={tooltip} placement="top" hasArrow>
+    <Tooltip label={tooltip} placement="top" hasArrow isOpen={true}>
       <MultiSelect
         ref={inputRef}
+        onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
         searchable={searchable}
+        maxDropdownHeight={300}
         styles={() => ({
           label: {
             color: mode(base700, base300)(colorMode),
@@ -66,6 +90,7 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
             '&[data-disabled]': {
               backgroundColor: mode(base300, base700)(colorMode),
               color: mode(base600, base400)(colorMode),
+              cursor: 'not-allowed',
             },
           },
           value: {
@@ -107,6 +132,10 @@ const IAIMantineMultiSelect = (props: IAIMultiSelectProps) => {
                 backgroundColor: mode(accent500, accent500)(colorMode),
                 color: mode('white', base50)(colorMode),
               },
+            },
+            '&[data-disabled]': {
+              color: mode(base500, base600)(colorMode),
+              cursor: 'not-allowed',
             },
           },
           rightSection: {

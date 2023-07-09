@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Union
+from typing import Any, Optional
 import networkx as nx
 
 from invokeai.app.models.metadata import ImageMetadata
@@ -34,7 +34,7 @@ class CoreMetadataService(MetadataServiceBase):
 
         return metadata
 
-    def _find_nearest_ancestor(self, G: nx.DiGraph, node_id: str) -> Union[str, None]:
+    def _find_nearest_ancestor(self, G: nx.DiGraph, node_id: str) -> Optional[str]:
         """
         Finds the id of the nearest ancestor (of a valid type) of a given node.
 
@@ -65,7 +65,7 @@ class CoreMetadataService(MetadataServiceBase):
 
     def _get_additional_metadata(
         self, graph: Graph, node_id: str
-    ) -> Union[dict[str, Any], None]:
+    ) -> Optional[dict[str, Any]]:
         """
         Returns additional metadata for a given node.
 
