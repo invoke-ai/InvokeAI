@@ -52,8 +52,8 @@ const ParamWidth = (props: ParamWidthProps) => {
 
   const handleReset = useCallback(() => {
     dispatch(setWidth(initial));
-    if (aspectRatio) dispatch(setHeight(roundToEight(width / aspectRatio)));
-  }, [dispatch, initial, width, aspectRatio]);
+    if (aspectRatio) dispatch(setHeight(roundToEight(initial / aspectRatio)));
+  }, [dispatch, initial, aspectRatio]);
 
   return (
     <IAISlider
