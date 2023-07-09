@@ -44,13 +44,13 @@ const UnifiedCanvasCoreParameters = () => {
       >
         {shouldUseSliders ? (
           <>
+            <ParamIterations />
+            <ParamSteps />
+            <ParamCFGScale />
             <ParamModelandVAEandScheduler />
             <Box pt={2}>
               <ParamSeedFull />
             </Box>
-            <ParamIterations />
-            <ParamSteps />
-            <ParamCFGScale />
             <ParamBoundingBoxWidth />
             <ParamBoundingBoxHeight />
           </>

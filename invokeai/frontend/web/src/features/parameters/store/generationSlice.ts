@@ -2,10 +2,14 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
 import { configChanged } from 'features/system/store/configSlice';
-import { setShouldShowAdvancedOptions } from 'features/ui/store/uiSlice';
+import {
+  setAspectRatio,
+  setShouldShowAdvancedOptions,
+} from 'features/ui/store/uiSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
+import { roundToEight } from '../components/Parameters/Core/ParamAspectRatio';
 import {
   CfgScaleParam,
   HeightParam,
@@ -261,6 +265,10 @@ export const generationSlice = createSlice({
     builder.addCase(setShouldShowAdvancedOptions, (state, action) => {
       const advancedOptionsStatus = action.payload;
       if (!advancedOptionsStatus) state.clipSkip = 0;
+    });
+    builder.addCase(setAspectRatio, (state, action) => {
+      const ratio = action.payload;
+      if (ratio) state.height = roundToEight(state.width / ratio);
     });
   },
 });
