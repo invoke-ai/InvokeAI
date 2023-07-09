@@ -54,8 +54,10 @@ export const parseFieldValue = (field: InputFieldValue) => {
 export const buildNodesGraph = (state: RootState): Graph => {
   const { nodes, edges } = state.nodes;
 
+  const filteredNodes = nodes.filter((n) => n.type !== 'progress_image');
+
   // Reduce the node editor nodes into invocation graph nodes
-  const parsedNodes = nodes.reduce<NonNullable<Graph['nodes']>>(
+  const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>(
     (nodesAccumulator, node, nodeIndex) => {
       const { id, data } = node;
       const { type, inputs } = data;

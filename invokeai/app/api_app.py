@@ -22,6 +22,7 @@ app_config.parse_args()
 logger = InvokeAILogger.getLogger(config=app_config)
 
 import invokeai.frontend.web as web_dir
+import mimetypes
 
 from .api.dependencies import ApiDependencies
 from .api.routers import sessions, models, images, boards, board_images, app_info
@@ -31,7 +32,12 @@ from .invocations.baseinvocation import BaseInvocation
 import torch
 if torch.backends.mps.is_available():
     import invokeai.backend.util.mps_fixes
-    
+
+# fix for windows mimetypes registry entries being borked
+# see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('text/css', '.css')
+
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
 app = FastAPI(title="Invoke AI", docs_url=None, redoc_url=None)

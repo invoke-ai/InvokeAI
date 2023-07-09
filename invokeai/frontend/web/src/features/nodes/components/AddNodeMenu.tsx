@@ -28,6 +28,12 @@ const selector = createSelector(
       };
     });
 
+    data.push({
+      label: 'Progress Image',
+      value: 'progress_image',
+      description: 'Displays the progress image in the Node Editor',
+    });
+
     return { data };
   },
   defaultSelectorOptions
