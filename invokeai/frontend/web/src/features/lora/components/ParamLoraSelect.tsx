@@ -4,7 +4,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState, stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { loraAdded } from 'features/lora/store/loraSlice';
 import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
@@ -58,12 +58,15 @@ const ParamLoraSelect = () => {
   }, [loras, lorasQueryData, currentMainModel?.base_model]);
 
   const handleChange = useCallback(
-    (v: string[]) => {
-      const loraEntity = lorasQueryData?.entities[v[0]];
+    (v: string | null | undefined) => {
+      if (!v) {
+        return;
+      }
+      const loraEntity = lorasQueryData?.entities[v];
       if (!loraEntity) {
         return;
       }
-      v[0] && dispatch(loraAdded(loraEntity));
+      dispatch(loraAdded(loraEntity));
     },
     [dispatch, lorasQueryData?.entities]
   );
@@ -79,15 +82,14 @@ const ParamLoraSelect = () => {
   }
 
   return (
-    <IAIMantineMultiSelect
+    <IAIMantineSelect
       placeholder={data.length === 0 ? 'All LoRAs added' : 'Add LoRA'}
-      value={[]}
+      value={null}
       data={data}
-      maxDropdownHeight={400}
       nothingFound="No matching LoRAs"
       itemComponent={IAIMantineSelectItemWithTooltip}
       disabled={data.length === 0}
-      filter={(value, selected, item: SelectItem) =>
+      filter={(value, item: SelectItem) =>
         item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
         item.value.toLowerCase().includes(value.toLowerCase().trim())
       }

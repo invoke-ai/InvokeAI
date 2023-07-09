@@ -3,7 +3,7 @@ import { Select, SelectProps } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
-import { KeyboardEvent, memo, useCallback } from 'react';
+import { KeyboardEvent, RefObject, memo, useCallback, useState } from 'react';
 import { mode } from 'theme/util/mode';
 
 export type IAISelectDataType = {
@@ -14,10 +14,11 @@ export type IAISelectDataType = {
 
 type IAISelectProps = SelectProps & {
   tooltip?: string;
+  inputRef?: RefObject<HTMLInputElement>;
 };
 
 const IAIMantineSelect = (props: IAISelectProps) => {
-  const { searchable = true, tooltip, ...rest } = props;
+  const { searchable = true, tooltip, inputRef, onChange, ...rest } = props;
   const dispatch = useAppDispatch();
   const {
     base50,
@@ -38,7 +39,9 @@ const IAIMantineSelect = (props: IAISelectProps) => {
   } = useChakraThemeTokens();
 
   const { colorMode } = useColorMode();
+  const [searchValue, setSearchValue] = useState('');
 
+  // we want to capture shift keypressed even when an input is focused
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.shiftKey) {
@@ -57,14 +60,33 @@ const IAIMantineSelect = (props: IAISelectProps) => {
     [dispatch]
   );
 
+  // wrap onChange to clear search value on select
+  const handleChange = useCallback(
+    (v: string | null) => {
+      setSearchValue('');
+
+      if (!onChange) {
+        return;
+      }
+
+      onChange(v);
+    },
+    [onChange]
+  );
+
   const [boxShadow] = useToken('shadows', ['dark-lg']);
 
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
       <Select
+        ref={inputRef}
+        searchValue={searchValue}
+        onSearchChange={setSearchValue}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
         onKeyUp={handleKeyUp}
         searchable={searchable}
+        maxDropdownHeight={300}
         styles={() => ({
           label: {
             color: mode(base700, base300)(colorMode),
