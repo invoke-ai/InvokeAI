@@ -1,4 +1,5 @@
 import {
+  Box,
   ChakraProps,
   Flex,
   Icon,
@@ -6,23 +7,6 @@ import {
   useColorMode,
   useColorModeValue,
 } from '@chakra-ui/react';
-import { useCombinedRefs } from '@dnd-kit/utilities';
-import IAIIconButton from 'common/components/IAIIconButton';
-import {
-  IAILoadingImageFallback,
-  IAINoContentFallback,
-} from 'common/components/IAIImageFallback';
-import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
-import { AnimatePresence } from 'framer-motion';
-import { MouseEvent, ReactElement, SyntheticEvent } from 'react';
-import { memo, useRef } from 'react';
-import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
-import { ImageDTO } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
-import IAIDropOverlay from './IAIDropOverlay';
-import { PostUploadAction } from 'services/api/thunks/image';
-import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { mode } from 'theme/util/mode';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
@@ -30,6 +14,21 @@ import {
   useDraggable,
   useDroppable,
 } from 'app/components/ImageDnd/typesafeDnd';
+import IAIIconButton from 'common/components/IAIIconButton';
+import {
+  IAILoadingImageFallback,
+  IAINoContentFallback,
+} from 'common/components/IAIImageFallback';
+import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
+import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { AnimatePresence } from 'framer-motion';
+import { MouseEvent, ReactElement, SyntheticEvent, memo, useRef } from 'react';
+import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
+import { PostUploadAction } from 'services/api/thunks/image';
+import { ImageDTO } from 'services/api/types';
+import { mode } from 'theme/util/mode';
+import { v4 as uuidv4 } from 'uuid';
+import IAIDropOverlay from './IAIDropOverlay';
 
 type IAIDndImageProps = {
   imageDTO: ImageDTO | undefined;
@@ -83,28 +82,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
 
   const { colorMode } = useColorMode();
 
-  const dndId = useRef(uuidv4());
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef: setDraggableRef,
-    isDragging,
-    active,
-  } = useDraggable({
-    id: dndId.current,
-    disabled: isDragDisabled || !imageDTO,
-    data: draggableData,
-  });
-
-  const { isOver, setNodeRef: setDroppableRef } = useDroppable({
-    id: dndId.current,
-    disabled: isDropDisabled,
-    data: droppableData,
-  });
-
-  const setDndRef = useCombinedRefs(setDroppableRef, setDraggableRef);
-
   const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
     postUploadAction,
     isDisabled: isUploadDisabled,
@@ -139,9 +116,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
         userSelect: 'none',
         cursor: isDragDisabled || !imageDTO ? 'default' : 'pointer',
       }}
-      {...attributes}
-      {...listeners}
-      ref={setDndRef}
     >
       {imageDTO && (
         <Flex
@@ -154,7 +128,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           }}
         >
           <Image
-            onClick={onClick}
             src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
             fallbackStrategy="beforeLoadOrError"
             fallback={<IAILoadingImageFallback image={imageDTO} />}
@@ -225,13 +198,84 @@ const IAIDndImage = (props: IAIDndImageProps) => {
         </>
       )}
       {!imageDTO && isUploadDisabled && noContentFallback}
-      <AnimatePresence>
-        {isValidDrop(droppableData, active) && !isDragging && (
-          <IAIDropOverlay isOver={isOver} label={dropLabel} />
-        )}
-      </AnimatePresence>
+      <Droppable
+        data={droppableData}
+        disabled={isDropDisabled}
+        dropLabel={dropLabel}
+      />
+      <Draggable
+        data={draggableData}
+        disabled={isDragDisabled || !imageDTO}
+        onClick={onClick}
+      />
     </Flex>
   );
 };
 
 export default memo(IAIDndImage);
+
+type DroppableProps = {
+  dropLabel?: string;
+  disabled?: boolean;
+  data?: TypesafeDroppableData;
+};
+
+const Droppable = memo((props: DroppableProps) => {
+  const { dropLabel, data, disabled } = props;
+  const dndId = useRef(uuidv4());
+
+  const { isOver, setNodeRef, active } = useDroppable({
+    id: dndId.current,
+    disabled,
+    data,
+  });
+
+  return (
+    <Box
+      ref={setNodeRef}
+      position="absolute"
+      w="full"
+      h="full"
+      pointerEvents="none"
+    >
+      <AnimatePresence>
+        {isValidDrop(data, active) && (
+          <IAIDropOverlay isOver={isOver} label={dropLabel} />
+        )}
+      </AnimatePresence>
+    </Box>
+  );
+});
+
+Droppable.displayName = 'Droppable';
+
+type DraggableProps = {
+  disabled?: boolean;
+  data?: TypesafeDraggableData;
+  onClick?: (event: MouseEvent<HTMLDivElement>) => void;
+};
+
+const Draggable = memo((props: DraggableProps) => {
+  const { data, disabled, onClick } = props;
+  const dndId = useRef(uuidv4());
+
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: dndId.current,
+    disabled,
+    data,
+  });
+
+  return (
+    <Box
+      onClick={onClick}
+      ref={setNodeRef}
+      position="absolute"
+      w="full"
+      h="full"
+      {...attributes}
+      {...listeners}
+    />
+  );
+});
+
+Draggable.displayName = 'Draggable';
