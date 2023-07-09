@@ -1,8 +1,7 @@
 import sqlite3
 import threading
+from abc import ABC, abstractmethod
 from typing import Optional, cast
-
-from ABC import abstractmethod
 
 from invokeai.app.services.board_record_storage import BoardRecord
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
