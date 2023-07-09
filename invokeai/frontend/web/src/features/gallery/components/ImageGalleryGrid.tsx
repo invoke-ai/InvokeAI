@@ -29,7 +29,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState, stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { selectFilteredImages } from 'features/gallery/store/gallerySlice';
+import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { receivedPageOfImages } from 'services/api/thunks/image';

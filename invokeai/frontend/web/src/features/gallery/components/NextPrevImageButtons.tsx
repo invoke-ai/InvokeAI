@@ -4,7 +4,6 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   imageSelected,
-  selectFilteredImages,
   selectImagesById,
 } from 'features/gallery/store/gallerySlice';
 import { clamp, isEqual } from 'lodash-es';
@@ -13,6 +12,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaAngleDoubleRight, FaAngleLeft, FaAngleRight } from 'react-icons/fa';
 import { receivedPageOfImages } from 'services/api/thunks/image';
+import { selectFilteredImages } from '../store/gallerySelectors';
 
 const nextPrevButtonTriggerAreaStyles: ChakraProps['sx'] = {
   height: '100%',

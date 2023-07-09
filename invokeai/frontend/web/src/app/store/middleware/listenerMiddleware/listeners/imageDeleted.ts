@@ -1,10 +1,10 @@
 import { log } from 'app/logging/useLogger';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
+import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
 import {
   imageRemoved,
   imageSelected,
-  selectFilteredImages,
 } from 'features/gallery/store/gallerySlice';
 import {
   imageDeletionConfirmed,

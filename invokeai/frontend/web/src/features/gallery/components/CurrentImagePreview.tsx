@@ -8,7 +8,7 @@ import {
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySlice';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { isEqual } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
