@@ -1,4 +1,4 @@
-import { ApiFullTagDescription, api } from '..';
+import { api } from '..';
 import { ImageDTO } from '../types';
 
 export const imagesApi = api.injectEndpoints({
@@ -8,13 +8,7 @@ export const imagesApi = api.injectEndpoints({
      */
     getImageDTO: build.query<ImageDTO, string>({
       query: (image_name) => ({ url: `images/${image_name}/metadata` }),
-      providesTags: (result, error, arg) => {
-        const tags: ApiFullTagDescription[] = [{ type: 'Image', id: arg }];
-        if (result?.board_id) {
-          tags.push({ type: 'Board', id: result.board_id });
-        }
-        return tags;
-      },
+      providesTags: (result, error, arg) => [{ type: 'Image', id: arg }],
       keepUnusedDataFor: 86400, // 24 hours
     }),
   }),
