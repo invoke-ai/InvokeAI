@@ -1,15 +1,15 @@
-import { Flex, Heading, Tooltip, Icon } from '@chakra-ui/react';
-import { InvocationTemplate } from 'features/nodes/types/types';
+import { Flex, Heading, Icon, Tooltip } from '@chakra-ui/react';
 import { memo } from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
 
 interface IAINodeHeaderProps {
-  nodeId: string;
-  template: InvocationTemplate;
+  nodeId?: string;
+  title?: string;
+  description?: string;
 }
 
 const IAINodeHeader = (props: IAINodeHeaderProps) => {
-  const { nodeId, template } = props;
+  const { nodeId, title, description } = props;
   return (
     <Flex
       sx={{
@@ -31,15 +31,10 @@ const IAINodeHeader = (props: IAINodeHeaderProps) => {
             _dark: { color: 'base.100' },
           }}
         >
-          {template.title}
+          {title}
         </Heading>
       </Tooltip>
-      <Tooltip
-        label={template.description}
-        placement="top"
-        hasArrow
-        shouldWrapChildren
-      >
+      <Tooltip label={description} placement="top" hasArrow shouldWrapChildren>
         <Icon
           sx={{
             h: 'min-content',
