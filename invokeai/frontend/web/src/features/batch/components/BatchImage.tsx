@@ -1,10 +1,12 @@
-import { Box, Spinner } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { TypesafeDraggableData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
+import IAIErrorLoadingImageFallback from 'common/components/IAIErrorLoadingImageFallback';
+import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
 import {
   batchImageRangeEndSelected,
   batchImageSelected,
@@ -32,11 +34,13 @@ type BatchImageProps = {
 
 const BatchImage = (props: BatchImageProps) => {
   const dispatch = useAppDispatch();
-
   const { imageName } = props;
-
-  const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
-
+  const {
+    currentData: imageDTO,
+    isLoading,
+    isError,
+    isSuccess,
+  } = useGetImageDTOQuery(imageName);
   const selector = useMemo(() => makeSelector(imageName), [imageName]);
 
   const { isSelected, selectionCount, selection } = useAppSelector(selector);
@@ -76,8 +80,12 @@ const BatchImage = (props: BatchImageProps) => {
     }
   }, [imageDTO, selection, selectionCount]);
 
-  if (!imageDTO) {
-    return <Spinner />;
+  if (isLoading) {
+    return <IAIFillSkeleton />;
+  }
+
+  if (isError || !imageDTO) {
+    return <IAIErrorLoadingImageFallback />;
   }
 
   return (
@@ -108,6 +116,7 @@ const BatchImage = (props: BatchImageProps) => {
               isUploadDisabled={true}
               resetTooltip="Remove from batch"
               withResetIcon
+              thumbnail
             />
           </Box>
         )}

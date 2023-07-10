@@ -38,6 +38,7 @@ import {
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { mode } from 'theme/util/mode';
 import BatchGrid from './BatchGrid';
+import BoardGrid from './BoardGrid';
 import BoardsList from './Boards/BoardsList';
 import ImageGalleryGrid from './ImageGalleryGrid';
 
@@ -228,7 +229,13 @@ const ImageGalleryContent = () => {
         </Box>
       </Box>
       <Flex direction="column" gap={2} h="full" w="full">
-        {selectedBoardId === 'batch' ? <BatchGrid /> : <ImageGalleryGrid />}
+        {selectedBoardId === 'batch' ? (
+          <BatchGrid />
+        ) : selectedBoardId ? (
+          <BoardGrid board_id={selectedBoardId} />
+        ) : (
+          <ImageGalleryGrid />
+        )}
       </Flex>
     </VStack>
   );

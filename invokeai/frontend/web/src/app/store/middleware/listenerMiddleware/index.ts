@@ -47,7 +47,6 @@ import { addInitialImageSelectedListener } from './listeners/initialImageSelecte
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
 import { addReceivedPageOfImagesListener } from './listeners/receivedPageOfImages';
-import { addSelectionAddedToBatchListener } from './listeners/selectionAddedToBatch';
 import {
   addSessionCanceledFulfilledListener,
   addSessionCanceledPendingListener,
@@ -201,7 +200,7 @@ addBoardIdSelectedListener();
 addReceivedOpenAPISchemaListener();
 
 // Batches
-addSelectionAddedToBatchListener();
+// addSelectionAddedToBatchListener();
 addAddBoardToBatchListener();
 
 // DND

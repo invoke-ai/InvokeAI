@@ -2,7 +2,6 @@ import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { MenuItem, MenuList } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
-import { selectionAddedToBatch } from 'app/store/middleware/listenerMiddleware/listeners/selectionAddedToBatch';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
@@ -10,6 +9,7 @@ import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
 import {
   imageAddedToBatch,
   imageRemovedFromBatch,
+  imagesAddedToBatch,
 } from 'features/batch/store/batchSlice';
 import {
   resizeAndScaleCanvas,
@@ -158,7 +158,7 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
   }, [imageDTO.image_url]);
 
   const handleAddSelectionToBatch = useCallback(() => {
-    dispatch(selectionAddedToBatch({ images_names: selection }));
+    dispatch(imagesAddedToBatch(selection));
   }, [dispatch, selection]);
 
   const handleAddToBatch = useCallback(() => {

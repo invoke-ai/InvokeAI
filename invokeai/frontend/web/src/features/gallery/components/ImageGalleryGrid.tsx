@@ -160,7 +160,7 @@ const ImageGalleryGrid = () => {
               ) : (
                 <GalleryImage
                   key={`${item.image_name}-${item.thumbnail_url}`}
-                  imageDTO={item}
+                  imageName={item.image_name}
                 />
               )
             }

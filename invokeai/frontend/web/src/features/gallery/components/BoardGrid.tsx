@@ -1,10 +1,9 @@
-import { Box } from '@chakra-ui/react';
-import { useAppSelector } from 'app/store/storeHooks';
+import { Box, Spinner } from '@chakra-ui/react';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 
 import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaImage } from 'react-icons/fa';
+import { FaExclamation, FaImage } from 'react-icons/fa';
 
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
@@ -12,6 +11,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import BatchImage from 'features/batch/components/BatchImage';
 import { VirtuosoGrid } from 'react-virtuoso';
+import { useGetAllBoardImagesForBoardQuery } from 'services/api/endpoints/boardImages';
 import ItemContainer from './ItemContainer';
 import ListContainer from './ListContainer';
 
@@ -25,7 +25,16 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const BatchGrid = () => {
+type BoardGridProps = {
+  board_id: string;
+};
+
+const BoardGrid = (props: BoardGridProps) => {
+  const { board_id } = props;
+  const { data, isLoading, isError, isSuccess } =
+    useGetAllBoardImagesForBoardQuery({
+      board_id,
+    });
   const { t } = useTranslation();
   const rootRef = useRef(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
@@ -42,8 +51,6 @@ const BatchGrid = () => {
     },
   });
 
-  const { imageNames } = useAppSelector(selector);
-
   useEffect(() => {
     const { current: root } = rootRef;
     if (scroller && root) {
@@ -57,12 +64,20 @@ const BatchGrid = () => {
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
 
-  if (imageNames.length) {
+  if (isLoading) {
+    return <Spinner />;
+  }
+
+  if (isError) {
+    return <FaExclamation />;
+  }
+
+  if (isSuccess && data.image_names) {
     return (
       <Box ref={rootRef} data-overlayscrollbars="" h="100%">
         <VirtuosoGrid
           style={{ height: '100%' }}
-          data={imageNames}
+          data={data.image_names}
           components={{
             Item: ItemContainer,
             List: ListContainer,
@@ -84,4 +99,4 @@ const BatchGrid = () => {
   );
 };
 
-export default memo(BatchGrid);
+export default memo(BoardGrid);

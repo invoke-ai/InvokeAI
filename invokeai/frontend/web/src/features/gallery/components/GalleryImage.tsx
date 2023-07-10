@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box, Spinner } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { TypesafeDraggableData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
@@ -7,8 +7,12 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
-import { ImageDTO } from 'services/api/types';
-import { imageSelected } from '../store/gallerySlice';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import {
+  imageRangeEndSelected,
+  imageSelected,
+  imageSelectionToggled,
+} from '../store/gallerySlice';
 import ImageContextMenu from './ImageContextMenu';
 
 export const makeSelector = (image_name: string) =>
@@ -23,33 +27,29 @@ export const makeSelector = (image_name: string) =>
   );
 
 interface HoverableImageProps {
-  imageDTO: ImageDTO;
+  imageName: string;
 }
 
 const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-
-  const { imageDTO } = props;
-  const { image_name } = imageDTO;
-
-  const localSelector = useMemo(() => makeSelector(image_name), [image_name]);
+  const { imageName } = props;
+  const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
+  const localSelector = useMemo(() => makeSelector(imageName), [imageName]);
 
   const { isSelected, selectionCount, selection } =
     useAppSelector(localSelector);
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      // multiselect disabled for now
-      // if (e.shiftKey) {
-      //   dispatch(imageRangeEndSelected(props.imageDTO.image_name));
-      // } else if (e.ctrlKey || e.metaKey) {
-      //   dispatch(imageSelectionToggled(props.imageDTO.image_name));
-      // } else {
-      //   dispatch(imageSelected(props.imageDTO.image_name));
-      // }
-      dispatch(imageSelected(props.imageDTO.image_name));
+      if (e.shiftKey) {
+        dispatch(imageRangeEndSelected(imageName));
+      } else if (e.ctrlKey || e.metaKey) {
+        dispatch(imageSelectionToggled(imageName));
+      } else {
+        dispatch(imageSelected(imageName));
+      }
     },
-    [dispatch, props.imageDTO.image_name]
+    [dispatch, imageName]
   );
 
   const handleDelete = useCallback(
@@ -81,13 +81,17 @@ const GalleryImage = (props: HoverableImageProps) => {
     }
   }, [imageDTO, selection, selectionCount]);
 
+  if (!imageDTO) {
+    return <Spinner />;
+  }
+
   return (
     <Box sx={{ w: 'full', h: 'full', touchAction: 'none' }}>
       <ImageContextMenu imageDTO={imageDTO}>
         {(ref) => (
           <Box
             position="relative"
-            key={image_name}
+            key={imageName}
             userSelect="none"
             ref={ref}
             sx={{
