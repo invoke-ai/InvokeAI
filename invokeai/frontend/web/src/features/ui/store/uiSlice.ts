@@ -21,6 +21,7 @@ export const initialUIState: UIState = {
   shouldShowProgressInViewer: true,
   shouldShowEmbeddingPicker: false,
   shouldShowAdvancedOptions: false,
+  aspectRatio: null,
   favoriteSchedulers: [],
 };
 
@@ -104,6 +105,9 @@ export const uiSlice = createSlice({
     setShouldShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
       state.shouldShowAdvancedOptions = action.payload;
     },
+    setAspectRatio: (state, action: PayloadAction<number | null>) => {
+      state.aspectRatio = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
@@ -132,6 +136,7 @@ export const {
   favoriteSchedulersChanged,
   toggleEmbeddingPicker,
   setShouldShowAdvancedOptions,
+  setAspectRatio,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

@@ -1,49 +1,32 @@
-import { MenuItem, MenuList } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { memo, useCallback, useContext } from 'react';
-import {
-  FaExpand,
-  FaFolder,
-  FaFolderPlus,
-  FaShare,
-  FaTrash,
-} from 'react-icons/fa';
-import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
-import {
-  resizeAndScaleCanvas,
-  setInitialCanvasImage,
-} from 'features/canvas/store/canvasSlice';
-import { setActiveTab } from 'features/ui/store/uiSlice';
-import { useTranslation } from 'react-i18next';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import { MenuItem, MenuList } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import { initialImageSelected } from 'features/parameters/store/actions';
-import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
 import { useAppToaster } from 'app/components/Toaster';
-import { AddImageToBoardContext } from '../../../app/contexts/AddImageToBoardContext';
-import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
-import { ImageDTO } from 'services/api/types';
-import { RootState, stateSelector } from 'app/store/store';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
 import {
   imagesAddedToBatch,
   selectionAddedToBatch,
 } from 'features/batch/store/batchSlice';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import {
+  resizeAndScaleCanvas,
+  setInitialCanvasImage,
+} from 'features/canvas/store/canvasSlice';
 import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
-
-const selector = createSelector(
-  [stateSelector, (state: RootState, imageDTO: ImageDTO) => imageDTO],
-  ({ gallery, batch }, imageDTO) => {
-    const selectionCount = gallery.selection.length;
-    const isInBatch = batch.imageNames.includes(imageDTO.image_name);
-
-    return { selectionCount, isInBatch };
-  },
-  defaultSelectorOptions
-);
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
+import { initialImageSelected } from 'features/parameters/store/actions';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { setActiveTab } from 'features/ui/store/uiSlice';
+import { memo, useCallback, useContext, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FaExpand, FaFolder, FaShare, FaTrash } from 'react-icons/fa';
+import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
+import { ImageDTO } from 'services/api/types';
+import { AddImageToBoardContext } from '../../../app/contexts/AddImageToBoardContext';
+import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
 
 type Props = {
   image: ImageDTO;
@@ -51,9 +34,21 @@ type Props = {
 };
 
 const ImageContextMenu = ({ image, children }: Props) => {
-  const { selectionCount, isInBatch } = useAppSelector((state) =>
-    selector(state, image)
+  const selector = useMemo(
+    () =>
+      createSelector(
+        [stateSelector],
+        ({ gallery, batch }) => {
+          const selectionCount = gallery.selection.length;
+          const isInBatch = batch.imageNames.includes(image.image_name);
+
+          return { selectionCount, isInBatch };
+        },
+        defaultSelectorOptions
+      ),
+    [image.image_name]
   );
+  const { selectionCount, isInBatch } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
