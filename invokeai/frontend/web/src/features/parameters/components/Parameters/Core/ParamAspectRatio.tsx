@@ -6,9 +6,9 @@ import { setAspectRatio } from 'features/ui/store/uiSlice';
 
 const aspectRatios = [
   { name: 'Free', value: null },
-  { name: '4:3', value: 4 / 3 },
-  { name: '16:9', value: 16 / 9 },
-  { name: '3:2', value: 3 / 2 },
+  { name: 'Portrait', value: 0.67 / 1 },
+  { name: 'Wide', value: 16 / 9 },
+  { name: 'Square', value: 1 / 1 },
 ];
 
 export default function ParamAspectRatio() {

@@ -1,13 +1,17 @@
 import { Flex, Spacer, Text } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { toggleSize } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
+import { MdOutlineSwapVert } from 'react-icons/md';
 import ParamAspectRatio from './ParamAspectRatio';
 import ParamHeight from './ParamHeight';
 import ParamWidth from './ParamWidth';
 
 export default function ParamSize() {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const shouldFitToWidthHeight = useAppSelector(
     (state: RootState) => state.generation.shouldFitToWidthHeight
   );
@@ -40,10 +44,20 @@ export default function ParamSize() {
         </Text>
         <Spacer />
         <ParamAspectRatio />
+        <IAIIconButton
+          tooltip={t('ui.swapSizes')}
+          aria-label={t('ui.swapSizes')}
+          size="sm"
+          icon={<MdOutlineSwapVert />}
+          fontSize={20}
+          onClick={() => dispatch(toggleSize())}
+        />
       </Flex>
-      <Flex gap={2} flexDirection="column">
-        <ParamWidth isDisabled={!shouldFitToWidthHeight} />
-        <ParamHeight isDisabled={!shouldFitToWidthHeight} />
+      <Flex gap={2} alignItems="center">
+        <Flex gap={2} flexDirection="column" width="full">
+          <ParamWidth isDisabled={!shouldFitToWidthHeight} />
+          <ParamHeight isDisabled={!shouldFitToWidthHeight} />
+        </Flex>
       </Flex>
     </Flex>
   );

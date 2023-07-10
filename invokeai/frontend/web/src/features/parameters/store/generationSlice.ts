@@ -143,6 +143,11 @@ export const generationSlice = createSlice({
     setWidth: (state, action: PayloadAction<number>) => {
       state.width = action.payload;
     },
+    toggleSize: (state) => {
+      const [width, height] = [state.width, state.height];
+      state.width = height;
+      state.height = width;
+    },
     setScheduler: (state, action: PayloadAction<SchedulerParam>) => {
       state.scheduler = action.payload;
     },
@@ -281,7 +286,9 @@ export const {
   resetParametersState,
   resetSeed,
   setCfgScale,
+  setWidth,
   setHeight,
+  toggleSize,
   setImg2imgStrength,
   setInfillMethod,
   setIterations,
@@ -302,7 +309,6 @@ export const {
   setThreshold,
   setTileSize,
   setVariationAmount,
-  setWidth,
   setShouldUseSymmetry,
   setHorizontalSymmetrySteps,
   setVerticalSymmetrySteps,

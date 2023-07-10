@@ -529,7 +529,7 @@
         "showPreview": "Show Preview",
         "controlNetControlMode": "Control Mode",
         "clipSkip": "Clip Skip",
-        "aspectRatio": "Aspect Ratio"
+        "aspectRatio": "Ratio"
     },
     "settings": {
         "models": "Models",
@@ -672,6 +672,7 @@
     },
     "ui": {
         "showProgressImages": "Show Progress Images",
-        "hideProgressImages": "Hide Progress Images"
+        "hideProgressImages": "Hide Progress Images",
+        "swapSizes": "Swap Sizes"
     }
 }
