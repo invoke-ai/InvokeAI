@@ -7,6 +7,7 @@ import {
   OnConnectEnd,
   OnConnectStart,
   OnEdgesChange,
+  OnInit,
   OnNodesChange,
   ReactFlow,
 } from 'reactflow';
@@ -16,6 +17,7 @@ import {
   connectionStarted,
   edgesChanged,
   nodesChanged,
+  setEditorInstance,
 } from '../store/nodesSlice';
 import { InvocationComponent } from './InvocationComponent';
 import ProgressImageNode from './ProgressImageNode';
@@ -67,6 +69,13 @@ export const Flow = () => {
     dispatch(connectionEnded());
   }, [dispatch]);
 
+  const onInit: OnInit = useCallback(
+    (v) => {
+      dispatch(setEditorInstance(v));
+    },
+    [dispatch]
+  );
+
   return (
     <ReactFlow
       nodeTypes={nodeTypes}
@@ -77,6 +86,7 @@ export const Flow = () => {
       onConnectStart={onConnectStart}
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
+      onInit={onInit}
       defaultEdgeOptions={{
         style: { strokeWidth: 2 },
       }}

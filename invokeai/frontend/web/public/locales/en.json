@@ -593,7 +593,10 @@
         "metadataLoadFailed": "Failed to load metadata",
         "initialImageSet": "Initial Image Set",
         "initialImageNotSet": "Initial Image Not Set",
-        "initialImageNotSetDesc": "Could not load initial image"
+        "initialImageNotSetDesc": "Could not load initial image",
+        "nodesSaved": "Nodes Saved",
+        "nodesLoaded": "Nodes Loaded",
+        "nodesLoadedFailed": "Failed To Load Nodes"
     },
     "tooltip": {
         "feature": {
@@ -674,5 +677,9 @@
         "showProgressImages": "Show Progress Images",
         "hideProgressImages": "Hide Progress Images",
         "swapSizes": "Swap Sizes"
+    },
+    "nodes": {
+        "saveNodes": "Save Nodes",
+        "loadNodes": "Load Nodes"
     }
 }
