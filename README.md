@@ -3,8 +3,8 @@
 ![project hero](https://github.com/invoke-ai/InvokeAI/assets/31807370/1a917d94-e099-4fa1-a70f-7dd8d0691018)
 
 # Invoke AI - Generative AI for Professional Creatives
-## Image Generation for Stable Diffusion, Custom-Trained Models, and more. 
-  Learn more about us and get started instantly at [invoke.ai](https://invoke.ai)
+## Professional Creative Tools for Stable Diffusion, Custom-Trained Models, and more. 
+  To learn more about Invoke AI, get started instantly, or implement our Business solutions, visit [invoke.ai](https://invoke.ai)
 
 
 [![discord badge]][discord link]
@@ -329,24 +329,24 @@ InvokeAI offers a locally hosted Web Server & React Frontend, with an industry l
 
 The Unified Canvas is a fully integrated canvas implementation with support for all core generation capabilities, in/outpainting, brush tools, and more. This creative tool unlocks the capability for artists to create with AI as a creative collaborator, and can be used to augment AI-generated imagery, sketches, photography, renders, and more.
 
-### *Advanced Prompt Syntax*
+### *Node Architecture & Editor (Beta)*
 
-Invoke AI's advanced prompt syntax allows for token weighting, cross-attention control, and prompt blending, allowing for fine-tuned tweaking of your invocations and exploration of the latent space. 
+Invoke AI's backend is built on a graph-based execution architecture. This allows for customizable generation pipelines to be developed by professional users looking to create specific workflows to support their production use-cases, and will be extended in the future with additional capabilities.
 
-### *Command Line Interface*
+### *Board & Gallery Management*
 
-For users utilizing a terminal-based environment, or who want to take advantage of CLI features, InvokeAI offers an extensive and actively supported command-line interface that provides the full suite of generation functionality available in the tool.
+Invoke AI provides an organized gallery system for easily storing, accessing, and remixing your content in the Invoke workspace. Images can be dragged/dropped onto any Image-base UI element in the application, and rich metadata within the Image allows for easy recall of key prompts or settings used in your workflow. 
 
 ### Other features
 
 - *Support for both ckpt and diffusers models*
 - *SD 2.0, 2.1 support*
-- *Upscaling & Face Restoration Tools*
+- *Upscaling Tools*
 - *Embedding Manager & Support*
 - *Model Manager & Support*
 - *Node-Based Architecture*
 - *Node-Based Plug-&-Play UI (Beta)*
-- *Boards & Gallery Management
+- *SDXL Support* (Coming soon)
 
 ### Latest Changes
 
@@ -359,7 +359,7 @@ Notes](https://github.com/invoke-ai/InvokeAI/releases) and the
 Please check out our **[Q&A](https://invoke-ai.github.io/InvokeAI/help/TROUBLESHOOT/#faq)** to get solutions for common installation
 problems and other issues.
 
-## 🤝 Contributing
+## Contributing
 
 Anyone who wishes to contribute to this project, whether documentation, features, bug fixes, code
 cleanup, testing, or code reviews, is very much encouraged to do so.
@@ -378,7 +378,7 @@ to become part of our community.
 
 Welcome to InvokeAI!
 
-### 👥 Contributors
+### Contributors
 
 This fork is a combined effort of various people from across the world.
 [Check out the list of all these amazing people](https://invoke-ai.github.io/InvokeAI/other/CONTRIBUTORS/). We thank them for

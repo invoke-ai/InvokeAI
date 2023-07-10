@@ -1,22 +1,16 @@
+import sqlite3
+import threading
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Generic, Optional, TypeVar, cast
-import sqlite3
-import threading
 
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
 
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.models.metadata import ImageMetadata
-from invokeai.app.models.image import (
-    ImageCategory,
-    ResourceOrigin,
-)
 from invokeai.app.services.models.image_record import (
-    ImageRecord,
-    ImageRecordChanges,
-    deserialize_image_record,
-)
+    ImageRecord, ImageRecordChanges, deserialize_image_record)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -162,7 +156,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 node_id TEXT,
                 metadata TEXT,
                 is_intermediate BOOLEAN DEFAULT FALSE,
-                board_id TEXT,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
