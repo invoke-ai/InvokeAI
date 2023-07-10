@@ -123,6 +123,7 @@ const GalleryImage = (props: HoverableImageProps) => {
               // withResetIcon // removed bc it's too easy to accidentally delete images
               isDropDisabled={true}
               isUploadDisabled={true}
+              thumbnail={true}
             />
           </Box>
         )}
