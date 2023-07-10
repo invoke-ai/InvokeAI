@@ -110,7 +110,7 @@ export const boardImagesApi = api.injectEndpoints({
     }),
 
     deleteBoardImage: build.mutation<void, { image_name: string }>({
-      query: (image_name) => ({
+      query: ({ image_name }) => ({
         url: `board_images/`,
         method: 'DELETE',
         body: image_name,

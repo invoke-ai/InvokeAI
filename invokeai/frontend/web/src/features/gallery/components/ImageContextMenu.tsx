@@ -2,6 +2,7 @@ import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { MenuItem, MenuList } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
+import { selectionAddedToBatch } from 'app/store/middleware/listenerMiddleware/listeners/selectionAddedToBatch';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
@@ -9,7 +10,6 @@ import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
 import {
   imageAddedToBatch,
   imageRemovedFromBatch,
-  selectionAddedToBatch,
 } from 'features/batch/store/batchSlice';
 import {
   resizeAndScaleCanvas,
@@ -22,9 +22,19 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaExpand, FaFolder, FaImages, FaShare, FaTrash } from 'react-icons/fa';
+import {
+  FaExpand,
+  FaFolder,
+  FaLayerGroup,
+  FaShare,
+  FaTrash,
+} from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { useDeleteBoardImageMutation } from 'services/api/endpoints/boardImages';
+import {
+  useAddManyBoardImagesMutation,
+  useDeleteBoardImageMutation,
+  useDeleteManyBoardImagesMutation,
+} from 'services/api/endpoints/boardImages';
 import { ImageDTO } from 'services/api/types';
 import { AddImageToBoardContext } from '../../../app/contexts/AddImageToBoardContext';
 import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
@@ -40,16 +50,18 @@ const ImageContextMenu = ({ image, children }: Props) => {
       createSelector(
         [stateSelector],
         ({ gallery, batch }) => {
-          const selectionCount = gallery.selection.length;
+          const isBatch = gallery.selectedBoardId === 'batch';
+
+          const selection = isBatch ? batch.selection : gallery.selection;
           const isInBatch = batch.ids.includes(image.image_name);
 
-          return { selectionCount, isInBatch };
+          return { selection, isInBatch };
         },
         defaultSelectorOptions
       ),
     [image.image_name]
   );
-  const { selectionCount, isInBatch } = useAppSelector(selector);
+  const { selection, isInBatch } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -71,6 +83,8 @@ const ImageContextMenu = ({ image, children }: Props) => {
     useRecallParameters();
 
   const [deleteBoardImage] = useDeleteBoardImageMutation();
+  const [deleteManyBoardImages] = useDeleteManyBoardImagesMutation();
+  const [addManyBoardImages] = useAddManyBoardImagesMutation();
 
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
@@ -132,20 +146,20 @@ const ImageContextMenu = ({ image, children }: Props) => {
   }, [deleteBoardImage, image.board_id, image.image_name]);
 
   const handleAddSelectionToBoard = useCallback(() => {
-    onClickAddToBoard(image);
-  }, [image, onClickAddToBoard]);
+    addManyBoardImages({ board_id, image_names: selection });
+  }, [addManyBoardImages, selection]);
 
   const handleRemoveSelectionFromBoard = useCallback(() => {
-    deleteBoardImage({ image_name: image.image_name });
-  }, [deleteBoardImage, image.image_name]);
+    deleteManyBoardImages({ image_names: selection });
+  }, [deleteManyBoardImages, selection]);
 
-  const handleOpenInNewTab = () => {
+  const handleOpenInNewTab = useCallback(() => {
     window.open(image.image_url, '_blank');
-  };
+  }, [image.image_url]);
 
   const handleAddSelectionToBatch = useCallback(() => {
-    dispatch(selectionAddedToBatch());
-  }, [dispatch]);
+    dispatch(selectionAddedToBatch({ images_names: selection }));
+  }, [dispatch, selection]);
 
   const handleAddToBatch = useCallback(() => {
     dispatch(imageAddedToBatch(image));
@@ -160,7 +174,7 @@ const ImageContextMenu = ({ image, children }: Props) => {
       menuProps={{ size: 'sm', isLazy: true }}
       renderMenu={() => (
         <MenuList sx={{ visibility: 'visible !important' }}>
-          {selectionCount === 1 ? (
+          {selection.length === 1 ? (
             <>
               <MenuItem
                 icon={<ExternalLinkIcon />}
@@ -190,13 +204,6 @@ const ImageContextMenu = ({ image, children }: Props) => {
               >
                 {t('parameters.useSeed')}
               </MenuItem>
-              {/* <MenuItem
-              icon={<IoArrowUndoCircleOutline />}
-              onClickCapture={handleRecallInitialImage}
-              isDisabled={image?.metadata?.type !== 'img2img'}
-            >
-              {t('parameters.useInitImg')}
-            </MenuItem> */}
               <MenuItem
                 icon={<IoArrowUndoCircleOutline />}
                 onClickCapture={handleUseAllParameters}
@@ -226,7 +233,7 @@ const ImageContextMenu = ({ image, children }: Props) => {
                 </MenuItem>
               )}
               <MenuItem
-                icon={<FaFolder />}
+                icon={<FaLayerGroup />}
                 onClickCapture={
                   isInBatch ? handleRemoveFromBatch : handleAddToBatch
                 }
@@ -267,7 +274,7 @@ const ImageContextMenu = ({ image, children }: Props) => {
                 Reset Board for Selection
               </MenuItem>
               <MenuItem
-                icon={<FaImages />}
+                icon={<FaLayerGroup />}
                 onClickCapture={handleAddSelectionToBatch}
               >
                 Add Selection to Batch

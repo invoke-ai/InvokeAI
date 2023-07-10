@@ -1,6 +1,5 @@
 import {
   PayloadAction,
-  createAction,
   createEntityAdapter,
   createSlice,
 } from '@reduxjs/toolkit';
@@ -146,7 +145,3 @@ export const {
 } = batch.actions;
 
 export default batch.reducer;
-
-export const selectionAddedToBatch = createAction(
-  'batch/selectionAddedToBatch'
-);
