@@ -879,7 +879,7 @@ export const canvasSlice = createSlice({
       if (ratio) {
         state.boundingBoxDimensions.height = roundToMultiple(
           state.boundingBoxDimensions.width / ratio,
-          8
+          64
         );
       }
     });

@@ -42,7 +42,7 @@ const ParamBoundingBoxWidth = () => {
       })
     );
     if (aspectRatio) {
-      const newHeight = roundToMultiple(v / aspectRatio, 8);
+      const newHeight = roundToMultiple(v / aspectRatio, 64);
       dispatch(
         setBoundingBoxDimensions({
           width: Math.floor(v),
@@ -60,7 +60,7 @@ const ParamBoundingBoxWidth = () => {
       })
     );
     if (aspectRatio) {
-      const newHeight = roundToMultiple(512 / aspectRatio, 8);
+      const newHeight = roundToMultiple(512 / aspectRatio, 64);
       dispatch(
         setBoundingBoxDimensions({
           width: Math.floor(512),

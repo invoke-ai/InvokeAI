@@ -528,7 +528,7 @@
         "hidePreview": "Hide Preview",
         "showPreview": "Show Preview",
         "controlNetControlMode": "Control Mode",
-        "clipSkip": "Clip Skip",
+        "clipSkip": "CLIP Skip",
         "aspectRatio": "Ratio"
     },
     "settings": {
