@@ -1,6 +1,8 @@
 import datetime
 from typing import Optional, Union
+
 from pydantic import BaseModel, Extra, Field, StrictBool, StrictStr
+
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.misc import get_iso_timestamp
@@ -95,8 +97,19 @@ class ImageDTO(ImageRecord, ImageUrlsDTO):
     pass
 
 
+class GetImagesByNamesResult(BaseModel):
+    """The result of a get all image names for board operation."""
+
+    image_dtos: list[ImageDTO] = Field(
+        description="The names of the images that are associated with the board"
+    )
+
+
 def image_record_to_dto(
-    image_record: ImageRecord, image_url: str, thumbnail_url: str, board_id: Optional[str]
+    image_record: ImageRecord,
+    image_url: str,
+    thumbnail_url: str,
+    board_id: Optional[str],
 ) -> ImageDTO:
     """Converts an image record to an image DTO."""
     return ImageDTO(

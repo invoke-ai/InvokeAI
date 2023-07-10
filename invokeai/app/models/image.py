@@ -115,3 +115,15 @@ class RemoveManyImagesFromBoardResult(BaseModel):
     removed_images: list[str] = Field(
         description="The names of the images that were successfully removed from their boards"
     )
+
+
+class GetAllBoardImagesForBoardResult(BaseModel):
+    """The result of a get all image names for board operation."""
+
+    board_id: str = Field(
+        description="The id of the board with which the images are associated"
+    )
+    image_names: list[str] = Field(
+        description="The names of the images that are associated with the board"
+    )
+

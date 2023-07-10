@@ -3,7 +3,7 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Optional, cast
 
-from invokeai.app.services.board_record_storage import BoardRecord
+from invokeai.app.models.image import GetAllBoardImagesForBoardResult
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.image_record import (
     ImageRecord, deserialize_image_record)
@@ -30,11 +30,11 @@ class BoardImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_images_for_board(
+    def get_all_board_images_for_board(
         self,
         board_id: str,
-    ) -> OffsetPaginatedResults[ImageRecord]:
-        """Gets images for a board."""
+    ) -> GetAllBoardImagesForBoardResult:
+        """Gets all image names for a board."""
         pass
 
     @abstractmethod
@@ -170,42 +170,32 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         finally:
             self._lock.release()
 
-    def get_images_for_board(
+    def get_all_board_images_for_board(
         self,
         board_id: str,
-        offset: int = 0,
-        limit: int = 10,
-    ) -> OffsetPaginatedResults[ImageRecord]:
-        # TODO: this isn't paginated yet?
+    ) -> GetAllBoardImagesForBoardResult:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                SELECT images.*
+                SELECT image_name
                 FROM board_images
-                INNER JOIN images ON board_images.image_name = images.image_name
-                WHERE board_images.board_id = ?
-                ORDER BY board_images.updated_at DESC;
+                WHERE board_id = ?
+                ORDER BY updated_at DESC;
                 """,
                 (board_id,),
             )
-            result = cast(list[sqlite3.Row], self._cursor.fetchall())
-            images = list(map(lambda r: deserialize_image_record(dict(r)), result))
 
-            self._cursor.execute(
-                """--sql
-                SELECT COUNT(*) FROM images WHERE 1=1;
-                """
-            )
-            count = cast(int, self._cursor.fetchone()[0])
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            image_names = list(map(lambda r: r[0], result))
 
         except sqlite3.Error as e:
             self._conn.rollback()
             raise e
         finally:
             self._lock.release()
-        return OffsetPaginatedResults(
-            items=images, offset=offset, limit=limit, total=count
+        return GetAllBoardImagesForBoardResult(
+            board_id=board_id, image_names=image_names
         )
 
     def get_board_for_image(

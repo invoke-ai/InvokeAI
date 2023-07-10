@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
-from collections import namedtuple
 from logging import Logger
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional
 
 from PIL.Image import Image as PILImageType
-from pydantic import BaseModel, Field
 
 from invokeai.app.models.image import (DeleteManyImagesResult, ImageCategory,
                                        InvalidImageCategoryException,
@@ -18,9 +16,10 @@ from invokeai.app.services.image_file_storage import (
 from invokeai.app.services.image_record_storage import (
     ImageRecordDeleteException, ImageRecordNotFoundException,
     ImageRecordSaveException, ImageRecordStorageBase, OffsetPaginatedResults)
-from invokeai.app.services.item_storage import ItemStorageABC, PaginatedResults
+from invokeai.app.services.item_storage import ItemStorageABC
 from invokeai.app.services.metadata import MetadataServiceBase
-from invokeai.app.services.models.image_record import (ImageDTO, ImageRecord,
+from invokeai.app.services.models.image_record import (GetImagesByNamesResult,
+                                                       ImageDTO, ImageRecord,
                                                        ImageRecordChanges,
                                                        image_record_to_dto)
 from invokeai.app.services.resource_name import NameServiceBase
@@ -96,6 +95,11 @@ class ImageServiceABC(ABC):
         board_id: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageDTO]:
         """Gets a paginated list of image DTOs."""
+        pass
+
+    @abstractmethod
+    def get_images_by_names(self, image_names: list[str]) -> GetImagesByNamesResult:
+        """Gets image DTOs by list of names."""
         pass
 
     @abstractmethod
@@ -328,6 +332,28 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem getting paginated image DTOs")
             raise e
 
+    def get_images_by_names(self, image_names: list[str]) -> GetImagesByNamesResult:
+        try:
+            image_records = self._services.image_records.get_by_names(image_names)
+
+            image_dtos = list(
+                map(
+                    lambda r: image_record_to_dto(
+                        r,
+                        self._services.urls.get_image_url(r.image_name),
+                        self._services.urls.get_image_url(r.image_name, True),
+                        self._services.board_image_records.get_board_for_image(
+                            r.image_name
+                        ),
+                    ),
+                    image_records,
+                )
+            )
+            return GetImagesByNamesResult(image_dtos=image_dtos)
+        except Exception as e:
+            self._services.logger.error("Problem getting image DTOs from names")
+            raise e
+
     def delete(self, image_name: str):
         try:
             self._services.image_files.delete(image_name)
@@ -362,13 +388,12 @@ class ImageService(ImageServiceABC):
 
     def delete_images_on_board(self, board_id: str):
         try:
-            images = self._services.board_image_records.get_images_for_board(board_id)
-            image_name_list = list(
-                map(
-                    lambda r: r.image_name,
-                    images.items,
+            board_images = (
+                self._services.board_image_records.get_all_board_images_for_board(
+                    board_id
                 )
             )
+            image_name_list = board_images.image_names
             for image_name in image_name_list:
                 self._services.image_files.delete(image_name)
             self._services.image_records.delete_many(image_name_list)

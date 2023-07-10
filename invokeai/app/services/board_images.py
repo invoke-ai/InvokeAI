@@ -1,13 +1,9 @@
 from abc import ABC, abstractmethod
 from logging import Logger
-from typing import List, Union, Optional
-from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
-from invokeai.app.services.board_record_storage import (
-    BoardRecord,
-    BoardRecordStorageBase,
-)
+from typing import List, Optional, Union
 
 from invokeai.app.models.image import (AddManyImagesToBoardResult,
+                                       GetAllBoardImagesForBoardResult,
                                        RemoveManyImagesFromBoardResult)
 from invokeai.app.services.board_image_record_storage import \
     BoardImageRecordStorageBase
@@ -59,11 +55,11 @@ class BoardImagesServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_images_for_board(
+    def get_all_board_images_for_board(
         self,
         board_id: str,
-    ) -> OffsetPaginatedResults[ImageDTO]:
-        """Gets images for a board."""
+    ) -> GetAllBoardImagesForBoardResult:
+        """Gets all image names for a board."""
         pass
 
     @abstractmethod
@@ -157,30 +153,14 @@ class BoardImagesService(BoardImagesServiceABC):
             removed_images=removed_images,
         )
 
-    def get_images_for_board(
+    def get_all_board_images_for_board(
         self,
         board_id: str,
-    ) -> OffsetPaginatedResults[ImageDTO]:
-        image_records = self._services.board_image_records.get_images_for_board(
+    ) -> GetAllBoardImagesForBoardResult:
+        result = self._services.board_image_records.get_all_board_images_for_board(
             board_id
         )
-        image_dtos = list(
-            map(
-                lambda r: image_record_to_dto(
-                    r,
-                    self._services.urls.get_image_url(r.image_name),
-                    self._services.urls.get_image_url(r.image_name, True),
-                    board_id,
-                ),
-                image_records.items,
-            )
-        )
-        return OffsetPaginatedResults[ImageDTO](
-            items=image_dtos,
-            offset=image_records.offset,
-            limit=image_records.limit,
-            total=image_records.total,
-        )
+        return result
 
     def get_board_for_image(
         self,

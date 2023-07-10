@@ -2,6 +2,7 @@ from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 
 from invokeai.app.models.image import (AddManyImagesToBoardResult,
+                                       GetAllBoardImagesForBoardResult,
                                        RemoveManyImagesFromBoardResult)
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.image_record import ImageDTO
@@ -58,20 +59,20 @@ async def remove_board_image(
 
 @board_images_router.get(
     "/{board_id}",
-    operation_id="list_board_images",
-    response_model=OffsetPaginatedResults[ImageDTO],
+    operation_id="get_all_board_images_for_board",
+    response_model=GetAllBoardImagesForBoardResult,
 )
-async def list_board_images(
+async def get_all_board_images_for_board(
     board_id: str = Path(description="The id of the board"),
-    offset: int = Query(default=0, description="The page offset"),
-    limit: int = Query(default=10, description="The number of boards per page"),
-) -> OffsetPaginatedResults[ImageDTO]:
-    """Gets a list of images for a board"""
+) -> GetAllBoardImagesForBoardResult:
+    """Gets all image names for a board"""
 
-    results = ApiDependencies.invoker.services.board_images.get_images_for_board(
-        board_id,
+    result = (
+        ApiDependencies.invoker.services.board_images.get_all_board_images_for_board(
+            board_id,
+        )
     )
-    return results
+    return result
 
 
 @board_images_router.patch(
