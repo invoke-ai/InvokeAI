@@ -7,7 +7,14 @@ import {
 import { IRect, Vector2d } from 'konva/lib/types';
 import { clamp, cloneDeep } from 'lodash-es';
 //
+import {
+  setActiveTab,
+  setAspectRatio,
+  setShouldUseCanvasBetaLayout,
+} from 'features/ui/store/uiSlice';
 import { RgbaColor } from 'react-colorful';
+import { sessionCanceled } from 'services/api/thunks/session';
+import { ImageDTO } from 'services/api/types';
 import calculateCoordinates from '../util/calculateCoordinates';
 import calculateScale from '../util/calculateScale';
 import { STAGE_PADDING_PERCENTAGE } from '../util/constants';
@@ -28,13 +35,6 @@ import {
   isCanvasBaseImage,
   isCanvasMaskLine,
 } from './canvasTypes';
-import { ImageDTO } from 'services/api/types';
-import { sessionCanceled } from 'services/api/thunks/session';
-import {
-  setActiveTab,
-  setShouldUseCanvasBetaLayout,
-} from 'features/ui/store/uiSlice';
-import { imageUrlsReceived } from 'services/api/thunks/image';
 
 export const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -239,6 +239,16 @@ export const canvasSlice = createSlice({
         const scaledDimensions = getScaledBoundingBoxDimensions(newDimensions);
         state.scaledBoundingBoxDimensions = scaledDimensions;
       }
+    },
+    toggleBoundingBoxDimensions: (state) => {
+      const [currWidth, currHeight] = [
+        state.boundingBoxDimensions.width,
+        state.boundingBoxDimensions.height,
+      ];
+      state.boundingBoxDimensions = {
+        width: currHeight,
+        height: currWidth,
+      };
     },
     setBoundingBoxCoordinates: (state, action: PayloadAction<Vector2d>) => {
       state.boundingBoxCoordinates = floorCoordinates(action.payload);
@@ -864,6 +874,15 @@ export const canvasSlice = createSlice({
     builder.addCase(setActiveTab, (state, action) => {
       state.doesCanvasNeedScaling = true;
     });
+    builder.addCase(setAspectRatio, (state, action) => {
+      const ratio = action.payload;
+      if (ratio) {
+        state.boundingBoxDimensions.height = roundToMultiple(
+          state.boundingBoxDimensions.width / ratio,
+          8
+        );
+      }
+    });
 
     // builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
     //   const { image_name, image_url, thumbnail_url } = action.payload;
@@ -912,6 +931,7 @@ export const {
   setBoundingBoxDimensions,
   setBoundingBoxPreviewFill,
   setBoundingBoxScaleMethod,
+  toggleBoundingBoxDimensions,
   setBrushColor,
   setBrushSize,
   setCanvasContainerDimensions,
