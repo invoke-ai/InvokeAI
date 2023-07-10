@@ -12,7 +12,7 @@ import { useReactFlow } from 'reactflow';
 const LoadNodesButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { setViewport } = useReactFlow();
+  const { fitView } = useReactFlow();
 
   const uploadedFileRef = useRef<() => void>(null);
 
@@ -36,10 +36,10 @@ const LoadNodesButton = () => {
         }
 
         if (retrievedNodeTree) {
-          const { x = 0, y = 0, zoom = 1 } = retrievedNodeTree.viewport;
           dispatch(loadFileNodes(retrievedNodeTree.nodes));
           dispatch(loadFileEdges(retrievedNodeTree.edges));
-          setViewport({ x, y, zoom });
+          fitView();
+
           dispatch(
             addToast(
               makeToast({ title: t('toast.nodesLoaded'), status: 'success' })
@@ -56,7 +56,7 @@ const LoadNodesButton = () => {
       // Cleanup
       uploadedFileRef.current?.();
     },
-    [setViewport, dispatch, t]
+    [fitView, dispatch, t]
   );
   return (
     <FileButton
