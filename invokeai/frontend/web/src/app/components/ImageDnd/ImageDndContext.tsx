@@ -7,7 +7,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
-import { imageDropped } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
+import { dndDropped } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PropsWithChildren, memo, useCallback, useState } from 'react';
@@ -42,7 +42,7 @@ const ImageDndContext = (props: ImageDndContextProps) => {
       if (!activeData || !overData) {
         return;
       }
-      dispatch(imageDropped({ overData, activeData }));
+      dispatch(dndDropped({ overData, activeData }));
       setActiveDragData(null);
     },
     [dispatch]

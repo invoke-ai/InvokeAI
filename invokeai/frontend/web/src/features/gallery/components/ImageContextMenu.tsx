@@ -40,11 +40,11 @@ import { AddImageToBoardContext } from '../../../app/contexts/AddImageToBoardCon
 import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
 
 type Props = {
-  image: ImageDTO;
+  imageDTO: ImageDTO;
   children: ContextMenuProps<HTMLDivElement>['children'];
 };
 
-const ImageContextMenu = ({ image, children }: Props) => {
+const ImageContextMenu = ({ imageDTO, children }: Props) => {
   const selector = useMemo(
     () =>
       createSelector(
@@ -53,13 +53,13 @@ const ImageContextMenu = ({ image, children }: Props) => {
           const isBatch = gallery.selectedBoardId === 'batch';
 
           const selection = isBatch ? batch.selection : gallery.selection;
-          const isInBatch = batch.ids.includes(image.image_name);
+          const isInBatch = batch.imageNames.includes(imageDTO.image_name);
 
           return { selection, isInBatch };
         },
         defaultSelectorOptions
       ),
-    [image.image_name]
+    [imageDTO.image_name]
   );
   const { selection, isInBatch } = useAppSelector(selector);
   const dispatch = useAppDispatch();
@@ -73,11 +73,11 @@ const ImageContextMenu = ({ image, children }: Props) => {
   const { onClickAddToBoard } = useContext(AddImageToBoardContext);
 
   const handleDelete = useCallback(() => {
-    if (!image) {
+    if (!imageDTO) {
       return;
     }
-    dispatch(imageToDeleteSelected(image));
-  }, [dispatch, image]);
+    dispatch(imageToDeleteSelected(imageDTO));
+  }, [dispatch, imageDTO]);
 
   const { recallBothPrompts, recallSeed, recallAllParameters } =
     useRecallParameters();
@@ -89,23 +89,23 @@ const ImageContextMenu = ({ image, children }: Props) => {
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
     recallBothPrompts(
-      image.metadata?.positive_conditioning,
-      image.metadata?.negative_conditioning
+      imageDTO.metadata?.positive_conditioning,
+      imageDTO.metadata?.negative_conditioning
     );
   }, [
-    image.metadata?.negative_conditioning,
-    image.metadata?.positive_conditioning,
+    imageDTO.metadata?.negative_conditioning,
+    imageDTO.metadata?.positive_conditioning,
     recallBothPrompts,
   ]);
 
   const handleRecallSeed = useCallback(() => {
-    recallSeed(image.metadata?.seed);
-  }, [image, recallSeed]);
+    recallSeed(imageDTO.metadata?.seed);
+  }, [imageDTO, recallSeed]);
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
-    dispatch(initialImageSelected(image));
-  }, [dispatch, image]);
+    dispatch(initialImageSelected(imageDTO));
+  }, [dispatch, imageDTO]);
 
   // const handleRecallInitialImage = useCallback(() => {
   //   recallInitialImage(image.metadata.invokeai?.node?.image);
@@ -113,7 +113,7 @@ const ImageContextMenu = ({ image, children }: Props) => {
 
   const handleSendToCanvas = () => {
     dispatch(sentImageToCanvas());
-    dispatch(setInitialCanvasImage(image));
+    dispatch(setInitialCanvasImage(imageDTO));
     dispatch(resizeAndScaleCanvas());
     dispatch(setActiveTab('unifiedCanvas'));
 
@@ -126,8 +126,8 @@ const ImageContextMenu = ({ image, children }: Props) => {
   };
 
   const handleUseAllParameters = useCallback(() => {
-    recallAllParameters(image);
-  }, [image, recallAllParameters]);
+    recallAllParameters(imageDTO);
+  }, [imageDTO, recallAllParameters]);
 
   const handleLightBox = () => {
     // dispatch(setCurrentImage(image));
@@ -135,39 +135,43 @@ const ImageContextMenu = ({ image, children }: Props) => {
   };
 
   const handleAddToBoard = useCallback(() => {
-    onClickAddToBoard(image);
-  }, [image, onClickAddToBoard]);
+    onClickAddToBoard(imageDTO);
+  }, [imageDTO, onClickAddToBoard]);
 
   const handleRemoveFromBoard = useCallback(() => {
-    if (!image.board_id) {
+    if (!imageDTO.board_id) {
       return;
     }
-    deleteBoardImage({ image_name: image.image_name });
-  }, [deleteBoardImage, image.board_id, image.image_name]);
+    deleteBoardImage({ image_name: imageDTO.image_name });
+  }, [deleteBoardImage, imageDTO.board_id, imageDTO.image_name]);
 
   const handleAddSelectionToBoard = useCallback(() => {
-    addManyBoardImages({ board_id, image_names: selection });
-  }, [addManyBoardImages, selection]);
+    // addManyBoardImages({ board_id, image_names: selection });
+  }, []);
 
   const handleRemoveSelectionFromBoard = useCallback(() => {
     deleteManyBoardImages({ image_names: selection });
   }, [deleteManyBoardImages, selection]);
 
   const handleOpenInNewTab = useCallback(() => {
-    window.open(image.image_url, '_blank');
-  }, [image.image_url]);
+    window.open(imageDTO.image_url, '_blank');
+  }, [imageDTO.image_url]);
 
   const handleAddSelectionToBatch = useCallback(() => {
     dispatch(selectionAddedToBatch({ images_names: selection }));
   }, [dispatch, selection]);
 
   const handleAddToBatch = useCallback(() => {
-    dispatch(imageAddedToBatch(image));
-  }, [dispatch, image]);
+    dispatch(imageAddedToBatch(imageDTO.image_name));
+  }, [dispatch, imageDTO]);
 
   const handleRemoveFromBatch = useCallback(() => {
-    dispatch(imageRemovedFromBatch(image.image_name));
-  }, [dispatch, image]);
+    dispatch(imageRemovedFromBatch(imageDTO.image_name));
+  }, [dispatch, imageDTO]);
+
+  if (!imageDTO) {
+    return null;
+  }
 
   return (
     <ContextMenu<HTMLDivElement>
@@ -191,7 +195,7 @@ const ImageContextMenu = ({ image, children }: Props) => {
                 icon={<IoArrowUndoCircleOutline />}
                 onClickCapture={handleRecallPrompt}
                 isDisabled={
-                  image?.metadata?.positive_conditioning === undefined
+                  imageDTO?.metadata?.positive_conditioning === undefined
                 }
               >
                 {t('parameters.usePrompt')}
@@ -200,7 +204,7 @@ const ImageContextMenu = ({ image, children }: Props) => {
               <MenuItem
                 icon={<IoArrowUndoCircleOutline />}
                 onClickCapture={handleRecallSeed}
-                isDisabled={image?.metadata?.seed === undefined}
+                isDisabled={imageDTO?.metadata?.seed === undefined}
               >
                 {t('parameters.useSeed')}
               </MenuItem>
@@ -210,7 +214,7 @@ const ImageContextMenu = ({ image, children }: Props) => {
                 isDisabled={
                   // what should these be
                   !['t2l', 'l2l', 'inpaint'].includes(
-                    String(image?.metadata?.type)
+                    String(imageDTO?.metadata?.type)
                   )
                 }
               >
@@ -241,9 +245,9 @@ const ImageContextMenu = ({ image, children }: Props) => {
                 {isInBatch ? 'Remove from Batch' : 'Add to Batch'}
               </MenuItem>
               <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
-                {image.board_id ? 'Change Board' : 'Add to Board'}
+                {imageDTO.board_id ? 'Change Board' : 'Add to Board'}
               </MenuItem>
-              {image.board_id && (
+              {imageDTO.board_id && (
                 <MenuItem
                   icon={<FaFolder />}
                   onClickCapture={handleRemoveFromBoard}

@@ -10,7 +10,7 @@ import GenericBoard from './GenericBoard';
 
 const selector = createSelector(stateSelector, (state) => {
   return {
-    count: state.batch.ids.length,
+    count: state.batch.imageNames.length,
   };
 });
 

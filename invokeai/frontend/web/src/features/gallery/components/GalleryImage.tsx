@@ -17,6 +17,7 @@ export const makeSelector = (image_name: string) =>
     ({ gallery }) => ({
       isSelected: gallery.selection.includes(image_name),
       selectionCount: gallery.selection.length,
+      selection: gallery.selection,
     }),
     defaultSelectorOptions
   );
@@ -33,7 +34,8 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const localSelector = useMemo(() => makeSelector(image_name), [image_name]);
 
-  const { isSelected, selectionCount } = useAppSelector(localSelector);
+  const { isSelected, selectionCount, selection } =
+    useAppSelector(localSelector);
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
@@ -65,7 +67,8 @@ const GalleryImage = (props: HoverableImageProps) => {
     if (selectionCount > 1) {
       return {
         id: 'gallery-image',
-        payloadType: 'GALLERY_SELECTION',
+        payloadType: 'IMAGE_NAMES',
+        payload: { image_names: selection },
       };
     }
 
@@ -76,11 +79,11 @@ const GalleryImage = (props: HoverableImageProps) => {
         payload: { imageDTO },
       };
     }
-  }, [imageDTO, selectionCount]);
+  }, [imageDTO, selection, selectionCount]);
 
   return (
     <Box sx={{ w: 'full', h: 'full', touchAction: 'none' }}>
-      <ImageContextMenu image={imageDTO}>
+      <ImageContextMenu imageDTO={imageDTO}>
         {(ref) => (
           <Box
             position="relative"

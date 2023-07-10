@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box, Spinner } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { TypesafeDraggableData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
@@ -13,54 +13,57 @@ import {
 } from 'features/batch/store/batchSlice';
 import ImageContextMenu from 'features/gallery/components/ImageContextMenu';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
-import { ImageDTO } from 'services/api/types';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const makeSelector = (image_name: string) =>
   createSelector(
     [stateSelector],
     (state) => ({
       selectionCount: state.batch.selection.length,
+      selection: state.batch.selection,
       isSelected: state.batch.selection.includes(image_name),
     }),
     defaultSelectorOptions
   );
 
 type BatchImageProps = {
-  imageDTO: ImageDTO;
+  imageName: string;
 };
 
 const BatchImage = (props: BatchImageProps) => {
   const dispatch = useAppDispatch();
 
-  const { imageDTO } = props;
-  const { image_name } = imageDTO;
+  const { imageName } = props;
 
-  const selector = useMemo(() => makeSelector(image_name), [image_name]);
+  const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
 
-  const { isSelected, selectionCount } = useAppSelector(selector);
+  const selector = useMemo(() => makeSelector(imageName), [imageName]);
+
+  const { isSelected, selectionCount, selection } = useAppSelector(selector);
 
   const handleClickRemove = useCallback(() => {
-    dispatch(imageRemovedFromBatch(image_name));
-  }, [dispatch, image_name]);
+    dispatch(imageRemovedFromBatch(imageName));
+  }, [dispatch, imageName]);
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       if (e.shiftKey) {
-        dispatch(batchImageRangeEndSelected(image_name));
+        dispatch(batchImageRangeEndSelected(imageName));
       } else if (e.ctrlKey || e.metaKey) {
-        dispatch(batchImageSelectionToggled(image_name));
+        dispatch(batchImageSelectionToggled(imageName));
       } else {
-        dispatch(batchImageSelected(image_name));
+        dispatch(batchImageSelected(imageName));
       }
     },
-    [dispatch, image_name]
+    [dispatch, imageName]
   );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
     if (selectionCount > 1) {
       return {
         id: 'batch',
-        payloadType: 'BATCH_SELECTION',
+        payloadType: 'IMAGE_NAMES',
+        payload: { image_names: selection },
       };
     }
 
@@ -71,15 +74,19 @@ const BatchImage = (props: BatchImageProps) => {
         payload: { imageDTO },
       };
     }
-  }, [imageDTO, selectionCount]);
+  }, [imageDTO, selection, selectionCount]);
+
+  if (!imageDTO) {
+    return <Spinner />;
+  }
 
   return (
     <Box sx={{ w: 'full', h: 'full', touchAction: 'none' }}>
-      <ImageContextMenu image={imageDTO}>
+      <ImageContextMenu imageDTO={imageDTO}>
         {(ref) => (
           <Box
             position="relative"
-            key={image_name}
+            key={imageName}
             userSelect="none"
             ref={ref}
             sx={{

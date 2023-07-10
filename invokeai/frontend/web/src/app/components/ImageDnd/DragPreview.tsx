@@ -82,7 +82,7 @@ const DragPreview = (props: OverlayDragImageProps) => {
     );
   }
 
-  if (props.dragData.payloadType === 'BATCH_SELECTION') {
+  if (props.dragData.payloadType === 'IMAGE_NAMES') {
     return (
       <Flex
         sx={{
@@ -95,26 +95,7 @@ const DragPreview = (props: OverlayDragImageProps) => {
           ...STYLES,
         }}
       >
-        <Heading>{batchSelectionCount}</Heading>
-        <Heading size="sm">Images</Heading>
-      </Flex>
-    );
-  }
-
-  if (props.dragData.payloadType === 'GALLERY_SELECTION') {
-    return (
-      <Flex
-        sx={{
-          cursor: 'none',
-          userSelect: 'none',
-          position: 'relative',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDir: 'column',
-          ...STYLES,
-        }}
-      >
-        <Heading>{gallerySelectionCount}</Heading>
+        <Heading>{props.dragData.payload.image_names.length}</Heading>
         <Heading size="sm">Images</Heading>
       </Flex>
     );

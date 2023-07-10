@@ -27,7 +27,7 @@ export const ASSETS_CATEGORIES: ImageCategory[] = [
 export const INITIAL_IMAGE_LIMIT = 100;
 export const IMAGE_LIMIT = 20;
 
-type AdditionaGalleryState = {
+type AdditionalGalleryState = {
   offset: number;
   limit: number;
   total: number;
@@ -43,7 +43,7 @@ type AdditionaGalleryState = {
 };
 
 export const initialGalleryState =
-  galleryImagesAdapter.getInitialState<AdditionaGalleryState>({
+  galleryImagesAdapter.getInitialState<AdditionalGalleryState>({
     offset: 0,
     limit: 0,
     total: 0,

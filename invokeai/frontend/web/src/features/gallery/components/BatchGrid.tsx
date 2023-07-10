@@ -11,7 +11,6 @@ import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import BatchImage from 'features/batch/components/BatchImage';
-import { batchImagesAdapter } from 'features/batch/store/batchSlice';
 import { VirtuosoGrid } from 'react-virtuoso';
 import ItemContainer from './ItemContainer';
 import ListContainer from './ListContainer';
@@ -19,9 +18,8 @@ import ListContainer from './ListContainer';
 const selector = createSelector(
   [stateSelector],
   (state) => {
-    const images = batchImagesAdapter.getSelectors().selectAll(state.batch);
     return {
-      images,
+      imageNames: state.batch.imageNames,
     };
   },
   defaultSelectorOptions
@@ -45,7 +43,7 @@ const BatchGrid = () => {
     },
   });
 
-  const { images } = useAppSelector(selector);
+  const { imageNames } = useAppSelector(selector);
 
   useEffect(() => {
     const { current: root } = rootRef;
@@ -60,22 +58,19 @@ const BatchGrid = () => {
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
 
-  if (images.length) {
+  if (imageNames.length) {
     return (
       <Box ref={rootRef} data-overlayscrollbars="" h="100%">
         <VirtuosoGrid
           style={{ height: '100%' }}
-          data={images}
+          data={imageNames}
           components={{
             Item: ItemContainer,
             List: ListContainer,
           }}
           scrollerRef={setScroller}
-          itemContent={(index, item) => (
-            <BatchImage
-              key={`${item.image_name}-${item.thumbnail_url}`}
-              imageDTO={item}
-            />
+          itemContent={(index, imageName) => (
+            <BatchImage key={imageName} imageName={imageName} />
           )}
         />
       </Box>
