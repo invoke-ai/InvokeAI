@@ -101,7 +101,7 @@ class ModelProbe(object):
                 upcast_attention = (base_type==BaseModelType.StableDiffusion2 \
                                      and prediction_type==SchedulerPredictionType.VPrediction),
                 format = format,
-                image_size = 1024 if (base_type==BaseModelType.StableDiffusionXL) else \
+                image_size = 1024 if (base_type in {BaseModelType.StableDiffusionXL,BaseModelType.StableDiffusionXLRefiner}) else \
                               768 if (base_type==BaseModelType.StableDiffusion2 \
                                      and prediction_type==SchedulerPredictionType.VPrediction ) else \
                               512
@@ -366,7 +366,9 @@ class PipelineFolderProbe(FolderProbeBase):
             return BaseModelType.StableDiffusion1  
         elif unet_conf['cross_attention_dim'] == 1024:
             return BaseModelType.StableDiffusion2
-        elif unet_conf['cross_attention_dim'] in {1280,2048}:
+        elif unet_conf['cross_attention_dim'] == 1280:
+            return BaseModelType.StableDiffusionXLRefiner
+        elif unet_conf['cross_attention_dim'] == 2048:
             return BaseModelType.StableDiffusionXL
         else:
             raise ValueError(f'Unknown base model for {self.folder_path}')

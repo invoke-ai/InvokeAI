@@ -5,14 +5,11 @@ from pydantic import Field
 from pathlib import Path
 from typing import Literal, Optional, Union
 from .base import (
-    ModelBase,
     ModelConfigBase,
     BaseModelType,
     ModelType,
-    SubModelType,
     ModelVariantType,
     DiffusersModel,
-    SchedulerPredictionType,
     SilenceWarnings,
     read_checkpoint_meta,
     classproperty,
@@ -222,105 +219,6 @@ class StableDiffusion2Model(DiffusersModel):
         else:
             return model_path
 
-class StableDiffusionXLModelFormat(str, Enum):
-    Checkpoint = "checkpoint"
-    Diffusers = "diffusers"
-    
-class StableDiffusionXLModel(DiffusersModel):
-
-    # TODO: check that configs overwriten properly
-    class DiffusersConfig(ModelConfigBase):
-        model_format: Literal[StableDiffusionXLModelFormat.Diffusers]
-        vae: Optional[str] = Field(None)
-        variant: ModelVariantType
-
-    class CheckpointConfig(ModelConfigBase):
-        model_format: Literal[StableDiffusionXLModelFormat.Checkpoint]
-        vae: Optional[str] = Field(None)
-        config: str
-        variant: ModelVariantType
-
-    def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
-        assert base_model == BaseModelType.StableDiffusionXL
-        assert model_type == ModelType.Main
-        super().__init__(
-            model_path=model_path,
-            base_model=BaseModelType.StableDiffusionXL,
-            model_type=ModelType.Main,
-        )
-
-    @classmethod
-    def probe_config(cls, path: str, **kwargs):
-        model_format = cls.detect_format(path)
-        ckpt_config_path = kwargs.get("config", None)
-        if model_format == StableDiffusionXLModelFormat.Checkpoint:
-            if ckpt_config_path:
-                ckpt_config = OmegaConf.load(ckpt_config_path)
-                ckpt_config["model"]["params"]["unet_config"]["params"]["in_channels"]
-
-            else:
-                checkpoint = read_checkpoint_meta(path)
-                checkpoint = checkpoint.get('state_dict', checkpoint)
-                in_channels = checkpoint["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
-
-        elif model_format == StableDiffusionXLModelFormat.Diffusers:
-            unet_config_path = os.path.join(path, "unet", "config.json")
-            if os.path.exists(unet_config_path):
-                with open(unet_config_path, "r") as f:
-                    unet_config = json.loads(f.read())
-                in_channels = unet_config['in_channels']
-
-            else:
-                raise Exception("Not supported stable diffusion diffusers format(possibly onnx?)")
-
-        else:
-            raise NotImplementedError(f"Unknown stable diffusion 2.* format: {model_format}")
-
-        if in_channels == 9:
-            variant = ModelVariantType.Inpaint
-        elif in_channels == 5:
-            variant = ModelVariantType.Depth
-        elif in_channels == 4:
-            variant = ModelVariantType.Normal
-        else:
-            raise Exception("Unkown stable diffusion 2.* model format")
-
-        if ckpt_config_path is None:
-            ckpt_config_path = _select_ckpt_config(BaseModelType.StableDiffusionXL, variant)
-
-        return cls.create_config(
-            path=path,
-            model_format=model_format,
-
-            config=ckpt_config_path,
-            variant=variant,
-        )
-
-    @classproperty
-    def save_to_config(cls) -> bool:
-        return True
-
-    @classmethod
-    def detect_format(cls, model_path: str):
-        if os.path.isdir(model_path):
-            return StableDiffusionXLModelFormat.Diffusers
-        else:
-            return StableDiffusionXLModelFormat.Checkpoint
-
-    @classmethod
-    def convert_if_required(
-        cls,
-        model_path: str,
-        output_path: str,
-        config: ModelConfigBase,
-        base_model: BaseModelType,
-    ) -> str:
-        if isinstance(config, cls.CheckpointConfig):
-            raise NotImplementedError('conversion of SDXL checkpoint models to diffusers format is not yet supported')
-        else:
-            return model_path
-        
-        
 def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
     ckpt_configs = {
         BaseModelType.StableDiffusion1: {
@@ -355,7 +253,7 @@ def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
 # Note that convert_ckpt_to_diffuses does not currently support conversion of SDXL models
 def _convert_ckpt_and_cache(
     version: BaseModelType,
-    model_config: Union[StableDiffusion1Model.CheckpointConfig, StableDiffusion2Model.CheckpointConfig, StableDiffusionXLModel.CheckpointConfig],
+    model_config: Union[StableDiffusion1Model.CheckpointConfig, StableDiffusion2Model.CheckpointConfig],
     output_path: str,
 ) -> str:
     """

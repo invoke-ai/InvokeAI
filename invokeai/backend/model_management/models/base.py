@@ -22,6 +22,7 @@ class BaseModelType(str, Enum):
     StableDiffusion1 = "sd-1"
     StableDiffusion2 = "sd-2"
     StableDiffusionXL = "sdxl"
+    StableDiffusionXLRefiner = "sdxl-refiner"
     #Kandinsky2_1 = "kandinsky-2.1"
 
 class ModelType(str, Enum):
