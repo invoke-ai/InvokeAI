@@ -8,7 +8,7 @@ import {
   selectImagesById,
 } from 'features/gallery/store/gallerySlice';
 import { clamp, isEqual } from 'lodash-es';
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaAngleDoubleRight, FaAngleLeft, FaAngleRight } from 'react-icons/fa';
@@ -227,4 +227,4 @@ const NextPrevImageButtons = () => {
   );
 };
 
-export default NextPrevImageButtons;
+export default memo(NextPrevImageButtons);
