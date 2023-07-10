@@ -38,6 +38,7 @@ import NodesTab from './tabs/Nodes/NodesTab';
 import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -107,6 +108,7 @@ const InvokeTabs = () => {
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
   );
+  const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
 
   const { shouldPinGallery, shouldPinParametersPanel, shouldShowGallery } =
     useAppSelector((state: RootState) => state.ui);
@@ -119,7 +121,9 @@ const InvokeTabs = () => {
   useHotkeys(
     'z',
     () => {
-      dispatch(setIsLightboxOpen(!isLightBoxOpen));
+      if (isLightboxEnabled) {
+        dispatch(setIsLightboxOpen(!isLightBoxOpen));
+      }
     },
     [isLightBoxOpen]
   );
