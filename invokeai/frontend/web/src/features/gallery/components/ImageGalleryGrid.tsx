@@ -1,32 +1,16 @@
-import {
-  Box,
-  Flex,
-  FlexProps,
-  Grid,
-  Skeleton,
-  Spinner,
-  forwardRef,
-} from '@chakra-ui/react';
+import { Box, Flex, Skeleton, Spinner } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { IMAGE_LIMIT } from 'features/gallery/store/gallerySlice';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 
-import {
-  PropsWithChildren,
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaImage } from 'react-icons/fa';
 import GalleryImage from './GalleryImage';
 
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState, stateSelector } from 'app/store/store';
+import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
@@ -34,6 +18,8 @@ import { VirtuosoGrid } from 'react-virtuoso';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { receivedPageOfImages } from 'services/api/thunks/image';
 import { ImageDTO } from 'services/api/types';
+import ItemContainer from './ItemContainer';
+import ListContainer from './ListContainer';
 
 const selector = createSelector(
   [stateSelector, selectFilteredImages],
@@ -202,32 +188,5 @@ const ImageGalleryGrid = () => {
     />
   );
 };
-
-type ItemContainerProps = PropsWithChildren & FlexProps;
-const ItemContainer = forwardRef((props: ItemContainerProps, ref) => (
-  <Box className="item-container" ref={ref} p={1.5}>
-    {props.children}
-  </Box>
-));
-
-type ListContainerProps = PropsWithChildren & FlexProps;
-const ListContainer = forwardRef((props: ListContainerProps, ref) => {
-  const galleryImageMinimumWidth = useAppSelector(
-    (state: RootState) => state.gallery.galleryImageMinimumWidth
-  );
-
-  return (
-    <Grid
-      {...props}
-      className="list-container"
-      ref={ref}
-      sx={{
-        gridTemplateColumns: `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr));`,
-      }}
-    >
-      {props.children}
-    </Grid>
-  );
-});
 
 export default memo(ImageGalleryGrid);

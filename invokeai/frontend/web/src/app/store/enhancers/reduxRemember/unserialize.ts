@@ -1,3 +1,4 @@
+import { initialBatchState } from 'features/batch/store/batchSlice';
 import { initialCanvasState } from 'features/canvas/store/canvasSlice';
 import { initialControlNetState } from 'features/controlNet/store/controlNetSlice';
 import { initialGalleryState } from 'features/gallery/store/gallerySlice';
@@ -17,6 +18,7 @@ const initialStates: {
 } = {
   canvas: initialCanvasState,
   gallery: initialGalleryState,
+  batch: initialBatchState,
   generation: initialGenerationState,
   lightbox: initialLightboxState,
   nodes: initialNodesState,

@@ -7,7 +7,8 @@ import {
 } from '@reduxjs/toolkit';
 
 import type { AppDispatch, RootState } from '../../store';
-import { addBoardListeners } from './listeners/addBoardListeners';
+import { addBoardApiListeners } from './listeners/addBoardApiListeners';
+import { addAddBoardToBatchListener } from './listeners/addBoardToBatch';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
 import { addAppStartedListener } from './listeners/appStarted';
 import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
@@ -19,16 +20,16 @@ import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGaller
 import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
 import { addControlNetImageProcessedListener } from './listeners/controlNetImageProcessed';
 import {
+  addImageDTOReceivedFulfilledListener,
+  addImageDTOReceivedRejectedListener,
+} from './listeners/imageDTOReceived';
+import {
   addImageDeletedFulfilledListener,
   addImageDeletedPendingListener,
   addImageDeletedRejectedListener,
   addRequestedImageDeletionListener,
 } from './listeners/imageDeleted';
 import { addImageDroppedListener } from './listeners/imageDropped';
-import {
-  addImageMetadataReceivedFulfilledListener,
-  addImageMetadataReceivedRejectedListener,
-} from './listeners/imageMetadataReceived';
 import { addImageToDeleteSelectedListener } from './listeners/imageToDeleteSelected';
 import {
   addImageUpdatedFulfilledListener,
@@ -45,10 +46,7 @@ import {
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
-import {
-  addReceivedPageOfImagesFulfilledListener,
-  addReceivedPageOfImagesRejectedListener,
-} from './listeners/receivedPageOfImages';
+import { addReceivedPageOfImagesListener } from './listeners/receivedPageOfImages';
 import { addSelectionAddedToBatchListener } from './listeners/selectionAddedToBatch';
 import {
   addSessionCanceledFulfilledListener,
@@ -125,8 +123,8 @@ addRequestedBoardImageDeletionListener();
 addImageToDeleteSelectedListener();
 
 // Image metadata
-addImageMetadataReceivedFulfilledListener();
-addImageMetadataReceivedRejectedListener();
+addImageDTOReceivedFulfilledListener();
+addImageDTOReceivedRejectedListener();
 
 // Image URLs
 addImageUrlsReceivedFulfilledListener();
@@ -186,8 +184,7 @@ addSessionCanceledFulfilledListener();
 addSessionCanceledRejectedListener();
 
 // Fetching images
-addReceivedPageOfImagesFulfilledListener();
-addReceivedPageOfImagesRejectedListener();
+addReceivedPageOfImagesListener();
 
 // ControlNet
 addControlNetImageProcessedListener();
@@ -197,7 +194,7 @@ addControlNetAutoProcessListener();
 // addUpdateImageUrlsOnConnectListener();
 
 // Boards
-addBoardListeners();
+addBoardApiListeners();
 addBoardIdSelectedListener();
 
 // Node schemas
@@ -205,6 +202,7 @@ addReceivedOpenAPISchemaListener();
 
 // Batches
 addSelectionAddedToBatchListener();
+addAddBoardToBatchListener();
 
 // DND
 addImageDroppedListener();

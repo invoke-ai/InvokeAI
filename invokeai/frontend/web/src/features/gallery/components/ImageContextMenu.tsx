@@ -7,7 +7,8 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
 import {
-  imagesAddedToBatch,
+  imageAddedToBatch,
+  imageRemovedFromBatch,
   selectionAddedToBatch,
 } from 'features/batch/store/batchSlice';
 import {
@@ -21,13 +22,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  FaExpand,
-  FaFolder,
-  FaFolderPlus,
-  FaShare,
-  FaTrash,
-} from 'react-icons/fa';
+import { FaExpand, FaFolder, FaImages, FaShare, FaTrash } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 import { useDeleteBoardImageMutation } from 'services/api/endpoints/boardImages';
 import { ImageDTO } from 'services/api/types';
@@ -46,7 +41,7 @@ const ImageContextMenu = ({ image, children }: Props) => {
         [stateSelector],
         ({ gallery, batch }) => {
           const selectionCount = gallery.selection.length;
-          const isInBatch = batch.imageNames.includes(image.image_name);
+          const isInBatch = batch.ids.includes(image.image_name);
 
           return { selectionCount, isInBatch };
         },
@@ -153,8 +148,12 @@ const ImageContextMenu = ({ image, children }: Props) => {
   }, [dispatch]);
 
   const handleAddToBatch = useCallback(() => {
-    dispatch(imagesAddedToBatch([image.image_name]));
-  }, [dispatch, image.image_name]);
+    dispatch(imageAddedToBatch(image));
+  }, [dispatch, image]);
+
+  const handleRemoveFromBatch = useCallback(() => {
+    dispatch(imageRemovedFromBatch(image.image_name));
+  }, [dispatch, image]);
 
   return (
     <ContextMenu<HTMLDivElement>
@@ -228,10 +227,11 @@ const ImageContextMenu = ({ image, children }: Props) => {
               )}
               <MenuItem
                 icon={<FaFolder />}
-                isDisabled={isInBatch}
-                onClickCapture={handleAddToBatch}
+                onClickCapture={
+                  isInBatch ? handleRemoveFromBatch : handleAddToBatch
+                }
               >
-                Add to Batch
+                {isInBatch ? 'Remove from Batch' : 'Add to Batch'}
               </MenuItem>
               <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
                 {image.board_id ? 'Change Board' : 'Add to Board'}
@@ -267,7 +267,7 @@ const ImageContextMenu = ({ image, children }: Props) => {
                 Reset Board for Selection
               </MenuItem>
               <MenuItem
-                icon={<FaFolderPlus />}
+                icon={<FaImages />}
                 onClickCapture={handleAddSelectionToBatch}
               >
                 Add Selection to Batch

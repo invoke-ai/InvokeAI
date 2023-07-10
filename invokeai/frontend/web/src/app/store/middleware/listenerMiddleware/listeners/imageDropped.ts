@@ -10,6 +10,7 @@ import {
 } from 'features/batch/store/batchSlice';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
+import { selectSelectedImages } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import {
   fieldValueChanged,
@@ -62,7 +63,7 @@ export const addImageDroppedListener = () => {
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        dispatch(imageAddedToBatch(activeData.payload.imageDTO.image_name));
+        dispatch(imageAddedToBatch(activeData.payload.imageDTO));
       }
 
       // add multiple images to batch
@@ -70,7 +71,8 @@ export const addImageDroppedListener = () => {
         overData.actionType === 'ADD_TO_BATCH' &&
         activeData.payloadType === 'GALLERY_SELECTION'
       ) {
-        dispatch(imagesAddedToBatch(state.gallery.selection));
+        const images = selectSelectedImages(state);
+        dispatch(imagesAddedToBatch(images));
       }
 
       // set control image

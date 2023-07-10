@@ -1,22 +1,22 @@
 import { log } from 'app/logging/useLogger';
 import { serializeError } from 'serialize-error';
 import { imagesApi } from 'services/api/endpoints/images';
-import { receivedPageOfImages } from 'services/api/thunks/image';
+import { receivedListOfImages } from 'services/api/thunks/image';
 import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'gallery' });
 
-export const addReceivedPageOfImagesListener = () => {
+export const addReceivedListOfImagesListener = () => {
   startAppListening({
-    actionCreator: receivedPageOfImages.fulfilled,
+    actionCreator: receivedListOfImages.fulfilled,
     effect: (action, { getState, dispatch }) => {
-      const { items } = action.payload;
+      const { image_dtos } = action.payload;
       moduleLog.debug(
         { data: { payload: action.payload } },
-        `Received ${items.length} images`
+        `Received ${image_dtos.length} images`
       );
 
-      items.forEach((image) => {
+      image_dtos.forEach((image) => {
         dispatch(
           imagesApi.util.upsertQueryData('getImageDTO', image.image_name, image)
         );
@@ -25,7 +25,7 @@ export const addReceivedPageOfImagesListener = () => {
   });
 
   startAppListening({
-    actionCreator: receivedPageOfImages.rejected,
+    actionCreator: receivedListOfImages.rejected,
     effect: (action, { getState, dispatch }) => {
       if (action.payload) {
         moduleLog.debug(

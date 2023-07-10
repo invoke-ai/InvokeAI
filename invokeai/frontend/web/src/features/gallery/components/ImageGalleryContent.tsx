@@ -19,7 +19,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { togglePinGalleryPanel } from 'features/ui/store/uiSlice';
 
-import { ChangeEvent, memo, useCallback, useRef } from 'react';
+import { ChangeEvent, memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { FaImage, FaServer, FaWrench } from 'react-icons/fa';
@@ -37,6 +37,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { mode } from 'theme/util/mode';
+import BatchGrid from './BatchGrid';
 import BoardsList from './Boards/BoardsList';
 import ImageGalleryGrid from './ImageGalleryGrid';
 
@@ -82,6 +83,16 @@ const ImageGalleryContent = () => {
       selectedBoard: data?.find((b) => b.board_id === selectedBoardId),
     }),
   });
+
+  const boardTitle = useMemo(() => {
+    if (selectedBoardId === 'batch') {
+      return 'Batch';
+    }
+    if (selectedBoard) {
+      return selectedBoard.board_name;
+    }
+    return 'All Images';
+  }, [selectedBoard, selectedBoardId]);
 
   const { isOpen: isBoardListOpen, onToggle } = useDisclosure();
 
@@ -163,7 +174,7 @@ const ImageGalleryContent = () => {
                 fontWeight: 600,
               }}
             >
-              {selectedBoard ? selectedBoard.board_name : 'All Images'}
+              {boardTitle}
             </Text>
             <ChevronUpIcon
               sx={{
@@ -217,7 +228,7 @@ const ImageGalleryContent = () => {
         </Box>
       </Box>
       <Flex direction="column" gap={2} h="full" w="full">
-        <ImageGalleryGrid />
+        {selectedBoardId === 'batch' ? <BatchGrid /> : <ImageGalleryGrid />}
       </Flex>
     </VStack>
   );

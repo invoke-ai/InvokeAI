@@ -1,13 +1,13 @@
 import { log } from 'app/logging/useLogger';
-import { startAppListening } from '..';
-import { imageMetadataReceived, imageUpdated } from 'services/api/thunks/image';
 import { imageUpserted } from 'features/gallery/store/gallerySlice';
+import { imageDTOReceived, imageUpdated } from 'services/api/thunks/image';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'image' });
 
-export const addImageMetadataReceivedFulfilledListener = () => {
+export const addImageDTOReceivedFulfilledListener = () => {
   startAppListening({
-    actionCreator: imageMetadataReceived.fulfilled,
+    actionCreator: imageDTOReceived.fulfilled,
     effect: (action, { getState, dispatch }) => {
       const image = action.payload;
 
@@ -38,9 +38,9 @@ export const addImageMetadataReceivedFulfilledListener = () => {
   });
 };
 
-export const addImageMetadataReceivedRejectedListener = () => {
+export const addImageDTOReceivedRejectedListener = () => {
   startAppListening({
-    actionCreator: imageMetadataReceived.rejected,
+    actionCreator: imageDTOReceived.rejected,
     effect: (action, { getState, dispatch }) => {
       moduleLog.debug(
         { data: { image: action.meta.arg } },

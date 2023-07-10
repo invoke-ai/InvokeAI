@@ -1,16 +1,16 @@
+import { resetCanvas } from 'features/canvas/store/canvasSlice';
+import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 import { requestedBoardImagesDeletion } from 'features/gallery/store/actions';
-import { startAppListening } from '..';
 import {
   imageSelected,
   imagesRemoved,
   selectImagesAll,
   selectImagesById,
 } from 'features/gallery/store/gallerySlice';
-import { resetCanvas } from 'features/canvas/store/canvasSlice';
-import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { LIST_TAG, api } from 'services/api';
+import { startAppListening } from '..';
 import { boardsApi } from '../../../../../services/api/endpoints/boards';
 
 export const addRequestedBoardImageDeletionListener = () => {

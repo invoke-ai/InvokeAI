@@ -2,14 +2,16 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { keyBy } from 'lodash-es';
-import { imagesAdapter, initialGalleryState } from './gallerySlice';
+import { galleryImagesAdapter, initialGalleryState } from './gallerySlice';
 
 export const gallerySelector = (state: RootState) => state.gallery;
 
 export const selectFilteredImagesLocal = createSelector(
   (state: typeof initialGalleryState) => state,
   (galleryState) => {
-    const allImages = imagesAdapter.getSelectors().selectAll(galleryState);
+    const allImages = galleryImagesAdapter
+      .getSelectors()
+      .selectAll(galleryState);
     const { categories, selectedBoardId } = galleryState;
 
     const filteredImages = allImages.filter((i) => {
@@ -45,5 +47,15 @@ export const selectFilteredImagesIds = createSelector(
 export const selectLastSelectedImage = createSelector(
   (state: RootState) => state,
   (state) => state.gallery.selection[state.gallery.selection.length - 1],
+  defaultSelectorOptions
+);
+
+export const selectSelectedImages = createSelector(
+  (state: RootState) => state,
+  (state) =>
+    galleryImagesAdapter
+      .getSelectors()
+      .selectAll(state.gallery)
+      .filter((i) => state.gallery.selection.includes(i.image_name)),
   defaultSelectorOptions
 );

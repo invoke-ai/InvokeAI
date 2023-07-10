@@ -11,7 +11,7 @@ import {
 import { ImageCategory, ImageDTO } from 'services/api/types';
 import { selectFilteredImagesLocal } from './gallerySelectors';
 
-export const imagesAdapter = createEntityAdapter<ImageDTO>({
+export const galleryImagesAdapter = createEntityAdapter<ImageDTO>({
   selectId: (image) => image.image_name,
   sortComparer: (a, b) => dateComparator(b.updated_at, a.updated_at),
 });
@@ -34,7 +34,7 @@ type AdditionaGalleryState = {
   isLoading: boolean;
   isFetching: boolean;
   categories: ImageCategory[];
-  selectedBoardId?: string;
+  selectedBoardId?: 'batch' | string;
   selection: string[];
   shouldAutoSwitch: boolean;
   galleryImageMinimumWidth: number;
@@ -43,7 +43,7 @@ type AdditionaGalleryState = {
 };
 
 export const initialGalleryState =
-  imagesAdapter.getInitialState<AdditionaGalleryState>({
+  galleryImagesAdapter.getInitialState<AdditionaGalleryState>({
     offset: 0,
     limit: 0,
     total: 0,
@@ -62,7 +62,7 @@ export const gallerySlice = createSlice({
   initialState: initialGalleryState,
   reducers: {
     imageUpserted: (state, action: PayloadAction<ImageDTO>) => {
-      imagesAdapter.upsertOne(state, action.payload);
+      galleryImagesAdapter.upsertOne(state, action.payload);
       if (
         state.shouldAutoSwitch &&
         action.payload.image_category === 'general'
@@ -73,16 +73,16 @@ export const gallerySlice = createSlice({
       }
     },
     imageUpdatedOne: (state, action: PayloadAction<Update<ImageDTO>>) => {
-      imagesAdapter.updateOne(state, action.payload);
+      galleryImagesAdapter.updateOne(state, action.payload);
     },
     imageUpdatedMany: (state, action: PayloadAction<Update<ImageDTO>[]>) => {
-      imagesAdapter.updateMany(state, action.payload);
+      galleryImagesAdapter.updateMany(state, action.payload);
     },
     imageRemoved: (state, action: PayloadAction<string>) => {
-      imagesAdapter.removeOne(state, action.payload);
+      galleryImagesAdapter.removeOne(state, action.payload);
     },
     imagesRemoved: (state, action: PayloadAction<string[]>) => {
-      imagesAdapter.removeMany(state, action.payload);
+      galleryImagesAdapter.removeMany(state, action.payload);
     },
     imageCategoriesChanged: (state, action: PayloadAction<ImageCategory[]>) => {
       state.categories = action.payload;
@@ -160,7 +160,7 @@ export const gallerySlice = createSlice({
 
       const { items, offset, limit, total } = action.payload;
 
-      imagesAdapter.upsertMany(state, items);
+      galleryImagesAdapter.upsertMany(state, items);
 
       if (state.selection.length === 0 && items.length) {
         state.selection = [items[0].image_name];
@@ -178,7 +178,7 @@ export const gallerySlice = createSlice({
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
       const { image_name, image_url, thumbnail_url } = action.payload;
 
-      imagesAdapter.updateOne(state, {
+      galleryImagesAdapter.updateOne(state, {
         id: image_name,
         changes: { image_url, thumbnail_url },
       });
@@ -200,7 +200,7 @@ export const {
   selectEntities: selectImagesEntities,
   selectIds: selectImagesIds,
   selectTotal: selectImagesTotal,
-} = imagesAdapter.getSelectors<RootState>((state) => state.gallery);
+} = galleryImagesAdapter.getSelectors<RootState>((state) => state.gallery);
 
 export const {
   imageUpserted,

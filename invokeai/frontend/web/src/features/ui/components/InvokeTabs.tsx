@@ -81,6 +81,7 @@ const tabs: InvokeTabInfo[] = [
   },
   {
     id: 'batch',
+    translationKey: 'modelManager.modelManager',
     icon: <Icon as={FaLayerGroup} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <BatchTab />,
   },

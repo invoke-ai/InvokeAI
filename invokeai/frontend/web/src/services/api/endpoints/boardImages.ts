@@ -1,12 +1,7 @@
 import { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
-import { OffsetPaginatedResults_ImageDTO_ } from 'services/api/types';
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
-import { paths } from '../schema';
+import { components, paths } from '../schema';
 import { imagesApi } from './images';
-
-type ListBoardImagesArg =
-  paths['/api/v1/board_images/{board_id}']['get']['parameters']['path'] &
-    paths['/api/v1/board_images/{board_id}']['get']['parameters']['query'];
 
 type AddImageToBoardArg =
   paths['/api/v1/board_images/']['post']['requestBody']['content']['application/json'];
@@ -20,21 +15,29 @@ type RemoveImageFromBoardArg =
 type RemoveManyBoardImagesArg =
   paths['/api/v1/board_images/images']['post']['requestBody']['content']['application/json'];
 
+type GetAllBoardImagesForBoardResult =
+  components['schemas']['GetAllBoardImagesForBoardResult'];
+
 export const boardImagesApi = api.injectEndpoints({
   endpoints: (build) => ({
     /**
      * Board Images Queries
      */
 
-    listBoardImages: build.query<
-      OffsetPaginatedResults_ImageDTO_,
-      ListBoardImagesArg
+    getAllBoardImagesForBoard: build.query<
+      GetAllBoardImagesForBoardResult,
+      { board_id: string }
     >({
-      query: ({ board_id, offset, limit }) => ({
+      query: ({ board_id }) => ({
         url: `board_images/${board_id}`,
-        method: 'DELETE',
-        body: { offset, limit },
+        method: 'GET',
       }),
+      providesTags: (result, error, arg) => [
+        {
+          type: 'Board',
+          id: arg.board_id,
+        },
+      ],
     }),
 
     /**
@@ -161,6 +164,7 @@ export const boardImagesApi = api.injectEndpoints({
 });
 
 export const {
+  useGetAllBoardImagesForBoardQuery,
   useAddBoardImageMutation,
   useAddManyBoardImagesMutation,
   useDeleteBoardImageMutation,

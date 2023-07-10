@@ -1,4 +1,4 @@
-import { Box, Icon, Skeleton } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { TypesafeDraggableData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
@@ -11,9 +11,9 @@ import {
   batchImageSelectionToggled,
   imageRemovedFromBatch,
 } from 'features/batch/store/batchSlice';
+import ImageContextMenu from 'features/gallery/components/ImageContextMenu';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
-import { FaExclamationCircle } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { ImageDTO } from 'services/api/types';
 
 const makeSelector = (image_name: string) =>
   createSelector(
@@ -26,40 +26,34 @@ const makeSelector = (image_name: string) =>
   );
 
 type BatchImageProps = {
-  imageName: string;
+  imageDTO: ImageDTO;
 };
 
 const BatchImage = (props: BatchImageProps) => {
-  const {
-    currentData: imageDTO,
-    isFetching,
-    isError,
-    isSuccess,
-  } = useGetImageDTOQuery(props.imageName);
   const dispatch = useAppDispatch();
 
-  const selector = useMemo(
-    () => makeSelector(props.imageName),
-    [props.imageName]
-  );
+  const { imageDTO } = props;
+  const { image_name } = imageDTO;
+
+  const selector = useMemo(() => makeSelector(image_name), [image_name]);
 
   const { isSelected, selectionCount } = useAppSelector(selector);
 
   const handleClickRemove = useCallback(() => {
-    dispatch(imageRemovedFromBatch(props.imageName));
-  }, [dispatch, props.imageName]);
+    dispatch(imageRemovedFromBatch(image_name));
+  }, [dispatch, image_name]);
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       if (e.shiftKey) {
-        dispatch(batchImageRangeEndSelected(props.imageName));
+        dispatch(batchImageRangeEndSelected(image_name));
       } else if (e.ctrlKey || e.metaKey) {
-        dispatch(batchImageSelectionToggled(props.imageName));
+        dispatch(batchImageSelectionToggled(image_name));
       } else {
-        dispatch(batchImageSelected(props.imageName));
+        dispatch(batchImageSelected(image_name));
       }
     },
-    [dispatch, props.imageName]
+    [dispatch, image_name]
   );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
@@ -79,36 +73,38 @@ const BatchImage = (props: BatchImageProps) => {
     }
   }, [imageDTO, selectionCount]);
 
-  if (isError) {
-    return <Icon as={FaExclamationCircle} />;
-  }
-
-  if (isFetching) {
-    return (
-      <Skeleton>
-        <Box w="full" h="full" aspectRatio="1/1" />
-      </Skeleton>
-    );
-  }
-
   return (
-    <Box sx={{ position: 'relative', aspectRatio: '1/1' }}>
-      <IAIDndImage
-        imageDTO={imageDTO}
-        draggableData={draggableData}
-        isDropDisabled={true}
-        isUploadDisabled={true}
-        imageSx={{
-          w: 'full',
-          h: 'full',
-        }}
-        onClick={handleClick}
-        isSelected={isSelected}
-        onClickReset={handleClickRemove}
-        resetTooltip="Remove from batch"
-        withResetIcon
-        thumbnail
-      />
+    <Box sx={{ w: 'full', h: 'full', touchAction: 'none' }}>
+      <ImageContextMenu image={imageDTO}>
+        {(ref) => (
+          <Box
+            position="relative"
+            key={image_name}
+            userSelect="none"
+            ref={ref}
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              aspectRatio: '1/1',
+            }}
+          >
+            <IAIDndImage
+              onClick={handleClick}
+              imageDTO={imageDTO}
+              draggableData={draggableData}
+              isSelected={isSelected}
+              minSize={0}
+              onClickReset={handleClickRemove}
+              isDropDisabled={true}
+              imageSx={{ w: 'full', h: 'full' }}
+              isUploadDisabled={true}
+              resetTooltip="Remove from batch"
+              withResetIcon
+            />
+          </Box>
+        )}
+      </ImageContextMenu>
     </Box>
   );
 };

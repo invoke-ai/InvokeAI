@@ -16,7 +16,7 @@ import { ContextMenu } from 'chakra-ui-contextmenu';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useContext, useMemo } from 'react';
-import { FaFolder, FaTrash } from 'react-icons/fa';
+import { FaFolder, FaImages, FaTrash } from 'react-icons/fa';
 import {
   useDeleteBoardMutation,
   useUpdateBoardMutation,
@@ -26,16 +26,17 @@ import { BoardDTO } from 'services/api/types';
 
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
+import { boardAddedToBatch } from 'app/store/middleware/listenerMiddleware/listeners/addBoardToBatch';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { mode } from 'theme/util/mode';
 import { DeleteBoardImagesContext } from '../../../../app/contexts/DeleteBoardImagesContext';
 
-interface HoverableBoardProps {
+interface GalleryBoardProps {
   board: BoardDTO;
   isSelected: boolean;
 }
 
-const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
+const GalleryBoard = memo(({ board, isSelected }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
 
   const { currentData: coverImage } = useGetImageDTOQuery(
@@ -66,6 +67,10 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
     deleteBoard(board_id);
   }, [board_id, deleteBoard]);
 
+  const handleAddBoardToBatch = useCallback(() => {
+    dispatch(boardAddedToBatch({ board_id }));
+  }, [board_id, dispatch]);
+
   const handleDeleteBoardAndImages = useCallback(() => {
     console.log({ board });
     onClickDeleteBoardImages(board);
@@ -87,16 +92,25 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
         renderMenu={() => (
           <MenuList sx={{ visibility: 'visible !important' }}>
             {board.image_count > 0 && (
-              <MenuItem
-                sx={{ color: 'error.300' }}
-                icon={<FaTrash />}
-                onClickCapture={handleDeleteBoardAndImages}
-              >
-                Delete Board and Images
-              </MenuItem>
+              <>
+                <MenuItem
+                  isDisabled={!board.image_count}
+                  icon={<FaImages />}
+                  onClickCapture={handleAddBoardToBatch}
+                >
+                  Add Board to Batch
+                </MenuItem>
+                <MenuItem
+                  sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
+                  icon={<FaTrash />}
+                  onClickCapture={handleDeleteBoardAndImages}
+                >
+                  Delete Board and Images
+                </MenuItem>
+              </>
             )}
             <MenuItem
-              sx={{ color: mode('error.700', 'error.300')(colorMode) }}
+              sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
               icon={<FaTrash />}
               onClickCapture={handleDeleteBoard}
             >
@@ -207,6 +221,6 @@ const HoverableBoard = memo(({ board, isSelected }: HoverableBoardProps) => {
   );
 });
 
-HoverableBoard.displayName = 'HoverableBoard';
+GalleryBoard.displayName = 'HoverableBoard';
 
-export default HoverableBoard;
+export default GalleryBoard;

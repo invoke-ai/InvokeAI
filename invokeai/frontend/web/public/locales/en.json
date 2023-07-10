@@ -118,7 +118,7 @@
         "pinGallery": "Pin Gallery",
         "allImagesLoaded": "All Images Loaded",
         "loadMore": "Load More",
-        "noImagesInGallery": "No Images In Gallery",
+        "noImagesInGallery": "No Images to Display",
         "deleteImage": "Delete Image",
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",

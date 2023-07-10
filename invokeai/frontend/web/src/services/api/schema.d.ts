@@ -107,12 +107,7 @@ export type paths = {
      */
     put: operations["merge_models"];
   };
-  "/api/v1/images/": {
-    /**
-     * List Images With Metadata 
-     * @description Gets a list of images
-     */
-    get: operations["list_images_with_metadata"];
+  "/api/v1/images/upload": {
     /**
      * Upload Image 
      * @description Uploads an image
@@ -121,10 +116,10 @@ export type paths = {
   };
   "/api/v1/images/{image_name}": {
     /**
-     * Get Image Full 
-     * @description Gets a full-resolution image file
+     * Get Image Dto 
+     * @description Gets an image's DTO
      */
-    get: operations["get_image_full"];
+    get: operations["get_image"];
     /**
      * Delete Image 
      * @description Deletes an image
@@ -136,12 +131,12 @@ export type paths = {
      */
     patch: operations["update_image"];
   };
-  "/api/v1/images/{image_name}/metadata": {
+  "/api/v1/images/{image_name}/full_size": {
     /**
-     * Get Image Metadata 
-     * @description Gets an image's metadata
+     * Get Image Full Size 
+     * @description Gets a full-resolution image file
      */
-    get: operations["get_image_metadata"];
+    get: operations["get_image_full_size"];
   };
   "/api/v1/images/{image_name}/thumbnail": {
     /**
@@ -156,6 +151,18 @@ export type paths = {
      * @description Gets an image and thumbnail URL
      */
     get: operations["get_image_urls"];
+  };
+  "/api/v1/images/": {
+    /**
+     * Get Many Images 
+     * @description Gets a list of images
+     */
+    get: operations["get_many_images"];
+    /**
+     * Get Images By Names 
+     * @description Gets a list of images
+     */
+    post: operations["get_images_by_names"];
   };
   "/api/v1/images/delete": {
     /**
@@ -207,10 +214,10 @@ export type paths = {
   };
   "/api/v1/board_images/{board_id}": {
     /**
-     * List Board Images 
-     * @description Gets a list of images for a board
+     * Get All Board Images For Board 
+     * @description Gets all image names for a board
      */
-    get: operations["list_board_images"];
+    get: operations["get_all_board_images_for_board"];
   };
   "/api/v1/board_images/{board_id}/images": {
     /**
@@ -1064,6 +1071,33 @@ export type components = {
        * @description The output float
        */
       param?: number;
+    };
+    /**
+     * GetAllBoardImagesForBoardResult 
+     * @description The result of a get all image names for board operation.
+     */
+    GetAllBoardImagesForBoardResult: {
+      /**
+       * Board Id 
+       * @description The id of the board with which the images are associated
+       */
+      board_id: string;
+      /**
+       * Image Names 
+       * @description The names of the images that are associated with the board
+       */
+      image_names: (string)[];
+    };
+    /**
+     * GetImagesByNamesResult 
+     * @description The result of a get all image names for board operation.
+     */
+    GetImagesByNamesResult: {
+      /**
+       * Image Dtos 
+       * @description The names of the images that are associated with the board
+       */
+      image_dtos: (components["schemas"]["ImageDTO"])[];
     };
     /** Graph */
     Graph: {
@@ -3129,7 +3163,7 @@ export type components = {
     /** ModelsList */
     ModelsList: {
       /** Models */
-      models: (components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"])[];
+      models: (components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"])[];
     };
     /**
      * MultiplyInvocation 
@@ -4445,17 +4479,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion1ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion2ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion1ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -4836,7 +4870,7 @@ export type operations = {
       /** @description The model imported successfully */
       201: {
         content: {
-          "application/json": components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"];
+          "application/json": components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"];
         };
       };
       /** @description The model could not be found */
@@ -4904,14 +4938,14 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"];
+        "application/json": components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"];
       };
     };
     responses: {
       /** @description The model was updated successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"];
+          "application/json": components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"];
         };
       };
       /** @description Bad request */
@@ -4945,7 +4979,7 @@ export type operations = {
       /** @description Model converted successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"];
+          "application/json": components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"];
         };
       };
       /** @description Bad request */
@@ -4980,49 +5014,13 @@ export type operations = {
       /** @description Model converted successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"];
+          "application/json": components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"];
         };
       };
       /** @description Incompatible models */
       400: never;
       /** @description One or more models not found */
       404: never;
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * List Images With Metadata 
-   * @description Gets a list of images
-   */
-  list_images_with_metadata: {
-    parameters: {
-      query?: {
-        /** @description The origin of images to list */
-        image_origin?: components["schemas"]["ResourceOrigin"];
-        /** @description The categories of image to include */
-        categories?: (components["schemas"]["ImageCategory"])[];
-        /** @description Whether to list intermediate images */
-        is_intermediate?: boolean;
-        /** @description The board id to filter by, provide 'none' for images without a board */
-        board_id?: string;
-        /** @description The page offset */
-        offset?: number;
-        /** @description The number of images per page */
-        limit?: number;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
-        };
-      };
       /** @description Validation Error */
       422: {
         content: {
@@ -5069,25 +5067,23 @@ export type operations = {
     };
   };
   /**
-   * Get Image Full 
-   * @description Gets a full-resolution image file
+   * Get Image Dto 
+   * @description Gets an image's DTO
    */
-  get_image_full: {
+  get_image: {
     parameters: {
       path: {
-        /** @description The name of full-resolution image file to get */
+        /** @description The name of image to get */
         image_name: string;
       };
     };
     responses: {
-      /** @description Return the full-resolution image */
+      /** @description Successful Response */
       200: {
         content: {
-          "image/png": unknown;
+          "application/json": components["schemas"]["ImageDTO"];
         };
       };
-      /** @description Image not found */
-      404: never;
       /** @description Validation Error */
       422: {
         content: {
@@ -5154,23 +5150,25 @@ export type operations = {
     };
   };
   /**
-   * Get Image Metadata 
-   * @description Gets an image's metadata
+   * Get Image Full Size 
+   * @description Gets a full-resolution image file
    */
-  get_image_metadata: {
+  get_image_full_size: {
     parameters: {
       path: {
-        /** @description The name of image to get */
+        /** @description The name of full-resolution image file to get */
         image_name: string;
       };
     };
     responses: {
-      /** @description Successful Response */
+      /** @description Return the full-resolution image */
       200: {
         content: {
-          "application/json": components["schemas"]["ImageDTO"];
+          "image/png": unknown;
         };
       };
+      /** @description Image not found */
+      404: never;
       /** @description Validation Error */
       422: {
         content: {
@@ -5223,6 +5221,67 @@ export type operations = {
       200: {
         content: {
           "application/json": components["schemas"]["ImageUrlsDTO"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Many Images 
+   * @description Gets a list of images
+   */
+  get_many_images: {
+    parameters: {
+      query?: {
+        /** @description The origin of images to list */
+        image_origin?: components["schemas"]["ResourceOrigin"];
+        /** @description The categories of image to include */
+        categories?: (components["schemas"]["ImageCategory"])[];
+        /** @description Whether to list intermediate images */
+        is_intermediate?: boolean;
+        /** @description The board id to filter by, provide 'none' for images without a board */
+        board_id?: string;
+        /** @description The page offset */
+        offset?: number;
+        /** @description The number of images per page */
+        limit?: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Images By Names 
+   * @description Gets a list of images
+   */
+  get_images_by_names: {
+    requestBody: {
+      content: {
+        "application/json": (string)[];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["GetImagesByNamesResult"];
         };
       };
       /** @description Validation Error */
@@ -5452,17 +5511,11 @@ export type operations = {
     };
   };
   /**
-   * List Board Images 
-   * @description Gets a list of images for a board
+   * Get All Board Images For Board 
+   * @description Gets all image names for a board
    */
-  list_board_images: {
+  get_all_board_images_for_board: {
     parameters: {
-      query?: {
-        /** @description The page offset */
-        offset?: number;
-        /** @description The number of boards per page */
-        limit?: number;
-      };
       path: {
         /** @description The id of the board */
         board_id: string;
@@ -5472,7 +5525,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
+          "application/json": components["schemas"]["GetAllBoardImagesForBoardResult"];
         };
       };
       /** @description Validation Error */

@@ -1,3 +1,4 @@
+import { CloseIcon } from '@chakra-ui/icons';
 import {
   Collapse,
   Flex,
@@ -9,17 +10,17 @@ import {
   InputRightElement,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { setBoardSearchText } from 'features/gallery/store/boardSlice';
-import { memo, useState } from 'react';
-import HoverableBoard from './HoverableBoard';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
+import { memo, useState } from 'react';
+import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import AddBoardButton from './AddBoardButton';
 import AllImagesBoard from './AllImagesBoard';
-import { CloseIcon } from '@chakra-ui/icons';
-import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import { stateSelector } from 'app/store/store';
+import BatchBoard from './BatchBoard';
+import GalleryBoard from './GalleryBoard';
 
 const selector = createSelector(
   [stateSelector],
@@ -115,14 +116,19 @@ const BoardsList = (props: Props) => {
             }}
           >
             {!searchMode && (
-              <GridItem sx={{ p: 1.5 }}>
-                <AllImagesBoard isSelected={!selectedBoardId} />
-              </GridItem>
+              <>
+                <GridItem sx={{ p: 1.5 }}>
+                  <AllImagesBoard isSelected={!selectedBoardId} />
+                </GridItem>
+                <GridItem sx={{ p: 1.5 }}>
+                  <BatchBoard isSelected={selectedBoardId === 'batch'} />
+                </GridItem>
+              </>
             )}
             {filteredBoards &&
               filteredBoards.map((board) => (
                 <GridItem key={board.board_id} sx={{ p: 1.5 }}>
-                  <HoverableBoard
+                  <GalleryBoard
                     board={board}
                     isSelected={selectedBoardId === board.board_id}
                   />

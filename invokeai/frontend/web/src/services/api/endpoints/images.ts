@@ -7,7 +7,7 @@ export const imagesApi = api.injectEndpoints({
      * Image Queries
      */
     getImageDTO: build.query<ImageDTO, string>({
-      query: (image_name) => ({ url: `images/${image_name}/metadata` }),
+      query: (image_name) => ({ url: `images/${image_name}` }),
       providesTags: (result, error, arg) => [{ type: 'Image', id: arg }],
       keepUnusedDataFor: 86400, // 24 hours
     }),

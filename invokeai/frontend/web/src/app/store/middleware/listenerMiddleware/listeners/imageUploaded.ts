@@ -1,13 +1,13 @@
-import { startAppListening } from '..';
-import { imageUploaded } from 'services/api/thunks/image';
-import { addToast } from 'features/system/store/systemSlice';
 import { log } from 'app/logging/useLogger';
-import { imageUpserted } from 'features/gallery/store/gallerySlice';
+import { imageAddedToBatch } from 'features/batch/store/batchSlice';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import { imageUpserted } from 'features/gallery/store/gallerySlice';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
-import { imageAddedToBatch } from 'features/batch/store/batchSlice';
+import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import { addToast } from 'features/system/store/systemSlice';
+import { imageUploaded } from 'services/api/thunks/image';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -73,7 +73,7 @@ export const addImageUploadedFulfilledListener = () => {
       }
 
       if (postUploadAction?.type === 'ADD_TO_BATCH') {
-        dispatch(imageAddedToBatch(image.image_name));
+        dispatch(imageAddedToBatch(image));
         return;
       }
     },
@@ -84,8 +84,8 @@ export const addImageUploadedRejectedListener = () => {
   startAppListening({
     actionCreator: imageUploaded.rejected,
     effect: (action, { dispatch }) => {
-      const { formData, ...rest } = action.meta.arg;
-      const sanitizedData = { arg: { ...rest, formData: { file: '<Blob>' } } };
+      const { file, ...rest } = action.meta.arg;
+      const sanitizedData = { arg: { ...rest, file: '<Blob>' } };
       moduleLog.error({ data: sanitizedData }, 'Image upload failed');
       dispatch(
         addToast({

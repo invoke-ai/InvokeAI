@@ -8,7 +8,7 @@ import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'boards' });
 
-export const addBoardListeners = () => {
+export const addBoardApiListeners = () => {
   // add image to board - fulfilled
   startAppListening({
     matcher: boardImagesApi.endpoints.addBoardImage.matchFulfilled,
