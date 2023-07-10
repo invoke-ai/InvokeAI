@@ -26,7 +26,7 @@ InvokeAI:
     max_cache_size: 6
     always_use_cpu: false
     free_gpu_mem: false
-    reserve_gpu_mem: 1
+    gpu_mem_reserved: 1
   Features:
     nsfw_checker: true
     restore: true
