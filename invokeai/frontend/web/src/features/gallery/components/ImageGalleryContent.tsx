@@ -29,16 +29,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
-  imageCategoriesChanged,
-  shouldAutoSwitchChanged,
-} from 'features/gallery/store/gallerySlice';
+import { shouldAutoSwitchChanged } from 'features/gallery/store/gallerySlice';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { mode } from 'theme/util/mode';
 import BatchGrid from './BatchGrid';
-import BoardGrid from './BoardGrid';
 import BoardsList from './Boards/BoardsList';
 import ImageGalleryGrid from './ImageGalleryGrid';
 
@@ -68,6 +62,7 @@ const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
+  const galleryGridRef = useRef<HTMLDivElement>(null);
 
   const { colorMode } = useColorMode();
 
@@ -107,12 +102,10 @@ const ImageGalleryContent = () => {
   };
 
   const handleClickImagesCategory = useCallback(() => {
-    dispatch(imageCategoriesChanged(IMAGE_CATEGORIES));
     dispatch(setGalleryView('images'));
   }, [dispatch]);
 
   const handleClickAssetsCategory = useCallback(() => {
-    dispatch(imageCategoriesChanged(ASSETS_CATEGORIES));
     dispatch(setGalleryView('assets'));
   }, [dispatch]);
 
@@ -228,14 +221,8 @@ const ImageGalleryContent = () => {
           <BoardsList isOpen={isBoardListOpen} />
         </Box>
       </Box>
-      <Flex direction="column" gap={2} h="full" w="full">
-        {selectedBoardId === 'batch' ? (
-          <BatchGrid />
-        ) : selectedBoardId ? (
-          <BoardGrid board_id={selectedBoardId} />
-        ) : (
-          <ImageGalleryGrid />
-        )}
+      <Flex ref={galleryGridRef} direction="column" gap={2} h="full" w="full">
+        {selectedBoardId === 'batch' ? <BatchGrid /> : <ImageGalleryGrid />}
       </Flex>
     </VStack>
   );

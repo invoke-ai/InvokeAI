@@ -104,10 +104,10 @@ export const store = configureStore({
       // manually type state, cannot type the arg
       // const typedState = state as ReturnType<typeof rootReducer>;
 
-      if (action.type.startsWith('api/')) {
-        // don't log api actions, with manual cache updates they are extremely noisy
-        return false;
-      }
+      // if (action.type.startsWith('api/')) {
+      //   // don't log api actions, with manual cache updates they are extremely noisy
+      //   return false;
+      // }
 
       if (actionsDenylist.includes(action.type)) {
         // don't log other noisy actions

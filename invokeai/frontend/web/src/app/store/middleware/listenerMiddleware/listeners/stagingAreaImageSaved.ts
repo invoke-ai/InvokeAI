@@ -1,9 +1,9 @@
-import { stagingAreaImageSaved } from 'features/canvas/store/actions';
-import { startAppListening } from '..';
 import { log } from 'app/logging/useLogger';
-import { imageUpdated } from 'services/api/thunks/image';
-import { imageUpserted } from 'features/gallery/store/gallerySlice';
+import { stagingAreaImageSaved } from 'features/canvas/store/actions';
 import { addToast } from 'features/system/store/systemSlice';
+import { imagesApi } from 'services/api/endpoints/images';
+import { imageUpdated } from 'services/api/thunks/image';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'canvas' });
 
@@ -43,7 +43,10 @@ export const addStagingAreaImageSavedListener = () => {
       }
 
       if (imageUpdated.fulfilled.match(imageUpdatedAction)) {
-        dispatch(imageUpserted(imageUpdatedAction.payload));
+        // update cache
+        imagesApi.util.updateQueryData('getImageDTO', imageName, (draft) => {
+          Object.assign(draft, { is_intermediate: false });
+        });
         dispatch(addToast({ title: 'Image Saved', status: 'success' }));
       }
     },

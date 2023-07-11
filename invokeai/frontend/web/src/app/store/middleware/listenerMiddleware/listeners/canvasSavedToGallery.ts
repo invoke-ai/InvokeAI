@@ -1,10 +1,10 @@
-import { canvasSavedToGallery } from 'features/canvas/store/actions';
-import { startAppListening } from '..';
 import { log } from 'app/logging/useLogger';
-import { imageUploaded } from 'services/api/thunks/image';
+import { canvasSavedToGallery } from 'features/canvas/store/actions';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
-import { imageUpserted } from 'features/gallery/store/gallerySlice';
+import { imagesApi } from 'services/api/endpoints/images';
+import { imageUploaded } from 'services/api/thunks/image';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'canvasSavedToGalleryListener' });
 
@@ -49,7 +49,11 @@ export const addCanvasSavedToGalleryListener = () => {
           uploadedImageAction.meta.requestId === imageUploadedRequest.requestId
       );
 
-      dispatch(imageUpserted(uploadedImageDTO));
+      imagesApi.util.upsertQueryData(
+        'getImageDTO',
+        uploadedImageDTO.image_name,
+        uploadedImageDTO
+      );
     },
   });
 };

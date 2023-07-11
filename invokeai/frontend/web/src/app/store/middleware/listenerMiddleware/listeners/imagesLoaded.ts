@@ -1,23 +1,21 @@
 import { log } from 'app/logging/useLogger';
 import { serializeError } from 'serialize-error';
 import { imagesApi } from 'services/api/endpoints/images';
-import { receivedPageOfImages } from 'services/api/thunks/image';
+import { imagesLoaded } from 'services/api/thunks/image';
 import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'gallery' });
 
-export const addReceivedPageOfImagesListener = () => {
+export const addImagesLoadedListener = () => {
   startAppListening({
-    actionCreator: receivedPageOfImages.fulfilled,
+    actionCreator: imagesLoaded.fulfilled,
     effect: (action, { getState, dispatch }) => {
       const { items } = action.payload;
       moduleLog.debug(
         { data: { payload: action.payload } },
-        `Received ${items.length} images`
+        `Loaded ${items.length} images`
       );
 
-      // inject the received images into the RTK Query cache so consumers of the useGetImageDTOQuery
-      // hook can get their data from the cache instead of fetching the data again
       items.forEach((image) => {
         dispatch(
           imagesApi.util.upsertQueryData('getImageDTO', image.image_name, image)
@@ -27,12 +25,12 @@ export const addReceivedPageOfImagesListener = () => {
   });
 
   startAppListening({
-    actionCreator: receivedPageOfImages.rejected,
+    actionCreator: imagesLoaded.rejected,
     effect: (action, { getState, dispatch }) => {
       if (action.payload) {
         moduleLog.debug(
           { data: { error: serializeError(action.payload) } },
-          'Problem receiving images'
+          'Problem loading images'
         );
       }
     },

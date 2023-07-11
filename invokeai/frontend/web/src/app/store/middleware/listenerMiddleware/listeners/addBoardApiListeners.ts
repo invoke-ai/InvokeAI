@@ -1,8 +1,4 @@
 import { log } from 'app/logging/useLogger';
-import {
-  imageUpdatedMany,
-  imageUpdatedOne,
-} from 'features/gallery/store/gallerySlice';
 import { boardImagesApi } from 'services/api/endpoints/boardImages';
 import { startAppListening } from '..';
 
@@ -18,13 +14,6 @@ export const addBoardApiListeners = () => {
       moduleLog.debug(
         { data: { board_id, image_name } },
         'Image added to board'
-      );
-
-      dispatch(
-        imageUpdatedOne({
-          id: image_name,
-          changes: { board_id },
-        })
       );
     },
   });
@@ -49,13 +38,6 @@ export const addBoardApiListeners = () => {
       const { image_name } = action.meta.arg.originalArgs;
 
       moduleLog.debug({ data: { image_name } }, 'Image removed from board');
-
-      dispatch(
-        imageUpdatedOne({
-          id: image_name,
-          changes: { board_id: undefined },
-        })
-      );
     },
   });
 
@@ -82,13 +64,6 @@ export const addBoardApiListeners = () => {
         { data: { board_id, image_names } },
         'Images added to board'
       );
-
-      const updates = image_names.map((image_name) => ({
-        id: image_name,
-        changes: { board_id },
-      }));
-
-      dispatch(imageUpdatedMany(updates));
     },
   });
 
@@ -112,13 +87,6 @@ export const addBoardApiListeners = () => {
       const { image_names } = action.meta.arg.originalArgs;
 
       moduleLog.debug({ data: { image_names } }, 'Images removed from board');
-
-      const updates = image_names.map((image_name) => ({
-        id: image_name,
-        changes: { board_id: undefined },
-      }));
-
-      dispatch(imageUpdatedMany(updates));
     },
   });
 

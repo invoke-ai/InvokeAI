@@ -39,10 +39,7 @@ import {
   addImageUploadedFulfilledListener,
   addImageUploadedRejectedListener,
 } from './listeners/imageUploaded';
-import {
-  addImageUrlsReceivedFulfilledListener,
-  addImageUrlsReceivedRejectedListener,
-} from './listeners/imageUrlsReceived';
+import { addImagesLoadedListener } from './listeners/imagesLoaded';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
@@ -125,10 +122,6 @@ addImageToDeleteSelectedListener();
 addImageDTOReceivedFulfilledListener();
 addImageDTOReceivedRejectedListener();
 
-// Image URLs
-addImageUrlsReceivedFulfilledListener();
-addImageUrlsReceivedRejectedListener();
-
 // User Invoked
 addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
@@ -184,6 +177,7 @@ addSessionCanceledRejectedListener();
 
 // Fetching images
 addReceivedPageOfImagesListener();
+addImagesLoadedListener();
 
 // ControlNet
 addControlNetImageProcessedListener();

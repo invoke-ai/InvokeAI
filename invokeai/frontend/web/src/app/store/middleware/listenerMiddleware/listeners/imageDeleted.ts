@@ -2,10 +2,7 @@ import { log } from 'app/logging/useLogger';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
-import {
-  imageRemoved,
-  imageSelected,
-} from 'features/gallery/store/gallerySlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import {
   imageDeletionConfirmed,
   isModalOpenChanged,
@@ -80,9 +77,6 @@ export const addRequestedImageDeletionListener = () => {
         dispatch(nodeEditorReset());
       }
 
-      // Preemptively remove from gallery
-      dispatch(imageRemoved(image_name));
-
       // Delete from server
       const { requestId } = dispatch(imageDeleted({ image_name }));
 
@@ -91,7 +85,7 @@ export const addRequestedImageDeletionListener = () => {
         (action): action is ReturnType<typeof imageDeleted.fulfilled> =>
           imageDeleted.fulfilled.match(action) &&
           action.meta.requestId === requestId,
-        30000
+        30_000
       );
 
       if (wasImageDeleted) {

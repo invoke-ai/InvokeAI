@@ -200,24 +200,24 @@ export type paths = {
      */
     patch: operations["update_board"];
   };
-  "/api/v1/board_images/": {
-    /**
-     * Create Board Image 
-     * @description Creates a board_image
-     */
-    post: operations["create_board_image"];
-    /**
-     * Remove Board Image 
-     * @description Deletes a board_image
-     */
-    delete: operations["remove_board_image"];
-  };
   "/api/v1/board_images/{board_id}": {
     /**
      * Get All Board Images For Board 
      * @description Gets all image names for a board
      */
     get: operations["get_all_board_images_for_board"];
+    /**
+     * Create Board Image 
+     * @description Creates a board_image
+     */
+    post: operations["create_board_image"];
+  };
+  "/api/v1/board_images/": {
+    /**
+     * Remove Board Image 
+     * @description Deletes a board_image
+     */
+    delete: operations["remove_board_image"];
   };
   "/api/v1/board_images/{board_id}/images": {
     /**
@@ -345,19 +345,6 @@ export type components = {
        * @description The number of images in the board.
        */
       image_count: number;
-    };
-    /** Body_create_board_image */
-    Body_create_board_image: {
-      /**
-       * Board Id 
-       * @description The id of the board to add to
-       */
-      board_id: string;
-      /**
-       * Image Name 
-       * @description The name of the image to add
-       */
-      image_name: string;
     };
     /** Body_import_model */
     Body_import_model: {
@@ -4479,17 +4466,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -5418,7 +5405,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          "application/json": components["schemas"]["DeleteManyImagesResult"];
         };
       };
       /** @description Validation Error */
@@ -5461,13 +5448,45 @@ export type operations = {
     };
   };
   /**
+   * Get All Board Images For Board 
+   * @description Gets all image names for a board
+   */
+  get_all_board_images_for_board: {
+    parameters: {
+      path: {
+        /** @description The id of the board */
+        board_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["GetAllBoardImagesForBoardResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
    * Create Board Image 
    * @description Creates a board_image
    */
   create_board_image: {
+    parameters: {
+      path: {
+        /** @description The id of the board to add to */
+        board_id: string;
+      };
+    };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_create_board_image"];
+        "application/json": string;
       };
     };
     responses: {
@@ -5500,32 +5519,6 @@ export type operations = {
       201: {
         content: {
           "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Get All Board Images For Board 
-   * @description Gets all image names for a board
-   */
-  get_all_board_images_for_board: {
-    parameters: {
-      path: {
-        /** @description The id of the board */
-        board_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["GetAllBoardImagesForBoardResult"];
         };
       };
       /** @description Validation Error */

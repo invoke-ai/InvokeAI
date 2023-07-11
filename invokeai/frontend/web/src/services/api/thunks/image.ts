@@ -4,6 +4,7 @@ import { size } from 'lodash-es';
 import queryString from 'query-string';
 import { $client } from 'services/api/client';
 import { paths } from 'services/api/schema';
+import { ImageCategory, OffsetPaginatedResults_ImageDTO_ } from '../types';
 
 type GetImageUrlsArg =
   paths['/api/v1/images/{image_name}/urls']['get']['parameters']['path'];
@@ -313,6 +314,75 @@ export const receivedPageOfImages = createAppAsyncThunk<
         offset: images.length,
       };
     }
+
+    const { data, error, response } = await get('/api/v1/images/', {
+      params: {
+        query,
+      },
+      querySerializer: (q) => queryString.stringify(q, { arrayFormat: 'none' }),
+    });
+
+    if (error) {
+      return rejectWithValue({ arg, error });
+    }
+
+    return data;
+  }
+);
+
+export type ImagesLoadedArg = {
+  board_id: 'all' | 'none' | (string & Record<never, never>);
+  view: 'images' | 'assets';
+  offset: number;
+  limit?: number;
+};
+
+type ImagesLoadedThunkConfig = {
+  rejectValue: {
+    arg: ImagesLoadedArg;
+    error: unknown;
+  };
+};
+
+const getCategories = (view: 'images' | 'assets'): ImageCategory[] => {
+  if (view === 'images') {
+    return ['general'];
+  }
+  return ['control', 'mask', 'user', 'other'];
+};
+
+const getBoardId = (
+  board_id: 'all' | 'none' | (string & Record<never, never>)
+) => {
+  if (board_id === 'all') {
+    return undefined;
+  }
+  if (board_id === 'none') {
+    return 'none';
+  }
+  return board_id;
+};
+
+/**
+ * `ImagesService.listImagesWithMetadata()` thunk
+ */
+export const imagesLoaded = createAppAsyncThunk<
+  OffsetPaginatedResults_ImageDTO_,
+  ImagesLoadedArg,
+  ImagesLoadedThunkConfig
+>(
+  'thunkApi/imagesLoaded',
+  async (arg, { getState, rejectWithValue, requestId }) => {
+    const { get } = $client.get();
+
+    // TODO: do not make request if request in progress
+
+    const query = {
+      categories: getCategories(arg.view),
+      board_id: getBoardId(arg.board_id),
+      offset: arg.offset,
+      limit: arg.limit ?? IMAGES_PER_PAGE,
+    };
 
     const { data, error, response } = await get('/api/v1/images/', {
       params: {

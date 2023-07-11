@@ -8,7 +8,7 @@ const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
   const dispatch = useDispatch();
 
   const handleAllImagesBoardClick = () => {
-    dispatch(boardIdSelected());
+    dispatch(boardIdSelected('all'));
   };
 
   const droppableData: MoveBoardDropData = {

@@ -1,5 +1,5 @@
 import { log } from 'app/logging/useLogger';
-import { imageUpserted } from 'features/gallery/store/gallerySlice';
+import { imagesApi } from 'services/api/endpoints/images';
 import { imageDTOReceived, imageUpdated } from 'services/api/thunks/image';
 import { startAppListening } from '..';
 
@@ -33,7 +33,7 @@ export const addImageDTOReceivedFulfilledListener = () => {
       }
 
       moduleLog.debug({ data: { image } }, 'Image metadata received');
-      dispatch(imageUpserted(image));
+      imagesApi.util.upsertQueryData('getImageDTO', image.image_name, image);
     },
   });
 };

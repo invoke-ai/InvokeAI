@@ -1,11 +1,9 @@
-from fastapi import Body, HTTPException, Path, Query
+from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
 
 from invokeai.app.models.image import (AddManyImagesToBoardResult,
                                        GetAllBoardImagesForBoardResult,
                                        RemoveManyImagesFromBoardResult)
-from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.models.image_record import ImageDTO
 
 from ..dependencies import ApiDependencies
 
@@ -13,7 +11,7 @@ board_images_router = APIRouter(prefix="/v1/board_images", tags=["boards"])
 
 
 @board_images_router.post(
-    "/",
+    "/{board_id}",
     operation_id="create_board_image",
     responses={
         201: {"description": "The image was added to a board successfully"},
@@ -21,7 +19,7 @@ board_images_router = APIRouter(prefix="/v1/board_images", tags=["boards"])
     status_code=201,
 )
 async def create_board_image(
-    board_id: str = Body(description="The id of the board to add to"),
+    board_id: str = Path(description="The id of the board to add to"),
     image_name: str = Body(description="The name of the image to add"),
 ):
     """Creates a board_image"""

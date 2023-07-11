@@ -1,7 +1,6 @@
-import { Box, Flex, Skeleton, Spinner } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { Box } from '@chakra-ui/react';
+import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import { IMAGE_LIMIT } from 'features/gallery/store/gallerySlice';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,48 +12,27 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
 import { VirtuosoGrid } from 'react-virtuoso';
-import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import { receivedPageOfImages } from 'services/api/thunks/image';
-import { ImageDTO } from 'services/api/types';
+import { useLoadMoreImages } from '../hooks/useLoadMoreImages';
 import ItemContainer from './ItemContainer';
 import ListContainer from './ListContainer';
 
 const selector = createSelector(
-  [stateSelector, selectFilteredImages],
-  (state, filteredImages) => {
-    const {
-      categories,
-      total: allImagesTotal,
-      isLoading,
-      isFetching,
-      selectedBoardId,
-    } = state.gallery;
-
-    let images = filteredImages as (ImageDTO | 'loading')[];
-
-    if (!isLoading && isFetching) {
-      // loading, not not the initial load
-      images = images.concat(Array(IMAGE_LIMIT).fill('loading'));
-    }
+  [stateSelector],
+  (state) => {
+    const { galleryImageMinimumWidth } = state.gallery;
 
     return {
-      images,
-      allImagesTotal,
-      isLoading,
-      isFetching,
-      categories,
-      selectedBoardId,
+      galleryImageMinimumWidth,
     };
   },
   defaultSelectorOptions
 );
 
 const ImageGalleryGrid = () => {
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const rootRef = useRef(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const emptyGalleryRef = useRef<HTMLDivElement>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars({
     defer: true,
@@ -69,46 +47,27 @@ const ImageGalleryGrid = () => {
     },
   });
 
+  const { galleryImageMinimumWidth } = useAppSelector(selector);
+
   const {
-    images,
-    isLoading,
-    isFetching,
-    allImagesTotal,
-    categories,
+    imageNames,
+    galleryView,
+    loadMoreImages,
     selectedBoardId,
-  } = useAppSelector(selector);
-
-  const { selectedBoard } = useListAllBoardsQuery(undefined, {
-    selectFromResult: ({ data }) => ({
-      selectedBoard: data?.find((b) => b.board_id === selectedBoardId),
-    }),
-  });
-
-  const filteredImagesTotal = useMemo(
-    () => selectedBoard?.image_count ?? allImagesTotal,
-    [allImagesTotal, selectedBoard?.image_count]
-  );
-
-  const areMoreAvailable = useMemo(() => {
-    return images.length < filteredImagesTotal;
-  }, [images.length, filteredImagesTotal]);
+    status,
+    areMoreAvailable,
+  } = useLoadMoreImages();
 
   const handleLoadMoreImages = useCallback(() => {
-    dispatch(
-      receivedPageOfImages({
-        categories,
-        board_id: selectedBoardId,
-        is_intermediate: false,
-      })
-    );
-  }, [categories, dispatch, selectedBoardId]);
+    loadMoreImages({});
+  }, [loadMoreImages]);
 
   const handleEndReached = useMemo(() => {
-    if (areMoreAvailable && !isLoading) {
+    if (areMoreAvailable && status !== 'pending') {
       return handleLoadMoreImages;
     }
     return undefined;
-  }, [areMoreAvailable, handleLoadMoreImages, isLoading]);
+  }, [areMoreAvailable, handleLoadMoreImages, status]);
 
   useEffect(() => {
     const { current: root } = rootRef;
@@ -123,53 +82,68 @@ const ImageGalleryGrid = () => {
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
 
-  if (isLoading) {
+  useEffect(() => {
+    // TODO: this doesn't actually prevent 2 intial image loads...
+    if (status !== undefined) {
+      return;
+    }
+
+    // rough, conservative calculation of how many images fit in the gallery
+    // TODO: this gets an incorrect value on first load...
+    const galleryHeight = rootRef.current?.clientHeight ?? 0;
+    const galleryWidth = rootRef.current?.clientHeight ?? 0;
+
+    const rows = galleryHeight / galleryImageMinimumWidth;
+    const columns = galleryWidth / galleryImageMinimumWidth;
+
+    const imagesToLoad = Math.ceil(rows * columns);
+
+    // load up that many images
+    loadMoreImages({
+      offset: 0,
+      limit: imagesToLoad,
+    });
+  }, [
+    galleryImageMinimumWidth,
+    galleryView,
+    loadMoreImages,
+    selectedBoardId,
+    status,
+  ]);
+
+  if (status === 'fulfilled' && imageNames.length === 0) {
     return (
-      <Flex
-        sx={{
-          w: 'full',
-          h: 'full',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Spinner
-          size="xl"
-          sx={{ color: 'base.300', _dark: { color: 'base.700' } }}
+      <Box ref={emptyGalleryRef} sx={{ w: 'full', h: 'full' }}>
+        <IAINoContentFallback
+          label={t('gallery.noImagesInGallery')}
+          icon={FaImage}
         />
-      </Flex>
+      </Box>
     );
   }
 
-  if (images.length) {
+  if (status !== 'rejected') {
     return (
       <>
         <Box ref={rootRef} data-overlayscrollbars="" h="100%">
           <VirtuosoGrid
             style={{ height: '100%' }}
-            data={images}
+            data={imageNames}
             endReached={handleEndReached}
             components={{
               Item: ItemContainer,
               List: ListContainer,
             }}
             scrollerRef={setScroller}
-            itemContent={(index, item) =>
-              typeof item === 'string' ? (
-                <Skeleton sx={{ w: 'full', h: 'full', aspectRatio: '1/1' }} />
-              ) : (
-                <GalleryImage
-                  key={`${item.image_name}-${item.thumbnail_url}`}
-                  imageName={item.image_name}
-                />
-              )
-            }
+            itemContent={(index, imageName) => (
+              <GalleryImage key={imageName} imageName={imageName} />
+            )}
           />
         </Box>
         <IAIButton
           onClick={handleLoadMoreImages}
           isDisabled={!areMoreAvailable}
-          isLoading={isFetching}
+          isLoading={status === 'pending'}
           loadingText="Loading"
           flexShrink={0}
         >
@@ -180,13 +154,6 @@ const ImageGalleryGrid = () => {
       </>
     );
   }
-
-  return (
-    <IAINoContentFallback
-      label={t('gallery.noImagesInGallery')}
-      icon={FaImage}
-    />
-  );
 };
 
 export default memo(ImageGalleryGrid);

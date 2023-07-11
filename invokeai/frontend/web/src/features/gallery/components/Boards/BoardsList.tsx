@@ -118,7 +118,7 @@ const BoardsList = (props: Props) => {
             {!searchMode && (
               <>
                 <GridItem sx={{ p: 1.5 }}>
-                  <AllImagesBoard isSelected={!selectedBoardId} />
+                  <AllImagesBoard isSelected={selectedBoardId === 'all'} />
                 </GridItem>
                 <GridItem sx={{ p: 1.5 }}>
                   <BatchBoard isSelected={selectedBoardId === 'batch'} />

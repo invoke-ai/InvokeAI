@@ -2,10 +2,10 @@ import { log } from 'app/logging/useLogger';
 import { imageAddedToBatch } from 'features/batch/store/batchSlice';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { imageUpserted } from 'features/gallery/store/gallerySlice';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { imagesApi } from 'services/api/endpoints/images';
 import { imageUploaded } from 'services/api/thunks/image';
 import { startAppListening } from '..';
 
@@ -24,7 +24,8 @@ export const addImageUploadedFulfilledListener = () => {
         return;
       }
 
-      dispatch(imageUpserted(image));
+      // update RTK query cache
+      imagesApi.util.upsertQueryData('getImageDTO', image.image_name, image);
 
       const { postUploadAction } = action.meta.arg;
 
@@ -73,7 +74,7 @@ export const addImageUploadedFulfilledListener = () => {
       }
 
       if (postUploadAction?.type === 'ADD_TO_BATCH') {
-        dispatch(imageAddedToBatch(image));
+        dispatch(imageAddedToBatch(image.image_name));
         return;
       }
     },

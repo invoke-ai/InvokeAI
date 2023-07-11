@@ -1,10 +1,8 @@
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
-import { requestedBoardImagesDeletion } from 'features/gallery/store/actions';
+import { requestedBoardImagesDeletion as requestedBoardAndImagesDeletion } from 'features/gallery/store/actions';
 import {
   imageSelected,
-  imagesRemoved,
-  selectImagesAll,
   selectImagesById,
 } from 'features/gallery/store/gallerySlice';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
@@ -15,7 +13,7 @@ import { boardsApi } from '../../../../../services/api/endpoints/boards';
 
 export const addRequestedBoardImageDeletionListener = () => {
   startAppListening({
-    actionCreator: requestedBoardImagesDeletion,
+    actionCreator: requestedBoardAndImagesDeletion,
     effect: async (action, { dispatch, getState, condition }) => {
       const { board, imagesUsage } = action.payload;
 
@@ -51,20 +49,12 @@ export const addRequestedBoardImageDeletionListener = () => {
         dispatch(nodeEditorReset());
       }
 
-      // Preemptively remove from gallery
-      const images = selectImagesAll(state).reduce((acc: string[], img) => {
-        if (img.board_id === board_id) {
-          acc.push(img.image_name);
-        }
-        return acc;
-      }, []);
-      dispatch(imagesRemoved(images));
-
       // Delete from server
       dispatch(boardsApi.endpoints.deleteBoardAndImages.initiate(board_id));
       const result =
         boardsApi.endpoints.deleteBoardAndImages.select(board_id)(state);
-      const { isSuccess } = result;
+
+      const { isSuccess, data } = result;
 
       // Wait for successful deletion, then trigger boards to re-fetch
       const wasBoardDeleted = await condition(() => !!isSuccess, 30000);

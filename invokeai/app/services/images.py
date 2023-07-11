@@ -113,7 +113,7 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete_images_on_board(self, board_id: str):
+    def delete_images_on_board(self, board_id: str) -> DeleteManyImagesResult:
         """Deletes all images on a board."""
         pass
 
@@ -386,7 +386,7 @@ class ImageService(ImageServiceABC):
                 deleted_images.append(image_name)
         return DeleteManyImagesResult(deleted_images=deleted_images)
 
-    def delete_images_on_board(self, board_id: str):
+    def delete_images_on_board(self, board_id: str) -> DeleteManyImagesResult:
         try:
             board_images = (
                 self._services.board_image_records.get_all_board_images_for_board(
@@ -397,6 +397,7 @@ class ImageService(ImageServiceABC):
             for image_name in image_name_list:
                 self._services.image_files.delete(image_name)
             self._services.image_records.delete_many(image_name_list)
+            return DeleteManyImagesResult(deleted_images=board_images.image_names)
         except ImageRecordDeleteException:
             self._services.logger.error(f"Failed to delete image records")
             raise

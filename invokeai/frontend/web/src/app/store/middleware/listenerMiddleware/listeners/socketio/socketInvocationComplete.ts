@@ -2,6 +2,7 @@ import { log } from 'app/logging/useLogger';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import { progressImageSet } from 'features/system/store/systemSlice';
 import { boardImagesApi } from 'services/api/endpoints/boardImages';
+import { imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
 import { imageDTOReceived } from 'services/api/thunks/image';
 import { sessionCanceled } from 'services/api/thunks/session';
@@ -41,14 +42,16 @@ export const addInvocationCompleteEventListener = () => {
         const { image_name } = result.image;
 
         // Get its metadata
-        dispatch(
+        const { requestId } = dispatch(
           imageDTOReceived({
             image_name,
           })
         );
 
         const [{ payload: imageDTO }] = await take(
-          imageDTOReceived.fulfilled.match
+          (action): action is ReturnType<typeof imageDTOReceived.fulfilled> =>
+            imageDTOReceived.fulfilled.match(action) &&
+            action.meta.requestId === requestId
         );
 
         // Handle canvas image
@@ -59,12 +62,32 @@ export const addInvocationCompleteEventListener = () => {
           dispatch(addImageToStagingArea(imageDTO));
         }
 
+        // Update the RTK Query cache
+        dispatch(
+          imagesApi.util.upsertQueryData(
+            'getImageDTO',
+            imageDTO.image_name,
+            imageDTO
+          )
+        );
+
         if (boardIdToAddTo && !imageDTO.is_intermediate) {
           dispatch(
             boardImagesApi.endpoints.addBoardImage.initiate({
               board_id: boardIdToAddTo,
               image_name,
             })
+          );
+
+          // Set the board_id on the image in the RTK Query cache
+          dispatch(
+            imagesApi.util.updateQueryData(
+              'getImageDTO',
+              imageDTO.image_name,
+              (draft) => {
+                Object.assign(draft, { board_id: boardIdToAddTo });
+              }
+            )
           );
         }
 

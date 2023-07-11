@@ -4,7 +4,7 @@ import { components, paths } from '../schema';
 import { imagesApi } from './images';
 
 type AddImageToBoardArg =
-  paths['/api/v1/board_images/']['post']['requestBody']['content']['application/json'];
+  paths['/api/v1/board_images/{board_id}']['post']['requestBody']['content']['application/json'];
 
 type AddManyImagesToBoardArg =
   paths['/api/v1/board_images/{board_id}/images']['patch']['requestBody']['content']['application/json'];
@@ -44,11 +44,14 @@ export const boardImagesApi = api.injectEndpoints({
      * Board Images Mutations
      */
 
-    addBoardImage: build.mutation<void, AddImageToBoardArg>({
+    addBoardImage: build.mutation<
+      void,
+      { board_id: string; image_name: string }
+    >({
       query: ({ board_id, image_name }) => ({
-        url: `board_images/`,
+        url: `board_images/${board_id}`,
         method: 'POST',
-        body: { board_id, image_name },
+        body: image_name,
       }),
       invalidatesTags: (result, error, arg) => [
         { type: 'Board', id: arg.board_id },

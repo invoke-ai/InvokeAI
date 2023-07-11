@@ -1,6 +1,6 @@
 import { BoardDTO, OffsetPaginatedResults_BoardDTO_ } from 'services/api/types';
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
-import { paths } from '../schema';
+import { components, paths } from '../schema';
 
 type ListBoardsArg = NonNullable<
   paths['/api/v1/boards/']['get']['parameters']['query']
@@ -86,7 +86,10 @@ export const boardsApi = api.injectEndpoints({
       query: (board_id) => ({ url: `boards/${board_id}`, method: 'DELETE' }),
       invalidatesTags: (result, error, arg) => [{ type: 'Board', id: arg }],
     }),
-    deleteBoardAndImages: build.mutation<void, string>({
+    deleteBoardAndImages: build.mutation<
+      components['schemas']['DeleteManyImagesResult'],
+      string
+    >({
       query: (board_id) => ({
         url: `boards/${board_id}`,
         method: 'DELETE',
