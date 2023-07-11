@@ -5,6 +5,7 @@ import { memo, useCallback } from 'react';
 import { Panel } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import NodeInvokeButton from '../ui/NodeInvokeButton';
+import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
 
 const TopCenterPanel = () => {
   const dispatch = useAppDispatch();
@@ -17,6 +18,7 @@ const TopCenterPanel = () => {
     <Panel position="top-center">
       <HStack>
         <NodeInvokeButton />
+        <CancelButton />
         <IAIButton onClick={handleReloadSchema}>Reload Schema</IAIButton>
       </HStack>
     </Panel>

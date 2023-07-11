@@ -1,8 +1,11 @@
 ---
-title: Concepts Library
+title: Concepts 
 ---
 
 # :material-library-shelves: The Hugging Face Concepts Library and Importing Textual Inversion files
+
+With the advances in research, many new capabilities are available to customize the knowledge and understanding of novel concepts not originally contained in the base model. 
+
 
 ## Using Textual Inversion Files
 
@@ -12,18 +15,16 @@ and artistic styles. They are also known as "embeds" in the machine learning
 world.
 
 Each TI file introduces one or more vocabulary terms to the SD model. These are
-known in InvokeAI as "triggers." Triggers are often, but not always, denoted
-using angle brackets as in "&lt;trigger-phrase&gt;". The two most common type of
+known in InvokeAI as "triggers." Triggers are denoted using angle brackets 
+as in "&lt;trigger-phrase&gt;". The two most common type of
 TI files that you'll encounter are `.pt` and `.bin` files, which are produced by
 different TI training packages. InvokeAI supports both formats, but its
-[built-in TI training system](TEXTUAL_INVERSION.md) produces `.pt`.
+[built-in TI training system](TRAINING.md) produces `.pt`.
 
 The [Hugging Face company](https://huggingface.co/sd-concepts-library) has
 amassed a large ligrary of &gt;800 community-contributed TI files covering a
-broad range of subjects and styles. InvokeAI has built-in support for this
-library which downloads and merges TI files automatically upon request. You can
-also install your own or others' TI files by placing them in a designated
-directory.
+broad range of subjects and styles. You can also install your own or others' TI files 
+by placing them in the designated directory for the compatible model type
 
 ### An Example
 
@@ -41,91 +42,43 @@ You can also combine styles and concepts:
   | :--------------------------------------------------------: |
   | ![](../assets/concepts/image5.png)                         |
 </figure>
-## Using a Hugging Face Concept
 
-!!! warning "Authenticating to HuggingFace"
-
-    Some concepts require valid authentication to HuggingFace. Without it, they will not be downloaded
-    and will be silently ignored.
-
-    If you used an installer to install InvokeAI, you may have already set a HuggingFace token.
-    If you skipped this step, you can:
-
-    - run the InvokeAI configuration script again (if you used a manual installer): `invokeai-configure`
-    - set one of the `HUGGINGFACE_TOKEN` or `HUGGING_FACE_HUB_TOKEN` environment variables to contain your token
-
-    Finally, if you already used any HuggingFace library on your computer, you might already have a token
-    in your local cache. Check for a hidden `.huggingface` directory in your home folder. If it
-    contains a `token` file, then you are all set.
-
-
-Hugging Face TI concepts are downloaded and installed automatically as you
-require them. This requires your machine to be connected to the Internet. To
-find out what each concept is for, you can browse the
-[Hugging Face concepts library](https://huggingface.co/sd-concepts-library) and
-look at examples of what each concept produces.
-
-When you have an idea of a concept you wish to try, go to the command-line
-client (CLI) and type a `<` character and the beginning of the Hugging Face
-concept name you wish to load. Press ++tab++, and the CLI will show you all
-matching concepts. You can also type `<` and hit ++tab++ to get a listing of all
-~800 concepts, but be prepared to scroll up to see them all! If there is more
-than one match you can continue to type and ++tab++ until the concept is
-completed.
-
-!!! example
-
-    if you type in `<x` and hit ++tab++, you'll be prompted with the completions:
-
-    ```py
-    <xatu2>        <xatu>         <xbh>          <xi>           <xidiversity>  <xioboma>      <xuna>         <xyz>
-    ```
-
-    Now type `id` and press ++tab++. It will be autocompleted to `<xidiversity>`
-    because this is a unique match.
-
-    Finish your prompt and generate as usual. You may include multiple concept terms
-    in the prompt.
-
-If you have never used this concept before, you will see a message that the TI
-model is being downloaded and installed. After this, the concept will be saved
-locally (in the `models/sd-concepts-library` directory) for future use.
-
-Several steps happen during downloading and installation, including a scan of
-the file for malicious code. Should any errors occur, you will be warned and the
-concept will fail to load. Generation will then continue treating the trigger
-term as a normal string of characters (e.g. as literal `<ghibli-face>`).
-
-You can also use `<concept-names>` in the WebGUI's prompt textbox. There is no
-autocompletion at this time.
 
 ## Installing your Own TI Files
 
 You may install any number of `.pt` and `.bin` files simply by copying them into
-the `embeddings` directory of the InvokeAI runtime directory (usually `invokeai`
-in your home directory). You may create subdirectories in order to organize the
-files in any way you wish. Be careful not to overwrite one file with another.
+the `embedding` directory of the corresponding InvokeAI models directory (usually `invokeai`
+in your home directory). For example, you can simply move a Stable Diffusion 1.5 embedding file to
+the `sd-1/embedding` folder. Be careful not to overwrite one file with another.
 For example, TI files generated by the Hugging Face toolkit share the named
-`learned_embedding.bin`. You can use subdirectories to keep them distinct.
+`learned_embedding.bin`. You can rename these, or use subdirectories to keep them distinct.
 
-At startup time, InvokeAI will scan the `embeddings` directory and load any TI
-files it finds there. At startup you will see a message similar to this one:
+At startup time, InvokeAI will scan the various `embedding` directories and load any TI
+files it finds there for compatible models. At startup you will see a message similar to this one:
 
 ```bash
->> Current embedding manager terms: *, <HOI4-Leader>, <princess-knight>
+>> Current embedding manager terms: <HOI4-Leader>, <princess-knight>
 ```
+To use these when generating, simply type the `<` key in your prompt to open the Textual Inversion WebUI and 
+select the embedding you'd like to use. This UI has type-ahead support, so you can easily find supported embeddings.
 
-Note the `*` trigger term. This is a placeholder term that many early TI
-tutorials taught people to use rather than a more descriptive term.
-Unfortunately, if you have multiple TI files that all use this term, only the
-first one loaded will be triggered by use of the term.
+## Using LoRAs
 
-To avoid this problem, you can use the `merge_embeddings.py` script to merge two
-or more TI files together. If it encounters a collision of terms, the script
-will prompt you to select new terms that do not collide. See
-[Textual Inversion](TEXTUAL_INVERSION.md) for details.
+LoRA files are models that customize the output of Stable Diffusion image generation.
+Larger than embeddings, but much smaller than full models, they augment SD with improved
+understanding of subjects and artistic styles.
 
-## Further Reading
+Unlike TI files, LoRAs do not introduce novel vocabulary into the model's known tokens. Instead,
+LoRAs augment the model's weights that are applied to generate imagery. LoRAs may be supplied
+with a "trigger" word that they have been explicitly trained on, or may simply apply their 
+effect without being triggered.
 
-Please see [the repository](https://github.com/rinongal/textual_inversion) and
-associated paper for details and limitations.
+LoRAs are typically stored in .safetensors files, which are the most secure way to store and transmit
+these types of weights. You may install any number of `.safetensors` LoRA files simply by copying them into
+the `lora` directory of the corresponding InvokeAI models directory (usually `invokeai`
+in your home directory). For example, you can simply move a Stable Diffusion 1.5 LoRA file to
+the `sd-1/lora` folder.
+
+To use these when generating, open the LoRA menu item in the options panel, select the LoRAs you want to apply
+and ensure that they have the appropriate weight recommended by the model provider. Typically, most LoRAs perform best at a weight of .75-1. 
+

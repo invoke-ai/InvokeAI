@@ -45,6 +45,7 @@ from invokeai.app.services.config import (
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 from invokeai.frontend.install.widgets import (
+    SingleSelectColumns,
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
@@ -76,7 +77,7 @@ Weights_dir = "ldm/stable-diffusion-v1/"
 Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
 
-PRECISION_CHOICES = ['auto','float16','float32','autocast']
+PRECISION_CHOICES = ['auto','float16','float32']
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -359,9 +360,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             scroll_exit=True,
         )
         self.nextrely += 1
-        label = """If you have an account at HuggingFace you may optionally paste your access token here
-to allow InvokeAI to download restricted styles & subjects from the "Concept Library". See https://huggingface.co/settings/tokens.
-"""
+        label = """HuggingFace access token (OPTIONAL) for automatic model downloads. See https://huggingface.co/settings/tokens."""
         for line in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
                 npyscreen.FixedText,
@@ -423,6 +422,7 @@ to allow InvokeAI to download restricted styles & subjects from the "Concept Lib
         )
         self.precision = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
+            columns = 2,
             name="Precision",
             values=PRECISION_CHOICES,
             value=PRECISION_CHOICES.index(precision),
@@ -430,13 +430,13 @@ to allow InvokeAI to download restricted styles & subjects from the "Concept Lib
             max_height=len(PRECISION_CHOICES) + 1,
             scroll_exit=True,
         )
-        self.max_loaded_models = self.add_widget_intelligent(
+        self.max_cache_size = self.add_widget_intelligent(
             IntTitleSlider,
-            name="Number of models to cache in CPU memory (each will use 2-4 GB!)",
-            value=old_opts.max_loaded_models,
-            out_of=10,
-            lowest=1,
-            begin_entry_at=4,
+            name="Size of the RAM cache used for fast model switching (GB)",
+            value=old_opts.max_cache_size,
+            out_of=20,
+            lowest=3,
+            begin_entry_at=6,
             scroll_exit=True,
         )
         self.nextrely += 1
@@ -539,7 +539,7 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
                 "outdir",
                 "nsfw_checker",
                 "free_gpu_mem",
-                "max_loaded_models",
+                "max_cache_size",
                 "xformers_enabled",
                 "always_use_cpu",
         ]:
@@ -555,9 +555,6 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
         new_opts.license_acceptance = self.license_acceptance.value
         new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
         
-        # widget library workaround to make max_loaded_models an int rather than a float
-        new_opts.max_loaded_models = int(new_opts.max_loaded_models)
-
         return new_opts
 
 

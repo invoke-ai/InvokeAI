@@ -1,10 +1,10 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName } from './tabMap';
 import { AddNewModelType, UIState } from './uiTypes';
-import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
 
 export const initialUIState: UIState = {
   activeTab: 0,
@@ -19,6 +19,9 @@ export const initialUIState: UIState = {
   shouldShowGallery: true,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
+  shouldShowEmbeddingPicker: false,
+  shouldShowAdvancedOptions: false,
+  aspectRatio: null,
   favoriteSchedulers: [],
 };
 
@@ -96,6 +99,15 @@ export const uiSlice = createSlice({
     ) => {
       state.favoriteSchedulers = action.payload;
     },
+    toggleEmbeddingPicker: (state) => {
+      state.shouldShowEmbeddingPicker = !state.shouldShowEmbeddingPicker;
+    },
+    setShouldShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowAdvancedOptions = action.payload;
+    },
+    setAspectRatio: (state, action: PayloadAction<number | null>) => {
+      state.aspectRatio = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
@@ -122,6 +134,9 @@ export const {
   toggleGalleryPanel,
   setShouldShowProgressInViewer,
   favoriteSchedulersChanged,
+  toggleEmbeddingPicker,
+  setShouldShowAdvancedOptions,
+  setAspectRatio,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

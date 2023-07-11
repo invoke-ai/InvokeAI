@@ -1,19 +1,19 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store/storeHooks';
-import { isEqual } from 'lodash-es';
-import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
-import NextPrevImageButtons from './NextPrevImageButtons';
-import { memo, useMemo } from 'react';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { stateSelector } from 'app/store/store';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySlice';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'app/components/ImageDnd/typesafeDnd';
+import { stateSelector } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySlice';
+import { isEqual } from 'lodash-es';
+import { memo, useMemo } from 'react';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
+import NextPrevImageButtons from './NextPrevImageButtons';
 
 export const imagesSelector = createSelector(
   [stateSelector, selectLastSelectedImage],

@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { modelSelected } from 'features/parameters/store/generationSlice';
 
-import { forEach, isString } from 'lodash-es';
 import { SelectItem } from '@mantine/core';
 import { RootState } from 'app/store/store';
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { modelSelected } from 'features/parameters/store/actions';
+import { forEach, isString } from 'lodash-es';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 export const MODEL_TYPE_MAP = {
   'sd-1': 'Stable Diffusion 1.x',
@@ -19,22 +19,20 @@ const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const selectedModelId = useAppSelector(
+  const currentModel = useAppSelector(
     (state: RootState) => state.generation.model
   );
 
-  const { data: pipelineModels, isLoading } = useListModelsQuery({
-    model_type: 'main',
-  });
+  const { data: mainModels, isLoading } = useGetMainModelsQuery();
 
   const data = useMemo(() => {
-    if (!pipelineModels) {
+    if (!mainModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(pipelineModels.entities, (model, id) => {
+    forEach(mainModels.entities, (model, id) => {
       if (!model) {
         return;
       }
@@ -47,11 +45,11 @@ const ModelSelect = () => {
     });
 
     return data;
-  }, [pipelineModels]);
+  }, [mainModels]);
 
   const selectedModel = useMemo(
-    () => pipelineModels?.entities[selectedModelId],
-    [pipelineModels?.entities, selectedModelId]
+    () => mainModels?.entities[currentModel?.id || ''],
+    [mainModels?.entities, currentModel]
   );
 
   const handleChangeModel = useCallback(
@@ -65,20 +63,24 @@ const ModelSelect = () => {
   );
 
   useEffect(() => {
-    // If the selected model is not in the list of models, select the first one
-    // Handles first-run setting of models, and the user deleting the previously-selected model
-    if (selectedModelId && pipelineModels?.ids.includes(selectedModelId)) {
+    if (isLoading) {
+      // return early here to avoid resetting model selection before we've loaded the available models
       return;
     }
 
-    const firstModel = pipelineModels?.ids[0];
+    if (selectedModel && mainModels?.ids.includes(selectedModel?.id)) {
+      // the selected model is an available model, no need to change it
+      return;
+    }
+
+    const firstModel = mainModels?.ids[0];
 
     if (!isString(firstModel)) {
       return;
     }
 
     handleChangeModel(firstModel);
-  }, [handleChangeModel, pipelineModels?.ids, selectedModelId]);
+  }, [handleChangeModel, isLoading, mainModels?.ids, selectedModel]);
 
   return isLoading ? (
     <IAIMantineSelect
@@ -91,7 +93,7 @@ const ModelSelect = () => {
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={t('modelManager.model')}
-      value={selectedModelId}
+      value={selectedModel?.id}
       placeholder={data.length > 0 ? 'Select a model' : 'No models detected!'}
       data={data}
       error={data.length === 0}

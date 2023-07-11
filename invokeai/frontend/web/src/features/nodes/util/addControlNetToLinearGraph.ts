@@ -1,5 +1,5 @@
 import { RootState } from 'app/store/store';
-import { filter } from 'lodash-es';
+import { getValidControlNets } from 'features/controlNet/util/getValidControlNets';
 import { CollectInvocation, ControlNetInvocation } from 'services/api/types';
 import { NonNullableGraph } from '../types/types';
 import { CONTROL_NET_COLLECT } from './graphBuilders/constants';
@@ -11,13 +11,7 @@ export const addControlNetToLinearGraph = (
 ): void => {
   const { isEnabled: isControlNetEnabled, controlNets } = state.controlNet;
 
-  const validControlNets = filter(
-    controlNets,
-    (c) =>
-      c.isEnabled &&
-      (Boolean(c.processedControlImage) ||
-        (c.processorType === 'none' && Boolean(c.controlImage)))
-  );
+  const validControlNets = getValidControlNets(controlNets);
 
   if (isControlNetEnabled && Boolean(validControlNets.length)) {
     if (validControlNets.length > 1) {

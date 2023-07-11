@@ -7,7 +7,6 @@ import {
 import { RootState } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { dateComparator } from 'common/util/dateComparator';
-import { imageDeletionConfirmed } from 'features/imageDeletion/store/imageDeletionSlice';
 import { keyBy, uniq } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import {
@@ -29,17 +28,22 @@ export const ASSETS_CATEGORIES: ImageCategory[] = [
   'other',
 ];
 
+export const INITIAL_IMAGE_LIMIT = 100;
+export const IMAGE_LIMIT = 20;
+
 type AdditionaGalleryState = {
   offset: number;
   limit: number;
   total: number;
   isLoading: boolean;
+  isFetching: boolean;
   categories: ImageCategory[];
   selectedBoardId?: string;
   selection: string[];
   shouldAutoSwitch: boolean;
   galleryImageMinimumWidth: number;
-  galleryView: 'images' | 'assets' | 'boards';
+  galleryView: 'images' | 'assets';
+  isInitialized: boolean;
 };
 
 export const initialGalleryState =
@@ -48,11 +52,13 @@ export const initialGalleryState =
     limit: 0,
     total: 0,
     isLoading: true,
+    isFetching: true,
     categories: IMAGE_CATEGORIES,
     selection: [],
     shouldAutoSwitch: true,
-    galleryImageMinimumWidth: 64,
+    galleryImageMinimumWidth: 96,
     galleryView: 'images',
+    isInitialized: false,
   });
 
 export const gallerySlice = createSlice({
@@ -66,6 +72,8 @@ export const gallerySlice = createSlice({
         action.payload.image_category === 'general'
       ) {
         state.selection = [action.payload.image_name];
+        state.galleryView = 'images';
+        state.categories = IMAGE_CATEGORIES;
       }
     },
     imageUpdatedOne: (state, action: PayloadAction<Update<ImageDTO>>) => {
@@ -129,38 +137,33 @@ export const gallerySlice = createSlice({
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
     },
-    setGalleryView: (
-      state,
-      action: PayloadAction<'images' | 'assets' | 'boards'>
-    ) => {
+    setGalleryView: (state, action: PayloadAction<'images' | 'assets'>) => {
       state.galleryView = action.payload;
     },
     boardIdSelected: (state, action: PayloadAction<string | undefined>) => {
       state.selectedBoardId = action.payload;
     },
+    isLoadingChanged: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(receivedPageOfImages.pending, (state) => {
-      state.isLoading = true;
+      state.isFetching = true;
     });
     builder.addCase(receivedPageOfImages.rejected, (state) => {
-      state.isLoading = false;
+      state.isFetching = false;
     });
     builder.addCase(receivedPageOfImages.fulfilled, (state, action) => {
-      state.isLoading = false;
+      state.isFetching = false;
       const { board_id, categories, image_origin, is_intermediate } =
         action.meta.arg;
 
       const { items, offset, limit, total } = action.payload;
 
-      const transformedItems = items.map((item) => ({
-        ...item,
-        isSelected: false,
-      }));
+      imagesAdapter.upsertMany(state, items);
 
-      imagesAdapter.upsertMany(state, transformedItems);
-
-      if (state.selection.length === 0) {
+      if (state.selection.length === 0 && items.length) {
         state.selection = [items[0].image_name];
       }
 
@@ -171,13 +174,7 @@ export const gallerySlice = createSlice({
       }
 
       state.offset = offset;
-      state.limit = limit;
       state.total = total;
-    });
-    builder.addCase(imageDeletionConfirmed, (state, action) => {
-      // Image deleted
-      const { image_name } = action.payload.imageDTO;
-      imagesAdapter.removeOne(state, image_name);
     });
     builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
       const { image_name, image_url, thumbnail_url } = action.payload;
@@ -219,6 +216,7 @@ export const {
   setGalleryImageMinimumWidth,
   setGalleryView,
   boardIdSelected,
+  isLoadingChanged,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

@@ -1,17 +1,18 @@
-import { ChakraProps, Flex, Grid, IconButton } from '@chakra-ui/react';
+import { ChakraProps, Flex, Grid, IconButton, Spinner } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { clamp, isEqual } from 'lodash-es';
-import { useCallback, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
 import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   imageSelected,
+  selectFilteredImages,
   selectImagesById,
 } from 'features/gallery/store/gallerySlice';
+import { clamp, isEqual } from 'lodash-es';
+import { memo, useCallback, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { selectFilteredImages } from 'features/gallery/store/gallerySlice';
+import { useTranslation } from 'react-i18next';
+import { FaAngleDoubleRight, FaAngleLeft, FaAngleRight } from 'react-icons/fa';
+import { receivedPageOfImages } from 'services/api/thunks/image';
 
 const nextPrevButtonTriggerAreaStyles: ChakraProps['sx'] = {
   height: '100%',
@@ -26,6 +27,7 @@ const nextPrevButtonStyles: ChakraProps['sx'] = {
 export const nextPrevImageButtonsSelector = createSelector(
   [stateSelector, selectFilteredImages],
   (state, filteredImages) => {
+    const { total, isFetching } = state.gallery;
     const lastSelectedImage =
       state.gallery.selection[state.gallery.selection.length - 1];
 
@@ -63,6 +65,8 @@ export const nextPrevImageButtonsSelector = createSelector(
       isOnFirstImage: currentImageIndex === 0,
       isOnLastImage:
         !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
+      areMoreImagesAvailable: total > imagesLength,
+      isFetching,
       nextImage,
       prevImage,
       nextImageId,
@@ -80,8 +84,14 @@ const NextPrevImageButtons = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { isOnFirstImage, isOnLastImage, nextImageId, prevImageId } =
-    useAppSelector(nextPrevImageButtonsSelector);
+  const {
+    isOnFirstImage,
+    isOnLastImage,
+    nextImageId,
+    prevImageId,
+    areMoreImagesAvailable,
+    isFetching,
+  } = useAppSelector(nextPrevImageButtonsSelector);
 
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =
     useState<boolean>(false);
@@ -102,6 +112,14 @@ const NextPrevImageButtons = () => {
     nextImageId && dispatch(imageSelected(nextImageId));
   }, [dispatch, nextImageId]);
 
+  const handleLoadMoreImages = useCallback(() => {
+    dispatch(
+      receivedPageOfImages({
+        is_intermediate: false,
+      })
+    );
+  }, [dispatch]);
+
   useHotkeys(
     'left',
     () => {
@@ -113,9 +131,21 @@ const NextPrevImageButtons = () => {
   useHotkeys(
     'right',
     () => {
-      handleNextImage();
+      if (isOnLastImage && areMoreImagesAvailable && !isFetching) {
+        handleLoadMoreImages();
+        return;
+      }
+      if (!isOnLastImage) {
+        handleNextImage();
+      }
     },
-    [nextImageId]
+    [
+      nextImageId,
+      isOnLastImage,
+      areMoreImagesAvailable,
+      handleLoadMoreImages,
+      isFetching,
+    ]
   );
 
   return (
@@ -164,9 +194,37 @@ const NextPrevImageButtons = () => {
             sx={nextPrevButtonStyles}
           />
         )}
+        {shouldShowNextPrevButtons &&
+          isOnLastImage &&
+          areMoreImagesAvailable &&
+          !isFetching && (
+            <IconButton
+              aria-label={t('accessibility.loadMore')}
+              icon={<FaAngleDoubleRight size={64} />}
+              variant="unstyled"
+              onClick={handleLoadMoreImages}
+              boxSize={16}
+              sx={nextPrevButtonStyles}
+            />
+          )}
+        {shouldShowNextPrevButtons &&
+          isOnLastImage &&
+          areMoreImagesAvailable &&
+          isFetching && (
+            <Flex
+              sx={{
+                w: 16,
+                h: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Spinner opacity={0.5} size="xl" />
+            </Flex>
+          )}
       </Grid>
     </Flex>
   );
 };
 
-export default NextPrevImageButtons;
+export default memo(NextPrevImageButtons);

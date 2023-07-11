@@ -8,20 +8,27 @@ import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 
-import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
-import { postprocessingSelector } from 'features/parameters/store/postprocessingSelectors';
-import { systemSelector } from 'features/system/store/systemSelectors';
 
-import {
-  activeTabNameSelector,
-  uiSelector,
-} from 'features/ui/store/uiSelectors';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { useAppToaster } from 'app/components/Toaster';
+import { stateSelector } from 'app/store/store';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { DeleteImageButton } from 'features/imageDeletion/components/DeleteImageButton';
+import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
+import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
+import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
+import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
+import { initialImageSelected } from 'features/parameters/store/actions';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
   setActiveTab,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
+import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -38,21 +45,8 @@ import {
   FaShare,
   FaShareAlt,
 } from 'react-icons/fa';
-import { useCallback } from 'react';
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import { initialImageSelected } from 'features/parameters/store/actions';
-import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
-import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
-import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
-import { useAppToaster } from 'app/components/Toaster';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { stateSelector } from 'app/store/store';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
-import { DeleteImageButton } from 'features/imageDeletion/components/DeleteImageButton';
+import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -549,7 +543,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           />
         </ButtonGroup>
 
-        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
+        <ButtonGroup isAttached={true}>
           <IAIIconButton
             aria-label={t('settings.displayInProgress')}
             tooltip={t('settings.displayInProgress')}

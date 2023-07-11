@@ -104,6 +104,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
                 except Exception as e:
                     error = traceback.format_exc()
+                    logger.error(error)
 
                     # Save error
                     graph_execution_state.set_node_error(invocation.id, error)

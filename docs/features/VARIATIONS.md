@@ -6,9 +6,7 @@ title: Variations
 
 ## Intro
 
-Release 1.13 of SD-Dream adds support for image variations.
-
-You are able to do the following:
+InvokeAI's support for variations enables you to do the following:
 
 1. Generate a series of systematic variations of an image, given a prompt. The
    amount of variation from one image to the next can be controlled.
@@ -30,19 +28,7 @@ The prompt we will use throughout is:
 This will be indicated as `#!bash "prompt"` in the examples below.
 
 First we let SD create a series of images in the usual way, in this case
-requesting six iterations:
-
-```bash
-invoke> lucy lawless as xena, warrior princess, character portrait, high resolution -n6
-...
-Outputs:
-./outputs/Xena/000001.1579445059.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -S1579445059
-./outputs/Xena/000001.1880768722.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -S1880768722
-./outputs/Xena/000001.332057179.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -S332057179
-./outputs/Xena/000001.2224800325.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -S2224800325
-./outputs/Xena/000001.465250761.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -S465250761
-./outputs/Xena/000001.3357757885.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -S3357757885
-```
+requesting six iterations.
 
 <figure markdown>
 ![var1](../assets/variation_walkthru/000001.3357757885.png)
@@ -53,22 +39,16 @@ Outputs:
 
 ## Step 2 - Generating Variations
 
-Let's try to generate some variations. Using the same seed, we pass the argument
-`-v0.1` (or --variant_amount), which generates a series of variations each
-differing by a variation amount of 0.2. This number ranges from `0` to `1.0`,
-with higher numbers being larger amounts of variation.
+Let's try to generate some variations on this image. We select the "*"
+symbol in the line of icons above the image in order to fix the prompt
+and seed. Then we open up the "Variations" section of the generation
+panel and use the slider to set the variation amount to 0.2. The
+higher this value, the more each generated image will differ from the
+previous one.
 
-```bash
-invoke> "prompt" -n6 -S3357757885 -v0.2
-...
-Outputs:
-./outputs/Xena/000002.784039624.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -V 784039624:0.2 -S3357757885
-./outputs/Xena/000002.3647897225.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -V 3647897225:0.2 -S3357757885
-./outputs/Xena/000002.917731034.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -V 917731034:0.2 -S3357757885
-./outputs/Xena/000002.4116285959.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -V 4116285959:0.2 -S3357757885
-./outputs/Xena/000002.1614299449.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -V 1614299449:0.2 -S3357757885
-./outputs/Xena/000002.1335553075.png: "prompt" -s50 -W512 -H512 -C7.5 -Ak_lms -V 1335553075:0.2 -S3357757885
-```
+Now we run the prompt a second time, requesting six iterations. You
+will see six images that are thematically related to each other. Try
+increasing and decreasing the variation amount and see what happens.
 
 ### **Variation Sub Seeding**
 

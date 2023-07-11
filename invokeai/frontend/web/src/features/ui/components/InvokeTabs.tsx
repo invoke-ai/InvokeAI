@@ -9,38 +9,40 @@ import {
   Tooltip,
   VisuallyHidden,
 } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
+import { configSelector } from 'features/system/store/configSelectors';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
-import { memo, MouseEvent, ReactNode, useCallback, useMemo } from 'react';
+import { ResourceKey } from 'i18next';
+import { isEqual } from 'lodash-es';
+import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
+import { FaCube, FaFont, FaImage } from 'react-icons/fa';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
+import { Panel, PanelGroup } from 'react-resizable-panels';
+import { useMinimumPanelSize } from '../hooks/useMinimumPanelSize';
 import {
   activeTabIndexSelector,
   activeTabNameSelector,
 } from '../store/uiSelectors';
-import { useTranslation } from 'react-i18next';
-import { ResourceKey } from 'i18next';
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { createSelector } from '@reduxjs/toolkit';
-import { configSelector } from 'features/system/store/configSelectors';
-import { isEqual } from 'lodash-es';
-import { Panel, PanelGroup } from 'react-resizable-panels';
-import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
+import ImageTab from './tabs/ImageToImage/ImageToImageTab';
+import ModelManagerTab from './tabs/ModelManager/ModelManagerTab';
+import NodesTab from './tabs/Nodes/NodesTab';
+import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
-import NodesTab from './tabs/Nodes/NodesTab';
-import { FaFont, FaImage, FaLayerGroup } from 'react-icons/fa';
-import ResizeHandle from './tabs/ResizeHandle';
-import ImageTab from './tabs/ImageToImage/ImageToImageTab';
-import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
-import { useMinimumPanelSize } from '../hooks/useMinimumPanelSize';
-import BatchTab from './tabs/Batch/BatchTab';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
+  translationKey: string;
   icon: ReactNode;
   content: ReactNode;
 }
@@ -48,23 +50,33 @@ export interface InvokeTabInfo {
 const tabs: InvokeTabInfo[] = [
   {
     id: 'txt2img',
+    translationKey: 'common.txt2img',
     icon: <Icon as={FaFont} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <TextToImageTab />,
   },
   {
     id: 'img2img',
+    translationKey: 'common.img2img',
     icon: <Icon as={FaImage} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <ImageTab />,
   },
   {
     id: 'unifiedCanvas',
+    translationKey: 'common.unifiedCanvas',
     icon: <Icon as={MdGridOn} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <UnifiedCanvasTab />,
   },
   {
     id: 'nodes',
+    translationKey: 'common.nodes',
     icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <NodesTab />,
+  },
+  {
+    id: 'modelManager',
+    translationKey: 'modelManager.modelManager',
+    icon: <Icon as={FaCube} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
+    content: <ModelManagerTab />,
   },
   // {
   //   id: 'batch',
@@ -87,6 +99,7 @@ const enabledTabsSelector = createSelector(
 
 const MIN_GALLERY_WIDTH = 300;
 const DEFAULT_GALLERY_PCT = 20;
+export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager'];
 
 const InvokeTabs = () => {
   const activeTab = useAppSelector(activeTabIndexSelector);
@@ -95,6 +108,7 @@ const InvokeTabs = () => {
   const isLightBoxOpen = useAppSelector(
     (state: RootState) => state.lightbox.isLightboxOpen
   );
+  const isLightboxEnabled = useFeatureStatus('lightbox').isFeatureEnabled;
 
   const { shouldPinGallery, shouldPinParametersPanel, shouldShowGallery } =
     useAppSelector((state: RootState) => state.ui);
@@ -107,7 +121,9 @@ const InvokeTabs = () => {
   useHotkeys(
     'z',
     () => {
-      dispatch(setIsLightboxOpen(!isLightBoxOpen));
+      if (isLightboxEnabled) {
+        dispatch(setIsLightboxOpen(!isLightBoxOpen));
+      }
     },
     [isLightBoxOpen]
   );
@@ -140,12 +156,12 @@ const InvokeTabs = () => {
         <Tooltip
           key={tab.id}
           hasArrow
-          label={String(t(`common.${tab.id}` as ResourceKey))}
+          label={String(t(tab.translationKey as ResourceKey))}
           placement="end"
         >
           <Tab onClick={handleClickTab}>
             <VisuallyHidden>
-              {String(t(`common.${tab.id}` as ResourceKey))}
+              {String(t(tab.translationKey as ResourceKey))}
             </VisuallyHidden>
             {tab.icon}
           </Tab>
@@ -198,26 +214,28 @@ const InvokeTabs = () => {
             {tabPanels}
           </TabPanels>
         </Panel>
-        {shouldPinGallery && shouldShowGallery && (
-          <>
-            <ResizeHandle />
-            <Panel
-              ref={galleryPanelRef}
-              onResize={handleResizeGallery}
-              id="gallery"
-              order={3}
-              defaultSize={
-                galleryMinSizePct > DEFAULT_GALLERY_PCT
-                  ? galleryMinSizePct
-                  : DEFAULT_GALLERY_PCT
-              }
-              minSize={galleryMinSizePct}
-              maxSize={50}
-            >
-              <ImageGalleryContent />
-            </Panel>
-          </>
-        )}
+        {shouldPinGallery &&
+          shouldShowGallery &&
+          !NO_GALLERY_TABS.includes(activeTabName) && (
+            <>
+              <ResizeHandle />
+              <Panel
+                ref={galleryPanelRef}
+                onResize={handleResizeGallery}
+                id="gallery"
+                order={3}
+                defaultSize={
+                  galleryMinSizePct > DEFAULT_GALLERY_PCT
+                    ? galleryMinSizePct
+                    : DEFAULT_GALLERY_PCT
+                }
+                minSize={galleryMinSizePct}
+                maxSize={50}
+              >
+                <ImageGalleryContent />
+              </Panel>
+            </>
+          )}
       </PanelGroup>
     </Tabs>
   );

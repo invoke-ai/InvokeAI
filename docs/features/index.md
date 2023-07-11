@@ -13,27 +13,15 @@ Build complex scenes by combine and modifying multiple images in a stepwise
 fashion. This feature combines img2img, inpainting and outpainting in
 a single convenient digital artist-optimized user interface.
 
-### * The [Command Line Interface (CLI)](CLI.md)
-Scriptable access to InvokeAI's features.
-
 ## Image Generation
 ### * [Prompt Engineering](PROMPTS.md)
 Get the images you want with the InvokeAI  prompt engineering language.
 
-## * [Post-Processing](POSTPROCESS.md)
-Restore mangled faces and make images larger with upscaling. Also see the [Embiggen Upscaling Guide](EMBIGGEN.md).
-
 ## * The [Concepts Library](CONCEPTS.md)
 Add custom subjects and styles using HuggingFace's repository of embeddings.
 
-### * [Image-to-Image Guide for the CLI](IMG2IMG.md)
+### * [Image-to-Image Guide](IMG2IMG.md)
 Use a seed image to build new creations in the CLI.
-
-### * [Inpainting Guide for the CLI](INPAINTING.md)
-Selectively erase and replace portions of an existing image in the CLI.
-
-### * [Outpainting Guide for the CLI](OUTPAINTING.md)
-Extend the borders of the image with an "outcrop" function within the CLI.
 
 ### * [Generating Variations](VARIATIONS.md)
 Have an image you like and want to generate many more like it? Variations

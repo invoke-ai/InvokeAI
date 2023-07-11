@@ -1,15 +1,15 @@
-import 'reactflow/dist/style.css';
-import { useCallback, forwardRef } from 'react';
 import { Flex, Text } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { nodeAdded, nodesSelector } from '../store/nodesSlice';
-import { map } from 'lodash-es';
-import { useBuildInvocation } from '../hooks/useBuildInvocation';
-import { AnyInvocationType } from 'services/events/types';
-import { useAppToaster } from 'app/components/Toaster';
 import { createSelector } from '@reduxjs/toolkit';
+import { useAppToaster } from 'app/components/Toaster';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { map } from 'lodash-es';
+import { forwardRef, useCallback } from 'react';
+import 'reactflow/dist/style.css';
+import { AnyInvocationType } from 'services/events/types';
+import { useBuildInvocation } from '../hooks/useBuildInvocation';
+import { nodeAdded, nodesSelector } from '../store/nodesSlice';
 
 type NodeTemplate = {
   label: string;
@@ -26,6 +26,12 @@ const selector = createSelector(
         value: template.type,
         description: template.description,
       };
+    });
+
+    data.push({
+      label: 'Progress Image',
+      value: 'progress_image',
+      description: 'Displays the progress image in the Node Editor',
     });
 
     return { data };
@@ -58,24 +64,33 @@ const AddNodeMenu = () => {
     [dispatch, buildInvocation, toaster]
   );
 
+  const handleChange = useCallback(
+    (v: string | null) => {
+      if (!v) {
+        return;
+      }
+
+      addNode(v as AnyInvocationType);
+    },
+    [addNode]
+  );
+
   return (
     <Flex sx={{ gap: 2, alignItems: 'center' }}>
-      <IAIMantineMultiSelect
+      <IAIMantineSelect
         selectOnBlur={false}
         placeholder="Add Node"
-        value={[]}
+        value={null}
         data={data}
         maxDropdownHeight={400}
         nothingFound="No matching nodes"
         itemComponent={SelectItem}
-        filter={(value, selected, item: NodeTemplate) =>
+        filter={(value, item: NodeTemplate) =>
           item.label.toLowerCase().includes(value.toLowerCase().trim()) ||
           item.value.toLowerCase().includes(value.toLowerCase().trim()) ||
           item.description.toLowerCase().includes(value.toLowerCase().trim())
         }
-        onChange={(v) => {
-          v[0] && addNode(v[0] as AnyInvocationType);
-        }}
+        onChange={handleChange}
         sx={{
           width: '18rem',
         }}

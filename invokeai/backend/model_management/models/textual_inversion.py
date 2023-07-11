@@ -8,6 +8,7 @@ from .base import (
     ModelType,
     SubModelType,
     classproperty,
+    ModelNotFoundException,
 )
 # TODO: naming
 from ..lora import TextualInversionModel as TextualInversionModelRaw
@@ -37,8 +38,15 @@ class TextualInversionModel(ModelBase):
         if child_type is not None:
             raise Exception("There is no child models in textual inversion")
 
+        checkpoint_path = self.model_path
+        if os.path.isdir(checkpoint_path):
+            checkpoint_path = os.path.join(checkpoint_path, "learned_embeds.bin")
+
+        if not os.path.exists(checkpoint_path):
+            raise ModelNotFoundException()
+
         model = TextualInversionModelRaw.from_checkpoint(
-            file_path=self.model_path,
+            file_path=checkpoint_path,
             dtype=torch_dtype,
         )
 

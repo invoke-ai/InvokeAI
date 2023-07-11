@@ -1,21 +1,21 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { RandomIntInvocation, RangeOfSizeInvocation } from 'services/api/types';
+import { initialGenerationState } from 'features/parameters/store/generationSlice';
+import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
+import { modelIdToMainModelField } from '../modelIdToMainModelField';
+import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addVAEToGraph } from './addVAEToGraph';
 import {
-  ITERATE,
+  CLIP_SKIP,
   LATENTS_TO_IMAGE,
-  PIPELINE_MODEL_LOADER,
+  MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  RANDOM_INT,
-  RANGE_OF_SIZE,
   TEXT_TO_IMAGE_GRAPH,
   TEXT_TO_LATENTS,
 } from './constants';
-import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
-import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
@@ -26,19 +26,23 @@ export const buildCanvasTextToImageGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: modelId,
+    model: currentModel,
     cfgScale: cfg_scale,
     scheduler,
     steps,
-    iterations,
-    seed,
-    shouldRandomizeSeed,
+    clipSkip,
+    shouldUseCpuNoise,
+    shouldUseNoiseSettings,
   } = state.generation;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const model = modelIdToPipelineModelField(modelId);
+  const model = modelIdToMainModelField(currentModel?.id || '');
+
+  const use_cpu = shouldUseNoiseSettings
+    ? shouldUseCpuNoise
+    : initialGenerationState.shouldUseCpuNoise;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -68,6 +72,7 @@ export const buildCanvasTextToImageGraph = (
         id: NOISE,
         width,
         height,
+        use_cpu,
       },
       [TEXT_TO_LATENTS]: {
         type: 't2l',
@@ -76,10 +81,15 @@ export const buildCanvasTextToImageGraph = (
         scheduler,
         steps,
       },
-      [PIPELINE_MODEL_LOADER]: {
-        type: 'pipeline_model_loader',
-        id: PIPELINE_MODEL_LOADER,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -109,7 +119,17 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
+          field: 'clip',
+        },
+        destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
@@ -119,7 +139,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
@@ -129,7 +149,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
@@ -145,16 +165,6 @@ export const buildCanvasTextToImageGraph = (
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: PIPELINE_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'vae',
         },
       },
       {
@@ -169,6 +179,11 @@ export const buildCanvasTextToImageGraph = (
       },
     ],
   };
+
+  addLoRAsToGraph(graph, state, TEXT_TO_LATENTS);
+
+  // Add VAE
+  addVAEToGraph(graph, state);
 
   // add dynamic prompts, mutating `graph`
   addDynamicPromptsToGraph(graph, state);

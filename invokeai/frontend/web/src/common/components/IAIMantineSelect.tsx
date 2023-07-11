@@ -1,7 +1,9 @@
 import { Tooltip, useColorMode, useToken } from '@chakra-ui/react';
 import { Select, SelectProps } from '@mantine/core';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
-import { memo } from 'react';
+import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
+import { KeyboardEvent, RefObject, memo, useCallback, useState } from 'react';
 import { mode } from 'theme/util/mode';
 
 export type IAISelectDataType = {
@@ -12,10 +14,12 @@ export type IAISelectDataType = {
 
 type IAISelectProps = SelectProps & {
   tooltip?: string;
+  inputRef?: RefObject<HTMLInputElement>;
 };
 
 const IAIMantineSelect = (props: IAISelectProps) => {
-  const { searchable = true, tooltip, ...rest } = props;
+  const { searchable = true, tooltip, inputRef, onChange, ...rest } = props;
+  const dispatch = useAppDispatch();
   const {
     base50,
     base100,
@@ -35,13 +39,54 @@ const IAIMantineSelect = (props: IAISelectProps) => {
   } = useChakraThemeTokens();
 
   const { colorMode } = useColorMode();
+  const [searchValue, setSearchValue] = useState('');
+
+  // we want to capture shift keypressed even when an input is focused
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.shiftKey) {
+        dispatch(shiftKeyPressed(true));
+      }
+    },
+    [dispatch]
+  );
+
+  const handleKeyUp = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (!e.shiftKey) {
+        dispatch(shiftKeyPressed(false));
+      }
+    },
+    [dispatch]
+  );
+
+  // wrap onChange to clear search value on select
+  const handleChange = useCallback(
+    (v: string | null) => {
+      setSearchValue('');
+
+      if (!onChange) {
+        return;
+      }
+
+      onChange(v);
+    },
+    [onChange]
+  );
 
   const [boxShadow] = useToken('shadows', ['dark-lg']);
 
   return (
     <Tooltip label={tooltip} placement="top" hasArrow>
       <Select
+        ref={inputRef}
+        searchValue={searchValue}
+        onSearchChange={setSearchValue}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
         searchable={searchable}
+        maxDropdownHeight={300}
         styles={() => ({
           label: {
             color: mode(base700, base300)(colorMode),
@@ -64,9 +109,10 @@ const IAIMantineSelect = (props: IAISelectProps) => {
             '&:focus-within': {
               borderColor: mode(accent200, accent600)(colorMode),
             },
-            '&:disabled': {
+            '&[data-disabled]': {
               backgroundColor: mode(base300, base700)(colorMode),
               color: mode(base600, base400)(colorMode),
+              cursor: 'not-allowed',
             },
           },
           value: {
@@ -108,6 +154,10 @@ const IAIMantineSelect = (props: IAISelectProps) => {
                 backgroundColor: mode(accent500, accent500)(colorMode),
                 color: mode('white', base50)(colorMode),
               },
+            },
+            '&[data-disabled]': {
+              color: mode(base500, base600)(colorMode),
+              cursor: 'not-allowed',
             },
           },
           rightSection: {

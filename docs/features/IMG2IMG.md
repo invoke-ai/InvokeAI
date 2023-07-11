@@ -4,86 +4,13 @@ title: Image-to-Image
 
 # :material-image-multiple: Image-to-Image
 
-Both the Web and command-line interfaces provide an "img2img" feature
-that lets you seed your creations with an initial drawing or
-photo. This is a really cool feature that tells stable diffusion to
-build the prompt on top of the image you provide, preserving the
-original's basic shape and layout.
+InvokeAI provides an "img2img" feature that lets you seed your
+creations with an initial drawing or photo. This is a really cool
+feature that tells stable diffusion to build the prompt on top of the
+image you provide, preserving the original's basic shape and layout.
 
-See the [WebUI Guide](WEB.md) for a walkthrough of the img2img feature
-in the InvokeAI web server. This document describes how to use img2img
-in the command-line tool.
-
-## Basic Usage
-
-Launch the command-line client by launching `invoke.sh`/`invoke.bat`
-and choosing option (1). Alternative, activate the InvokeAI
-environment and issue the command `invokeai`.
-
-Once the `invoke> ` prompt appears, you can start an img2img render by
-pointing to a seed file with the `-I` option as shown here:
-
-!!! example ""
-
-    ```commandline
-    tree on a hill with a river, nature photograph, national geographic -I./test-pictures/tree-and-river-sketch.png -f 0.85
-    ```
-
-    <figure markdown>
-
-    | original image | generated image |
-    | :------------: | :-------------: |
-    | ![original-image](https://user-images.githubusercontent.com/50542132/193946000-c42a96d8-5a74-4f8a-b4c3-5213e6cadcce.png){ width=320 } | ![generated-image](https://user-images.githubusercontent.com/111189/194135515-53d4c060-e994-4016-8121-7c685e281ac9.png){ width=320 } |
-
-    </figure>
-
-The `--init_img` (`-I`) option gives the path to the seed picture. `--strength`
-(`-f`) controls how much the original will be modified, ranging from `0.0` (keep
-the original intact), to `1.0` (ignore the original completely). The default is
-`0.75`, and ranges from `0.25-0.90` give interesting results. Other relevant
-options include `-C` (classification free guidance scale), and `-s` (steps).
-Unlike `txt2img`, adding steps will continuously change the resulting image and
-it will not converge.
-
-You may also pass a `-v<variation_amount>` option to generate `-n<iterations>`
-count variants on the original image. This is done by passing the first
-generated image back into img2img the requested number of times. It generates
-interesting variants.
-
-Note that the prompt makes a big difference. For example, this slight variation
-on the prompt produces a very different image:
-
-<figure markdown>
-![](https://user-images.githubusercontent.com/111189/194135220-16b62181-b60c-4248-8989-4834a8fd7fbd.png){ width=320 }
-<caption markdown>photograph of a tree on a hill with a river</caption>
-</figure>
-
-!!! tip
-
-    When designing prompts, think about how the images scraped from the internet were
-    captioned. Very few photographs will be labeled "photograph" or "photorealistic."
-    They will, however, be captioned with the publication, photographer, camera model,
-    or film settings.
-
-If the initial image contains transparent regions, then Stable Diffusion will
-only draw within the transparent regions, a process called
-[`inpainting`](./INPAINTING.md#creating-transparent-regions-for-inpainting).
-However, for this to work correctly, the color information underneath the
-transparent needs to be preserved, not erased.
-
-!!! warning "**IMPORTANT ISSUE** "
-
-    `img2img` does not work properly on initial images smaller
-    than 512x512. Please scale your image to at least 512x512 before using it.
-    Larger images are not a problem, but may run out of VRAM on your GPU card. To
-    fix this, use the --fit option, which downscales the initial image to fit within
-    the box specified by width x height:
-
-    ```
-    tree on a hill with a river, national geographic -I./test-pictures/big-sketch.png -H512 -W512 --fit
-    ```
-
-## How does it actually work, though?
+For a walkthrough of using Image-to-Image in the Web UI, see [InvokeAI
+Web Server](./WEB.md#image-to-image).
 
 The main difference between `img2img` and `prompt2img` is the starting point.
 While `prompt2img` always starts with pure gaussian noise and progressively
@@ -98,10 +25,6 @@ Diffusion's internal representation of the image) for the prompt "fire" with
 seed `1592514025` develops something like this:
 
 !!! example ""
-
-    ```bash
-    invoke> "fire" -s10 -W384 -H384 -S1592514025
-    ```
 
     <figure markdown>
     ![latent steps](../assets/img2img/000019.steps.png){ width=720 }
@@ -157,17 +80,8 @@ Diffusion has less chance to refine itself, so the result ends up inheriting all
 the problems of my bad drawing.
 
 If you want to try this out yourself, all of these are using a seed of
-`1592514025` with a width/height of `384`, step count `10`, the default sampler
-(`k_lms`), and the single-word prompt `"fire"`:
-
-```bash
-invoke> "fire" -s10 -W384 -H384 -S1592514025 -I /tmp/fire-drawing.png --strength 0.7
-```
-
-The code for rendering intermediates is on my (damian0815's) branch
-[document-img2img](https://github.com/damian0815/InvokeAI/tree/document-img2img) -
-run `invoke.py` and check your `outputs/img-samples/intermediates` folder while
-generating an image.
+`1592514025` with a width/height of `384`, step count `10`, the
+`k_lms` sampler, and the single-word prompt `"fire"`.
 
 ### Compensating for the reduced step count
 
@@ -180,20 +94,12 @@ give each generation 20 steps.
 Here's strength `0.4` (note step count `50`, which is `20 ÷ 0.4` to make sure SD
 does `20` steps from my image):
 
-```bash
-invoke> "fire" -s50 -W384 -H384 -S1592514025 -I /tmp/fire-drawing.png -f 0.4
-```
-
 <figure markdown>
 ![000035.1592514025](../assets/img2img/000035.1592514025.png)
 </figure>
 
 and here is strength `0.7` (note step count `30`, which is roughly `20 ÷ 0.7` to
 make sure SD does `20` steps from my image):
-
-```commandline
-invoke> "fire" -s30 -W384 -H384 -S1592514025 -I /tmp/fire-drawing.png -f 0.7
-```
 
 <figure markdown>
 ![000046.1592514025](../assets/img2img/000046.1592514025.png)

@@ -1,40 +1,38 @@
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
-import { useCallback } from 'react';
-import { isEnabledToggled } from '../store/slice';
-import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
 import ParamDynamicPromptsCombinatorial from './ParamDynamicPromptsCombinatorial';
-import { Flex } from '@chakra-ui/react';
+import ParamDynamicPromptsToggle from './ParamDynamicPromptsEnabled';
+import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   stateSelector,
   (state) => {
     const { isEnabled } = state.dynamicPrompts;
 
-    return { isEnabled };
+    return { activeLabel: isEnabled ? 'Enabled' : undefined };
   },
   defaultSelectorOptions
 );
 
 const ParamDynamicPromptsCollapse = () => {
-  const dispatch = useAppDispatch();
-  const { isEnabled } = useAppSelector(selector);
+  const { activeLabel } = useAppSelector(selector);
 
-  const handleToggleIsEnabled = useCallback(() => {
-    dispatch(isEnabledToggled());
-  }, [dispatch]);
+  const isDynamicPromptingEnabled =
+    useFeatureStatus('dynamicPrompting').isFeatureEnabled;
+
+  if (!isDynamicPromptingEnabled) {
+    return null;
+  }
 
   return (
-    <IAICollapse
-      isOpen={isEnabled}
-      onToggle={handleToggleIsEnabled}
-      label="Dynamic Prompts"
-      withSwitch
-    >
+    <IAICollapse label="Dynamic Prompts" activeLabel={activeLabel}>
       <Flex sx={{ gap: 2, flexDir: 'column' }}>
+        <ParamDynamicPromptsToggle />
         <ParamDynamicPromptsCombinatorial />
         <ParamDynamicPromptsMaxPrompts />
       </Flex>
