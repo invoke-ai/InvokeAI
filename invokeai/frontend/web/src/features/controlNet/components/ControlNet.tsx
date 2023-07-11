@@ -124,6 +124,7 @@ const ControlNet = (props: ControlNetProps) => {
             />
           }
         />
+
         {!shouldAutoConfig && (
           <Box
             sx={{
@@ -137,6 +138,16 @@ const ControlNet = (props: ControlNetProps) => {
             }}
           />
         )}
+      </Flex>
+      <Flex alignItems="flex-end" gap="2">
+        <ParamControlNetProcessorSelect
+          controlNetId={controlNetId}
+          processorNode={processorNode}
+        />
+        <ParamControlNetShouldAutoConfig
+          controlNetId={controlNetId}
+          shouldAutoConfig={shouldAutoConfig}
+        />
       </Flex>
       {isEnabled && (
         <>
@@ -196,17 +207,9 @@ const ControlNet = (props: ControlNetProps) => {
                   height={96}
                 />
               </Box>
-              <ParamControlNetProcessorSelect
-                controlNetId={controlNetId}
-                processorNode={processorNode}
-              />
               <ControlNetProcessorComponent
                 controlNetId={controlNetId}
                 processorNode={processorNode}
-              />
-              <ParamControlNetShouldAutoConfig
-                controlNetId={controlNetId}
-                shouldAutoConfig={shouldAutoConfig}
               />
             </>
           )}

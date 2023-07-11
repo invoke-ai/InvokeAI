@@ -173,91 +173,17 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
   },
 };
 
-type ControlNetModelsDict = Record<string, ControlNetModel>;
-
-type ControlNetModel = {
-  type: string;
-  label: string;
-  description?: string;
-  defaultProcessor?: ControlNetProcessorType;
+export const CONTROLNET_MODEL_DEFAULT_PROCESSORS: {
+  [key: string]: ControlNetProcessorType;
+} = {
+  canny: 'canny_image_processor',
+  mlsd: 'mlsd_image_processor',
+  depth: 'midas_depth_image_processor',
+  bae: 'normalbae_image_processor',
+  lineart: 'lineart_image_processor',
+  lineart_anime: 'lineart_anime_image_processor',
+  softedge: 'hed_image_processor',
+  shuffle: 'content_shuffle_image_processor',
+  openpose: 'openpose_image_processor',
+  mediapipe: 'mediapipe_face_processor',
 };
-
-export const CONTROLNET_MODELS: ControlNetModelsDict = {
-  'lllyasviel/control_v11p_sd15_canny': {
-    type: 'lllyasviel/control_v11p_sd15_canny',
-    label: 'Canny',
-    defaultProcessor: 'canny_image_processor',
-  },
-  'lllyasviel/control_v11p_sd15_inpaint': {
-    type: 'lllyasviel/control_v11p_sd15_inpaint',
-    label: 'Inpaint',
-    defaultProcessor: 'none',
-  },
-  'lllyasviel/control_v11p_sd15_mlsd': {
-    type: 'lllyasviel/control_v11p_sd15_mlsd',
-    label: 'M-LSD',
-    defaultProcessor: 'mlsd_image_processor',
-  },
-  'lllyasviel/control_v11f1p_sd15_depth': {
-    type: 'lllyasviel/control_v11f1p_sd15_depth',
-    label: 'Depth',
-    defaultProcessor: 'midas_depth_image_processor',
-  },
-  'lllyasviel/control_v11p_sd15_normalbae': {
-    type: 'lllyasviel/control_v11p_sd15_normalbae',
-    label: 'Normal Map (BAE)',
-    defaultProcessor: 'normalbae_image_processor',
-  },
-  'lllyasviel/control_v11p_sd15_seg': {
-    type: 'lllyasviel/control_v11p_sd15_seg',
-    label: 'Segmentation',
-    defaultProcessor: 'none',
-  },
-  'lllyasviel/control_v11p_sd15_lineart': {
-    type: 'lllyasviel/control_v11p_sd15_lineart',
-    label: 'Lineart',
-    defaultProcessor: 'lineart_image_processor',
-  },
-  'lllyasviel/control_v11p_sd15s2_lineart_anime': {
-    type: 'lllyasviel/control_v11p_sd15s2_lineart_anime',
-    label: 'Lineart Anime',
-    defaultProcessor: 'lineart_anime_image_processor',
-  },
-  'lllyasviel/control_v11p_sd15_scribble': {
-    type: 'lllyasviel/control_v11p_sd15_scribble',
-    label: 'Scribble',
-    defaultProcessor: 'none',
-  },
-  'lllyasviel/control_v11p_sd15_softedge': {
-    type: 'lllyasviel/control_v11p_sd15_softedge',
-    label: 'Soft Edge',
-    defaultProcessor: 'hed_image_processor',
-  },
-  'lllyasviel/control_v11e_sd15_shuffle': {
-    type: 'lllyasviel/control_v11e_sd15_shuffle',
-    label: 'Content Shuffle',
-    defaultProcessor: 'content_shuffle_image_processor',
-  },
-  'lllyasviel/control_v11p_sd15_openpose': {
-    type: 'lllyasviel/control_v11p_sd15_openpose',
-    label: 'Openpose',
-    defaultProcessor: 'openpose_image_processor',
-  },
-  'lllyasviel/control_v11f1e_sd15_tile': {
-    type: 'lllyasviel/control_v11f1e_sd15_tile',
-    label: 'Tile (experimental)',
-    defaultProcessor: 'none',
-  },
-  'lllyasviel/control_v11e_sd15_ip2p': {
-    type: 'lllyasviel/control_v11e_sd15_ip2p',
-    label: 'Pix2Pix (experimental)',
-    defaultProcessor: 'none',
-  },
-  'CrucibleAI/ControlNetMediaPipeFace': {
-    type: 'CrucibleAI/ControlNetMediaPipeFace',
-    label: 'Mediapipe Face',
-    defaultProcessor: 'mediapipe_face_processor',
-  },
-};
-
-export type ControlNetModelName = keyof typeof CONTROLNET_MODELS;

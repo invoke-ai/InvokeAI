@@ -8,9 +8,10 @@ import {
   RequiredControlNetProcessorNode,
 } from './types';
 import {
-  CONTROLNET_MODELS,
+  CONTROLNET_MODEL_DEFAULT_PROCESSORS,
+  // CONTROLNET_MODELS,
   CONTROLNET_PROCESSORS,
-  ControlNetModelName,
+  // ControlNetModelName,
 } from './constants';
 import { controlNetImageProcessed } from './actions';
 import { imageDeleted, imageUrlsReceived } from 'services/api/thunks/image';
@@ -26,7 +27,7 @@ export type ControlModes =
 
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   isEnabled: true,
-  model: CONTROLNET_MODELS['lllyasviel/control_v11p_sd15_canny'].type,
+  model: '',
   weight: 1,
   beginStepPct: 0,
   endStepPct: 1,
@@ -42,7 +43,7 @@ export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
 export type ControlNetConfig = {
   controlNetId: string;
   isEnabled: boolean;
-  model: ControlNetModelName;
+  model: string;
   weight: number;
   beginStepPct: number;
   endStepPct: number;
@@ -147,7 +148,7 @@ export const controlNetSlice = createSlice({
       state,
       action: PayloadAction<{
         controlNetId: string;
-        model: ControlNetModelName;
+        model: string;
       }>
     ) => {
       const { controlNetId, model } = action.payload;
@@ -155,7 +156,15 @@ export const controlNetSlice = createSlice({
       state.controlNets[controlNetId].processedControlImage = null;
 
       if (state.controlNets[controlNetId].shouldAutoConfig) {
-        const processorType = CONTROLNET_MODELS[model].defaultProcessor;
+        let processorType: ControlNetProcessorType | undefined = undefined;
+
+        for (const modelSubstring in CONTROLNET_MODEL_DEFAULT_PROCESSORS) {
+          if (model.includes(modelSubstring)) {
+            processorType = CONTROLNET_MODEL_DEFAULT_PROCESSORS[modelSubstring];
+            break;
+          }
+        }
+
         if (processorType) {
           state.controlNets[controlNetId].processorType = processorType;
           state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
@@ -241,9 +250,15 @@ export const controlNetSlice = createSlice({
 
       if (newShouldAutoConfig) {
         // manage the processor for the user
-        const processorType =
-          CONTROLNET_MODELS[state.controlNets[controlNetId].model]
-            .defaultProcessor;
+        let processorType: ControlNetProcessorType | undefined = undefined;
+
+        for (const modelSubstring in CONTROLNET_MODEL_DEFAULT_PROCESSORS) {
+          if (state.controlNets[controlNetId].model.includes(modelSubstring)) {
+            processorType = CONTROLNET_MODEL_DEFAULT_PROCESSORS[modelSubstring];
+            break;
+          }
+        }
+
         if (processorType) {
           state.controlNets[controlNetId].processorType = processorType;
           state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
