@@ -37,7 +37,7 @@ from .models import BaseModelType, ModelType, SubModelType, ModelBase
 DEFAULT_MAX_CACHE_SIZE = 6.0
 
 # amount of GPU memory to hold in reserve for use by generations (GB)
-DEFAULT_GPU_MEM_RESERVED= 2.75
+DEFAULT_MAX_VRAM_CACHE_SIZE= 2.75
 
 # actual size of a gig
 GIG = 1073741824
@@ -85,13 +85,13 @@ class ModelCache(object):
     def __init__(
         self,
         max_cache_size: float=DEFAULT_MAX_CACHE_SIZE,
+        max_vram_cache_size: float=DEFAULT_MAX_VRAM_CACHE_SIZE,
         execution_device: torch.device=torch.device('cuda'),
         storage_device: torch.device=torch.device('cpu'),
         precision: torch.dtype=torch.float16,
         sequential_offload: bool=False,
         lazy_offloading: bool=True,
         sha_chunksize: int = 16777216,
-        gpu_mem_reserved: float=DEFAULT_GPU_MEM_RESERVED,
         logger: types.ModuleType = logger
     ):
         '''
@@ -107,7 +107,7 @@ class ModelCache(object):
         self.lazy_offloading = lazy_offloading
         self.precision: torch.dtype=precision
         self.max_cache_size: float=max_cache_size
-        self.gpu_mem_reserved: float=gpu_mem_reserved
+        self.max_vram_cache_size: float=max_vram_cache_size
         self.execution_device: torch.device=execution_device
         self.storage_device: torch.device=storage_device
         self.sha_chunksize=sha_chunksize
@@ -349,7 +349,7 @@ class ModelCache(object):
         self.logger.debug(f"After unloading: cached_models={len(self._cached_models)}")
 
     def _offload_unlocked_models(self, size_needed: int=0):
-        reserved = self.gpu_mem_reserved * GIG
+        reserved = self.max_vram_cache_size * GIG
         vram_in_use = torch.cuda.memory_allocated()
         self.logger.debug(f'{(vram_in_use/GIG):.2f}GB VRAM used for models; max allowed={(reserved/GIG):.2f}GB')
         for model_key, cache_entry in sorted(self._cached_models.items(), key=lambda x:x[1].size):
