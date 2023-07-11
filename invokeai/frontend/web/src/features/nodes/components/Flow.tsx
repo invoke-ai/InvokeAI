@@ -72,6 +72,7 @@ export const Flow = () => {
   const onInit: OnInit = useCallback(
     (v) => {
       dispatch(setEditorInstance(v));
+      if (v) v.fitView();
     },
     [dispatch]
   );
