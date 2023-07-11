@@ -8,6 +8,7 @@ import { MdOutlineSwapVert } from 'react-icons/md';
 import ParamAspectRatio from './ParamAspectRatio';
 import ParamHeight from './ParamHeight';
 import ParamWidth from './ParamWidth';
+import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
 
 export default function ParamSize() {
   const { t } = useTranslation();
@@ -15,6 +16,7 @@ export default function ParamSize() {
   const shouldFitToWidthHeight = useAppSelector(
     (state: RootState) => state.generation.shouldFitToWidthHeight
   );
+  const activeTabName = useAppSelector(activeTabNameSelector);
   return (
     <Flex
       sx={{
@@ -50,13 +52,24 @@ export default function ParamSize() {
           size="sm"
           icon={<MdOutlineSwapVert />}
           fontSize={20}
+          isDisabled={
+            activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
+          }
           onClick={() => dispatch(toggleSize())}
         />
       </Flex>
       <Flex gap={2} alignItems="center">
         <Flex gap={2} flexDirection="column" width="full">
-          <ParamWidth isDisabled={!shouldFitToWidthHeight} />
-          <ParamHeight isDisabled={!shouldFitToWidthHeight} />
+          <ParamWidth
+            isDisabled={
+              activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
+            }
+          />
+          <ParamHeight
+            isDisabled={
+              activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
+            }
+          />
         </Flex>
       </Flex>
     </Flex>
