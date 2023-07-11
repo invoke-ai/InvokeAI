@@ -23,7 +23,8 @@ InvokeAI:
     xformers_enabled: false
     sequential_guidance: false
     precision: float16
-    max_loaded_models: 4
+    max_cache_size: 6
+    max_vram_cache_size: 2.7
     always_use_cpu: false
     free_gpu_mem: false
   Features:
@@ -269,8 +270,9 @@ class InvokeAISettings(BaseSettings):
         parser.add_parser(cls.cmd_name(), help=cls.__doc__)
 
     @classmethod
-    def _excluded(self)->Set[str]:
-        return {'type','initconf','version'}
+    def _excluded(self)->List[str]:
+        # combination of deprecated parameters and internal ones
+        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version']
 
     class Config:
         env_file_encoding = 'utf-8'
@@ -363,8 +365,10 @@ setting environment variables INVOKEAI_<setting>.
 
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
     free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
-    max_loaded_models   : int = Field(default=3, gt=0, description="(DEPRECATED: use max_cache_size) Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
+    max_loaded_models   : int = Field(default=3, gt=0, description="(DEPRECATED: use max_cache_size) Maximum number of models to keep in memory for rapid switching", category='DEPRECATED')
     max_cache_size      : float = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching", category='Memory/Performance')
+    max_vram_cache_size : float = Field(default=2.75, ge=0, description="Amount of VRAM reserved for model storage", category='Memory/Performance')
+    gpu_mem_reserved    : float = Field(default=2.75, ge=0, description="DEPRECATED: use max_vram_cache_size. Amount of VRAM reserved for model storage", category='DEPRECATED')
     precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='float16',description='Floating point precision', category='Memory/Performance')
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
