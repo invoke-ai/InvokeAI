@@ -679,6 +679,7 @@
         "swapSizes": "Swap Sizes"
     },
     "nodes": {
+        "reloadSchema": "Reload Schema",
         "saveNodes": "Save Nodes",
         "loadNodes": "Load Nodes"
     }
