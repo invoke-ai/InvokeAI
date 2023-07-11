@@ -29,5 +29,6 @@ export interface UIState {
   shouldShowProgressInViewer: boolean;
   shouldShowEmbeddingPicker: boolean;
   shouldShowAdvancedOptions: boolean;
+  aspectRatio: number | null;
   favoriteSchedulers: SchedulerParam[];
 }

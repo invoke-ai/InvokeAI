@@ -53,13 +53,15 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      if (e.shiftKey) {
-        dispatch(imageRangeEndSelected(props.imageDTO.image_name));
-      } else if (e.ctrlKey || e.metaKey) {
-        dispatch(imageSelectionToggled(props.imageDTO.image_name));
-      } else {
-        dispatch(imageSelected(props.imageDTO.image_name));
-      }
+      // multiselect disabled for now
+      // if (e.shiftKey) {
+      //   dispatch(imageRangeEndSelected(props.imageDTO.image_name));
+      // } else if (e.ctrlKey || e.metaKey) {
+      //   dispatch(imageSelectionToggled(props.imageDTO.image_name));
+      // } else {
+      //   dispatch(imageSelected(props.imageDTO.image_name));
+      // }
+      dispatch(imageSelected(props.imageDTO.image_name));
     },
     [dispatch, props.imageDTO.image_name]
   );
@@ -121,6 +123,7 @@ const GalleryImage = (props: HoverableImageProps) => {
               // withResetIcon // removed bc it's too easy to accidentally delete images
               isDropDisabled={true}
               isUploadDisabled={true}
+              thumbnail={true}
             />
           </Box>
         )}
