@@ -16,7 +16,10 @@ export default function MergeModelsPanel() {
 
   const dispatch = useAppDispatch();
 
-  const { data } = useGetMainModelsQuery();
+  const { data } = useGetMainModelsQuery({
+    model_type: 'main',
+    base_models: ['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner'],
+  });
 
   const diffusersModels = pickBy(
     data?.entities,

@@ -25,7 +25,10 @@ const ModelSelect = () => {
     (state: RootState) => state.generation.model
   );
 
-  const { data: mainModels, isLoading } = useGetMainModelsQuery();
+  const { data: mainModels, isLoading } = useGetMainModelsQuery({
+    model_type: 'main',
+    base_models: ['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner'],
+  });
 
   const data = useMemo(() => {
     if (!mainModels) {

@@ -2,9 +2,11 @@ import { EntityState, createEntityAdapter } from '@reduxjs/toolkit';
 import { cloneDeep } from 'lodash-es';
 import {
   AnyModelConfig,
+  BaseModelType,
   ControlNetModelConfig,
   LoRAModelConfig,
   MainModelConfig,
+  ModelType,
   TextualInversionModelConfig,
   VaeModelConfig,
 } from 'services/api/types';
@@ -68,21 +70,19 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
   return entityArray;
 };
 
+type MainModelQueryArg = {
+  model_type: ModelType;
+  base_models: BaseModelType[];
+};
+
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getMainModels: build.query<EntityState<MainModelConfigEntity>, void>({
-      query: () => {
-        const baseModels = {
-          base_models: ['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner'],
-        };
-        const baseModelsQueryStr = queryString.stringify(baseModels, {});
-        return {
-          url: `models/?${baseModelsQueryStr}`,
-          params: {
-            model_type: 'main',
-          },
-        };
-      },
+    getMainModels: build.query<
+      EntityState<MainModelConfigEntity>,
+      MainModelQueryArg
+    >({
+      query: (arg: MainModelQueryArg) =>
+        `models/?${queryString.stringify(arg)}`,
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
           { id: 'MainModel', type: LIST_TAG },

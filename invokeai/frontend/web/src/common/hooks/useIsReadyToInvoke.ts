@@ -3,13 +3,8 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import {
-  modelsApi,
-  useGetMainModelsQuery,
-} from '../../services/api/endpoints/models';
+import { modelsApi } from '../../services/api/endpoints/models';
 
 const readinessSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -38,7 +33,10 @@ const readinessSelector = createSelector(
     }
 
     const { isSuccess: mainModelsSuccessfullyLoaded } =
-      modelsApi.endpoints.getMainModels.select()(state);
+      modelsApi.endpoints.getMainModels.select({
+        model_type: 'main',
+        base_models: ['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner'],
+      })(state);
     if (!mainModelsSuccessfullyLoaded) {
       isReady = false;
       reasonsWhyNotReady.push('Models are not loaded');

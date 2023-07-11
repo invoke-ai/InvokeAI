@@ -8,7 +8,10 @@ import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
 
 export default function ModelManagerPanel() {
-  const { data: mainModels } = useGetMainModelsQuery();
+  const { data: mainModels } = useGetMainModelsQuery({
+    model_type: 'main',
+    base_models: ['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner'],
+  });
 
   const openModel = useAppSelector(
     (state: RootState) => state.system.openModel
