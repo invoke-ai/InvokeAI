@@ -17,14 +17,14 @@ import { FieldComponentProps } from './types';
 const ModelInputFieldComponent = (
   props: FieldComponentProps<ModelInputFieldValue, ModelInputFieldTemplate>
 ) => {
-  const { nodeId, field } = props;
+  const { nodeId, field, base_models } = props;
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const { data: mainModels } = useGetMainModelsQuery({
     model_type: 'main',
-    base_models: ['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner'],
+    base_models: base_models,
   });
 
   const data = useMemo(() => {
