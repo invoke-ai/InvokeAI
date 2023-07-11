@@ -169,7 +169,7 @@ from argparse import ArgumentParser
 from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
 from pydantic import BaseSettings, Field, parse_obj_as
-from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
+from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path('invokeai.yaml')
 MODEL_CORE = Path('models/core')
@@ -271,7 +271,8 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def _excluded(self)->List[str]:
-        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models']
+        # combination of deprecated parameters and internal ones
+        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version']
 
     class Config:
         env_file_encoding = 'utf-8'
@@ -392,6 +393,8 @@ setting environment variables INVOKEAI_<setting>.
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
     log_format          : Literal[tuple(['plain','color','syslog','legacy'])] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
     log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="debug", description="Emit logging messages at this level or  higher", category="Logging")
+
+    version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
     #fmt: on
 
     def parse_args(self, argv: List[str]=None, conf: DictConfig = None, clobber=False):

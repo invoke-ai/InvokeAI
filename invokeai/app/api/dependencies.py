@@ -17,6 +17,7 @@ from invokeai.app.services.metadata import CoreMetadataService
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.version.invokeai_version import __version__
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
@@ -58,7 +59,8 @@ class ApiDependencies:
 
     @staticmethod
     def initialize(config, event_handler_id: int, logger: Logger = logger):
-        logger.info(f"Internet connectivity is {config.internet_available}")
+        logger.debug(f'InvokeAI version {__version__}')
+        logger.debug(f"Internet connectivity is {config.internet_available}")
 
         events = FastAPIEventService(event_handler_id)
 
