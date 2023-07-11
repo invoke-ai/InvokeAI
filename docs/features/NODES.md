@@ -35,7 +35,74 @@ A noise scheduler (eg. DPM++ 2M Karras) schedules the subtraction of noise from 
 
 ## Node Types
 
-_List all nodes with a short explanation of each_
+| Node <img width=160 align="right"> | Function                                                                              |
+| ---------------------------------- | --------------------------------------------------------------------------------------|
+| Add                                | Adds two numbers |
+| CannyImageProcessor                | Canny edge detection for ControlNet |
+| ClipSkip                           | Skip layers in clip text_encoder model |
+| Collect                            | Collects values into a collection |
+| Prompt (Compel)                    | Parse prompt using compel package to conditioning |
+| ContentShuffleImageProcessor       | Applies content shuffle processing to image |
+| ControlNet                         | Collects ControlNet info to pass to other nodes |
+| CvInpaint                          | Simple inpaint using opencv |
+| Divide                             | Divides two numbers |
+| DynamicPrompt                      | Parses a prompt using adieyal/dynamic prompt's random or combinatorial generator |
+| FloatLinearRange                   | Creates a range |
+| HedImageProcessor                  | Applies HED edge detection to image |
+| ImageBlur                          | Blurs an image |
+| ImageChannel                       | Gets a channel from an image |
+| ImageCollection                    | Load a collection of images and provide it as output |
+| ImageConvert                       | Converts an image to a different mode |
+| ImageCrop                          | Crops an imiage to a specified box. The box can be outside of the image. |
+| ImageInverseLerp                   | Inverse linear interpolation of all pixels of an image |
+| ImageLerp                          | Linear interpolation of all pixels of an image |
+| ImageMultiply                      | Multiplies two images together using `PIL.ImageChops.Multiply()` |
+| ImagePaste                         | Pastes an image into another image |
+| ImageProcessor                     | Base class for invocations that reprocess images for ControlNet |
+| ImageResize                        | Resizes an image to specific dimensions |
+| ImageScale                         | Scales an image by a factor |
+| ImageToLatents                     | Scales latents by a given factor |
+| InfillColor                        | Infills transparent areas of an image with a solid color |
+| InfillPatchMatch                   | Infills transparent areas of an image using the PatchMatch algorithm |
+| InfillTile                         | Infills transparents areas of an image with tiles of the image |
+| Inpaint                            | Generates an image using inpaint |
+| Iterate                            | Iterates over a list of items |
+| LatentsToImage                     | Generates an image from latents |
+| LatentsToLatents                   | Generates latents using latents as base image |
+| LeresImageProcessor                | Applies leres processing to image |
+| LineartAnimeImageProcessor         | Applies line art anime processing to image |
+| LineartImageProcessor              | Applies line art processing to image |
+| LoadImage                          | Load an image and provide it as output |
+| Lora Loader                        | Apply selected lora to unet and text_encoder |
+| Model Loader                       | Loads a main model, outputting its submodels |
+| MaskFromAlpha                      | Extracts the alpha channel of an image as a mask |
+| MediapipeFaceProcessor             | Applies mediapipe face processing to image |
+| MidasDepthImageProcessor           | Applies Midas depth processing to image |
+| MlsdImageProcessor                 | Applied MLSD processing to image |
+| Multiply                           | Multiplies two numbers |
+| Noise                              | Generates latent noise |
+| NormalbaeImageProcessor            | Applies NormalBAE processing to image |
+| OpenposeImageProcessor             | Applies Openpose processing to image |
+| ParamFloat                         | A float parameter |
+| ParamInt                           | An integer parameter |
+| PidiImageProcessor                 | Applies PIDI processing to an image |
+| Progress Image                     | Displays the progress image in the Node Editor |
+| RandomInit                         | Outputs a single random integer |
+| RandomRange                        | Creates a collection of random numbers |
+| Range                              | Creates a range of numbers from start to stop with step |
+| RangeOfSize                        | Creates a range from start to start + size with step |
+| ResizeLatents                      | Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8. |
+| RestoreFace                        | Restores faces in the image |
+| ScaleLatents                       | Scales latents by a given factor |
+| SegmentAnythingProcessor           | Applies segment anything processing to image |
+| ShowImage                          | Displays a provided image, and passes it forward in the pipeline |
+| StepParamEasing                    | Experimental per-step parameter for easing for denoising steps |
+| Subtract                           | Subtracts two numbers |
+| TextToLatents                      | Generates latents from conditionings |
+| TileResampleProcessor              | Bass class for invocations that preprocess images for ControlNet |
+| Upscale                            | Upscales an image |
+| VAE Loader                         | Loads a VAE model, outputting a VaeLoaderOutput |
+| ZoeDepthImageProcessor             | Applies Zoe depth processing to image |
 
 ## Examples
 
