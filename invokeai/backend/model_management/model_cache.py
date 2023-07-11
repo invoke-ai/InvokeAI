@@ -37,7 +37,7 @@ from .models import BaseModelType, ModelType, SubModelType, ModelBase
 DEFAULT_MAX_CACHE_SIZE = 6.0
 
 # amount of GPU memory to hold in reserve for use by generations (GB)
-DEFAULT_GPU_MEM_RESERVED= 1.75
+DEFAULT_GPU_MEM_RESERVED= 2.75
 
 # actual size of a gig
 GIG = 1073741824
@@ -350,17 +350,18 @@ class ModelCache(object):
 
     def _offload_unlocked_models(self, size_needed: int=0):
         reserved = self.gpu_mem_reserved * GIG
+        vram_in_use = torch.cuda.memory_allocated()
+        self.logger.debug(f'{(vram_in_use/GIG):.2f}GB VRAM used for models; max allowed={(reserved/GIG):.2f}GB')
         for model_key, cache_entry in sorted(self._cached_models.items(), key=lambda x:x[1].size):
-            free_mem, used_mem = torch.cuda.mem_get_info()
-            free_mem -= reserved
-            self.logger.debug(f'Require {(size_needed/GIG):.2f}GB VRAM. Have {(free_mem/GIG):.2f}GB available ({(reserved/GIG):.2f} reserved).')
-            if free_mem > size_needed:
+            if vram_in_use <= reserved:
                 break
             if not cache_entry.locked and cache_entry.loaded:
                 self.logger.debug(f'Offloading {model_key} from {self.execution_device} into {self.storage_device}')
                 with VRAMUsage() as mem:
                     cache_entry.model.to(self.storage_device)
                 self.logger.debug(f'GPU VRAM freed: {(mem.vram_used/GIG):.2f} GB')
+                vram_in_use += mem.vram_used  # note vram_used is negative
+                self.logger.debug(f'{(vram_in_use/GIG):.2f}GB VRAM used for models; max allowed={(reserved/GIG):.2f}GB')
         
     def _local_model_hash(self, model_path: Union[str, Path]) -> str:
         sha = hashlib.sha256()

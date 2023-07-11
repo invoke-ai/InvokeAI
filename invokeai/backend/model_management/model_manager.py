@@ -340,6 +340,7 @@ class ModelManager(object):
             precision = precision,
             sequential_offload = sequential_offload,
             logger = logger,
+            gpu_mem_reserved = self.app_config.gpu_mem_reserved
         )
         self.cache_keys = dict()
 
