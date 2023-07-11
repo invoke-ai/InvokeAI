@@ -150,7 +150,7 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
         nodeId={nodeId}
         field={field}
         template={template}
-        base_models={['sd-1', 'sd-2']}
+        base_models={['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']}
       />
     );
   }
