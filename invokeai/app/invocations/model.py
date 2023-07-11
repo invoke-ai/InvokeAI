@@ -33,7 +33,6 @@ class ClipField(BaseModel):
     skipped_layers: int = Field(description="Number of skipped layers in text_encoder")
     loras: List[LoraInfo] = Field(description="Loras to apply on model loading")
 
-
 class VaeField(BaseModel):
     # TODO: better naming?
     vae: ModelInfo = Field(description="Info to load vae submodel")
@@ -50,6 +49,18 @@ class ModelLoaderOutput(BaseInvocationOutput):
     vae: VaeField = Field(default=None, description="Vae submodel")
     # fmt: on
 
+class SDXLModelLoaderOutput(BaseInvocationOutput):
+    """SDXL model loader output"""
+
+    # fmt: off
+    type: Literal["sdxl_model_loader_output"] = "sdxl_model_loader_output"
+
+    unet: UNetField = Field(default=None, description="UNet submodel")
+    clip: ClipField = Field(default=None, description="Tokenizer and text_encoder submodels")
+    clip2: ClipField = Field(default=None, description="Tokenizer and text_encoder submodels (2d set)")
+    vae: VaeField = Field(default=None, description="Vae submodel")
+    # fmt: on
+
 
 class MainModelField(BaseModel):
     """Main model field"""
@@ -63,7 +74,6 @@ class LoRAModelField(BaseModel):
 
     model_name: str = Field(description="Name of the LoRA model")
     base_model: BaseModelType = Field(description="Base model")
-
 
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
@@ -167,7 +177,97 @@ class MainModelLoaderInvocation(BaseInvocation):
             ),
         )
 
+class SDXLMainModelLoaderInvocation(BaseInvocation):
+    """Loads an SDXL main model, outputting its submodels."""
 
+    type: Literal["sdxl_main_model_loader"] = "sdxl_main_model_loader"
+
+    model: MainModelField = Field(description="The SDXL model to load")
+    # TODO: precision?
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "SDXL Model Loader",
+                "tags": ["model", "loader", "sdxl"],
+                "type_hints": {"model": "model"},
+            },
+        }
+
+    def invoke(self, context: InvocationContext) -> SDXLModelLoaderOutput:
+        base_model = self.model.base_model
+        model_name = self.model.model_name
+        model_type = ModelType.Main
+
+        # TODO: not found exceptions
+        if not context.services.model_manager.model_exists(
+            model_name=model_name,
+            base_model=base_model,
+            model_type=model_type,
+        ):
+            raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
+
+        return SDXLModelLoaderOutput(
+            unet=UNetField(
+                unet=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.UNet,
+                ),
+                scheduler=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Scheduler,
+                ),
+                loras=[],
+            ),
+            clip=ClipField(
+                tokenizer=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Tokenizer,
+                ),
+                text_encoder=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.TextEncoder,
+                ),
+                loras=[],
+                skipped_layers=0,
+            ),
+            clip2=ClipField(
+                tokenizer=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Tokenizer2,
+                ),
+                text_encoder=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.TextEncoder2,
+                ),
+                loras=[],
+                skipped_layers=0,
+            ),
+            vae=VaeField(
+                vae=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Vae,
+                ),
+            ),
+        )
+
+
+    
 class LoraLoaderOutput(BaseInvocationOutput):
     """Model loader output"""
 
