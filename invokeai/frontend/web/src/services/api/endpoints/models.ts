@@ -9,6 +9,7 @@ import {
   VaeModelConfig,
 } from 'services/api/types';
 
+import queryString from 'query-string';
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
 
 export type MainModelConfigEntity = MainModelConfig & { id: string };
@@ -70,7 +71,18 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
     getMainModels: build.query<EntityState<MainModelConfigEntity>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'main', base_models: ['sd-1','sd-2' ]} }),
+      query: () => {
+        const baseModels = {
+          base_models: ['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner'],
+        };
+        const baseModelsQueryStr = queryString.stringify(baseModels, {});
+        return {
+          url: `models/?${baseModelsQueryStr}`,
+          params: {
+            model_type: 'main',
+          },
+        };
+      },
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
           { id: 'MainModel', type: LIST_TAG },
