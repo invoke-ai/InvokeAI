@@ -70,7 +70,7 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
     getMainModels: build.query<EntityState<MainModelConfigEntity>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'main' } }),
+      query: () => ({ url: 'models/', params: { model_type: 'main', base_models: ['sd-1','sd-2' ]} }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
           { id: 'MainModel', type: LIST_TAG },

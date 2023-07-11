@@ -32,7 +32,7 @@ class ModelsList(BaseModel):
     responses={200: {"model": ModelsList }},
 )
 async def list_models(
-    base_models: Optional[List[Union[BaseModelType,None]]] = Query(default=None, description="Base models to include"),
+    base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
     model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
 ) -> ModelsList:
     """Gets a list of models"""
