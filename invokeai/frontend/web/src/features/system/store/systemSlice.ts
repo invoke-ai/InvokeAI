@@ -219,6 +219,9 @@ export const systemSlice = createSlice({
     progressImageSet(state, action: PayloadAction<ProgressImage | null>) {
       state.progressImage = action.payload;
     },
+    setBoardIdToAddTo(state, action: PayloadAction<string | undefined>) {
+      state.boardIdToAddTo = action.payload;
+    },
   },
   extraReducers(builder) {
     /**
@@ -226,7 +229,7 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
-      state.boardIdToAddTo = action.payload.boardId;
+      // state.boardIdToAddTo = action.payload.boardId;
       state.canceledSession = '';
     });
 
@@ -235,7 +238,7 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketUnsubscribed, (state) => {
       state.sessionId = null;
-      state.boardIdToAddTo = undefined;
+      // state.boardIdToAddTo = undefined;
     });
 
     /**
@@ -451,6 +454,7 @@ export const {
   shouldAntialiasProgressImageChanged,
   languageChanged,
   progressImageSet,
+  setBoardIdToAddTo,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

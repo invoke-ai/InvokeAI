@@ -11,12 +11,14 @@ import ParamVariationCollapse from 'features/parameters/components/Parameters/Va
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import { memo } from 'react';
 import ImageToImageTabCoreParameters from './ImageToImageTabCoreParameters';
+import BoardSelect from '../../../../parameters/components/BoardSelect';
 
 const ImageToImageTabParameters = () => {
   return (
     <>
       <ParamPositiveConditioning />
       <ParamNegativeConditioning />
+      <BoardSelect />
       <ProcessButtons />
       <ImageToImageTabCoreParameters />
       <ParamLoraCollapse />
