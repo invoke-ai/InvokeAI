@@ -50,7 +50,7 @@ const ModelList = () => {
 
   const [searchText, setSearchText] = useState<string>('');
   const [isSelectedFilter, setIsSelectedFilter] = useState<
-    'all' | 'ckpt' | 'diffusers'
+    'all' | 'checkpoint' | 'diffusers'
   >('all');
   const [_, startTransition] = useTransition();
 
@@ -73,35 +73,39 @@ const ModelList = () => {
     const modelList = mainModels.entities;
 
     Object.keys(modelList).forEach((model, i) => {
-      if (
-        modelList[model].name.toLowerCase().includes(searchText.toLowerCase())
-      ) {
+      const modelInfo = modelList[model];
+
+      // If no model info found for a model, ignore it
+      if (!modelInfo) return;
+
+      if (modelInfo.name.toLowerCase().includes(searchText.toLowerCase())) {
         filteredModelListItemsToRender.push(
           <ModelListItem
             key={i}
             modelKey={model}
-            name={modelList[model].name}
-            description={modelList[model].description}
+            name={modelInfo.name}
+            description={modelInfo.description}
           />
         );
-        if (modelList[model]?.model_format === isSelectedFilter) {
+        if (modelInfo?.model_format === isSelectedFilter) {
           localFilteredModelListItemsToRender.push(
             <ModelListItem
               key={i}
               modelKey={model}
-              name={modelList[model].name}
-              description={modelList[model].description}
+              name={modelInfo.name}
+              description={modelInfo.description}
             />
           );
         }
       }
-      if (modelList[model]?.model_format !== 'diffusers') {
+
+      if (modelInfo?.model_format !== 'diffusers') {
         ckptModelListItemsToRender.push(
           <ModelListItem
             key={i}
             modelKey={model}
-            name={modelList[model].name}
-            description={modelList[model].description}
+            name={modelInfo.name}
+            description={modelInfo.description}
           />
         );
       } else {
@@ -109,8 +113,8 @@ const ModelList = () => {
           <ModelListItem
             key={i}
             modelKey={model}
-            name={modelList[model].name}
-            description={modelList[model].description}
+            name={modelInfo.name}
+            description={modelInfo.description}
           />
         );
       }
@@ -170,7 +174,7 @@ const ModelList = () => {
           </Flex>
         )}
 
-        {isSelectedFilter === 'ckpt' && (
+        {isSelectedFilter === 'checkpoint' && (
           <Flex flexDirection="column" marginTop={4}>
             {ckptModelListItemsToRender}
           </Flex>
@@ -206,8 +210,8 @@ const ModelList = () => {
           />
           <ModelFilterButton
             label={t('modelManager.checkpointModels')}
-            onClick={() => setIsSelectedFilter('ckpt')}
-            isActive={isSelectedFilter === 'ckpt'}
+            onClick={() => setIsSelectedFilter('checkpoint')}
+            isActive={isSelectedFilter === 'checkpoint'}
           />
         </Flex>
 

@@ -45,7 +45,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
 
   const { modelToEdit, retrievedModel } = props;
 
-  const [updateMainModel, { error }] = useUpdateMainModelsMutation();
+  const [updateMainModel, { error, isLoading }] = useUpdateMainModelsMutation();
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -145,7 +145,11 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               label={t('modelManager.config')}
               {...checkpointEditForm.getInputProps('config')}
             />
-            <IAIButton disabled={isProcessing} type="submit">
+            <IAIButton
+              disabled={isProcessing}
+              type="submit"
+              isLoading={isLoading}
+            >
               {t('modelManager.updateModel')}
             </IAIButton>
           </Flex>

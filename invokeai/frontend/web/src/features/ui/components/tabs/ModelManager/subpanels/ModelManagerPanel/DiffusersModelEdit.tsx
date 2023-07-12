@@ -42,7 +42,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
   );
   const { retrievedModel, modelToEdit } = props;
 
-  const [updateMainModel, { error }] = useUpdateMainModelsMutation();
+  const [updateMainModel, { isLoading, error }] = useUpdateMainModelsMutation();
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -129,7 +129,11 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
             label={t('modelManager.vaeLocation')}
             {...diffusersEditForm.getInputProps('vae')}
           />
-          <IAIButton disabled={isProcessing} type="submit">
+          <IAIButton
+            disabled={isProcessing}
+            type="submit"
+            isLoading={isLoading}
+          >
             {t('modelManager.updateModel')}
           </IAIButton>
         </Flex>

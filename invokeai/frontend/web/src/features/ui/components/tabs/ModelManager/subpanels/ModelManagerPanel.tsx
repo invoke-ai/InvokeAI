@@ -17,19 +17,23 @@ export default function ModelManagerPanel() {
   const renderModelEditTabs = () => {
     if (!openModel || !mainModels) return;
 
-    if (mainModels['entities'][openModel]['model_format'] === 'diffusers') {
+    const openedModelData = mainModels['entities'][openModel];
+
+    if (openedModelData && openedModelData.model_format === 'diffusers') {
       return (
         <DiffusersModelEdit
           modelToEdit={openModel}
-          retrievedModel={mainModels['entities'][openModel]}
+          retrievedModel={openedModelData}
           key={openModel}
         />
       );
-    } else {
+    }
+
+    if (openedModelData && openedModelData.model_format === 'checkpoint') {
       return (
         <CheckpointModelEdit
           modelToEdit={openModel}
-          retrievedModel={mainModels['entities'][openModel]}
+          retrievedModel={openedModelData}
           key={openModel}
         />
       );
