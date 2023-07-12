@@ -70,7 +70,9 @@ export const Flow = () => {
   }, [dispatch]);
 
   const onInit: OnInit = useCallback((v: ReactFlowInstance) => {
-    if (v) v.fitView();
+    if (v) {
+      v.fitView();
+    }
   }, []);
 
   return (

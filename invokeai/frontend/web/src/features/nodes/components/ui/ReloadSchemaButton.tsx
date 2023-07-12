@@ -2,7 +2,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BiRefresh } from 'react-icons/bi';
+import { FaSyncAlt } from 'react-icons/fa';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 
 export default function ReloadSchemaButton() {
@@ -15,8 +15,7 @@ export default function ReloadSchemaButton() {
 
   return (
     <IAIIconButton
-      icon={<BiRefresh />}
-      fontSize={24}
+      icon={<FaSyncAlt />}
       tooltip={t('nodes.reloadSchema')}
       aria-label={t('nodes.reloadSchema')}
       onClick={handleReloadSchema}
