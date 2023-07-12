@@ -162,7 +162,7 @@ export const useRecallParameters = () => {
         parameterNotSetToast();
         return;
       }
-      dispatch(modelSelected(model?.id || ''));
+      dispatch(modelSelected(model));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]

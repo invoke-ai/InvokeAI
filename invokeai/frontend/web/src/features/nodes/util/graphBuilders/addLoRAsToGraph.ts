@@ -1,19 +1,23 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { forEach, size } from 'lodash-es';
-import { LoraLoaderInvocation } from 'services/api/types';
+import {
+  LoraLoaderInvocation,
+  MetadataAccumulatorInvocation,
+} from 'services/api/types';
 import { modelIdToLoRAModelField } from '../modelIdToLoRAName';
 import {
   CLIP_SKIP,
   LORA_LOADER,
   MAIN_MODEL_LOADER,
+  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
 } from './constants';
 
 export const addLoRAsToGraph = (
-  graph: NonNullableGraph,
   state: RootState,
+  graph: NonNullableGraph,
   baseNodeId: string
 ): void => {
   /**
@@ -26,6 +30,9 @@ export const addLoRAsToGraph = (
 
   const { loras } = state.lora;
   const loraCount = size(loras);
+  const metadataAccumulator = graph.nodes[
+    METADATA_ACCUMULATOR
+  ] as MetadataAccumulatorInvocation;
 
   if (loraCount > 0) {
     // Remove MAIN_MODEL_LOADER unet connection to feed it to LoRAs
@@ -62,6 +69,10 @@ export const addLoRAsToGraph = (
       weight,
     };
 
+    // add the lora to the metadata accumulator
+    metadataAccumulator.loras.push({ lora: loraField, weight });
+
+    // add to graph
     graph.nodes[currentLoraNodeId] = loraLoaderNode;
 
     if (currentLoraIndex === 0) {

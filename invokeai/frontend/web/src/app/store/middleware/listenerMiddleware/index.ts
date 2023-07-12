@@ -51,6 +51,7 @@ import {
 } from './listeners/imageUrlsReceived';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
+import { addModelsLoadedListener } from './listeners/modelsLoaded';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
 import {
   addReceivedPageOfImagesFulfilledListener,
@@ -224,3 +225,4 @@ addModelSelectedListener();
 
 // app startup
 addAppStartedListener();
+addModelsLoadedListener();

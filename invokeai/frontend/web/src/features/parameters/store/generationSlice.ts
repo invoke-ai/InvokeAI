@@ -8,12 +8,11 @@ import {
   setShouldShowAdvancedOptions,
 } from 'features/ui/store/uiSlice';
 import { clamp } from 'lodash-es';
-import { ImageDTO } from 'services/api/types';
+import { ImageDTO, MainModelField } from 'services/api/types';
 import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
 import {
   CfgScaleParam,
   HeightParam,
-  MainModelParam,
   NegativePromptParam,
   PositivePromptParam,
   SchedulerParam,
@@ -54,7 +53,7 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: MainModelParam | null;
+  model: MainModelField | null;
   vae: VaeModelParam | null;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
@@ -227,22 +226,16 @@ export const generationSlice = createSlice({
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelSelected: (state, action: PayloadAction<string>) => {
-      const [base_model, type, name] = action.payload.split('/');
+    modelChanged: (state, action: PayloadAction<MainModelField | null>) => {
+      if (!action.payload) {
+        state.model = null;
+      }
 
-      state.model = zMainModel.parse({
-        id: action.payload,
-        base_model,
-        name,
-        type,
-      });
+      state.model = zMainModel.parse(action.payload);
 
       // Clamp ClipSkip Based On Selected Model
       const { maxClip } = clipSkipMap[state.model.base_model];
       state.clipSkip = clamp(state.clipSkip, 0, maxClip);
-    },
-    modelChanged: (state, action: PayloadAction<MainModelParam>) => {
-      state.model = action.payload;
     },
     vaeSelected: (state, action: PayloadAction<VaeModelParam | null>) => {
       state.vae = action.payload;
