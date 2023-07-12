@@ -2,7 +2,7 @@
 
 ## Builder stage
 
-FROM ubuntu:22.04 AS builder
+FROM library/ubuntu:22.04 AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     elif [ "$GPU_DRIVER" = "rocm" ]; then \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm5.2"; \
     else \
-        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu117"; \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu118"; \
     fi &&\
     pip install $extra_index_url_arg \
         torch==$TORCH_VERSION \
@@ -59,18 +59,18 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # #### Build the Web UI ------------------------------------
 
-FROM node:18 as web-builder
+FROM node:18 AS web-builder
 WORKDIR /build
 COPY invokeai/frontend/web/ ./
-RUN --mount=type=cache,target=node_modules \
+RUN --mount=type=cache,target=/usr/lib/node_modules \
     npm install --include dev
-RUN --mount=type=cache,target=node_modules \
+RUN --mount=type=cache,target=/usr/lib/node_modules \
     yarn vite build
 
 
 #### Runtime stage ---------------------------------------
 
-FROM library/ubuntu:22.04 as runtime
+FROM library/ubuntu:22.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
