@@ -53,7 +53,7 @@
         "linear": "Linear",
         "nodes": "Node Editor",
         "batch": "Batch Manager",
-        "modelmanager": "Model Manager",
+        "modelManager": "Model Manager",
         "postprocessing": "Post Processing",
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
         "postProcessing": "Post Processing",
@@ -527,7 +527,9 @@
         "showOptionsPanel": "Show Options Panel",
         "hidePreview": "Hide Preview",
         "showPreview": "Show Preview",
-        "controlNetControlMode": "Control Mode"
+        "controlNetControlMode": "Control Mode",
+        "clipSkip": "Clip Skip",
+        "aspectRatio": "Ratio"
     },
     "settings": {
         "models": "Models",
@@ -551,7 +553,8 @@
         "generation": "Generation",
         "ui": "User Interface",
         "favoriteSchedulers": "Favorite Schedulers",
-        "favoriteSchedulersPlaceholder": "No schedulers favorited"
+        "favoriteSchedulersPlaceholder": "No schedulers favorited",
+        "showAdvancedOptions": "Show Advanced Options"
     },
     "toast": {
         "serverError": "Server Error",
@@ -669,6 +672,7 @@
     },
     "ui": {
         "showProgressImages": "Show Progress Images",
-        "hideProgressImages": "Hide Progress Images"
+        "hideProgressImages": "Hide Progress Images",
+        "swapSizes": "Swap Sizes"
     }
 }
