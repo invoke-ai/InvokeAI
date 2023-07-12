@@ -102,6 +102,8 @@ export type AppFeature =
 export type SDFeature =
   | 'controlNet'
   | 'noise'
+  | 'perlinNoise'
+  | 'noiseThreshold'
   | 'variation'
   | 'symmetry'
   | 'seamless'
