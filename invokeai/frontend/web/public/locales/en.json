@@ -427,6 +427,7 @@
         "customSaveLocation": "Custom Save Location",
         "merge": "Merge",
         "modelsMerged": "Models Merged",
+        "modelsMergeFailed": "Model Merge Failed",
         "mergeModels": "Merge Models",
         "modelOne": "Model 1",
         "modelTwo": "Model 2",
@@ -447,7 +448,8 @@
         "weightedSum": "Weighted Sum",
         "none": "none",
         "addDifference": "Add Difference",
-        "pickModelType": "Pick Model Type"
+        "pickModelType": "Pick Model Type",
+        "selectModel": "Select Model"
     },
     "parameters": {
         "general": "General",

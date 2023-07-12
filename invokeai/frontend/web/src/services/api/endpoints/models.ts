@@ -6,6 +6,7 @@ import {
   ControlNetModelConfig,
   LoRAModelConfig,
   MainModelConfig,
+  MergeModelConfig,
   TextualInversionModelConfig,
   VaeModelConfig,
 } from 'services/api/types';
@@ -47,6 +48,11 @@ type DeleteMainModelQuery = {
 type ConvertMainModelQuery = {
   base_model: BaseModelType;
   model_name: string;
+};
+
+type MergeMainModelQuery = {
+  base_model: BaseModelType;
+  body: MergeModelConfig;
 };
 
 const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
@@ -143,7 +149,7 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['MainModel'],
     }),
-    convertMainModel: build.mutation<
+    convertMainModels: build.mutation<
       EntityState<MainModelConfigEntity>,
       ConvertMainModelQuery
     >({
@@ -151,6 +157,19 @@ export const modelsApi = api.injectEndpoints({
         return {
           url: `models/convert/${base_model}/main/${model_name}`,
           method: 'PUT',
+        };
+      },
+      invalidatesTags: ['MainModel'],
+    }),
+    mergeMainModels: build.mutation<
+      EntityState<MainModelConfigEntity>,
+      MergeMainModelQuery
+    >({
+      query: ({ base_model, body }) => {
+        return {
+          url: `models/merge/${base_model}`,
+          method: 'PUT',
+          body: body,
         };
       },
       invalidatesTags: ['MainModel'],
@@ -300,5 +319,6 @@ export const {
   useGetVaeModelsQuery,
   useUpdateMainModelsMutation,
   useDeleteMainModelsMutation,
-  useConvertMainModelMutation,
+  useConvertMainModelsMutation,
+  useMergeMainModelsMutation,
 } = modelsApi;

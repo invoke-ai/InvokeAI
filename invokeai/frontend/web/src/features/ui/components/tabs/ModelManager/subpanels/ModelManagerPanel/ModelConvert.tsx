@@ -7,7 +7,8 @@ import IAIButton from 'common/components/IAIButton';
 import { addToast } from 'features/system/store/systemSlice';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useConvertMainModelMutation } from 'services/api/endpoints/models';
+
+import { useConvertMainModelsMutation } from 'services/api/endpoints/models';
 import { CheckpointModelConfig } from './CheckpointModelEdit';
 
 interface ModelConvertProps {
@@ -21,7 +22,7 @@ export default function ModelConvert(props: ModelConvertProps) {
   const { t } = useTranslation();
 
   const [convertModel, { isLoading, error, data }] =
-    useConvertMainModelMutation();
+    useConvertMainModelsMutation();
 
   const [saveLocation, setSaveLocation] = useState<string>('same');
   const [customSaveLocation, setCustomSaveLocation] = useState<string>('');

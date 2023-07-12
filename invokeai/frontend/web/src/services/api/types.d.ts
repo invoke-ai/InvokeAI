@@ -50,6 +50,7 @@ export type AnyModelConfig =
   | ControlNetModelConfig
   | TextualInversionModelConfig
   | MainModelConfig;
+export type MergeModelConfig = components['schemas']['Body_merge_models'];
 
 // Graphs
 export type Graph = components['schemas']['Graph'];
