@@ -1,6 +1,7 @@
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { map, omit } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaSave } from 'react-icons/fa';
@@ -14,6 +15,11 @@ const SaveNodesButton = () => {
   const saveEditorToJSON = useCallback(() => {
     if (editorInstance) {
       const editorState = editorInstance.toObject();
+
+      editorState.edges = map(editorState.edges, (edge) => {
+        return omit(edge, ['style']);
+      });
+
       const nodeSetupJSON = new Blob([JSON.stringify(editorState)]);
       const nodeDownloadElement = document.createElement('a');
       nodeDownloadElement.href = URL.createObjectURL(nodeSetupJSON);
