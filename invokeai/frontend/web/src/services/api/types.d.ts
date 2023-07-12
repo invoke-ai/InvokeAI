@@ -10,6 +10,7 @@ type TypeReq<T> = O.Required<T, 'type'>;
 
 // App Info
 export type AppVersion = components['schemas']['AppVersion'];
+export type AppConfig = components['schemas']['AppConfig'];
 
 // Images
 export type ImageDTO = components['schemas']['ImageDTO'];

@@ -219,6 +219,9 @@ export const systemSlice = createSlice({
     progressImageSet(state, action: PayloadAction<ProgressImage | null>) {
       state.progressImage = action.payload;
     },
+    setAvailableInfillMethods(state, action: PayloadAction<InfillMethod[]>) {
+      state.infillMethods = action.payload;
+    },
   },
   extraReducers(builder) {
     /**
@@ -451,6 +454,7 @@ export const {
   shouldAntialiasProgressImageChanged,
   languageChanged,
   progressImageSet,
+  setAvailableInfillMethods,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

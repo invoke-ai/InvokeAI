@@ -1,5 +1,5 @@
 import { api } from '..';
-import { AppVersion } from '../types';
+import { AppVersion, AppConfig } from '../types';
 
 export const appInfoApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -9,7 +9,13 @@ export const appInfoApi = api.injectEndpoints({
         method: 'GET',
       }),
     }),
+    getAppConfig: build.query<AppConfig, void>({
+      query: () => ({
+        url: `app/config`,
+        method: 'GET',
+      }),
+    }),
   }),
 });
 
-export const { useGetAppVersionQuery } = appInfoApi;
+export const { useGetAppVersionQuery, useGetAppConfigQuery } = appInfoApi;

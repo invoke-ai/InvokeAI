@@ -6,8 +6,10 @@ import { generationSelector } from 'features/parameters/store/generationSelector
 import { setInfillMethod } from 'features/parameters/store/generationSlice';
 import { systemSelector } from 'features/system/store/systemSelectors';
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetAppConfigQuery } from '../../../../../../services/api/endpoints/appInfo';
+import { setAvailableInfillMethods } from '../../../../../system/store/systemSlice';
 
 const selector = createSelector(
   [generationSelector, systemSelector],
@@ -27,6 +29,8 @@ const ParamInfillMethod = () => {
   const dispatch = useAppDispatch();
   const { infillMethod, infillMethods } = useAppSelector(selector);
 
+  const { data: appConfigData } = useGetAppConfigQuery();
+
   const { t } = useTranslation();
 
   const handleChange = useCallback(
@@ -35,6 +39,19 @@ const ParamInfillMethod = () => {
     },
     [dispatch]
   );
+
+  useEffect(() => {
+    if (!appConfigData) return;
+    if (!appConfigData.patchmatch_enabled) {
+      const filteredMethods = infillMethods.filter(
+        (method) => method !== 'patchmatch'
+      );
+      dispatch(setAvailableInfillMethods(filteredMethods));
+      dispatch(setInfillMethod(filteredMethods[0]));
+    } else {
+      dispatch(setInfillMethod('patchmatch'));
+    }
+  }, [appConfigData, infillMethods, dispatch]);
 
   return (
     <IAIMantineSelect
