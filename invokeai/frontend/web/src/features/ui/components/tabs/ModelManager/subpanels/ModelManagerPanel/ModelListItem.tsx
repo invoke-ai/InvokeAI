@@ -8,6 +8,7 @@ import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { setOpenModel } from 'features/system/store/systemSlice';
 import { useTranslation } from 'react-i18next';
+import { useDeleteMainModelsMutation } from 'services/api/endpoints/models';
 
 type ModelListItemProps = {
   modelKey: string;
@@ -24,6 +25,8 @@ export default function ModelListItem(props: ModelListItemProps) {
     (state: RootState) => state.system.openModel
   );
 
+  const [deleteMainModel] = useDeleteMainModelsMutation();
+
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
@@ -35,7 +38,11 @@ export default function ModelListItem(props: ModelListItemProps) {
   };
 
   const handleModelDelete = () => {
-    dispatch(deleteModel(modelKey));
+    const [base_model, _, model_name] = modelKey.split('/');
+    deleteMainModel({
+      base_model: base_model,
+      model_name: model_name,
+    });
     dispatch(setOpenModel(null));
   };
 

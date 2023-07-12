@@ -39,6 +39,11 @@ type UpdateMainModelQuery = {
   body: MainModelConfig;
 };
 
+type DeleteMainModelQuery = {
+  base_model: BaseModelType;
+  model_name: string;
+};
+
 const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
@@ -117,6 +122,18 @@ export const modelsApi = api.injectEndpoints({
           url: `models/${base_model}/main/${model_name}`,
           method: 'PATCH',
           body: body,
+        };
+      },
+      invalidatesTags: ['MainModel'],
+    }),
+    deleteMainModels: build.mutation<
+      EntityState<MainModelConfigEntity>,
+      DeleteMainModelQuery
+    >({
+      query: ({ base_model, model_name }) => {
+        return {
+          url: `models/${base_model}/main/${model_name}`,
+          method: 'DELETE',
         };
       },
       invalidatesTags: ['MainModel'],
@@ -265,4 +282,5 @@ export const {
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,
   useUpdateMainModelsMutation,
+  useDeleteMainModelsMutation,
 } = modelsApi;
