@@ -7,8 +7,10 @@ import {
   OnConnectEnd,
   OnConnectStart,
   OnEdgesChange,
+  OnInit,
   OnNodesChange,
   ReactFlow,
+  ReactFlowInstance,
 } from 'reactflow';
 import {
   connectionEnded,
@@ -67,6 +69,12 @@ export const Flow = () => {
     dispatch(connectionEnded());
   }, [dispatch]);
 
+  const onInit: OnInit = useCallback((v: ReactFlowInstance) => {
+    if (v) {
+      v.fitView();
+    }
+  }, []);
+
   return (
     <ReactFlow
       nodeTypes={nodeTypes}
@@ -77,6 +85,7 @@ export const Flow = () => {
       onConnectStart={onConnectStart}
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
+      onInit={onInit}
       defaultEdgeOptions={{
         style: { strokeWidth: 2 },
       }}
