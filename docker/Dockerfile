@@ -35,7 +35,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cpu"; \
     elif [ "$GPU_DRIVER" = "rocm" ]; then \
-        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm5.2"; \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm5.4.2"; \
     else \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu118"; \
     fi &&\
@@ -90,7 +90,8 @@ RUN apt update && apt install -y --no-install-recommends \
         python3-venv \
         python3-pip \
         build-essential \
-        libopencv-dev &&\
+        libopencv-dev \
+        libstdc++-10-dev &&\
     apt-get clean && apt-get autoclean
 
 # globally add magic-wormhole
@@ -107,6 +108,11 @@ ENV PATH="$VIRTUAL_ENV/bin:$INVOKEAI_SRC:$PATH"
 COPY --link --from=builder ${INVOKEAI_SRC} ${INVOKEAI_SRC}
 COPY --link --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 COPY --link --from=web-builder /build/dist ${INVOKEAI_SRC}/invokeai/frontend/web/dist
+
+# Link amdgpu.ids for ROCm builds
+# contributed by https://github.com/Rubonnek
+RUN mkdir -p "/opt/amdgpu/share/libdrm" &&\
+  ln -s "/usr/share/libdrm/amdgpu.ids" "/opt/amdgpu/share/libdrm/amdgpu.ids"
 
 WORKDIR ${INVOKEAI_SRC}
 
