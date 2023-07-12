@@ -45,7 +45,7 @@ export default function ModelConvert(props: ModelConvertProps) {
       dispatch(
         addToast(
           makeToast({
-            title: t('modelManager.modelConversionFailed'),
+            title: `${t('modelManager.modelConversionFailed')}: ${model.name}`,
             status: 'error',
           })
         )
@@ -56,7 +56,7 @@ export default function ModelConvert(props: ModelConvertProps) {
       dispatch(
         addToast(
           makeToast({
-            title: t('modelManager.modelConverted'),
+            title: `${t('modelManager.modelConverted')}: ${model.name}`,
             status: 'success',
           })
         )
