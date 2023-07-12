@@ -77,7 +77,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
         addToast(
           makeToast({
             title: t('modelManager.modelUpdateFailed'),
-            status: 'success',
+            status: 'error',
           })
         )
       );
