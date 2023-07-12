@@ -1,6 +1,14 @@
-import { Tab, TabList, TabPanel, TabPanels, Tabs } from '@chakra-ui/react';
+import {
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  useColorMode,
+} from '@chakra-ui/react';
 import i18n from 'i18n';
 import { ReactNode, memo } from 'react';
+import { mode } from 'theme/util/mode';
 import AddModelsPanel from './subpanels/AddModelsPanel';
 import MergeModelsPanel from './subpanels/MergeModelsPanel';
 import ModelManagerPanel from './subpanels/ModelManagerPanel';
@@ -31,41 +39,43 @@ const modelManagerTabs: ModelManagerTabInfo[] = [
   },
 ];
 
-const renderTabsList = () => {
-  const modelManagerTabListsToRender: ReactNode[] = [];
-  modelManagerTabs.forEach((modelManagerTab) => {
-    modelManagerTabListsToRender.push(
-      <Tab key={modelManagerTab.id}>{modelManagerTab.label}</Tab>
-    );
-  });
-
-  return (
-    <TabList
-      sx={{
-        w: '100%',
-        color: 'base.200',
-        flexDirection: 'row',
-        borderBottomWidth: 2,
-        borderColor: 'accent.700',
-      }}
-    >
-      {modelManagerTabListsToRender}
-    </TabList>
-  );
-};
-
-const renderTabPanels = () => {
-  const modelManagerTabPanelsToRender: ReactNode[] = [];
-  modelManagerTabs.forEach((modelManagerTab) => {
-    modelManagerTabPanelsToRender.push(
-      <TabPanel key={modelManagerTab.id}>{modelManagerTab.content}</TabPanel>
-    );
-  });
-
-  return <TabPanels sx={{ p: 2 }}>{modelManagerTabPanelsToRender}</TabPanels>;
-};
-
 const ModelManagerTab = () => {
+  const { colorMode } = useColorMode();
+
+  const renderTabsList = () => {
+    const modelManagerTabListsToRender: ReactNode[] = [];
+
+    modelManagerTabs.forEach((modelManagerTab) => {
+      modelManagerTabListsToRender.push(
+        <Tab key={modelManagerTab.id}>{modelManagerTab.label}</Tab>
+      );
+    });
+
+    return (
+      <TabList
+        sx={{
+          w: '100%',
+          color: mode('base.900', 'base.400')(colorMode),
+          flexDirection: 'row',
+          borderBottomWidth: 2,
+          borderColor: mode('accent.300', 'accent.600')(colorMode),
+        }}
+      >
+        {modelManagerTabListsToRender}
+      </TabList>
+    );
+  };
+
+  const renderTabPanels = () => {
+    const modelManagerTabPanelsToRender: ReactNode[] = [];
+    modelManagerTabs.forEach((modelManagerTab) => {
+      modelManagerTabPanelsToRender.push(
+        <TabPanel key={modelManagerTab.id}>{modelManagerTab.content}</TabPanel>
+      );
+    });
+
+    return <TabPanels sx={{ p: 2 }}>{modelManagerTabPanelsToRender}</TabPanels>;
+  };
   return (
     <Tabs
       isLazy

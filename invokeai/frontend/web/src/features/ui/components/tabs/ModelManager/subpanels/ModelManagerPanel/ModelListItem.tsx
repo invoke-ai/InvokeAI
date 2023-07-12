@@ -1,5 +1,12 @@
 import { DeleteIcon, EditIcon } from '@chakra-ui/icons';
-import { Box, Flex, Spacer, Text, Tooltip } from '@chakra-ui/react';
+import {
+  Box,
+  Flex,
+  Spacer,
+  Text,
+  Tooltip,
+  useColorMode,
+} from '@chakra-ui/react';
 
 // import { deleteModel, requestModelChange } from 'app/socketio/actions';
 import { RootState } from 'app/store/store';
@@ -9,6 +16,8 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { setOpenModel } from 'features/system/store/systemSlice';
 import { useTranslation } from 'react-i18next';
 import { useDeleteMainModelsMutation } from 'services/api/endpoints/models';
+import { BaseModelType } from 'services/api/types';
+import { mode } from 'theme/util/mode';
 
 type ModelListItemProps = {
   modelKey: string;
@@ -20,6 +29,8 @@ export default function ModelListItem(props: ModelListItemProps) {
   const { isProcessing, isConnected } = useAppSelector(
     (state: RootState) => state.system
   );
+
+  const { colorMode } = useColorMode();
 
   const openModel = useAppSelector(
     (state: RootState) => state.system.openModel
@@ -40,7 +51,7 @@ export default function ModelListItem(props: ModelListItemProps) {
   const handleModelDelete = () => {
     const [base_model, _, model_name] = modelKey.split('/');
     deleteMainModel({
-      base_model: base_model,
+      base_model: base_model as BaseModelType,
       model_name: model_name,
     });
     dispatch(setOpenModel(null));
@@ -54,14 +65,14 @@ export default function ModelListItem(props: ModelListItemProps) {
       sx={
         modelKey === openModel
           ? {
-              bg: 'accent.750',
+              bg: mode('accent.200', 'accent.600')(colorMode),
               _hover: {
-                bg: 'accent.750',
+                bg: mode('accent.200', 'accent.600')(colorMode),
               },
             }
           : {
               _hover: {
-                bg: 'base.750',
+                bg: mode('base.100', 'base.800')(colorMode),
               },
             }
       }

@@ -1,4 +1,4 @@
-import { Box, Flex, Spinner, Text } from '@chakra-ui/react';
+import { Box, Flex, Spinner, Text, useColorMode } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 
@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import type { ChangeEvent, ReactNode } from 'react';
 import React, { useMemo, useState, useTransition } from 'react';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { mode } from 'theme/util/mode';
 
 function ModelFilterButton({
   label,
@@ -20,16 +21,7 @@ function ModelFilterButton({
   onClick: () => void;
 }) {
   return (
-    <IAIButton
-      onClick={onClick}
-      isActive={isActive}
-      sx={{
-        _active: {
-          bg: 'accent.750',
-        },
-      }}
-      size="sm"
-    >
+    <IAIButton onClick={onClick} isChecked={isActive} size="sm">
       {label}
     </IAIButton>
   );
@@ -37,6 +29,7 @@ function ModelFilterButton({
 
 const ModelList = () => {
   const { data: mainModels } = useGetMainModelsQuery();
+  const { colorMode } = useColorMode();
 
   const [renderModelList, setRenderModelList] = React.useState<boolean>(false);
 
@@ -130,41 +123,46 @@ const ModelList = () => {
       <Flex flexDirection="column" rowGap={6}>
         {isSelectedFilter === 'all' && (
           <>
-            <Box>
-              <Text
-                sx={{
-                  fontWeight: '500',
-                  py: 2,
-                  px: 4,
-                  mb: 4,
-                  borderRadius: 'base',
-                  width: 'max-content',
-                  fontSize: 'sm',
-                  bg: 'base.750',
-                }}
-              >
-                {t('modelManager.diffusersModels')}
-              </Text>
-              {diffusersModelListItemsToRender}
-            </Box>
-            <Box>
-              <Text
-                sx={{
-                  fontWeight: '500',
-                  py: 2,
-                  px: 4,
-                  my: 4,
-                  mx: 0,
-                  borderRadius: 'base',
-                  width: 'max-content',
-                  fontSize: 'sm',
-                  bg: 'base.750',
-                }}
-              >
-                {t('modelManager.checkpointModels')}
-              </Text>
-              {ckptModelListItemsToRender}
-            </Box>
+            {diffusersModelListItemsToRender.length > 0 && (
+              <Box>
+                <Text
+                  sx={{
+                    fontWeight: '500',
+                    py: 2,
+                    px: 4,
+                    mb: 4,
+                    borderRadius: 'base',
+                    width: 'max-content',
+                    fontSize: 'sm',
+                    bg: mode('base.100', 'base.800')(colorMode),
+                  }}
+                >
+                  {t('modelManager.diffusersModels')}
+                </Text>
+                {diffusersModelListItemsToRender}
+              </Box>
+            )}
+
+            {ckptModelListItemsToRender.length > 0 && (
+              <Box>
+                <Text
+                  sx={{
+                    fontWeight: '500',
+                    py: 2,
+                    px: 4,
+                    my: 4,
+                    mx: 0,
+                    borderRadius: 'base',
+                    width: 'max-content',
+                    fontSize: 'sm',
+                    bg: mode('base.150', 'base.750')(colorMode),
+                  }}
+                >
+                  {t('modelManager.checkpointModels')}
+                </Text>
+                {ckptModelListItemsToRender}
+              </Box>
+            )}
           </>
         )}
 
@@ -181,7 +179,7 @@ const ModelList = () => {
         )}
       </Flex>
     );
-  }, [mainModels, searchText, t, isSelectedFilter]);
+  }, [mainModels, searchText, t, isSelectedFilter, colorMode]);
 
   return (
     <Flex flexDirection="column" rowGap={4} width="50%" minWidth="50%">
