@@ -6,7 +6,7 @@ import { loadFileEdges, loadFileNodes } from 'features/nodes/store/nodesSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BiUpload } from 'react-icons/bi';
+import { FaUpload } from 'react-icons/fa';
 import { useReactFlow } from 'reactflow';
 
 const LoadNodesButton = () => {
@@ -66,8 +66,7 @@ const LoadNodesButton = () => {
     >
       {(props) => (
         <IAIIconButton
-          icon={<BiUpload />}
-          fontSize={20}
+          icon={<FaUpload />}
           tooltip={t('nodes.loadNodes')}
           aria-label={t('nodes.loadNodes')}
           {...props}

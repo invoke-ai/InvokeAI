@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BiSave } from 'react-icons/bi';
+import { FaSave } from 'react-icons/fa';
 
 const SaveNodesButton = () => {
   const { t } = useTranslation();
@@ -27,8 +27,8 @@ const SaveNodesButton = () => {
 
   return (
     <IAIIconButton
-      icon={<BiSave />}
-      fontSize={20}
+      icon={<FaSave />}
+      fontSize={18}
       tooltip={t('nodes.saveNodes')}
       aria-label={t('nodes.saveNodes')}
       onClick={saveEditorToJSON}
