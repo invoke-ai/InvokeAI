@@ -538,9 +538,9 @@ class ModelManager(object):
             model_dict = dict(
                 **model_config.dict(exclude_defaults=True),
                 # OpenAPIModelInfoBase
-                name=cur_model_name,
+                model_name=cur_model_name,
                 base_model=cur_base_model,
-                type=cur_model_type,
+                model_type=cur_model_type,
             )
 
             models.append(model_dict)
