@@ -9,7 +9,7 @@ import { useForm } from '@mantine/form';
 import { makeToast } from 'app/components/Toaster';
 import type { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
-import IAIInput from 'common/components/IAIInput';
+import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
 import { addToast } from 'features/system/store/systemSlice';
@@ -57,6 +57,10 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
       model_format: 'diffusers',
       vae: retrievedModel.vae ? retrievedModel.vae : '',
       variant: retrievedModel.variant,
+    },
+    validate: {
+      path: (value) =>
+        value.trim().length === 0 ? 'Must provide a path' : null,
     },
   });
 
@@ -107,7 +111,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
         )}
       >
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <IAIInput
+          <IAIMantineTextInput
             label={t('modelManager.description')}
             {...diffusersEditForm.getInputProps('description')}
           />
@@ -121,11 +125,11 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
             data={variantSelectData}
             {...diffusersEditForm.getInputProps('variant')}
           />
-          <IAIInput
+          <IAIMantineTextInput
             label={t('modelManager.modelLocation')}
             {...diffusersEditForm.getInputProps('path')}
           />
-          <IAIInput
+          <IAIMantineTextInput
             label={t('modelManager.vaeLocation')}
             {...diffusersEditForm.getInputProps('vae')}
           />

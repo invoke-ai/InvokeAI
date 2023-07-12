@@ -8,11 +8,11 @@ import { useTranslation } from 'react-i18next';
 
 import type { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
-import IAIInput from 'common/components/IAIInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
 
 import { makeToast } from 'app/components/Toaster';
+import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import { addToast } from 'features/system/store/systemSlice';
 import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
 import { components } from 'services/api/schema';
@@ -61,6 +61,10 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
       vae: retrievedModel.vae ? retrievedModel.vae : '',
       config: retrievedModel.config ? retrievedModel.config : '',
       variant: retrievedModel.variant,
+    },
+    validate: {
+      path: (value) =>
+        value.trim().length === 0 ? 'Must provide a path' : null,
     },
   });
 
@@ -119,7 +123,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
           )}
         >
           <Flex flexDirection="column" overflowY="scroll" gap={4}>
-            <IAIInput
+            <IAIMantineTextInput
               label={t('modelManager.description')}
               {...checkpointEditForm.getInputProps('description')}
             />
@@ -133,15 +137,15 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               data={variantSelectData}
               {...checkpointEditForm.getInputProps('variant')}
             />
-            <IAIInput
+            <IAIMantineTextInput
               label={t('modelManager.modelLocation')}
               {...checkpointEditForm.getInputProps('path')}
             />
-            <IAIInput
+            <IAIMantineTextInput
               label={t('modelManager.vaeLocation')}
               {...checkpointEditForm.getInputProps('vae')}
             />
-            <IAIInput
+            <IAIMantineTextInput
               label={t('modelManager.config')}
               {...checkpointEditForm.getInputProps('config')}
             />
