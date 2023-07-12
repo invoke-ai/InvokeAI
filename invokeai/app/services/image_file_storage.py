@@ -1,14 +1,14 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
+import json
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
 from typing import Dict, Optional, Union
 
-from PIL.Image import Image as PILImageType
 from PIL import Image, PngImagePlugin
+from PIL.Image import Image as PILImageType
 from send2trash import send2trash
 
-from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 
@@ -59,7 +59,8 @@ class ImageFileStorageBase(ABC):
         self,
         image: PILImageType,
         image_name: str,
-        metadata: Optional[ImageMetadata] = None,
+        metadata: Optional[dict] = None,
+        graph: Optional[dict] = None,
         thumbnail_size: int = 256,
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
@@ -110,20 +111,22 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self,
         image: PILImageType,
         image_name: str,
-        metadata: Optional[ImageMetadata] = None,
+        metadata: Optional[dict] = None,
+        graph: Optional[dict] = None,
         thumbnail_size: int = 256,
     ) -> None:
         try:
             self.__validate_storage_folders()
             image_path = self.get_path(image_name)
 
+            pnginfo = PngImagePlugin.PngInfo()
+            
             if metadata is not None:
-                pnginfo = PngImagePlugin.PngInfo()
-                pnginfo.add_text("invokeai", metadata.json())
-                image.save(image_path, "PNG", pnginfo=pnginfo)
-            else:
-                image.save(image_path, "PNG")
+                pnginfo.add_text("metadata", json.dumps(metadata))
+            if graph is not None:
+                pnginfo.add_text("graph", json.dumps(graph))
 
+            image.save(image_path, "PNG", pnginfo=pnginfo)
             thumbnail_name = get_thumbnail_name(image_name)
             thumbnail_path = self.get_path(thumbnail_name, thumbnail=True)
             thumbnail_image = make_thumbnail(image, thumbnail_size)
