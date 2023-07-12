@@ -674,5 +674,8 @@
         "showProgressImages": "Show Progress Images",
         "hideProgressImages": "Hide Progress Images",
         "swapSizes": "Swap Sizes"
+    },
+    "nodes": {
+        "reloadSchema": "Reload Schema"
     }
 }
