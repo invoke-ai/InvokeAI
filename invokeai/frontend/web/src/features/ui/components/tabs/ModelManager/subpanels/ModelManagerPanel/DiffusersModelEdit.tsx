@@ -6,20 +6,23 @@ import { Divider, Flex, Text } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
 
 import { useForm } from '@mantine/form';
+import { makeToast } from 'app/components/Toaster';
 import type { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
-import { S } from 'services/api/types';
+import { addToast } from 'features/system/store/systemSlice';
+import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
+import { components } from 'services/api/schema';
 
-type DiffusersModel =
-  | S<'StableDiffusion1ModelDiffusersConfig'>
-  | S<'StableDiffusion2ModelDiffusersConfig'>;
+export type DiffusersModelConfig =
+  | components['schemas']['StableDiffusion1ModelDiffusersConfig']
+  | components['schemas']['StableDiffusion2ModelDiffusersConfig'];
 
 type DiffusersModelEditProps = {
   modelToEdit: string;
-  retrievedModel: DiffusersModel;
+  retrievedModel: DiffusersModelConfig;
 };
 
 const baseModelSelectData = [
@@ -39,24 +42,51 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
   );
   const { retrievedModel, modelToEdit } = props;
 
+  const [updateMainModel, { error }] = useUpdateMainModelsMutation();
+
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const diffusersEditForm = useForm({
+  const diffusersEditForm = useForm<DiffusersModelConfig>({
     initialValues: {
-      name: retrievedModel.name,
+      name: retrievedModel.name ? retrievedModel.name : '',
       base_model: retrievedModel.base_model,
       type: 'main',
-      path: retrievedModel.path,
-      description: retrievedModel.description,
+      path: retrievedModel.path ? retrievedModel.path : '',
+      description: retrievedModel.description ? retrievedModel.description : '',
       model_format: 'diffusers',
-      vae: retrievedModel.vae,
+      vae: retrievedModel.vae ? retrievedModel.vae : '',
       variant: retrievedModel.variant,
     },
   });
 
-  const editModelFormSubmitHandler = (values) => {
-    console.log(values);
+  const editModelFormSubmitHandler = (values: DiffusersModelConfig) => {
+    const responseBody = {
+      base_model: retrievedModel.base_model,
+      model_name: retrievedModel.name,
+      body: values,
+    };
+    updateMainModel(responseBody);
+
+    if (error) {
+      dispatch(
+        addToast(
+          makeToast({
+            title: t('modelManager.modelUpdateFailed'),
+            status: 'success',
+          })
+        )
+      );
+    }
+
+    dispatch(
+      addToast(
+        makeToast({
+          title: t('modelManager.modelUpdated'),
+          status: 'success',
+        })
+      )
+    );
   };
 
   return modelToEdit ? (
@@ -77,10 +107,6 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
         )}
       >
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <IAIInput
-            label={t('modelManager.name')}
-            {...diffusersEditForm.getInputProps('name')}
-          />
           <IAIInput
             label={t('modelManager.description')}
             {...diffusersEditForm.getInputProps('description')}

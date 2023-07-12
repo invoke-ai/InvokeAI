@@ -2,6 +2,7 @@ import { EntityState, createEntityAdapter } from '@reduxjs/toolkit';
 import { cloneDeep } from 'lodash-es';
 import {
   AnyModelConfig,
+  BaseModelType,
   ControlNetModelConfig,
   LoRAModelConfig,
   MainModelConfig,
@@ -31,6 +32,12 @@ type AnyModelConfigEntity =
   | ControlNetModelConfigEntity
   | TextualInversionModelConfigEntity
   | VaeModelConfigEntity;
+
+type UpdateMainModelQuery = {
+  base_model: BaseModelType;
+  model_name: string;
+  body: MainModelConfig;
+};
 
 const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.name.localeCompare(b.name),
@@ -100,6 +107,19 @@ export const modelsApi = api.injectEndpoints({
           entities
         );
       },
+    }),
+    updateMainModels: build.mutation<
+      EntityState<MainModelConfigEntity>,
+      UpdateMainModelQuery
+    >({
+      query: ({ base_model, model_name, body }) => {
+        return {
+          url: `models/${base_model}/main/${model_name}`,
+          method: 'PATCH',
+          body: body,
+        };
+      },
+      invalidatesTags: ['MainModel'],
     }),
     getLoRAModels: build.query<EntityState<LoRAModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
@@ -244,4 +264,5 @@ export const {
   useGetLoRAModelsQuery,
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,
+  useUpdateMainModelsMutation,
 } = modelsApi;

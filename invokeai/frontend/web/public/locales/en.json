@@ -342,6 +342,7 @@
         "safetensorModels": "SafeTensors",
         "modelAdded": "Model Added",
         "modelUpdated": "Model Updated",
+        "modelUpdateFailed": "Model Update Failed",
         "modelEntryDeleted": "Model Entry Deleted",
         "cannotUseSpaces": "Cannot Use Spaces",
         "addNew": "Add New",

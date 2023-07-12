@@ -11,7 +11,11 @@ import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
-import { S } from 'services/api/types';
+
+import { makeToast } from 'app/components/Toaster';
+import { addToast } from 'features/system/store/systemSlice';
+import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
+import { components } from 'services/api/schema';
 import ModelConvert from './ModelConvert';
 
 const baseModelSelectData = [
@@ -25,13 +29,13 @@ const variantSelectData = [
   { value: 'depth', label: 'Depth' },
 ];
 
-export type CheckpointModel =
-  | S<'StableDiffusion1ModelCheckpointConfig'>
-  | S<'StableDiffusion2ModelCheckpointConfig'>;
+export type CheckpointModelConfig =
+  | components['schemas']['StableDiffusion1ModelCheckpointConfig']
+  | components['schemas']['StableDiffusion2ModelCheckpointConfig'];
 
 type CheckpointModelEditProps = {
   modelToEdit: string;
-  retrievedModel: CheckpointModel;
+  retrievedModel: CheckpointModelConfig;
 };
 
 export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
@@ -41,25 +45,52 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
 
   const { modelToEdit, retrievedModel } = props;
 
+  const [updateMainModel, { error }] = useUpdateMainModelsMutation();
+
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const checkpointEditForm = useForm({
+  const checkpointEditForm = useForm<CheckpointModelConfig>({
     initialValues: {
-      name: retrievedModel.name,
+      name: retrievedModel.name ? retrievedModel.name : '',
       base_model: retrievedModel.base_model,
       type: 'main',
-      path: retrievedModel.path,
-      description: retrievedModel.description,
+      path: retrievedModel.path ? retrievedModel.path : '',
+      description: retrievedModel.description ? retrievedModel.description : '',
       model_format: 'checkpoint',
-      vae: retrievedModel.vae,
-      config: retrievedModel.config,
+      vae: retrievedModel.vae ? retrievedModel.vae : '',
+      config: retrievedModel.config ? retrievedModel.config : '',
       variant: retrievedModel.variant,
     },
   });
 
-  const editModelFormSubmitHandler = (values) => {
-    console.log(values);
+  const editModelFormSubmitHandler = (values: CheckpointModelConfig) => {
+    const responseBody = {
+      base_model: retrievedModel.base_model,
+      model_name: retrievedModel.name,
+      body: values,
+    };
+    updateMainModel(responseBody);
+
+    if (error) {
+      dispatch(
+        addToast(
+          makeToast({
+            title: t('modelManager.modelUpdateFailed'),
+            status: 'success',
+          })
+        )
+      );
+    }
+
+    dispatch(
+      addToast(
+        makeToast({
+          title: t('modelManager.modelUpdated'),
+          status: 'success',
+        })
+      )
+    );
   };
 
   return modelToEdit ? (
@@ -88,10 +119,6 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
           )}
         >
           <Flex flexDirection="column" overflowY="scroll" gap={4}>
-            <IAIInput
-              label={t('modelManager.name')}
-              {...checkpointEditForm.getInputProps('name')}
-            />
             <IAIInput
               label={t('modelManager.description')}
               {...checkpointEditForm.getInputProps('description')}
