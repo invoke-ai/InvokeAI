@@ -118,7 +118,6 @@ const CurrentImagePreview = () => {
             width: 'full',
             height: 'full',
             borderRadius: 'base',
-            overflow: 'scroll',
           }}
         >
           <ImageMetadataViewer image={imageDTO} />
