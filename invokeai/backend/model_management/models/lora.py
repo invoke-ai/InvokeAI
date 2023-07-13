@@ -9,6 +9,7 @@ from .base import (
     ModelType,
     SubModelType,
     classproperty,
+    InvalidModelException,
 )
 # TODO: naming
 from ..lora import LoRAModel as LoRAModelRaw
@@ -56,10 +57,18 @@ class LoRAModel(ModelBase):
 
     @classmethod
     def detect_format(cls, path: str):
+        if not os.path.exists(path):
+            raise ModelNotFoundException()
+
         if os.path.isdir(path):
-            return LoRAModelFormat.Diffusers
-        else:
-            return LoRAModelFormat.LyCORIS
+            if os.path.exists(os.path.join(path, "pytorch_lora_weights.bin")):
+                return LoRAModelFormat.Diffusers
+
+        if os.path.isfile(path):
+            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+                return LoRAModelFormat.LyCORIS
+
+        raise InvalidModelException(f"Not a valid model: {path}")
 
     @classmethod
     def convert_if_required(

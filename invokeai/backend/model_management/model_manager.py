@@ -250,8 +250,8 @@ from .model_cache import ModelCache, ModelLocker
 from .models import (
     BaseModelType, ModelType, SubModelType,
     ModelError, SchedulerPredictionType, MODEL_CLASSES,
-    ModelConfigBase, ModelNotFoundException,
-    )
+    ModelConfigBase, ModelNotFoundException, InvalidModelException,
+)
 
 # We are only starting to number the config file with release 3.
 # The config file version doesn't have to start at release version, but it will help
@@ -274,10 +274,6 @@ class ModelInfo():
 
     def __exit__(self,*args, **kwargs):
         self.context.__exit__(*args, **kwargs)
-
-class InvalidModelError(Exception):
-    "Raised when an invalid model is requested"
-    pass
 
 class AddModelResult(BaseModel):
     name: str = Field(description="The name of the model after installation")
@@ -818,6 +814,8 @@ class ModelManager(object):
                                 model_config: ModelConfigBase = model_class.probe_config(str(model_path))
                                 self.models[model_key] = model_config
                                 new_models_found = True
+                            except InvalidModelException:
+                                self.logger.warning(f"Not a valid model: {model_path}")
                             except NotImplementedError as e:
                                 self.logger.warning(e)
 

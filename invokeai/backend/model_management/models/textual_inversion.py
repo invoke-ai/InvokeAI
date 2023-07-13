@@ -9,6 +9,7 @@ from .base import (
     SubModelType,
     classproperty,
     ModelNotFoundException,
+    InvalidModelException,
 )
 # TODO: naming
 from ..lora import TextualInversionModel as TextualInversionModelRaw
@@ -59,7 +60,18 @@ class TextualInversionModel(ModelBase):
 
     @classmethod
     def detect_format(cls, path: str):
-        return None
+        if not os.path.exists(path):
+            raise ModelNotFoundException()
+
+        if os.path.isdir(path):
+            if os.path.exists(os.path.join(path, "learned_embeds.bin")):
+                return None # diffusers-ti
+
+        if os.path.isfile(path):
+            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+                return None
+
+        raise InvalidModelException(f"Not a valid model: {path}")
 
     @classmethod
     def convert_if_required(
