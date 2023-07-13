@@ -106,7 +106,7 @@ A noise scheduler (eg. DPM++ 2M Karras) schedules the subtraction of noise from 
 
 ## Node Grouping Concepts
 
-There are several node grouping concepts that can be examined with a narrow focus. These (and other) groupings can be pieced together to make up functional graph setups, and are important to understanding how groups of nodes work together as part of a whole. Note that the screenshots below aren't examples of complete functioning node graphs (see [Examples](https://github.com/ymgenesis/InvokeAI/edit/main/docs/features/NODES.md#examples)).
+There are several node grouping concepts that can be examined with a narrow focus. These (and other) groupings can be pieced together to make up functional graph setups, and are important to understanding how groups of nodes work together as part of a whole. Note that the screenshots below aren't examples of complete functioning node graphs (see Examples).
 
 ### Noise
 
