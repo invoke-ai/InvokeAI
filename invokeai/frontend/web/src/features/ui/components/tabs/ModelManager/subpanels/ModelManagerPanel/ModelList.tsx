@@ -74,13 +74,15 @@ const ModelList = () => {
 
     Object.keys(modelList).forEach((model, i) => {
       if (
-        modelList[model].name.toLowerCase().includes(searchText.toLowerCase())
+        modelList[model]?.model_name
+          .toLowerCase()
+          .includes(searchText.toLowerCase())
       ) {
         filteredModelListItemsToRender.push(
           <ModelListItem
             key={i}
             modelKey={model}
-            name={modelList[model].name}
+            name={modelList[model]?.model_name}
             description={modelList[model].description}
           />
         );
@@ -89,7 +91,7 @@ const ModelList = () => {
             <ModelListItem
               key={i}
               modelKey={model}
-              name={modelList[model].name}
+              name={modelList[model]?.model_name}
               description={modelList[model].description}
             />
           );
@@ -100,7 +102,7 @@ const ModelList = () => {
           <ModelListItem
             key={i}
             modelKey={model}
-            name={modelList[model].name}
+            name={modelList[model]?.model_name}
             description={modelList[model].description}
           />
         );
@@ -109,7 +111,7 @@ const ModelList = () => {
           <ModelListItem
             key={i}
             modelKey={model}
-            name={modelList[model].name}
+            name={modelList[model]?.model_name}
             description={modelList[model].description}
           />
         );
