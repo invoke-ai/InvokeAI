@@ -13,6 +13,8 @@ import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import {
+  ASSETS_CATEGORIES,
+  IMAGE_CATEGORIES,
   IMAGE_LIMIT,
   selectImagesAll,
 } from 'features/gallery//store/gallerySlice';
@@ -24,8 +26,8 @@ import ImageGridListContainer from './ImageGridListContainer';
 import { useListBoardImagesQuery } from '../../../../services/api/endpoints/boardImages';
 
 const selector = createSelector(
-  [stateSelector, selectImagesAll],
-  (state, images) => {
+  [stateSelector, selectFilteredImages],
+  (state, filteredImages) => {
     const {
       galleryImageMinimumWidth,
       selectedBoardId,
@@ -35,7 +37,7 @@ const selector = createSelector(
     } = state.gallery;
 
     return {
-      imageNames: images.map((i) => i.image_name),
+      imageNames: filteredImages.map((i) => i.image_name),
       total,
       selectedBoardId,
       galleryView,
@@ -83,23 +85,38 @@ const GalleryImageGrid = () => {
       { skip: selectedBoardId === 'all' }
     );
 
-  const imageNames =
-    selectedBoardId === 'all'
-      ? imageNamesAll
-      : (imagesForBoard?.items || []).map((img) => img.image_name);
-  const areMoreAvailable =
-    selectedBoardId === 'all' ? totalAll > imageNamesAll.length : false;
-  const isLoading =
-    selectedBoardId === 'all' ? isLoadingAll : isLoadingImagesForBoard;
+  const imageNames = useMemo(() => {
+    if (selectedBoardId === 'all') {
+      return imageNamesAll; // already sorted by images/uploads in gallery selector
+    } else {
+      const categories =
+        galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES;
+      const imageList = (imagesForBoard?.items || []).filter((img) =>
+        categories.includes(img.image_category)
+      );
+      return imageList.map((img) => img.image_name);
+    }
+  }, [selectedBoardId, galleryView, imagesForBoard, imageNamesAll]);
+
+  const areMoreAvailable = useMemo(() => {
+    return selectedBoardId === 'all' ? totalAll > imageNamesAll.length : false;
+  }, [selectedBoardId, imageNamesAll.length, totalAll]);
+
+  const isLoading = useMemo(() => {
+    return selectedBoardId === 'all' ? isLoadingAll : isLoadingImagesForBoard;
+  }, [selectedBoardId, isLoadingAll, isLoadingImagesForBoard]);
 
   const handleLoadMoreImages = useCallback(() => {
     dispatch(
       receivedPageOfImages({
+        categories:
+          galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+        is_intermediate: false,
         offset: imageNames.length,
         limit: IMAGE_LIMIT,
       })
     );
-  }, [dispatch, imageNames.length]);
+  }, [dispatch, imageNames.length, galleryView]);
 
   const handleEndReached = useMemo(() => {
     if (areMoreAvailable) {
@@ -108,36 +125,36 @@ const GalleryImageGrid = () => {
     return undefined;
   }, [areMoreAvailable, handleLoadMoreImages]);
 
-  useEffect(() => {
-    if (!didInitialFetch) {
-      return;
-    }
-    // rough, conservative calculation of how many images fit in the gallery
-    // TODO: this gets an incorrect value on first load...
-    const galleryHeight = rootRef.current?.clientHeight ?? 0;
-    const galleryWidth = rootRef.current?.clientHeight ?? 0;
+  // useEffect(() => {
+  //   if (!didInitialFetch) {
+  //     return;
+  //   }
+  //   // rough, conservative calculation of how many images fit in the gallery
+  //   // TODO: this gets an incorrect value on first load...
+  //   const galleryHeight = rootRef.current?.clientHeight ?? 0;
+  //   const galleryWidth = rootRef.current?.clientHeight ?? 0;
 
-    const rows = galleryHeight / galleryImageMinimumWidth;
-    const columns = galleryWidth / galleryImageMinimumWidth;
+  //   const rows = galleryHeight / galleryImageMinimumWidth;
+  //   const columns = galleryWidth / galleryImageMinimumWidth;
 
-    const imagesToLoad = Math.ceil(rows * columns);
+  //   const imagesToLoad = Math.ceil(rows * columns);
 
-    setDidInitialFetch(true);
+  //   setDidInitialFetch(true);
 
-    // load up that many images
-    dispatch(
-      receivedPageOfImages({
-        offset: 0,
-        limit: 10,
-      })
-    );
-  }, [
-    didInitialFetch,
-    dispatch,
-    galleryImageMinimumWidth,
-    galleryView,
-    selectedBoardId,
-  ]);
+  //   // load up that many images
+  //   dispatch(
+  //     receivedPageOfImages({
+  //       offset: 0,
+  //       limit: 10,
+  //     })
+  //   );
+  // }, [
+  //   didInitialFetch,
+  //   dispatch,
+  //   galleryImageMinimumWidth,
+  //   galleryView,
+  //   selectedBoardId,
+  // ]);
 
   if (!isLoading && imageNames.length === 0) {
     return (
