@@ -13,6 +13,7 @@ import {
   Node,
   NodeChange,
   OnConnectStartParams,
+  ReactFlowInstance,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { ImageField } from 'services/api/types';
@@ -25,6 +26,7 @@ export type NodesState = {
   invocationTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   shouldShowGraphOverlay: boolean;
+  editorInstance: ReactFlowInstance | undefined;
 };
 
 export const initialNodesState: NodesState = {
@@ -34,6 +36,7 @@ export const initialNodesState: NodesState = {
   invocationTemplates: {},
   connectionStartParams: null,
   shouldShowGraphOverlay: false,
+  editorInstance: undefined,
 };
 
 const nodesSlice = createSlice({
@@ -121,6 +124,15 @@ const nodesSlice = createSlice({
     nodeEditorReset: () => {
       return { ...initialNodesState };
     },
+    setEditorInstance: (state, action) => {
+      state.editorInstance = action.payload;
+    },
+    loadFileNodes: (state, action: PayloadAction<Node<InvocationValue>[]>) => {
+      state.nodes = action.payload;
+    },
+    loadFileEdges: (state, action: PayloadAction<Edge[]>) => {
+      state.edges = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
@@ -141,6 +153,9 @@ export const {
   nodeTemplatesBuilt,
   nodeEditorReset,
   imageCollectionFieldValueChanged,
+  setEditorInstance,
+  loadFileNodes,
+  loadFileEdges,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
