@@ -41,13 +41,15 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      if (e.shiftKey) {
-        dispatch(imageRangeEndSelected(imageName));
-      } else if (e.ctrlKey || e.metaKey) {
-        dispatch(imageSelectionToggled(imageName));
-      } else {
-        dispatch(imageSelected(imageName));
-      }
+      // disable multiselect for now
+      // if (e.shiftKey) {
+      //   dispatch(imageRangeEndSelected(imageName));
+      // } else if (e.ctrlKey || e.metaKey) {
+      //   dispatch(imageSelectionToggled(imageName));
+      // } else {
+      //   dispatch(imageSelected(imageName));
+      // }
+      dispatch(imageSelected(imageName));
     },
     [dispatch, imageName]
   );

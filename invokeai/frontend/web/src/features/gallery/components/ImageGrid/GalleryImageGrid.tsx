@@ -12,25 +12,35 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { IMAGE_LIMIT } from 'features/gallery//store/gallerySlice';
+import {
+  IMAGE_LIMIT,
+  selectImagesAll,
+} from 'features/gallery//store/gallerySlice';
 import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { receivedPageOfImages } from 'services/api/thunks/image';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
+import { useListBoardImagesQuery } from '../../../../services/api/endpoints/boardImages';
 
 const selector = createSelector(
-  [stateSelector, selectFilteredImages],
-  (state, filteredImages) => {
-    const { galleryImageMinimumWidth, selectedBoardId, galleryView, total } =
-      state.gallery;
+  [stateSelector, selectImagesAll],
+  (state, images) => {
+    const {
+      galleryImageMinimumWidth,
+      selectedBoardId,
+      galleryView,
+      total,
+      isLoading,
+    } = state.gallery;
 
     return {
-      imageNames: filteredImages.map((i) => i.image_name),
-      areMoreAvailable: total > filteredImages.length,
+      imageNames: images.map((i) => i.image_name),
+      total,
       selectedBoardId,
       galleryView,
       galleryImageMinimumWidth,
+      isLoading,
     };
   },
   defaultSelectorOptions
@@ -60,11 +70,27 @@ const GalleryImageGrid = () => {
 
   const {
     galleryImageMinimumWidth,
-    imageNames,
+    imageNames: imageNamesAll, //all images names loaded on main tab,
+    total: totalAll,
     selectedBoardId,
     galleryView,
-    areMoreAvailable,
+    isLoading: isLoadingAll,
   } = useAppSelector(selector);
+
+  const { data: imagesForBoard, isLoading: isLoadingImagesForBoard } =
+    useListBoardImagesQuery(
+      { board_id: selectedBoardId },
+      { skip: selectedBoardId === 'all' }
+    );
+
+  const imageNames =
+    selectedBoardId === 'all'
+      ? imageNamesAll
+      : (imagesForBoard?.items || []).map((img) => img.image_name);
+  const areMoreAvailable =
+    selectedBoardId === 'all' ? totalAll > imageNamesAll.length : false;
+  const isLoading =
+    selectedBoardId === 'all' ? isLoadingAll : isLoadingImagesForBoard;
 
   const handleLoadMoreImages = useCallback(() => {
     dispatch(
@@ -81,20 +107,6 @@ const GalleryImageGrid = () => {
     }
     return undefined;
   }, [areMoreAvailable, handleLoadMoreImages]);
-
-  useEffect(() => {
-    // Set up gallery scroler
-    const { current: root } = rootRef;
-    if (scroller && root) {
-      initialize({
-        target: root,
-        elements: {
-          viewport: scroller,
-        },
-      });
-    }
-    return () => osInstance()?.destroy();
-  }, [scroller, initialize, osInstance]);
 
   useEffect(() => {
     if (!didInitialFetch) {
@@ -116,7 +128,7 @@ const GalleryImageGrid = () => {
     dispatch(
       receivedPageOfImages({
         offset: 0,
-        limit: imagesToLoad,
+        limit: 10,
       })
     );
   }, [
@@ -127,7 +139,7 @@ const GalleryImageGrid = () => {
     selectedBoardId,
   ]);
 
-  if (status === 'fulfilled' && imageNames.length === 0) {
+  if (!isLoading && imageNames.length === 0) {
     return (
       <Box ref={emptyGalleryRef} sx={{ w: 'full', h: 'full' }}>
         <IAINoContentFallback
@@ -137,6 +149,7 @@ const GalleryImageGrid = () => {
       </Box>
     );
   }
+  console.log({ selectedBoardId });
 
   if (status !== 'rejected') {
     return (
@@ -145,7 +158,6 @@ const GalleryImageGrid = () => {
           <VirtuosoGrid
             style={{ height: '100%' }}
             data={imageNames}
-            endReached={handleEndReached}
             components={{
               Item: ImageGridItemContainer,
               List: ImageGridListContainer,

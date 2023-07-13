@@ -165,7 +165,7 @@ export const addImageDroppedListener = () => {
         const { image_name } = activeData.payload.imageDTO;
         const { boardId } = overData.context;
         dispatch(
-          boardImagesApi.endpoints.addBoardImage.initiate({
+          boardImagesApi.endpoints.addImageToBoard.initiate({
             image_name,
             board_id: boardId,
           })
@@ -180,10 +180,15 @@ export const addImageDroppedListener = () => {
         activeData.payload.imageDTO &&
         overData.context.boardId === null
       ) {
-        const { image_name } = activeData.payload.imageDTO;
-        dispatch(
-          boardImagesApi.endpoints.deleteBoardImage.initiate({ image_name })
-        );
+        const { image_name, board_id } = activeData.payload.imageDTO;
+        if (board_id) {
+          dispatch(
+            boardImagesApi.endpoints.removeImageFromBoard.initiate({
+              image_name,
+              board_id,
+            })
+          );
+        }
         return;
       }
 

@@ -55,6 +55,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const toaster = useAppToaster();
 
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
+  const isBatchEnabled = useFeatureStatus('batches').isFeatureEnabled;
 
   const { onClickAddToBoard } = useContext(AddImageToBoardContext);
 
@@ -175,13 +176,15 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           {t('parameters.sendToUnifiedCanvas')}
         </MenuItem>
       )}
-      <MenuItem
-        icon={<FaFolder />}
-        isDisabled={isInBatch}
-        onClickCapture={handleAddToBatch}
-      >
-        Add to Batch
-      </MenuItem>
+      {isBatchEnabled && (
+        <MenuItem
+          icon={<FaFolder />}
+          isDisabled={isInBatch}
+          onClickCapture={handleAddToBatch}
+        >
+          Add to Batch
+        </MenuItem>
+      )}
       <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
         {imageDTO.board_id ? 'Change Board' : 'Add to Board'}
       </MenuItem>

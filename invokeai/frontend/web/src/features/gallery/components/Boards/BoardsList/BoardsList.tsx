@@ -21,6 +21,7 @@ import AddBoardButton from './AddBoardButton';
 import AllImagesBoard from './AllImagesBoard';
 import BatchBoard from './BatchBoard';
 import GalleryBoard from './GalleryBoard';
+import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   [stateSelector],
@@ -42,6 +43,8 @@ const BoardsList = (props: Props) => {
   const { selectedBoardId, searchText } = useAppSelector(selector);
 
   const { data: boards } = useListAllBoardsQuery();
+
+  const isBatchEnabled = useFeatureStatus('batches').isFeatureEnabled;
 
   const filteredBoards = searchText
     ? boards?.filter((board) =>
@@ -120,9 +123,11 @@ const BoardsList = (props: Props) => {
                 <GridItem sx={{ p: 1.5 }}>
                   <AllImagesBoard isSelected={selectedBoardId === 'all'} />
                 </GridItem>
-                <GridItem sx={{ p: 1.5 }}>
-                  <BatchBoard isSelected={selectedBoardId === 'batch'} />
-                </GridItem>
+                {isBatchEnabled && (
+                  <GridItem sx={{ p: 1.5 }}>
+                    <BatchBoard isSelected={selectedBoardId === 'batch'} />
+                  </GridItem>
+                )}
               </>
             )}
             {filteredBoards &&
