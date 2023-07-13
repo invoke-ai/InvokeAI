@@ -38,7 +38,7 @@ const ModelInputFieldComponent = (
 
       data.push({
         value: id,
-        label: model.name,
+        label: model.model_name,
         group: BASE_MODEL_NAME_MAP[model.base_model],
       });
     });
