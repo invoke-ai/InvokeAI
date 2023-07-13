@@ -19,9 +19,9 @@ export const addControlNetToLinearGraph = (
 
   const validControlNets = getValidControlNets(controlNets);
 
-  const metadataAccumulator = graph.nodes[
-    METADATA_ACCUMULATOR
-  ] as MetadataAccumulatorInvocation;
+  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+    | MetadataAccumulatorInvocation
+    | undefined;
 
   if (isControlNetEnabled && Boolean(validControlNets.length)) {
     if (validControlNets.length) {
@@ -79,13 +79,15 @@ export const addControlNetToLinearGraph = (
 
         graph.nodes[controlNetNode.id] = controlNetNode;
 
-        // metadata accumulator only needs a control field - not the whole node
-        // extract what we need and add to the accumulator
-        const controlField = omit(controlNetNode, [
-          'id',
-          'type',
-        ]) as ControlField;
-        metadataAccumulator.controlnets.push(controlField);
+        if (metadataAccumulator) {
+          // metadata accumulator only needs a control field - not the whole node
+          // extract what we need and add to the accumulator
+          const controlField = omit(controlNetNode, [
+            'id',
+            'type',
+          ]) as ControlField;
+          metadataAccumulator.controlnets.push(controlField);
+        }
 
         graph.edges.push({
           source: { node_id: controlNetNode.id, field: 'control' },

@@ -22,9 +22,9 @@ export const addVAEToGraph = (
   const vae_model = modelIdToVAEModelField(vae?.id || '');
 
   const isAutoVae = !vae;
-  const metadataAccumulator = graph.nodes[
-    METADATA_ACCUMULATOR
-  ] as MetadataAccumulatorInvocation;
+  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+    | MetadataAccumulatorInvocation
+    | undefined;
 
   if (!isAutoVae) {
     graph.nodes[VAE_LOADER] = {
@@ -73,7 +73,7 @@ export const addVAEToGraph = (
     });
   }
 
-  if (vae) {
+  if (vae && metadataAccumulator) {
     metadataAccumulator.vae = vae_model;
   }
 };
