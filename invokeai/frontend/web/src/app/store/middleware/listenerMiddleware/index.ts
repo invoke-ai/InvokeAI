@@ -8,6 +8,7 @@ import {
 
 import type { AppDispatch, RootState } from '../../store';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
+import { addAppConfigReceivedListener } from './listeners/appConfigReceived';
 import { addAppStartedListener } from './listeners/appStarted';
 import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
 import { addRequestedBoardImageDeletionListener } from './listeners/boardImagesDeleted';
@@ -222,3 +223,4 @@ addModelSelectedListener();
 // app startup
 addAppStartedListener();
 addModelsLoadedListener();
+addAppConfigReceivedListener();

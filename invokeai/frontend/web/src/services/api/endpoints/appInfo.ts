@@ -1,5 +1,5 @@
 import { api } from '..';
-import { AppVersion } from '../types';
+import { AppConfig, AppVersion } from '../types';
 
 export const appInfoApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -8,8 +8,16 @@ export const appInfoApi = api.injectEndpoints({
         url: `app/version`,
         method: 'GET',
       }),
+      keepUnusedDataFor: 86400000, // 1 day
+    }),
+    getAppConfig: build.query<AppConfig, void>({
+      query: () => ({
+        url: `app/config`,
+        method: 'GET',
+      }),
+      keepUnusedDataFor: 86400000, // 1 day
     }),
   }),
 });
 
-export const { useGetAppVersionQuery } = appInfoApi;
+export const { useGetAppVersionQuery, useGetAppConfigQuery } = appInfoApi;
