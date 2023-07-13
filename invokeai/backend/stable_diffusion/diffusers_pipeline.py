@@ -127,7 +127,7 @@ class AddsMaskGuidance:
 
     def _t_for_field(self, field_name: str, t):
         if field_name == "pred_original_sample":
-            return torch.zeros_like(t, dtype=t.dtype)  # it represents t=0
+            return self.scheduler.timesteps[-1]
         return t
 
     def apply_mask(self, latents: torch.Tensor, t) -> torch.Tensor:
