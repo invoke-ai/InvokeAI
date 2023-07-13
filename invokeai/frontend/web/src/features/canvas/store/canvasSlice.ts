@@ -240,7 +240,7 @@ export const canvasSlice = createSlice({
         state.scaledBoundingBoxDimensions = scaledDimensions;
       }
     },
-    toggleBoundingBoxDimensions: (state) => {
+    flipBoundingBoxAxes: (state) => {
       const [currWidth, currHeight] = [
         state.boundingBoxDimensions.width,
         state.boundingBoxDimensions.height,
@@ -931,7 +931,7 @@ export const {
   setBoundingBoxDimensions,
   setBoundingBoxPreviewFill,
   setBoundingBoxScaleMethod,
-  toggleBoundingBoxDimensions,
+  flipBoundingBoxAxes,
   setBrushColor,
   setBrushSize,
   setCanvasContainerDimensions,

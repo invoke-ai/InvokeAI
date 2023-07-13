@@ -1,7 +1,7 @@
 import { Flex, Spacer, Text } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { toggleBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import { flipBoundingBoxAxes } from 'features/canvas/store/canvasSlice';
 import { useTranslation } from 'react-i18next';
 import { MdOutlineSwapVert } from 'react-icons/md';
 import ParamAspectRatio from '../../Core/ParamAspectRatio';
@@ -47,7 +47,7 @@ export default function ParamBoundingBoxSize() {
           size="sm"
           icon={<MdOutlineSwapVert />}
           fontSize={20}
-          onClick={() => dispatch(toggleBoundingBoxDimensions())}
+          onClick={() => dispatch(flipBoundingBoxAxes())}
         />
       </Flex>
       <ParamBoundingBoxWidth />
