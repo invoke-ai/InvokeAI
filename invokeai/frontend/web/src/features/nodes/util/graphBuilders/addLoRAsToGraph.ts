@@ -30,9 +30,9 @@ export const addLoRAsToGraph = (
 
   const { loras } = state.lora;
   const loraCount = size(loras);
-  const metadataAccumulator = graph.nodes[
-    METADATA_ACCUMULATOR
-  ] as MetadataAccumulatorInvocation;
+  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+    | MetadataAccumulatorInvocation
+    | undefined;
 
   if (loraCount > 0) {
     // Remove MAIN_MODEL_LOADER unet connection to feed it to LoRAs
@@ -70,7 +70,9 @@ export const addLoRAsToGraph = (
     };
 
     // add the lora to the metadata accumulator
-    metadataAccumulator.loras.push({ lora: loraField, weight });
+    if (metadataAccumulator) {
+      metadataAccumulator.loras.push({ lora: loraField, weight });
+    }
 
     // add to graph
     graph.nodes[currentLoraNodeId] = loraLoaderNode;
