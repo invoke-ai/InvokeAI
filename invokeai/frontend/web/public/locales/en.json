@@ -102,7 +102,8 @@
         "openInNewTab": "Open in New Tab",
         "dontAskMeAgain": "Don't ask me again",
         "areYouSure": "Are you sure?",
-        "imagePrompt": "Image Prompt"
+        "imagePrompt": "Image Prompt",
+        "clearNodes": "Are you sure you want to clear all nodes?"
     },
     "gallery": {
         "generations": "Generations",
@@ -596,7 +597,9 @@
         "initialImageNotSetDesc": "Could not load initial image",
         "nodesSaved": "Nodes Saved",
         "nodesLoaded": "Nodes Loaded",
-        "nodesLoadedFailed": "Failed To Load Nodes"
+        "nodesLoadedFailed": "Failed To Load Nodes",
+        "nodesCleared": "Nodes Cleared"
+
     },
     "tooltip": {
         "feature": {
@@ -681,6 +684,7 @@
     "nodes": {
         "reloadSchema": "Reload Schema",
         "saveNodes": "Save Nodes",
-        "loadNodes": "Load Nodes"
+        "loadNodes": "Load Nodes",
+        "clearNodes": "Clear Nodes"
     }
 }
