@@ -10,8 +10,9 @@ from PIL import Image
 from invokeai.app.invocations.metadata import ImageMetadata
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.item_storage import PaginatedResults
-from invokeai.app.services.models.image_record import (ImageDTO,
+from invokeai.app.services.models.image_record import (DeleteManyImagesResult,
+                                                       GetImagesByNamesResult,
+                                                       ImageDTO,
                                                        ImageRecordChanges,
                                                        ImageUrlsDTO)
 
@@ -21,7 +22,7 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
 
 @images_router.post(
-    "/",
+    "/upload",
     operation_id="upload_image",
     responses={
         201: {"description": "The image was uploaded successfully"},
@@ -144,7 +145,7 @@ async def get_image_metadata(
         404: {"description": "Image not found"},
     },
 )
-async def get_image_full(
+async def get_image_full_size(
     image_name: str = Path(description="The name of full-resolution image file to get"),
 ) -> FileResponse:
     """Gets a full-resolution image file"""
@@ -236,7 +237,8 @@ async def list_image_dtos(
         default=None, description="Whether to list intermediate images"
     ),
     board_id: Optional[str] = Query(
-        default=None, description="The board id to filter by"
+        default=None,
+        description="The board id to filter by, provide 'none' for images without a board",
     ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
@@ -253,3 +255,36 @@ async def list_image_dtos(
     )
 
     return image_dtos
+
+
+@images_router.post(
+    "/",
+    operation_id="get_images_by_names",
+    response_model=GetImagesByNamesResult,
+)
+async def get_images_by_names(
+    image_names: list[str] = Body(description="The names of the images to get"),
+) -> GetImagesByNamesResult:
+    """Gets a list of images"""
+
+    result = ApiDependencies.invoker.services.images.get_images_by_names(
+        image_names
+    )
+
+    return result
+
+
+@images_router.post(
+    "/delete",
+    operation_id="delete_many_images",
+    response_model=DeleteManyImagesResult,
+)
+async def delete_many_images(
+    image_names: list[str] = Body(description="The names of the images to delete"),
+) -> DeleteManyImagesResult:
+    """Deletes many images"""
+
+    try:
+        return ApiDependencies.invoker.services.images.delete_many(image_names)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete images")

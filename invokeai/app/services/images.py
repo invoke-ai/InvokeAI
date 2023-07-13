@@ -1,4 +1,3 @@
-import json
 from abc import ABC, abstractmethod
 from logging import Logger
 from typing import TYPE_CHECKING, Optional
@@ -11,7 +10,6 @@ from invokeai.app.models.image import (ImageCategory,
                                        InvalidOriginException, ResourceOrigin)
 from invokeai.app.services.board_image_record_storage import \
     BoardImageRecordStorageBase
-from invokeai.app.services.graph import Graph
 from invokeai.app.services.image_file_storage import (
     ImageFileDeleteException, ImageFileNotFoundException,
     ImageFileSaveException, ImageFileStorageBase)
@@ -19,7 +17,9 @@ from invokeai.app.services.image_record_storage import (
     ImageRecordDeleteException, ImageRecordNotFoundException,
     ImageRecordSaveException, ImageRecordStorageBase, OffsetPaginatedResults)
 from invokeai.app.services.item_storage import ItemStorageABC
-from invokeai.app.services.models.image_record import (ImageDTO, ImageRecord,
+from invokeai.app.services.models.image_record import (DeleteManyImagesResult,
+                                                       GetImagesByNamesResult,
+                                                       ImageDTO, ImageRecord,
                                                        ImageRecordChanges,
                                                        image_record_to_dto)
 from invokeai.app.services.resource_name import NameServiceBase
@@ -105,12 +105,22 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def get_images_by_names(self, image_names: list[str]) -> GetImagesByNamesResult:
+        """Gets image DTOs by list of names."""
+        pass
+
+    @abstractmethod
     def delete(self, image_name: str):
         """Deletes an image."""
         pass
 
     @abstractmethod
-    def delete_images_on_board(self, board_id: str):
+    def delete_many(self, image_names: list[str]) -> DeleteManyImagesResult:
+        """Deletes many images."""
+        pass
+
+    @abstractmethod
+    def delete_images_on_board(self, board_id: str) -> DeleteManyImagesResult:
         """Deletes all images on a board."""
         pass
 
@@ -362,6 +372,28 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem getting paginated image DTOs")
             raise e
 
+    def get_images_by_names(self, image_names: list[str]) -> GetImagesByNamesResult:
+        try:
+            image_records = self._services.image_records.get_by_names(image_names)
+
+            image_dtos = list(
+                map(
+                    lambda r: image_record_to_dto(
+                        r,
+                        self._services.urls.get_image_url(r.image_name),
+                        self._services.urls.get_image_url(r.image_name, True),
+                        self._services.board_image_records.get_board_for_image(
+                            r.image_name
+                        ),
+                    ),
+                    image_records,
+                )
+            )
+            return GetImagesByNamesResult(image_dtos=image_dtos)
+        except Exception as e:
+            self._services.logger.error("Problem getting image DTOs from names")
+            raise e
+
     def delete(self, image_name: str):
         try:
             self._services.image_files.delete(image_name)
@@ -376,18 +408,36 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Problem deleting image record and file")
             raise e
 
-    def delete_images_on_board(self, board_id: str):
+    def delete_many(self, image_names: list[str]) -> DeleteManyImagesResult:
+        deleted_images: list[str] = []
+        for image_name in image_names:
+            try:
+                self._services.image_files.delete(image_name)
+                self._services.image_records.delete(image_name)
+                deleted_images.append(image_name)
+            except ImageRecordDeleteException:
+                self._services.logger.error(f"Failed to delete image record: {image_name}")
+                pass
+            except ImageFileDeleteException:
+                self._services.logger.error(f"Failed to delete image file: {image_name}")
+                pass
+            except Exception as e:
+                self._services.logger.error(f"Problem deleting image record and file: {image_name}")
+                pass
+        return DeleteManyImagesResult(deleted_images=deleted_images)
+
+    def delete_images_on_board(self, board_id: str) -> DeleteManyImagesResult:
         try:
-            images = self._services.board_image_records.get_images_for_board(board_id)
-            image_name_list = list(
-                map(
-                    lambda r: r.image_name,
-                    images.items,
+            board_images = (
+                self._services.board_image_records.get_all_board_images_for_board(
+                    board_id
                 )
             )
+            image_name_list = board_images.image_names
             for image_name in image_name_list:
                 self._services.image_files.delete(image_name)
             self._services.image_records.delete_many(image_name_list)
+            return DeleteManyImagesResult(deleted_images=board_images.image_names)
         except ImageRecordDeleteException:
             self._services.logger.error(f"Failed to delete image records")
             raise

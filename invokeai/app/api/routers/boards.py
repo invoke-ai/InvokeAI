@@ -1,10 +1,12 @@
 from typing import Optional, Union
+
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
+
 from invokeai.app.services.board_record_storage import BoardChanges
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.board_record import BoardDTO
-
+from invokeai.app.services.models.image_record import DeleteManyImagesResult
 
 from ..dependencies import ApiDependencies
 
@@ -69,25 +71,26 @@ async def update_board(
         raise HTTPException(status_code=500, detail="Failed to update board")
 
 
-@boards_router.delete("/{board_id}", operation_id="delete_board")
+@boards_router.delete("/{board_id}", operation_id="delete_board", response_model=DeleteManyImagesResult)
 async def delete_board(
     board_id: str = Path(description="The id of board to delete"),
     include_images: Optional[bool] = Query(
         description="Permanently delete all images on the board", default=False
     ),
-) -> None:
+) -> DeleteManyImagesResult:
     """Deletes a board"""
     try:
         if include_images is True:
-            ApiDependencies.invoker.services.images.delete_images_on_board(
+            result = ApiDependencies.invoker.services.images.delete_images_on_board(
                 board_id=board_id
             )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
         else:
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
+            result = DeleteManyImagesResult(deleted_images=[])
+        return result
     except Exception as e:
-        # TODO: Does this need any exception handling at all?
-        pass
+        raise HTTPException(status_code=500, detail="Failed to delete images on board")
 
 
 @boards_router.get(

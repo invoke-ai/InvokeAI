@@ -91,8 +91,56 @@ class ImageDTO(ImageRecord, ImageUrlsDTO):
     pass
 
 
+class DeleteManyImagesResult(BaseModel):
+    """The result of a delete many image operation."""
+
+    deleted_images: list[str] = Field(
+        description="The names of the images that were successfully deleted"
+    )
+
+
+class AddManyImagesToBoardResult(BaseModel):
+    """The result of an add many images to board operation."""
+
+    board_id: str = Field(description="The id of the board the images were added to")
+    added_images: list[str] = Field(
+        description="The names of the images that were successfully added"
+    )
+    total: int = Field(description="The total number of images on the board")
+
+
+class RemoveManyImagesFromBoardResult(BaseModel):
+    """The result of a remove many images from their boards operation."""
+
+    removed_images: list[str] = Field(
+        description="The names of the images that were successfully removed from their boards"
+    )
+
+
+class GetAllBoardImagesForBoardResult(BaseModel):
+    """The result of a get all image names for board operation."""
+
+    board_id: str = Field(
+        description="The id of the board with which the images are associated"
+    )
+    image_names: list[str] = Field(
+        description="The names of the images that are associated with the board"
+    )
+
+
+class GetImagesByNamesResult(BaseModel):
+    """The result of a get all image names for board operation."""
+
+    image_dtos: list[ImageDTO] = Field(
+        description="The names of the images that are associated with the board"
+    )
+
+
 def image_record_to_dto(
-    image_record: ImageRecord, image_url: str, thumbnail_url: str, board_id: Optional[str]
+    image_record: ImageRecord,
+    image_url: str,
+    thumbnail_url: str,
+    board_id: Optional[str],
 ) -> ImageDTO:
     """Converts an image record to an image DTO."""
     return ImageDTO(

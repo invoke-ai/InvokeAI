@@ -107,6 +107,11 @@ class ImageRecordStorageBase(ABC):
         """Gets a page of image records."""
         pass
 
+    @abstractmethod
+    def get_by_names(self, image_names: list[str]) -> list[ImageRecord]:
+        """Gets a list of image records by name."""
+        pass
+
     # TODO: The database has a nullable `deleted_at` column, currently unused.
     # Should we implement soft deletes? Would need coordination with ImageFileStorage.
     @abstractmethod
@@ -378,11 +383,15 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_params.append(is_intermediate)
 
             if board_id is not None:
-                query_conditions += """--sql
-                AND board_images.board_id = ?
-                """
-
-                query_params.append(board_id)
+                if board_id == "none":
+                    query_conditions += """--sql
+                    AND board_images.board_id IS NULL
+                    """
+                else:
+                    query_conditions += """--sql
+                    AND board_images.board_id = ?
+                    """
+                    query_params.append(board_id)
 
             query_pagination = """--sql
             ORDER BY images.created_at DESC LIMIT ? OFFSET ?
@@ -413,6 +422,30 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         return OffsetPaginatedResults(
             items=images, offset=offset, limit=limit, total=count
         )
+
+    def get_by_names(self, image_names: list[str]) -> list[ImageRecord]:
+        try:
+            placeholders = ",".join("?" for _ in image_names)
+
+            self._lock.acquire()
+
+            # Construct the SQLite query with the placeholders
+            query = f"""--sql
+            SELECT * FROM images
+            WHERE image_name IN ({placeholders})
+            """
+
+            # Execute the query with the list of IDs as parameters
+            self._cursor.execute(query, image_names)
+
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            images = list(map(lambda r: deserialize_image_record(dict(r)), result))
+            return images
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise e
+        finally:
+            self._lock.release()
 
     def delete(self, image_name: str) -> None:
         try:
