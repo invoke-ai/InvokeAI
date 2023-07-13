@@ -10,7 +10,6 @@ import {
   OnInit,
   OnNodesChange,
   ReactFlow,
-  ReactFlowInstance,
 } from 'reactflow';
 import {
   connectionEnded,
@@ -18,6 +17,7 @@ import {
   connectionStarted,
   edgesChanged,
   nodesChanged,
+  setEditorInstance,
 } from '../store/nodesSlice';
 import { InvocationComponent } from './InvocationComponent';
 import ProgressImageNode from './ProgressImageNode';
@@ -69,11 +69,13 @@ export const Flow = () => {
     dispatch(connectionEnded());
   }, [dispatch]);
 
-  const onInit: OnInit = useCallback((v: ReactFlowInstance) => {
-    if (v) {
-      v.fitView();
-    }
-  }, []);
+  const onInit: OnInit = useCallback(
+    (v) => {
+      dispatch(setEditorInstance(v));
+      if (v) v.fitView();
+    },
+    [dispatch]
+  );
 
   return (
     <ReactFlow

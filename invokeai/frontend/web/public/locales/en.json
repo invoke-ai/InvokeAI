@@ -528,7 +528,7 @@
         "hidePreview": "Hide Preview",
         "showPreview": "Show Preview",
         "controlNetControlMode": "Control Mode",
-        "clipSkip": "Clip Skip",
+        "clipSkip": "CLIP Skip",
         "aspectRatio": "Ratio"
     },
     "settings": {
@@ -593,7 +593,10 @@
         "metadataLoadFailed": "Failed to load metadata",
         "initialImageSet": "Initial Image Set",
         "initialImageNotSet": "Initial Image Not Set",
-        "initialImageNotSetDesc": "Could not load initial image"
+        "initialImageNotSetDesc": "Could not load initial image",
+        "nodesSaved": "Nodes Saved",
+        "nodesLoaded": "Nodes Loaded",
+        "nodesLoadedFailed": "Failed To Load Nodes"
     },
     "tooltip": {
         "feature": {
@@ -676,6 +679,8 @@
         "swapSizes": "Swap Sizes"
     },
     "nodes": {
-        "reloadSchema": "Reload Schema"
+        "reloadSchema": "Reload Schema",
+        "saveNodes": "Save Nodes",
+        "loadNodes": "Load Nodes"
     }
 }
