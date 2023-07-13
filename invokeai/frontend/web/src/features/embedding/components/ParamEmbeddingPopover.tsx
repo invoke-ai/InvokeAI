@@ -47,8 +47,8 @@ const ParamEmbeddingPopover = (props: Props) => {
       const disabled = currentMainModel?.base_model !== embedding.base_model;
 
       data.push({
-        value: embedding.name,
-        label: embedding.name,
+        value: embedding.model_name,
+        label: embedding.model_name,
         group: MODEL_TYPE_MAP[embedding.base_model],
         disabled,
         tooltip: disabled

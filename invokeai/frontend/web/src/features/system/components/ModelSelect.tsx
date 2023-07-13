@@ -1,13 +1,16 @@
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 
 import { SelectItem } from '@mantine/core';
-import { RootState } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { modelIdToMainModelField } from 'features/nodes/util/modelIdToMainModelField';
 import { modelSelected } from 'features/parameters/store/actions';
-import { forEach, isString } from 'lodash-es';
+import { forEach } from 'lodash-es';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 export const MODEL_TYPE_MAP = {
@@ -15,13 +18,17 @@ export const MODEL_TYPE_MAP = {
   'sd-2': 'Stable Diffusion 2.x',
 };
 
+const selector = createSelector(
+  stateSelector,
+  (state) => ({ currentModel: state.generation.model }),
+  defaultSelectorOptions
+);
+
 const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const currentModel = useAppSelector(
-    (state: RootState) => state.generation.model
-  );
+  const { currentModel } = useAppSelector(selector);
 
   const { data: mainModels, isLoading } = useGetMainModelsQuery();
 
@@ -39,7 +46,7 @@ const ModelSelect = () => {
 
       data.push({
         value: id,
-        label: model.name,
+        label: model.model_name,
         group: MODEL_TYPE_MAP[model.base_model],
       });
     });
@@ -48,7 +55,10 @@ const ModelSelect = () => {
   }, [mainModels]);
 
   const selectedModel = useMemo(
-    () => mainModels?.entities[currentModel?.id || ''],
+    () =>
+      mainModels?.entities[
+        `${currentModel?.base_model}/main/${currentModel?.model_name}`
+      ],
     [mainModels?.entities, currentModel]
   );
 
@@ -57,30 +67,12 @@ const ModelSelect = () => {
       if (!v) {
         return;
       }
-      dispatch(modelSelected(v));
+
+      const modelField = modelIdToMainModelField(v);
+      dispatch(modelSelected(modelField));
     },
     [dispatch]
   );
-
-  useEffect(() => {
-    if (isLoading) {
-      // return early here to avoid resetting model selection before we've loaded the available models
-      return;
-    }
-
-    if (selectedModel && mainModels?.ids.includes(selectedModel?.id)) {
-      // the selected model is an available model, no need to change it
-      return;
-    }
-
-    const firstModel = mainModels?.ids[0];
-
-    if (!isString(firstModel)) {
-      return;
-    }
-
-    handleChangeModel(firstModel);
-  }, [handleChangeModel, isLoading, mainModels?.ids, selectedModel]);
 
   return isLoading ? (
     <IAIMantineSelect
@@ -94,9 +86,10 @@ const ModelSelect = () => {
       tooltip={selectedModel?.description}
       label={t('modelManager.model')}
       value={selectedModel?.id}
-      placeholder={data.length > 0 ? 'Select a model' : 'No models detected!'}
+      placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
       data={data}
       error={data.length === 0}
+      disabled={data.length === 0}
       onChange={handleChangeModel}
     />
   );

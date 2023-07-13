@@ -1,6 +1,6 @@
 import sqlite3
 from threading import Lock
-from typing import Generic, TypeVar, Optional, Union, get_args
+from typing import Generic, Optional, TypeVar, get_args
 
 from pydantic import BaseModel, parse_raw_as
 
@@ -77,6 +77,21 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             return None
 
         return self._parse_item(result[0])
+
+    def get_raw(self, id: str) -> Optional[str]:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                f"""SELECT item FROM {self._table_name} WHERE id = ?;""", (str(id),)
+            )
+            result = self._cursor.fetchone()
+        finally:
+            self._lock.release()
+
+        if not result:
+            return None
+
+        return result[0]
 
     def delete(self, id: str):
         try:

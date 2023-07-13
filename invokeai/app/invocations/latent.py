@@ -9,9 +9,9 @@ from diffusers.image_processor import VaeImageProcessor
 from diffusers.schedulers import SchedulerMixin as Scheduler
 from pydantic import BaseModel, Field, validator
 
+from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 
-from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
@@ -21,6 +21,7 @@ from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import \
     PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import torch_dtype
+from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
 from .compel import ConditioningField
@@ -449,6 +450,8 @@ class LatentsToImageInvocation(BaseInvocation):
     tiled: bool = Field(
         default=False,
         description="Decode latents by overlaping tiles(less memory consumption)")
+    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")
+    
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -493,7 +496,8 @@ class LatentsToImageInvocation(BaseInvocation):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate
+            is_intermediate=self.is_intermediate,
+            metadata=self.metadata.dict() if self.metadata else None,
         )
 
         return ImageOutput(

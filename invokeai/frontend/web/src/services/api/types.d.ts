@@ -19,6 +19,7 @@ export type ImageChanges = components['schemas']['ImageRecordChanges'];
 export type ImageCategory = components['schemas']['ImageCategory'];
 export type ResourceOrigin = components['schemas']['ResourceOrigin'];
 export type ImageField = components['schemas']['ImageField'];
+export type ImageMetadata = components['schemas']['ImageMetadata'];
 export type OffsetPaginatedResults_BoardDTO_ =
   components['schemas']['OffsetPaginatedResults_BoardDTO_'];
 export type OffsetPaginatedResults_ImageDTO_ =
@@ -31,6 +32,7 @@ export type MainModelField = components['schemas']['MainModelField'];
 export type VAEModelField = components['schemas']['VAEModelField'];
 export type LoRAModelField = components['schemas']['LoRAModelField'];
 export type ModelsList = components['schemas']['ModelsList'];
+export type ControlField = components['schemas']['ControlField'];
 
 // Model Configs
 export type LoRAModelConfig = components['schemas']['LoRAModelConfig'];
@@ -106,6 +108,9 @@ export type MainModelLoaderInvocation = TypeReq<
 >;
 export type LoraLoaderInvocation = TypeReq<
   components['schemas']['LoraLoaderInvocation']
+>;
+export type MetadataAccumulatorInvocation = TypeReq<
+  components['schemas']['MetadataAccumulatorInvocation']
 >;
 
 // ControlNet Nodes

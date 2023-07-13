@@ -1,5 +1,14 @@
 import { ApiFullTagDescription, api } from '..';
+import { components } from '../schema';
 import { ImageDTO } from '../types';
+
+/**
+ * This is an unsafe type; the object inside is not guaranteed to be valid.
+ */
+export type UnsafeImageMetadata = {
+  metadata: components['schemas']['CoreMetadata'];
+  graph: NonNullable<components['schemas']['Graph']>;
+};
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -7,7 +16,7 @@ export const imagesApi = api.injectEndpoints({
      * Image Queries
      */
     getImageDTO: build.query<ImageDTO, string>({
-      query: (image_name) => ({ url: `images/${image_name}/metadata` }),
+      query: (image_name) => ({ url: `images/${image_name}` }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [{ type: 'Image', id: arg }];
         if (result?.board_id) {
@@ -17,7 +26,17 @@ export const imagesApi = api.injectEndpoints({
       },
       keepUnusedDataFor: 86400, // 24 hours
     }),
+    getImageMetadata: build.query<UnsafeImageMetadata, string>({
+      query: (image_name) => ({ url: `images/${image_name}/metadata` }),
+      providesTags: (result, error, arg) => {
+        const tags: ApiFullTagDescription[] = [
+          { type: 'ImageMetadata', id: arg },
+        ];
+        return tags;
+      },
+      keepUnusedDataFor: 86400, // 24 hours
+    }),
   }),
 });
 
-export const { useGetImageDTOQuery } = imagesApi;
+export const { useGetImageDTOQuery, useGetImageMetadataQuery } = imagesApi;
