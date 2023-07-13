@@ -7,7 +7,6 @@ import {
   RandomIntInvocation,
   RangeOfSizeInvocation,
 } from 'services/api/types';
-import { modelIdToMainModelField } from '../modelIdToMainModelField';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
@@ -35,7 +34,7 @@ export const buildCanvasInpaintGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: currentModel,
+    model,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -53,13 +52,16 @@ export const buildCanvasInpaintGraph = (
     clipSkip,
   } = state.generation;
 
+  if (!model) {
+    moduleLog.error('No model found in state');
+    throw new Error('No model found in state');
+  }
+
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
   // We may need to set the inpaint width and height to scale the image
   const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
-
-  const model = modelIdToMainModelField(currentModel?.id || '');
 
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
