@@ -37,7 +37,7 @@ const ParamLora = (props: Props) => {
   return (
     <Flex sx={{ gap: 2.5, alignItems: 'flex-end' }}>
       <IAISlider
-        label={lora.name}
+        label={lora.model_name}
         value={lora.weight}
         onChange={handleChange}
         min={-1}
