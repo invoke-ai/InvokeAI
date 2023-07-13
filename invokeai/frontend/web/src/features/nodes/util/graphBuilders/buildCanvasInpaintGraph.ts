@@ -212,10 +212,10 @@ export const buildCanvasInpaintGraph = (
     ],
   };
 
-  addLoRAsToGraph(graph, state, INPAINT);
+  addLoRAsToGraph(state, graph, INPAINT);
 
   // Add VAE
-  addVAEToGraph(graph, state);
+  addVAEToGraph(state, graph);
 
   // handle seed
   if (shouldRandomizeSeed) {

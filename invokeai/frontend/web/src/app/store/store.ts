@@ -1,6 +1,7 @@
 import {
   AnyAction,
   ThunkDispatch,
+  autoBatchEnhancer,
   combineReducers,
   configureStore,
 } from '@reduxjs/toolkit';
@@ -79,14 +80,18 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
 
 export const store = configureStore({
   reducer: rememberedRootReducer,
-  enhancers: [
-    rememberEnhancer(window.localStorage, rememberedKeys, {
-      persistDebounce: 300,
-      serialize,
-      unserialize,
-      prefix: LOCALSTORAGE_PREFIX,
-    }),
-  ],
+  enhancers: (existingEnhancers) => {
+    return existingEnhancers
+      .concat(
+        rememberEnhancer(window.localStorage, rememberedKeys, {
+          persistDebounce: 300,
+          serialize,
+          unserialize,
+          prefix: LOCALSTORAGE_PREFIX,
+        })
+      )
+      .concat(autoBatchEnhancer());
+  },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       immutableCheck: false,

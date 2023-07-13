@@ -6,6 +6,7 @@ import LoadNodesButton from '../ui/LoadNodesButton';
 import NodeInvokeButton from '../ui/NodeInvokeButton';
 import ReloadSchemaButton from '../ui/ReloadSchemaButton';
 import SaveNodesButton from '../ui/SaveNodesButton';
+import ClearNodesButton from '../ui/ClearNodesButton';
 
 const TopCenterPanel = () => {
   return (
@@ -16,6 +17,7 @@ const TopCenterPanel = () => {
         <ReloadSchemaButton />
         <SaveNodesButton />
         <LoadNodesButton />
+        <ClearNodesButton />
       </HStack>
     </Panel>
   );

@@ -50,7 +50,7 @@ const VAESelect = () => {
 
       data.push({
         value: id,
-        label: model.name,
+        label: model.model_name,
         group: MODEL_TYPE_MAP[model.base_model],
         disabled,
         tooltip: disabled
