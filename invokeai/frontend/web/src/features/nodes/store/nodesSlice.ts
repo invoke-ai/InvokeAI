@@ -133,6 +133,10 @@ const nodesSlice = createSlice({
     loadFileEdges: (state, action: PayloadAction<Edge[]>) => {
       state.edges = action.payload;
     },
+    clearNodes: (state) => {
+      state.nodes = [];
+      state.edges = [];
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
@@ -156,6 +160,7 @@ export const {
   setEditorInstance,
   loadFileNodes,
   loadFileEdges,
+  clearNodes,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
