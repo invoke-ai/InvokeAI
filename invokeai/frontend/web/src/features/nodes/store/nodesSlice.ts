@@ -121,8 +121,9 @@ const nodesSlice = createSlice({
     ) => {
       state.invocationTemplates = action.payload;
     },
-    nodeEditorReset: () => {
-      return { ...initialNodesState };
+    nodeEditorReset: (state) => {
+      state.nodes = [];
+      state.edges = [];
     },
     setEditorInstance: (state, action) => {
       state.editorInstance = action.payload;
@@ -132,10 +133,6 @@ const nodesSlice = createSlice({
     },
     loadFileEdges: (state, action: PayloadAction<Edge[]>) => {
       state.edges = action.payload;
-    },
-    clearNodes: (state) => {
-      state.nodes = [];
-      state.edges = [];
     },
   },
   extraReducers: (builder) => {
@@ -160,7 +157,6 @@ export const {
   setEditorInstance,
   loadFileNodes,
   loadFileEdges,
-  clearNodes,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
