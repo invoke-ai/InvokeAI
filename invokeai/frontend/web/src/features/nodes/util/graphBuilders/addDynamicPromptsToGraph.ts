@@ -32,9 +32,9 @@ export const addDynamicPromptsToGraph = (
     maxPrompts,
   } = state.dynamicPrompts;
 
-  const metadataAccumulator = graph.nodes[
-    METADATA_ACCUMULATOR
-  ] as MetadataAccumulatorInvocation;
+  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+    | MetadataAccumulatorInvocation
+    | undefined;
 
   if (isDynamicPromptsEnabled) {
     // iteration is handled via dynamic prompts
@@ -116,11 +116,15 @@ export const addDynamicPromptsToGraph = (
       (graph.nodes[NOISE] as NoiseInvocation).seed = seed;
 
       // hook up seed to metadata
-      metadataAccumulator.seed = seed;
+      if (metadataAccumulator) {
+        metadataAccumulator.seed = seed;
+      }
     }
   } else {
     // no dynamic prompt - hook up positive prompt
-    metadataAccumulator.positive_prompt = positivePrompt;
+    if (metadataAccumulator) {
+      metadataAccumulator.positive_prompt = positivePrompt;
+    }
 
     const rangeOfSizeNode: RangeOfSizeInvocation = {
       id: RANGE_OF_SIZE,
