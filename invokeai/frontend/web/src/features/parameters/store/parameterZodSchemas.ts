@@ -170,7 +170,7 @@ export const isValidVaeModel = (val: unknown): val is VaeModelParam =>
  */
 export const zLoRAModel = z.object({
   id: z.string(),
-  name: z.string(),
+  model_name: z.string(),
   base_model: zBaseModel,
 });
 /**
