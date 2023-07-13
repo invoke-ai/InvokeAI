@@ -1,8 +1,10 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
+import { unset } from 'lodash-es';
 import {
   DynamicPromptInvocation,
   IterateInvocation,
+  MetadataAccumulatorInvocation,
   NoiseInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
@@ -10,16 +12,16 @@ import {
 import {
   DYNAMIC_PROMPT,
   ITERATE,
+  METADATA_ACCUMULATOR,
   NOISE,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
 } from './constants';
-import { unset } from 'lodash-es';
 
 export const addDynamicPromptsToGraph = (
-  graph: NonNullableGraph,
-  state: RootState
+  state: RootState,
+  graph: NonNullableGraph
 ): void => {
   const { positivePrompt, iterations, seed, shouldRandomizeSeed } =
     state.generation;
@@ -29,6 +31,10 @@ export const addDynamicPromptsToGraph = (
     isEnabled: isDynamicPromptsEnabled,
     maxPrompts,
   } = state.dynamicPrompts;
+
+  const metadataAccumulator = graph.nodes[
+    METADATA_ACCUMULATOR
+  ] as MetadataAccumulatorInvocation;
 
   if (isDynamicPromptsEnabled) {
     // iteration is handled via dynamic prompts
@@ -74,6 +80,18 @@ export const addDynamicPromptsToGraph = (
       }
     );
 
+    // hook up positive prompt to metadata
+    graph.edges.push({
+      source: {
+        node_id: ITERATE,
+        field: 'item',
+      },
+      destination: {
+        node_id: METADATA_ACCUMULATOR,
+        field: 'positive_prompt',
+      },
+    });
+
     if (shouldRandomizeSeed) {
       // Random int node to generate the starting seed
       const randomIntNode: RandomIntInvocation = {
@@ -88,11 +106,22 @@ export const addDynamicPromptsToGraph = (
         source: { node_id: RANDOM_INT, field: 'a' },
         destination: { node_id: NOISE, field: 'seed' },
       });
+
+      graph.edges.push({
+        source: { node_id: RANDOM_INT, field: 'a' },
+        destination: { node_id: METADATA_ACCUMULATOR, field: 'seed' },
+      });
     } else {
       // User specified seed, so set the start of the range of size to the seed
       (graph.nodes[NOISE] as NoiseInvocation).seed = seed;
+
+      // hook up seed to metadata
+      metadataAccumulator.seed = seed;
     }
   } else {
+    // no dynamic prompt - hook up positive prompt
+    metadataAccumulator.positive_prompt = positivePrompt;
+
     const rangeOfSizeNode: RangeOfSizeInvocation = {
       id: RANGE_OF_SIZE,
       type: 'range_of_size',
@@ -126,6 +155,18 @@ export const addDynamicPromptsToGraph = (
       },
       destination: {
         node_id: NOISE,
+        field: 'seed',
+      },
+    });
+
+    // hook up seed to metadata
+    graph.edges.push({
+      source: {
+        node_id: ITERATE,
+        field: 'item',
+      },
+      destination: {
+        node_id: METADATA_ACCUMULATOR,
         field: 'seed',
       },
     });

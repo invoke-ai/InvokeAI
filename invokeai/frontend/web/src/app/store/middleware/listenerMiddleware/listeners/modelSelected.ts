@@ -14,7 +14,7 @@ export const addModelSelectedListener = () => {
     actionCreator: modelSelected,
     effect: (action, { getState, dispatch }) => {
       const state = getState();
-      const [base_model, type, name] = action.payload.split('/');
+      const { base_model, model_name } = action.payload;
 
       if (state.generation.model?.base_model !== base_model) {
         dispatch(
@@ -30,11 +30,7 @@ export const addModelSelectedListener = () => {
         // TODO: controlnet cleared
       }
 
-      const newModel = zMainModel.parse({
-        id: action.payload,
-        base_model,
-        name,
-      });
+      const newModel = zMainModel.parse(action.payload);
 
       dispatch(modelChanged(newModel));
     },

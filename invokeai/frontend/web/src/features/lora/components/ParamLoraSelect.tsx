@@ -45,7 +45,7 @@ const ParamLoraSelect = () => {
 
       data.push({
         value: id,
-        label: lora.name,
+        label: lora.model_name,
         disabled,
         group: MODEL_TYPE_MAP[lora.base_model],
         tooltip: disabled

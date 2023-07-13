@@ -33,25 +33,28 @@ type AnyModelConfigEntity =
   | VaeModelConfigEntity;
 
 const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
+  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
 const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
+  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
 const controlNetModelsAdapter =
   createEntityAdapter<ControlNetModelConfigEntity>({
-    sortComparer: (a, b) => a.name.localeCompare(b.name),
+    sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
 const textualInversionModelsAdapter =
   createEntityAdapter<TextualInversionModelConfigEntity>({
-    sortComparer: (a, b) => a.name.localeCompare(b.name),
+    sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
 const vaeModelsAdapter = createEntityAdapter<VaeModelConfigEntity>({
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
+  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
 
-export const getModelId = ({ base_model, type, name }: AnyModelConfig) =>
-  `${base_model}/${type}/${name}`;
+export const getModelId = ({
+  base_model,
+  model_type,
+  model_name,
+}: AnyModelConfig) => `${base_model}/${model_type}/${model_name}`;
 
 const createModelEntities = <T extends AnyModelConfigEntity>(
   models: AnyModelConfig[]

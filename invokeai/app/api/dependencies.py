@@ -13,7 +13,6 @@ from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
 from invokeai.app.services.boards import BoardService, BoardServiceDependencies
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService, ImageServiceDependencies
-from invokeai.app.services.metadata import CoreMetadataService
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
@@ -75,7 +74,6 @@ class ApiDependencies:
         )
 
         urls = LocalUrlService()
-        metadata = CoreMetadataService()
         image_record_storage = SqliteImageRecordStorage(db_location)
         image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
         names = SimpleNameService()
@@ -111,7 +109,6 @@ class ApiDependencies:
                 board_image_record_storage=board_image_record_storage,
                 image_record_storage=image_record_storage,
                 image_file_storage=image_file_storage,
-                metadata=metadata,
                 url=urls,
                 logger=logger,
                 names=names,

@@ -135,8 +135,7 @@ export type BaseModelParam = z.infer<typeof zBaseModel>;
  * TODO: Make this a dynamically generated enum?
  */
 export const zMainModel = z.object({
-  id: z.string(),
-  name: z.string(),
+  model_name: z.string(),
   base_model: zBaseModel,
 });
 
