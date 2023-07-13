@@ -1,5 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import {
+  ASSETS_CATEGORIES,
+  IMAGE_CATEGORIES,
   INITIAL_IMAGE_LIMIT,
   isLoadingChanged,
 } from 'features/gallery/store/gallerySlice';
@@ -20,7 +22,7 @@ export const addAppStartedListener = () => {
       // fill up the gallery tab with images
       await dispatch(
         receivedPageOfImages({
-          categories: ['general'],
+          categories: IMAGE_CATEGORIES,
           is_intermediate: false,
           offset: 0,
           limit: INITIAL_IMAGE_LIMIT,
@@ -30,7 +32,7 @@ export const addAppStartedListener = () => {
       // fill up the assets tab with images
       await dispatch(
         receivedPageOfImages({
-          categories: ['control', 'mask', 'user', 'other'],
+          categories: ASSETS_CATEGORIES,
           is_intermediate: false,
           offset: 0,
           limit: INITIAL_IMAGE_LIMIT,

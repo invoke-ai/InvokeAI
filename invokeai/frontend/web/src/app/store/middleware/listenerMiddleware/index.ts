@@ -57,7 +57,6 @@ import {
   addReceivedPageOfImagesFulfilledListener,
   addReceivedPageOfImagesRejectedListener,
 } from './listeners/receivedPageOfImages';
-import { addSelectionAddedToBatchListener } from './listeners/selectionAddedToBatch';
 import {
   addSessionCanceledFulfilledListener,
   addSessionCanceledPendingListener,
@@ -213,9 +212,6 @@ addBoardIdSelectedListener();
 
 // Node schemas
 addReceivedOpenAPISchemaListener();
-
-// Batches
-addSelectionAddedToBatchListener();
 
 // DND
 addImageDroppedListener();
