@@ -1,4 +1,3 @@
-import { useDisclosure } from '@chakra-ui/react';
 import {
   AlertDialog,
   AlertDialogBody,
@@ -6,27 +5,27 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogOverlay,
-  Divider,
-  Text,
   Button,
+  Text,
+  useDisclosure,
 } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { clearNodes } from 'features/nodes/store/nodesSlice';
 import { makeToast } from 'app/components/Toaster';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { clearNodes } from 'features/nodes/store/nodesSlice';
 import { addToast } from 'features/system/store/systemSlice';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
-import IAIIconButton from 'common/components/IAIIconButton';
 
 const ClearNodesButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
 
-  const handleClearNodes = () => {
-    onOpen();
-  };
+  const nodes = useAppSelector((state: RootState) => state.nodes.nodes);
 
   const handleConfirmClear = () => {
     dispatch(clearNodes());
@@ -43,20 +42,22 @@ const ClearNodesButton = () => {
     onClose();
   };
 
-  const handleCancelClear = () => {
-    onClose();
-  };
-
   return (
     <>
       <IAIIconButton
         icon={<FaTrash />}
         tooltip={t('nodes.clearNodes')}
         aria-label={t('nodes.clearNodes')}
-        onClick={handleClearNodes}
+        onClick={onOpen}
+        isDisabled={nodes.length === 0}
       />
 
-      <AlertDialog isOpen={isOpen} onClose={handleCancelClear} isCentered>
+      <AlertDialog
+        isOpen={isOpen}
+        onClose={onClose}
+        leastDestructiveRef={cancelRef}
+        isCentered
+      >
         <AlertDialogOverlay />
 
         <AlertDialogContent>
@@ -68,10 +69,10 @@ const ClearNodesButton = () => {
             <Text>{t('common.clearNodes')}</Text>
           </AlertDialogBody>
 
-          <Divider />
-
           <AlertDialogFooter>
-            <Button onClick={handleCancelClear}>{t('common.cancel')}</Button>
+            <Button ref={cancelRef} onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
             <Button colorScheme="red" ml={3} onClick={handleConfirmClear}>
               {t('common.accept')}
             </Button>
