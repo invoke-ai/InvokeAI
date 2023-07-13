@@ -1,13 +1,14 @@
 import datetime
 from typing import Optional, Union
+
 from pydantic import BaseModel, Extra, Field, StrictBool, StrictStr
+
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
-from invokeai.app.models.metadata import ImageMetadata
 from invokeai.app.util.misc import get_iso_timestamp
 
 
 class ImageRecord(BaseModel):
-    """Deserialized image record."""
+    """Deserialized image record without metadata."""
 
     image_name: str = Field(description="The unique name of the image.")
     """The unique name of the image."""
@@ -43,11 +44,6 @@ class ImageRecord(BaseModel):
         description="The node ID that generated this image, if it is a generated image.",
     )
     """The node ID that generated this image, if it is a generated image."""
-    metadata: Optional[ImageMetadata] = Field(
-        default=None,
-        description="A limited subset of the image's generation metadata. Retrieve the image's session for full metadata.",
-    )
-    """A limited subset of the image's generation metadata. Retrieve the image's session for full metadata."""
 
 
 class ImageRecordChanges(BaseModel, extra=Extra.forbid):
@@ -112,6 +108,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
 
     # Retrieve all the values, setting "reasonable" defaults if they are not present.
 
+    # TODO: do we really need to handle default values here? ideally the data is the correct shape...
     image_name = image_dict.get("image_name", "unknown")
     image_origin = ResourceOrigin(
         image_dict.get("image_origin", ResourceOrigin.INTERNAL.value)
@@ -128,13 +125,6 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     deleted_at = image_dict.get("deleted_at", get_iso_timestamp())
     is_intermediate = image_dict.get("is_intermediate", False)
 
-    raw_metadata = image_dict.get("metadata")
-
-    if raw_metadata is not None:
-        metadata = ImageMetadata.parse_raw(raw_metadata)
-    else:
-        metadata = None
-
     return ImageRecord(
         image_name=image_name,
         image_origin=image_origin,
@@ -143,7 +133,6 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         height=height,
         session_id=session_id,
         node_id=node_id,
-        metadata=metadata,
         created_at=created_at,
         updated_at=updated_at,
         deleted_at=deleted_at,

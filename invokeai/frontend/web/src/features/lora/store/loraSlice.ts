@@ -1,12 +1,8 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { LoRAModelParam } from 'features/parameters/store/parameterZodSchemas';
 import { LoRAModelConfigEntity } from 'services/api/endpoints/models';
-import { BaseModelType } from 'services/api/types';
 
-export type Lora = {
-  id: string;
-  base_model: BaseModelType;
-  name: string;
+export type Lora = LoRAModelParam & {
   weight: number;
 };
 
@@ -27,8 +23,8 @@ export const loraSlice = createSlice({
   initialState: intialLoraState,
   reducers: {
     loraAdded: (state, action: PayloadAction<LoRAModelConfigEntity>) => {
-      const { name, id, base_model } = action.payload;
-      state.loras[id] = { id, name, base_model, ...defaultLoRAConfig };
+      const { model_name, id, base_model } = action.payload;
+      state.loras[id] = { id, model_name, base_model, ...defaultLoRAConfig };
     },
     loraRemoved: (state, action: PayloadAction<string>) => {
       const id = action.payload;

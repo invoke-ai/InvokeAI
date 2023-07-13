@@ -16,6 +16,7 @@ from .base import (
     SilenceWarnings,
     read_checkpoint_meta,
     classproperty,
+    InvalidModelException,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
 from omegaconf import OmegaConf
@@ -98,10 +99,18 @@ class StableDiffusion1Model(DiffusersModel):
 
     @classmethod
     def detect_format(cls, model_path: str):
+        if not os.path.exists(model_path):
+            raise ModelNotFoundException()
+
         if os.path.isdir(model_path):
-            return StableDiffusion1ModelFormat.Diffusers
-        else:
-            return StableDiffusion1ModelFormat.Checkpoint
+            if os.path.exists(os.path.join(model_path, "model_index.json")):
+                return StableDiffusion1ModelFormat.Diffusers
+
+        if os.path.isfile(model_path):
+            if any([model_path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+                return StableDiffusion1ModelFormat.Checkpoint
+
+        raise InvalidModelException(f"Not a valid model: {model_path}")
 
     @classmethod
     def convert_if_required(
@@ -200,10 +209,18 @@ class StableDiffusion2Model(DiffusersModel):
 
     @classmethod
     def detect_format(cls, model_path: str):
+        if not os.path.exists(model_path):
+            raise ModelNotFoundException()
+
         if os.path.isdir(model_path):
-            return StableDiffusion2ModelFormat.Diffusers
-        else:
-            return StableDiffusion2ModelFormat.Checkpoint
+            if os.path.exists(os.path.join(model_path, "model_index.json")):
+                return StableDiffusion2ModelFormat.Diffusers
+
+        if os.path.isfile(model_path):
+            if any([model_path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+                return StableDiffusion2ModelFormat.Checkpoint
+
+        raise InvalidModelException(f"Not a valid model: {model_path}")
 
     @classmethod
     def convert_if_required(

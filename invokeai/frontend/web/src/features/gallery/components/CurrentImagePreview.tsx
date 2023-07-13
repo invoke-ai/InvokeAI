@@ -11,7 +11,9 @@ import IAIDndImage from 'common/components/IAIDndImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySlice';
 import { isEqual } from 'lodash-es';
 import { memo, useMemo } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useNextPrevImage } from '../hooks/useNextPrevImage';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
 
@@ -48,6 +50,45 @@ const CurrentImagePreview = () => {
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
+
+  const {
+    handlePrevImage,
+    handleNextImage,
+    prevImageId,
+    nextImageId,
+    isOnLastImage,
+    handleLoadMoreImages,
+    areMoreImagesAvailable,
+    isFetching,
+  } = useNextPrevImage();
+
+  useHotkeys(
+    'left',
+    () => {
+      handlePrevImage();
+    },
+    [prevImageId]
+  );
+
+  useHotkeys(
+    'right',
+    () => {
+      if (isOnLastImage && areMoreImagesAvailable && !isFetching) {
+        handleLoadMoreImages();
+        return;
+      }
+      if (!isOnLastImage) {
+        handleNextImage();
+      }
+    },
+    [
+      nextImageId,
+      isOnLastImage,
+      areMoreImagesAvailable,
+      handleLoadMoreImages,
+      isFetching,
+    ]
+  );
 
   const {
     currentData: imageDTO,
@@ -118,7 +159,6 @@ const CurrentImagePreview = () => {
             width: 'full',
             height: 'full',
             borderRadius: 'base',
-            overflow: 'scroll',
           }}
         >
           <ImageMetadataViewer image={imageDTO} />
