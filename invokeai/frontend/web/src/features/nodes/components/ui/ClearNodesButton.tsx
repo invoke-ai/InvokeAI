@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useDisclosure } from '@chakra-ui/react';
 import {
   AlertDialog,
   AlertDialogBody,
@@ -22,10 +22,10 @@ import IAIIconButton from 'common/components/IAIIconButton';
 const ClearNodesButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   const handleClearNodes = () => {
-    setIsDialogOpen(true);
+    onOpen();
   };
 
   const handleConfirmClear = () => {
@@ -40,11 +40,11 @@ const ClearNodesButton = () => {
       )
     );
 
-    setIsDialogOpen(false);
+    onClose();
   };
 
   const handleCancelClear = () => {
-    setIsDialogOpen(false);
+    onClose();
   };
 
   return (
@@ -56,12 +56,7 @@ const ClearNodesButton = () => {
         onClick={handleClearNodes}
       />
 
-      <AlertDialog
-        isOpen={isDialogOpen}
-        leastDestructiveRef={undefined}
-        onClose={handleCancelClear}
-        isCentered
-      >
+      <AlertDialog isOpen={isOpen} onClose={handleCancelClear} isCentered>
         <AlertDialogOverlay />
 
         <AlertDialogContent>
