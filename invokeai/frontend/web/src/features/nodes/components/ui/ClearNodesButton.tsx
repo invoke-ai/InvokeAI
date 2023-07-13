@@ -13,9 +13,9 @@ import { makeToast } from 'app/components/Toaster';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { clearNodes } from 'features/nodes/store/nodesSlice';
+import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { addToast } from 'features/system/store/systemSlice';
-import { memo, useRef } from 'react';
+import { memo, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 
@@ -27,8 +27,8 @@ const ClearNodesButton = () => {
 
   const nodes = useAppSelector((state: RootState) => state.nodes.nodes);
 
-  const handleConfirmClear = () => {
-    dispatch(clearNodes());
+  const handleConfirmClear = useCallback(() => {
+    dispatch(nodeEditorReset());
 
     dispatch(
       addToast(
@@ -40,7 +40,7 @@ const ClearNodesButton = () => {
     );
 
     onClose();
-  };
+  }, [dispatch, t, onClose]);
 
   return (
     <>
