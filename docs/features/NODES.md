@@ -2,7 +2,7 @@
 
 The nodes editor is a blank canvas where you add modular node windows for image generation. The node processing flow is usually done from left to right, though linearity can become abstracted the more complex the node graph becomes. Nodes are connected via wires/noodles.
 
-To better understand how nodes are used, think of how an electric power bar works. It takes in one input (electricity from a wall outlet) and passes it to multiple devices through multiple outputs. Similarly, a node could have multiple inputs and outputs functioning at the same (or different) time, but all node outputs pass information onwards like a power bar passes electricity. Not all outputs are compatible with all inputs, however, much like a power bar can’t take in spaghetti noodles instead of electricity. In general, node outputs are colour-coded to match compatible inputs of other nodes.
+To better understand how nodes are used, think of how an electric power bar works. It takes in one input (electricity from a wall outlet) and passes it to multiple devices through multiple outputs. Similarly, a node could have multiple inputs and outputs functioning at the same (or different) time, but all node outputs pass information onward like a power bar passes electricity. Not all outputs are compatible with all inputs, however, much like a power bar can’t take in spaghetti noodles instead of electricity. In general, node outputs are colour-coded to match compatible inputs of other nodes.
 
 ## Anatomy of a Node
 
@@ -14,11 +14,11 @@ Individual nodes are made up of the following:
 
 ## Diffusion Overview
 
-Taking the time to understand the diffusion process will help you to understand how to setup your nodes in the nodes editor. 
+Taking the time to understand the diffusion process will help you to understand how to set up your nodes in the nodes editor. 
 
 There are two main spaces Stable Diffusion works in: image space and latent space.
 
-Image space represents images in pixel-form that you look at. Latent space represents compressed inputs. It’s in latent space that Stable Diffusion processes images. A VAE (Variational Auto Encoder) is responsible for compressing and encoding inputs into latent space, as well as decoding outputs back into image space.
+Image space represents images in pixel form that you look at. Latent space represents compressed inputs. It’s in latent space that Stable Diffusion processes images. A VAE (Variational Auto Encoder) is responsible for compressing and encoding inputs into latent space, as well as decoding outputs back into image space.
 
 When you generate an image using text-to-image, multiple steps occur in latent space:
 1. Random noise is generated at the chosen height and width. The noise’s characteristics are dictated by the chosen (or not chosen) seed. This noise tensor is passed into latent space. We’ll call this noise A.
@@ -27,7 +27,7 @@ When you generate an image using text-to-image, multiple steps occur in latent s
 1. The VAE decodes the final latent image from latent space into image space.
 
 image-to-image is a similar process, with only step 1 being different:
-1. The input image is decoded from image space into latent space by the VAE. Noise is then added to the input latent image. Denoising Strength dictates how much noise is added, 0 being none, 1 being all-encompassing. We’ll call this noise A. The process is then the same as steps 2-4 in the text-to-image explanation above. 
+1. The input image is decoded from image space into latent space by the VAE. Noise is then added to the input latent image. Denoising Strength dictates how much noise is added, 0 being none, and 1 being all-encompassing. We’ll call this noise A. The process is then the same as steps 2-4 in the text-to-image explanation above. 
 
 Furthermore, a model provides the CLIP prompt tokenizer, the VAE, and a U-Net (where noise prediction occurs given a prompt and initial noise tensor).
 
@@ -53,7 +53,7 @@ A noise scheduler (eg. DPM++ 2M Karras) schedules the subtraction of noise from 
 | ImageChannel                       | Gets a channel from an image |
 | ImageCollection                    | Load a collection of images and provide it as output |
 | ImageConvert                       | Converts an image to a different mode |
-| ImageCrop                          | Crops an imiage to a specified box. The box can be outside of the image. |
+| ImageCrop                          | Crops an image to a specified box. The box can be outside of the image. |
 | ImageInverseLerp                   | Inverse linear interpolation of all pixels of an image |
 | ImageLerp                          | Linear interpolation of all pixels of an image |
 | ImageMultiply                      | Multiplies two images together using `PIL.ImageChops.Multiply()` |
@@ -64,7 +64,7 @@ A noise scheduler (eg. DPM++ 2M Karras) schedules the subtraction of noise from 
 | ImageToLatents                     | Scales latents by a given factor |
 | InfillColor                        | Infills transparent areas of an image with a solid color |
 | InfillPatchMatch                   | Infills transparent areas of an image using the PatchMatch algorithm |
-| InfillTile                         | Infills transparents areas of an image with tiles of the image |
+| InfillTile                         | Infills transparent areas of an image with tiles of the image |
 | Inpaint                            | Generates an image using inpaint |
 | Iterate                            | Iterates over a list of items |
 | LatentsToImage                     | Generates an image from latents |
@@ -104,9 +104,69 @@ A noise scheduler (eg. DPM++ 2M Karras) schedules the subtraction of noise from 
 | VAE Loader                         | Loads a VAE model, outputting a VaeLoaderOutput |
 | ZoeDepthImageProcessor             | Applies Zoe depth processing to image |
 
+## Node Grouping Concepts
+
+There are several node grouping concepts that can be examined with a narrow focus. These (and other) groupings can be pieced together to make up functional graph setups, and are important to understanding how groups of nodes work together as part of a whole. Note that the screenshots below aren't examples of complete functioning node graphs (see [Examples](https://github.com/ymgenesis/InvokeAI/edit/main/docs/features/NODES.md#examples)).
+
+### Noise
+
+As described, an initial noise tensor is necessary for the latent diffusion process. As a result, all non-image *ToLatents nodes require a noise node input.  
+
+<img width="654" alt="groupsnoise" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/2e8d297e-ad55-4d27-bc93-c119dad2a2c5">
+
+### Conditioning
+
+As described, conditioning is necessary for the latent diffusion process, whether empty or not. As a result, all non-image *ToLatents nodes require positive and negative conditioning inputs. Conditioning is reliant on a CLIP tokenizer provided by the Model Loader node.
+
+<img width="1024" alt="groupsconditioning" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/f8f7ad8a-8d9c-418e-b5ad-1437b774b27e">
+
+### Image Space & VAE
+
+The ImageToLatents node doesn't require a noise node input, but requires a VAE input to convert the image from image space into latent space. In reverse, the LatentsToImage node requires a VAE input to convert from latent space back into image space.
+
+<img width="637" alt="groupsimgvae" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/dd99969c-e0a8-4f78-9b17-3ffe179cef9a">
+
+### Defined & Random Seeds
+
+It is common to want to use both the same seed (for continuity) and random seeds (for variance). To define a seed, simply enter it into the 'Seed' field on a noise node. Conversely, the RandomInt node generates a random integer between 'Low' and 'High', and can be used as input to the 'Seed' edge point on a noise node to randomize your seed.
+
+<img width="922" alt="groupsrandseed" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/af55bc20-60f6-438e-aba5-3ec871443710">
+
+### Control
+
+Control means to guide the diffusion process to adhere to a defined input or structure. Control can be provided as input to non-image *ToLatents nodes from ControlNet nodes. ControlNet nodes usually require an image processor which converts an input image for use with ControlNet.
+
+<img width="805" alt="groupscontrol" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/cc9c5de7-23a7-46c8-bbad-1f3609d999a6">
+
+### LoRA
+
+The Lora Loader node lets you load a LoRA (say that ten times fast) and pass it as output to both the Prompt (Compel) and non-image *ToLatents nodes. A model's CLIP tokenizer is passed through the LoRA into Prompt (Compel), where it affects conditioning. A model's U-Net is also passed through the LoRA into a non-image *ToLatents node, where it affects noise prediction.
+
+<img width="993" alt="groupslora" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/630962b0-d914-4505-b3ea-ccae9b0269da">
+
+### Scaling
+
+Use the ImageScale, ScaleLatents, and Upscale nodes to upscale images and/or latent images. The chosen method differs across contexts. However, be aware that latents are already noisy and compressed at their original resolution; scaling an image could produce more detailed results.
+
+<img width="644" alt="groupsallscale" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/99314f05-dd9f-4b6d-b378-31de55346a13">
+
+### Iteration + Multiple Images as Input
+
+Iteration is a common concept in any processing, and means to repeat a process with given input. In nodes, you're able to use the Iterate node to iterate through collections usually gathered by the Collect node. The Iterate node has many potential uses, from processing a collection of images one after another, to varying seeds across multiple image generations and more. This screenshot demonstrates how to collect several images and pass them out one at a time.
+
+<img width="788" alt="groupsiterate" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/4af5ca27-82c9-4018-8c5b-024d3ee0a121">
+
+### Multiple Image Generation + Random Seeds
+
+Multiple image generation in the node editor is done using the RandomRange node. In this case, the 'Size' field represents the number of images to generate. As RandomRange produces a collection of integers, we need to add the Iterate node to iterate through the collection. 
+
+To control seeds across generations takes some care. The first row in the screenshot will generate multiple images with different seeds, but using the same RandomRange parameters across invocations will result in the same group of random seeds being used across the images, producing repeatable results. In the second row, adding the RandomInt node as input to RandomRange's 'Seed' edge point will ensure that seeds are varied across all images across invocations, producing varied results.
+
+<img width="1027" alt="groupsmultigenseeding" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/518d1b2b-fed1-416b-a052-ab06552521b3">
+
 ## Examples
 
-With our knowledge on the diffusion process, let’s break down some basic graphs in the nodes editor. Note that a node's options can be overridden by inputs from other nodes. These examples aren't strict rules to follow, and only demonstrate some basic configurations.
+With our knowledge of node grouping and the diffusion process, let’s break down some basic graphs in the nodes editor. Note that a node's options can be overridden by inputs from other nodes. These examples aren't strict rules to follow and only demonstrate some basic configurations.
 
 ### Basic text-to-image Node Graph
 
@@ -124,7 +184,7 @@ With our knowledge on the diffusion process, let’s break down some basic graph
 
 - Model Loader: Choose a model from the dropdown.
 - Prompt (Compel): Two prompt nodes. One positive (dog), one negative (dog). Same CLIP inputs from the Model Loader node as before.
-- ImageToLatents: Upload a a source image directly in the node window, via drag'n'drop from the gallery, or passed in as input. The ImageToLatents node inputs the VAE from the Model Loader node to decode the chosen image from image space into latent space, hence the name ImageTo**Latents**. It outputs latents for use in the next LatentsToLatents node. It also outputs the source image's width and height for use in the next Noise node if the final image is to be the same dimensions as the source image.
+- ImageToLatents: Upload a source image directly in the node window, via drag'n'drop from the gallery, or passed in as input. The ImageToLatents node inputs the VAE from the Model Loader node to decode the chosen image from image space into latent space, hence the name ImageTo**Latents**. It outputs latents for use in the next LatentsToLatents node. It also outputs the source image's width and height for use in the next Noise node if the final image is to be the same dimensions as the source image.
 - Noise: A noise tensor is created with the width and height of the source image, and connected to the next LatentsToLatents node. Notice the width and height fields are overridden by the input from the ImageToLatents width and height outputs.
 - LatentsToLatents: The inputs and options are nearly identical to TextToLatents, except that LatentsToLatents also takes latents as an input. Considering our source image is already converted to latents in the last ImageToLatents node, and text + noise are no longer the only inputs to process, we use the LatentsToLatents node. 
 - LatentsToImage: Like previously, the LatentsToImage node will use the VAE from the Model Loader as input to decode the latents from LatentsToLatents into image space, and save it to the gallery.
