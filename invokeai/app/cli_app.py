@@ -16,6 +16,12 @@ from invokeai.backend.util.logging import InvokeAILogger
 config = InvokeAIAppConfig.get_config()
 config.parse_args()
 logger = InvokeAILogger().getLogger(config=config)
+from invokeai.version.invokeai_version import __version__
+
+# we call this early so that the message appears before other invokeai initialization messages
+if config.version:
+    print(f'InvokeAI version {__version__}')
+    sys.exit(0)
 
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
@@ -208,6 +214,7 @@ def invoke_all(context: CliContext):
         raise SessionError()
 
 def invoke_cli():
+    logger.info(f'InvokeAI version {__version__}')
     # get the optional list of invocations to execute on the command line
     parser = config.get_parser()
     parser.add_argument('commands',nargs='*')

@@ -27,6 +27,9 @@ const ParamNoiseCollapse = () => {
   const { t } = useTranslation();
 
   const isNoiseEnabled = useFeatureStatus('noise').isFeatureEnabled;
+  const isPerlinNoiseEnabled = useFeatureStatus('perlinNoise').isFeatureEnabled;
+  const isNoiseThresholdEnabled =
+    useFeatureStatus('noiseThreshold').isFeatureEnabled;
 
   const { activeLabel } = useAppSelector(selector);
 
@@ -42,8 +45,8 @@ const ParamNoiseCollapse = () => {
       <Flex sx={{ gap: 2, flexDirection: 'column' }}>
         <ParamNoiseToggle />
         <ParamCpuNoiseToggle />
-        <ParamPerlinNoise />
-        <ParamNoiseThreshold />
+        {isPerlinNoiseEnabled && <ParamPerlinNoise />}
+        {isNoiseThresholdEnabled && <ParamNoiseThreshold />}
       </Flex>
     </IAICollapse>
   );
