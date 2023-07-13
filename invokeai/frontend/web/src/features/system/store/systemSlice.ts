@@ -4,8 +4,14 @@ import * as InvokeAI from 'app/types/invokeai';
 
 import { InvokeLogLevel } from 'app/logging/useLogger';
 import { userInvoked } from 'app/store/actions';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { TFuncKey, t } from 'i18next';
 import { LogLevelName } from 'roarr';
+import { imageUploaded } from 'services/api/thunks/image';
+import {
+  isAnySessionRejected,
+  sessionCanceled,
+} from 'services/api/thunks/session';
 import {
   appSocketConnected,
   appSocketDisconnected,
@@ -18,18 +24,10 @@ import {
   appSocketUnsubscribed,
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
-import { imageUploaded } from 'services/api/thunks/image';
-import {
-  isAnySessionRejected,
-  sessionCanceled,
-} from 'services/api/thunks/session';
 import { makeToast } from '../../../app/components/Toaster';
 import { LANGUAGES } from '../components/LanguagePicker';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
-
-export type InfillMethod = 'tile' | 'patchmatch';
 
 export interface SystemState {
   isGFPGANAvailable: boolean;
@@ -87,10 +85,6 @@ export interface SystemState {
    * When a session is canceled, its ID is stored here until a new session is created.
    */
   canceledSession: string;
-  /**
-   * TODO: get this from backend
-   */
-  infillMethods: InfillMethod[];
   isPersisted: boolean;
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
@@ -128,7 +122,6 @@ export const initialSystemState: SystemState = {
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
   canceledSession: '',
-  infillMethods: ['tile', 'patchmatch'],
   isPersisted: false,
   language: 'en',
   isUploading: false,
@@ -218,9 +211,6 @@ export const systemSlice = createSlice({
     },
     progressImageSet(state, action: PayloadAction<ProgressImage | null>) {
       state.progressImage = action.payload;
-    },
-    setAvailableInfillMethods(state, action: PayloadAction<InfillMethod[]>) {
-      state.infillMethods = action.payload;
     },
   },
   extraReducers(builder) {
@@ -454,7 +444,6 @@ export const {
   shouldAntialiasProgressImageChanged,
   languageChanged,
   progressImageSet,
-  setAvailableInfillMethods,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
