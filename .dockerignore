@@ -1,25 +1,9 @@
-# use this file as a whitelist
 *
 !invokeai
-!ldm
 !pyproject.toml
+!docker/docker-entrypoint.sh
+!LICENSE
 
-# ignore frontend/web but whitelist dist
-invokeai/frontend/web/
-!invokeai/frontend/web/dist/
-
-# ignore invokeai/assets but whitelist invokeai/assets/web
-invokeai/assets/
-!invokeai/assets/web/
-
-# Guard against pulling in any models that might exist in the directory tree
-**/*.pt*
-**/*.ckpt
-
-# Byte-compiled / optimized / DLL files
-**/__pycache__/
-**/*.py[cod]
-
-# Distribution / packaging
-**/*.egg-info/
-**/*.egg
+**/node_modules
+**/__pycache__
+**/*.egg-info
