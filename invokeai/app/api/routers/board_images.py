@@ -2,8 +2,10 @@ from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
 
 from invokeai.app.services.models.image_record import (
-    AddManyImagesToBoardResult, GetAllBoardImagesForBoardResult,
-    RemoveManyImagesFromBoardResult)
+    AddManyImagesToBoardResult,
+    GetAllBoardImagesForBoardResult,
+    RemoveManyImagesFromBoardResult,
+)
 
 from ..dependencies import ApiDependencies
 
@@ -33,7 +35,7 @@ async def create_board_image(
 
 
 @board_images_router.delete(
-    "/",
+    "/{board_id}",
     operation_id="remove_board_image",
     responses={
         201: {"description": "The image was removed from the board successfully"},
@@ -41,6 +43,9 @@ async def create_board_image(
     status_code=201,
 )
 async def remove_board_image(
+    board_id: str = Path(
+        description="The id of the board the image is being removed from"
+    ),
     image_name: str = Body(
         description="The name of the image to remove from its board"
     ),
@@ -96,7 +101,7 @@ async def create_multiple_board_images(
 
 
 @board_images_router.post(
-    "/images",
+    "/{board_id}/images",
     operation_id="delete_multiple_board_images",
     responses={
         201: {"description": "The images were removed from their boards successfully"},
@@ -104,11 +109,14 @@ async def create_multiple_board_images(
     status_code=201,
 )
 async def delete_multiple_board_images(
+    board_id: str = Path(
+        description="The id of the board images are being removed from"
+    ),
     image_names: list[str] = Body(
         description="The names of the images to remove from their boards, if they have one"
     ),
 ) -> RemoveManyImagesFromBoardResult:
-    """Remove many images from their boards, if they have one"""
+    """Remove many images from a board"""
 
     results = (
         ApiDependencies.invoker.services.board_images.remove_many_images_from_board(
