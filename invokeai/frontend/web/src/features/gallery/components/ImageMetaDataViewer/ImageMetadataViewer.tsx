@@ -13,6 +13,7 @@ import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { memo, useMemo } from 'react';
 import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
+import { useDebounce } from 'use-debounce';
 import ImageMetadataActions from './ImageMetadataActions';
 import MetadataJSONViewer from './MetadataJSONViewer';
 
@@ -27,16 +28,26 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   //   dispatch(setShouldShowImageDetails(false));
   // });
 
-  const { data } = useGetImageMetadataQuery(image?.image_name ?? skipToken);
-  const metadata = data?.metadata;
+  const [debouncedMetadataQueryArg, debounceState] = useDebounce(
+    image.image_name,
+    500
+  );
+
+  const { currentData } = useGetImageMetadataQuery(
+    debounceState.isPending()
+      ? skipToken
+      : debouncedMetadataQueryArg ?? skipToken
+  );
+  const metadata = currentData?.metadata;
+  const graph = currentData?.graph;
 
   const tabData = useMemo(() => {
     const _tabData: { label: string; data: object; copyTooltip: string }[] = [];
 
-    if (data?.metadata) {
+    if (metadata) {
       _tabData.push({
         label: 'Core Metadata',
-        data: data?.metadata,
+        data: metadata,
         copyTooltip: 'Copy Core Metadata JSON',
       });
     }
@@ -49,15 +60,15 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
       });
     }
 
-    if (data?.graph) {
+    if (graph) {
       _tabData.push({
         label: 'Graph',
-        data: data?.graph,
+        data: graph,
         copyTooltip: 'Copy Graph JSON',
       });
     }
     return _tabData;
-  }, [data?.metadata, data?.graph, image]);
+  }, [metadata, graph, image]);
 
   return (
     <Flex
