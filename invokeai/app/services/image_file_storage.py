@@ -122,9 +122,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
             pnginfo = PngImagePlugin.PngInfo()
             
             if metadata is not None:
-                pnginfo.add_text("metadata", json.dumps(metadata))
+                pnginfo.add_text("invokeai_metadata", json.dumps(metadata))
             if graph is not None:
-                pnginfo.add_text("graph", json.dumps(graph))
+                pnginfo.add_text("invokeai_graph", json.dumps(graph))
 
             image.save(image_path, "PNG", pnginfo=pnginfo)
             thumbnail_name = get_thumbnail_name(image_name)
