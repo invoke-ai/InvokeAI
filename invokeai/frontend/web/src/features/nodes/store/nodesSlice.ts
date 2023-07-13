@@ -157,7 +157,6 @@ export const {
   setEditorInstance,
   loadFileNodes,
   loadFileEdges,
-  clearNodes,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
