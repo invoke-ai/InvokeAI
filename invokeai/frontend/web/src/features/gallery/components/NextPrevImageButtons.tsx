@@ -1,17 +1,12 @@
-import { ChakraProps, Flex, Grid, IconButton, Spinner } from '@chakra-ui/react';
-import { memo, useCallback, useState } from 'react';
+import { Box, ChakraProps, Flex, IconButton, Spinner } from '@chakra-ui/react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaAngleDoubleRight, FaAngleLeft, FaAngleRight } from 'react-icons/fa';
 import { useNextPrevImage } from '../hooks/useNextPrevImage';
 
-const nextPrevButtonTriggerAreaStyles: ChakraProps['sx'] = {
-  height: '100%',
-  width: '15%',
-  alignItems: 'center',
-  pointerEvents: 'auto',
-};
 const nextPrevButtonStyles: ChakraProps['sx'] = {
   color: 'base.100',
+  pointerEvents: 'auto',
 };
 
 const NextPrevImageButtons = () => {
@@ -27,35 +22,23 @@ const NextPrevImageButtons = () => {
     isFetching,
   } = useNextPrevImage();
 
-  const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =
-    useState<boolean>(false);
-
-  const handleCurrentImagePreviewMouseOver = useCallback(() => {
-    setShouldShowNextPrevButtons(true);
-  }, []);
-
-  const handleCurrentImagePreviewMouseOut = useCallback(() => {
-    setShouldShowNextPrevButtons(false);
-  }, []);
-
   return (
-    <Flex
+    <Box
       sx={{
-        justifyContent: 'space-between',
+        position: 'relative',
         height: '100%',
         width: '100%',
-        pointerEvents: 'none',
       }}
     >
-      <Grid
+      <Box
         sx={{
-          ...nextPrevButtonTriggerAreaStyles,
-          justifyContent: 'flex-start',
+          pos: 'absolute',
+          top: '50%',
+          transform: 'translate(0, -50%)',
+          insetInlineStart: 0,
         }}
-        onMouseOver={handleCurrentImagePreviewMouseOver}
-        onMouseOut={handleCurrentImagePreviewMouseOut}
       >
-        {shouldShowNextPrevButtons && !isOnFirstImage && (
+        {!isOnFirstImage && (
           <IconButton
             aria-label={t('accessibility.previousImage')}
             icon={<FaAngleLeft size={64} />}
@@ -65,16 +48,16 @@ const NextPrevImageButtons = () => {
             sx={nextPrevButtonStyles}
           />
         )}
-      </Grid>
-      <Grid
+      </Box>
+      <Box
         sx={{
-          ...nextPrevButtonTriggerAreaStyles,
-          justifyContent: 'flex-end',
+          pos: 'absolute',
+          top: '50%',
+          transform: 'translate(0, -50%)',
+          insetInlineEnd: 0,
         }}
-        onMouseOver={handleCurrentImagePreviewMouseOver}
-        onMouseOut={handleCurrentImagePreviewMouseOut}
       >
-        {shouldShowNextPrevButtons && !isOnLastImage && (
+        {!isOnLastImage && (
           <IconButton
             aria-label={t('accessibility.nextImage')}
             icon={<FaAngleRight size={64} />}
@@ -84,36 +67,30 @@ const NextPrevImageButtons = () => {
             sx={nextPrevButtonStyles}
           />
         )}
-        {shouldShowNextPrevButtons &&
-          isOnLastImage &&
-          areMoreImagesAvailable &&
-          !isFetching && (
-            <IconButton
-              aria-label={t('accessibility.loadMore')}
-              icon={<FaAngleDoubleRight size={64} />}
-              variant="unstyled"
-              onClick={handleLoadMoreImages}
-              boxSize={16}
-              sx={nextPrevButtonStyles}
-            />
-          )}
-        {shouldShowNextPrevButtons &&
-          isOnLastImage &&
-          areMoreImagesAvailable &&
-          isFetching && (
-            <Flex
-              sx={{
-                w: 16,
-                h: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Spinner opacity={0.5} size="xl" />
-            </Flex>
-          )}
-      </Grid>
-    </Flex>
+        {isOnLastImage && areMoreImagesAvailable && !isFetching && (
+          <IconButton
+            aria-label={t('accessibility.loadMore')}
+            icon={<FaAngleDoubleRight size={64} />}
+            variant="unstyled"
+            onClick={handleLoadMoreImages}
+            boxSize={16}
+            sx={nextPrevButtonStyles}
+          />
+        )}
+        {isOnLastImage && areMoreImagesAvailable && isFetching && (
+          <Flex
+            sx={{
+              w: 16,
+              h: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Spinner opacity={0.5} size="xl" />
+          </Flex>
+        )}
+      </Box>
+    </Box>
   );
 };
 

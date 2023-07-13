@@ -1,5 +1,5 @@
 import { Box, Flex } from '@chakra-ui/react';
-import CurrentImageDisplay from 'features/gallery/components/CurrentImageDisplay';
+import CurrentImageDisplay from 'features/gallery/components/CurrentImage/CurrentImageDisplay';
 
 const TextToImageTabMain = () => {
   return (
