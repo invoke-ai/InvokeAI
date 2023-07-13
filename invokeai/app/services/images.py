@@ -1,39 +1,30 @@
+import json
 from abc import ABC, abstractmethod
 from logging import Logger
-from typing import Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Optional
+
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.models.image import (
-    ImageCategory,
-    ResourceOrigin,
-    InvalidImageCategoryException,
-    InvalidOriginException,
-)
-from invokeai.app.models.metadata import ImageMetadata
-from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
-from invokeai.app.services.image_record_storage import (
-    ImageRecordDeleteException,
-    ImageRecordNotFoundException,
-    ImageRecordSaveException,
-    ImageRecordStorageBase,
-    OffsetPaginatedResults,
-)
-from invokeai.app.services.models.image_record import (
-    ImageRecord,
-    ImageDTO,
-    ImageRecordChanges,
-    image_record_to_dto,
-)
+from invokeai.app.invocations.metadata import ImageMetadata
+from invokeai.app.models.image import (ImageCategory,
+                                       InvalidImageCategoryException,
+                                       InvalidOriginException, ResourceOrigin)
+from invokeai.app.services.board_image_record_storage import \
+    BoardImageRecordStorageBase
+from invokeai.app.services.graph import Graph
 from invokeai.app.services.image_file_storage import (
-    ImageFileDeleteException,
-    ImageFileNotFoundException,
-    ImageFileSaveException,
-    ImageFileStorageBase,
-)
-from invokeai.app.services.item_storage import ItemStorageABC, PaginatedResults
-from invokeai.app.services.metadata import MetadataServiceBase
+    ImageFileDeleteException, ImageFileNotFoundException,
+    ImageFileSaveException, ImageFileStorageBase)
+from invokeai.app.services.image_record_storage import (
+    ImageRecordDeleteException, ImageRecordNotFoundException,
+    ImageRecordSaveException, ImageRecordStorageBase, OffsetPaginatedResults)
+from invokeai.app.services.item_storage import ItemStorageABC
+from invokeai.app.services.models.image_record import (ImageDTO, ImageRecord,
+                                                       ImageRecordChanges,
+                                                       image_record_to_dto)
 from invokeai.app.services.resource_name import NameServiceBase
 from invokeai.app.services.urls import UrlServiceBase
+from invokeai.app.util.metadata import get_metadata_graph_from_raw_session
 
 if TYPE_CHECKING:
     from invokeai.app.services.graph import GraphExecutionState
@@ -51,6 +42,7 @@ class ImageServiceABC(ABC):
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
         is_intermediate: bool = False,
+        metadata: Optional[dict] = None,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         pass
@@ -77,6 +69,11 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def get_dto(self, image_name: str) -> ImageDTO:
         """Gets an image DTO."""
+        pass
+
+    @abstractmethod
+    def get_metadata(self, image_name: str) -> ImageMetadata:
+        """Gets an image's metadata."""
         pass
 
     @abstractmethod
@@ -124,7 +121,6 @@ class ImageServiceDependencies:
     image_records: ImageRecordStorageBase
     image_files: ImageFileStorageBase
     board_image_records: BoardImageRecordStorageBase
-    metadata: MetadataServiceBase
     urls: UrlServiceBase
     logger: Logger
     names: NameServiceBase
@@ -135,7 +131,6 @@ class ImageServiceDependencies:
         image_record_storage: ImageRecordStorageBase,
         image_file_storage: ImageFileStorageBase,
         board_image_record_storage: BoardImageRecordStorageBase,
-        metadata: MetadataServiceBase,
         url: UrlServiceBase,
         logger: Logger,
         names: NameServiceBase,
@@ -144,7 +139,6 @@ class ImageServiceDependencies:
         self.image_records = image_record_storage
         self.image_files = image_file_storage
         self.board_image_records = board_image_record_storage
-        self.metadata = metadata
         self.urls = url
         self.logger = logger
         self.names = names
@@ -165,6 +159,7 @@ class ImageService(ImageServiceABC):
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
         is_intermediate: bool = False,
+        metadata: Optional[dict] = None,
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -174,7 +169,16 @@ class ImageService(ImageServiceABC):
 
         image_name = self._services.names.create_image_name()
 
-        metadata = self._get_metadata(session_id, node_id)
+        graph = None
+
+        if session_id is not None:
+            session_raw = self._services.graph_execution_manager.get_raw(session_id)
+            if session_raw is not None:
+                try:
+                    graph = get_metadata_graph_from_raw_session(session_raw)
+                except Exception as e:
+                    self._services.logger.warn(f"Failed to parse session graph: {e}")
+                    graph = None
 
         (width, height) = image.size
 
@@ -191,14 +195,12 @@ class ImageService(ImageServiceABC):
                 is_intermediate=is_intermediate,
                 # Nullable fields
                 node_id=node_id,
-                session_id=session_id,
                 metadata=metadata,
+                session_id=session_id,
             )
 
             self._services.image_files.save(
-                image_name=image_name,
-                image=image,
-                metadata=metadata,
+                image_name=image_name, image=image, metadata=metadata, graph=graph
             )
 
             image_dto = self.get_dto(image_name)
@@ -261,6 +263,34 @@ class ImageService(ImageServiceABC):
             )
 
             return image_dto
+        except ImageRecordNotFoundException:
+            self._services.logger.error("Image record not found")
+            raise
+        except Exception as e:
+            self._services.logger.error("Problem getting image DTO")
+            raise e
+
+    def get_metadata(self, image_name: str) -> Optional[ImageMetadata]:
+        try:
+            image_record = self._services.image_records.get(image_name)
+
+            if not image_record.session_id:
+                return ImageMetadata()
+
+            session_raw = self._services.graph_execution_manager.get_raw(
+                image_record.session_id
+            )
+            graph = None
+
+            if session_raw:
+                try:
+                    graph = get_metadata_graph_from_raw_session(session_raw)
+                except Exception as e:
+                    self._services.logger.warn(f"Failed to parse session graph: {e}")
+                    graph = None
+
+            metadata = self._services.image_records.get_metadata(image_name)
+            return ImageMetadata(graph=graph, metadata=metadata)
         except ImageRecordNotFoundException:
             self._services.logger.error("Image record not found")
             raise
@@ -367,15 +397,3 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self._services.logger.error("Problem deleting image records and files")
             raise e
-
-    def _get_metadata(
-        self, session_id: Optional[str] = None, node_id: Optional[str] = None
-    ) -> Optional[ImageMetadata]:
-        """Get the metadata for a node."""
-        metadata = None
-
-        if node_id is not None and session_id is not None:
-            session = self._services.graph_execution_manager.get(session_id)
-            metadata = self._services.metadata.create_image_metadata(session, node_id)
-
-        return metadata

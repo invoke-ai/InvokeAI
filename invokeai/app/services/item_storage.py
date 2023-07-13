@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Generic, TypeVar
+from typing import Callable, Generic, Optional, TypeVar
 
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
@@ -29,14 +29,22 @@ class ItemStorageABC(ABC, Generic[T]):
 
     @abstractmethod
     def get(self, item_id: str) -> T:
+        """Gets the item, parsing it into a Pydantic model"""
+        pass
+
+    @abstractmethod
+    def get_raw(self, item_id: str) -> Optional[str]:
+        """Gets the raw item as a string, skipping Pydantic parsing"""
         pass
 
     @abstractmethod
     def set(self, item: T) -> None:
+        """Sets the item"""
         pass
 
     @abstractmethod
     def list(self, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
+        """Gets a paginated list of items"""
         pass
 
     @abstractmethod

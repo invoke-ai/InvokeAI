@@ -45,7 +45,11 @@ import {
   FaShare,
   FaShareAlt,
 } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import {
+  useGetImageDTOQuery,
+  useGetImageMetadataQuery,
+} from 'services/api/endpoints/images';
+import { useDebounce } from 'use-debounce';
 import { sentImageToCanvas, sentImageToImg2Img } from '../store/actions';
 
 const currentImageButtonsSelector = createSelector(
@@ -128,9 +132,22 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const { recallBothPrompts, recallSeed, recallAllParameters } =
     useRecallParameters();
 
-  const { currentData: image } = useGetImageDTOQuery(
+  const [debouncedMetadataQueryArg, debounceState] = useDebounce(
+    lastSelectedImage,
+    500
+  );
+
+  const { currentData: image, isFetching } = useGetImageDTOQuery(
     lastSelectedImage ?? skipToken
   );
+
+  const { currentData: metadataData } = useGetImageMetadataQuery(
+    debounceState.isPending()
+      ? skipToken
+      : debouncedMetadataQueryArg ?? skipToken
+  );
+
+  const metadata = metadataData?.metadata;
 
   // const handleCopyImage = useCallback(async () => {
   //   if (!image?.url) {
@@ -193,29 +210,26 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   }, [toaster, t, image]);
 
   const handleClickUseAllParameters = useCallback(() => {
-    recallAllParameters(image);
-  }, [image, recallAllParameters]);
+    recallAllParameters(metadata);
+  }, [metadata, recallAllParameters]);
 
   useHotkeys(
     'a',
     () => {
       handleClickUseAllParameters;
     },
-    [image, recallAllParameters]
+    [metadata, recallAllParameters]
   );
 
   const handleUseSeed = useCallback(() => {
-    recallSeed(image?.metadata?.seed);
-  }, [image, recallSeed]);
+    recallSeed(metadata?.seed);
+  }, [metadata?.seed, recallSeed]);
 
   useHotkeys('s', handleUseSeed, [image]);
 
   const handleUsePrompt = useCallback(() => {
-    recallBothPrompts(
-      image?.metadata?.positive_conditioning,
-      image?.metadata?.negative_conditioning
-    );
-  }, [image, recallBothPrompts]);
+    recallBothPrompts(metadata?.positive_prompt, metadata?.negative_prompt);
+  }, [metadata?.negative_prompt, metadata?.positive_prompt, recallBothPrompts]);
 
   useHotkeys('p', handleUsePrompt, [image]);
 
@@ -440,7 +454,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
-            isDisabled={!image?.metadata?.positive_conditioning}
+            isDisabled={!metadata?.positive_prompt}
             onClick={handleUsePrompt}
           />
 
@@ -448,7 +462,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             icon={<FaSeedling />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
-            isDisabled={!image?.metadata?.seed}
+            isDisabled={!metadata?.seed}
             onClick={handleUseSeed}
           />
 
@@ -456,10 +470,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
             icon={<FaAsterisk />}
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}
-            isDisabled={
-              // not sure what this list should be
-              !['t2l', 'l2l', 'inpaint'].includes(String(image?.metadata?.type))
-            }
+            isDisabled={!metadata}
             onClick={handleClickUseAllParameters}
           />
         </ButtonGroup>

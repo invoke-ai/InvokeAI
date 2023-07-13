@@ -2,7 +2,7 @@ import inspect
 from enum import Enum
 from pydantic import BaseModel
 from typing import Literal, get_origin
-from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings, ModelNotFoundException
+from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings, ModelNotFoundException, InvalidModelException
 from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
 from .vae import VaeModel
 from .lora import LoRAModel
@@ -37,9 +37,9 @@ MODEL_CONFIGS = list()
 OPENAPI_MODEL_CONFIGS = list()
 
 class OpenAPIModelInfoBase(BaseModel):
-    name: str
+    model_name: str
     base_model: BaseModelType
-    type: ModelType
+    model_type: ModelType
 
 
 for base_model, models in MODEL_CLASSES.items():
@@ -56,7 +56,7 @@ for base_model, models in MODEL_CLASSES.items():
 
             api_wrapper = type(openapi_cfg_name, (cfg, OpenAPIModelInfoBase), dict(
                 __annotations__ = dict(
-                    type=Literal[model_type.value],
+                    model_type=Literal[model_type.value],
                 ),
             ))
 

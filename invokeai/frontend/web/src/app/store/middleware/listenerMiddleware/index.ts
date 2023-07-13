@@ -8,6 +8,7 @@ import {
 
 import type { AppDispatch, RootState } from '../../store';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
+import { addAppConfigReceivedListener } from './listeners/appConfigReceived';
 import { addAppStartedListener } from './listeners/appStarted';
 import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
 import { addRequestedBoardImageDeletionListener } from './listeners/boardImagesDeleted';
@@ -51,6 +52,7 @@ import {
 } from './listeners/imageUrlsReceived';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
+import { addModelsLoadedListener } from './listeners/modelsLoaded';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
 import {
   addReceivedPageOfImagesFulfilledListener,
@@ -224,3 +226,5 @@ addModelSelectedListener();
 
 // app startup
 addAppStartedListener();
+addModelsLoadedListener();
+addAppConfigReceivedListener();

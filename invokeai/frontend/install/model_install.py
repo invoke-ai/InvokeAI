@@ -773,7 +773,7 @@ def main():
     config.parse_args(invoke_args)
     logger = InvokeAILogger().getLogger(config=config)
 
-    if not (config.root_dir / config.conf_path.parent).exists():
+    if not (config.conf_path / 'models.yaml').exists():
         logger.info(
             "Your InvokeAI root directory is not set up. Calling invokeai-configure."
         )
