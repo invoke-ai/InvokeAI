@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import copy
-from pathlib import Path
 from contextlib import contextmanager
-from typing import Optional, Dict, Tuple, Any
+from typing import Optional, Dict, Tuple, Any, Union, List
+from pathlib import Path
 
 import torch
 from safetensors.torch import load_file
@@ -16,6 +16,9 @@ from onnxruntime import OrtValue
 import numpy as np
 
 from compel.embeddings_provider import BaseTextualInversionManager
+from diffusers.models import UNet2DConditionModel
+from safetensors.torch import load_file
+from transformers import CLIPTextModel, CLIPTokenizer
 
 # TODO: rename and split this file
 
@@ -129,8 +132,8 @@ class LoRALayer(LoRALayerBase):
 
     def get_weight(self):
         if self.mid is not None:
-            up = self.up.reshape(up.shape[0], up.shape[1])
-            down = self.down.reshape(up.shape[0], up.shape[1])
+            up = self.up.reshape(self.up.shape[0], self.up.shape[1])
+            down = self.down.reshape(self.down.shape[0], self.down.shape[1])
             weight = torch.einsum("m n w h, i m, n j -> i j w h", self.mid, up, down)
         else:
             weight = self.up.reshape(self.up.shape[0], -1) @ self.down.reshape(self.down.shape[0], -1)
@@ -171,7 +174,7 @@ class LoHALayer(LoRALayerBase):
         layer_key: str,
         values: dict,
     ):
-        super().__init__(module_key, rank, alpha, bias)
+        super().__init__(layer_key, values)
 
         self.w1_a = values["hada_w1_a"]
         self.w1_b = values["hada_w1_b"]
@@ -244,7 +247,7 @@ class LoKRLayer(LoRALayerBase):
         layer_key: str,
         values: dict,
     ):
-        super().__init__(module_key, rank, alpha, bias)        
+        super().__init__(layer_key, values)        
 
         if "lokr_w1" in values:
             self.w1 = values["lokr_w1"]
@@ -291,7 +294,7 @@ class LoKRLayer(LoRALayerBase):
         if len(w2.shape) == 4:
             w1 = w1.unsqueeze(2).unsqueeze(2)
         w2 = w2.contiguous()
-        weight = torch.kron(w1, w2)#.reshape(module.weight.shape) # TODO: can we remove reshape?
+        weight = torch.kron(w1, w2)
 
         return weight
 
@@ -416,7 +419,7 @@ class LoRAModel: #(torch.nn.Module):
             else:
                 # TODO: diff/ia3/... format
                 print(
-                    f">> Encountered unknown lora layer module in {self.name}: {layer_key}"
+                    f">> Encountered unknown lora layer module in {model.name}: {layer_key}"
                 )
                 return
 
@@ -476,7 +479,7 @@ class ModelPatcher:
                 submodule_name += "_" + key_parts.pop(0)
 
         module = module.get_submodule(submodule_name)
-        module_key = module_key.rstrip(".")
+        module_key = (module_key + "." + submodule_name).lstrip(".")
 
         return (module_key, module)
 
@@ -530,23 +533,37 @@ class ModelPatcher:
         loras: List[Tuple[LoraModel, float]],
         prefix: str,
     ):
-        hooks = dict()
+        original_weights = dict()
         try:
-            for lora, lora_weight in loras:
-                for layer_key, layer in lora.layers.items():
-                    if not layer_key.startswith(prefix):
-                        continue
+            with torch.no_grad():
+                for lora, lora_weight in loras:
+                    #assert lora.device.type == "cpu"
+                    for layer_key, layer in lora.layers.items():
+                        if not layer_key.startswith(prefix):
+                            continue
 
-                    module_key, module = cls._resolve_lora_key(model, layer_key, prefix)
-                    if module_key not in hooks:
-                        hooks[module_key] = module.register_forward_hook(cls._lora_forward_hook(loras, layer_key))
+                        module_key, module = cls._resolve_lora_key(model, layer_key, prefix)
+                        if module_key not in original_weights:
+                            original_weights[module_key] = module.weight.detach().to(device="cpu", copy=True)
+
+                        # enable autocast to calc fp16 loras on cpu
+                        #with torch.autocast(device_type="cpu"):
+                        layer.to(dtype=torch.float32)
+                        layer_scale = layer.alpha / layer.rank if (layer.alpha and layer.rank) else 1.0
+                        layer_weight = layer.get_weight() * lora_weight * layer_scale
+
+                        if module.weight.shape != layer_weight.shape:
+                            # TODO: debug on lycoris
+                            layer_weight = layer_weight.reshape(module.weight.shape)
+
+                        module.weight += layer_weight.to(device=module.weight.device, dtype=module.weight.dtype)
 
             yield # wait for context manager exit
 
         finally:
-            for module_key, hook in hooks.items():
-                hook.remove()
-            hooks.clear()
+            with torch.no_grad():
+                for module_key, weight in original_weights.items():
+                    model.get_submodule(module_key).weight.copy_(weight)
 
 
     @classmethod
@@ -596,7 +613,7 @@ class ModelPatcher:
                             f"Cannot load embedding for {trigger}. It was trained on a model with token dimension {embedding.shape[0]}, but the current model has token dimension {model_embeddings.weight.data[token_id].shape[0]}."
                         )
 
-                    model_embeddings.weight.data[token_id] = embedding
+                    model_embeddings.weight.data[token_id] = embedding.to(device=text_encoder.device, dtype=text_encoder.dtype)
                     ti_tokens.append(token_id)
 
                 if len(ti_tokens) > 1:
@@ -608,6 +625,24 @@ class ModelPatcher:
             if init_tokens_count and new_tokens_added:
                 text_encoder.resize_token_embeddings(init_tokens_count)
 
+
+    @classmethod
+    @contextmanager
+    def apply_clip_skip(
+        cls,
+        text_encoder: CLIPTextModel,
+        clip_skip: int,
+    ):
+        skipped_layers = []
+        try:
+            for i in range(clip_skip):
+                skipped_layers.append(text_encoder.text_model.encoder.layers.pop(-1))
+
+            yield
+
+        finally:
+            while len(skipped_layers) > 0:
+                text_encoder.text_model.encoder.layers.append(skipped_layers.pop())
 
 class TextualInversionModel:
     name: str
@@ -646,6 +681,9 @@ class TextualInversionModel:
         # v4(diffusers bin files)
         else:
             result.embedding = next(iter(state_dict.values()))
+
+            if len(result.embedding.shape) == 1:
+                result.embedding = result.embedding.unsqueeze(0)
 
             if not isinstance(result.embedding, torch.Tensor):
                 raise ValueError(f"Invalid embeddings file: {file_path.name}")

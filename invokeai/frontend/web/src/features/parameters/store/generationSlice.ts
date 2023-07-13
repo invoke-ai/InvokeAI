@@ -1,20 +1,27 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
+import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { configChanged } from 'features/system/store/configSlice';
+import {
+  setAspectRatio,
+  setShouldShowAdvancedOptions,
+} from 'features/ui/store/uiSlice';
 import { clamp } from 'lodash-es';
-import { ImageDTO } from 'services/api';
+import { ImageDTO, MainModelField } from 'services/api/types';
+import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
 import {
   CfgScaleParam,
   HeightParam,
-  ModelParam,
   NegativePromptParam,
   PositivePromptParam,
   SchedulerParam,
   SeedParam,
   StepsParam,
   StrengthParam,
+  VaeModelParam,
   WidthParam,
+  zMainModel,
 } from './parameterZodSchemas';
 
 export interface GenerationState {
@@ -46,10 +53,12 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: ModelParam;
-  shouldUseSeamless: boolean;
+  model: MainModelField | null;
+  vae: VaeModelParam | null;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
+  clipSkip: number;
+  shouldUseCpuNoise: boolean;
 }
 
 export const initialGenerationState: GenerationState = {
@@ -80,10 +89,12 @@ export const initialGenerationState: GenerationState = {
   shouldUseSymmetry: false,
   horizontalSymmetrySteps: 0,
   verticalSymmetrySteps: 0,
-  model: '',
-  shouldUseSeamless: false,
-  seamlessXAxis: true,
-  seamlessYAxis: true,
+  model: null,
+  vae: null,
+  seamlessXAxis: false,
+  seamlessYAxis: false,
+  clipSkip: 0,
+  shouldUseCpuNoise: true,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -131,6 +142,11 @@ export const generationSlice = createSlice({
     setWidth: (state, action: PayloadAction<number>) => {
       state.width = action.payload;
     },
+    toggleSize: (state) => {
+      const [width, height] = [state.width, state.height];
+      state.width = height;
+      state.height = width;
+    },
     setScheduler: (state, action: PayloadAction<SchedulerParam>) => {
       state.scheduler = action.payload;
     },
@@ -140,9 +156,6 @@ export const generationSlice = createSlice({
     },
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
-    },
-    setSeamless: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseSeamless = action.payload;
     },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessXAxis = action.payload;
@@ -213,15 +226,48 @@ export const generationSlice = createSlice({
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelSelected: (state, action: PayloadAction<string>) => {
-      state.model = action.payload;
+    modelChanged: (state, action: PayloadAction<MainModelField | null>) => {
+      if (!action.payload) {
+        state.model = null;
+      }
+
+      state.model = zMainModel.parse(action.payload);
+
+      // Clamp ClipSkip Based On Selected Model
+      const { maxClip } = clipSkipMap[state.model.base_model];
+      state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+    },
+    vaeSelected: (state, action: PayloadAction<VaeModelParam | null>) => {
+      state.vae = action.payload;
+    },
+    setClipSkip: (state, action: PayloadAction<number>) => {
+      state.clipSkip = action.payload;
+    },
+    shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldUseCpuNoise = action.payload;
     },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
       const defaultModel = action.payload.sd?.defaultModel;
+
       if (defaultModel && !state.model) {
-        state.model = defaultModel;
+        const [base_model, model_type, model_name] = defaultModel.split('/');
+        state.model = zMainModel.parse({
+          id: defaultModel,
+          name: model_name,
+          base_model,
+        });
+      }
+    });
+    builder.addCase(setShouldShowAdvancedOptions, (state, action) => {
+      const advancedOptionsStatus = action.payload;
+      if (!advancedOptionsStatus) state.clipSkip = 0;
+    });
+    builder.addCase(setAspectRatio, (state, action) => {
+      const ratio = action.payload;
+      if (ratio) {
+        state.height = roundToMultiple(state.width / ratio, 8);
       }
     });
   },
@@ -233,7 +279,9 @@ export const {
   resetParametersState,
   resetSeed,
   setCfgScale,
+  setWidth,
   setHeight,
+  toggleSize,
   setImg2imgStrength,
   setInfillMethod,
   setIterations,
@@ -254,16 +302,17 @@ export const {
   setThreshold,
   setTileSize,
   setVariationAmount,
-  setWidth,
   setShouldUseSymmetry,
   setHorizontalSymmetrySteps,
   setVerticalSymmetrySteps,
   initialImageChanged,
-  modelSelected,
+  modelChanged,
+  vaeSelected,
   setShouldUseNoiseSettings,
-  setSeamless,
   setSeamlessXAxis,
   setSeamlessYAxis,
+  setClipSkip,
+  shouldUseCpuNoiseChanged,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

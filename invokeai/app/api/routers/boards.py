@@ -5,6 +5,7 @@ from invokeai.app.services.board_record_storage import BoardChanges
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.board_record import BoardDTO
 
+
 from ..dependencies import ApiDependencies
 
 boards_router = APIRouter(prefix="/v1/boards", tags=["boards"])
@@ -71,11 +72,19 @@ async def update_board(
 @boards_router.delete("/{board_id}", operation_id="delete_board")
 async def delete_board(
     board_id: str = Path(description="The id of board to delete"),
+    include_images: Optional[bool] = Query(
+        description="Permanently delete all images on the board", default=False
+    ),
 ) -> None:
     """Deletes a board"""
-
     try:
-        ApiDependencies.invoker.services.boards.delete(board_id=board_id)
+        if include_images is True:
+            ApiDependencies.invoker.services.images.delete_images_on_board(
+                board_id=board_id
+            )
+            ApiDependencies.invoker.services.boards.delete(board_id=board_id)
+        else:
+            ApiDependencies.invoker.services.boards.delete(board_id=board_id)
     except Exception as e:
         # TODO: Does this need any exception handling at all?
         pass

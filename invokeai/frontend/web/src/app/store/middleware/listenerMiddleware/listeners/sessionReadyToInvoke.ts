@@ -1,5 +1,5 @@
 import { startAppListening } from '..';
-import { sessionInvoked } from 'services/thunks/session';
+import { sessionInvoked } from 'services/api/thunks/session';
 import { log } from 'app/logging/useLogger';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
 
@@ -9,13 +9,13 @@ export const addSessionReadyToInvokeListener = () => {
   startAppListening({
     actionCreator: sessionReadyToInvoke,
     effect: (action, { getState, dispatch }) => {
-      const { sessionId } = getState().system;
-      if (sessionId) {
+      const { sessionId: session_id } = getState().system;
+      if (session_id) {
         moduleLog.debug(
-          { sessionId },
-          `Session ready to invoke (${sessionId})})`
+          { session_id },
+          `Session ready to invoke (${session_id})})`
         );
-        dispatch(sessionInvoked({ sessionId }));
+        dispatch(sessionInvoked({ session_id }));
       }
     },
   });

@@ -1,30 +1,36 @@
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useCallback } from 'react';
 import {
   Background,
   OnConnect,
+  OnConnectEnd,
+  OnConnectStart,
   OnEdgesChange,
+  OnInit,
   OnNodesChange,
   ReactFlow,
-  OnConnectStart,
-  OnConnectEnd,
 } from 'reactflow';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { RootState } from 'app/store/store';
 import {
   connectionEnded,
   connectionMade,
   connectionStarted,
   edgesChanged,
   nodesChanged,
+  setEditorInstance,
 } from '../store/nodesSlice';
-import { useCallback } from 'react';
 import { InvocationComponent } from './InvocationComponent';
-import TopLeftPanel from './panels/TopLeftPanel';
-import TopRightPanel from './panels/TopRightPanel';
-import TopCenterPanel from './panels/TopCenterPanel';
+import ProgressImageNode from './ProgressImageNode';
 import BottomLeftPanel from './panels/BottomLeftPanel.tsx';
 import MinimapPanel from './panels/MinimapPanel';
+import TopCenterPanel from './panels/TopCenterPanel';
+import TopLeftPanel from './panels/TopLeftPanel';
+import TopRightPanel from './panels/TopRightPanel';
 
-const nodeTypes = { invocation: InvocationComponent };
+const nodeTypes = {
+  invocation: InvocationComponent,
+  progress_image: ProgressImageNode,
+};
 
 export const Flow = () => {
   const dispatch = useAppDispatch();
@@ -63,6 +69,14 @@ export const Flow = () => {
     dispatch(connectionEnded());
   }, [dispatch]);
 
+  const onInit: OnInit = useCallback(
+    (v) => {
+      dispatch(setEditorInstance(v));
+      if (v) v.fitView();
+    },
+    [dispatch]
+  );
+
   return (
     <ReactFlow
       nodeTypes={nodeTypes}
@@ -73,6 +87,7 @@ export const Flow = () => {
       onConnectStart={onConnectStart}
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
+      onInit={onInit}
       defaultEdgeOptions={{
         style: { strokeWidth: 2 },
       }}

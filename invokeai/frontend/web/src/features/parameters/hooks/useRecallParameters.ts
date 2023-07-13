@@ -1,8 +1,12 @@
+import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { UnsafeImageMetadata } from 'services/api/endpoints/images';
+import { isImageField } from 'services/api/guards';
+import { ImageDTO } from 'services/api/types';
+import { initialImageSelected, modelSelected } from '../store/actions';
 import {
-  modelSelected,
   setCfgScale,
   setHeight,
   setImg2imgStrength,
@@ -13,14 +17,10 @@ import {
   setSteps,
   setWidth,
 } from '../store/generationSlice';
-import { isImageField } from 'services/types/guards';
-import { initialImageSelected } from '../store/actions';
-import { useAppToaster } from 'app/components/Toaster';
-import { ImageDTO } from 'services/api';
 import {
   isValidCfgScale,
   isValidHeight,
-  isValidModel,
+  isValidMainModel,
   isValidNegativePrompt,
   isValidPositivePrompt,
   isValidScheduler,
@@ -159,7 +159,7 @@ export const useRecallParameters = () => {
    */
   const recallModel = useCallback(
     (model: unknown) => {
-      if (!isValidModel(model)) {
+      if (!isValidMainModel(model)) {
         parameterNotSetToast();
         return;
       }
@@ -270,40 +270,36 @@ export const useRecallParameters = () => {
   );
 
   const recallAllParameters = useCallback(
-    (image: ImageDTO | undefined) => {
-      if (!image || !image.metadata) {
+    (metadata: UnsafeImageMetadata['metadata'] | undefined) => {
+      if (!metadata) {
         allParameterNotSetToast();
         return;
       }
+
       const {
         cfg_scale,
         height,
         model,
-        positive_conditioning,
-        negative_conditioning,
+        positive_prompt,
+        negative_prompt,
         scheduler,
         seed,
         steps,
         width,
         strength,
-        clip,
-        extra,
-        latents,
-        unet,
-        vae,
-      } = image.metadata;
+      } = metadata;
 
       if (isValidCfgScale(cfg_scale)) {
         dispatch(setCfgScale(cfg_scale));
       }
-      if (isValidModel(model)) {
+      if (isValidMainModel(model)) {
         dispatch(modelSelected(model));
       }
-      if (isValidPositivePrompt(positive_conditioning)) {
-        dispatch(setPositivePrompt(positive_conditioning));
+      if (isValidPositivePrompt(positive_prompt)) {
+        dispatch(setPositivePrompt(positive_prompt));
       }
-      if (isValidNegativePrompt(negative_conditioning)) {
-        dispatch(setNegativePrompt(negative_conditioning));
+      if (isValidNegativePrompt(negative_prompt)) {
+        dispatch(setNegativePrompt(negative_prompt));
       }
       if (isValidScheduler(scheduler)) {
         dispatch(setScheduler(scheduler));

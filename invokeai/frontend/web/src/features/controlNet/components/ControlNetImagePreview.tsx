@@ -1,21 +1,21 @@
-import { memo, useCallback, useState } from 'react';
-import { ImageDTO } from 'services/api';
+import { Box, Flex, Spinner, SystemStyleObject } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
+import {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'app/components/ImageDnd/typesafeDnd';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { PostUploadAction } from 'services/api/thunks/image';
 import {
   ControlNetConfig,
   controlNetImageChanged,
   controlNetSelector,
 } from '../store/controlNetSlice';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { Box, ChakraProps, Flex } from '@chakra-ui/react';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { createSelector } from '@reduxjs/toolkit';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { AnimatePresence, motion } from 'framer-motion';
-import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { FaUndo } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/apiSlice';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 const selector = createSelector(
   controlNetSelector,
@@ -28,11 +28,11 @@ const selector = createSelector(
 
 type Props = {
   controlNet: ControlNetConfig;
-  imageSx?: ChakraProps['sx'];
+  height: SystemStyleObject['h'];
 };
 
 const ControlNetImagePreview = (props: Props) => {
-  const { imageSx } = props;
+  const { height } = props;
   const {
     controlNetId,
     controlImage: controlImageName,
@@ -45,34 +45,18 @@ const ControlNetImagePreview = (props: Props) => {
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
   const {
-    data: controlImage,
+    currentData: controlImage,
     isLoading: isLoadingControlImage,
     isError: isErrorControlImage,
     isSuccess: isSuccessControlImage,
   } = useGetImageDTOQuery(controlImageName ?? skipToken);
 
   const {
-    data: processedControlImage,
+    currentData: processedControlImage,
     isLoading: isLoadingProcessedControlImage,
     isError: isErrorProcessedControlImage,
     isSuccess: isSuccessProcessedControlImage,
   } = useGetImageDTOQuery(processedControlImageName ?? skipToken);
-
-  const handleDrop = useCallback(
-    (droppedImage: ImageDTO) => {
-      if (controlImageName === droppedImage.image_name) {
-        return;
-      }
-      setIsMouseOverImage(false);
-      dispatch(
-        controlNetImageChanged({
-          controlNetId,
-          controlImage: droppedImage.image_name,
-        })
-      );
-    },
-    [controlImageName, controlNetId, dispatch]
-  );
 
   const handleResetControlImage = useCallback(() => {
     dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
@@ -85,9 +69,29 @@ const ControlNetImagePreview = (props: Props) => {
     setIsMouseOverImage(false);
   }, []);
 
-  const shouldShowProcessedImageBackdrop =
-    Number(controlImage?.width) > Number(processedControlImage?.width) ||
-    Number(controlImage?.height) > Number(processedControlImage?.height);
+  const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
+    if (controlImage) {
+      return {
+        id: controlNetId,
+        payloadType: 'IMAGE_DTO',
+        payload: { imageDTO: controlImage },
+      };
+    }
+  }, [controlImage, controlNetId]);
+
+  const droppableData = useMemo<TypesafeDroppableData | undefined>(
+    () => ({
+      id: controlNetId,
+      actionType: 'SET_CONTROLNET_IMAGE',
+      context: { controlNetId },
+    }),
+    [controlNetId]
+  );
+
+  const postUploadAction = useMemo<PostUploadAction>(
+    () => ({ type: 'SET_CONTROLNET_IMAGE', controlNetId }),
+    [controlNetId]
+  );
 
   const shouldShowProcessedImage =
     controlImage &&
@@ -97,102 +101,75 @@ const ControlNetImagePreview = (props: Props) => {
     processorType !== 'none';
 
   return (
-    <Box
+    <Flex
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      sx={{ position: 'relative', w: 'full', h: 'full' }}
+      sx={{
+        position: 'relative',
+        w: 'full',
+        h: height,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
       <IAIDndImage
-        image={controlImage}
-        onDrop={handleDrop}
-        isDropDisabled={Boolean(
-          processedControlImage && processorType !== 'none'
-        )}
-        isUploadDisabled={Boolean(controlImage)}
-        postUploadAction={{ type: 'SET_CONTROLNET_IMAGE', controlNetId }}
-        imageSx={imageSx}
+        draggableData={draggableData}
+        droppableData={droppableData}
+        imageDTO={controlImage}
+        isDropDisabled={shouldShowProcessedImage}
+        onClickReset={handleResetControlImage}
+        postUploadAction={postUploadAction}
+        resetTooltip="Reset Control Image"
+        withResetIcon={Boolean(controlImage)}
       />
-      <AnimatePresence>
-        {shouldShowProcessedImage && (
-          <motion.div
-            style={{ width: '100%' }}
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-              transition: { duration: 0.1 },
-            }}
-            exit={{
-              opacity: 0,
-              transition: { duration: 0.1 },
-            }}
-          >
-            <>
-              {shouldShowProcessedImageBackdrop && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 0,
-                    insetInlineStart: 0,
-                    w: 'full',
-                    h: 'full',
-                    bg: 'base.900',
-                    opacity: 0.7,
-                  }}
-                />
-              )}
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  insetInlineStart: 0,
-                  w: 'full',
-                  h: 'full',
-                }}
-              >
-                <IAIDndImage
-                  image={processedControlImage}
-                  onDrop={handleDrop}
-                  payloadImage={controlImage}
-                  isUploadDisabled={true}
-                  imageSx={imageSx}
-                />
-              </Box>
-            </>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          insetInlineStart: 0,
+          w: 'full',
+          h: 'full',
+          opacity: shouldShowProcessedImage ? 1 : 0,
+          transitionProperty: 'common',
+          transitionDuration: 'normal',
+          pointerEvents: 'none',
+        }}
+      >
+        <IAIDndImage
+          draggableData={draggableData}
+          droppableData={droppableData}
+          imageDTO={processedControlImage}
+          isUploadDisabled={true}
+          onClickReset={handleResetControlImage}
+          resetTooltip="Reset Control Image"
+          withResetIcon={Boolean(controlImage)}
+        />
+      </Box>
       {pendingControlImages.includes(controlNetId) && (
-        <Box
+        <Flex
           sx={{
             position: 'absolute',
             top: 0,
             insetInlineStart: 0,
             w: 'full',
             h: 'full',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.8,
+            borderRadius: 'base',
+            bg: 'base.400',
+            _dark: {
+              bg: 'base.900',
+            },
           }}
         >
-          <IAIImageLoadingFallback />
-        </Box>
-      )}
-      {controlImage && (
-        <Flex sx={{ position: 'absolute', top: 0, insetInlineEnd: 0 }}>
-          <IAIIconButton
-            aria-label="Reset Control Image"
-            tooltip="Reset Control Image"
-            size="sm"
-            onClick={handleResetControlImage}
-            icon={<FaUndo />}
-            variant="link"
-            sx={{
-              p: 2,
-              color: 'base.50',
-            }}
+          <Spinner
+            size="xl"
+            sx={{ color: 'base.100', _dark: { color: 'base.400' } }}
           />
         </Flex>
       )}
-    </Box>
+    </Flex>
   );
 };
 

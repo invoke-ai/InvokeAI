@@ -15,7 +15,7 @@ import IAIButton from 'common/components/IAIButton';
 import { memo, useContext, useRef, useState } from 'react';
 import { AddImageToBoardContext } from '../../../../app/contexts/AddImageToBoardContext';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { useListAllBoardsQuery } from 'services/apiSlice';
+import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 const UpdateImageBoardModal = () => {
   // const boards = useSelector(selectBoardsAll);

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from inspect import signature
-from typing import get_args, get_type_hints, Dict, List, Literal, TypedDict, TYPE_CHECKING
+from typing import (TYPE_CHECKING, Dict, List, Literal, TypedDict, get_args,
+                    get_type_hints)
 
-from pydantic import BaseModel, Field
+from pydantic import BaseConfig, BaseModel, Field
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
@@ -65,8 +66,13 @@ class BaseInvocation(ABC, BaseModel):
     @classmethod
     def get_invocations_map(cls):
         # Get the type strings out of the literals and into a dictionary
-        return dict(map(lambda t: (get_args(get_type_hints(t)['type'])[0], t),BaseInvocation.get_all_subclasses()))
-    
+        return dict(
+            map(
+                lambda t: (get_args(get_type_hints(t)["type"])[0], t),
+                BaseInvocation.get_all_subclasses(),
+            )
+        )
+
     @classmethod
     def get_output_type(cls):
         return signature(cls.invoke).return_annotation
@@ -75,11 +81,11 @@ class BaseInvocation(ABC, BaseModel):
     def invoke(self, context: InvocationContext) -> BaseInvocationOutput:
         """Invoke with provided context and return outputs."""
         pass
-    
-    #fmt: off
+
+    # fmt: off
     id: str = Field(description="The id of this node. Must be unique among all nodes.")
     is_intermediate: bool = Field(default=False, description="Whether or not this node is an intermediate node.")
-    #fmt: on
+    # fmt: on
 
 
 # TODO: figure out a better way to provide these hints
@@ -97,16 +103,20 @@ class UIConfig(TypedDict, total=False):
             "latents",
             "model",
             "control",
+            "image_collection",
+            "vae_model",
+            "lora_model",
         ],
     ]
     tags: List[str]
     title: str
 
+
 class CustomisedSchemaExtra(TypedDict):
     ui: UIConfig
 
 
-class InvocationConfig(BaseModel.Config):
+class InvocationConfig(BaseConfig):
     """Customizes pydantic's BaseModel.Config class for use by Invocations.
 
     Provide `schema_extra` a `ui` dict to add hints for generated UIs.

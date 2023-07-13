@@ -1,23 +1,25 @@
+import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
+import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   ImageDTO,
   InpaintInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
-} from 'services/api';
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { log } from 'app/logging/useLogger';
+} from 'services/api/types';
+import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addVAEToGraph } from './addVAEToGraph';
 import {
+  CLIP_SKIP,
+  INPAINT,
+  INPAINT_GRAPH,
   ITERATE,
-  MODEL_LOADER,
+  MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
-  INPAINT_GRAPH,
-  INPAINT,
 } from './constants';
-import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
@@ -32,7 +34,7 @@ export const buildCanvasInpaintGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: modelId,
+    model,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -47,15 +49,19 @@ export const buildCanvasInpaintGraph = (
     seamStrength,
     tileSize,
     infillMethod,
+    clipSkip,
   } = state.generation;
+
+  if (!model) {
+    moduleLog.error('No model found in state');
+    throw new Error('No model found in state');
+  }
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
   // We may need to set the inpaint width and height to scale the image
   const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
-
-  const model = modelIdToPipelineModelField(modelId);
 
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
@@ -101,10 +107,15 @@ export const buildCanvasInpaintGraph = (
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
       },
-      [MODEL_LOADER]: {
-        type: 'pipeline_model_loader',
-        id: MODEL_LOADER,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
       },
       [RANGE_OF_SIZE]: {
         type: 'range_of_size',
@@ -120,6 +131,46 @@ export const buildCanvasInpaintGraph = (
       },
     },
     edges: [
+      {
+        source: {
+          node_id: MAIN_MODEL_LOADER,
+          field: 'unet',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'unet',
+        },
+      },
+      {
+        source: {
+          node_id: MAIN_MODEL_LOADER,
+          field: 'clip',
+        },
+        destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
       {
         source: {
           node_id: NEGATIVE_CONDITIONING,
@@ -138,46 +189,6 @@ export const buildCanvasInpaintGraph = (
         destination: {
           node_id: INPAINT,
           field: 'positive_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: MODEL_LOADER,
-          field: 'clip',
-        },
-        destination: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: MODEL_LOADER,
-          field: 'clip',
-        },
-        destination: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: MODEL_LOADER,
-          field: 'unet',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'unet',
-        },
-      },
-      {
-        source: {
-          node_id: MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'vae',
         },
       },
       {
@@ -202,6 +213,11 @@ export const buildCanvasInpaintGraph = (
       },
     ],
   };
+
+  addLoRAsToGraph(state, graph, INPAINT);
+
+  // Add VAE
+  addVAEToGraph(state, graph);
 
   // handle seed
   if (shouldRandomizeSeed) {

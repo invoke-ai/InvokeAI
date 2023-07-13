@@ -1,10 +1,10 @@
 import { startAppListening } from '..';
-import { sessionCreated } from 'services/thunks/session';
+import { sessionCreated } from 'services/api/thunks/session';
 import { buildCanvasGraph } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
 import { log } from 'app/logging/useLogger';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
-import { imageUpdated, imageUploaded } from 'services/thunks/image';
-import { ImageDTO } from 'services/api';
+import { imageUpdated, imageUploaded } from 'services/api/thunks/image';
+import { ImageDTO } from 'services/api/types';
 import {
   canvasSessionIdChanged,
   stagingAreaInitialized,
@@ -75,13 +75,11 @@ export const addUserInvokedCanvasListener = () => {
         // upload the image, saving the request id
         const { requestId: initImageUploadedRequestId } = dispatch(
           imageUploaded({
-            formData: {
-              file: new File([baseBlob], 'canvasInitImage.png', {
-                type: 'image/png',
-              }),
-            },
-            imageCategory: 'general',
-            isIntermediate: true,
+            file: new File([baseBlob], 'canvasInitImage.png', {
+              type: 'image/png',
+            }),
+            image_category: 'general',
+            is_intermediate: true,
           })
         );
 
@@ -100,13 +98,11 @@ export const addUserInvokedCanvasListener = () => {
         // upload the image, saving the request id
         const { requestId: maskImageUploadedRequestId } = dispatch(
           imageUploaded({
-            formData: {
-              file: new File([maskBlob], 'canvasMaskImage.png', {
-                type: 'image/png',
-              }),
-            },
-            imageCategory: 'mask',
-            isIntermediate: true,
+            file: new File([maskBlob], 'canvasMaskImage.png', {
+              type: 'image/png',
+            }),
+            image_category: 'mask',
+            is_intermediate: true,
           })
         );
 
@@ -149,8 +145,8 @@ export const addUserInvokedCanvasListener = () => {
       if (['img2img', 'inpaint'].includes(generationMode) && canvasInitImage) {
         dispatch(
           imageUpdated({
-            imageName: canvasInitImage.image_name,
-            requestBody: { session_id: sessionId },
+            image_name: canvasInitImage.image_name,
+            session_id: sessionId,
           })
         );
       }
@@ -159,8 +155,8 @@ export const addUserInvokedCanvasListener = () => {
       if (['inpaint'].includes(generationMode) && canvasMaskImage) {
         dispatch(
           imageUpdated({
-            imageName: canvasMaskImage.image_name,
-            requestBody: { session_id: sessionId },
+            image_name: canvasMaskImage.image_name,
+            session_id: sessionId,
           })
         );
       }

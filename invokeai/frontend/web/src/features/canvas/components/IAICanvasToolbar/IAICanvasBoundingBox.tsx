@@ -12,6 +12,7 @@ import {
   setIsMovingBoundingBox,
   setIsTransformingBoundingBox,
 } from 'features/canvas/store/canvasSlice';
+import { uiSelector } from 'features/ui/store/uiSelectors';
 import Konva from 'konva';
 import { GroupConfig } from 'konva/lib/Group';
 import { KonvaEventObject } from 'konva/lib/Node';
@@ -22,8 +23,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Group, Rect, Transformer } from 'react-konva';
 
 const boundingBoxPreviewSelector = createSelector(
-  canvasSelector,
-  (canvas) => {
+  [canvasSelector, uiSelector],
+  (canvas, ui) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -35,6 +36,8 @@ const boundingBoxPreviewSelector = createSelector(
       shouldSnapToGrid,
     } = canvas;
 
+    const { aspectRatio } = ui;
+
     return {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -45,6 +48,7 @@ const boundingBoxPreviewSelector = createSelector(
       shouldSnapToGrid,
       tool,
       hitStrokeWidth: 20 / stageScale,
+      aspectRatio,
     };
   },
   {
@@ -70,6 +74,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     shouldSnapToGrid,
     tool,
     hitStrokeWidth,
+    aspectRatio,
   } = useAppSelector(boundingBoxPreviewSelector);
 
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -137,12 +142,22 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     const x = Math.round(rect.x());
     const y = Math.round(rect.y());
 
-    dispatch(
-      setBoundingBoxDimensions({
-        width,
-        height,
-      })
-    );
+    if (aspectRatio) {
+      const newHeight = roundToMultiple(width / aspectRatio, 64);
+      dispatch(
+        setBoundingBoxDimensions({
+          width: width,
+          height: newHeight,
+        })
+      );
+    } else {
+      dispatch(
+        setBoundingBoxDimensions({
+          width,
+          height,
+        })
+      );
+    }
 
     dispatch(
       setBoundingBoxCoordinates({
@@ -154,7 +169,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     // Reset the scale now that the coords/dimensions have been un-scaled
     rect.scaleX(1);
     rect.scaleY(1);
-  }, [dispatch, shouldSnapToGrid]);
+  }, [dispatch, shouldSnapToGrid, aspectRatio]);
 
   const anchorDragBoundFunc = useCallback(
     (

@@ -93,7 +93,8 @@ export type AppFeature =
   | 'discordLink'
   | 'bugLink'
   | 'localization'
-  | 'consoleLogging';
+  | 'consoleLogging'
+  | 'dynamicPrompting';
 
 /**
  * A disable-able Stable Diffusion feature
@@ -101,10 +102,15 @@ export type AppFeature =
 export type SDFeature =
   | 'controlNet'
   | 'noise'
+  | 'perlinNoise'
+  | 'noiseThreshold'
   | 'variation'
   | 'symmetry'
   | 'seamless'
-  | 'hires';
+  | 'hires'
+  | 'lora'
+  | 'embedding'
+  | 'vae';
 
 /**
  * Configuration options for the InvokeAI UI.
@@ -170,6 +176,14 @@ export type AppConfig = {
       inputMax: number;
       fineStep: number;
       coarseStep: number;
+    };
+    dynamicPrompts: {
+      maxPrompts: {
+        initial: number;
+        min: number;
+        sliderMax: number;
+        inputMax: number;
+      };
     };
   };
 };

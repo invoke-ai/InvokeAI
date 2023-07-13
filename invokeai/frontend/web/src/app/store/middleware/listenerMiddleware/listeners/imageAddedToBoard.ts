@@ -1,13 +1,13 @@
 import { log } from 'app/logging/useLogger';
+import { boardImagesApi } from 'services/api/endpoints/boardImages';
+import { imageDTOReceived } from 'services/api/thunks/image';
 import { startAppListening } from '..';
-import { imageMetadataReceived } from 'services/thunks/image';
-import { api } from 'services/apiSlice';
 
 const moduleLog = log.child({ namespace: 'boards' });
 
 export const addImageAddedToBoardFulfilledListener = () => {
   startAppListening({
-    matcher: api.endpoints.addImageToBoard.matchFulfilled,
+    matcher: boardImagesApi.endpoints.addImageToBoard.matchFulfilled,
     effect: (action, { getState, dispatch }) => {
       const { board_id, image_name } = action.meta.arg.originalArgs;
 
@@ -17,8 +17,8 @@ export const addImageAddedToBoardFulfilledListener = () => {
       );
 
       dispatch(
-        imageMetadataReceived({
-          imageName: image_name,
+        imageDTOReceived({
+          image_name,
         })
       );
     },
@@ -27,7 +27,7 @@ export const addImageAddedToBoardFulfilledListener = () => {
 
 export const addImageAddedToBoardRejectedListener = () => {
   startAppListening({
-    matcher: api.endpoints.addImageToBoard.matchRejected,
+    matcher: boardImagesApi.endpoints.addImageToBoard.matchRejected,
     effect: (action, { getState, dispatch }) => {
       const { board_id, image_name } = action.meta.arg.originalArgs;
 

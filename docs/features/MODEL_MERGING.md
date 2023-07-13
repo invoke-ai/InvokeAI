@@ -71,6 +71,3 @@ under the selected name and register it with InvokeAI.
   use InvokeAI conventions - only alphanumeric letters and the
   characters ".+-".
 
-## Caveats
-
-This is a new script and may contain bugs.

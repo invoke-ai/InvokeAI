@@ -1,18 +1,8 @@
-import { ChakraProps, Flex, Grid, IconButton } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { clamp, isEqual } from 'lodash-es';
-import { useCallback, useState } from 'react';
+import { ChakraProps, Flex, Grid, IconButton, Spinner } from '@chakra-ui/react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaAngleLeft, FaAngleRight } from 'react-icons/fa';
-import { gallerySelector } from '../store/gallerySelectors';
-import { RootState } from 'app/store/store';
-import { imageSelected } from '../store/gallerySlice';
-import { useHotkeys } from 'react-hotkeys-hook';
-import {
-  selectFilteredImagesAsObject,
-  selectFilteredImagesIds,
-} from '../store/imagesSlice';
+import { FaAngleDoubleRight, FaAngleLeft, FaAngleRight } from 'react-icons/fa';
+import { useNextPrevImage } from '../hooks/useNextPrevImage';
 
 const nextPrevButtonTriggerAreaStyles: ChakraProps['sx'] = {
   height: '100%',
@@ -24,70 +14,18 @@ const nextPrevButtonStyles: ChakraProps['sx'] = {
   color: 'base.100',
 };
 
-export const nextPrevImageButtonsSelector = createSelector(
-  [
-    (state: RootState) => state,
-    gallerySelector,
-    selectFilteredImagesAsObject,
-    selectFilteredImagesIds,
-  ],
-  (state, gallery, filteredImagesAsObject, filteredImageIds) => {
-    const { selectedImage } = gallery;
-
-    if (!selectedImage) {
-      return {
-        isOnFirstImage: true,
-        isOnLastImage: true,
-      };
-    }
-
-    const currentImageIndex = filteredImageIds.findIndex(
-      (i) => i === selectedImage
-    );
-
-    const nextImageIndex = clamp(
-      currentImageIndex + 1,
-      0,
-      filteredImageIds.length - 1
-    );
-
-    const prevImageIndex = clamp(
-      currentImageIndex - 1,
-      0,
-      filteredImageIds.length - 1
-    );
-
-    const nextImageId = filteredImageIds[nextImageIndex];
-    const prevImageId = filteredImageIds[prevImageIndex];
-
-    const nextImage = filteredImagesAsObject[nextImageId];
-    const prevImage = filteredImagesAsObject[prevImageId];
-
-    const imagesLength = filteredImageIds.length;
-
-    return {
-      isOnFirstImage: currentImageIndex === 0,
-      isOnLastImage:
-        !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
-      nextImage,
-      prevImage,
-      nextImageId,
-      prevImageId,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
-
 const NextPrevImageButtons = () => {
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { isOnFirstImage, isOnLastImage, nextImageId, prevImageId } =
-    useAppSelector(nextPrevImageButtonsSelector);
+  const {
+    handlePrevImage,
+    handleNextImage,
+    isOnFirstImage,
+    isOnLastImage,
+    handleLoadMoreImages,
+    areMoreImagesAvailable,
+    isFetching,
+  } = useNextPrevImage();
 
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =
     useState<boolean>(false);
@@ -99,30 +37,6 @@ const NextPrevImageButtons = () => {
   const handleCurrentImagePreviewMouseOut = useCallback(() => {
     setShouldShowNextPrevButtons(false);
   }, []);
-
-  const handlePrevImage = useCallback(() => {
-    dispatch(imageSelected(prevImageId));
-  }, [dispatch, prevImageId]);
-
-  const handleNextImage = useCallback(() => {
-    dispatch(imageSelected(nextImageId));
-  }, [dispatch, nextImageId]);
-
-  useHotkeys(
-    'left',
-    () => {
-      handlePrevImage();
-    },
-    [prevImageId]
-  );
-
-  useHotkeys(
-    'right',
-    () => {
-      handleNextImage();
-    },
-    [nextImageId]
-  );
 
   return (
     <Flex
@@ -170,9 +84,37 @@ const NextPrevImageButtons = () => {
             sx={nextPrevButtonStyles}
           />
         )}
+        {shouldShowNextPrevButtons &&
+          isOnLastImage &&
+          areMoreImagesAvailable &&
+          !isFetching && (
+            <IconButton
+              aria-label={t('accessibility.loadMore')}
+              icon={<FaAngleDoubleRight size={64} />}
+              variant="unstyled"
+              onClick={handleLoadMoreImages}
+              boxSize={16}
+              sx={nextPrevButtonStyles}
+            />
+          )}
+        {shouldShowNextPrevButtons &&
+          isOnLastImage &&
+          areMoreImagesAvailable &&
+          isFetching && (
+            <Flex
+              sx={{
+                w: 16,
+                h: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Spinner opacity={0.5} size="xl" />
+            </Flex>
+          )}
       </Grid>
     </Flex>
   );
 };
 
-export default NextPrevImageButtons;
+export default memo(NextPrevImageButtons);

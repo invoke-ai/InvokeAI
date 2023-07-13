@@ -1,20 +1,17 @@
 import { Flex, Link } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
-import { FaCube, FaKeyboard, FaBug, FaGithub, FaDiscord } from 'react-icons/fa';
+import { FaBug, FaDiscord, FaGithub, FaKeyboard } from 'react-icons/fa';
 import { MdSettings } from 'react-icons/md';
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 import LanguagePicker from './LanguagePicker';
-import ModelManagerModal from './ModelManager/ModelManagerModal';
 import SettingsModal from './SettingsModal/SettingsModal';
-import ThemeChanger from './ThemeChanger';
+
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useFeatureStatus } from '../hooks/useFeatureStatus';
 
 const SiteHeaderMenu = () => {
   const { t } = useTranslation();
 
-  const isModelManagerEnabled =
-    useFeatureStatus('modelManager').isFeatureEnabled;
   const isLocalizationEnabled =
     useFeatureStatus('localization').isFeatureEnabled;
   const isBugLinkEnabled = useFeatureStatus('bugLink').isFeatureEnabled;
@@ -27,20 +24,6 @@ const SiteHeaderMenu = () => {
       flexDirection={{ base: 'column', xl: 'row' }}
       gap={{ base: 4, xl: 1 }}
     >
-      {isModelManagerEnabled && (
-        <ModelManagerModal>
-          <IAIIconButton
-            aria-label={t('modelManager.modelManager')}
-            tooltip={t('modelManager.modelManager')}
-            size="sm"
-            variant="link"
-            data-variant="link"
-            fontSize={20}
-            icon={<FaCube />}
-          />
-        </ModelManagerModal>
-      )}
-
       <HotkeysModal>
         <IAIIconButton
           aria-label={t('common.hotkeysLabel')}
@@ -52,8 +35,6 @@ const SiteHeaderMenu = () => {
           icon={<FaKeyboard />}
         />
       </HotkeysModal>
-
-      <ThemeChanger />
 
       {isLocalizationEnabled && <LanguagePicker />}
 

@@ -1,6 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
-import { Graph, ImageDTO } from 'services/api';
+import { Graph, ImageDTO, ImageField } from 'services/api/types';
 import { AnyInvocationType } from 'services/events/types';
 import { O } from 'ts-toolbelt';
 
@@ -34,12 +34,10 @@ export type InvocationTemplate = {
    * Array of invocation inputs
    */
   inputs: Record<string, InputFieldTemplate>;
-  // inputs: InputField[];
   /**
    * Array of the invocation outputs
    */
   outputs: Record<string, OutputFieldTemplate>;
-  // outputs: OutputField[];
 };
 
 export type FieldUIConfig = {
@@ -66,9 +64,12 @@ export type FieldType =
   | 'vae'
   | 'control'
   | 'model'
+  | 'vae_model'
+  | 'lora_model'
   | 'array'
   | 'item'
-  | 'color';
+  | 'color'
+  | 'image_collection';
 
 /**
  * An input field is persisted across reloads as part of the user's local state.
@@ -92,9 +93,12 @@ export type InputFieldValue =
   | ControlInputFieldValue
   | EnumInputFieldValue
   | ModelInputFieldValue
+  | VaeModelInputFieldValue
+  | LoRAModelInputFieldValue
   | ArrayInputFieldValue
   | ItemInputFieldValue
-  | ColorInputFieldValue;
+  | ColorInputFieldValue
+  | ImageCollectionInputFieldValue;
 
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
@@ -116,9 +120,12 @@ export type InputFieldTemplate =
   | ControlInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
+  | VaeModelInputFieldTemplate
+  | LoRAModelInputFieldTemplate
   | ArrayInputFieldTemplate
   | ItemInputFieldTemplate
-  | ColorInputFieldTemplate;
+  | ColorInputFieldTemplate
+  | ImageCollectionInputFieldTemplate;
 
 /**
  * An output field is persisted across as part of the user's local state.
@@ -214,11 +221,26 @@ export type VaeInputFieldValue = FieldValueBase & {
 
 export type ImageInputFieldValue = FieldValueBase & {
   type: 'image';
-  value?: string;
+  value?: ImageField;
+};
+
+export type ImageCollectionInputFieldValue = FieldValueBase & {
+  type: 'image_collection';
+  value?: ImageField[];
 };
 
 export type ModelInputFieldValue = FieldValueBase & {
   type: 'model';
+  value?: string;
+};
+
+export type VaeModelInputFieldValue = FieldValueBase & {
+  type: 'vae_model';
+  value?: string;
+};
+
+export type LoRAModelInputFieldValue = FieldValueBase & {
+  type: 'lora_model';
   value?: string;
 };
 
@@ -284,6 +306,11 @@ export type ImageInputFieldTemplate = InputFieldTemplateBase & {
   type: 'image';
 };
 
+export type ImageCollectionInputFieldTemplate = InputFieldTemplateBase & {
+  default: ImageField[];
+  type: 'image_collection';
+};
+
 export type LatentsInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'latents';
@@ -292,6 +319,21 @@ export type LatentsInputFieldTemplate = InputFieldTemplateBase & {
 export type ConditioningInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
   type: 'conditioning';
+};
+
+export type UNetInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'unet';
+};
+
+export type ClipInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'clip';
+};
+
+export type VaeInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'vae';
 };
 
 export type ControlInputFieldTemplate = InputFieldTemplateBase & {
@@ -309,6 +351,16 @@ export type EnumInputFieldTemplate = InputFieldTemplateBase & {
 export type ModelInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'model';
+};
+
+export type VaeModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
+  type: 'vae_model';
+};
+
+export type LoRAModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
+  type: 'lora_model';
 };
 
 export type ArrayInputFieldTemplate = InputFieldTemplateBase & {

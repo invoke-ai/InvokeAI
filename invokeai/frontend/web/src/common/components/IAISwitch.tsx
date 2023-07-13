@@ -36,12 +36,20 @@ const IAISwitch = (props: Props) => {
         isDisabled={isDisabled}
         width={width}
         display="flex"
-        gap={4}
         alignItems="center"
         {...formControlProps}
       >
         {label && (
-          <FormLabel my={1} flexGrow={1} {...formLabelProps}>
+          <FormLabel
+            my={1}
+            flexGrow={1}
+            sx={{
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
+              ...formLabelProps?.sx,
+              pe: 4,
+            }}
+            {...formLabelProps}
+          >
             {label}
           </FormLabel>
         )}

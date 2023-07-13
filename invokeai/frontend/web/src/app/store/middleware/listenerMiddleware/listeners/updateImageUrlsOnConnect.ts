@@ -3,13 +3,12 @@ import { startAppListening } from '..';
 import { createSelector } from '@reduxjs/toolkit';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import { nodesSelecter } from 'features/nodes/store/nodesSlice';
+import { nodesSelector } from 'features/nodes/store/nodesSlice';
 import { controlNetSelector } from 'features/controlNet/store/controlNetSlice';
-import { ImageDTO } from 'services/api';
 import { forEach, uniqBy } from 'lodash-es';
-import { imageUrlsReceived } from 'services/thunks/image';
+import { imageUrlsReceived } from 'services/api/thunks/image';
 import { log } from 'app/logging/useLogger';
-import { selectImagesEntities } from 'features/gallery/store/imagesSlice';
+import { selectImagesEntities } from 'features/gallery/store/gallerySlice';
 
 const moduleLog = log.child({ namespace: 'images' });
 
@@ -17,7 +16,7 @@ const selectAllUsedImages = createSelector(
   [
     generationSelector,
     canvasSelector,
-    nodesSelecter,
+    nodesSelector,
     controlNetSelector,
     selectImagesEntities,
   ],
@@ -37,7 +36,7 @@ const selectAllUsedImages = createSelector(
     nodes.nodes.forEach((node) => {
       forEach(node.data.inputs, (input) => {
         if (input.type === 'image' && input.value) {
-          allUsedImages.push(input.value);
+          allUsedImages.push(input.value.image_name);
         }
       });
     });
@@ -83,7 +82,7 @@ export const addUpdateImageUrlsOnConnectListener = () => {
       allUsedImages.forEach((image_name) => {
         dispatch(
           imageUrlsReceived({
-            imageName: image_name,
+            image_name,
           })
         );
       });

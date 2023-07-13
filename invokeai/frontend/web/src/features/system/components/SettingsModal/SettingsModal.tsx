@@ -1,5 +1,4 @@
 import {
-  ChakraProps,
   Flex,
   Heading,
   Modal,
@@ -31,6 +30,7 @@ import {
 } from 'features/system/store/systemSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
+  setShouldShowAdvancedOptions,
   setShouldShowProgressInViewer,
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
@@ -39,6 +39,7 @@ import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash-es';
 import {
   ChangeEvent,
+  PropsWithChildren,
   ReactElement,
   cloneElement,
   useCallback,
@@ -64,6 +65,7 @@ const selector = createSelector(
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
       shouldShowProgressInViewer,
+      shouldShowAdvancedOptions,
     } = ui;
 
     return {
@@ -76,6 +78,7 @@ const selector = createSelector(
       consoleLogLevel,
       shouldLogToConsole,
       shouldAntialiasProgressImage,
+      shouldShowAdvancedOptions,
     };
   },
   {
@@ -83,18 +86,11 @@ const selector = createSelector(
   }
 );
 
-const modalSectionStyles: ChakraProps['sx'] = {
-  flexDirection: 'column',
-  gap: 2,
-  p: 4,
-  bg: 'base.900',
-  borderRadius: 'base',
-};
-
 type ConfigOptions = {
   shouldShowDeveloperSettings: boolean;
   shouldShowResetWebUiText: boolean;
   shouldShowBetaLayout: boolean;
+  shouldShowAdvancedOptionsSettings: boolean;
 };
 
 type SettingsModalProps = {
@@ -111,6 +107,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowDeveloperSettings =
     config?.shouldShowDeveloperSettings ?? true;
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
+  const shouldShowAdvancedOptionsSettings =
+    config?.shouldShowAdvancedOptionsSettings ?? true;
 
   useEffect(() => {
     if (!shouldShowDeveloperSettings) {
@@ -140,6 +138,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     consoleLogLevel,
     shouldLogToConsole,
     shouldAntialiasProgressImage,
+    shouldShowAdvancedOptions,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -183,12 +182,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
         isCentered
       >
         <ModalOverlay />
-        <ModalContent paddingInlineEnd={4}>
+        <ModalContent>
           <ModalHeader>{t('common.settingsLabel')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <Flex sx={{ gap: 4, flexDirection: 'column' }}>
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.general')}</Heading>
                 <IAISwitch
                   label={t('settings.confirmOnDelete')}
@@ -197,14 +196,23 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     dispatch(setShouldConfirmOnDelete(e.target.checked))
                   }
                 />
-              </Flex>
+                {shouldShowAdvancedOptionsSettings && (
+                  <IAISwitch
+                    label={t('settings.showAdvancedOptions')}
+                    isChecked={shouldShowAdvancedOptions}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(setShouldShowAdvancedOptions(e.target.checked))
+                    }
+                  />
+                )}
+              </StyledFlex>
 
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.generation')}</Heading>
                 <SettingsSchedulers />
-              </Flex>
+              </StyledFlex>
 
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.ui')}</Heading>
                 <IAISwitch
                   label={t('settings.displayHelpIcons')}
@@ -245,10 +253,10 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     )
                   }
                 />
-              </Flex>
+              </StyledFlex>
 
               {shouldShowDeveloperSettings && (
-                <Flex sx={modalSectionStyles}>
+                <StyledFlex>
                   <Heading size="sm">{t('settings.developer')}</Heading>
                   <IAISwitch
                     label={t('settings.shouldLogToConsole')}
@@ -269,10 +277,10 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                       dispatch(setEnableImageDebugging(e.target.checked))
                     }
                   />
-                </Flex>
+                </StyledFlex>
               )}
 
-              <Flex sx={modalSectionStyles}>
+              <StyledFlex>
                 <Heading size="sm">{t('settings.resetWebUI')}</Heading>
                 <IAIButton colorScheme="error" onClick={handleClickResetWebUI}>
                   {t('settings.resetWebUI')}
@@ -283,7 +291,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     <Text>{t('settings.resetWebUIDesc2')}</Text>
                   </>
                 )}
-              </Flex>
+              </StyledFlex>
             </Flex>
           </ModalBody>
 
@@ -319,3 +327,19 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 };
 
 export default SettingsModal;
+
+const StyledFlex = (props: PropsWithChildren) => {
+  return (
+    <Flex
+      layerStyle="second"
+      sx={{
+        flexDirection: 'column',
+        gap: 2,
+        p: 4,
+        borderRadius: 'base',
+      }}
+    >
+      {props.children}
+    </Flex>
+  );
+};

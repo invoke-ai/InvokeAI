@@ -15,7 +15,7 @@ InvokeAI:
     conf_path: configs/models.yaml
     legacy_conf_dir: configs/stable-diffusion
     outdir: outputs
-    autoconvert_dir: null
+    autoimport_dir: null
   Models:
     model: stable-diffusion-1.5
     embeddings: true
@@ -23,7 +23,8 @@ InvokeAI:
     xformers_enabled: false
     sequential_guidance: false
     precision: float16
-    max_loaded_models: 4
+    max_cache_size: 6
+    max_vram_cache_size: 2.7
     always_use_cpu: false
     free_gpu_mem: false
   Features:
@@ -168,9 +169,10 @@ from argparse import ArgumentParser
 from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
 from pydantic import BaseSettings, Field, parse_obj_as
-from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
+from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path('invokeai.yaml')
+MODEL_CORE = Path('models/core')
 DB_FILE   = Path('invokeai.db')
 LEGACY_INIT_FILE = Path('invokeai.init')
 
@@ -228,10 +230,10 @@ class InvokeAISettings(BaseSettings):
         upcase_environ = dict()
         for key,value in os.environ.items():
             upcase_environ[key.upper()] = value
-        
+
         fields = cls.__fields__
         cls.argparse_groups = {}
-        
+
         for name, field in fields.items():
             if name not in cls._excluded():
                 current_default = field.default
@@ -269,7 +271,8 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def _excluded(self)->List[str]:
-        return ['type','initconf']
+        # combination of deprecated parameters and internal ones
+        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version']
 
     class Config:
         env_file_encoding = 'utf-8'
@@ -324,16 +327,11 @@ class InvokeAISettings(BaseSettings):
                 help=field.field_info.description,
             )
 def _find_root()->Path:
+    venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
         root = Path(os.environ.get("INVOKEAI_ROOT")).resolve()
-    elif (
-            os.environ.get("VIRTUAL_ENV")
-            and (Path(os.environ.get("VIRTUAL_ENV"), "..", INIT_FILE).exists()
-                 or
-                 Path(os.environ.get("VIRTUAL_ENV"), "..", LEGACY_INIT_FILE).exists()
-                 )
-    ):
-        root = Path(os.environ.get("VIRTUAL_ENV"), "..").resolve()
+    elif any([(venv.parent/x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE, MODEL_CORE]]):
+        root = (venv.parent).resolve()
     else:
         root = Path("~/invokeai").expanduser().resolve()
     return root
@@ -348,7 +346,7 @@ setting environment variables INVOKEAI_<setting>.
      '''
     singleton_config: ClassVar[InvokeAIAppConfig] = None
     singleton_init: ClassVar[Dict] = None
-    
+
     #fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
     host                : str = Field(default="127.0.0.1", description="IP address to bind to", category='Web Server')
@@ -367,33 +365,41 @@ setting environment variables INVOKEAI_<setting>.
 
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
     free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
-    max_loaded_models   : int = Field(default=2, gt=0, description="Maximum number of models to keep in memory for rapid switching", category='Memory/Performance')
+    max_loaded_models   : int = Field(default=3, gt=0, description="(DEPRECATED: use max_cache_size) Maximum number of models to keep in memory for rapid switching", category='DEPRECATED')
+    max_cache_size      : float = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching", category='Memory/Performance')
+    max_vram_cache_size : float = Field(default=2.75, ge=0, description="Amount of VRAM reserved for model storage", category='Memory/Performance')
+    gpu_mem_reserved    : float = Field(default=2.75, ge=0, description="DEPRECATED: use max_vram_cache_size. Amount of VRAM reserved for model storage", category='DEPRECATED')
     precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='float16',description='Floating point precision', category='Memory/Performance')
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
     tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
 
     root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
-    autoconvert_dir     : Path = Field(default=None, description='Path to a directory of ckpt files to be converted into diffusers and imported on startup.', category='Paths')
+    autoimport_dir      : Path = Field(default='autoimport/main', description='Path to a directory of models files to be imported on startup.', category='Paths')
+    lora_dir            : Path = Field(default='autoimport/lora', description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', category='Paths')
+    embedding_dir       : Path = Field(default='autoimport/embedding', description='Path to a directory of Textual Inversion embeddings to be imported on startup.', category='Paths')
+    controlnet_dir      : Path = Field(default='autoimport/controlnet', description='Path to a directory of ControlNet embeddings to be imported on startup.', category='Paths')
     conf_path           : Path = Field(default='configs/models.yaml', description='Path to models definition file', category='Paths')
-    models_dir          : Path = Field(default='./models', description='Path to the models directory', category='Paths')
+    models_dir          : Path = Field(default='models', description='Path to the models directory', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
     db_dir              : Path = Field(default='databases', description='Path to InvokeAI databases directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
-    
+
     model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
-    
+
     log_handlers        : List[str] = Field(default=["console"], description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>"', category="Logging")
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
     log_format          : Literal[tuple(['plain','color','syslog','legacy'])] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
     log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="debug", description="Emit logging messages at this level or  higher", category="Logging")
+
+    version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
     #fmt: on
 
     def parse_args(self, argv: List[str]=None, conf: DictConfig = None, clobber=False):
         '''
-        Update settings with contents of init file, environment, and 
+        Update settings with contents of init file, environment, and
         command-line settings.
         :param conf: alternate Omegaconf dictionary object
         :param argv: aternate sys.argv list
@@ -408,7 +414,7 @@ setting environment variables INVOKEAI_<setting>.
             except:
                 pass
         InvokeAISettings.initconf = conf
-        
+
         # parse args again in order to pick up settings in configuration file
         super().parse_args(argv)
 
@@ -428,7 +434,7 @@ setting environment variables INVOKEAI_<setting>.
             cls.singleton_config = cls(**kwargs)
             cls.singleton_init = kwargs
         return cls.singleton_config
-        
+
     @property
     def root_path(self)->Path:
         '''

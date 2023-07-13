@@ -1,23 +1,16 @@
+import json
+import sqlite3
+import threading
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Generic, Optional, TypeVar, cast
-import sqlite3
-import threading
-from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
 
-from invokeai.app.models.metadata import ImageMetadata
-from invokeai.app.models.image import (
-    ImageCategory,
-    ResourceOrigin,
-)
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.models.image_record import (
-    ImageRecord,
-    ImageRecordChanges,
-    deserialize_image_record,
-)
+    ImageRecord, ImageRecordChanges, deserialize_image_record)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -55,6 +48,28 @@ class ImageRecordDeleteException(Exception):
         super().__init__(message)
 
 
+IMAGE_DTO_COLS = ", ".join(
+    list(
+        map(
+            lambda c: "images." + c,
+            [
+                "image_name",
+                "image_origin",
+                "image_category",
+                "width",
+                "height",
+                "session_id",
+                "node_id",
+                "is_intermediate",
+                "created_at",
+                "updated_at",
+                "deleted_at",
+            ],
+        )
+    )
+)
+
+
 class ImageRecordStorageBase(ABC):
     """Low-level service responsible for interfacing with the image record store."""
 
@@ -63,6 +78,11 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get(self, image_name: str) -> ImageRecord:
         """Gets an image record."""
+        pass
+
+    @abstractmethod
+    def get_metadata(self, image_name: str) -> Optional[dict]:
+        """Gets an image's metadata'."""
         pass
 
     @abstractmethod
@@ -95,6 +115,11 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def delete_many(self, image_names: list[str]) -> None:
+        """Deletes many image records."""
+        pass
+
+    @abstractmethod
     def save(
         self,
         image_name: str,
@@ -104,14 +129,14 @@ class ImageRecordStorageBase(ABC):
         height: int,
         session_id: Optional[str],
         node_id: Optional[str],
-        metadata: Optional[ImageMetadata],
+        metadata: Optional[dict],
         is_intermediate: bool = False,
     ) -> datetime:
         """Saves an image record."""
         pass
 
     @abstractmethod
-    def get_most_recent_image_for_board(self, board_id: str) -> ImageRecord | None:
+    def get_most_recent_image_for_board(self, board_id: str) -> Optional[ImageRecord]:
         """Gets the most recent image for a board."""
         pass
 
@@ -158,7 +183,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 node_id TEXT,
                 metadata TEXT,
                 is_intermediate BOOLEAN DEFAULT FALSE,
-                board_id TEXT,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
@@ -203,19 +227,19 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             """
         )
 
-    def get(self, image_name: str) -> Union[ImageRecord, None]:
+    def get(self, image_name: str) -> Optional[ImageRecord]:
         try:
             self._lock.acquire()
 
             self._cursor.execute(
                 f"""--sql
-                SELECT * FROM images
+                SELECT {IMAGE_DTO_COLS} FROM images
                 WHERE image_name = ?;
                 """,
                 (image_name,),
             )
 
-            result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
+            result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
         except sqlite3.Error as e:
             self._conn.rollback()
             raise ImageRecordNotFoundException from e
@@ -226,6 +250,28 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordNotFoundException
 
         return deserialize_image_record(dict(result))
+
+    def get_metadata(self, image_name: str) -> Optional[dict]:
+        try:
+            self._lock.acquire()
+
+            self._cursor.execute(
+                f"""--sql
+                SELECT images.metadata FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
+
+            result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
+            if not result or not result[0]:
+                return None
+            return json.loads(result[0])
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordNotFoundException from e
+        finally:
+            self._lock.release()
 
     def update(
         self,
@@ -294,8 +340,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             WHERE 1=1
             """
 
-            images_query = """--sql
-            SELECT images.*
+            images_query = f"""--sql
+            SELECT {IMAGE_DTO_COLS}
             FROM images
             LEFT JOIN board_images ON board_images.image_name = images.image_name
             WHERE 1=1
@@ -385,6 +431,25 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         finally:
             self._lock.release()
 
+    def delete_many(self, image_names: list[str]) -> None:
+        try:
+            placeholders = ",".join("?" for _ in image_names)
+
+            self._lock.acquire()
+
+            # Construct the SQLite query with the placeholders
+            query = f"DELETE FROM images WHERE image_name IN ({placeholders})"
+
+            # Execute the query with the list of IDs as parameters
+            self._cursor.execute(query, image_names)
+
+            self._conn.commit()
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordDeleteException from e
+        finally:
+            self._lock.release()
+
     def save(
         self,
         image_name: str,
@@ -394,12 +459,12 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         width: int,
         height: int,
         node_id: Optional[str],
-        metadata: Optional[ImageMetadata],
+        metadata: Optional[dict],
         is_intermediate: bool = False,
     ) -> datetime:
         try:
             metadata_json = (
-                None if metadata is None else metadata.json(exclude_none=True)
+                None if metadata is None else json.dumps(metadata)
             )
             self._lock.acquire()
             self._cursor.execute(
@@ -449,9 +514,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         finally:
             self._lock.release()
 
-    def get_most_recent_image_for_board(
-        self, board_id: str
-    ) -> Union[ImageRecord, None]:
+    def get_most_recent_image_for_board(self, board_id: str) -> Optional[ImageRecord]:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -466,7 +529,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 (board_id,),
             )
 
-            result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
+            result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
         finally:
             self._lock.release()
         if result is None:

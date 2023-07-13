@@ -1,12 +1,11 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 import argparse
-import os
 import re
 import shlex
 import sys
 import time
-from typing import Union, get_type_hints
+from typing import Union, get_type_hints, Optional
 
 from pydantic import BaseModel, ValidationError
 from pydantic.fields import Field
@@ -17,10 +16,24 @@ from invokeai.backend.util.logging import InvokeAILogger
 config = InvokeAIAppConfig.get_config()
 config.parse_args()
 logger = InvokeAILogger().getLogger(config=config)
+from invokeai.version.invokeai_version import __version__
 
+# we call this early so that the message appears before other invokeai initialization messages
+if config.version:
+    print(f'InvokeAI version {__version__}')
+    sys.exit(0)
+
+from invokeai.app.services.board_image_record_storage import (
+    SqliteBoardImageRecordStorage,
+)
+from invokeai.app.services.board_images import (
+    BoardImagesService,
+    BoardImagesServiceDependencies,
+)
+from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
+from invokeai.app.services.boards import BoardService, BoardServiceDependencies
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
-from invokeai.app.services.images import ImageService
-from invokeai.app.services.metadata import CoreMetadataService
+from invokeai.app.services.images import ImageService, ImageServiceDependencies
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 from .services.default_graphs import (default_text_to_image_graph_id,
@@ -43,6 +56,10 @@ from .services.model_manager_service import ModelManagerService
 from .services.processor import DefaultInvocationProcessor
 from .services.restoration_services import RestorationServices
 from .services.sqlite import SqliteItemStorage
+
+import torch
+if torch.backends.mps.is_available():
+    import invokeai.backend.util.mps_fixes
 
 
 class CliCommand(BaseModel):
@@ -196,6 +213,7 @@ def invoke_all(context: CliContext):
         raise SessionError()
 
 def invoke_cli():
+    logger.info(f'InvokeAI version {__version__}')
     # get the optional list of invocations to execute on the command line
     parser = config.get_parser()
     parser.add_argument('commands',nargs='*')
@@ -225,26 +243,52 @@ def invoke_cli():
         )
 
     urls = LocalUrlService()
-    metadata = CoreMetadataService()
     image_record_storage = SqliteImageRecordStorage(db_location)
     image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
     names = SimpleNameService()
 
-    images = ImageService(
-        image_record_storage=image_record_storage,
-        image_file_storage=image_file_storage,
-        metadata=metadata,
-        url=urls,
-        logger=logger,
-        names=names,
-        graph_execution_manager=graph_execution_manager,
+    board_record_storage = SqliteBoardRecordStorage(db_location)
+    board_image_record_storage = SqliteBoardImageRecordStorage(db_location)
+
+    boards = BoardService(
+        services=BoardServiceDependencies(
+            board_image_record_storage=board_image_record_storage,
+            board_record_storage=board_record_storage,
+            image_record_storage=image_record_storage,
+            url=urls,
+            logger=logger,
+        )
     )
 
+    board_images = BoardImagesService(
+        services=BoardImagesServiceDependencies(
+            board_image_record_storage=board_image_record_storage,
+            board_record_storage=board_record_storage,
+            image_record_storage=image_record_storage,
+            url=urls,
+            logger=logger,
+        )
+    )
+
+    images = ImageService(
+        services=ImageServiceDependencies(
+            board_image_record_storage=board_image_record_storage,
+            image_record_storage=image_record_storage,
+            image_file_storage=image_file_storage,
+            url=urls,
+            logger=logger,
+            names=names,
+            graph_execution_manager=graph_execution_manager,
+        )
+    )
+        
     services = InvocationServices(
         model_manager=model_manager,
         events=events,
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f'{output_folder}/latents')),
         images=images,
+        boards=boards,
+        board_images=board_images,
         queue=MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](
             filename=db_location, table_name="graphs"
@@ -311,7 +355,7 @@ def invoke_cli():
 
                 # Parse invocation
                 command: CliCommand = None # type:ignore
-                system_graph: LibraryGraph|None = None
+                system_graph: Optional[LibraryGraph] = None
                 if args['type'] in system_graph_names:
                     system_graph = next(filter(lambda g: g.name == args['type'], system_graphs))
                     invocation = GraphInvocation(graph=system_graph.graph, id=str(current_id))

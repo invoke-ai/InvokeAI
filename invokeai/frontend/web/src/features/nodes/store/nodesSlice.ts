@@ -1,5 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { RootState } from 'app/store/store';
+import { cloneDeep, uniqBy } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
+import { RgbaColor } from 'react-colorful';
 import {
   addEdge,
   applyEdgeChanges,
@@ -10,16 +13,11 @@ import {
   Node,
   NodeChange,
   OnConnectStartParams,
+  ReactFlowInstance,
 } from 'reactflow';
-import { ImageDTO } from 'services/api';
-import { receivedOpenAPISchema } from 'services/thunks/schema';
+import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import { ImageField } from 'services/api/types';
 import { InvocationTemplate, InvocationValue } from '../types/types';
-import { parseSchema } from '../util/parseSchema';
-import { log } from 'app/logging/useLogger';
-import { forEach, size } from 'lodash-es';
-import { RgbaColor } from 'react-colorful';
-import { imageUrlsReceived } from 'services/thunks/image';
-import { RootState } from 'app/store/store';
 
 export type NodesState = {
   nodes: Node<InvocationValue>[];
@@ -28,6 +26,7 @@ export type NodesState = {
   invocationTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   shouldShowGraphOverlay: boolean;
+  editorInstance: ReactFlowInstance | undefined;
 };
 
 export const initialNodesState: NodesState = {
@@ -37,6 +36,7 @@ export const initialNodesState: NodesState = {
   invocationTemplates: {},
   connectionStartParams: null,
   shouldShowGraphOverlay: false,
+  editorInstance: undefined,
 };
 
 const nodesSlice = createSlice({
@@ -66,7 +66,14 @@ const nodesSlice = createSlice({
       action: PayloadAction<{
         nodeId: string;
         fieldName: string;
-        value: string | number | boolean | ImageDTO | RgbaColor | undefined;
+        value:
+          | string
+          | number
+          | boolean
+          | ImageField
+          | RgbaColor
+          | undefined
+          | ImageField[];
       }>
     ) => {
       const { nodeId, fieldName, value } = action.payload;
@@ -76,28 +83,59 @@ const nodesSlice = createSlice({
         state.nodes[nodeIndex].data.inputs[fieldName].value = value;
       }
     },
+    imageCollectionFieldValueChanged: (
+      state,
+      action: PayloadAction<{
+        nodeId: string;
+        fieldName: string;
+        value: ImageField[];
+      }>
+    ) => {
+      const { nodeId, fieldName, value } = action.payload;
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+
+      if (nodeIndex === -1) {
+        return;
+      }
+
+      const currentValue = cloneDeep(
+        state.nodes[nodeIndex].data.inputs[fieldName].value
+      );
+
+      if (!currentValue) {
+        state.nodes[nodeIndex].data.inputs[fieldName].value = value;
+        return;
+      }
+
+      state.nodes[nodeIndex].data.inputs[fieldName].value = uniqBy(
+        (currentValue as ImageField[]).concat(value),
+        'image_name'
+      );
+    },
     shouldShowGraphOverlayChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGraphOverlay = action.payload;
     },
-    parsedOpenAPISchema: (state, action: PayloadAction<OpenAPIV3.Document>) => {
-      try {
-        const parsedSchema = parseSchema(action.payload);
-
-        // TODO: Achtung! Side effect in a reducer!
-        log.info(
-          { namespace: 'schema', nodes: parsedSchema },
-          `Parsed ${size(parsedSchema)} nodes`
-        );
-        state.invocationTemplates = parsedSchema;
-      } catch (err) {
-        console.error(err);
-      }
+    nodeTemplatesBuilt: (
+      state,
+      action: PayloadAction<Record<string, InvocationTemplate>>
+    ) => {
+      state.invocationTemplates = action.payload;
     },
-    nodeEditorReset: () => {
-      return { ...initialNodesState };
+    nodeEditorReset: (state) => {
+      state.nodes = [];
+      state.edges = [];
+    },
+    setEditorInstance: (state, action) => {
+      state.editorInstance = action.payload;
+    },
+    loadFileNodes: (state, action: PayloadAction<Node<InvocationValue>[]>) => {
+      state.nodes = action.payload;
+    },
+    loadFileEdges: (state, action: PayloadAction<Edge[]>) => {
+      state.edges = action.payload;
     },
   },
-  extraReducers(builder) {
+  extraReducers: (builder) => {
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
       state.schema = action.payload;
     });
@@ -113,10 +151,14 @@ export const {
   connectionStarted,
   connectionEnded,
   shouldShowGraphOverlayChanged,
-  parsedOpenAPISchema,
+  nodeTemplatesBuilt,
   nodeEditorReset,
+  imageCollectionFieldValueChanged,
+  setEditorInstance,
+  loadFileNodes,
+  loadFileEdges,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
 
-export const nodesSelecter = (state: RootState) => state.nodes;
+export const nodesSelector = (state: RootState) => state.nodes;

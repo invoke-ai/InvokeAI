@@ -1,57 +1,65 @@
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { modelSelected } from 'features/parameters/store/generationSlice';
 
-import { forEach, isString } from 'lodash-es';
 import { SelectItem } from '@mantine/core';
-import { RootState } from 'app/store/store';
-import { useListModelsQuery } from 'services/apiSlice';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { modelIdToMainModelField } from 'features/nodes/util/modelIdToMainModelField';
+import { modelSelected } from 'features/parameters/store/actions';
+import { forEach } from 'lodash-es';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 export const MODEL_TYPE_MAP = {
   'sd-1': 'Stable Diffusion 1.x',
   'sd-2': 'Stable Diffusion 2.x',
 };
 
+const selector = createSelector(
+  stateSelector,
+  (state) => ({ currentModel: state.generation.model }),
+  defaultSelectorOptions
+);
+
 const ModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const selectedModelId = useAppSelector(
-    (state: RootState) => state.generation.model
-  );
+  const { currentModel } = useAppSelector(selector);
 
-  const { data: pipelineModels } = useListModelsQuery({
-    model_type: 'pipeline',
-  });
+  const { data: mainModels, isLoading } = useGetMainModelsQuery();
 
   const data = useMemo(() => {
-    if (!pipelineModels) {
+    if (!mainModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(pipelineModels.entities, (model, id) => {
+    forEach(mainModels.entities, (model, id) => {
       if (!model) {
         return;
       }
 
       data.push({
         value: id,
-        label: model.name,
+        label: model.model_name,
         group: MODEL_TYPE_MAP[model.base_model],
       });
     });
 
     return data;
-  }, [pipelineModels]);
+  }, [mainModels]);
 
   const selectedModel = useMemo(
-    () => pipelineModels?.entities[selectedModelId],
-    [pipelineModels?.entities, selectedModelId]
+    () =>
+      mainModels?.entities[
+        `${currentModel?.base_model}/main/${currentModel?.model_name}`
+      ],
+    [mainModels?.entities, currentModel]
   );
 
   const handleChangeModel = useCallback(
@@ -59,32 +67,29 @@ const ModelSelect = () => {
       if (!v) {
         return;
       }
-      dispatch(modelSelected(v));
+
+      const modelField = modelIdToMainModelField(v);
+      dispatch(modelSelected(modelField));
     },
     [dispatch]
   );
 
-  useEffect(() => {
-    if (selectedModelId && pipelineModels?.ids.includes(selectedModelId)) {
-      return;
-    }
-
-    const firstModel = pipelineModels?.ids[0];
-
-    if (!isString(firstModel)) {
-      return;
-    }
-
-    handleChangeModel(firstModel);
-  }, [handleChangeModel, pipelineModels?.ids, selectedModelId]);
-
-  return (
+  return isLoading ? (
+    <IAIMantineSelect
+      label={t('modelManager.model')}
+      placeholder="Loading..."
+      disabled={true}
+      data={[]}
+    />
+  ) : (
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={t('modelManager.model')}
-      value={selectedModelId}
-      placeholder="Pick one"
+      value={selectedModel?.id}
+      placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
       data={data}
+      error={data.length === 0}
+      disabled={data.length === 0}
       onChange={handleChangeModel}
     />
   );

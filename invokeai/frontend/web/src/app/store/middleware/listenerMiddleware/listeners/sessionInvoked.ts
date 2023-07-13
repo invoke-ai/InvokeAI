@@ -1,6 +1,6 @@
 import { log } from 'app/logging/useLogger';
 import { startAppListening } from '..';
-import { sessionInvoked } from 'services/thunks/session';
+import { sessionInvoked } from 'services/api/thunks/session';
 import { serializeError } from 'serialize-error';
 
 const moduleLog = log.child({ namespace: 'session' });
@@ -18,10 +18,10 @@ export const addSessionInvokedFulfilledListener = () => {
   startAppListening({
     actionCreator: sessionInvoked.fulfilled,
     effect: (action, { getState, dispatch }) => {
-      const { sessionId } = action.meta.arg;
+      const { session_id } = action.meta.arg;
       moduleLog.debug(
-        { data: { sessionId } },
-        `Session invoked (${sessionId})`
+        { data: { session_id } },
+        `Session invoked (${session_id})`
       );
     },
   });
@@ -33,6 +33,7 @@ export const addSessionInvokedRejectedListener = () => {
     effect: (action, { getState, dispatch }) => {
       if (action.payload) {
         const { arg, error } = action.payload;
+        const stringifiedError = JSON.stringify(error);
         moduleLog.error(
           {
             data: {
@@ -40,7 +41,7 @@ export const addSessionInvokedRejectedListener = () => {
               error: serializeError(error),
             },
           },
-          `Problem invoking session`
+          `Problem invoking session: ${stringifiedError}`
         );
       }
     },

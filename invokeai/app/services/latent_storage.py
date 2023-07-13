@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
-from typing import Dict
+from typing import Dict, Union, Optional
 
 import torch
 
@@ -55,7 +55,7 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
         if name in self.__cache:
             del self.__cache[name]
 
-    def __get_cache(self, name: str) -> torch.Tensor|None:
+    def __get_cache(self, name: str) -> Optional[torch.Tensor]:
         return None if name not in self.__cache else self.__cache[name]
 
     def __set_cache(self, name: str, data: torch.Tensor):
@@ -69,9 +69,9 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
 class DiskLatentsStorage(LatentsStorageBase):
     """Stores latents in a folder on disk without caching"""
 
-    __output_folder: str | Path
+    __output_folder: Union[str, Path]
 
-    def __init__(self, output_folder: str | Path):
+    def __init__(self, output_folder: Union[str, Path]):
         self.__output_folder = output_folder if isinstance(output_folder, Path) else Path(output_folder)
         self.__output_folder.mkdir(parents=True, exist_ok=True)
 

@@ -2,7 +2,7 @@ import inspect
 from enum import Enum
 from pydantic import BaseModel
 from typing import Literal, get_origin
-from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings
+from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings, ModelNotFoundException, InvalidModelException
 from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
 from .vae import VaeModel
 from .lora import LoRAModel
@@ -13,23 +13,23 @@ from .stable_diffusion_onnx import ONNXStableDiffusion1Model, ONNXStableDiffusio
 
 MODEL_CLASSES = {
     BaseModelType.StableDiffusion1: {
-        ModelType.Pipeline: StableDiffusion1Model,
         ModelType.ONNX: ONNXStableDiffusion1Model,
+        ModelType.Main: StableDiffusion1Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
     },
     BaseModelType.StableDiffusion2: {
-        ModelType.Pipeline: StableDiffusion2Model,
         ModelType.ONNX: ONNXStableDiffusion2Model,
+        ModelType.Main: StableDiffusion2Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
     },
     #BaseModelType.Kandinsky2_1: {
-    #    ModelType.Pipeline: Kandinsky2_1Model,
+    #    ModelType.Main: Kandinsky2_1Model,
     #    ModelType.MoVQ: MoVQModel,
     #    ModelType.Lora: LoRAModel,
     #    ModelType.ControlNet: ControlNetModel,
@@ -41,9 +41,9 @@ MODEL_CONFIGS = list()
 OPENAPI_MODEL_CONFIGS = list()
 
 class OpenAPIModelInfoBase(BaseModel):
-    name: str
+    model_name: str
     base_model: BaseModelType
-    type: ModelType
+    model_type: ModelType
 
 
 for base_model, models in MODEL_CLASSES.items():
@@ -60,7 +60,7 @@ for base_model, models in MODEL_CLASSES.items():
 
             api_wrapper = type(openapi_cfg_name, (cfg, OpenAPIModelInfoBase), dict(
                 __annotations__ = dict(
-                    type=Literal[model_type.value],
+                    model_type=Literal[model_type.value],
                 ),
             ))
 
@@ -72,7 +72,11 @@ def get_model_config_enums():
     enums = list()
 
     for model_config in MODEL_CONFIGS:
-        fields = inspect.get_annotations(model_config)
+
+        if hasattr(inspect,'get_annotations'):
+            fields = inspect.get_annotations(model_config)
+        else:
+            fields = model_config.__annotations__
         try:
             field = fields["model_format"]
         except:

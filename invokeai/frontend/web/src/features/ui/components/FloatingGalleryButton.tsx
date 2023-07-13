@@ -1,13 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { useTranslation } from 'react-i18next';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { setShouldShowGallery } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
+import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MdPhotoLibrary } from 'react-icons/md';
 import { activeTabNameSelector, uiSelector } from '../store/uiSelectors';
-import { memo } from 'react';
+import { NO_GALLERY_TABS } from './InvokeTabs';
 
 const floatingGalleryButtonSelector = createSelector(
   [activeTabNameSelector, uiSelector],
@@ -16,7 +17,9 @@ const floatingGalleryButtonSelector = createSelector(
 
     return {
       shouldPinGallery,
-      shouldShowGalleryButton: !shouldShowGallery,
+      shouldShowGalleryButton: NO_GALLERY_TABS.includes(activeTabName)
+        ? false
+        : !shouldShowGallery,
     };
   },
   { memoizeOptions: { resultEqualityCheck: isEqual } }
@@ -51,6 +54,7 @@ const FloatingGalleryButton = () => {
         w: 8,
         borderStartEndRadius: 0,
         borderEndEndRadius: 0,
+        shadow: '2xl',
       }}
     >
       <MdPhotoLibrary />

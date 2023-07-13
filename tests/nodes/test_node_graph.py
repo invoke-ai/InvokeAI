@@ -1,6 +1,5 @@
-from .test_nodes import ListPassThroughInvocation, PromptTestInvocation
+from .test_nodes import ImageToImageTestInvocation, TextToImageTestInvocation, ListPassThroughInvocation, PromptTestInvocation
 from invokeai.app.services.graph import Edge, Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation
-from invokeai.app.invocations.generate import ImageToImageInvocation, TextToImageInvocation
 from invokeai.app.invocations.upscale import UpscaleInvocation
 from invokeai.app.invocations.image import *
 from invokeai.app.invocations.math import AddInvocation, SubtractInvocation
@@ -18,7 +17,7 @@ def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edg
 
 # Tests
 def test_connections_are_compatible():
-    from_node = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    from_node = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     from_field = "image"
     to_node = UpscaleInvocation(id = "2")
     to_field = "image"
@@ -28,7 +27,7 @@ def test_connections_are_compatible():
     assert result == True
 
 def test_connections_are_incompatible():
-    from_node = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    from_node = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     from_field = "image"
     to_node = UpscaleInvocation(id = "2")
     to_field = "strength"
@@ -38,7 +37,7 @@ def test_connections_are_incompatible():
     assert result == False
 
 def test_connections_incompatible_with_invalid_fields():
-    from_node = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    from_node = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     from_field = "invalid_field"
     to_node = UpscaleInvocation(id = "2")
     to_field = "image"
@@ -56,28 +55,28 @@ def test_connections_incompatible_with_invalid_fields():
 
 def test_graph_can_add_node():
     g = Graph()
-    n = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     g.add_node(n)
 
     assert n.id in g.nodes
 
 def test_graph_fails_to_add_node_with_duplicate_id():
     g = Graph()
-    n = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     g.add_node(n)
-    n2 = TextToImageInvocation(id = "1", prompt = "Banana sushi the second")
+    n2 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi the second")
 
     with pytest.raises(NodeAlreadyInGraphError):
         g.add_node(n2)
 
 def test_graph_updates_node():
     g = Graph()
-    n = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     g.add_node(n)
-    n2 = TextToImageInvocation(id = "2", prompt = "Banana sushi the second")
+    n2 = TextToImageTestInvocation(id = "2", prompt = "Banana sushi the second")
     g.add_node(n2)
 
-    nu = TextToImageInvocation(id = "1", prompt = "Banana sushi updated")
+    nu = TextToImageTestInvocation(id = "1", prompt = "Banana sushi updated")
 
     g.update_node("1", nu)
 
@@ -85,7 +84,7 @@ def test_graph_updates_node():
 
 def test_graph_fails_to_update_node_if_type_changes():
     g = Graph()
-    n = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     g.add_node(n)
     n2 = UpscaleInvocation(id = "2")
     g.add_node(n2)
@@ -97,14 +96,14 @@ def test_graph_fails_to_update_node_if_type_changes():
 
 def test_graph_allows_non_conflicting_id_change():
     g = Graph()
-    n = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     g.add_node(n)
     n2 = UpscaleInvocation(id = "2")
     g.add_node(n2)
     e1 = create_edge(n.id,"image",n2.id,"image")
     g.add_edge(e1)
     
-    nu = TextToImageInvocation(id = "3", prompt = "Banana sushi")
+    nu = TextToImageTestInvocation(id = "3", prompt = "Banana sushi")
     g.update_node("1", nu)
 
     with pytest.raises(NodeNotFoundError):
@@ -117,18 +116,18 @@ def test_graph_allows_non_conflicting_id_change():
 
 def test_graph_fails_to_update_node_id_if_conflict():
     g = Graph()
-    n = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     g.add_node(n)
-    n2 = TextToImageInvocation(id = "2", prompt = "Banana sushi the second")
+    n2 = TextToImageTestInvocation(id = "2", prompt = "Banana sushi the second")
     g.add_node(n2)
     
-    nu = TextToImageInvocation(id = "2", prompt = "Banana sushi")
+    nu = TextToImageTestInvocation(id = "2", prompt = "Banana sushi")
     with pytest.raises(NodeAlreadyInGraphError):
         g.update_node("1", nu)
 
 def test_graph_adds_edge():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = UpscaleInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
@@ -148,7 +147,7 @@ def test_graph_fails_to_add_edge_with_cycle():
 
 def test_graph_fails_to_add_edge_with_long_cycle():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = UpscaleInvocation(id = "2")
     n3 = UpscaleInvocation(id = "3")
     g.add_node(n1)
@@ -164,7 +163,7 @@ def test_graph_fails_to_add_edge_with_long_cycle():
 
 def test_graph_fails_to_add_edge_with_missing_node_id():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = UpscaleInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
@@ -177,7 +176,7 @@ def test_graph_fails_to_add_edge_with_missing_node_id():
 
 def test_graph_fails_to_add_edge_when_destination_exists():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = UpscaleInvocation(id = "2")
     n3 = UpscaleInvocation(id = "3")
     g.add_node(n1)
@@ -194,7 +193,7 @@ def test_graph_fails_to_add_edge_when_destination_exists():
 
 def test_graph_fails_to_add_edge_with_mismatched_types():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = UpscaleInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
@@ -204,8 +203,8 @@ def test_graph_fails_to_add_edge_with_mismatched_types():
 
 def test_graph_connects_collector():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
-    n2 = TextToImageInvocation(id = "2", prompt = "Banana sushi 2")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
+    n2 = TextToImageTestInvocation(id = "2", prompt = "Banana sushi 2")
     n3 = CollectInvocation(id = "3")
     n4 = ListPassThroughInvocation(id = "4")
     g.add_node(n1)
@@ -224,7 +223,7 @@ def test_graph_connects_collector():
 
 def test_graph_collector_invalid_with_varying_input_types():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = PromptTestInvocation(id = "2", prompt = "banana sushi 2")
     n3 = CollectInvocation(id = "3")
     g.add_node(n1)
@@ -282,7 +281,7 @@ def test_graph_connects_iterator():
     g = Graph()
     n1 = ListPassThroughInvocation(id = "1")
     n2 = IterateInvocation(id = "2")
-    n3 = ImageToImageInvocation(id = "3", prompt = "Banana sushi")
+    n3 = ImageToImageTestInvocation(id = "3", prompt = "Banana sushi")
     g.add_node(n1)
     g.add_node(n2)
     g.add_node(n3)
@@ -298,7 +297,7 @@ def test_graph_iterator_invalid_if_multiple_inputs():
     g = Graph()
     n1 = ListPassThroughInvocation(id = "1")
     n2 = IterateInvocation(id = "2")
-    n3 = ImageToImageInvocation(id = "3", prompt = "Banana sushi")
+    n3 = ImageToImageTestInvocation(id = "3", prompt = "Banana sushi")
     n4 = ListPassThroughInvocation(id = "4")
     g.add_node(n1)
     g.add_node(n2)
@@ -316,7 +315,7 @@ def test_graph_iterator_invalid_if_multiple_inputs():
 
 def test_graph_iterator_invalid_if_input_not_list():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", promopt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = IterateInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
@@ -344,7 +343,7 @@ def test_graph_iterator_invalid_if_output_and_input_types_different():
 
 def test_graph_validates():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = UpscaleInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
@@ -355,7 +354,7 @@ def test_graph_validates():
 
 def test_graph_invalid_if_edges_reference_missing_nodes():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     g.nodes[n1.id] = n1
     e1 = create_edge("1","image","2","image")
     g.edges.append(e1)
@@ -367,7 +366,7 @@ def test_graph_invalid_if_subgraph_invalid():
     n1 = GraphInvocation(id = "1")
     n1.graph = Graph()
 
-    n1_1 = TextToImageInvocation(id = "2", prompt = "Banana sushi")
+    n1_1 = TextToImageTestInvocation(id = "2", prompt = "Banana sushi")
     n1.graph.nodes[n1_1.id] = n1_1
     e1 = create_edge("1","image","2","image")
     n1.graph.edges.append(e1)
@@ -391,7 +390,7 @@ def test_graph_invalid_if_has_cycle():
 
 def test_graph_invalid_with_invalid_connection():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = UpscaleInvocation(id = "2")
     g.nodes[n1.id] = n1
     g.nodes[n2.id] = n2
@@ -408,7 +407,7 @@ def test_graph_gets_subgraph_node():
     n1.graph = Graph()
     n1.graph.add_node
 
-    n1_1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1_1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n1.graph.add_node(n1_1)
 
     g.add_node(n1)
@@ -485,7 +484,7 @@ def test_graph_fails_to_get_missing_subgraph_node():
     n1.graph = Graph()
     n1.graph.add_node
 
-    n1_1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1_1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n1.graph.add_node(n1_1)
 
     g.add_node(n1)
@@ -499,7 +498,7 @@ def test_graph_fails_to_enumerate_non_subgraph_node():
     n1.graph = Graph()
     n1.graph.add_node
 
-    n1_1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1_1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n1.graph.add_node(n1_1)
 
     g.add_node(n1)
@@ -512,7 +511,7 @@ def test_graph_fails_to_enumerate_non_subgraph_node():
 
 def test_graph_gets_networkx_graph():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = UpscaleInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
@@ -529,7 +528,7 @@ def test_graph_gets_networkx_graph():
 # TODO: Graph serializes and deserializes
 def test_graph_can_serialize():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = UpscaleInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
@@ -541,7 +540,7 @@ def test_graph_can_serialize():
 
 def test_graph_can_deserialize():
     g = Graph()
-    n1 = TextToImageInvocation(id = "1", prompt = "Banana sushi")
+    n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     n2 = UpscaleInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)

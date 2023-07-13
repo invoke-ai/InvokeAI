@@ -8,6 +8,8 @@ from .base import (
     ModelType,
     SubModelType,
     classproperty,
+    ModelNotFoundException,
+    InvalidModelException,
 )
 # TODO: naming
 from ..lora import TextualInversionModel as TextualInversionModelRaw
@@ -37,8 +39,15 @@ class TextualInversionModel(ModelBase):
         if child_type is not None:
             raise Exception("There is no child models in textual inversion")
 
+        checkpoint_path = self.model_path
+        if os.path.isdir(checkpoint_path):
+            checkpoint_path = os.path.join(checkpoint_path, "learned_embeds.bin")
+
+        if not os.path.exists(checkpoint_path):
+            raise ModelNotFoundException()
+
         model = TextualInversionModelRaw.from_checkpoint(
-            file_path=self.model_path,
+            file_path=checkpoint_path,
             dtype=torch_dtype,
         )
 
@@ -51,7 +60,18 @@ class TextualInversionModel(ModelBase):
 
     @classmethod
     def detect_format(cls, path: str):
-        return None
+        if not os.path.exists(path):
+            raise ModelNotFoundException()
+
+        if os.path.isdir(path):
+            if os.path.exists(os.path.join(path, "learned_embeds.bin")):
+                return None # diffusers-ti
+
+        if os.path.isfile(path):
+            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+                return None
+
+        raise InvalidModelException(f"Not a valid model: {path}")
 
     @classmethod
     def convert_if_required(

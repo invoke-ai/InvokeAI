@@ -5,21 +5,18 @@ import StatusIndicator from './StatusIndicator';
 import { Link } from '@chakra-ui/react';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useTranslation } from 'react-i18next';
-import { FaBug, FaCube, FaDiscord, FaGithub, FaKeyboard } from 'react-icons/fa';
+import { FaBug, FaDiscord, FaGithub, FaKeyboard } from 'react-icons/fa';
 import { MdSettings } from 'react-icons/md';
+import { useFeatureStatus } from '../hooks/useFeatureStatus';
+import ColorModeButton from './ColorModeButton';
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 import InvokeAILogoComponent from './InvokeAILogoComponent';
 import LanguagePicker from './LanguagePicker';
-import ModelManagerModal from './ModelManager/ModelManagerModal';
 import SettingsModal from './SettingsModal/SettingsModal';
-import ThemeChanger from './ThemeChanger';
-import { useFeatureStatus } from '../hooks/useFeatureStatus';
 
 const SiteHeader = () => {
   const { t } = useTranslation();
 
-  const isModelManagerEnabled =
-    useFeatureStatus('modelManager').isFeatureEnabled;
   const isLocalizationEnabled =
     useFeatureStatus('localization').isFeatureEnabled;
   const isBugLinkEnabled = useFeatureStatus('bugLink').isFeatureEnabled;
@@ -37,20 +34,6 @@ const SiteHeader = () => {
       <Spacer />
       <StatusIndicator />
 
-      {isModelManagerEnabled && (
-        <ModelManagerModal>
-          <IAIIconButton
-            aria-label={t('modelManager.modelManager')}
-            tooltip={t('modelManager.modelManager')}
-            size="sm"
-            variant="link"
-            data-variant="link"
-            fontSize={20}
-            icon={<FaCube />}
-          />
-        </ModelManagerModal>
-      )}
-
       <HotkeysModal>
         <IAIIconButton
           aria-label={t('common.hotkeysLabel')}
@@ -62,8 +45,6 @@ const SiteHeader = () => {
           icon={<FaKeyboard />}
         />
       </HotkeysModal>
-
-      <ThemeChanger />
 
       {isLocalizationEnabled && <LanguagePicker />}
 
@@ -120,6 +101,8 @@ const SiteHeader = () => {
           />
         </Link>
       )}
+
+      <ColorModeButton />
 
       <SettingsModal>
         <IAIIconButton

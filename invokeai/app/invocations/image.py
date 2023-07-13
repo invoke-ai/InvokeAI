@@ -1,7 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-import io
-from typing import Literal, Optional, Union
+from typing import Literal, Optional
 
 import numpy
 from PIL import Image, ImageFilter, ImageOps, ImageChops
@@ -67,7 +66,7 @@ class LoadImageInvocation(BaseInvocation):
     type: Literal["load_image"] = "load_image"
 
     # Inputs
-    image: Union[ImageField, None] = Field(
+    image: Optional[ImageField] = Field(
         default=None, description="The image to load"
     )
     # fmt: on
@@ -87,7 +86,7 @@ class ShowImageInvocation(BaseInvocation):
     type: Literal["show_image"] = "show_image"
 
     # Inputs
-    image: Union[ImageField, None] = Field(
+    image: Optional[ImageField] = Field(
         default=None, description="The image to show"
     )
 
@@ -112,7 +111,7 @@ class ImageCropInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_crop"] = "img_crop"
 
     # Inputs
-    image: Union[ImageField, None]  = Field(default=None, description="The image to crop")
+    image: Optional[ImageField]  = Field(default=None, description="The image to crop")
     x:      int = Field(default=0, description="The left x coordinate of the crop rectangle")
     y:      int = Field(default=0, description="The top y coordinate of the crop rectangle")
     width:  int = Field(default=512, gt=0, description="The width of the crop rectangle")
@@ -150,8 +149,8 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_paste"] = "img_paste"
 
     # Inputs
-    base_image:     Union[ImageField, None]  = Field(default=None, description="The base image")
-    image:          Union[ImageField, None]  = Field(default=None, description="The image to paste")
+    base_image:     Optional[ImageField]  = Field(default=None, description="The base image")
+    image:          Optional[ImageField]  = Field(default=None, description="The image to paste")
     mask: Optional[ImageField] = Field(default=None, description="The mask to use when pasting")
     x:                     int = Field(default=0, description="The left x coordinate at which to paste the image")
     y:                     int = Field(default=0, description="The top y coordinate at which to paste the image")
@@ -203,7 +202,7 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["tomask"] = "tomask"
 
     # Inputs
-    image: Union[ImageField, None]  = Field(default=None, description="The image to create the mask from")
+    image: Optional[ImageField]  = Field(default=None, description="The image to create the mask from")
     invert:      bool = Field(default=False, description="Whether or not to invert the mask")
     # fmt: on
 
@@ -237,8 +236,8 @@ class ImageMultiplyInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_mul"] = "img_mul"
 
     # Inputs
-    image1: Union[ImageField, None]  = Field(default=None, description="The first image to multiply")
-    image2: Union[ImageField, None]  = Field(default=None, description="The second image to multiply")
+    image1: Optional[ImageField]  = Field(default=None, description="The first image to multiply")
+    image2: Optional[ImageField]  = Field(default=None, description="The second image to multiply")
     # fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -273,7 +272,7 @@ class ImageChannelInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_chan"] = "img_chan"
 
     # Inputs
-    image: Union[ImageField, None]  = Field(default=None, description="The image to get the channel from")
+    image: Optional[ImageField]  = Field(default=None, description="The image to get the channel from")
     channel: IMAGE_CHANNELS  = Field(default="A", description="The channel to get")
     # fmt: on
 
@@ -308,7 +307,7 @@ class ImageConvertInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_conv"] = "img_conv"
 
     # Inputs
-    image: Union[ImageField, None]  = Field(default=None, description="The image to convert")
+    image: Optional[ImageField]  = Field(default=None, description="The image to convert")
     mode: IMAGE_MODES  = Field(default="L", description="The mode to convert to")
     # fmt: on
 
@@ -340,7 +339,7 @@ class ImageBlurInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_blur"] = "img_blur"
 
     # Inputs
-    image: Union[ImageField, None]  = Field(default=None, description="The image to blur")
+    image: Optional[ImageField]  = Field(default=None, description="The image to blur")
     radius:     float = Field(default=8.0, ge=0, description="The blur radius")
     blur_type: Literal["gaussian", "box"] = Field(default="gaussian", description="The type of blur")
     # fmt: on
@@ -398,7 +397,7 @@ class ImageResizeInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_resize"] = "img_resize"
 
     # Inputs
-    image: Union[ImageField, None]  = Field(default=None, description="The image to resize")
+    image: Optional[ImageField]  = Field(default=None, description="The image to resize")
     width:                         int = Field(ge=64, multiple_of=8, description="The width to resize to (px)")
     height:                        int = Field(ge=64, multiple_of=8, description="The height to resize to (px)")
     resample_mode:  PIL_RESAMPLING_MODES = Field(default="bicubic", description="The resampling mode")
@@ -437,7 +436,7 @@ class ImageScaleInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_scale"] = "img_scale"
 
     # Inputs
-    image:       Union[ImageField, None] = Field(default=None, description="The image to scale")
+    image:       Optional[ImageField] = Field(default=None, description="The image to scale")
     scale_factor:                  float = Field(gt=0, description="The factor by which to scale the image")
     resample_mode:  PIL_RESAMPLING_MODES = Field(default="bicubic", description="The resampling mode")
     # fmt: on
@@ -477,7 +476,7 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_lerp"] = "img_lerp"
 
     # Inputs
-    image: Union[ImageField, None]  = Field(default=None, description="The image to lerp")
+    image: Optional[ImageField]  = Field(default=None, description="The image to lerp")
     min: int = Field(default=0, ge=0, le=255, description="The minimum output value")
     max: int = Field(default=255, ge=0, le=255, description="The maximum output value")
     # fmt: on
@@ -513,7 +512,7 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_ilerp"] = "img_ilerp"
 
     # Inputs
-    image: Union[ImageField, None]  = Field(default=None, description="The image to lerp")
+    image: Optional[ImageField]  = Field(default=None, description="The image to lerp")
     min: int = Field(default=0, ge=0, le=255, description="The minimum input value")
     max: int = Field(default=255, ge=0, le=255, description="The maximum input value")
     # fmt: on

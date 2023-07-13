@@ -1,14 +1,13 @@
-import { startAppListening } from '..';
-import { imageMetadataReceived } from 'services/thunks/image';
 import { log } from 'app/logging/useLogger';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
-import { Graph } from 'services/api';
-import { sessionCreated } from 'services/thunks/session';
-import { sessionReadyToInvoke } from 'features/system/store/actions';
-import { socketInvocationComplete } from 'services/events/actions';
-import { isImageOutput } from 'services/types/guards';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { pick } from 'lodash-es';
+import { sessionReadyToInvoke } from 'features/system/store/actions';
+import { isImageOutput } from 'services/api/guards';
+import { imageDTOReceived } from 'services/api/thunks/image';
+import { sessionCreated } from 'services/api/thunks/session';
+import { Graph } from 'services/api/types';
+import { socketInvocationComplete } from 'services/events/actions';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'controlNet' });
 
@@ -64,10 +63,8 @@ export const addControlNetImageProcessedListener = () => {
 
         // Wait for the ImageDTO to be received
         const [imageMetadataReceivedAction] = await take(
-          (
-            action
-          ): action is ReturnType<typeof imageMetadataReceived.fulfilled> =>
-            imageMetadataReceived.fulfilled.match(action) &&
+          (action): action is ReturnType<typeof imageDTOReceived.fulfilled> =>
+            imageDTOReceived.fulfilled.match(action) &&
             action.payload.image_name === image_name
         );
         const processedControlImage = imageMetadataReceivedAction.payload;

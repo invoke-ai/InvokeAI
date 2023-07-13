@@ -7,7 +7,7 @@ import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generic, List, Optional, Type, TypeVar, Union
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 import einops
 import PIL.Image
@@ -17,12 +17,11 @@ import psutil
 import torch
 import torchvision.transforms as T
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
-from diffusers.models.controlnet import ControlNetModel, ControlNetOutput
+from diffusers.models.controlnet import ControlNetModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
     StableDiffusionPipeline,
 )
-from diffusers.pipelines.controlnet import MultiControlNetModel
 
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import (
     StableDiffusionImg2ImgPipeline,
@@ -46,7 +45,7 @@ from .diffusion import (
     InvokeAIDiffuserComponent,
     PostprocessingSettings,
 )
-from .offloading import FullyLoadedModelGroup, LazilyLoadedModelGroup, ModelGroup
+from .offloading import FullyLoadedModelGroup, ModelGroup
 
 @dataclass
 class PipelineIntermediateState:
@@ -105,7 +104,7 @@ class AddsMaskGuidance:
     _debug: Optional[Callable] = None
 
     def __call__(
-        self, step_output: BaseOutput | SchedulerOutput, t: torch.Tensor, conditioning
+        self, step_output: Union[BaseOutput, SchedulerOutput], t: torch.Tensor, conditioning
     ) -> BaseOutput:
         output_class = step_output.__class__  # We'll create a new one with masked data.
 
@@ -128,7 +127,7 @@ class AddsMaskGuidance:
 
     def _t_for_field(self, field_name: str, t):
         if field_name == "pred_original_sample":
-            return torch.zeros_like(t, dtype=t.dtype)  # it represents t=0
+            return self.scheduler.timesteps[-1]
         return t
 
     def apply_mask(self, latents: torch.Tensor, t) -> torch.Tensor:
@@ -215,10 +214,12 @@ class GeneratorToCallbackinator(Generic[ParamType, ReturnType, CallbackType]):
 @dataclass
 class ControlNetData:
     model: ControlNetModel = Field(default=None)
-    image_tensor: torch.Tensor= Field(default=None)
-    weight: Union[float, List[float]]= Field(default=1.0)
+    image_tensor: torch.Tensor = Field(default=None)
+    weight: Union[float, List[float]] = Field(default=1.0)
     begin_step_percent: float = Field(default=0.0)
     end_step_percent: float = Field(default=1.0)
+    control_mode: str = Field(default="balanced")
+
 
 @dataclass(frozen=True)
 class ConditioningData:
@@ -359,37 +360,34 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         ):
             self.enable_xformers_memory_efficient_attention()
         else:
-            if torch.backends.mps.is_available():
-                # until pytorch #91617 is fixed, slicing is borked on MPS
-                # https://github.com/pytorch/pytorch/issues/91617
-                # fix is in https://github.com/kulinseth/pytorch/pull/222 but no idea when it will get merged to pytorch mainline.
-                pass
+            if self.device.type == "cpu" or self.device.type == "mps":
+                mem_free = psutil.virtual_memory().free
+            elif self.device.type == "cuda":
+                mem_free, _ = torch.cuda.mem_get_info(normalize_device(self.device))
             else:
-                if self.device.type == "cpu" or self.device.type == "mps":
-                    mem_free = psutil.virtual_memory().free
-                elif self.device.type == "cuda":
-                    mem_free, _ = torch.cuda.mem_get_info(normalize_device(self.device))
-                else:
-                    raise ValueError(f"unrecognized device {self.device}")
-                # input tensor of [1, 4, h/8, w/8]
-                # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
-                bytes_per_element_needed_for_baddbmm_duplication = (
-                    latents.element_size() + 4
-                )
-                max_size_required_for_baddbmm = (
-                    16
-                    * latents.size(dim=2)
-                    * latents.size(dim=3)
-                    * latents.size(dim=2)
-                    * latents.size(dim=3)
-                    * bytes_per_element_needed_for_baddbmm_duplication
-                )
-                if max_size_required_for_baddbmm > (
-                    mem_free * 3.0 / 4.0
-                ):  # 3.3 / 4.0 is from old Invoke code
-                    self.enable_attention_slicing(slice_size="max")
-                else:
-                    self.disable_attention_slicing()
+                raise ValueError(f"unrecognized device {self.device}")
+            # input tensor of [1, 4, h/8, w/8]
+            # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
+            bytes_per_element_needed_for_baddbmm_duplication = (
+                latents.element_size() + 4
+            )
+            max_size_required_for_baddbmm = (
+                16
+                * latents.size(dim=2)
+                * latents.size(dim=3)
+                * latents.size(dim=2)
+                * latents.size(dim=3)
+                * bytes_per_element_needed_for_baddbmm_duplication
+            )
+            if max_size_required_for_baddbmm > (
+                mem_free * 3.0 / 4.0
+            ):  # 3.3 / 4.0 is from old Invoke code
+                self.enable_attention_slicing(slice_size="max")
+            elif torch.backends.mps.is_available():
+                # diffusers recommends always enabling for mps
+                self.enable_attention_slicing(slice_size="max")
+            else:
+                self.disable_attention_slicing()
 
     def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
         # overridden method; types match the superclass.
@@ -599,48 +597,68 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
-        latent_model_input = self.scheduler.scale_model_input(latents, timestep)
+        unet_latent_input = self.scheduler.scale_model_input(latents, timestep)
 
         # default is no controlnet, so set controlnet processing output to None
         down_block_res_samples, mid_block_res_sample = None, None
 
         if control_data is not None:
-            # FIXME: make sure guidance_scale < 1.0 is handled correctly if doing per-step guidance setting
-            # if conditioning_data.guidance_scale > 1.0:
-            if conditioning_data.guidance_scale is not None:
-                # expand the latents input to control model if doing classifier free guidance
-                #    (which I think for now is always true, there is conditional elsewhere that stops execution if
-                #     classifier_free_guidance is <= 1.0 ?)
-                latent_control_input = torch.cat([latent_model_input] * 2)
-            else:
-                latent_control_input = latent_model_input
             # control_data should be type List[ControlNetData]
             # this loop covers both ControlNet (one ControlNetData in list)
             #      and MultiControlNet (multiple ControlNetData in list)
             for i, control_datum in enumerate(control_data):
-                # print("controlnet", i, "==>", type(control_datum))
+                control_mode = control_datum.control_mode
+                # soft_injection and cfg_injection are the two ControlNet control_mode booleans
+                #     that are combined at higher level to make control_mode enum
+                #  soft_injection determines whether to do per-layer re-weighting adjustment (if True)
+                #     or default weighting (if False)
+                soft_injection = (control_mode == "more_prompt" or control_mode == "more_control")
+                #  cfg_injection = determines whether to apply ControlNet to only the conditional (if True)
+                #      or the default both conditional and unconditional (if False)
+                cfg_injection = (control_mode == "more_control" or control_mode == "unbalanced")
+
                 first_control_step = math.floor(control_datum.begin_step_percent * total_step_count)
                 last_control_step = math.ceil(control_datum.end_step_percent * total_step_count)
                 # only apply controlnet if current step is within the controlnet's begin/end step range
                 if step_index >= first_control_step and step_index <= last_control_step:
-                    # print("running controlnet", i, "for step", step_index)
+
+                    if cfg_injection:
+                        control_latent_input = unet_latent_input
+                    else:
+                        # expand the latents input to control model if doing classifier free guidance
+                        #    (which I think for now is always true, there is conditional elsewhere that stops execution if
+                        #     classifier_free_guidance is <= 1.0 ?)
+                        control_latent_input = torch.cat([unet_latent_input] * 2)
+
+                    if cfg_injection:  # only applying ControlNet to conditional instead of in unconditioned
+                        encoder_hidden_states = conditioning_data.text_embeddings
+                    else:
+                        encoder_hidden_states = torch.cat([conditioning_data.unconditioned_embeddings,
+                                                           conditioning_data.text_embeddings])
                     if isinstance(control_datum.weight, list):
                         # if controlnet has multiple weights, use the weight for the current step
                         controlnet_weight = control_datum.weight[step_index]
                     else:
                         # if controlnet has a single weight, use it for all steps
                         controlnet_weight = control_datum.weight
+
+                    # controlnet(s) inference
                     down_samples, mid_sample = control_datum.model(
-                        sample=latent_control_input,
+                        sample=control_latent_input,
                         timestep=timestep,
-                        encoder_hidden_states=torch.cat([conditioning_data.unconditioned_embeddings,
-                                                         conditioning_data.text_embeddings]),
+                        encoder_hidden_states=encoder_hidden_states,
                         controlnet_cond=control_datum.image_tensor,
-                        conditioning_scale=controlnet_weight,
-                        # cross_attention_kwargs,
-                        guess_mode=False,
+                        conditioning_scale=controlnet_weight, # controlnet specific, NOT the guidance scale
+                        guess_mode=soft_injection, # this is still called guess_mode in diffusers ControlNetModel
                         return_dict=False,
                     )
+                    if cfg_injection:
+                        # Inferred ControlNet only for the conditional batch.
+                        # To apply the output of ControlNet to both the unconditional and conditional batches,
+                        #   add 0 to the unconditional batch to keep it unchanged.
+                        down_samples = [torch.cat([torch.zeros_like(d), d]) for d in down_samples]
+                        mid_sample = torch.cat([torch.zeros_like(mid_sample), mid_sample])
+
                     if down_block_res_samples is None and mid_block_res_sample is None:
                         down_block_res_samples, mid_block_res_sample = down_samples, mid_sample
                     else:
@@ -653,11 +671,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # predict the noise residual
         noise_pred = self.invokeai_diffuser.do_diffusion_step(
-            latent_model_input,
-            t,
-            conditioning_data.unconditioned_embeddings,
-            conditioning_data.text_embeddings,
-            conditioning_data.guidance_scale,
+            x=unet_latent_input,
+            sigma=t,
+            unconditioning=conditioning_data.unconditioned_embeddings,
+            conditioning=conditioning_data.text_embeddings,
+            unconditional_guidance_scale=conditioning_data.guidance_scale,
             step_index=step_index,
             total_step_count=total_step_count,
             down_block_additional_residuals=down_block_res_samples,  # from controlnet(s)
@@ -895,20 +913,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def non_noised_latents_from_image(self, init_image, *, device: torch.device, dtype):
         init_image = init_image.to(device=device, dtype=dtype)
         with torch.inference_mode():
-            if device.type == "mps":
-                # workaround for torch MPS bug that has been fixed in https://github.com/kulinseth/pytorch/pull/222
-                # TODO remove this workaround once kulinseth#222 is merged to pytorch mainline
-                self.vae.to(CPU_DEVICE)
-                init_image = init_image.to(CPU_DEVICE)
-            else:
-                self._model_group.load(self.vae)
+            self._model_group.load(self.vae)
             init_latent_dist = self.vae.encode(init_image).latent_dist
             init_latents = init_latent_dist.sample().to(
                 dtype=dtype
             )  # FIXME: uses torch.randn. make reproducible!
-            if device.type == "mps":
-                self.vae.to(device)
-                init_latents = init_latents.to(device)
 
         init_latents = 0.18215 * init_latents
         return init_latents
@@ -962,6 +971,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         device="cuda",
         dtype=torch.float16,
         do_classifier_free_guidance=True,
+        control_mode="balanced"
     ):
 
         if not isinstance(image, torch.Tensor):
@@ -992,6 +1002,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             repeat_by = num_images_per_prompt
         image = image.repeat_interleave(repeat_by, dim=0)
         image = image.to(device=device, dtype=dtype)
-        if do_classifier_free_guidance:
+        cfg_injection = (control_mode == "more_control" or control_mode == "unbalanced")
+        if do_classifier_free_guidance and not cfg_injection:
             image = torch.cat([image] * 2)
         return image

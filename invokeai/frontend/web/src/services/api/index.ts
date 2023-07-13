@@ -1,13 +1,14 @@
-/* istanbul ignore file */
-/* tslint:disable */
-/* eslint-disable */
-export { ApiError } from './core/ApiError';
-export { CancelablePromise, CancelError } from './core/CancelablePromise';
-export { OpenAPI } from './core/OpenAPI';
-export type { OpenAPIConfig } from './core/OpenAPI';
+import { FullTagDescription } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
+import {
+  BaseQueryFn,
+  FetchArgs,
+  FetchBaseQueryError,
+  createApi,
+  fetchBaseQuery,
+} from '@reduxjs/toolkit/query/react';
+import { $authToken, $baseUrl } from 'services/api/client';
 
 export type { AddInvocation } from './models/AddInvocation';
-export type { BaseModelType } from './models/BaseModelType';
 export type { BoardChanges } from './models/BoardChanges';
 export type { BoardDTO } from './models/BoardDTO';
 export type { Body_create_board_image } from './models/Body_create_board_image';
@@ -26,7 +27,6 @@ export type { ContentShuffleImageProcessorInvocation } from './models/ContentShu
 export type { ControlField } from './models/ControlField';
 export type { ControlNetInvocation } from './models/ControlNetInvocation';
 export type { ControlNetModelConfig } from './models/ControlNetModelConfig';
-export type { ControlNetModelFormat } from './models/ControlNetModelFormat';
 export type { ControlOutput } from './models/ControlOutput';
 export type { CreateModelRequest } from './models/CreateModelRequest';
 export type { CvInpaintInvocation } from './models/CvInpaintInvocation';
@@ -42,10 +42,8 @@ export type { Graph } from './models/Graph';
 export type { GraphExecutionState } from './models/GraphExecutionState';
 export type { GraphInvocation } from './models/GraphInvocation';
 export type { GraphInvocationOutput } from './models/GraphInvocationOutput';
-export type { HedImageProcessorInvocation } from './models/HedImageProcessorInvocation';
 export type { HTTPValidationError } from './models/HTTPValidationError';
 export type { ImageBlurInvocation } from './models/ImageBlurInvocation';
-export type { ImageCategory } from './models/ImageCategory';
 export type { ImageChannelInvocation } from './models/ImageChannelInvocation';
 export type { ImageConvertInvocation } from './models/ImageConvertInvocation';
 export type { ImageCropInvocation } from './models/ImageCropInvocation';
@@ -81,19 +79,15 @@ export type { LoadImageInvocation } from './models/LoadImageInvocation';
 export type { LoraInfo } from './models/LoraInfo';
 export type { LoraLoaderInvocation } from './models/LoraLoaderInvocation';
 export type { LoraLoaderOutput } from './models/LoraLoaderOutput';
-export type { LoRAModelConfig } from './models/LoRAModelConfig';
-export type { LoRAModelFormat } from './models/LoRAModelFormat';
 export type { MaskFromAlphaInvocation } from './models/MaskFromAlphaInvocation';
 export type { MaskOutput } from './models/MaskOutput';
 export type { MediapipeFaceProcessorInvocation } from './models/MediapipeFaceProcessorInvocation';
 export type { MidasDepthImageProcessorInvocation } from './models/MidasDepthImageProcessorInvocation';
 export type { MlsdImageProcessorInvocation } from './models/MlsdImageProcessorInvocation';
-export type { ModelError } from './models/ModelError';
 export type { ModelInfo } from './models/ModelInfo';
 export type { ModelLoaderOutput } from './models/ModelLoaderOutput';
 export type { ModelsList } from './models/ModelsList';
 export type { ModelType } from './models/ModelType';
-export type { ModelVariantType } from './models/ModelVariantType';
 export type { MultiplyInvocation } from './models/MultiplyInvocation';
 export type { NoiseInvocation } from './models/NoiseInvocation';
 export type { NoiseOutput } from './models/NoiseOutput';
@@ -121,17 +115,13 @@ export type { RandomRangeInvocation } from './models/RandomRangeInvocation';
 export type { RangeInvocation } from './models/RangeInvocation';
 export type { RangeOfSizeInvocation } from './models/RangeOfSizeInvocation';
 export type { ResizeLatentsInvocation } from './models/ResizeLatentsInvocation';
-export type { ResourceOrigin } from './models/ResourceOrigin';
 export type { RestoreFaceInvocation } from './models/RestoreFaceInvocation';
 export type { ScaleLatentsInvocation } from './models/ScaleLatentsInvocation';
-export type { SchedulerPredictionType } from './models/SchedulerPredictionType';
 export type { ShowImageInvocation } from './models/ShowImageInvocation';
 export type { StableDiffusion1ModelCheckpointConfig } from './models/StableDiffusion1ModelCheckpointConfig';
 export type { StableDiffusion1ModelDiffusersConfig } from './models/StableDiffusion1ModelDiffusersConfig';
-export type { StableDiffusion1ModelFormat } from './models/StableDiffusion1ModelFormat';
 export type { StableDiffusion2ModelCheckpointConfig } from './models/StableDiffusion2ModelCheckpointConfig';
 export type { StableDiffusion2ModelDiffusersConfig } from './models/StableDiffusion2ModelDiffusersConfig';
-export type { StableDiffusion2ModelFormat } from './models/StableDiffusion2ModelFormat';
 export type { StepParamEasingInvocation } from './models/StepParamEasingInvocation';
 export type { SubModelType } from './models/SubModelType';
 export type { SubtractInvocation } from './models/SubtractInvocation';
@@ -141,12 +131,40 @@ export type { UNetField } from './models/UNetField';
 export type { UpscaleInvocation } from './models/UpscaleInvocation';
 export type { VaeField } from './models/VaeField';
 export type { VaeModelConfig } from './models/VaeModelConfig';
-export type { VaeModelFormat } from './models/VaeModelFormat';
 export type { VaeRepo } from './models/VaeRepo';
 export type { ValidationError } from './models/ValidationError';
 export type { ZoeDepthImageProcessorInvocation } from './models/ZoeDepthImageProcessorInvocation';
+export const tagTypes = ['Board', 'Image', 'ImageMetadata', 'Model'];
+export type ApiFullTagDescription = FullTagDescription<
+  (typeof tagTypes)[number]
+>;
+export const LIST_TAG = 'LIST';
 
-export { BoardsService } from './services/BoardsService';
-export { ImagesService } from './services/ImagesService';
-export { ModelsService } from './services/ModelsService';
-export { SessionsService } from './services/SessionsService';
+const dynamicBaseQuery: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, api, extraOptions) => {
+  const baseUrl = $baseUrl.get();
+  const authToken = $authToken.get();
+
+  const rawBaseQuery = fetchBaseQuery({
+    baseUrl: `${baseUrl ?? ''}/api/v1`,
+    prepareHeaders: (headers) => {
+      if (authToken) {
+        headers.set('Authorization', `Bearer ${authToken}`);
+      }
+
+      return headers;
+    },
+  });
+
+  return rawBaseQuery(args, api, extraOptions);
+};
+
+export const api = createApi({
+  baseQuery: dynamicBaseQuery,
+  reducerPath: 'api',
+  tagTypes,
+  endpoints: () => ({}),
+});

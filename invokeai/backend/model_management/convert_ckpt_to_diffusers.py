@@ -29,8 +29,8 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
 from .model_manager import ModelManager
-from .model_cache import ModelCache
-from .models import SchedulerPredictionType, BaseModelType, ModelVariantType
+from picklescan.scanner import scan_file_path
+from .models import BaseModelType, ModelVariantType
 
 try:
     from omegaconf import OmegaConf
@@ -73,7 +73,9 @@ from transformers import (
 
 from ..stable_diffusion import StableDiffusionGeneratorPipeline
 
-MODEL_ROOT = None
+# TODO: redo in future
+#CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().models_path / "core" / "convert"
+CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().root_path / "models" / "core" / "convert"
 
 def shave_segments(path, n_shave_prefix_segments=1):
     """
@@ -159,17 +161,17 @@ def renew_vae_attention_paths(old_list, n_shave_prefix_segments=0):
         new_item = new_item.replace("norm.weight", "group_norm.weight")
         new_item = new_item.replace("norm.bias", "group_norm.bias")
 
-        new_item = new_item.replace("q.weight", "query.weight")
-        new_item = new_item.replace("q.bias", "query.bias")
+        new_item = new_item.replace("q.weight", "to_q.weight")
+        new_item = new_item.replace("q.bias", "to_q.bias")
 
-        new_item = new_item.replace("k.weight", "key.weight")
-        new_item = new_item.replace("k.bias", "key.bias")
+        new_item = new_item.replace("k.weight", "to_k.weight")
+        new_item = new_item.replace("k.bias", "to_k.bias")
 
-        new_item = new_item.replace("v.weight", "value.weight")
-        new_item = new_item.replace("v.bias", "value.bias")
+        new_item = new_item.replace("v.weight", "to_v.weight")
+        new_item = new_item.replace("v.bias", "to_v.bias")
 
-        new_item = new_item.replace("proj_out.weight", "proj_attn.weight")
-        new_item = new_item.replace("proj_out.bias", "proj_attn.bias")
+        new_item = new_item.replace("proj_out.weight", "to_out.0.weight")
+        new_item = new_item.replace("proj_out.bias", "to_out.0.bias")
 
         new_item = shave_segments(
             new_item, n_shave_prefix_segments=n_shave_prefix_segments
@@ -184,7 +186,6 @@ def assign_to_checkpoint(
     paths,
     checkpoint,
     old_checkpoint,
-    attention_paths_to_split=None,
     additional_replacements=None,
     config=None,
 ):
@@ -199,34 +200,8 @@ def assign_to_checkpoint(
         paths, list
     ), "Paths should be a list of dicts containing 'old' and 'new' keys."
 
-    # Splits the attention layers into three variables.
-    if attention_paths_to_split is not None:
-        for path, path_map in attention_paths_to_split.items():
-            old_tensor = old_checkpoint[path]
-            channels = old_tensor.shape[0] // 3
-
-            target_shape = (-1, channels) if len(old_tensor.shape) == 3 else (-1)
-
-            num_heads = old_tensor.shape[0] // config["num_head_channels"] // 3
-
-            old_tensor = old_tensor.reshape(
-                (num_heads, 3 * channels // num_heads) + old_tensor.shape[1:]
-            )
-            query, key, value = old_tensor.split(channels // num_heads, dim=1)
-
-            checkpoint[path_map["query"]] = query.reshape(target_shape)
-            checkpoint[path_map["key"]] = key.reshape(target_shape)
-            checkpoint[path_map["value"]] = value.reshape(target_shape)
-
     for path in paths:
         new_path = path["new"]
-
-        # These have already been assigned
-        if (
-            attention_paths_to_split is not None
-            and new_path in attention_paths_to_split
-        ):
-            continue
 
         # Global renaming happens here
         new_path = new_path.replace("middle_block.0", "mid_block.resnets.0")
@@ -246,14 +221,14 @@ def assign_to_checkpoint(
 
 def conv_attn_to_linear(checkpoint):
     keys = list(checkpoint.keys())
-    attn_keys = ["query.weight", "key.weight", "value.weight"]
+    attn_keys = ["to_q.weight", "to_k.weight", "to_v.weight"]
     for key in keys:
         if ".".join(key.split(".")[-2:]) in attn_keys:
             if checkpoint[key].ndim > 2:
                 checkpoint[key] = checkpoint[key][:, :, 0, 0]
-        elif "proj_attn.weight" in key:
+        elif "to_out.0.weight" in key:
             if checkpoint[key].ndim > 2:
-                checkpoint[key] = checkpoint[key][:, :, 0]
+                checkpoint[key] = checkpoint[key][:, :, 0, 0]
 
 
 def create_unet_diffusers_config(original_config, image_size: int):
@@ -632,7 +607,7 @@ def convert_ldm_vae_checkpoint(checkpoint, config):
     else:
         vae_state_dict = checkpoint
         
-    new_checkpoint = convert_ldm_vae_state_dict(vae_state_dict,config)
+    new_checkpoint = convert_ldm_vae_state_dict(vae_state_dict, config)
     return new_checkpoint
 
 def convert_ldm_vae_state_dict(vae_state_dict, config):
@@ -855,7 +830,7 @@ def convert_ldm_bert_checkpoint(checkpoint, config):
 
 
 def convert_ldm_clip_checkpoint(checkpoint):
-    text_model = CLIPTextModel.from_pretrained(MODEL_ROOT / 'clip-vit-large-patch14')
+    text_model = CLIPTextModel.from_pretrained(CONVERT_MODEL_ROOT / 'clip-vit-large-patch14')
     keys = list(checkpoint.keys())
 
     text_model_dict = {}
@@ -909,7 +884,7 @@ textenc_pattern = re.compile("|".join(protected.keys()))
 
 def convert_open_clip_checkpoint(checkpoint):
     text_model = CLIPTextModel.from_pretrained(
-        MODEL_ROOT / 'stable-diffusion-2-clip',
+        CONVERT_MODEL_ROOT / 'stable-diffusion-2-clip',
         subfolder='text_encoder',
     )
 
@@ -976,7 +951,7 @@ def convert_open_clip_checkpoint(checkpoint):
 
     return text_model
 
-def replace_checkpoint_vae(checkpoint, vae_path:str):
+def replace_checkpoint_vae(checkpoint, vae_path: str):
     if vae_path.endswith(".safetensors"):
         vae_ckpt = load_file(vae_path)
     else:
@@ -986,7 +961,7 @@ def replace_checkpoint_vae(checkpoint, vae_path:str):
         new_key = f'first_stage_model.{vae_key}'
         checkpoint[new_key] = state_dict[vae_key]
 
-def convert_ldm_vae_to_diffusers(checkpoint, vae_config: DictConfig, image_size: int)->AutoencoderKL:
+def convert_ldm_vae_to_diffusers(checkpoint, vae_config: DictConfig, image_size: int) -> AutoencoderKL:
     vae_config = create_vae_diffusers_config(
         vae_config, image_size=image_size
     )
@@ -1006,8 +981,6 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     original_config_file: str,
     extract_ema: bool = True,
     precision: torch.dtype = torch.float32,
-    upcast_attention: bool = False,
-    prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon,
     scan_needed: bool = True,
 ) -> StableDiffusionPipeline:
     """
@@ -1021,8 +994,6 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
     :param checkpoint_path: Path to `.ckpt` file.
     :param original_config_file: Path to `.yaml` config file corresponding to the original architecture.
       If `None`, will be automatically inferred by looking for a key that only exists in SD2.0 models.
-    :param prediction_type: The prediction type that the model was trained on. Use `'epsilon'` for Stable Diffusion
-     v1.X and Stable Diffusion v2 Base. Use `'v-prediction'` for Stable Diffusion v2.
     :param scheduler_type: Type of scheduler to use. Should be one of `["pndm", "lms", "heun", "euler",
      "euler-ancestral", "dpm", "ddim"]`. :param model_type: The pipeline type. `None` to automatically infer, or one of
      `["FrozenOpenCLIPEmbedder", "FrozenCLIPEmbedder"]`. :param extract_ema: Only relevant for
@@ -1030,21 +1001,23 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
      or not. Defaults to `False`. Pass `True` to extract the EMA weights. EMA weights usually yield higher
      quality images for inference. Non-EMA weights are usually better to continue fine-tuning.
     :param precision: precision to use - torch.float16, torch.float32 or torch.autocast
-    :param upcast_attention: Whether the attention computation should always be upcasted. This is necessary when
-    running stable diffusion 2.1.
     """
-    config = InvokeAIAppConfig.get_config()
+    if not isinstance(checkpoint_path, Path):
+        checkpoint_path = Path(checkpoint_path)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         verbosity = dlogging.get_verbosity()
         dlogging.set_verbosity_error()
 
-        if str(checkpoint_path).endswith(".safetensors"):
+        if checkpoint_path.suffix == ".safetensors":
             checkpoint = load_file(checkpoint_path)
         else:
             if scan_needed:
-                ModelCache.scan_model(checkpoint_path, checkpoint_path)
+                # scan model
+                scan_result = scan_file_path(checkpoint_path)
+                if scan_result.infected_files != 0:
+                    raise "The model {checkpoint_path} is potentially infected by malware. Aborting import."
             checkpoint = torch.load(checkpoint_path)
 
         # sometimes there is a state_dict key and sometimes not
@@ -1053,9 +1026,13 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
         original_config = OmegaConf.load(original_config_file)
 
-        if model_version == BaseModelType.StableDiffusion2 and prediction_type == SchedulerPredictionType.VPrediction:
+        if model_version == BaseModelType.StableDiffusion2 and original_config["model"]["params"]["parameterization"] == "v":
+            prediction_type = "v_prediction"
+            upcast_attention = True
             image_size = 768
         else:
+            prediction_type = "epsilon"
+            upcast_attention = False
             image_size = 512
 
         #
@@ -1110,7 +1087,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         if model_type == "FrozenOpenCLIPEmbedder":
             text_model = convert_open_clip_checkpoint(checkpoint)
             tokenizer = CLIPTokenizer.from_pretrained(
-                MODEL_ROOT / 'stable-diffusion-2-clip',
+                CONVERT_MODEL_ROOT / 'stable-diffusion-2-clip',
                 subfolder='tokenizer',
             )
             pipe = StableDiffusionPipeline(
@@ -1126,9 +1103,9 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 
         elif model_type in ["FrozenCLIPEmbedder", "WeightedFrozenCLIPEmbedder"]:
             text_model = convert_ldm_clip_checkpoint(checkpoint)
-            tokenizer = CLIPTokenizer.from_pretrained(MODEL_ROOT / 'clip-vit-large-patch14')
-            safety_checker = StableDiffusionSafetyChecker.from_pretrained(MODEL_ROOT / 'stable-diffusion-safety-checker')
-            feature_extractor = AutoFeatureExtractor.from_pretrained(MODEL_ROOT / 'stable-diffusion-safety-checker')
+            tokenizer = CLIPTokenizer.from_pretrained(CONVERT_MODEL_ROOT / 'clip-vit-large-patch14')
+            safety_checker = StableDiffusionSafetyChecker.from_pretrained(CONVERT_MODEL_ROOT / 'stable-diffusion-safety-checker')
+            feature_extractor = AutoFeatureExtractor.from_pretrained(CONVERT_MODEL_ROOT / 'stable-diffusion-safety-checker')
             pipe = StableDiffusionPipeline(
                 vae=vae.to(precision),
                 text_encoder=text_model.to(precision),
@@ -1142,7 +1119,7 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
         else:
             text_config = create_ldm_bert_config(original_config)
             text_model = convert_ldm_bert_checkpoint(checkpoint, text_config)
-            tokenizer = BertTokenizerFast.from_pretrained(MODEL_ROOT / "bert-base-uncased")
+            tokenizer = BertTokenizerFast.from_pretrained(CONVERT_MODEL_ROOT / "bert-base-uncased")
             pipe = LDMTextToImagePipeline(
                 vqvae=vae,
                 bert=text_model,
@@ -1158,7 +1135,6 @@ def load_pipeline_from_original_stable_diffusion_ckpt(
 def convert_ckpt_to_diffusers(
         checkpoint_path: Union[str, Path],
         dump_path: Union[str, Path],
-        model_root: Union[str, Path],
         **kwargs,
 ):
     """
@@ -1166,9 +1142,6 @@ def convert_ckpt_to_diffusers(
     and in addition a path-like object indicating the location of the desired diffusers
     model to be written.
     """
-    # setting global here to avoid massive changes late at night
-    global MODEL_ROOT
-    MODEL_ROOT = Path(model_root) / 'core/convert'
     pipe = load_pipeline_from_original_stable_diffusion_ckpt(checkpoint_path, **kwargs)
 
     pipe.save_pretrained(

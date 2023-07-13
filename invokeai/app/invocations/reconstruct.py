@@ -1,4 +1,4 @@
-from typing import Literal, Union
+from typing import Literal, Optional
 
 from pydantic import Field
 
@@ -15,7 +15,7 @@ class RestoreFaceInvocation(BaseInvocation):
     type:  Literal["restore_face"] = "restore_face"
 
     # Inputs
-    image: Union[ImageField, None] = Field(description="The input image")
+    image: Optional[ImageField] = Field(description="The input image")
     strength:                float = Field(default=0.75, gt=0, le=1, description="The strength of the restoration"  )
     # fmt: on
 

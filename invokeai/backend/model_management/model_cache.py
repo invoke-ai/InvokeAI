@@ -8,7 +8,7 @@ The cache returns context manager generators designed to load the
 model into the GPU within the context, and unload outside the
 context. Use like this:
 
-   cache = ModelCache(max_models_cached=6)
+   cache = ModelCache(max_cache_size=7.5)
    with cache.get_model('runwayml/stable-diffusion-1-5') as SD1,
           cache.get_model('stabilityai/stable-diffusion-2') as SD2:
        do_something_in_GPU(SD1,SD2)
@@ -35,6 +35,9 @@ from .models import BaseModelType, ModelType, SubModelType, ModelBase
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
 DEFAULT_MAX_CACHE_SIZE = 6.0
+
+# amount of GPU memory to hold in reserve for use by generations (GB)
+DEFAULT_MAX_VRAM_CACHE_SIZE= 2.75
 
 # actual size of a gig
 GIG = 1073741824
@@ -82,6 +85,7 @@ class ModelCache(object):
     def __init__(
         self,
         max_cache_size: float=DEFAULT_MAX_CACHE_SIZE,
+        max_vram_cache_size: float=DEFAULT_MAX_VRAM_CACHE_SIZE,
         execution_device: torch.device=torch.device('cuda'),
         storage_device: torch.device=torch.device('cpu'),
         precision: torch.dtype=torch.float16,
@@ -91,7 +95,7 @@ class ModelCache(object):
         logger: types.ModuleType = logger
     ):
         '''
-        :param max_models: Maximum number of models to cache in CPU RAM [4]
+        :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
         :param execution_device: Torch device to load active model into [torch.device('cuda')]
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
         :param precision: Precision for loaded models [torch.float16]
@@ -99,14 +103,11 @@ class ModelCache(object):
         :param sequential_offload: Conserve VRAM by loading and unloading each stage of the pipeline sequentially
         :param sha_chunksize: Chunksize to use when calculating sha256 model hash
         '''
-        #max_cache_size = 9999
-        execution_device = torch.device('cuda')
-
         self.model_infos: Dict[str, ModelBase] = dict()
         self.lazy_offloading = lazy_offloading
-        #self.sequential_offload: bool=sequential_offload
         self.precision: torch.dtype=precision
-        self.max_cache_size: int=max_cache_size
+        self.max_cache_size: float=max_cache_size
+        self.max_vram_cache_size: float=max_vram_cache_size
         self.execution_device: torch.device=execution_device
         self.storage_device: torch.device=storage_device
         self.sha_chunksize=sha_chunksize
@@ -128,16 +129,6 @@ class ModelCache(object):
             key += f":{submodel_type}"
         return key
 
-    #def get_model(
-    #    self,
-    #    repo_id_or_path: Union[str, Path],
-    #    model_type: ModelType = ModelType.Diffusers,
-    #    subfolder: Path = None,
-    #    submodel: ModelType = None,
-    #    revision: str = None,
-    #    attach_model_part: Tuple[ModelType, str] = (None, None),
-    #    gpu_load: bool = True,
-    #) -> ModelLocker:  # ?? what does it return
     def _get_model_info(
         self,
         model_path: str,
@@ -213,14 +204,22 @@ class ModelCache(object):
             self._cache_stack.remove(key)
         self._cache_stack.append(key)
 
-        return self.ModelLocker(self, key, cache_entry.model, gpu_load)
+        return self.ModelLocker(self, key, cache_entry.model, gpu_load, cache_entry.size)
 
     class ModelLocker(object):
-        def __init__(self, cache, key, model, gpu_load):
+        def __init__(self, cache, key, model, gpu_load, size_needed):
+            '''
+            :param cache: The model_cache object
+            :param key: The key of the model to lock in GPU
+            :param model: The model to lock
+            :param gpu_load: True if load into gpu
+            :param size_needed: Size of the model to load
+            '''
             self.gpu_load = gpu_load
             self.cache = cache
             self.key = key
             self.model = model
+            self.size_needed = size_needed
             self.cache_entry = self.cache._cached_models[self.key]
 
         def __enter__(self) -> Any:
@@ -234,7 +233,7 @@ class ModelCache(object):
 
                 try:
                     if self.cache.lazy_offloading:
-                       self.cache._offload_unlocked_models()
+                       self.cache._offload_unlocked_models(self.size_needed)
                        
                     if self.model.device != self.cache.execution_device:
                         self.cache.logger.debug(f'Moving {self.key} into {self.cache.execution_device}')
@@ -349,12 +348,20 @@ class ModelCache(object):
 
         self.logger.debug(f"After unloading: cached_models={len(self._cached_models)}")
 
-
-    def _offload_unlocked_models(self):
-        for model_key, cache_entry in self._cached_models.items():
+    def _offload_unlocked_models(self, size_needed: int=0):
+        reserved = self.max_vram_cache_size * GIG
+        vram_in_use = torch.cuda.memory_allocated()
+        self.logger.debug(f'{(vram_in_use/GIG):.2f}GB VRAM used for models; max allowed={(reserved/GIG):.2f}GB')
+        for model_key, cache_entry in sorted(self._cached_models.items(), key=lambda x:x[1].size):
+            if vram_in_use <= reserved:
+                break
             if not cache_entry.locked and cache_entry.loaded:
                 self.logger.debug(f'Offloading {model_key} from {self.execution_device} into {self.storage_device}')
-                cache_entry.model.to(self.storage_device)
+                with VRAMUsage() as mem:
+                    cache_entry.model.to(self.storage_device)
+                self.logger.debug(f'GPU VRAM freed: {(mem.vram_used/GIG):.2f} GB')
+                vram_in_use += mem.vram_used  # note vram_used is negative
+                self.logger.debug(f'{(vram_in_use/GIG):.2f}GB VRAM used for models; max allowed={(reserved/GIG):.2f}GB')
         
     def _local_model_hash(self, model_path: Union[str, Path]) -> str:
         sha = hashlib.sha256()

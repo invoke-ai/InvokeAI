@@ -1,7 +1,7 @@
 import { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { ImageDTO } from 'services/api';
+import { ImageDTO } from 'services/api/types';
 import {
   ControlNetProcessorType,
   RequiredCannyImageProcessorInvocation,
@@ -13,10 +13,16 @@ import {
   ControlNetModelName,
 } from './constants';
 import { controlNetImageProcessed } from './actions';
-import { imageDeleted, imageUrlsReceived } from 'services/thunks/image';
+import { imageDeleted, imageUrlsReceived } from 'services/api/thunks/image';
 import { forEach } from 'lodash-es';
-import { isAnySessionRejected } from 'services/thunks/session';
+import { isAnySessionRejected } from 'services/api/thunks/session';
 import { appSocketInvocationError } from 'services/events/actions';
+
+export type ControlModes =
+  | 'balanced'
+  | 'more_prompt'
+  | 'more_control'
+  | 'unbalanced';
 
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   isEnabled: true,
@@ -24,6 +30,7 @@ export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   weight: 1,
   beginStepPct: 0,
   endStepPct: 1,
+  controlMode: 'balanced',
   controlImage: null,
   processedControlImage: null,
   processorType: 'canny_image_processor',
@@ -39,6 +46,7 @@ export type ControlNetConfig = {
   weight: number;
   beginStepPct: number;
   endStepPct: number;
+  controlMode: ControlModes;
   controlImage: string | null;
   processedControlImage: string | null;
   processorType: ControlNetProcessorType;
@@ -181,6 +189,13 @@ export const controlNetSlice = createSlice({
       const { controlNetId, endStepPct } = action.payload;
       state.controlNets[controlNetId].endStepPct = endStepPct;
     },
+    controlNetControlModeChanged: (
+      state,
+      action: PayloadAction<{ controlNetId: string; controlMode: ControlModes }>
+    ) => {
+      const { controlNetId, controlMode } = action.payload;
+      state.controlNets[controlNetId].controlMode = controlMode;
+    },
     controlNetProcessorParamsChanged: (
       state,
       action: PayloadAction<{
@@ -258,13 +273,13 @@ export const controlNetSlice = createSlice({
 
     builder.addCase(imageDeleted.pending, (state, action) => {
       // Preemptively remove the image from the gallery
-      const { imageName } = action.meta.arg;
+      const { image_name } = action.meta.arg;
       forEach(state.controlNets, (c) => {
-        if (c.controlImage === imageName) {
+        if (c.controlImage === image_name) {
           c.controlImage = null;
           c.processedControlImage = null;
         }
-        if (c.processedControlImage === imageName) {
+        if (c.processedControlImage === image_name) {
           c.processedControlImage = null;
         }
       });
@@ -307,6 +322,7 @@ export const {
   controlNetWeightChanged,
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
+  controlNetControlModeChanged,
   controlNetProcessorParamsChanged,
   controlNetProcessorTypeChanged,
   controlNetReset,

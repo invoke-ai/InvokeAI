@@ -4,77 +4,12 @@ title: Prompting-Features
 
 # :octicons-command-palette-24: Prompting-Features
 
-## **Reading Prompts from a File**
-
-You can automate `invoke.py` by providing a text file with the prompts you want
-to run, one line per prompt. The text file must be composed with a text editor
-(e.g. Notepad) and not a word processor. Each line should look like what you
-would type at the invoke> prompt:
-
-```bash
-"a beautiful sunny day in the park, children playing" -n4 -C10
-"stormy weather on a mountain top, goats grazing" -s100
-"innovative packaging for a squid's dinner" -S137038382
-```
-
-Then pass this file's name to `invoke.py` when you invoke it:
-
-```bash
-python scripts/invoke.py --from_file "/path/to/prompts.txt"
-```
-
-You may also read a series of prompts from standard input by providing
-a filename of `-`. For example, here is a python script that creates a
-matrix of prompts, each one varying slightly:
-
-```bash
-#!/usr/bin/env python
-
-adjectives = ['sunny','rainy','overcast']
-samplers = ['k_lms','k_euler_a','k_heun']
-cfg = [7.5, 9, 11]
-
-for adj in adjectives:
-    for samp in samplers:
-        for cg in cfg:
-            print(f'a {adj} day -A{samp} -C{cg}')
-```
-
-Its output looks like this (abbreviated):
-
-```bash
-a sunny day -Aklms -C7.5
-a sunny day -Aklms -C9
-a sunny day -Aklms -C11
-a sunny day -Ak_euler_a -C7.5
-a sunny day -Ak_euler_a -C9
-...
-a overcast day -Ak_heun -C9
-a overcast day -Ak_heun -C11
-```
-
-To feed it to invoke.py, pass the filename of "-"
-
-```bash
-python matrix.py | python scripts/invoke.py --from_file -
-```
-
-When the script is finished, each of the 27 combinations
-of adjective, sampler and CFG will be executed.
-
-The command-line interface provides `!fetch` and `!replay` commands
-which allow you to read the prompts from a single previously-generated
-image or a whole directory of them, write the prompts to a file, and
-then replay them. Or you can create your own file of prompts and feed
-them to the command-line client from within an interactive session.
-See [Command-Line Interface](CLI.md) for details.
-
----
-
 ## **Negative and Unconditioned Prompts**
 
-Any words between a pair of square brackets will instruct Stable Diffusion to
-attempt to ban the concept from the generated image.
+Any words between a pair of square brackets will instruct Stable
+Diffusion to attempt to ban the concept from the generated image. The
+same effect is achieved by placing words in the "Negative Prompts"
+textbox in the Web UI.
 
 ```text
 this is a test prompt [not really] to make you understand [cool] how this works.
@@ -87,7 +22,9 @@ Here's a prompt that depicts what it does.
 
 original prompt:
 
-`#!bash "A fantastical translucent pony made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
+`#!bash "A fantastical translucent pony made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve"`
+
+`#!bash parameters: steps=20, dimensions=512x768, CFG=7.5, Scheduler=k_euler_a, seed=1654590180`
 
 <figure markdown>
 
@@ -99,7 +36,8 @@ That image has a woman, so if we want the horse without a rider, we can
 influence the image not to have a woman by putting [woman] in the prompt, like
 this:
 
-`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman]" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
+`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman]"`
+(same parameters as above)
 
 <figure markdown>
 
@@ -110,7 +48,8 @@ this:
 That's nice - but say we also don't want the image to be quite so blue. We can
 add "blue" to the list of negative prompts, so it's now [woman blue]:
 
-`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue]" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
+`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue]"`
+(same parameters as above)
 
 <figure markdown>
 
@@ -121,7 +60,8 @@ add "blue" to the list of negative prompts, so it's now [woman blue]:
 Getting close - but there's no sense in having a saddle when our horse doesn't
 have a rider, so we'll add one more negative prompt: [woman blue saddle].
 
-`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue saddle]" -s 20 -W 512 -H 768 -C 7.5 -A k_euler_a -S 1654590180`
+`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue saddle]"`
+(same parameters as above)
 
 <figure markdown>
 
@@ -261,19 +201,6 @@ Prompt2prompt `.swap()` is not compatible with xformers, which will be temporari
 The `prompt2prompt` code is based off
 [bloc97's colab](https://github.com/bloc97/CrossAttentionControl).
 
-Note that `prompt2prompt` is not currently working with the runwayML inpainting
-model, and may never work due to the way this model is set up. If you attempt to
-use `prompt2prompt` you will get the original image back. However, since this
-model is so good at inpainting, a good substitute is to use the `clipseg` text
-masking option:
-
-```bash
-invoke> a fluffy cat eating a hotdog
-Outputs:
-[1010] outputs/000025.2182095108.png: a fluffy cat eating a hotdog
-invoke> a smiling dog eating a hotdog -I 000025.2182095108.png -tm cat
-```
-
 ### Escaping parantheses () and speech marks ""
 
 If the model you are using has parentheses () or speech marks "" as part of its
@@ -374,6 +301,48 @@ summoning up the concept of some sort of scifi creature? Let's find out.
 Indeed, removing the word "hybrid" produces an image that is more like what we'd
 expect.
 
-In conclusion, prompt blending is great for exploring creative space, but can be
-difficult to direct. A forthcoming release of InvokeAI will feature more
-deterministic prompt weighting.
+## Dynamic Prompts
+
+Dynamic Prompts are a powerful feature designed to produce a variety of prompts based on user-defined options. Using a special syntax, you can construct a prompt with multiple possibilities, and the system will automatically generate a series of permutations based on your settings. This is extremely beneficial for ideation, exploring various scenarios, or testing different concepts swiftly and efficiently.
+
+### Structure of a Dynamic Prompt
+
+A Dynamic Prompt comprises of regular text, supplemented with alternatives enclosed within curly braces {} and separated by a vertical bar |. For example: {option1|option2|option3}. The system will then select one of the options to include in the final prompt. This flexible system allows for options to be placed throughout the text as needed.
+
+Furthermore, Dynamic Prompts can designate multiple selections from a single group of options. This feature is triggered by prefixing the options with a numerical value followed by $$. For example, in {2$$option1|option2|option3}, the system will select two distinct options from the set.
+### Creating Dynamic Prompts
+
+To create a Dynamic Prompt, follow these steps:
+
+    Draft your sentence or phrase, identifying words or phrases with multiple possible options.
+    Encapsulate the different options within curly braces {}.
+    Within the braces, separate each option using a vertical bar |.
+    If you want to include multiple options from a single group, prefix with the desired number and $$.
+
+For instance: A {house|apartment|lodge|cottage} in {summer|winter|autumn|spring} designed in {2$$style1|style2|style3}.
+### How Dynamic Prompts Work
+
+Once a Dynamic Prompt is configured, the system generates an array of combinations using the options provided. Each group of options in curly braces is treated independently, with the system selecting one option from each group. For a prefixed set (e.g., 2$$), the system will select two distinct options.
+
+For example, the following prompts could be generated from the above Dynamic Prompt:
+
+    A house in summer designed in style1, style2
+    A lodge in autumn designed in style3, style1
+    A cottage in winter designed in style2, style3
+    And many more!
+
+When the `Combinatorial` setting is on, Invoke will disable the "Images" selection, and generate every combination up until the setting for Max Prompts is reached.
+When the `Combinatorial` setting is off, Invoke will randomly generate combinations up until the setting for Images has been reached.
+
+
+
+### Tips and Tricks for Using Dynamic Prompts
+
+Below are some useful strategies for creating Dynamic Prompts:
+
+    Utilize Dynamic Prompts to generate a wide spectrum of prompts, perfect for brainstorming and exploring diverse ideas.
+    Ensure that the options within a group are contextually relevant to the part of the sentence where they are used. For instance, group building types together, and seasons together.
+    Apply the 2$$ prefix when you want to incorporate more than one option from a single group. This becomes quite handy when mixing and matching different elements.
+    Experiment with different quantities for the prefix. For example, 3$$ will select three distinct options.
+    Be aware of coherence in your prompts. Although the system can generate all possible combinations, not all may semantically make sense. Therefore, carefully choose the options for each group.
+    Always review and fine-tune the generated prompts as needed. While Dynamic Prompts can help you generate a multitude of combinations, the final polishing and refining remain in your hands.

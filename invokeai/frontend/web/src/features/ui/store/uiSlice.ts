@@ -1,14 +1,13 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName } from './tabMap';
 import { AddNewModelType, UIState } from './uiTypes';
-import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
 
 export const initialUIState: UIState = {
   activeTab: 0,
-  currentTheme: 'dark',
   shouldPinParametersPanel: true,
   shouldShowParametersPanel: true,
   shouldShowImageDetails: false,
@@ -20,6 +19,9 @@ export const initialUIState: UIState = {
   shouldShowGallery: true,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
+  shouldShowEmbeddingPicker: false,
+  shouldShowAdvancedOptions: false,
+  aspectRatio: null,
   favoriteSchedulers: [],
 };
 
@@ -29,9 +31,6 @@ export const uiSlice = createSlice({
   reducers: {
     setActiveTab: (state, action: PayloadAction<number | InvokeTabName>) => {
       setActiveTabReducer(state, action.payload);
-    },
-    setCurrentTheme: (state, action: PayloadAction<string>) => {
-      state.currentTheme = action.payload;
     },
     setShouldPinParametersPanel: (state, action: PayloadAction<boolean>) => {
       state.shouldPinParametersPanel = action.payload;
@@ -100,6 +99,15 @@ export const uiSlice = createSlice({
     ) => {
       state.favoriteSchedulers = action.payload;
     },
+    toggleEmbeddingPicker: (state) => {
+      state.shouldShowEmbeddingPicker = !state.shouldShowEmbeddingPicker;
+    },
+    setShouldShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowAdvancedOptions = action.payload;
+    },
+    setAspectRatio: (state, action: PayloadAction<number | null>) => {
+      state.aspectRatio = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
@@ -110,7 +118,6 @@ export const uiSlice = createSlice({
 
 export const {
   setActiveTab,
-  setCurrentTheme,
   setShouldPinParametersPanel,
   setShouldShowParametersPanel,
   setShouldShowImageDetails,
@@ -127,6 +134,9 @@ export const {
   toggleGalleryPanel,
   setShouldShowProgressInViewer,
   favoriteSchedulersChanged,
+  toggleEmbeddingPicker,
+  setShouldShowAdvancedOptions,
+  setAspectRatio,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

@@ -1,8 +1,6 @@
-import { Box } from '@chakra-ui/react';
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import randomInt from 'common/util/randomInt';
 import { setSeed } from 'features/parameters/store/generationSlice';
@@ -28,17 +26,5 @@ export default function ParamSeedShuffle() {
       onClick={handleClickRandomizeSeed}
       icon={<FaRandom />}
     />
-  );
-
-  return (
-    <IAIButton
-      size="sm"
-      isDisabled={shouldRandomizeSeed}
-      aria-label={t('parameters.shuffle')}
-      tooltip={t('parameters.shuffle')}
-      onClick={handleClickRandomizeSeed}
-    >
-      <Box px={2}> {t('parameters.shuffle')}</Box>
-    </IAIButton>
   );
 }

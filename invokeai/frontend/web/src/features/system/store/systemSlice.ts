@@ -4,9 +4,14 @@ import * as InvokeAI from 'app/types/invokeai';
 
 import { InvokeLogLevel } from 'app/logging/useLogger';
 import { userInvoked } from 'app/store/actions';
-import { parsedOpenAPISchema } from 'features/nodes/store/nodesSlice';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { TFuncKey, t } from 'i18next';
 import { LogLevelName } from 'roarr';
+import { imageUploaded } from 'services/api/thunks/image';
+import {
+  isAnySessionRejected,
+  sessionCanceled,
+} from 'services/api/thunks/session';
 import {
   appSocketConnected,
   appSocketDisconnected,
@@ -19,14 +24,10 @@ import {
   appSocketUnsubscribed,
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
-import { imageUploaded } from 'services/thunks/image';
-import { isAnySessionRejected, sessionCanceled } from 'services/thunks/session';
 import { makeToast } from '../../../app/components/Toaster';
 import { LANGUAGES } from '../components/LanguagePicker';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
-
-export type InfillMethod = 'tile' | 'patchmatch';
 
 export interface SystemState {
   isGFPGANAvailable: boolean;
@@ -84,10 +85,6 @@ export interface SystemState {
    * When a session is canceled, its ID is stored here until a new session is created.
    */
   canceledSession: string;
-  /**
-   * TODO: get this from backend
-   */
-  infillMethods: InfillMethod[];
   isPersisted: boolean;
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
@@ -125,7 +122,6 @@ export const initialSystemState: SystemState = {
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
   canceledSession: '',
-  infillMethods: ['tile', 'patchmatch'],
   isPersisted: false,
   language: 'en',
   isUploading: false,
@@ -362,7 +358,7 @@ export const systemSlice = createSlice({
      * Session Canceled - FULFILLED
      */
     builder.addCase(sessionCanceled.fulfilled, (state, action) => {
-      state.canceledSession = action.meta.arg.sessionId;
+      state.canceledSession = action.meta.arg.session_id;
       state.isProcessing = false;
       state.isCancelable = false;
       state.isCancelScheduled = false;
@@ -379,7 +375,7 @@ export const systemSlice = createSlice({
     /**
      * OpenAPI schema was parsed
      */
-    builder.addCase(parsedOpenAPISchema, (state) => {
+    builder.addCase(nodeTemplatesBuilt, (state) => {
       state.wasSchemaParsed = true;
     });
 

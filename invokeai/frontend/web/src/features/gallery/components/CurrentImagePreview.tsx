@@ -1,35 +1,35 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { uiSelector } from 'features/ui/store/uiSelectors';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
+import {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'app/components/ImageDnd/typesafeDnd';
+import { stateSelector } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySlice';
 import { isEqual } from 'lodash-es';
-
-import { gallerySelector } from '../store/gallerySelectors';
+import { memo, useMemo } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useNextPrevImage } from '../hooks/useNextPrevImage';
 import ImageMetadataViewer from './ImageMetaDataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from './NextPrevImageButtons';
-import { memo, useCallback } from 'react';
-import { systemSelector } from 'features/system/store/systemSelectors';
-import { imageSelected } from '../store/gallerySlice';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api';
-import { IAIImageLoadingFallback } from 'common/components/IAIImageFallback';
-import { useGetImageDTOQuery } from 'services/apiSlice';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 export const imagesSelector = createSelector(
-  [uiSelector, gallerySelector, systemSelector],
-  (ui, gallery, system) => {
+  [stateSelector, selectLastSelectedImage],
+  ({ ui, system }, lastSelectedImage) => {
     const {
       shouldShowImageDetails,
       shouldHidePreview,
       shouldShowProgressInViewer,
     } = ui;
-    const { selectedImage } = gallery;
     const { progressImage, shouldAntialiasProgressImage } = system;
     return {
       shouldShowImageDetails,
       shouldHidePreview,
-      selectedImage,
+      imageName: lastSelectedImage,
       progressImage,
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
@@ -45,33 +45,74 @@ export const imagesSelector = createSelector(
 const CurrentImagePreview = () => {
   const {
     shouldShowImageDetails,
-    selectedImage,
+    imageName,
     progressImage,
     shouldShowProgressInViewer,
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
 
-  // const image = useAppSelector((state: RootState) =>
-  //   selectImagesById(state, selectedImage ?? '')
-  // );
+  const {
+    handlePrevImage,
+    handleNextImage,
+    prevImageId,
+    nextImageId,
+    isOnLastImage,
+    handleLoadMoreImages,
+    areMoreImagesAvailable,
+    isFetching,
+  } = useNextPrevImage();
+
+  useHotkeys(
+    'left',
+    () => {
+      handlePrevImage();
+    },
+    [prevImageId]
+  );
+
+  useHotkeys(
+    'right',
+    () => {
+      if (isOnLastImage && areMoreImagesAvailable && !isFetching) {
+        handleLoadMoreImages();
+        return;
+      }
+      if (!isOnLastImage) {
+        handleNextImage();
+      }
+    },
+    [
+      nextImageId,
+      isOnLastImage,
+      areMoreImagesAvailable,
+      handleLoadMoreImages,
+      isFetching,
+    ]
+  );
 
   const {
-    data: image,
+    currentData: imageDTO,
     isLoading,
     isError,
     isSuccess,
-  } = useGetImageDTOQuery(selectedImage ?? skipToken);
+  } = useGetImageDTOQuery(imageName ?? skipToken);
 
-  const dispatch = useAppDispatch();
+  const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
+    if (imageDTO) {
+      return {
+        id: 'current-image',
+        payloadType: 'IMAGE_DTO',
+        payload: { imageDTO },
+      };
+    }
+  }, [imageDTO]);
 
-  const handleDrop = useCallback(
-    (droppedImage: ImageDTO) => {
-      if (droppedImage.image_name === image?.image_name) {
-        return;
-      }
-      dispatch(imageSelected(droppedImage.image_name));
-    },
-    [dispatch, image?.image_name]
+  const droppableData = useMemo<TypesafeDroppableData | undefined>(
+    () => ({
+      id: 'current-image',
+      actionType: 'SET_CURRENT_IMAGE',
+    }),
+    []
   );
 
   return (
@@ -79,9 +120,9 @@ const CurrentImagePreview = () => {
       sx={{
         width: 'full',
         height: 'full',
-        position: 'relative',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
       }}
     >
       {progressImage && shouldShowProgressInViewer ? (
@@ -101,23 +142,16 @@ const CurrentImagePreview = () => {
           }}
         />
       ) : (
-        <Flex
-          sx={{
-            width: 'full',
-            height: 'full',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IAIDndImage
-            image={selectedImage && image ? image : undefined}
-            onDrop={handleDrop}
-            fallback={<IAIImageLoadingFallback sx={{ bg: 'none' }} />}
-            isUploadDisabled={true}
-          />
-        </Flex>
+        <IAIDndImage
+          imageDTO={imageDTO}
+          droppableData={droppableData}
+          draggableData={draggableData}
+          isUploadDisabled={true}
+          fitContainer
+          dropLabel="Set as Current Image"
+        />
       )}
-      {shouldShowImageDetails && image && selectedImage && (
+      {shouldShowImageDetails && imageDTO && (
         <Box
           sx={{
             position: 'absolute',
@@ -125,13 +159,12 @@ const CurrentImagePreview = () => {
             width: 'full',
             height: 'full',
             borderRadius: 'base',
-            overflow: 'scroll',
           }}
         >
-          <ImageMetadataViewer image={image} />
+          <ImageMetadataViewer image={imageDTO} />
         </Box>
       )}
-      {!shouldShowImageDetails && image && selectedImage && (
+      {!shouldShowImageDetails && imageDTO && (
         <Box
           sx={{
             position: 'absolute',

@@ -16,7 +16,6 @@ export type Rect = Coordinates & Dimensions;
 
 export interface UIState {
   activeTab: number;
-  currentTheme: string;
   shouldPinParametersPanel: boolean;
   shouldShowParametersPanel: boolean;
   shouldShowImageDetails: boolean;
@@ -28,5 +27,8 @@ export interface UIState {
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
   shouldShowProgressInViewer: boolean;
+  shouldShowEmbeddingPicker: boolean;
+  shouldShowAdvancedOptions: boolean;
+  aspectRatio: number | null;
   favoriteSchedulers: SchedulerParam[];
 }
