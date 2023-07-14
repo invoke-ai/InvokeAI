@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useConvertMainModelsMutation } from 'services/api/endpoints/models';
-import { CheckpointModelConfig } from './CheckpointModelEdit';
+import { CheckpointModelConfig } from 'services/api/types';
 
 interface ModelConvertProps {
   model: CheckpointModelConfig;
@@ -21,8 +21,7 @@ export default function ModelConvert(props: ModelConvertProps) {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const [convertModel, { isLoading, error, data }] =
-    useConvertMainModelsMutation();
+  const [convertModel, { isLoading }] = useConvertMainModelsMutation();
 
   const [saveLocation, setSaveLocation] = useState<string>('same');
   const [customSaveLocation, setCustomSaveLocation] = useState<string>('');
@@ -42,7 +41,7 @@ export default function ModelConvert(props: ModelConvertProps) {
     };
     convertModel(responseBody)
       .unwrap()
-      .then((payload) => {
+      .then((_) => {
         dispatch(
           addToast(
             makeToast({
@@ -52,7 +51,7 @@ export default function ModelConvert(props: ModelConvertProps) {
           )
         );
       })
-      .catch((error) => {
+      .catch((_) => {
         dispatch(
           addToast(
             makeToast({

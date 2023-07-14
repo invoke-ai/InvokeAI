@@ -43,8 +43,7 @@ export default function MergeModelsPanel() {
 
   const { data } = useGetMainModelsQuery();
 
-  const [mergeModels, { isLoading, error, data: mergedModelData }] =
-    useMergeMainModelsMutation();
+  const [mergeModels, { isLoading }] = useMergeMainModelsMutation();
 
   const [baseModel, setBaseModel] = useState<BaseModelType>('sd-1');
 
@@ -134,29 +133,30 @@ export default function MergeModelsPanel() {
     mergeModels({
       base_model: baseModel,
       body: mergeModelsInfo,
-    });
-
-    if (error) {
-      dispatch(
-        addToast(
-          makeToast({
-            title: t('modelManager.modelsMergeFailed'),
-            status: 'error',
-          })
-        )
-      );
-    }
-
-    if (mergedModelData) {
-      dispatch(
-        addToast(
-          makeToast({
-            title: t('modelManager.modelsMerged'),
-            status: 'success',
-          })
-        )
-      );
-    }
+    })
+      .unwrap()
+      .then((_) => {
+        dispatch(
+          addToast(
+            makeToast({
+              title: t('modelManager.modelsMerged'),
+              status: 'success',
+            })
+          )
+        );
+      })
+      .catch((error) => {
+        if (error) {
+          dispatch(
+            addToast(
+              makeToast({
+                title: t('modelManager.modelsMergeFailed'),
+                status: 'error',
+              })
+            )
+          );
+        }
+      });
   };
 
   return (
