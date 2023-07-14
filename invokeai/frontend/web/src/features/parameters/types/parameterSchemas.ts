@@ -135,7 +135,7 @@ export type BaseModelParam = z.infer<typeof zBaseModel>;
  * TODO: Make this a dynamically generated enum?
  */
 export const zMainModel = z.object({
-  model_name: z.string(),
+  model_name: z.string().min(1),
   base_model: zBaseModel,
 });
 
@@ -152,8 +152,7 @@ export const isValidMainModel = (val: unknown): val is MainModelParam =>
  * Zod schema for VAE parameter
  */
 export const zVaeModel = z.object({
-  id: z.string(),
-  name: z.string(),
+  model_name: z.string().min(1),
   base_model: zBaseModel,
 });
 /**
@@ -169,8 +168,7 @@ export const isValidVaeModel = (val: unknown): val is VaeModelParam =>
  * Zod schema for LoRA
  */
 export const zLoRAModel = z.object({
-  id: z.string(),
-  model_name: z.string(),
+  model_name: z.string().min(1),
   base_model: zBaseModel,
 });
 /**

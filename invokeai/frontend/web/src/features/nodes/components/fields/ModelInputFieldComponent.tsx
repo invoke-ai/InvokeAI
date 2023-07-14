@@ -7,7 +7,7 @@ import {
 } from 'features/nodes/types/types';
 
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { forEach, isString } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,7 +39,7 @@ const ModelInputFieldComponent = (
       data.push({
         value: id,
         label: model.model_name,
-        group: BASE_MODEL_NAME_MAP[model.base_model],
+        group: MODEL_TYPE_MAP[model.base_model],
       });
     });
 
@@ -86,8 +86,7 @@ const ModelInputFieldComponent = (
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={
-        selectedModel?.base_model &&
-        BASE_MODEL_NAME_MAP[selectedModel?.base_model]
+        selectedModel?.base_model && MODEL_TYPE_MAP[selectedModel?.base_model]
       }
       value={field.value}
       placeholder="Pick one"

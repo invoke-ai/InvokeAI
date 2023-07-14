@@ -1,4 +1,4 @@
-import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
+import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
 
 export type AddNewModelType = 'ckpt' | 'diffusers' | null;
 

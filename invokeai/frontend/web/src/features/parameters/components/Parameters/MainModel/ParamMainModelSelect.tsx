@@ -8,27 +8,23 @@ import { SelectItem } from '@mantine/core';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { modelIdToMainModelField } from 'features/nodes/util/modelIdToMainModelField';
 import { modelSelected } from 'features/parameters/store/actions';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
 import { forEach } from 'lodash-es';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
-export const MODEL_TYPE_MAP = {
-  'sd-1': 'Stable Diffusion 1.x',
-  'sd-2': 'Stable Diffusion 2.x',
-};
-
 const selector = createSelector(
   stateSelector,
-  (state) => ({ currentModel: state.generation.model }),
+  (state) => ({ model: state.generation.model }),
   defaultSelectorOptions
 );
 
-const ModelSelect = () => {
+const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { currentModel } = useAppSelector(selector);
+  const { model } = useAppSelector(selector);
 
   const { data: mainModels, isLoading } = useGetMainModelsQuery();
 
@@ -54,12 +50,13 @@ const ModelSelect = () => {
     return data;
   }, [mainModels]);
 
+  // grab the full model entity from the RTK Query cache
+  // TODO: maybe we should just store the full model entity in state?
   const selectedModel = useMemo(
     () =>
-      mainModels?.entities[
-        `${currentModel?.base_model}/main/${currentModel?.model_name}`
-      ],
-    [mainModels?.entities, currentModel]
+      mainModels?.entities[`${model?.base_model}/main/${model?.model_name}`] ??
+      null,
+    [mainModels?.entities, model]
   );
 
   const handleChangeModel = useCallback(
@@ -68,8 +65,13 @@ const ModelSelect = () => {
         return;
       }
 
-      const modelField = modelIdToMainModelField(v);
-      dispatch(modelSelected(modelField));
+      const newModel = modelIdToMainModelParam(v);
+
+      if (!newModel) {
+        return;
+      }
+
+      dispatch(modelSelected(newModel));
     },
     [dispatch]
   );
@@ -95,4 +97,4 @@ const ModelSelect = () => {
   );
 };
 
-export default memo(ModelSelect);
+export default memo(ParamMainModelSelect);
