@@ -20,7 +20,7 @@ export const boardsApi = api.injectEndpoints({
       query: (arg) => ({ url: 'boards/', params: arg }),
       providesTags: (result, error, arg) => {
         // any list of boards
-        const tags: ApiFullTagDescription[] = [{ id: 'Board', type: LIST_TAG }];
+        const tags: ApiFullTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
 
         if (result) {
           // and individual tags for each board
@@ -43,7 +43,7 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result, error, arg) => {
         // any list of boards
-        const tags: ApiFullTagDescription[] = [{ id: 'Board', type: LIST_TAG }];
+        const tags: ApiFullTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
 
         if (result) {
           // and individual tags for each board
@@ -69,7 +69,7 @@ export const boardsApi = api.injectEndpoints({
         method: 'POST',
         params: { board_name },
       }),
-      invalidatesTags: [{ id: 'Board', type: LIST_TAG }],
+      invalidatesTags: [{ type: 'Board', id: LIST_TAG }],
     }),
 
     updateBoard: build.mutation<BoardDTO, UpdateBoardArg>({
@@ -87,8 +87,15 @@ export const boardsApi = api.injectEndpoints({
       invalidatesTags: (result, error, arg) => [{ type: 'Board', id: arg }],
     }),
     deleteBoardAndImages: build.mutation<void, string>({
-      query: (board_id) => ({ url: `boards/${board_id}`, method: 'DELETE', params: { include_images: true } }),
-      invalidatesTags: (result, error, arg) => [{ type: 'Board', id: arg }, { type: 'Image', id: LIST_TAG }],
+      query: (board_id) => ({
+        url: `boards/${board_id}`,
+        method: 'DELETE',
+        params: { include_images: true },
+      }),
+      invalidatesTags: (result, error, arg) => [
+        { type: 'Board', id: arg },
+        { type: 'Image', id: LIST_TAG },
+      ],
     }),
   }),
 });
@@ -99,5 +106,5 @@ export const {
   useCreateBoardMutation,
   useUpdateBoardMutation,
   useDeleteBoardMutation,
-  useDeleteBoardAndImagesMutation
+  useDeleteBoardAndImagesMutation,
 } = boardsApi;

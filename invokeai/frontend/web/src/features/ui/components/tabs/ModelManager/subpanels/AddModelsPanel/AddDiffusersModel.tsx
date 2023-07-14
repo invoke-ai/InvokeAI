@@ -66,13 +66,13 @@ export default function AddDiffusersModel() {
   };
 
   return (
-    <Flex overflow="scroll" maxHeight={window.innerHeight - 270}>
+    <Flex overflow="scroll" maxHeight={window.innerHeight - 270} width="100%">
       <Formik
         initialValues={addModelFormValues}
         onSubmit={addModelFormSubmitHandler}
       >
         {({ handleSubmit, errors, touched }) => (
-          <IAIForm onSubmit={handleSubmit}>
+          <IAIForm onSubmit={handleSubmit} w="full">
             <VStack rowGap={2}>
               <IAIFormItemWrapper>
                 {/* Name */}
@@ -90,7 +90,6 @@ export default function AddDiffusersModel() {
                       name="name"
                       type="text"
                       validate={baseValidation}
-                      width="2xl"
                       isRequired
                     />
                     {!!errors.name && touched.name ? (
@@ -119,7 +118,6 @@ export default function AddDiffusersModel() {
                       id="description"
                       name="description"
                       type="text"
-                      width="2xl"
                       isRequired
                     />
                     {!!errors.description && touched.description ? (
@@ -153,13 +151,7 @@ export default function AddDiffusersModel() {
                     {t('modelManager.modelLocation')}
                   </FormLabel>
                   <VStack alignItems="start">
-                    <Field
-                      as={IAIInput}
-                      id="path"
-                      name="path"
-                      type="text"
-                      width="2xl"
-                    />
+                    <Field as={IAIInput} id="path" name="path" type="text" />
                     {!!errors.path && touched.path ? (
                       <FormErrorMessage>{errors.path}</FormErrorMessage>
                     ) : (
@@ -181,7 +173,6 @@ export default function AddDiffusersModel() {
                       id="repo_id"
                       name="repo_id"
                       type="text"
-                      width="2xl"
                     />
                     {!!errors.repo_id && touched.repo_id ? (
                       <FormErrorMessage>{errors.repo_id}</FormErrorMessage>
@@ -220,7 +211,6 @@ export default function AddDiffusersModel() {
                       id="vae.path"
                       name="vae.path"
                       type="text"
-                      width="2xl"
                     />
                     {!!errors.vae?.path && touched.vae?.path ? (
                       <FormErrorMessage>{errors.vae?.path}</FormErrorMessage>
@@ -245,7 +235,6 @@ export default function AddDiffusersModel() {
                       id="vae.repo_id"
                       name="vae.repo_id"
                       type="text"
-                      width="2xl"
                     />
                     {!!errors.vae?.repo_id && touched.vae?.repo_id ? (
                       <FormErrorMessage>{errors.vae?.repo_id}</FormErrorMessage>

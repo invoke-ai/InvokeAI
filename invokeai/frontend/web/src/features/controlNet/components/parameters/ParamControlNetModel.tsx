@@ -1,8 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIMantineSelect, {
+import IAIMantineSearchableSelect, {
   IAISelectDataType,
-} from 'common/components/IAIMantineSelect';
+} from 'common/components/IAIMantineSearchableSelect';
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import {
   CONTROLNET_MODELS,
@@ -48,7 +48,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   );
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       data={controlNetModels}
       value={model}
       onChange={handleModelChanged}

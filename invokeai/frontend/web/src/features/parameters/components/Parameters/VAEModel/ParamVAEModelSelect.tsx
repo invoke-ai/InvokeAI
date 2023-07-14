@@ -2,7 +2,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 
 import { SelectItem } from '@mantine/core';
 import { forEach } from 'lodash-es';
@@ -92,7 +92,7 @@ const ParamVAEModelSelect = () => {
   );
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       itemComponent={IAIMantineSelectItemWithTooltip}
       tooltip={selectedVaeModel?.description}
       label={t('modelManager.vae')}
