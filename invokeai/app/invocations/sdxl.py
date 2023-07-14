@@ -101,6 +101,11 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
         cross_attention_kwargs = None
         with unet_info as unet:
 
+            if "generator" in set(inspect.signature(scheduler.step).parameters.keys()):
+                extra_step_kwargs.update(
+                    generator=torch.Generator(device=unet.device).manual_seed(0),
+                )
+
             if not context.services.configuration.sequential_guidance:
                 prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
                 add_text_embeds = torch.cat([negative_pooled_prompt_embeds, pooled_prompt_embeds], dim=0)
