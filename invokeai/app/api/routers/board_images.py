@@ -79,7 +79,7 @@ async def get_all_board_images_for_board(
 
 
 @board_images_router.post(
-    "/{board_id}/images",
+    "/{board_id}/add_images",
     operation_id="create_multiple_board_images",
     responses={
         201: {"description": "The images were added to the board successfully"},
@@ -101,7 +101,7 @@ async def create_multiple_board_images(
 
 
 @board_images_router.post(
-    "/{board_id}/images",
+    "/{board_id}/remove_images",
     operation_id="delete_multiple_board_images",
     responses={
         201: {"description": "The images were removed from their boards successfully"},
