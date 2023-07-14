@@ -30,10 +30,15 @@ const baseModelTypeSelectData = [
   { label: 'Stable Diffusion 2', value: 'sd-2' },
 ];
 
+type MergeInterpolationMethods =
+  | 'weighted_sum'
+  | 'sigmoid'
+  | 'inv_sigmoid'
+  | 'add_difference';
+
 export default function MergeModelsPanel() {
   const { t } = useTranslation();
   const { colorMode } = useColorMode();
-
   const dispatch = useAppDispatch();
 
   const { data } = useGetMainModelsQuery();
@@ -74,9 +79,8 @@ export default function MergeModelsPanel() {
   const [mergedModelName, setMergedModelName] = useState<string>('');
   const [modelMergeAlpha, setModelMergeAlpha] = useState<number>(0.5);
 
-  const [modelMergeInterp, setModelMergeInterp] = useState<
-    'weighted_sum' | 'sigmoid' | 'inv_sigmoid' | 'add_difference'
-  >('weighted_sum');
+  const [modelMergeInterp, setModelMergeInterp] =
+    useState<MergeInterpolationMethods>('weighted_sum');
 
   const [modelMergeSaveLocType, setModelMergeSaveLocType] = useState<
     'root' | 'custom'
@@ -256,9 +260,7 @@ export default function MergeModelsPanel() {
         </Text>
         <RadioGroup
           value={modelMergeInterp}
-          onChange={(
-            v: 'weighted_sum' | 'sigmoid' | 'inv_sigmoid' | 'add_difference'
-          ) => setModelMergeInterp(v)}
+          onChange={(v: MergeInterpolationMethods) => setModelMergeInterp(v)}
         >
           <Flex columnGap={4}>
             {modelThree === null ? (
