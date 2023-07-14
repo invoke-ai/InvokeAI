@@ -5,8 +5,8 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  VaeModelInputFieldTemplate,
-  VaeModelInputFieldValue,
+  LoRAModelInputFieldTemplate,
+  LoRAModelInputFieldValue,
 } from 'features/nodes/types/types';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToLoRAModelParam } from 'features/parameters/util/modelIdToLoRAModelParam';
@@ -17,8 +17,8 @@ import { FieldComponentProps } from './types';
 
 const LoRAModelInputFieldComponent = (
   props: FieldComponentProps<
-    VaeModelInputFieldValue,
-    VaeModelInputFieldTemplate
+    LoRAModelInputFieldValue,
+    LoRAModelInputFieldTemplate
   >
 ) => {
   const { nodeId, field } = props;

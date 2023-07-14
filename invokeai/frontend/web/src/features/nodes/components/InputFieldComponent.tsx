@@ -16,8 +16,7 @@ import LoRAModelInputFieldComponent from './fields/LoRAModelInputFieldComponent'
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
-import UNetInputFieldComponent from './fields/UNetInputFieldComponent';
-import VaeInputFieldComponent from './fields/VaeInputFieldComponent';
+import UnetInputFieldComponent from './fields/UnetInputFieldComponent';
 import VaeModelInputFieldComponent from './fields/VaeModelInputFieldComponent';
 
 type InputFieldComponentProps = {
@@ -106,7 +105,7 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
 
   if (type === 'unet' && template.type === 'unet') {
     return (
-      <UNetInputFieldComponent
+      <UnetInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}
@@ -124,9 +123,9 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
     );
   }
 
-  if (type === 'vae' && template.type === 'vae') {
+  if (type === 'vae_model' && template.type === 'vae_model') {
     return (
-      <VaeInputFieldComponent
+      <VaeModelInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}

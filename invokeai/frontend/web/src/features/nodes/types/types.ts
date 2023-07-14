@@ -94,7 +94,7 @@ export type InputFieldValue =
   | ConditioningInputFieldValue
   | UNetInputFieldValue
   | ClipInputFieldValue
-  | VaeInputFieldValue
+  | VaeModelInputFieldValue
   | ControlInputFieldValue
   | EnumInputFieldValue
   | MainModelInputFieldValue
@@ -121,7 +121,7 @@ export type InputFieldTemplate =
   | ConditioningInputFieldTemplate
   | UNetInputFieldTemplate
   | ClipInputFieldTemplate
-  | VaeInputFieldTemplate
+  | VaeModelInputFieldTemplate
   | ControlInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
