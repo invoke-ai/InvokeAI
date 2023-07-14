@@ -256,6 +256,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         widgets = dict()
         model_list = [x for x in self.all_models if self.all_models[x].model_type==model_type and not x in exclude]
         model_labels = [self.model_labels[x] for x in model_list]
+
+        show_recommended = len(self.installed_models)==0
         if len(model_list) > 0:
             max_width = max([len(x) for x in model_labels])
             columns = window_width // (max_width+8)  # 8 characters for "[x] " and padding
@@ -280,7 +282,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                     value=[
                         model_list.index(x)
                         for x in model_list
-                        if self.all_models[x].installed
+                        if (show_recommended and self.all_models[x].recommended) \
+                            or self.all_models[x].installed
                     ],
                     max_height=len(model_list)//columns + 1,
                     relx=4,
@@ -773,7 +776,7 @@ def main():
     config.parse_args(invoke_args)
     logger = InvokeAILogger().getLogger(config=config)
 
-    if not (config.conf_path / 'models.yaml').exists():
+    if not config.model_conf_path.exists():
         logger.info(
             "Your InvokeAI root directory is not set up. Calling invokeai-configure."
         )

@@ -227,45 +227,25 @@ def download_conversion_models():
 # ---------------------------------------------
 def download_realesrgan():
     logger.info("Installing models from RealESRGAN...")
-    model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
-    wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
-
-    model_dest = config.root_path / "models/core/upscaling/realesrgan/realesr-general-x4v3.pth"
-    wdn_model_dest = config.root_path / "models/core/upscaling/realesrgan/realesr-general-wdn-x4v3.pth"
-
-    download_with_progress_bar(model_url, str(model_dest), "RealESRGAN")
-    download_with_progress_bar(wdn_model_url, str(wdn_model_dest), "RealESRGANwdn")
-
-
-def download_gfpgan():
-    logger.info("Installing GFPGAN models...")
-    for model in (
-        [
-            "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
-            "./models/core/face_restoration/gfpgan/GFPGANv1.4.pth",
-        ],
-        [
-            "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
-            "./models/core/face_restoration/gfpgan/weights/detection_Resnet50_Final.pth",
-        ],
-        [
-            "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
-            "./models/core/face_restoration/gfpgan/weights/parsing_parsenet.pth",
-        ],
-    ):
-        model_url, model_dest = model[0], config.root_path / model[1]
-        download_with_progress_bar(model_url, str(model_dest), "GFPGAN weights")
-
-
-# ---------------------------------------------
-def download_codeformer():
-    logger.info("Installing CodeFormer model file...")
-    model_url = (
-        "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
-    )
-    model_dest = config.root_path / "models/core/face_restoration/codeformer/codeformer.pth"
-    download_with_progress_bar(model_url, str(model_dest), "CodeFormer")
-
+    URLs = [
+        dict(
+            url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+            dest = "core/upscaling/realesrgan/RealESRGAN_x4plus.pth",
+            description = "RealESRGAN X4 Plus",
+        ),
+        dict(
+            url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+            dest = "core/upscaling/realesrgan/RealESRGAN_x4plus_anime_6B.pth",
+            description = "RealESRGAN X4 Plus Anime 6B",
+        ),
+        dict(
+            url= "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+            dest= "core/upscaling/realesrgan/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+            description = "RealESRGAN X4 Official",
+        ),
+    ]
+    for model in URLs:
+        download_with_progress_bar(model['url'], config.models_path / model['dest'], model['description'])
 
 # ---------------------------------------------
 def download_clipseg():
@@ -281,8 +261,6 @@ def download_clipseg():
 
 def download_support_models():
     download_realesrgan()
-    download_gfpgan()
-    download_codeformer()
     download_clipseg()
     download_conversion_models()
 
