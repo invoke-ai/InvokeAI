@@ -74,27 +74,30 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
       model_name: retrievedModel.model_name,
       body: values,
     };
-    updateMainModel(responseBody);
-
-    if (error) {
-      dispatch(
-        addToast(
-          makeToast({
-            title: t('modelManager.modelUpdateFailed'),
-            status: 'success',
-          })
-        )
-      );
-    }
-
-    dispatch(
-      addToast(
-        makeToast({
-          title: t('modelManager.modelUpdated'),
-          status: 'success',
-        })
-      )
-    );
+    updateMainModel(responseBody)
+      .unwrap()
+      .then((payload) => {
+        checkpointEditForm.setValues(payload as CheckpointModelConfig);
+        dispatch(
+          addToast(
+            makeToast({
+              title: t('modelManager.modelUpdated'),
+              status: 'success',
+            })
+          )
+        );
+      })
+      .catch((error) => {
+        checkpointEditForm.reset();
+        dispatch(
+          addToast(
+            makeToast({
+              title: t('modelManager.modelUpdateFailed'),
+              status: 'error',
+            })
+          )
+        );
+      });
   };
 
   return modelToEdit ? (

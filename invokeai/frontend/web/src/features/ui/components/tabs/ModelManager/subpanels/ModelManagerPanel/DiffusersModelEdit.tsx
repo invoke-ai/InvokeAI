@@ -71,27 +71,30 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
       model_name: retrievedModel.model_name,
       body: values,
     };
-    updateMainModel(responseBody);
-
-    if (error) {
-      dispatch(
-        addToast(
-          makeToast({
-            title: t('modelManager.modelUpdateFailed'),
-            status: 'error',
-          })
-        )
-      );
-    }
-
-    dispatch(
-      addToast(
-        makeToast({
-          title: t('modelManager.modelUpdated'),
-          status: 'success',
-        })
-      )
-    );
+    updateMainModel(responseBody)
+      .unwrap()
+      .then((payload) => {
+        diffusersEditForm.setValues(payload as DiffusersModelConfig);
+        dispatch(
+          addToast(
+            makeToast({
+              title: t('modelManager.modelUpdated'),
+              status: 'success',
+            })
+          )
+        );
+      })
+      .catch((error) => {
+        diffusersEditForm.reset();
+        dispatch(
+          addToast(
+            makeToast({
+              title: t('modelManager.modelUpdateFailed'),
+              status: 'error',
+            })
+          )
+        );
+      });
   };
 
   return modelToEdit ? (
