@@ -1,8 +1,8 @@
-# Nodes Editor
+# Nodes Editor (Experimental Beta)
 
-The nodes editor is a blank canvas where you add modular node windows for image generation. The node processing flow is usually done from left to right, though linearity can become abstracted the more complex the node graph becomes. Nodes are connected via wires/noodles.
+The nodes editor is a blank canvas allowing for the use of individual functions and image transformations to control the image generation workflow. The node processing flow is usually done from left (inputs) to right (outputs), though linearity can become abstracted the more complex the node graph becomes. Nodes inputs and outputs are connected by dragging connectors from node to node.
 
-To better understand how nodes are used, think of how an electric power bar works. It takes in one input (electricity from a wall outlet) and passes it to multiple devices through multiple outputs. Similarly, a node could have multiple inputs and outputs functioning at the same (or different) time, but all node outputs pass information onward like a power bar passes electricity. Not all outputs are compatible with all inputs, however, much like a power bar can’t take in spaghetti noodles instead of electricity. In general, node outputs are colour-coded to match compatible inputs of other nodes.
+To better understand how nodes are used, think of how an electric power bar works. It takes in one input (electricity from a wall outlet) and passes it to multiple devices through multiple outputs. Similarly, a node could have multiple inputs and outputs functioning at the same (or different) time, but all node outputs pass information onward like a power bar passes electricity. Not all outputs are compatible with all inputs, however - Each node has different constraints on how it is expecting to input/output information. In general, node outputs are colour-coded to match compatible inputs of other nodes.
 
 ## Anatomy of a Node
 
@@ -33,7 +33,7 @@ Furthermore, a model provides the CLIP prompt tokenizer, the VAE, and a U-Net (w
 
 A noise scheduler (eg. DPM++ 2M Karras) schedules the subtraction of noise from the latent image across the sampler steps chosen (step 3 above). Less noise is usually subtracted at higher sampler steps. 
 
-## Node Types
+## Node Types (Base Nodes)
 
 | Node <img width=160 align="right"> | Function                                                                              |
 | ---------------------------------- | --------------------------------------------------------------------------------------|
