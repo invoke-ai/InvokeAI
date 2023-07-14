@@ -5,13 +5,15 @@ import { imagesApi } from './images';
 
 type ListBoardImagesArg =
   paths['/api/v1/board_images/{board_id}']['get']['parameters']['path'] &
-    paths['/api/v1/board_images/{board_id}']['get']['parameters']['query'];
+  paths['/api/v1/board_images/{board_id}']['get']['parameters']['query'];
 
 type AddImageToBoardArg =
-  paths['/api/v1/board_images/']['post']['requestBody']['content']['application/json'];
+  paths['/api/v1/board_images/{board_id}']['post']['parameters']['path'] &
+  { image_name: paths['/api/v1/board_images/{board_id}']['post']['requestBody']['content']['application/json'] };
 
 type RemoveImageFromBoardArg =
-  paths['/api/v1/board_images/']['delete']['requestBody']['content']['application/json'];
+  paths['/api/v1/board_images/{board_id}']['delete']['parameters']['path'] &
+  { image_name: paths['/api/v1/board_images/{board_id}']['delete']['requestBody']['content']['application/json'] };
 
 export const boardImagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -36,9 +38,9 @@ export const boardImagesApi = api.injectEndpoints({
 
     addImageToBoard: build.mutation<void, AddImageToBoardArg>({
       query: ({ board_id, image_name }) => ({
-        url: `board_images/`,
+        url: `board_images/${board_id}`,
         method: 'POST',
-        body: { board_id, image_name },
+        body: image_name,
       }),
       invalidatesTags: (result, error, arg) => [
         { type: 'Board', id: arg.board_id },
@@ -62,9 +64,9 @@ export const boardImagesApi = api.injectEndpoints({
 
     removeImageFromBoard: build.mutation<void, RemoveImageFromBoardArg>({
       query: ({ board_id, image_name }) => ({
-        url: `board_images/`,
+        url: `board_images/${board_id}`,
         method: 'DELETE',
-        body: { board_id, image_name },
+        body: image_name,
       }),
       invalidatesTags: (result, error, arg) => [
         { type: 'Board', id: arg.board_id },
