@@ -17,34 +17,22 @@ import {
   IMAGE_CATEGORIES,
   IMAGE_LIMIT,
   INITIAL_IMAGE_LIMIT,
-  selectImagesAll,
 } from 'features/gallery//store/gallerySlice';
-import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { receivedPageOfImages } from 'services/api/thunks/image';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
-import { useListBoardImagesQuery } from '../../../../services/api/endpoints/boardImages';
 import { useListImagesQuery } from '../../../../services/api/endpoints/images';
+import { ImageDTO } from '../../../../services/api/types';
 
 const selector = createSelector(
-  [stateSelector, selectFilteredImages],
-  (state, filteredImages) => {
-    const {
-      galleryImageMinimumWidth,
-      selectedBoardId,
-      galleryView,
-      total,
-      isLoading,
-    } = state.gallery;
+  [stateSelector],
+  (state) => {
+    const { selectedBoardId, galleryView } = state.gallery;
 
     return {
-      imageNames: filteredImages.map((i) => i.image_name),
-      total,
       selectedBoardId,
       galleryView,
-      galleryImageMinimumWidth,
-      isLoading,
     };
   },
   defaultSelectorOptions
@@ -55,6 +43,10 @@ const GalleryImageGrid = () => {
   const rootRef = useRef<HTMLDivElement>(null);
   const emptyGalleryRef = useRef<HTMLDivElement>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [limit, setLimit] = useState(INITIAL_IMAGE_LIMIT);
+  const [imageList, setImageList] = useState<ImageDTO[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(true);
   const [initialize, osInstance] = useOverlayScrollbars({
     defer: true,
     options: {
@@ -68,20 +60,17 @@ const GalleryImageGrid = () => {
     },
   });
 
-  const [didInitialFetch, setDidInitialFetch] = useState(false);
-
   const dispatch = useAppDispatch();
 
-  const {
-    galleryImageMinimumWidth,
-    imageNames: imageNamesAll, //all images names loaded on main tab,
-    total: totalAll,
-    selectedBoardId,
-    galleryView,
-    isLoading: isLoadingAll,
-  } = useAppSelector(selector);
+  const { selectedBoardId, galleryView } = useAppSelector(selector);
 
-  const { data: images, isLoading: isLoading } = useListImagesQuery({
+  useEffect(() => {
+    setImageList([]);
+    setOffset(0);
+    setLimit(INITIAL_IMAGE_LIMIT);
+  }, [selectedBoardId]);
+
+  const { data: imageListResponse, isLoading: isLoading } = useListImagesQuery({
     categories: galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
     is_intermediate: false,
     offset: 0,
@@ -89,45 +78,37 @@ const GalleryImageGrid = () => {
     ...(selectedBoardId === 'all' ? {} : { board_id: selectedBoardId }),
   });
 
-  // const imageNames = useMemo(() => {
-  //   if (selectedBoardId === 'all') {
-  //     return imageNamesAll; // already sorted by images/uploads in gallery selector
-  //   } else {
-  //     const categories =
-  //       galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES;
-  //     const imageList = (imagesForBoard?.items || []).filter((img) =>
-  //       categories.includes(img.image_category)
-  //     );
-  //     return imageList.map((img) => img.image_name);
-  //   }
-  // }, [selectedBoardId, galleryView, imagesForBoard, imageNamesAll]);
-
-  // const areMoreAvailable = useMemo(() => {
-  //   return selectedBoardId === 'all' ? totalAll > imageNamesAll.length : false;
-  // }, [selectedBoardId, imageNamesAll.length, totalAll]);
-
-  // const isLoading = useMemo(() => {
-  //   return selectedBoardId === 'all' ? isLoadingAll : isLoadingImagesForBoard;
-  // }, [selectedBoardId, isLoadingAll, isLoadingImagesForBoard]);
-
-  const handleLoadMoreImages = useCallback(() => {
-    dispatch(
-      receivedPageOfImages({
+  const { data: paginatedData, isLoading: isLoadingPaginated } =
+    useListImagesQuery(
+      {
         categories:
           galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
         is_intermediate: false,
-        offset: images?.items.length,
-        limit: IMAGE_LIMIT,
-      })
+        offset,
+        limit,
+        ...(selectedBoardId === 'all' ? {} : { board_id: selectedBoardId }),
+      },
+      { skip: offset === 0 }
     );
-  }, [dispatch, images?.items.length, galleryView]);
 
-  // const handleEndReached = useMemo(() => {
-  //   if (areMoreAvailable) {
-  //     return handleLoadMoreImages;
-  //   }
-  //   return undefined;
-  // }, [areMoreAvailable, handleLoadMoreImages]);
+  useEffect(() => {
+    if (imageListResponse) setImageList(imageListResponse.items);
+  }, [imageListResponse]);
+
+  useEffect(() => {
+    if (paginatedData) setImageList((i) => [...i, ...paginatedData.items]);
+  }, [paginatedData]);
+
+  const areMoreAvailable = useMemo(() => {
+    if (imageListResponse?.total) {
+      return imageListResponse?.total > imageList.length;
+    }
+  }, [imageListResponse?.total, imageList.length]);
+
+  const handleLoadMoreImages = useCallback(() => {
+    setOffset(imageList.length);
+    setLimit(IMAGE_LIMIT);
+  }, [imageList.length]);
 
   useEffect(() => {
     // Set up gallery scroler
@@ -143,7 +124,7 @@ const GalleryImageGrid = () => {
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
 
-  if (!isLoading && images?.items.length === 0) {
+  if (!isLoading && imageList.length === 0) {
     return (
       <Box ref={emptyGalleryRef} sx={{ w: 'full', h: 'full' }}>
         <IAINoContentFallback
@@ -153,15 +134,14 @@ const GalleryImageGrid = () => {
       </Box>
     );
   }
-  console.log({ selectedBoardId });
 
-  if (status !== 'rejected') {
+  if (!isLoading) {
     return (
       <>
         <Box ref={rootRef} data-overlayscrollbars="" h="100%">
           <VirtuosoGrid
             style={{ height: '100%' }}
-            data={images?.items || []}
+            data={imageList}
             components={{
               Item: ImageGridItemContainer,
               List: ImageGridListContainer,
@@ -177,14 +157,14 @@ const GalleryImageGrid = () => {
         </Box>
         <IAIButton
           onClick={handleLoadMoreImages}
-          // isDisabled={!areMoreAvailable}
+          isDisabled={!areMoreAvailable}
           isLoading={status === 'pending'}
           loadingText="Loading"
           flexShrink={0}
         >
-          {/* {areMoreAvailable
+          {areMoreAvailable
             ? t('gallery.loadMore')
-            : t('gallery.allImagesLoaded')} */}
+            : t('gallery.allImagesLoaded')}
         </IAIButton>
       </>
     );
