@@ -73,19 +73,13 @@ const GalleryImageGrid = () => {
     setLimit(INITIAL_IMAGE_LIMIT);
   }, [selectedBoardId]);
 
-  const BASE_QUERY = useMemo(() => {
-    return {
-      categories:
-        galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
-      is_intermediate: false,
-      offset: 0,
-      limit: INITIAL_IMAGE_LIMIT,
-      ...(selectedBoardId === 'all' ? {} : { board_id: selectedBoardId }),
-    };
-  }, [galleryView, selectedBoardId]);
-
-  const { data: imageListResponse, isLoading: isLoading } =
-    useListImagesQuery(BASE_QUERY);
+  const { data: imageListResponse, isLoading: isLoading } = useListImagesQuery({
+    categories: galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+    is_intermediate: false,
+    offset: 0,
+    limit: INITIAL_IMAGE_LIMIT,
+    ...(selectedBoardId === 'all' ? {} : { board_id: selectedBoardId }),
+  });
 
   const { data: paginatedData } = useListImagesQuery(
     {
@@ -108,7 +102,14 @@ const GalleryImageGrid = () => {
       dispatch(
         imagesApi.util.updateQueryData(
           'listImages',
-          BASE_QUERY,
+          {
+            categories:
+              galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+            is_intermediate: false,
+            offset: 0,
+            limit: INITIAL_IMAGE_LIMIT,
+            ...(selectedBoardId === 'all' ? {} : { board_id: selectedBoardId }),
+          },
           (draftPosts) => {
             paginatedData.items.forEach((item) => {
               draftPosts.items.push(item);
@@ -117,7 +118,8 @@ const GalleryImageGrid = () => {
         )
       );
     }
-  }, [paginatedData, dispatch, BASE_QUERY]);
+    //eslint-disable-next-line
+  }, [paginatedData, dispatch]);
 
   const areMoreAvailable = useMemo(() => {
     if (imageListResponse?.total) {
