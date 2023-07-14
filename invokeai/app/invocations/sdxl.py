@@ -84,6 +84,8 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
         scheduler.set_timesteps(self.steps)
         timesteps = scheduler.timesteps
 
+        latents = latents * scheduler.init_noise_sigma
+
         extra_step_kwargs = dict()
         if "eta" in set(inspect.signature(scheduler.step).parameters.keys()):
             extra_step_kwargs.update(
