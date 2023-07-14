@@ -9,7 +9,6 @@ const UNetInputFieldComponent = (
   props: FieldComponentProps<UNetInputFieldValue, UNetInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
-
   return null;
 };
 

@@ -5,14 +5,14 @@ import IAISlider from 'common/components/IAISlider';
 import { memo, useCallback } from 'react';
 import { FaTrash } from 'react-icons/fa';
 import {
-  Lora,
+  LoRA,
   loraRemoved,
   loraWeightChanged,
   loraWeightReset,
 } from '../store/loraSlice';
 
 type Props = {
-  lora: Lora;
+  lora: LoRA;
 };
 
 const ParamLora = (props: Props) => {

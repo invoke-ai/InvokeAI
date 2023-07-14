@@ -81,16 +81,18 @@ export const addDynamicPromptsToGraph = (
     );
 
     // hook up positive prompt to metadata
-    graph.edges.push({
-      source: {
-        node_id: ITERATE,
-        field: 'item',
-      },
-      destination: {
-        node_id: METADATA_ACCUMULATOR,
-        field: 'positive_prompt',
-      },
-    });
+    if (metadataAccumulator) {
+      graph.edges.push({
+        source: {
+          node_id: ITERATE,
+          field: 'item',
+        },
+        destination: {
+          node_id: METADATA_ACCUMULATOR,
+          field: 'positive_prompt',
+        },
+      });
+    }
 
     if (shouldRandomizeSeed) {
       // Random int node to generate the starting seed
@@ -107,10 +109,12 @@ export const addDynamicPromptsToGraph = (
         destination: { node_id: NOISE, field: 'seed' },
       });
 
-      graph.edges.push({
-        source: { node_id: RANDOM_INT, field: 'a' },
-        destination: { node_id: METADATA_ACCUMULATOR, field: 'seed' },
-      });
+      if (metadataAccumulator) {
+        graph.edges.push({
+          source: { node_id: RANDOM_INT, field: 'a' },
+          destination: { node_id: METADATA_ACCUMULATOR, field: 'seed' },
+        });
+      }
     } else {
       // User specified seed, so set the start of the range of size to the seed
       (graph.nodes[NOISE] as NoiseInvocation).seed = seed;
@@ -164,17 +168,18 @@ export const addDynamicPromptsToGraph = (
     });
 
     // hook up seed to metadata
-    graph.edges.push({
-      source: {
-        node_id: ITERATE,
-        field: 'item',
-      },
-      destination: {
-        node_id: METADATA_ACCUMULATOR,
-        field: 'seed',
-      },
-    });
-
+    if (metadataAccumulator) {
+      graph.edges.push({
+        source: {
+          node_id: ITERATE,
+          field: 'item',
+        },
+        destination: {
+          node_id: METADATA_ACCUMULATOR,
+          field: 'seed',
+        },
+      });
+    }
     // handle seed
     if (shouldRandomizeSeed) {
       // Random int node to generate the starting seed

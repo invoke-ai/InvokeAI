@@ -1,3 +1,8 @@
+import {
+  LoRAModelParam,
+  MainModelParam,
+  VaeModelParam,
+} from 'features/parameters/types/parameterSchemas';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Graph, ImageDTO, ImageField } from 'services/api/types';
@@ -92,7 +97,7 @@ export type InputFieldValue =
   | VaeInputFieldValue
   | ControlInputFieldValue
   | EnumInputFieldValue
-  | ModelInputFieldValue
+  | MainModelInputFieldValue
   | VaeModelInputFieldValue
   | LoRAModelInputFieldValue
   | ArrayInputFieldValue
@@ -229,19 +234,19 @@ export type ImageCollectionInputFieldValue = FieldValueBase & {
   value?: ImageField[];
 };
 
-export type ModelInputFieldValue = FieldValueBase & {
+export type MainModelInputFieldValue = FieldValueBase & {
   type: 'model';
-  value?: string;
+  value?: MainModelParam;
 };
 
 export type VaeModelInputFieldValue = FieldValueBase & {
   type: 'vae_model';
-  value?: string;
+  value?: VaeModelParam;
 };
 
 export type LoRAModelInputFieldValue = FieldValueBase & {
   type: 'lora_model';
-  value?: string;
+  value?: LoRAModelParam;
 };
 
 export type ArrayInputFieldValue = FieldValueBase & {
