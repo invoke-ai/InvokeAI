@@ -6,6 +6,7 @@ import {
   createApi,
   fetchBaseQuery,
 } from '@reduxjs/toolkit/query/react';
+import queryString from 'query-string';
 import { $authToken, $baseUrl } from 'services/api/client';
 
 export const tagTypes = ['Board', 'Image', 'ImageMetadata', 'Model'];
@@ -31,6 +32,9 @@ const dynamicBaseQuery: BaseQueryFn<
 
       return headers;
     },
+    paramsSerializer: (params: Record<string, any>) => {
+      return queryString.stringify(params, { arrayFormat: 'none' })
+    }
   });
 
   return rawBaseQuery(args, api, extraOptions);

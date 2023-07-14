@@ -1,6 +1,10 @@
-import { ApiFullTagDescription, api } from '..';
-import { components } from '../schema';
-import { ImageDTO } from '../types';
+import { ApiFullTagDescription, LIST_TAG, api } from '..';
+import { components, paths } from '../schema';
+import { ImageDTO, OffsetPaginatedResults_ImageDTO_ } from '../types';
+
+type ListImagesArg = NonNullable<
+  paths['/api/v1/images/']['get']['parameters']['query']
+>;
 
 /**
  * This is an unsafe type; the object inside is not guaranteed to be valid.
@@ -15,6 +19,25 @@ export const imagesApi = api.injectEndpoints({
     /**
      * Image Queries
      */
+    listImages: build.query<OffsetPaginatedResults_ImageDTO_, ListImagesArg>({
+      query: (arg) => ({ url: 'images/', params: arg }),
+      providesTags: (result, error, arg) => {
+        // any list of images
+        const tags: ApiFullTagDescription[] = [{ id: 'Image', type: LIST_TAG }];
+
+        if (result) {
+          // and individual tags for each image
+          tags.push(
+            ...result.items.map(({ image_name }) => ({
+              type: 'Image' as const,
+              id: image_name,
+            }))
+          );
+        }
+
+        return tags;
+      },
+    }),
     getImageDTO: build.query<ImageDTO, string>({
       query: (image_name) => ({ url: `images/${image_name}` }),
       providesTags: (result, error, arg) => {
@@ -39,4 +62,4 @@ export const imagesApi = api.injectEndpoints({
   }),
 });
 
-export const { useGetImageDTOQuery, useGetImageMetadataQuery } = imagesApi;
+export const { useGetImageDTOQuery, useGetImageMetadataQuery, useListImagesQuery } = imagesApi;
