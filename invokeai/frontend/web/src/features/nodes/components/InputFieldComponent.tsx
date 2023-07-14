@@ -17,6 +17,7 @@ import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
 import UnetInputFieldComponent from './fields/UnetInputFieldComponent';
+import VaeInputFieldComponent from './fields/VaeInputFieldComponent';
 import VaeModelInputFieldComponent from './fields/VaeModelInputFieldComponent';
 
 type InputFieldComponentProps = {
@@ -123,9 +124,9 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
     );
   }
 
-  if (type === 'vae_model' && template.type === 'vae_model') {
+  if (type === 'vae' && template.type === 'vae') {
     return (
-      <VaeModelInputFieldComponent
+      <VaeInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}
