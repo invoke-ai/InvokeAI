@@ -11,7 +11,11 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { modelIdToMainModelField } from 'features/nodes/util/modelIdToMainModelField';
 import { modelSelected } from 'features/parameters/store/actions';
 import { forEach } from 'lodash-es';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import {
+  useGetMainModelsQuery,
+  useGetOnnxModelsQuery,
+} from 'services/api/endpoints/models';
+import { modelIdToOnnxModelField } from 'features/nodes/util/modelIdToOnnxModelField';
 
 export const MODEL_TYPE_MAP = {
   'sd-1': 'Stable Diffusion 1.x',
@@ -31,6 +35,7 @@ const ModelSelect = () => {
   const { currentModel } = useAppSelector(selector);
 
   const { data: mainModels, isLoading } = useGetMainModelsQuery();
+  const { data: onnxModels, isLoading: onnxLoading } = useGetOnnxModelsQuery();
 
   const data = useMemo(() => {
     if (!mainModels) {
@@ -50,16 +55,30 @@ const ModelSelect = () => {
         group: MODEL_TYPE_MAP[model.base_model],
       });
     });
+    forEach(onnxModels?.entities, (model, id) => {
+      if (!model) {
+        return;
+      }
+
+      data.push({
+        value: id,
+        label: model.model_name,
+        group: MODEL_TYPE_MAP[model.base_model],
+      });
+    });
 
     return data;
-  }, [mainModels]);
+  }, [mainModels, onnxModels]);
 
   const selectedModel = useMemo(
     () =>
       mainModels?.entities[
         `${currentModel?.base_model}/main/${currentModel?.model_name}`
+      ] ||
+      onnxModels?.entities[
+        `${currentModel?.base_model}/onnx/${currentModel?.model_name}`
       ],
-    [mainModels?.entities, currentModel]
+    [mainModels?.entities, onnxModels?.entities, currentModel]
   );
 
   const handleChangeModel = useCallback(
@@ -67,14 +86,16 @@ const ModelSelect = () => {
       if (!v) {
         return;
       }
-
-      const modelField = modelIdToMainModelField(v);
+      let modelField = modelIdToMainModelField(v);
+      if (v.includes('onnx')) {
+        modelField = modelIdToOnnxModelField(v);
+      }
       dispatch(modelSelected(modelField));
     },
     [dispatch]
   );
 
-  return isLoading ? (
+  return isLoading || onnxLoading ? (
     <IAIMantineSelect
       label={t('modelManager.model')}
       placeholder="Loading..."

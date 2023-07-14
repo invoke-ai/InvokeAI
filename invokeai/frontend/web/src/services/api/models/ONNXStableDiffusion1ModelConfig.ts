@@ -12,7 +12,6 @@ export type ONNXStableDiffusion1ModelConfig = {
   type: 'onnx';
   path: string;
   description?: string;
-  model_format: null;
   error?: ModelError;
   variant: ModelVariantType;
 };

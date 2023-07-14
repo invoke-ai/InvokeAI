@@ -11,7 +11,10 @@ import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/component
 import { forEach, isString } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import {
+  useGetMainModelsQuery,
+  useGetOnnxModelsQuery,
+} from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 
 const ModelInputFieldComponent = (
@@ -23,6 +26,7 @@ const ModelInputFieldComponent = (
   const { t } = useTranslation();
 
   const { data: mainModels } = useGetMainModelsQuery();
+  const { data: onnxModels } = useGetOnnxModelsQuery();
 
   const data = useMemo(() => {
     if (!mainModels) {
@@ -43,12 +47,33 @@ const ModelInputFieldComponent = (
       });
     });
 
+    if (onnxModels) {
+      forEach(onnxModels.entities, (model, id) => {
+        if (!model) {
+          return;
+        }
+
+        data.push({
+          value: id,
+          label: model.model_name,
+          group: BASE_MODEL_NAME_MAP[model.base_model],
+        });
+      });
+    }
     return data;
-  }, [mainModels]);
+  }, [mainModels, onnxModels]);
 
   const selectedModel = useMemo(
-    () => mainModels?.entities[field.value ?? mainModels.ids[0]],
-    [mainModels?.entities, mainModels?.ids, field.value]
+    () =>
+      mainModels?.entities[field.value ?? mainModels.ids[0]] ||
+      onnxModels?.entities[field.value ?? onnxModels.ids[0]],
+    [
+      mainModels?.entities,
+      mainModels?.ids,
+      onnxModels?.entities,
+      onnxModels?.ids,
+      field.value,
+    ]
   );
 
   const handleValueChanged = useCallback(
@@ -69,18 +94,22 @@ const ModelInputFieldComponent = (
   );
 
   useEffect(() => {
-    if (field.value && mainModels?.ids.includes(field.value)) {
+    if (
+      field.value &&
+      (mainModels?.ids.includes(field.value) ||
+        onnxModels?.ids.includes(field.value))
+    ) {
       return;
     }
 
-    const firstModel = mainModels?.ids[0];
+    const firstModel = mainModels?.ids[0] || onnxModels?.ids[0];
 
     if (!isString(firstModel)) {
       return;
     }
 
     handleValueChanged(firstModel);
-  }, [field.value, handleValueChanged, mainModels?.ids]);
+  }, [field.value, handleValueChanged, mainModels?.ids, onnxModels?.ids]);
 
   return (
     <IAIMantineSelect

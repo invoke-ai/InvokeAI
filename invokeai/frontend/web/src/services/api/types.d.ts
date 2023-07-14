@@ -30,6 +30,7 @@ export type OffsetPaginatedResults_ImageDTO_ =
 export type ModelType = components['schemas']['ModelType'];
 export type BaseModelType = components['schemas']['BaseModelType'];
 export type MainModelField = components['schemas']['MainModelField'];
+export type OnnxModelField = components['schemas']['OnnxModelField'];
 export type VAEModelField = components['schemas']['VAEModelField'];
 export type LoRAModelField = components['schemas']['LoRAModelField'];
 export type ModelsList = components['schemas']['ModelsList'];
@@ -47,6 +48,7 @@ export type MainModelConfig =
   | components['schemas']['StableDiffusion1ModelDiffusersConfig']
   | components['schemas']['StableDiffusion2ModelCheckpointConfig']
   | components['schemas']['StableDiffusion2ModelDiffusersConfig'];
+export type OnnxModelConfig = components['schemas']['ONNXStableDiffusion1ModelConfig']
 export type AnyModelConfig =
   | LoRAModelConfig
   | VaeModelConfig
@@ -106,6 +108,9 @@ export type ImageCollectionInvocation = TypeReq<
 >;
 export type MainModelLoaderInvocation = TypeReq<
   components['schemas']['MainModelLoaderInvocation']
+>;
+export type OnnxModelLoaderInvocation = TypeReq<
+  components['schemas']['OnnxModelLoaderInvocation']
 >;
 export type LoraLoaderInvocation = TypeReq<
   components['schemas']['LoraLoaderInvocation']

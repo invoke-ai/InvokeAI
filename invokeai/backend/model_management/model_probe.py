@@ -22,7 +22,7 @@ class ModelProbeInfo(object):
     variant_type: ModelVariantType
     prediction_type: SchedulerPredictionType
     upcast_attention: bool
-    format: Literal['diffusers','checkpoint', 'lycoris']
+    format: Literal['diffusers','checkpoint', 'lycoris', 'olive']
     image_size: int
 
 class ProbeBase(object):

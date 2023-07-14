@@ -10,6 +10,7 @@ import {
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
+  ONNX_MODEL_LOADER,
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
 } from './constants';
@@ -33,11 +34,13 @@ export const addVAEToGraph = (
       vae_model,
     };
   }
-
+  const model_loader = vae?.id.includes('onnx')
+    ? ONNX_MODEL_LOADER
+    : MAIN_MODEL_LOADER;
   if (graph.id === TEXT_TO_IMAGE_GRAPH || graph.id === IMAGE_TO_IMAGE_GRAPH) {
     graph.edges.push({
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? model_loader : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -50,7 +53,7 @@ export const addVAEToGraph = (
   if (graph.id === IMAGE_TO_IMAGE_GRAPH) {
     graph.edges.push({
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? model_loader : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -63,7 +66,7 @@ export const addVAEToGraph = (
   if (graph.id === INPAINT_GRAPH) {
     graph.edges.push({
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? model_loader : VAE_LOADER,
         field: 'vae',
       },
       destination: {

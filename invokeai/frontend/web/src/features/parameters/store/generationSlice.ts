@@ -8,7 +8,7 @@ import {
   setShouldShowAdvancedOptions,
 } from 'features/ui/store/uiSlice';
 import { clamp } from 'lodash-es';
-import { ImageDTO, MainModelField } from 'services/api/types';
+import { ImageDTO, MainModelField, OnnxModelField } from 'services/api/types';
 import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
 import {
   CfgScaleParam,
@@ -53,7 +53,7 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: MainModelField | null;
+  model: MainModelField | OnnxModelField | null;
   vae: VaeModelParam | null;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
@@ -226,7 +226,10 @@ export const generationSlice = createSlice({
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelChanged: (state, action: PayloadAction<MainModelField | null>) => {
+    modelChanged: (
+      state,
+      action: PayloadAction<MainModelField | OnnxModelField | null>
+    ) => {
       if (!action.payload) {
         state.model = null;
       }

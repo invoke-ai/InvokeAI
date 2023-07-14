@@ -10,6 +10,7 @@ import {
   CLIP_SKIP,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
+  ONNX_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
@@ -46,6 +47,10 @@ export const buildLinearTextToImageGraph = (
     throw new Error('No model found in state');
   }
 
+  console.log(model);
+  const model_loader = model.model_name.includes('onnx')
+    ? ONNX_MODEL_LOADER
+    : MAIN_MODEL_LOADER;
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -56,12 +61,14 @@ export const buildLinearTextToImageGraph = (
    */
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
+
+  // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+      [model_loader]: {
+        type: model_loader,
+        id: model_loader,
         model,
       },
       [CLIP_SKIP]: {
@@ -101,7 +108,7 @@ export const buildLinearTextToImageGraph = (
     edges: [
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: model_loader,
           field: 'clip',
         },
         destination: {
@@ -111,7 +118,7 @@ export const buildLinearTextToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: model_loader,
           field: 'unet',
         },
         destination: {

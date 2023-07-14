@@ -10,6 +10,7 @@ import {
   CLIP_SKIP,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
+  ONNX_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
@@ -49,7 +50,10 @@ export const buildCanvasTextToImageGraph = (
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
-
+  console.log(model);
+  const model_loader = model.model_name.includes('onnx')
+    ? ONNX_MODEL_LOADER
+    : MAIN_MODEL_LOADER;
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -60,6 +64,7 @@ export const buildCanvasTextToImageGraph = (
    */
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
+  // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
@@ -87,9 +92,9 @@ export const buildCanvasTextToImageGraph = (
         scheduler,
         steps,
       },
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+      [model_loader]: {
+        type: model_loader,
+        id: model_loader,
         model,
       },
       [CLIP_SKIP]: {
@@ -125,7 +130,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: model_loader,
           field: 'clip',
         },
         destination: {
@@ -155,7 +160,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: model_loader,
           field: 'unet',
         },
         destination: {

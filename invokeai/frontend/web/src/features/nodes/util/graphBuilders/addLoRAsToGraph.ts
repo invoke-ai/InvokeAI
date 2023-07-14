@@ -10,6 +10,7 @@ import {
   CLIP_SKIP,
   LORA_LOADER,
   MAIN_MODEL_LOADER,
+  ONNX_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
@@ -40,6 +41,10 @@ export const addLoRAsToGraph = (
       (e) =>
         !(
           e.source.node_id === MAIN_MODEL_LOADER &&
+          ['unet'].includes(e.source.field)
+        ) &&
+        !(
+          e.source.node_id === ONNX_MODEL_LOADER &&
           ['unet'].includes(e.source.field)
         )
     );
@@ -77,11 +82,14 @@ export const addLoRAsToGraph = (
     // add to graph
     graph.nodes[currentLoraNodeId] = loraLoaderNode;
 
+    const model_loader = id.includes('onnx')
+      ? ONNX_MODEL_LOADER
+      : MAIN_MODEL_LOADER;
     if (currentLoraIndex === 0) {
       // first lora = start the lora chain, attach directly to model loader
       graph.edges.push({
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: model_loader,
           field: 'unet',
         },
         destination: {

@@ -430,3 +430,118 @@ class ONNXSD1ModelLoaderInvocation(BaseInvocation):
                 ),
             )
         )
+
+class OnnxModelField(BaseModel):
+    """Onnx model field"""
+
+    model_name: str = Field(description="Name of the model")
+    base_model: BaseModelType = Field(description="Base model")
+
+class OnnxModelLoaderInvocation(BaseInvocation):
+    """Loads a main model, outputting its submodels."""
+
+    type: Literal["onnx_model_loader"] = "onnx_model_loader"
+
+    model: OnnxModelField = Field(description="The model to load")
+    # TODO: precision?
+
+    # Schema customisation
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Onnx Model Loader",
+                "tags": ["model", "loader"],
+                "type_hints": {"model": "model"},
+            },
+        }
+
+    def invoke(self, context: InvocationContext) -> ONNXModelLoaderOutput:
+        base_model = self.model.base_model
+        model_name = self.model.model_name
+        model_type = ModelType.ONNX
+
+        # TODO: not found exceptions
+        if not context.services.model_manager.model_exists(
+            model_name=model_name,
+            base_model=base_model,
+            model_type=model_type,
+        ):
+            raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
+
+        """
+        if not context.services.model_manager.model_exists(
+            model_name=self.model_name,
+            model_type=SDModelType.Diffusers,
+            submodel=SDModelType.Tokenizer,
+        ):
+            raise Exception(
+                f"Failed to find tokenizer submodel in {self.model_name}! Check if model corrupted"
+            )
+
+        if not context.services.model_manager.model_exists(
+            model_name=self.model_name,
+            model_type=SDModelType.Diffusers,
+            submodel=SDModelType.TextEncoder,
+        ):
+            raise Exception(
+                f"Failed to find text_encoder submodel in {self.model_name}! Check if model corrupted"
+            )
+
+        if not context.services.model_manager.model_exists(
+            model_name=self.model_name,
+            model_type=SDModelType.Diffusers,
+            submodel=SDModelType.UNet,
+        ):
+            raise Exception(
+                f"Failed to find unet submodel from {self.model_name}! Check if model corrupted"
+            )
+        """
+
+        return ONNXModelLoaderOutput(
+            unet=UNetField(
+                unet=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.UNet,
+                ),
+                scheduler=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Scheduler,
+                ),
+                loras=[],
+            ),
+            clip=ClipField(
+                tokenizer=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Tokenizer,
+                ),
+                text_encoder=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.TextEncoder,
+                ),
+                loras=[],
+            ),
+            vae_decoder=VaeField(
+                vae=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.VaeDecoder,
+                ),
+            ),
+            vae_encoder=VaeField(
+                vae=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.VaeEncoder,
+                ),
+            )
+        )

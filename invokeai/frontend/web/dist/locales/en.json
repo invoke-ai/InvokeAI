@@ -102,7 +102,8 @@
         "openInNewTab": "Open in New Tab",
         "dontAskMeAgain": "Don't ask me again",
         "areYouSure": "Are you sure?",
-        "imagePrompt": "Image Prompt"
+        "imagePrompt": "Image Prompt",
+        "clearNodes": "Are you sure you want to clear all nodes?"
     },
     "gallery": {
         "generations": "Generations",
@@ -528,7 +529,7 @@
         "hidePreview": "Hide Preview",
         "showPreview": "Show Preview",
         "controlNetControlMode": "Control Mode",
-        "clipSkip": "Clip Skip",
+        "clipSkip": "CLIP Skip",
         "aspectRatio": "Ratio"
     },
     "settings": {
@@ -593,7 +594,11 @@
         "metadataLoadFailed": "Failed to load metadata",
         "initialImageSet": "Initial Image Set",
         "initialImageNotSet": "Initial Image Not Set",
-        "initialImageNotSetDesc": "Could not load initial image"
+        "initialImageNotSetDesc": "Could not load initial image",
+        "nodesSaved": "Nodes Saved",
+        "nodesLoaded": "Nodes Loaded",
+        "nodesLoadedFailed": "Failed To Load Nodes",
+        "nodesCleared": "Nodes Cleared"
     },
     "tooltip": {
         "feature": {
@@ -674,5 +679,11 @@
         "showProgressImages": "Show Progress Images",
         "hideProgressImages": "Hide Progress Images",
         "swapSizes": "Swap Sizes"
+    },
+    "nodes": {
+        "reloadSchema": "Reload Schema",
+        "saveNodes": "Save Nodes",
+        "loadNodes": "Load Nodes",
+        "clearNodes": "Clear Nodes"
     }
 }

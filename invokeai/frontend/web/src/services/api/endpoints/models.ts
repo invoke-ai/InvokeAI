@@ -5,6 +5,7 @@ import {
   ControlNetModelConfig,
   LoRAModelConfig,
   MainModelConfig,
+  OnnxModelConfig,
   TextualInversionModelConfig,
   VaeModelConfig,
 } from 'services/api/types';
@@ -12,6 +13,8 @@ import {
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
 
 export type MainModelConfigEntity = MainModelConfig & { id: string };
+
+export type OnnxModelConfigEntity = OnnxModelConfig & { id: string };
 
 export type LoRAModelConfigEntity = LoRAModelConfig & { id: string };
 
@@ -27,12 +30,17 @@ export type VaeModelConfigEntity = VaeModelConfig & { id: string };
 
 type AnyModelConfigEntity =
   | MainModelConfigEntity
+  | OnnxModelConfigEntity
   | LoRAModelConfigEntity
   | ControlNetModelConfigEntity
   | TextualInversionModelConfigEntity
   | VaeModelConfigEntity;
 
 const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
+  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+});
+
+const onnxModelsAdapter = createEntityAdapter<OnnxModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
 const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
@@ -72,6 +80,38 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
+    getOnnxModels: build.query<EntityState<OnnxModelConfigEntity>, void>({
+      query: () => ({ url: 'models/', params: { model_type: 'onnx' } }),
+      providesTags: (result, error, arg) => {
+        const tags: ApiFullTagDescription[] = [
+          { id: 'OnnxModel', type: LIST_TAG },
+        ];
+
+        if (result) {
+          tags.push(
+            ...result.ids.map((id) => ({
+              type: 'OnnxModel' as const,
+              id,
+            }))
+          );
+        }
+
+        return tags;
+      },
+      transformResponse: (
+        response: { models: OnnxModelConfig[] },
+        meta,
+        arg
+      ) => {
+        const entities = createModelEntities<OnnxModelConfigEntity>(
+          response.models
+        );
+        return onnxModelsAdapter.setAll(
+          onnxModelsAdapter.getInitialState(),
+          entities
+        );
+      },
+    }),
     getMainModels: build.query<EntityState<MainModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'main' } }),
       providesTags: (result, error, arg) => {
@@ -243,6 +283,7 @@ export const modelsApi = api.injectEndpoints({
 
 export const {
   useGetMainModelsQuery,
+  useGetOnnxModelsQuery,
   useGetControlNetModelsQuery,
   useGetLoRAModelsQuery,
   useGetTextualInversionModelsQuery,

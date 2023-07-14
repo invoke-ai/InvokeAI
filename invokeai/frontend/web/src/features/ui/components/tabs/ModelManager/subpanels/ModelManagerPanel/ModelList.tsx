@@ -50,7 +50,7 @@ const ModelList = () => {
 
   const [searchText, setSearchText] = useState<string>('');
   const [isSelectedFilter, setIsSelectedFilter] = useState<
-    'all' | 'ckpt' | 'diffusers'
+    'all' | 'ckpt' | 'diffusers' | 'olive'
   >('all');
   const [_, startTransition] = useTransition();
 
