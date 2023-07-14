@@ -53,14 +53,14 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
         description={template.description}
       />
       <Flex
-        className="nopan"
+        className={'nopan'}
         sx={{
+          cursor: 'auto',
           flexDirection: 'column',
           borderBottomRadius: 'md',
           py: 2,
           bg: 'base.200',
           _dark: { bg: 'base.800' },
-          cursor: 'auto',
         }}
       >
         <IAINodeOutputs nodeId={nodeId} outputs={outputs} template={template} />
