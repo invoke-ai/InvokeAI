@@ -19,16 +19,8 @@ const invokeAI = defineStyle((props) => {
       bg: mode('base.200', 'base.600')(props),
       color: mode('base.850', 'base.100')(props),
       borderRadius: 'base',
-      textShadow: mode(
-        '0 0 0.3rem var(--invokeai-colors-base-50)',
-        '0 0 0.3rem var(--invokeai-colors-base-900)'
-      )(props),
       svg: {
         fill: mode('base.850', 'base.100')(props),
-        filter: mode(
-          'drop-shadow(0px 0px 0.3rem var(--invokeai-colors-base-100))',
-          'drop-shadow(0px 0px 0.3rem var(--invokeai-colors-base-800))'
-        )(props),
       },
       _hover: {
         bg: mode('base.300', 'base.500')(props),
@@ -57,16 +49,8 @@ const invokeAI = defineStyle((props) => {
     bg: mode(`${c}.400`, `${c}.600`)(props),
     color: mode(`base.50`, `base.100`)(props),
     borderRadius: 'base',
-    textShadow: mode(
-      `0 0 0.3rem var(--invokeai-colors-${c}-600)`,
-      `0 0 0.3rem var(--invokeai-colors-${c}-800)`
-    )(props),
     svg: {
       fill: mode(`base.50`, `base.100`)(props),
-      filter: mode(
-        `drop-shadow(0px 0px 0.3rem var(--invokeai-colors-${c}-600))`,
-        `drop-shadow(0px 0px 0.3rem var(--invokeai-colors-${c}-800))`
-      )(props),
     },
     _disabled,
     _hover: {

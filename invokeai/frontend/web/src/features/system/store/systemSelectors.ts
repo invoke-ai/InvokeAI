@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { reduce, pickBy } from 'lodash-es';
+import { pickBy, reduce } from 'lodash-es';
 
 export const systemSelector = (state: RootState) => state.system;
 
@@ -50,3 +50,8 @@ export const languageSelector = createSelector(
 
 export const isProcessingSelector = (state: RootState) =>
   state.system.isProcessing;
+
+export const selectIsBusy = createSelector(
+  (state: RootState) => state,
+  (state) => state.system.isProcessing || !state.system.isConnected
+);

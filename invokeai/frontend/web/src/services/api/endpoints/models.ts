@@ -2,16 +2,27 @@ import { EntityState, createEntityAdapter } from '@reduxjs/toolkit';
 import { cloneDeep } from 'lodash-es';
 import {
   AnyModelConfig,
+  BaseModelType,
+  CheckpointModelConfig,
   ControlNetModelConfig,
+  DiffusersModelConfig,
   LoRAModelConfig,
   MainModelConfig,
+  MergeModelConfig,
   TextualInversionModelConfig,
   VaeModelConfig,
 } from 'services/api/types';
 
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
+import { paths } from '../schema';
 
-export type MainModelConfigEntity = MainModelConfig & { id: string };
+export type DiffusersModelConfigEntity = DiffusersModelConfig & { id: string };
+export type CheckpointModelConfigEntity = CheckpointModelConfig & {
+  id: string;
+};
+export type MainModelConfigEntity =
+  | DiffusersModelConfigEntity
+  | CheckpointModelConfigEntity;
 
 export type LoRAModelConfigEntity = LoRAModelConfig & { id: string };
 
@@ -31,6 +42,38 @@ type AnyModelConfigEntity =
   | ControlNetModelConfigEntity
   | TextualInversionModelConfigEntity
   | VaeModelConfigEntity;
+
+type UpdateMainModelArg = {
+  base_model: BaseModelType;
+  model_name: string;
+  body: MainModelConfig;
+};
+
+type UpdateMainModelResponse =
+  paths['/api/v1/models/{base_model}/{model_type}/{model_name}']['patch']['responses']['200']['content']['application/json'];
+
+type DeleteMainModelArg = {
+  base_model: BaseModelType;
+  model_name: string;
+};
+
+type DeleteMainModelResponse = void;
+
+type ConvertMainModelArg = {
+  base_model: BaseModelType;
+  model_name: string;
+};
+
+type ConvertMainModelResponse =
+  paths['/api/v1/models/convert/{base_model}/{model_type}/{model_name}']['put']['responses']['200']['content']['application/json'];
+
+type MergeMainModelArg = {
+  base_model: BaseModelType;
+  body: MergeModelConfig;
+};
+
+type MergeMainModelResponse =
+  paths['/api/v1/models/merge/{base_model}']['put']['responses']['200']['content']['application/json'];
 
 const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
@@ -76,7 +119,7 @@ export const modelsApi = api.injectEndpoints({
       query: () => ({ url: 'models/', params: { model_type: 'main' } }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'MainModel', type: LIST_TAG },
+          { type: 'MainModel', id: LIST_TAG },
         ];
 
         if (result) {
@@ -104,11 +147,58 @@ export const modelsApi = api.injectEndpoints({
         );
       },
     }),
+    updateMainModels: build.mutation<
+      UpdateMainModelResponse,
+      UpdateMainModelArg
+    >({
+      query: ({ base_model, model_name, body }) => {
+        return {
+          url: `models/${base_model}/main/${model_name}`,
+          method: 'PATCH',
+          body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+    }),
+    deleteMainModels: build.mutation<
+      DeleteMainModelResponse,
+      DeleteMainModelArg
+    >({
+      query: ({ base_model, model_name }) => {
+        return {
+          url: `models/${base_model}/main/${model_name}`,
+          method: 'DELETE',
+        };
+      },
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+    }),
+    convertMainModels: build.mutation<
+      ConvertMainModelResponse,
+      ConvertMainModelArg
+    >({
+      query: ({ base_model, model_name }) => {
+        return {
+          url: `models/convert/${base_model}/main/${model_name}`,
+          method: 'PUT',
+        };
+      },
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+    }),
+    mergeMainModels: build.mutation<MergeMainModelResponse, MergeMainModelArg>({
+      query: ({ base_model, body }) => {
+        return {
+          url: `models/merge/${base_model}`,
+          method: 'PUT',
+          body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+    }),
     getLoRAModels: build.query<EntityState<LoRAModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'LoRAModel', type: LIST_TAG },
+          { type: 'LoRAModel', id: LIST_TAG },
         ];
 
         if (result) {
@@ -143,7 +233,7 @@ export const modelsApi = api.injectEndpoints({
       query: () => ({ url: 'models/', params: { model_type: 'controlnet' } }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'ControlNetModel', type: LIST_TAG },
+          { type: 'ControlNetModel', id: LIST_TAG },
         ];
 
         if (result) {
@@ -175,7 +265,7 @@ export const modelsApi = api.injectEndpoints({
       query: () => ({ url: 'models/', params: { model_type: 'vae' } }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'VaeModel', type: LIST_TAG },
+          { type: 'VaeModel', id: LIST_TAG },
         ];
 
         if (result) {
@@ -210,7 +300,7 @@ export const modelsApi = api.injectEndpoints({
       query: () => ({ url: 'models/', params: { model_type: 'embedding' } }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'TextualInversionModel', type: LIST_TAG },
+          { type: 'TextualInversionModel', id: LIST_TAG },
         ];
 
         if (result) {
@@ -247,4 +337,8 @@ export const {
   useGetLoRAModelsQuery,
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,
+  useUpdateMainModelsMutation,
+  useDeleteMainModelsMutation,
+  useConvertMainModelsMutation,
+  useMergeMainModelsMutation,
 } = modelsApi;

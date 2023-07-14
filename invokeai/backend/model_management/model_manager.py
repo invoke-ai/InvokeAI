@@ -589,6 +589,7 @@ class ModelManager(object):
                 rmtree(str(model_path))
             else:
                 model_path.unlink()
+        self.commit()
 
     # LS: tested
     def add_model(

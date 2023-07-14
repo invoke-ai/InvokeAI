@@ -1,6 +1,6 @@
 import { SelectItem } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
@@ -86,7 +86,7 @@ const VaeModelInputFieldComponent = (
   );
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       itemComponent={IAIMantineSelectItemWithTooltip}
       tooltip={selectedVaeModel?.description}
       label={
