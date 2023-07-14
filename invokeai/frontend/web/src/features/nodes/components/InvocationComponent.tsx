@@ -23,7 +23,14 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
   if (!template) {
     return (
       <NodeWrapper selected={selected}>
-        <Flex sx={{ alignItems: 'center', justifyContent: 'center' }}>
+        <Flex
+          className="nopan"
+          sx={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'auto',
+          }}
+        >
           <Icon
             as={FaExclamationCircle}
             sx={{
@@ -46,12 +53,14 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
         description={template.description}
       />
       <Flex
+        className="nopan"
         sx={{
           flexDirection: 'column',
           borderBottomRadius: 'md',
           py: 2,
           bg: 'base.200',
           _dark: { bg: 'base.800' },
+          cursor: 'auto',
         }}
       >
         <IAINodeOutputs nodeId={nodeId} outputs={outputs} template={template} />
