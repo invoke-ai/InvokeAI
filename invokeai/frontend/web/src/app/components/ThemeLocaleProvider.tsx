@@ -9,7 +9,6 @@ import { theme as invokeAITheme } from 'theme/theme';
 
 import '@fontsource-variable/inter';
 import { MantineProvider } from '@mantine/core';
-import { mantineTheme } from 'mantine-theme/theme';
 import 'overlayscrollbars/overlayscrollbars.css';
 import 'theme/css/overlayscrollbars.css';
 
@@ -36,7 +35,7 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
   }, [direction]);
 
   return (
-    <MantineProvider withGlobalStyles theme={mantineTheme}>
+    <MantineProvider>
       <ChakraProvider theme={theme} colorModeManager={manager}>
         {children}
       </ChakraProvider>

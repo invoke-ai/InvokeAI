@@ -10,6 +10,7 @@ import { makeToast } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAISlider from 'common/components/IAISlider';
@@ -176,7 +177,7 @@ export default function MergeModelsPanel() {
           value={baseModel}
           onChange={handleBaseModelChange}
         />
-        <IAIMantineSelect
+        <IAIMantineSearchableSelect
           label={t('modelManager.modelOne')}
           w="100%"
           value={modelOne}
@@ -184,7 +185,7 @@ export default function MergeModelsPanel() {
           data={modelOneList}
           onChange={(v) => setModelOne(v)}
         />
-        <IAIMantineSelect
+        <IAIMantineSearchableSelect
           label={t('modelManager.modelTwo')}
           w="100%"
           placeholder={t('modelManager.selectModel')}
@@ -192,7 +193,7 @@ export default function MergeModelsPanel() {
           data={modelTwoList}
           onChange={(v) => setModelTwo(v)}
         />
-        <IAIMantineSelect
+        <IAIMantineSearchableSelect
           label={t('modelManager.modelThree')}
           data={modelThreeList}
           w="100%"

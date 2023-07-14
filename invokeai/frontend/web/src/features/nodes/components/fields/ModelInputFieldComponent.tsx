@@ -6,7 +6,7 @@ import {
 } from 'features/nodes/types/types';
 
 import { SelectItem } from '@mantine/core';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
 import { forEach } from 'lodash-es';
@@ -81,14 +81,14 @@ const ModelInputFieldComponent = (
   );
 
   return isLoading ? (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       label={t('modelManager.model')}
       placeholder="Loading..."
       disabled={true}
       data={[]}
     />
   ) : (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       tooltip={selectedModel?.description}
       label={
         selectedModel?.base_model && MODEL_TYPE_MAP[selectedModel?.base_model]

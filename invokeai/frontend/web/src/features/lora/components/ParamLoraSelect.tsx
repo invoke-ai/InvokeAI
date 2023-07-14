@@ -4,7 +4,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState, stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { loraAdded } from 'features/lora/store/loraSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
@@ -84,7 +84,7 @@ const ParamLoRASelect = () => {
   }
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       placeholder={data.length === 0 ? 'All LoRAs added' : 'Add LoRA'}
       value={null}
       data={data}

@@ -7,8 +7,17 @@ type IAIMantineTextInputProps = TextInputProps;
 
 export default function IAIMantineTextInput(props: IAIMantineTextInputProps) {
   const { ...rest } = props;
-  const { base50, base100, base200, base800, base900, accent500, accent300 } =
-    useChakraThemeTokens();
+  const {
+    base50,
+    base100,
+    base200,
+    base300,
+    base800,
+    base700,
+    base900,
+    accent500,
+    accent300,
+  } = useChakraThemeTokens();
   const { colorMode } = useColorMode();
 
   return (
@@ -23,6 +32,10 @@ export default function IAIMantineTextInput(props: IAIMantineTextInputProps) {
           ':focus': {
             borderColor: mode(accent300, accent500)(colorMode),
           },
+        },
+        label: {
+          color: mode(base700, base300)(colorMode),
+          fontWeight: 'normal',
         },
       })}
       {...rest}
