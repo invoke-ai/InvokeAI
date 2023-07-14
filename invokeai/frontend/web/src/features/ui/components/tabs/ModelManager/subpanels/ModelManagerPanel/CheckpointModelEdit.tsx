@@ -71,7 +71,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
   const editModelFormSubmitHandler = (values: CheckpointModelConfig) => {
     const responseBody = {
       base_model: retrievedModel.base_model,
-      model_name: retrievedModel.name,
+      model_name: retrievedModel.model_name,
       body: values,
     };
     updateMainModel(responseBody);

@@ -38,7 +38,7 @@ export default function ModelConvert(props: ModelConvertProps) {
   const modelConvertHandler = () => {
     const responseBody = {
       base_model: model.base_model,
-      model_name: model.name,
+      model_name: model.model_name,
     };
     convertModel(responseBody);
 
@@ -46,7 +46,9 @@ export default function ModelConvert(props: ModelConvertProps) {
       dispatch(
         addToast(
           makeToast({
-            title: `${t('modelManager.modelConversionFailed')}: ${model.name}`,
+            title: `${t('modelManager.modelConversionFailed')}: ${
+              model.model_name
+            }`,
             status: 'error',
           })
         )
@@ -57,7 +59,7 @@ export default function ModelConvert(props: ModelConvertProps) {
       dispatch(
         addToast(
           makeToast({
-            title: `${t('modelManager.modelConverted')}: ${model.name}`,
+            title: `${t('modelManager.modelConverted')}: ${model.model_name}`,
             status: 'success',
           })
         )
@@ -67,7 +69,7 @@ export default function ModelConvert(props: ModelConvertProps) {
 
   return (
     <IAIAlertDialog
-      title={`${t('modelManager.convert')} ${model.name}`}
+      title={`${t('modelManager.convert')} ${model.model_name}`}
       acceptCallback={modelConvertHandler}
       cancelCallback={modelConvertCancelHandler}
       acceptButtonText={`${t('modelManager.convert')}`}

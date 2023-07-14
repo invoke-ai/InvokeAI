@@ -67,7 +67,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
   const editModelFormSubmitHandler = (values: DiffusersModelConfig) => {
     const responseBody = {
       base_model: retrievedModel.base_model,
-      model_name: retrievedModel.name,
+      model_name: retrievedModel.model_name,
       body: values,
     };
     updateMainModel(responseBody);
