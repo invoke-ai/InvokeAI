@@ -1,14 +1,16 @@
 import { SelectItem } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   VaeModelInputFieldTemplate,
   VaeModelInputFieldValue,
 } from 'features/nodes/types/types';
-import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { modelIdToVAEModelParam } from 'features/parameters/util/modelIdToVAEModelParam';
 import { forEach } from 'lodash-es';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
@@ -20,42 +22,55 @@ const VaeModelInputFieldComponent = (
   >
 ) => {
   const { nodeId, field } = props;
-
+  const vae = field.value;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
   const { data: vaeModels } = useGetVaeModelsQuery();
-
-  const selectedModel = useMemo(
-    () => vaeModels?.entities[field.value ?? vaeModels.ids[0]],
-    [vaeModels?.entities, vaeModels?.ids, field.value]
-  );
 
   const data = useMemo(() => {
     if (!vaeModels) {
       return [];
     }
 
-    const data: SelectItem[] = [];
+    const data: SelectItem[] = [
+      {
+        value: 'default',
+        label: 'Default',
+        group: 'Default',
+      },
+    ];
 
-    forEach(vaeModels.entities, (model, id) => {
-      if (!model) {
+    forEach(vaeModels.entities, (vae, id) => {
+      if (!vae) {
         return;
       }
 
       data.push({
         value: id,
-        label: model.model_name,
-        group: BASE_MODEL_NAME_MAP[model.base_model],
+        label: vae.model_name,
+        group: MODEL_TYPE_MAP[vae.base_model],
       });
     });
 
-    return data;
+    return data.sort((a, b) => (a.disabled && !b.disabled ? 1 : -1));
   }, [vaeModels]);
 
-  const handleValueChanged = useCallback(
+  // grab the full model entity from the RTK Query cache
+  const selectedVaeModel = useMemo(
+    () =>
+      vaeModels?.entities[`${vae?.base_model}/vae/${vae?.model_name}`] ?? null,
+    [vaeModels?.entities, vae]
+  );
+
+  const handleChangeModel = useCallback(
     (v: string | null) => {
       if (!v) {
+        return;
+      }
+
+      const newVaeModel = modelIdToVAEModelParam(v);
+
+      if (!newVaeModel) {
         return;
       }
 
@@ -63,31 +78,27 @@ const VaeModelInputFieldComponent = (
         fieldValueChanged({
           nodeId,
           fieldName: field.name,
-          value: v,
+          value: newVaeModel,
         })
       );
     },
     [dispatch, field.name, nodeId]
   );
 
-  useEffect(() => {
-    if (field.value && vaeModels?.ids.includes(field.value)) {
-      return;
-    }
-    handleValueChanged('auto');
-  }, [field.value, handleValueChanged, vaeModels?.ids]);
-
   return (
     <IAIMantineSelect
-      tooltip={selectedModel?.description}
+      itemComponent={IAIMantineSelectItemWithTooltip}
+      tooltip={selectedVaeModel?.description}
       label={
-        selectedModel?.base_model &&
-        BASE_MODEL_NAME_MAP[selectedModel?.base_model]
+        selectedVaeModel?.base_model &&
+        MODEL_TYPE_MAP[selectedVaeModel?.base_model]
       }
-      value={field.value}
-      placeholder="Pick one"
+      value={selectedVaeModel?.id ?? 'default'}
+      placeholder="Default"
       data={data}
-      onChange={handleValueChanged}
+      onChange={handleChangeModel}
+      disabled={data.length === 0}
+      clearable
     />
   );
 };
