@@ -36,11 +36,11 @@ const ModelEdit = (props: ModelEditProps) => {
   const { model } = props;
 
   if (model?.model_format === 'checkpoint') {
-    return <CheckpointModelEdit model={model} />;
+    return <CheckpointModelEdit key={model.id} model={model} />;
   }
 
   if (model?.model_format === 'diffusers') {
-    return <DiffusersModelEdit model={model} />;
+    return <DiffusersModelEdit key={model.id} model={model} />;
   }
 
   return (
