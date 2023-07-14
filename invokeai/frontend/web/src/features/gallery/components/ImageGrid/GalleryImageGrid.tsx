@@ -22,7 +22,10 @@ import { VirtuosoGrid } from 'react-virtuoso';
 import { receivedPageOfImages } from 'services/api/thunks/image';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
-import { useListImagesQuery } from '../../../../services/api/endpoints/images';
+import {
+  imagesApi,
+  useListImagesQuery,
+} from '../../../../services/api/endpoints/images';
 import { ImageDTO } from '../../../../services/api/types';
 
 const selector = createSelector(
@@ -70,34 +73,51 @@ const GalleryImageGrid = () => {
     setLimit(INITIAL_IMAGE_LIMIT);
   }, [selectedBoardId]);
 
-  const { data: imageListResponse, isLoading: isLoading } = useListImagesQuery({
-    categories: galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
-    is_intermediate: false,
-    offset: 0,
-    limit: INITIAL_IMAGE_LIMIT,
-    ...(selectedBoardId === 'all' ? {} : { board_id: selectedBoardId }),
-  });
+  const BASE_QUERY = useMemo(() => {
+    return {
+      categories:
+        galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+      is_intermediate: false,
+      offset: 0,
+      limit: INITIAL_IMAGE_LIMIT,
+      ...(selectedBoardId === 'all' ? {} : { board_id: selectedBoardId }),
+    };
+  }, [galleryView, selectedBoardId]);
 
-  const { data: paginatedData, isLoading: isLoadingPaginated } =
-    useListImagesQuery(
-      {
-        categories:
-          galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
-        is_intermediate: false,
-        offset,
-        limit,
-        ...(selectedBoardId === 'all' ? {} : { board_id: selectedBoardId }),
-      },
-      { skip: offset === 0 }
-    );
+  const { data: imageListResponse, isLoading: isLoading } =
+    useListImagesQuery(BASE_QUERY);
+
+  const { data: paginatedData } = useListImagesQuery(
+    {
+      categories:
+        galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+      is_intermediate: false,
+      offset,
+      limit,
+      ...(selectedBoardId === 'all' ? {} : { board_id: selectedBoardId }),
+    },
+    { skip: offset === 0 }
+  );
 
   useEffect(() => {
     if (imageListResponse) setImageList(imageListResponse.items);
   }, [imageListResponse]);
 
   useEffect(() => {
-    if (paginatedData) setImageList((i) => [...i, ...paginatedData.items]);
-  }, [paginatedData]);
+    if (paginatedData) {
+      dispatch(
+        imagesApi.util.updateQueryData(
+          'listImages',
+          BASE_QUERY,
+          (draftPosts) => {
+            paginatedData.items.forEach((item) => {
+              draftPosts.items.push(item);
+            });
+          }
+        )
+      );
+    }
+  }, [paginatedData, dispatch, BASE_QUERY]);
 
   const areMoreAvailable = useMemo(() => {
     if (imageListResponse?.total) {

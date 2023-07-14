@@ -28,9 +28,18 @@ export const imagesApi = api.injectEndpoints({
         if (result) {
           // and individual tags for each image
           tags.push(
-            ...result.items.map(({ image_name }) => ({
+            ...result.items.map(({ image_name, board_id }) => ({
               type: 'Image' as const,
               id: image_name,
+            }))
+          );
+        }
+
+        if (result && arg.board_id) {
+          tags.push(
+            ...result.items.map(({ image_name, board_id }) => ({
+              type: 'BoardImage' as const,
+              id: `${image_name}_${board_id}`,
             }))
           );
         }
