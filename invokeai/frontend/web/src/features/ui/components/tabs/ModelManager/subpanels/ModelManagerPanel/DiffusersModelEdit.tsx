@@ -11,7 +11,8 @@ import type { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
+
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
 import { components } from 'services/api/schema';
