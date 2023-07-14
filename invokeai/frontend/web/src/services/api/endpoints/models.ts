@@ -12,6 +12,7 @@ import {
 } from 'services/api/types';
 
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
+import { paths } from '../schema';
 
 export type MainModelConfigEntity = MainModelConfig & { id: string };
 
@@ -34,26 +35,37 @@ type AnyModelConfigEntity =
   | TextualInversionModelConfigEntity
   | VaeModelConfigEntity;
 
-type UpdateMainModelQuery = {
+type UpdateMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
   body: MainModelConfig;
 };
 
-type DeleteMainModelQuery = {
+type UpdateMainModelResponse =
+  paths['/api/v1/models/{base_model}/{model_type}/{model_name}']['patch']['responses']['200']['content']['application/json'];
+
+type DeleteMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
 };
 
-type ConvertMainModelQuery = {
+type DeleteMainModelResponse = void;
+
+type ConvertMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
 };
 
-type MergeMainModelQuery = {
+type ConvertMainModelResponse =
+  paths['/api/v1/models/convert/{base_model}/{model_type}/{model_name}']['put']['responses']['200']['content']['application/json'];
+
+type MergeMainModelArg = {
   base_model: BaseModelType;
   body: MergeModelConfig;
 };
+
+type MergeMainModelResponse =
+  paths['/api/v1/models/merge/{base_model}']['put']['responses']['200']['content']['application/json'];
 
 const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
@@ -128,8 +140,8 @@ export const modelsApi = api.injectEndpoints({
       },
     }),
     updateMainModels: build.mutation<
-      EntityState<MainModelConfigEntity>,
-      UpdateMainModelQuery
+      UpdateMainModelResponse,
+      UpdateMainModelArg
     >({
       query: ({ base_model, model_name, body }) => {
         return {
@@ -141,8 +153,8 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
     }),
     deleteMainModels: build.mutation<
-      EntityState<MainModelConfigEntity>,
-      DeleteMainModelQuery
+      DeleteMainModelResponse,
+      DeleteMainModelArg
     >({
       query: ({ base_model, model_name }) => {
         return {
@@ -153,8 +165,8 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
     }),
     convertMainModels: build.mutation<
-      EntityState<MainModelConfigEntity>,
-      ConvertMainModelQuery
+      ConvertMainModelResponse,
+      ConvertMainModelArg
     >({
       query: ({ base_model, model_name }) => {
         return {
@@ -164,10 +176,7 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
     }),
-    mergeMainModels: build.mutation<
-      EntityState<MainModelConfigEntity>,
-      MergeMainModelQuery
-    >({
+    mergeMainModels: build.mutation<MergeMainModelResponse, MergeMainModelArg>({
       query: ({ base_model, body }) => {
         return {
           url: `models/merge/${base_model}`,
