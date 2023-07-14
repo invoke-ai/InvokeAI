@@ -18,7 +18,7 @@ export default function ModelManagerPanel() {
   });
 
   return (
-    <Flex width="100%" columnGap={8}>
+    <Flex sx={{ gap: 8, w: 'full', h: 'full' }}>
       <ModelList
         selectedModelId={selectedModelId}
         setSelectedModelId={setSelectedModelId}
@@ -46,14 +46,15 @@ const ModelEdit = (props: ModelEditProps) => {
   return (
     <Flex
       sx={{
-        width: '100%',
+        w: 'full',
+        h: 'full',
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 'base',
-        bg: 'base.900',
+        maxH: 96,
+        userSelect: 'none',
       }}
     >
-      <Text fontWeight={500}>Pick A Model To Edit</Text>
+      <Text variant="subtext">No Model Selected</Text>
     </Flex>
   );
 };

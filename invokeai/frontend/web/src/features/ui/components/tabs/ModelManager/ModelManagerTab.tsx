@@ -46,9 +46,11 @@ const ModelManagerTab = () => {
           </Tab>
         ))}
       </TabList>
-      <TabPanels sx={{ p: 4 }}>
+      <TabPanels sx={{ w: 'full', h: 'full', p: 4 }}>
         {tabs.map((tab) => (
-          <TabPanel key={tab.id}>{tab.content}</TabPanel>
+          <TabPanel sx={{ w: 'full', h: 'full' }} key={tab.id}>
+            {tab.content}
+          </TabPanel>
         ))}
       </TabPanels>
     </Tabs>
