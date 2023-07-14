@@ -40,31 +40,30 @@ export default function ModelConvert(props: ModelConvertProps) {
       base_model: model.base_model,
       model_name: model.model_name,
     };
-    convertModel(responseBody);
-
-    if (error) {
-      dispatch(
-        addToast(
-          makeToast({
-            title: `${t('modelManager.modelConversionFailed')}: ${
-              model.model_name
-            }`,
-            status: 'error',
-          })
-        )
-      );
-    }
-
-    if (data) {
-      dispatch(
-        addToast(
-          makeToast({
-            title: `${t('modelManager.modelConverted')}: ${model.model_name}`,
-            status: 'success',
-          })
-        )
-      );
-    }
+    convertModel(responseBody)
+      .unwrap()
+      .then((payload) => {
+        dispatch(
+          addToast(
+            makeToast({
+              title: `${t('modelManager.modelConverted')}: ${model.model_name}`,
+              status: 'success',
+            })
+          )
+        );
+      })
+      .catch((error) => {
+        dispatch(
+          addToast(
+            makeToast({
+              title: `${t('modelManager.modelConversionFailed')}: ${
+                model.model_name
+              }`,
+              status: 'error',
+            })
+          )
+        );
+      });
   };
 
   return (
