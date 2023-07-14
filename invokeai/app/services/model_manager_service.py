@@ -19,7 +19,7 @@ from invokeai.backend.model_management import (
     ModelMerger,
     MergeInterpolationMethod,
 )
-
+from invokeai.backend.model_management.model_search import FindModels
 
 import torch
 from invokeai.app.models.exceptions import CanceledException
@@ -230,7 +230,14 @@ class ModelManagerServiceBase(ABC):
         :param interp: Interpolation method. None (default) 
         """
         pass
-    
+
+    @abstractmethod
+    def search_for_models(self, directory: Path)->List[Path]:
+        """
+        Return list of all models found in the designated directory.
+        """
+        pass
+        
     @abstractmethod
     def commit(self, conf_file: Optional[Path] = None) -> None:
         """
@@ -558,3 +565,10 @@ class ModelManagerService(ModelManagerServiceBase):
         except AssertionError as e:
             raise ValueError(e)
         return result
+
+    def search_for_models(self, directory: Path)->List[Path]:
+        """
+        Return list of all models found in the designated directory.
+        """
+        search = FindModels(directory,self.logger)
+        return search.list_models()

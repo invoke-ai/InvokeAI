@@ -1,6 +1,7 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654), 2023 Kent Keirsey (https://github.com/hipsterusername), 2024 Lincoln Stein
+# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654), 2023 Kent Keirsey (https://github.com/hipsterusername), 2023 Lincoln D. Stein
 
 
+import pathlib
 from typing import Literal, List, Optional, Union
 
 from fastapi import Body, Path, Query, Response
@@ -191,6 +192,23 @@ async def convert_model(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return response
+
+@models_router.get(
+    "/search",
+    operation_id="search_for_models",
+    responses={
+        200: { "description": "Directory searched successfully" },
+        404: { "description": "Invalid directory path"  },
+    },
+    status_code = 200,
+    response_model = List[pathlib.Path]
+)
+async def search_for_models(
+        search_path: pathlib.Path = Query(description="Directory path to search for models")
+)->List[pathlib.Path]:
+    if not search_path.is_dir():
+        raise HTTPException(status_code=404, detail=f"The search path '{search_path}' does not exist or is not directory")
+    return ApiDependencies.invoker.services.model_manager.search_for_models([search_path])
         
 @models_router.put(
     "/merge/{base_model}",

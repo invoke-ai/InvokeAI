@@ -247,6 +247,7 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, Chdir
 from .model_cache import ModelCache, ModelLocker
+from .model_search import ModelSearch
 from .models import (
     BaseModelType, ModelType, SubModelType,
     ModelError, SchedulerPredictionType, MODEL_CLASSES,
@@ -823,6 +824,7 @@ class ModelManager(object):
         if (new_models_found or imported_models) and self.config_path:
             self.commit()
 
+
     def autoimport(self)->Dict[str, AddModelResult]:
         '''
         Scan the autoimport directory (if defined) and import new models, delete defunct models.
@@ -830,63 +832,42 @@ class ModelManager(object):
         # avoid circular import
         from invokeai.backend.install.model_install_backend import ModelInstall
         from invokeai.frontend.install.model_install import ask_user_for_prediction_type
-        
+
+
+        class ScanAndImport(ModelSearch):
+            def __init__(self, directories, logger, ignore: Set[Path], installer: ModelInstall):
+                super().__init__(directories, logger)
+                self.installer = installer
+                self.ignore = ignore
+
+            def on_search_started(self):
+                self.new_models_found = dict()
+
+            def on_model_found(self, model: Path):
+                if model not in self.ignore:
+                    self.new_models_found.update(self.installer.heuristic_import(model))
+
+            def on_search_completed(self):
+                self.logger.info(f'Scanned {self._items_scanned} files and directories, imported {len(self.new_models_found)} models')
+
+            def models_found(self):
+                return self.new_models_found
+
+
         installer = ModelInstall(config = self.app_config,
                                  model_manager = self,
                                  prediction_type_helper = ask_user_for_prediction_type,
                                  )
-        
-        scanned_dirs = set()
-        
         config = self.app_config
-        known_paths = {(self.app_config.root_path / x['path']) for x in self.list_models()}
-
-        for autodir in [config.autoimport_dir,
-                        config.lora_dir,
-                        config.embedding_dir,
-                        config.controlnet_dir]:
-            if autodir is None:
-                continue
-
-            self.logger.info(f'Scanning {autodir} for models to import')
-            installed = dict()
-        
-            autodir = self.app_config.root_path / autodir
-            if not autodir.exists():
-                continue
-
-            items_scanned = 0
-            new_models_found = dict()
-            
-            for root, dirs, files in os.walk(autodir):
-                items_scanned += len(dirs) + len(files)
-                for d in dirs:
-                    path = Path(root) / d
-                    if path in known_paths or path.parent in scanned_dirs:
-                        scanned_dirs.add(path)
-                        continue
-                    if any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}]):
-                        try:
-                            new_models_found.update(installer.heuristic_import(path))
-                            scanned_dirs.add(path)
-                        except ValueError as e:
-                            self.logger.warning(str(e))
-
-                for f in files:
-                    path = Path(root) / f
-                    if path in known_paths or path.parent in scanned_dirs:
-                        continue
-                    if path.suffix in {'.ckpt','.bin','.pth','.safetensors','.pt'}:
-                        try:
-                            import_result = installer.heuristic_import(path)
-                            new_models_found.update(import_result)
-                        except ValueError as e:
-                            self.logger.warning(str(e))
-
-            self.logger.info(f'Scanned {items_scanned} files and directories, imported {len(new_models_found)} models')
-            installed.update(new_models_found)
-
-        return installed
+        known_paths = {config.root_path / x['path'] for x in self.list_models()}
+        directories = {config.root_path / x for x in [config.autoimport_dir,
+                                                      config.lora_dir,
+                                                      config.embedding_dir,
+                                                      config.controlnet_dir]
+                       }
+        scanner = ScanAndImport(directories, self.logger, ignore=known_paths, installer=installer)
+        scanner.search()
+        return scanner.models_found()
 
     def heuristic_import(self,
                          items_to_import: Set[str],
@@ -924,3 +905,4 @@ class ModelManager(object):
             successfully_installed.update(installed)
         self.commit()                
         return successfully_installed
+
