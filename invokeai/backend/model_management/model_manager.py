@@ -849,7 +849,6 @@ class ModelManager(object):
             if autodir is None:
                 continue
 
-            self.logger.info(f'Scanning {autodir} for models to import')
             installed = dict()
         
             autodir = self.app_config.root_path / autodir
@@ -884,9 +883,9 @@ class ModelManager(object):
                         except ValueError as e:
                             self.logger.warning(str(e))
 
-            self.logger.info(f'Scanned {items_scanned} files and directories, imported {len(new_models_found)} models')
             installed.update(new_models_found)
 
+        self.logger.info(f'Scanned {items_scanned} files and directories, imported {len(new_models_found)} models')
         return installed
 
     def heuristic_import(self,

@@ -836,9 +836,9 @@ def main():
             download_support_models()
 
         if opt.skip_sd_weights:
-            logger.info("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
+            logger.warning("SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST")
         elif models_to_download:
-            logger.info("\n** DOWNLOADING DIFFUSION WEIGHTS **")
+            logger.info("DOWNLOADING DIFFUSION WEIGHTS")
             process_and_execute(opt, models_to_download)
 
         postscript(errors=errors)

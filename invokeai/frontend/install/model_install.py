@@ -675,7 +675,9 @@ def select_and_download_models(opt: Namespace):
     # pass
     
     installer = ModelInstall(config, prediction_type_helper=helper)
-    if opt.add or opt.delete:
+    if opt.list_models:
+        installer.list_models(opt.list_models)
+    elif opt.add or opt.delete:
         selections = InstallSelections(
             install_models = opt.add or [],
             remove_models = opt.delete or []
@@ -748,7 +750,7 @@ def main():
     )
     parser.add_argument(
         "--list-models",
-        choices=["diffusers","loras","controlnets","tis"],
+        choices=[x.value for x in ModelType],
         help="list installed models",
     )
     parser.add_argument(
