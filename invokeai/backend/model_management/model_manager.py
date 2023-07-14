@@ -323,16 +323,7 @@ class ModelManager(object):
         self.config_meta = ConfigMeta(**config.pop("__metadata__"))
         # TODO: metadata not found
         # TODO: version check
-
-        self.models = dict()
-        for model_key, model_config in config.items():
-            model_name, base_model, model_type = self.parse_key(model_key)
-            model_class = MODEL_CLASSES[base_model][model_type]
-            # alias for config file
-            model_config["model_format"] = model_config.pop("format")
-            self.models[model_key] = model_class.create_config(**model_config)
-
-        # check config version number and update on disk/RAM if necessary
+        
         self.app_config = InvokeAIAppConfig.get_config()
         self.logger = logger
         self.cache = ModelCache(
@@ -343,10 +334,40 @@ class ModelManager(object):
             sequential_offload = sequential_offload,
             logger = logger,
         )
+
+        self._read_models(config)
+
+    def _read_models(self, config: Optional[DictConfig] = None):
+        if not config:
+            if self.config_path:
+                config = OmegaConf.load(self.config_path)
+            else:
+                return
+
+        self.models = dict()
+        for model_key, model_config in config.items():
+            if model_key.startswith('_'):
+                continue
+            model_name, base_model, model_type = self.parse_key(model_key)
+            model_class = MODEL_CLASSES[base_model][model_type]
+            # alias for config file
+            model_config["model_format"] = model_config.pop("format")
+            self.models[model_key] = model_class.create_config(**model_config)
+
+        # check config version number and update on disk/RAM if necessary
         self.cache_keys = dict()
 
         # add controlnet, lora and textual_inversion models from disk
         self.scan_models_directory()
+
+    def sync_to_config(self):
+        """
+        Call this when `models.yaml` has been changed externally.
+        This will reinitialize internal data structures
+        """
+        # Reread models directory; note that this will reinitialize the cache,
+        # causing otherwise unreferenced models to be removed from memory
+        self._read_models()
 
     def model_exists(
         self,
@@ -528,7 +549,10 @@ class ModelManager(object):
         model_keys = [self.create_key(model_name, base_model, model_type)] if model_name else sorted(self.models, key=str.casefold)
         models = []
         for model_key in model_keys:
-            model_config = self.models[model_key]
+            model_config = self.models.get(model_key)
+            if not model_config:
+                self.logger.error(f'Unknown model {model_name}')
+                raise KeyError(f'Unknown model {model_name}')
 
             cur_model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
             if base_model is not None and cur_base_model != base_model:
@@ -651,6 +675,7 @@ class ModelManager(object):
             model_name: str,
             base_model: BaseModelType,
             model_type: Union[ModelType.Main,ModelType.Vae],
+            dest_directory: Optional[Path]=None,
     ) -> AddModelResult:
         '''
         Convert a checkpoint file into a diffusers folder, deleting the cached
@@ -677,14 +702,14 @@ class ModelManager(object):
                                )
         checkpoint_path = self.app_config.root_path / info["path"]
         old_diffusers_path = self.app_config.models_path / model.location
-        new_diffusers_path = self.app_config.models_path / base_model.value / model_type.value / model_name
+        new_diffusers_path = (dest_directory or self.app_config.models_path / base_model.value / model_type.value) / model_name
         if new_diffusers_path.exists():
             raise ValueError(f"A diffusers model already exists at {new_diffusers_path}")
 
         try:
             move(old_diffusers_path,new_diffusers_path)
             info["model_format"] = "diffusers"
-            info["path"] = str(new_diffusers_path.relative_to(self.app_config.root_path))
+            info["path"] = str(new_diffusers_path) if dest_directory else str(new_diffusers_path.relative_to(self.app_config.root_path))
             info.pop('config')
 
             result = self.add_model(model_name, base_model, model_type,

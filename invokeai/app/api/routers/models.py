@@ -132,13 +132,11 @@ async def import_model(
     "/{base_model}/{model_type}/{model_name}",
     operation_id="del_model",
     responses={
-        204: {
-        "description": "Model deleted successfully"
-        }, 
-        404: {
-        "description": "Model not found"
-        }
+        204: { "description": "Model deleted successfully" }, 
+        404: { "description": "Model not found" }
     },
+    status_code = 204,
+    response_model = None,
 )
 async def delete_model(
         base_model: BaseModelType = Path(description="Base model"),
@@ -174,14 +172,17 @@ async def convert_model(
         base_model: BaseModelType = Path(description="Base model"),
         model_type: ModelType = Path(description="The type of model"),
         model_name: str = Path(description="model name"),
+        convert_dest_directory: Optional[str] = Query(default=None, description="Save the converted model to the designated directory"),
 ) -> ConvertModelResponse:
-    """Convert a checkpoint model into a diffusers model"""
+    """Convert a checkpoint model into a diffusers model, optionally saving to the indicated destination directory, or `models` if none."""
     logger = ApiDependencies.invoker.services.logger
     try:
         logger.info(f"Converting model: {model_name}")
+        dest = pathlib.Path(convert_dest_directory) if convert_dest_directory else None
         ApiDependencies.invoker.services.model_manager.convert_model(model_name,
                                                                      base_model = base_model,
-                                                                     model_type = model_type
+                                                                     model_type = model_type,
+                                                                     convert_dest_directory = dest,
                                                                      )
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(model_name,
                                                                               base_model = base_model,
@@ -209,6 +210,36 @@ async def search_for_models(
     if not search_path.is_dir():
         raise HTTPException(status_code=404, detail=f"The search path '{search_path}' does not exist or is not directory")
     return ApiDependencies.invoker.services.model_manager.search_for_models([search_path])
+
+@models_router.get(
+    "/ckpt_confs",
+    operation_id="list_ckpt_configs",
+    responses={
+        200: { "description" : "paths retrieved successfully" },
+    },
+    status_code = 200,
+    response_model = List[pathlib.Path]
+)
+async def list_ckpt_configs(
+)->List[pathlib.Path]:
+    """Return a list of the legacy checkpoint configuration files stored in `ROOT/configs/stable-diffusion`, relative to ROOT."""
+    return ApiDependencies.invoker.services.model_manager.list_checkpoint_configs()
+    
+        
+@models_router.get(
+    "/sync",
+    operation_id="sync_to_config",
+    responses={
+        201: { "description": "synchronization successful" },
+    },
+    status_code = 201,
+    response_model = None
+)
+async def sync_to_config(
+)->None:
+    """Call after making changes to models.yaml, autoimport directories or models directory to synchronize
+    in-memory data structures with disk data structures."""
+    return ApiDependencies.invoker.services.model_manager.sync_to_config()
         
 @models_router.put(
     "/merge/{base_model}",
@@ -228,17 +259,21 @@ async def merge_models(
         alpha: Optional[float]                     = Body(description="Alpha weighting strength to apply to 2d and 3d models", default=0.5),
         interp: Optional[MergeInterpolationMethod] = Body(description="Interpolation method"),
         force: Optional[bool]                      = Body(description="Force merging of models created with different versions of diffusers", default=False),
+        merge_dest_directory: Optional[str]       = Body(description="Save the merged model to the designated directory (with 'merged_model_name' appended)", default=None)
 ) -> MergeModelResponse:
     """Convert a checkpoint model into a diffusers model"""
     logger = ApiDependencies.invoker.services.logger
     try:
-        logger.info(f"Merging models: {model_names}")
+        logger.info(f"Merging models: {model_names} into {merge_dest_directory or '<MODELS>'}/{merged_model_name}")
+        dest = pathlib.Path(merge_dest_directory) if merge_dest_directory else None
         result = ApiDependencies.invoker.services.model_manager.merge_models(model_names,
                                                                              base_model,
-                                                                             merged_model_name or "+".join(model_names),
-                                                                             alpha,
-                                                                             interp,
-                                                                             force)
+                                                                             merged_model_name=merged_model_name or "+".join(model_names),
+                                                                             alpha=alpha,
+                                                                             interp=interp,
+                                                                             force=force,
+                                                                             merge_dest_directory = dest
+                                                                             )
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(result.name,
                                                                               base_model = base_model,
                                                                               model_type = ModelType.Main,
