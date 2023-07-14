@@ -99,7 +99,7 @@ export const modelsApi = api.injectEndpoints({
       query: () => ({ url: 'models/', params: { model_type: 'main' } }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'MainModel', type: LIST_TAG },
+          { type: 'MainModel', id: LIST_TAG },
         ];
 
         if (result) {
@@ -138,7 +138,7 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: ['MainModel'],
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
     }),
     deleteMainModels: build.mutation<
       EntityState<MainModelConfigEntity>,
@@ -150,7 +150,7 @@ export const modelsApi = api.injectEndpoints({
           method: 'DELETE',
         };
       },
-      invalidatesTags: ['MainModel'],
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
     }),
     convertMainModels: build.mutation<
       EntityState<MainModelConfigEntity>,
@@ -162,7 +162,7 @@ export const modelsApi = api.injectEndpoints({
           method: 'PUT',
         };
       },
-      invalidatesTags: ['MainModel'],
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
     }),
     mergeMainModels: build.mutation<
       EntityState<MainModelConfigEntity>,
@@ -175,13 +175,13 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: ['MainModel'],
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
     }),
     getLoRAModels: build.query<EntityState<LoRAModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'LoRAModel', type: LIST_TAG },
+          { type: 'LoRAModel', id: LIST_TAG },
         ];
 
         if (result) {
@@ -216,7 +216,7 @@ export const modelsApi = api.injectEndpoints({
       query: () => ({ url: 'models/', params: { model_type: 'controlnet' } }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'ControlNetModel', type: LIST_TAG },
+          { type: 'ControlNetModel', id: LIST_TAG },
         ];
 
         if (result) {
@@ -248,7 +248,7 @@ export const modelsApi = api.injectEndpoints({
       query: () => ({ url: 'models/', params: { model_type: 'vae' } }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'VaeModel', type: LIST_TAG },
+          { type: 'VaeModel', id: LIST_TAG },
         ];
 
         if (result) {
@@ -283,7 +283,7 @@ export const modelsApi = api.injectEndpoints({
       query: () => ({ url: 'models/', params: { model_type: 'embedding' } }),
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'TextualInversionModel', type: LIST_TAG },
+          { type: 'TextualInversionModel', id: LIST_TAG },
         ];
 
         if (result) {
