@@ -7,12 +7,12 @@ import { useTranslation } from 'react-i18next';
 
 import { useForm } from '@mantine/form';
 import { makeToast } from 'app/components/Toaster';
-import type { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
 import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
 import { components } from 'services/api/schema';
@@ -38,9 +38,8 @@ const variantSelectData = [
 ];
 
 export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
-  const isProcessing = useAppSelector(
-    (state: RootState) => state.system.isProcessing
-  );
+  const isBusy = useAppSelector(selectIsBusy);
+
   const { retrievedModel, modelToEdit } = props;
 
   const [updateMainModel, { isLoading, error }] = useUpdateMainModelsMutation();
@@ -138,8 +137,8 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
             {...diffusersEditForm.getInputProps('vae')}
           />
           <IAIButton
-            disabled={isProcessing}
             type="submit"
+            isDisabled={isBusy || isLoading}
             isLoading={isLoading}
           >
             {t('modelManager.updateModel')}

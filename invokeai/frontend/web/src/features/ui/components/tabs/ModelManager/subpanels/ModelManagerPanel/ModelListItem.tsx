@@ -13,6 +13,7 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { setOpenModel } from 'features/system/store/systemSlice';
 import { useTranslation } from 'react-i18next';
 import { useDeleteMainModelsMutation } from 'services/api/endpoints/models';
@@ -26,9 +27,7 @@ type ModelListItemProps = {
 };
 
 export default function ModelListItem(props: ModelListItemProps) {
-  const { isProcessing, isConnected } = useAppSelector(
-    (state: RootState) => state.system
-  );
+  const isBusy = useAppSelector(selectIsBusy);
 
   const { colorMode } = useColorMode();
 
@@ -89,7 +88,7 @@ export default function ModelListItem(props: ModelListItemProps) {
           size="sm"
           onClick={openModelHandler}
           aria-label={t('accessibility.modifyConfig')}
-          isDisabled={status === 'active' || isProcessing || !isConnected}
+          isDisabled={isBusy}
         />
         <IAIAlertDialog
           title={t('modelManager.deleteModel')}
@@ -100,7 +99,7 @@ export default function ModelListItem(props: ModelListItemProps) {
               icon={<DeleteIcon />}
               size="sm"
               aria-label={t('modelManager.deleteConfig')}
-              isDisabled={status === 'active' || isProcessing || !isConnected}
+              isDisabled={isBusy}
               colorScheme="error"
             />
           }

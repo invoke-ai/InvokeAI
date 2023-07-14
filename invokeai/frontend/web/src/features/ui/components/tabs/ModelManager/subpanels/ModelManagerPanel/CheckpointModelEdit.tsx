@@ -6,13 +6,13 @@ import { Divider, Flex, Text } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
 import { useTranslation } from 'react-i18next';
 
-import type { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 
 import { makeToast } from 'app/components/Toaster';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
 import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
 import { components } from 'services/api/schema';
@@ -39,9 +39,7 @@ type CheckpointModelEditProps = {
 };
 
 export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
-  const isProcessing = useAppSelector(
-    (state: RootState) => state.system.isProcessing
-  );
+  const isBusy = useAppSelector(selectIsBusy);
 
   const { modelToEdit, retrievedModel } = props;
 
@@ -153,8 +151,8 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               {...checkpointEditForm.getInputProps('config')}
             />
             <IAIButton
-              disabled={isProcessing}
               type="submit"
+              isDisabled={isBusy || isLoading}
               isLoading={isLoading}
             >
               {t('modelManager.updateModel')}
