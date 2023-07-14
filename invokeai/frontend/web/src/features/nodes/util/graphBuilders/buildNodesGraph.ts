@@ -1,8 +1,5 @@
 import { RootState } from 'app/store/store';
 import { InputFieldValue } from 'features/nodes/types/types';
-import { modelIdToLoRAModelParam } from 'features/parameters/util/modelIdToLoRAModelParam';
-import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
-import { modelIdToVAEModelParam } from 'features/parameters/util/modelIdToVAEModelParam';
 import { cloneDeep, omit, reduce } from 'lodash-es';
 import { Graph } from 'services/api/types';
 import { AnyInvocation } from 'services/events/types';
@@ -24,24 +21,6 @@ export const parseFieldValue = (field: InputFieldValue) => {
 
       Object.assign(clonedValue, transformedColor);
       return clonedValue;
-    }
-  }
-
-  if (field.type === 'model') {
-    if (field.value) {
-      return modelIdToMainModelParam(field.value);
-    }
-  }
-
-  if (field.type === 'vae_model') {
-    if (field.value) {
-      return modelIdToVAEModelParam(field.value);
-    }
-  }
-
-  if (field.type === 'lora_model') {
-    if (field.value) {
-      return modelIdToLoRAModelParam(field.value);
     }
   }
 

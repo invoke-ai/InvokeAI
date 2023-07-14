@@ -1,5 +1,10 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
+import {
+  LoRAModelParam,
+  MainModelParam,
+  VaeModelParam,
+} from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, uniqBy } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
@@ -73,7 +78,10 @@ const nodesSlice = createSlice({
           | ImageField
           | RgbaColor
           | undefined
-          | ImageField[];
+          | ImageField[]
+          | MainModelParam
+          | VaeModelParam
+          | LoRAModelParam;
       }>
     ) => {
       const { nodeId, fieldName, value } = action.payload;

@@ -1,28 +1,29 @@
-import { SelectItem } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
+  MainModelInputFieldValue,
   ModelInputFieldTemplate,
-  ModelInputFieldValue,
 } from 'features/nodes/types/types';
 
+import { SelectItem } from '@mantine/core';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
-import { forEach, isString } from 'lodash-es';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
+import { forEach } from 'lodash-es';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 
 const ModelInputFieldComponent = (
-  props: FieldComponentProps<ModelInputFieldValue, ModelInputFieldTemplate>
+  props: FieldComponentProps<MainModelInputFieldValue, ModelInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { data: mainModels } = useGetMainModelsQuery();
+  const { data: mainModels, isLoading } = useGetMainModelsQuery();
 
   const data = useMemo(() => {
     if (!mainModels) {
@@ -46,14 +47,25 @@ const ModelInputFieldComponent = (
     return data;
   }, [mainModels]);
 
+  // grab the full model entity from the RTK Query cache
+  // TODO: maybe we should just store the full model entity in state?
   const selectedModel = useMemo(
-    () => mainModels?.entities[field.value ?? mainModels.ids[0]],
-    [mainModels?.entities, mainModels?.ids, field.value]
+    () =>
+      mainModels?.entities[
+        `${field.value?.base_model}/main/${field.value?.model_name}`
+      ] ?? null,
+    [field.value?.base_model, field.value?.model_name, mainModels?.entities]
   );
 
-  const handleValueChanged = useCallback(
+  const handleChangeModel = useCallback(
     (v: string | null) => {
       if (!v) {
+        return;
+      }
+
+      const newModel = modelIdToMainModelParam(v);
+
+      if (!newModel) {
         return;
       }
 
@@ -61,37 +73,32 @@ const ModelInputFieldComponent = (
         fieldValueChanged({
           nodeId,
           fieldName: field.name,
-          value: v,
+          value: newModel,
         })
       );
     },
     [dispatch, field.name, nodeId]
   );
 
-  useEffect(() => {
-    if (field.value && mainModels?.ids.includes(field.value)) {
-      return;
-    }
-
-    const firstModel = mainModels?.ids[0];
-
-    if (!isString(firstModel)) {
-      return;
-    }
-
-    handleValueChanged(firstModel);
-  }, [field.value, handleValueChanged, mainModels?.ids]);
-
-  return (
+  return isLoading ? (
+    <IAIMantineSelect
+      label={t('modelManager.model')}
+      placeholder="Loading..."
+      disabled={true}
+      data={[]}
+    />
+  ) : (
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={
         selectedModel?.base_model && MODEL_TYPE_MAP[selectedModel?.base_model]
       }
-      value={field.value}
-      placeholder="Pick one"
+      value={selectedModel?.id}
+      placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
       data={data}
-      onChange={handleValueChanged}
+      error={data.length === 0}
+      disabled={data.length === 0}
+      onChange={handleChangeModel}
     />
   );
 };
