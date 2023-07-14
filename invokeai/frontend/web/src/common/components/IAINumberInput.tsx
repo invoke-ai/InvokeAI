@@ -28,7 +28,7 @@ import {
   useState,
 } from 'react';
 
-const numberStringRegex = /^-?(0\.)?\.?$/;
+export const numberStringRegex = /^-?(0\.)?\.?$/;
 
 interface Props extends Omit<NumberInputProps, 'onChange'> {
   label?: string;
