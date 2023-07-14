@@ -1,10 +1,10 @@
 import { log } from 'app/logging/useLogger';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
+import { selectNextImageToSelect } from 'features/gallery/store/gallerySelectors';
 import {
   imageRemoved,
   imageSelected,
-  selectFilteredImages,
 } from 'features/gallery/store/gallerySlice';
 import {
   imageDeletionConfirmed,
@@ -12,7 +12,6 @@ import {
 } from 'features/imageDeletion/store/imageDeletionSlice';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { clamp } from 'lodash-es';
 import { api } from 'services/api';
 import { imageDeleted } from 'services/api/thunks/image';
 import { startAppListening } from '..';
@@ -37,26 +36,10 @@ export const addRequestedImageDeletionListener = () => {
         state.gallery.selection[state.gallery.selection.length - 1];
 
       if (lastSelectedImage === image_name) {
-        const filteredImages = selectFilteredImages(state);
-
-        const ids = filteredImages.map((i) => i.image_name);
-
-        const deletedImageIndex = ids.findIndex(
-          (result) => result.toString() === image_name
-        );
-
-        const filteredIds = ids.filter((id) => id.toString() !== image_name);
-
-        const newSelectedImageIndex = clamp(
-          deletedImageIndex,
-          0,
-          filteredIds.length - 1
-        );
-
-        const newSelectedImageId = filteredIds[newSelectedImageIndex];
+        const newSelectedImageId = selectNextImageToSelect(state, image_name);
 
         if (newSelectedImageId) {
-          dispatch(imageSelected(newSelectedImageId as string));
+          dispatch(imageSelected(newSelectedImageId));
         } else {
           dispatch(imageSelected(null));
         }

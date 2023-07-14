@@ -94,7 +94,8 @@ export type AppFeature =
   | 'bugLink'
   | 'localization'
   | 'consoleLogging'
-  | 'dynamicPrompting';
+  | 'dynamicPrompting'
+  | 'batches';
 
 /**
  * A disable-able Stable Diffusion feature

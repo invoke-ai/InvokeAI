@@ -49,9 +49,9 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
 
   const diffusersEditForm = useForm<DiffusersModelConfig>({
     initialValues: {
-      name: retrievedModel.name ? retrievedModel.name : '',
+      model_name: retrievedModel.model_name ? retrievedModel.model_name : '',
       base_model: retrievedModel.base_model,
-      type: 'main',
+      model_type: 'main',
       path: retrievedModel.path ? retrievedModel.path : '',
       description: retrievedModel.description ? retrievedModel.description : '',
       model_format: 'diffusers',
@@ -97,7 +97,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex flexDirection="column">
         <Text fontSize="lg" fontWeight="bold">
-          {retrievedModel.name}
+          {retrievedModel.model_name}
         </Text>
         <Text fontSize="sm" color="base.400">
           {MODEL_TYPE_MAP[retrievedModel.base_model]} Model

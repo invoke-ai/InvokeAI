@@ -12,6 +12,8 @@ const SaveNodesButton = () => {
     (state: RootState) => state.nodes.editorInstance
   );
 
+  const nodes = useAppSelector((state: RootState) => state.nodes.nodes);
+
   const saveEditorToJSON = useCallback(() => {
     if (editorInstance) {
       const editorState = editorInstance.toObject();
@@ -38,6 +40,7 @@ const SaveNodesButton = () => {
       tooltip={t('nodes.saveNodes')}
       aria-label={t('nodes.saveNodes')}
       onClick={saveEditorToJSON}
+      isDisabled={nodes.length === 0}
     />
   );
 };

@@ -52,9 +52,9 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
 
   const checkpointEditForm = useForm<CheckpointModelConfig>({
     initialValues: {
-      name: retrievedModel.name ? retrievedModel.name : '',
+      model_name: retrievedModel.model_name ? retrievedModel.model_name : '',
       base_model: retrievedModel.base_model,
-      type: 'main',
+      model_type: 'main',
       path: retrievedModel.path ? retrievedModel.path : '',
       description: retrievedModel.description ? retrievedModel.description : '',
       model_format: 'checkpoint',
@@ -102,7 +102,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
       <Flex justifyContent="space-between" alignItems="center">
         <Flex flexDirection="column">
           <Text fontSize="lg" fontWeight="bold">
-            {retrievedModel.name}
+            {retrievedModel.model_name}
           </Text>
           <Text fontSize="sm" color="base.400">
             {MODEL_TYPE_MAP[retrievedModel.base_model]} Model

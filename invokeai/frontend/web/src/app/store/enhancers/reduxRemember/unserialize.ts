@@ -1,7 +1,6 @@
 import { initialCanvasState } from 'features/canvas/store/canvasSlice';
 import { initialControlNetState } from 'features/controlNet/store/controlNetSlice';
 import { initialGalleryState } from 'features/gallery/store/gallerySlice';
-import { initialLightboxState } from 'features/lightbox/store/lightboxSlice';
 import { initialNodesState } from 'features/nodes/store/nodesSlice';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { initialPostprocessingState } from 'features/parameters/store/postprocessingSlice';
@@ -18,7 +17,6 @@ const initialStates: {
   canvas: initialCanvasState,
   gallery: initialGalleryState,
   generation: initialGenerationState,
-  lightbox: initialLightboxState,
   nodes: initialNodesState,
   postprocessing: initialPostprocessingState,
   system: initialSystemState,

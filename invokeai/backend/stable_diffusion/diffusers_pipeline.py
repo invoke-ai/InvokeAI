@@ -127,7 +127,7 @@ class AddsMaskGuidance:
 
     def _t_for_field(self, field_name: str, t):
         if field_name == "pred_original_sample":
-            return torch.zeros_like(t, dtype=t.dtype)  # it represents t=0
+            return self.scheduler.timesteps[-1]
         return t
 
     def apply_mask(self, latents: torch.Tensor, t) -> torch.Tensor:
@@ -631,7 +631,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                         control_latent_input = torch.cat([unet_latent_input] * 2)
 
                     if cfg_injection:  # only applying ControlNet to conditional instead of in unconditioned
-                        encoder_hidden_states = torch.cat([conditioning_data.unconditioned_embeddings])
+                        encoder_hidden_states = conditioning_data.text_embeddings
                     else:
                         encoder_hidden_states = torch.cat([conditioning_data.unconditioned_embeddings,
                                                            conditioning_data.text_embeddings])

@@ -1,13 +1,15 @@
-import { startAppListening } from '..';
-import { imageUploaded } from 'services/api/thunks/image';
-import { addToast } from 'features/system/store/systemSlice';
 import { log } from 'app/logging/useLogger';
-import { imageUpserted } from 'features/gallery/store/gallerySlice';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import {
+  imageUpserted,
+  imagesAddedToBatch,
+} from 'features/gallery/store/gallerySlice';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
-import { imageAddedToBatch } from 'features/batch/store/batchSlice';
+import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import { addToast } from 'features/system/store/systemSlice';
+import { imageUploaded } from 'services/api/thunks/image';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -73,7 +75,7 @@ export const addImageUploadedFulfilledListener = () => {
       }
 
       if (postUploadAction?.type === 'ADD_TO_BATCH') {
-        dispatch(imageAddedToBatch(image.image_name));
+        dispatch(imagesAddedToBatch([image.image_name]));
         return;
       }
     },

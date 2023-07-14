@@ -3,25 +3,21 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
-  ImageCollectionInvocation,
   ImageResizeInvocation,
   ImageToLatentsInvocation,
-  IterateInvocation,
 } from 'services/api/types';
-import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
-import { modelIdToMainModelField } from '../modelIdToMainModelField';
+import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
   CLIP_SKIP,
-  IMAGE_COLLECTION,
-  IMAGE_COLLECTION_ITERATE,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
   LATENTS_TO_LATENTS,
   MAIN_MODEL_LOADER,
+  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -39,7 +35,7 @@ export const buildLinearImageToImageGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: currentModel,
+    model,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -53,14 +49,15 @@ export const buildLinearImageToImageGraph = (
     shouldUseNoiseSettings,
   } = state.generation;
 
-  const {
-    isEnabled: isBatchEnabled,
-    imageNames: batchImageNames,
-    asInitialImage,
-  } = state.batch;
+  // TODO: add batch functionality
+  // const {
+  //   isEnabled: isBatchEnabled,
+  //   imageNames: batchImageNames,
+  //   asInitialImage,
+  // } = state.batch;
 
-  const shouldBatch =
-    isBatchEnabled && batchImageNames.length > 0 && asInitialImage;
+  // const shouldBatch =
+  //   isBatchEnabled && batchImageNames.length > 0 && asInitialImage;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -71,12 +68,15 @@ export const buildLinearImageToImageGraph = (
    * the `fit` param. These are added to the graph at the end.
    */
 
-  if (!initialImage && !shouldBatch) {
+  if (!initialImage) {
     moduleLog.error('No initial image found in state');
     throw new Error('No initial image found in state');
   }
 
-  const model = modelIdToMainModelField(currentModel?.id || '');
+  if (!model) {
+    moduleLog.error('No model found in state');
+    throw new Error('No model found in state');
+  }
 
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
@@ -295,51 +295,87 @@ export const buildLinearImageToImageGraph = (
     });
   }
 
-  if (isBatchEnabled && asInitialImage && batchImageNames.length > 0) {
-    // we are going to connect an iterate up to the init image
-    delete (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image;
+  // TODO: add batch functionality
+  // if (isBatchEnabled && asInitialImage && batchImageNames.length > 0) {
+  //   // we are going to connect an iterate up to the init image
+  //   delete (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image;
 
-    const imageCollection: ImageCollectionInvocation = {
-      id: IMAGE_COLLECTION,
-      type: 'image_collection',
-      images: batchImageNames.map((image_name) => ({ image_name })),
-    };
+  //   const imageCollection: ImageCollectionInvocation = {
+  //     id: IMAGE_COLLECTION,
+  //     type: 'image_collection',
+  //     images: batchImageNames.map((image_name) => ({ image_name })),
+  //   };
 
-    const imageCollectionIterate: IterateInvocation = {
-      id: IMAGE_COLLECTION_ITERATE,
-      type: 'iterate',
-    };
+  //   const imageCollectionIterate: IterateInvocation = {
+  //     id: IMAGE_COLLECTION_ITERATE,
+  //     type: 'iterate',
+  //   };
 
-    graph.nodes[IMAGE_COLLECTION] = imageCollection;
-    graph.nodes[IMAGE_COLLECTION_ITERATE] = imageCollectionIterate;
+  //   graph.nodes[IMAGE_COLLECTION] = imageCollection;
+  //   graph.nodes[IMAGE_COLLECTION_ITERATE] = imageCollectionIterate;
 
-    graph.edges.push({
-      source: { node_id: IMAGE_COLLECTION, field: 'collection' },
-      destination: {
-        node_id: IMAGE_COLLECTION_ITERATE,
-        field: 'collection',
-      },
-    });
+  //   graph.edges.push({
+  //     source: { node_id: IMAGE_COLLECTION, field: 'collection' },
+  //     destination: {
+  //       node_id: IMAGE_COLLECTION_ITERATE,
+  //       field: 'collection',
+  //     },
+  //   });
 
-    graph.edges.push({
-      source: { node_id: IMAGE_COLLECTION_ITERATE, field: 'item' },
-      destination: {
-        node_id: IMAGE_TO_LATENTS,
-        field: 'image',
-      },
-    });
-  }
+  //   graph.edges.push({
+  //     source: { node_id: IMAGE_COLLECTION_ITERATE, field: 'item' },
+  //     destination: {
+  //       node_id: IMAGE_TO_LATENTS,
+  //       field: 'image',
+  //     },
+  //   });
+  // }
 
-  addLoRAsToGraph(graph, state, LATENTS_TO_LATENTS);
+  // add metadata accumulator, which is only mostly populated - some fields are added later
+  graph.nodes[METADATA_ACCUMULATOR] = {
+    id: METADATA_ACCUMULATOR,
+    type: 'metadata_accumulator',
+    generation_mode: 'img2img',
+    cfg_scale,
+    height,
+    width,
+    positive_prompt: '', // set in addDynamicPromptsToGraph
+    negative_prompt: negativePrompt,
+    model,
+    seed: 0, // set in addDynamicPromptsToGraph
+    steps,
+    rand_device: use_cpu ? 'cpu' : 'cuda',
+    scheduler,
+    vae: undefined, // option; set in addVAEToGraph
+    controlnets: [], // populated in addControlNetToLinearGraph
+    loras: [], // populated in addLoRAsToGraph
+    clip_skip: clipSkip,
+    strength,
+    init_image: initialImage.imageName,
+  };
 
-  // Add VAE
-  addVAEToGraph(graph, state);
+  graph.edges.push({
+    source: {
+      node_id: METADATA_ACCUMULATOR,
+      field: 'metadata',
+    },
+    destination: {
+      node_id: LATENTS_TO_IMAGE,
+      field: 'metadata',
+    },
+  });
 
-  // add dynamic prompts, mutating `graph`
-  addDynamicPromptsToGraph(graph, state);
+  // add LoRA support
+  addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
+
+  // optionally add custom VAE
+  addVAEToGraph(state, graph);
+
+  // add dynamic prompts - also sets up core iteration and seed
+  addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(graph, LATENTS_TO_LATENTS, state);
+  addControlNetToLinearGraph(state, graph, LATENTS_TO_LATENTS);
 
   return graph;
 };

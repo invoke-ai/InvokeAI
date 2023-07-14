@@ -71,12 +71,14 @@ const ModelList = () => {
       // If no model info found for a model, ignore it
       if (!modelInfo) return;
 
-      if (modelInfo.name.toLowerCase().includes(searchText.toLowerCase())) {
+      if (
+        modelInfo.model_name.toLowerCase().includes(searchText.toLowerCase())
+      ) {
         filteredModelListItemsToRender.push(
           <ModelListItem
             key={i}
             modelKey={model}
-            name={modelInfo.name}
+            name={modelInfo.model_name}
             description={modelInfo.description}
           />
         );
@@ -85,7 +87,7 @@ const ModelList = () => {
             <ModelListItem
               key={i}
               modelKey={model}
-              name={modelInfo.name}
+              name={modelInfo.model_name}
               description={modelInfo.description}
             />
           );
@@ -97,7 +99,7 @@ const ModelList = () => {
           <ModelListItem
             key={i}
             modelKey={model}
-            name={modelInfo.name}
+            name={modelInfo.model_name}
             description={modelInfo.description}
           />
         );
@@ -106,7 +108,7 @@ const ModelList = () => {
           <ModelListItem
             key={i}
             modelKey={model}
-            name={modelInfo.name}
+            name={modelInfo.model_name}
             description={modelInfo.description}
           />
         );
