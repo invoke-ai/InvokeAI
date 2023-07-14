@@ -1,7 +1,7 @@
 import { UPSCALING_LEVELS } from 'app/constants';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import {
   UpscalingLevel,
   setUpscalingLevel,
@@ -24,7 +24,7 @@ export default function UpscaleScale() {
     dispatch(setUpscalingLevel(Number(v) as UpscalingLevel));
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       disabled={!isESRGANAvailable}
       label={t('parameters.scale')}
       value={String(upscalingLevel)}

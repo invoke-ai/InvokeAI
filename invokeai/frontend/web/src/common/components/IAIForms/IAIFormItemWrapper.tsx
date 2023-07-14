@@ -1,11 +1,13 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex, useColorMode } from '@chakra-ui/react';
 import { ReactElement } from 'react';
+import { mode } from 'theme/util/mode';
 
 export function IAIFormItemWrapper({
   children,
 }: {
   children: ReactElement | ReactElement[];
 }) {
+  const { colorMode } = useColorMode();
   return (
     <Flex
       sx={{
@@ -14,7 +16,7 @@ export function IAIFormItemWrapper({
         rowGap: 4,
         borderRadius: 'base',
         width: 'full',
-        bg: 'base.900',
+        bg: mode('base.100', 'base.900')(colorMode),
       }}
     >
       {children}

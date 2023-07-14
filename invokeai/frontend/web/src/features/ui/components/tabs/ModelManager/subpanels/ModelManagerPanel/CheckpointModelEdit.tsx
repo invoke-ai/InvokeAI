@@ -1,17 +1,20 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-
 import { Divider, Flex, Text } from '@chakra-ui/react';
-
-// import { addNewModel } from 'app/socketio/actions';
 import { useForm } from '@mantine/form';
-import { useTranslation } from 'react-i18next';
-
-import type { RootState } from 'app/store/store';
+import { makeToast } from 'app/components/Toaster';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAIInput from 'common/components/IAIInput';
+import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
-import { S } from 'services/api/types';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
+import { addToast } from 'features/system/store/systemSlice';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  CheckpointModelConfigEntity,
+  useUpdateMainModelsMutation,
+} from 'services/api/endpoints/models';
+import { CheckpointModelConfig } from 'services/api/types';
 import ModelConvert from './ModelConvert';
 
 const baseModelSelectData = [
@@ -25,55 +28,92 @@ const variantSelectData = [
   { value: 'depth', label: 'Depth' },
 ];
 
-export type CheckpointModel =
-  | S<'StableDiffusion1ModelCheckpointConfig'>
-  | S<'StableDiffusion2ModelCheckpointConfig'>;
-
 type CheckpointModelEditProps = {
-  modelToEdit: string;
-  retrievedModel: CheckpointModel;
+  model: CheckpointModelConfigEntity;
 };
 
 export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
-  const isProcessing = useAppSelector(
-    (state: RootState) => state.system.isProcessing
-  );
+  const isBusy = useAppSelector(selectIsBusy);
 
-  const { modelToEdit, retrievedModel } = props;
+  const { model } = props;
+
+  const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const checkpointEditForm = useForm({
+  const checkpointEditForm = useForm<CheckpointModelConfig>({
     initialValues: {
-      name: retrievedModel.model_name,
-      base_model: retrievedModel.base_model,
-      type: 'main',
-      path: retrievedModel.path,
-      description: retrievedModel.description,
+      model_name: model.model_name ? model.model_name : '',
+      base_model: model.base_model,
+      model_type: 'main',
+      path: model.path ? model.path : '',
+      description: model.description ? model.description : '',
       model_format: 'checkpoint',
-      vae: retrievedModel.vae,
-      config: retrievedModel.config,
-      variant: retrievedModel.variant,
+      vae: model.vae ? model.vae : '',
+      config: model.config ? model.config : '',
+      variant: model.variant,
+    },
+    validate: {
+      path: (value) =>
+        value.trim().length === 0 ? 'Must provide a path' : null,
     },
   });
 
-  const editModelFormSubmitHandler = (values) => {
-    console.log(values);
-  };
+  const editModelFormSubmitHandler = useCallback(
+    (values: CheckpointModelConfig) => {
+      const responseBody = {
+        base_model: model.base_model,
+        model_name: model.model_name,
+        body: values,
+      };
+      updateMainModel(responseBody)
+        .unwrap()
+        .then((payload) => {
+          checkpointEditForm.setValues(payload as CheckpointModelConfig);
+          dispatch(
+            addToast(
+              makeToast({
+                title: t('modelManager.modelUpdated'),
+                status: 'success',
+              })
+            )
+          );
+        })
+        .catch((error) => {
+          checkpointEditForm.reset();
+          dispatch(
+            addToast(
+              makeToast({
+                title: t('modelManager.modelUpdateFailed'),
+                status: 'error',
+              })
+            )
+          );
+        });
+    },
+    [
+      checkpointEditForm,
+      dispatch,
+      model.base_model,
+      model.model_name,
+      t,
+      updateMainModel,
+    ]
+  );
 
-  return modelToEdit ? (
+  return (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex justifyContent="space-between" alignItems="center">
         <Flex flexDirection="column">
           <Text fontSize="lg" fontWeight="bold">
-            {retrievedModel.model_name}
+            {model.model_name}
           </Text>
           <Text fontSize="sm" color="base.400">
-            {MODEL_TYPE_MAP[retrievedModel.base_model]} Model
+            {MODEL_TYPE_MAP[model.base_model]} Model
           </Text>
         </Flex>
-        <ModelConvert model={retrievedModel} />
+        <ModelConvert model={model} />
       </Flex>
       <Divider />
 
@@ -88,11 +128,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
           )}
         >
           <Flex flexDirection="column" overflowY="scroll" gap={4}>
-            <IAIInput
-              label={t('modelManager.name')}
-              {...checkpointEditForm.getInputProps('name')}
-            />
-            <IAIInput
+            <IAIMantineTextInput
               label={t('modelManager.description')}
               {...checkpointEditForm.getInputProps('description')}
             />
@@ -106,36 +142,28 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               data={variantSelectData}
               {...checkpointEditForm.getInputProps('variant')}
             />
-            <IAIInput
+            <IAIMantineTextInput
               label={t('modelManager.modelLocation')}
               {...checkpointEditForm.getInputProps('path')}
             />
-            <IAIInput
+            <IAIMantineTextInput
               label={t('modelManager.vaeLocation')}
               {...checkpointEditForm.getInputProps('vae')}
             />
-            <IAIInput
+            <IAIMantineTextInput
               label={t('modelManager.config')}
               {...checkpointEditForm.getInputProps('config')}
             />
-            <IAIButton disabled={isProcessing} type="submit">
+            <IAIButton
+              type="submit"
+              isDisabled={isBusy || isLoading}
+              isLoading={isLoading}
+            >
               {t('modelManager.updateModel')}
             </IAIButton>
           </Flex>
         </form>
       </Flex>
-    </Flex>
-  ) : (
-    <Flex
-      sx={{
-        width: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 'base',
-        bg: 'base.900',
-      }}
-    >
-      <Text fontWeight={500}>Pick A Model To Edit</Text>
     </Flex>
   );
 }

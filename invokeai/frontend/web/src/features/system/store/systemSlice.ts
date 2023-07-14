@@ -46,7 +46,6 @@ export interface SystemState {
   toastQueue: UseToastOptions[];
   searchFolder: string | null;
   foundModels: InvokeAI.FoundModel[] | null;
-  openModel: string | null;
   /**
    * The current progress image
    */
@@ -109,7 +108,6 @@ export const initialSystemState: SystemState = {
   toastQueue: [],
   searchFolder: null,
   foundModels: null,
-  openModel: null,
   progressImage: null,
   shouldAntialiasProgressImage: false,
   sessionId: null,
@@ -163,9 +161,6 @@ export const systemSlice = createSlice({
       action: PayloadAction<InvokeAI.FoundModel[] | null>
     ) => {
       state.foundModels = action.payload;
-    },
-    setOpenModel: (state, action: PayloadAction<string | null>) => {
-      state.openModel = action.payload;
     },
     /**
      * A cancel was scheduled
@@ -433,7 +428,6 @@ export const {
   clearToastQueue,
   setSearchFolder,
   setFoundModels,
-  setOpenModel,
   cancelScheduled,
   scheduledCancelAborted,
   cancelTypeChanged,
