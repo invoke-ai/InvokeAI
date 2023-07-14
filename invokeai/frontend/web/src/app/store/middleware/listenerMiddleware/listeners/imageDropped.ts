@@ -175,14 +175,30 @@ export const addImageDroppedListener = () => {
       }
 
       // add multiple images to board
-      // TODO: add endpoint
-      // if (
-      //   actionType === 'ADD_TO_BATCH' &&
-      //   activeData.payloadType === 'IMAGE_NAMES' &&
-      //   activeData.payload.imageDTONames
-      // ) {
-      //   dispatch(boardImagesApi.endpoints.addImagesToBoard.intiate({}));
-      // }
+      if (
+        actionType === 'MOVE_BOARD' &&
+        activeData.payloadType === 'GALLERY_SELECTION'
+      ) {
+        const { boardId } = overData.context;
+        if (boardId) {
+          dispatch(
+            boardImagesApi.endpoints.addMultipleImagesToBoard.initiate({
+              board_id: boardId as string,
+              image_names: state.gallery.selection,
+            })
+          );
+        } else {
+          const oldBoardId = state.gallery.selectedBoardId;
+          if (oldBoardId) {
+            dispatch(
+              boardImagesApi.endpoints.removeMultipleImagesFromBoard.initiate({
+                board_id: oldBoardId,
+                image_names: state.gallery.selection,
+              })
+            );
+          }
+        }
+      }
     },
   });
 };
