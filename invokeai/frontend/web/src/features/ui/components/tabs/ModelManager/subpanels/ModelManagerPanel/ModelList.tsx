@@ -79,36 +79,38 @@ const ModelList = (props: ModelListProps) => {
           </IAIButton>
         </ButtonGroup>
 
-        {['all', 'diffusers'].includes(modelFormatFilter) && (
-          <Flex sx={{ gap: 2, flexDir: 'column' }}>
-            <Text variant="subtext" size="sm">
-              Diffusers
-            </Text>
-            {filteredDiffusersModels.map((model) => (
-              <ModelListItem
-                key={model.id}
-                model={model}
-                isSelected={selectedModelId === model.id}
-                setSelectedModelId={setSelectedModelId}
-              />
-            ))}
-          </Flex>
-        )}
-        {['all', 'checkpoint'].includes(modelFormatFilter) && (
-          <Flex sx={{ gap: 2, flexDir: 'column' }}>
-            <Text variant="subtext" size="sm">
-              Checkpoint
-            </Text>
-            {filteredCheckpointModels.map((model) => (
-              <ModelListItem
-                key={model.id}
-                model={model}
-                isSelected={selectedModelId === model.id}
-                setSelectedModelId={setSelectedModelId}
-              />
-            ))}
-          </Flex>
-        )}
+        {['all', 'diffusers'].includes(modelFormatFilter) &&
+          filteredDiffusersModels.length > 0 && (
+            <Flex sx={{ gap: 2, flexDir: 'column' }}>
+              <Text variant="subtext" size="sm">
+                Diffusers
+              </Text>
+              {filteredDiffusersModels.map((model) => (
+                <ModelListItem
+                  key={model.id}
+                  model={model}
+                  isSelected={selectedModelId === model.id}
+                  setSelectedModelId={setSelectedModelId}
+                />
+              ))}
+            </Flex>
+          )}
+        {['all', 'checkpoint'].includes(modelFormatFilter) &&
+          filteredCheckpointModels.length > 0 && (
+            <Flex sx={{ gap: 2, flexDir: 'column' }}>
+              <Text variant="subtext" size="sm">
+                Checkpoint
+              </Text>
+              {filteredCheckpointModels.map((model) => (
+                <ModelListItem
+                  key={model.id}
+                  model={model}
+                  isSelected={selectedModelId === model.id}
+                  setSelectedModelId={setSelectedModelId}
+                />
+              ))}
+            </Flex>
+          )}
       </Flex>
     </Flex>
   );
