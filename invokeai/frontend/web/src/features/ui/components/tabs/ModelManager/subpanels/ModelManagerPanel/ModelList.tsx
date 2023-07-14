@@ -82,7 +82,7 @@ const ModelList = (props: ModelListProps) => {
         {['all', 'diffusers'].includes(modelFormatFilter) &&
           filteredDiffusersModels.length > 0 && (
             <Flex sx={{ gap: 2, flexDir: 'column' }}>
-              <Text variant="subtext" size="sm">
+              <Text variant="subtext" fontSize="sm">
                 Diffusers
               </Text>
               {filteredDiffusersModels.map((model) => (
@@ -98,7 +98,7 @@ const ModelList = (props: ModelListProps) => {
         {['all', 'checkpoint'].includes(modelFormatFilter) &&
           filteredCheckpointModels.length > 0 && (
             <Flex sx={{ gap: 2, flexDir: 'column' }}>
-              <Text variant="subtext" size="sm">
+              <Text variant="subtext" fontSize="sm">
                 Checkpoint
               </Text>
               {filteredCheckpointModels.map((model) => (
