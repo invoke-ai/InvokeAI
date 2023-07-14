@@ -1,5 +1,9 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { selectImagesAll } from 'features/gallery/store/gallerySlice';
+import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
+import {
+  ASSETS_CATEGORIES,
+  IMAGE_CATEGORIES,
+} from 'features/gallery/store/gallerySlice';
 import { size } from 'lodash-es';
 import queryString from 'query-string';
 import { $client } from 'services/api/client';
@@ -287,15 +291,12 @@ export const receivedPageOfImages = createAppAsyncThunk<
     const { get } = $client.get();
 
     const state = getState();
-    const { categories, selectedBoardId } = state.gallery;
 
-    const images = selectImagesAll(state).filter((i) => {
-      const isInCategory = categories.includes(i.image_category);
-      const isInSelectedBoard = selectedBoardId
-        ? i.board_id === selectedBoardId
-        : true;
-      return isInCategory && isInSelectedBoard;
-    });
+    const images = selectFilteredImages(state);
+    const categories =
+      state.gallery.galleryView === 'images'
+        ? IMAGE_CATEGORIES
+        : ASSETS_CATEGORIES;
 
     let query: ListImagesArg = {};
 

@@ -519,9 +519,9 @@ class ResizeLatentsInvocation(BaseInvocation):
     # Inputs
     latents: Optional[LatentsField] = Field(
         description="The latents to resize")
-    width:                         int = Field(
+    width:                         Union[int, None] = Field(default=512,
         ge=64, multiple_of=8, description="The width to resize to (px)")
-    height:                        int = Field(
+    height:                        Union[int, None] = Field(default=512,
         ge=64, multiple_of=8, description="The height to resize to (px)")
     mode:   LATENTS_INTERPOLATION_MODE = Field(
         default="bilinear", description="The interpolation mode")

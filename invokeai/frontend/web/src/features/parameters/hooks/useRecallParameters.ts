@@ -28,7 +28,7 @@ import {
   isValidSteps,
   isValidStrength,
   isValidWidth,
-} from '../store/parameterZodSchemas';
+} from '../types/parameterSchemas';
 
 export const useRecallParameters = () => {
   const dispatch = useAppDispatch();

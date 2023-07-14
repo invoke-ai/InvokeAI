@@ -10,7 +10,7 @@ import type { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { S } from 'services/api/types';
 
 type DiffusersModel =

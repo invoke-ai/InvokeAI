@@ -1,8 +1,8 @@
 import { Box, Flex } from '@chakra-ui/react';
-import ModelSelect from 'features/system/components/ModelSelect';
-import VAESelect from 'features/system/components/VAESelect';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
-import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
+import ParamMainModelSelect from '../MainModel/ParamMainModelSelect';
+import ParamVAEModelSelect from '../VAEModel/ParamVAEModelSelect';
 import ParamScheduler from './ParamScheduler';
 
 const ParamModelandVAEandScheduler = () => {
@@ -11,12 +11,12 @@ const ParamModelandVAEandScheduler = () => {
   return (
     <Flex gap={3} w="full" flexWrap={isVaeEnabled ? 'wrap' : 'nowrap'}>
       <Box w="full">
-        <ModelSelect />
+        <ParamMainModelSelect />
       </Box>
       <Flex gap={3} w="full">
         {isVaeEnabled && (
           <Box w="full">
-            <VAESelect />
+            <ParamVAEModelSelect />
           </Box>
         )}
         <Box w="full">
