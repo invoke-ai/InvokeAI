@@ -11,7 +11,7 @@ import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
-import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { forEach } from 'lodash-es';
 import { PropsWithChildren, useCallback, useMemo, useRef } from 'react';
 import { useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
@@ -47,8 +47,8 @@ const ParamEmbeddingPopover = (props: Props) => {
       const disabled = currentMainModel?.base_model !== embedding.base_model;
 
       data.push({
-        value: embedding.name,
-        label: embedding.name,
+        value: embedding.model_name,
+        label: embedding.model_name,
         group: MODEL_TYPE_MAP[embedding.base_model],
         disabled,
         tooltip: disabled

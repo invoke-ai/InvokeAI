@@ -5,32 +5,23 @@ import { setGalleryImageMinimumWidth } from 'features/gallery/store/gallerySlice
 import { clamp, isEqual } from 'lodash-es';
 import { useHotkeys } from 'react-hotkeys-hook';
 
-import './ImageGallery.css';
-import ImageGalleryContent from './ImageGalleryContent';
-import ResizableDrawer from 'features/ui/components/common/ResizableDrawer/ResizableDrawer';
-import { setShouldShowGallery } from 'features/ui/store/uiSlice';
 import { createSelector } from '@reduxjs/toolkit';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import ResizableDrawer from 'features/ui/components/common/ResizableDrawer/ResizableDrawer';
 import {
   activeTabNameSelector,
   uiSelector,
 } from 'features/ui/store/uiSelectors';
-import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
+import { setShouldShowGallery } from 'features/ui/store/uiSlice';
 import { memo } from 'react';
+import ImageGalleryContent from './ImageGalleryContent';
 
 const selector = createSelector(
-  [
-    activeTabNameSelector,
-    uiSelector,
-    gallerySelector,
-    isStagingSelector,
-    lightboxSelector,
-  ],
-  (activeTabName, ui, gallery, isStaging, lightbox) => {
+  [activeTabNameSelector, uiSelector, gallerySelector, isStagingSelector],
+  (activeTabName, ui, gallery, isStaging) => {
     const { shouldPinGallery, shouldShowGallery } = ui;
     const { galleryImageMinimumWidth } = gallery;
-    const { isLightboxOpen } = lightbox;
 
     return {
       activeTabName,
@@ -39,7 +30,6 @@ const selector = createSelector(
       shouldShowGallery,
       galleryImageMinimumWidth,
       isResizable: activeTabName !== 'unifiedCanvas',
-      isLightboxOpen,
     };
   },
   {
@@ -58,7 +48,6 @@ const GalleryDrawer = () => {
     // activeTabName,
     // isStaging,
     // isResizable,
-    // isLightboxOpen,
   } = useAppSelector(selector);
 
   const handleCloseGallery = () => {

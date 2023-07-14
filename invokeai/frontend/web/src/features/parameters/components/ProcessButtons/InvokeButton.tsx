@@ -78,7 +78,7 @@ export default function InvokeButton(props: InvokeButton) {
             aria-label={t('parameters.invoke')}
             type="submit"
             icon={<FaPlay />}
-            isDisabled={!isReady}
+            isDisabled={!isReady || isProcessing}
             onClick={handleInvoke}
             tooltip={t('parameters.invoke')}
             tooltipProps={{ placement: 'top' }}
@@ -95,7 +95,7 @@ export default function InvokeButton(props: InvokeButton) {
           <IAIButton
             aria-label={t('parameters.invoke')}
             type="submit"
-            isDisabled={!isReady}
+            isDisabled={!isReady || isProcessing}
             onClick={handleInvoke}
             colorScheme="accent"
             id="invoke-button"

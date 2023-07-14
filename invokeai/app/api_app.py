@@ -1,5 +1,6 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
+# Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 import asyncio
+import sys
 from inspect import signature
 
 import uvicorn
@@ -20,6 +21,13 @@ from ..backend.util.logging import InvokeAILogger
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
 logger = InvokeAILogger.getLogger(config=app_config)
+from invokeai.version.invokeai_version import __version__
+
+# we call this early so that the message appears before
+# other invokeai initialization messages
+if app_config.version:
+    print(f'InvokeAI version {__version__}')
+    sys.exit(0)
 
 import invokeai.frontend.web as web_dir
 import mimetypes
@@ -28,6 +36,7 @@ from .api.dependencies import ApiDependencies
 from .api.routers import sessions, models, images, boards, board_images, app_info
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
+    
 
 import torch
 if torch.backends.mps.is_available():

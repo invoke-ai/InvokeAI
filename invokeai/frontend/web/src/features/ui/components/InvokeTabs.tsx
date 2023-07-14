@@ -15,7 +15,6 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
-import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { configSelector } from 'features/system/store/configSelectors';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
@@ -104,9 +103,6 @@ const InvokeTabs = () => {
   const activeTab = useAppSelector(activeTabIndexSelector);
   const activeTabName = useAppSelector(activeTabNameSelector);
   const enabledTabs = useAppSelector(enabledTabsSelector);
-  const isLightBoxOpen = useAppSelector(
-    (state: RootState) => state.lightbox.isLightboxOpen
-  );
 
   const { shouldPinGallery, shouldPinParametersPanel, shouldShowGallery } =
     useAppSelector((state: RootState) => state.ui);
@@ -114,15 +110,6 @@ const InvokeTabs = () => {
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
-
-  // Lightbox Hotkey
-  useHotkeys(
-    'z',
-    () => {
-      dispatch(setIsLightboxOpen(!isLightBoxOpen));
-    },
-    [isLightBoxOpen]
-  );
 
   useHotkeys(
     'f',

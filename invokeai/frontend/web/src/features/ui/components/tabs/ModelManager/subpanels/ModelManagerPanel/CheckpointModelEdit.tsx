@@ -10,7 +10,7 @@ import type { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { S } from 'services/api/types';
 import ModelConvert from './ModelConvert';
 
@@ -46,7 +46,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
 
   const checkpointEditForm = useForm({
     initialValues: {
-      name: retrievedModel.name,
+      name: retrievedModel.model_name,
       base_model: retrievedModel.base_model,
       type: 'main',
       path: retrievedModel.path,
@@ -67,7 +67,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
       <Flex justifyContent="space-between" alignItems="center">
         <Flex flexDirection="column">
           <Text fontSize="lg" fontWeight="bold">
-            {retrievedModel.name}
+            {retrievedModel.model_name}
           </Text>
           <Text fontSize="sm" color="base.400">
             {MODEL_TYPE_MAP[retrievedModel.base_model]} Model

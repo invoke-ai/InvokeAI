@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
 
+from invokeai.app.invocations.metadata import ImageMetadata
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.item_storage import PaginatedResults
@@ -104,23 +105,38 @@ async def update_image(
 
 
 @images_router.get(
-    "/{image_name}/metadata",
-    operation_id="get_image_metadata",
+    "/{image_name}",
+    operation_id="get_image_dto",
     response_model=ImageDTO,
 )
-async def get_image_metadata(
+async def get_image_dto(
     image_name: str = Path(description="The name of image to get"),
 ) -> ImageDTO:
-    """Gets an image's metadata"""
+    """Gets an image's DTO"""
 
     try:
         return ApiDependencies.invoker.services.images.get_dto(image_name)
     except Exception as e:
         raise HTTPException(status_code=404)
 
+@images_router.get(
+    "/{image_name}/metadata",
+    operation_id="get_image_metadata",
+    response_model=ImageMetadata,
+)
+async def get_image_metadata(
+    image_name: str = Path(description="The name of image to get"),
+) -> ImageMetadata:
+    """Gets an image's metadata"""
+
+    try:
+        return ApiDependencies.invoker.services.images.get_metadata(image_name)
+    except Exception as e:
+        raise HTTPException(status_code=404)
+
 
 @images_router.get(
-    "/{image_name}",
+    "/{image_name}/full",
     operation_id="get_image_full",
     response_class=Response,
     responses={
@@ -213,10 +229,10 @@ async def get_image_urls(
 
 @images_router.get(
     "/",
-    operation_id="list_images_with_metadata",
+    operation_id="list_image_dtos",
     response_model=OffsetPaginatedResults[ImageDTO],
 )
-async def list_images_with_metadata(
+async def list_image_dtos(
     image_origin: Optional[ResourceOrigin] = Query(
         default=None, description="The origin of images to list"
     ),
@@ -232,7 +248,7 @@ async def list_images_with_metadata(
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
 ) -> OffsetPaginatedResults[ImageDTO]:
-    """Gets a list of images"""
+    """Gets a list of image DTOs"""
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
         offset,

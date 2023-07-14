@@ -1,8 +1,8 @@
+import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
-import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
-import { modelIdToMainModelField } from '../modelIdToMainModelField';
+import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
@@ -10,6 +10,7 @@ import {
   CLIP_SKIP,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
+  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -17,13 +18,15 @@ import {
   TEXT_TO_LATENTS,
 } from './constants';
 
+const moduleLog = log.child({ namespace: 'nodes' });
+
 export const buildLinearTextToImageGraph = (
   state: RootState
 ): NonNullableGraph => {
   const {
     positivePrompt,
     negativePrompt,
-    model: currentModel,
+    model,
     cfgScale: cfg_scale,
     scheduler,
     steps,
@@ -34,11 +37,14 @@ export const buildLinearTextToImageGraph = (
     shouldUseNoiseSettings,
   } = state.generation;
 
-  const model = modelIdToMainModelField(currentModel?.id || '');
-
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
+
+  if (!model) {
+    moduleLog.error('No model found in state');
+    throw new Error('No model found in state');
+  }
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -176,16 +182,49 @@ export const buildLinearTextToImageGraph = (
     ],
   };
 
-  addLoRAsToGraph(graph, state, TEXT_TO_LATENTS);
+  // add metadata accumulator, which is only mostly populated - some fields are added later
+  graph.nodes[METADATA_ACCUMULATOR] = {
+    id: METADATA_ACCUMULATOR,
+    type: 'metadata_accumulator',
+    generation_mode: 'txt2img',
+    cfg_scale,
+    height,
+    width,
+    positive_prompt: '', // set in addDynamicPromptsToGraph
+    negative_prompt: negativePrompt,
+    model,
+    seed: 0, // set in addDynamicPromptsToGraph
+    steps,
+    rand_device: use_cpu ? 'cpu' : 'cuda',
+    scheduler,
+    vae: undefined, // option; set in addVAEToGraph
+    controlnets: [], // populated in addControlNetToLinearGraph
+    loras: [], // populated in addLoRAsToGraph
+    clip_skip: clipSkip,
+  };
 
-  // Add Custom VAE Support
-  addVAEToGraph(graph, state);
+  graph.edges.push({
+    source: {
+      node_id: METADATA_ACCUMULATOR,
+      field: 'metadata',
+    },
+    destination: {
+      node_id: LATENTS_TO_IMAGE,
+      field: 'metadata',
+    },
+  });
 
-  // add dynamic prompts, mutating `graph`
-  addDynamicPromptsToGraph(graph, state);
+  // add LoRA support
+  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS);
+
+  // optionally add custom VAE
+  addVAEToGraph(state, graph);
+
+  // add dynamic prompts - also sets up core iteration and seed
+  addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(graph, TEXT_TO_LATENTS, state);
+  addControlNetToLinearGraph(state, graph, TEXT_TO_LATENTS);
 
   return graph;
 };

@@ -231,6 +231,7 @@ from __future__ import annotations
 import os
 import hashlib
 import textwrap
+import yaml
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List, Tuple, Union, Dict, Set, Callable, types
@@ -249,8 +250,8 @@ from .model_cache import ModelCache, ModelLocker
 from .models import (
     BaseModelType, ModelType, SubModelType,
     ModelError, SchedulerPredictionType, MODEL_CLASSES,
-    ModelConfigBase, ModelNotFoundException,
-    )
+    ModelConfigBase, ModelNotFoundException, InvalidModelException,
+)
 
 # We are only starting to number the config file with release 3.
 # The config file version doesn't have to start at release version, but it will help
@@ -273,10 +274,6 @@ class ModelInfo():
 
     def __exit__(self,*args, **kwargs):
         self.context.__exit__(*args, **kwargs)
-
-class InvalidModelError(Exception):
-    "Raised when an invalid model is requested"
-    pass
 
 class AddModelResult(BaseModel):
     name: str = Field(description="The name of the model after installation")
@@ -314,6 +311,9 @@ class ModelManager(object):
         self.config_path = None
         if isinstance(config, (str, Path)):
             self.config_path = Path(config)
+            if not self.config_path.exists():
+                logger.warning(f'The file {self.config_path} was not found. Initializing a new file')
+                self.initialize_model_config(self.config_path)
             config = OmegaConf.load(self.config_path)
 
         elif not isinstance(config, DictConfig):
@@ -336,6 +336,7 @@ class ModelManager(object):
         self.logger = logger
         self.cache = ModelCache(
             max_cache_size=max_cache_size,
+            max_vram_cache_size = self.app_config.max_vram_cache_size,
             execution_device = device_type,
             precision = precision,
             sequential_offload = sequential_offload,
@@ -385,6 +386,16 @@ class ModelManager(object):
 
     def _get_model_cache_path(self, model_path):
         return self.app_config.models_path / ".cache" / hashlib.md5(str(model_path).encode()).hexdigest()
+
+    @classmethod
+    def initialize_model_config(cls, config_path: Path):
+        """Create empty config file"""
+        with open(config_path,'w') as yaml_file:
+            yaml_file.write(yaml.dump({'__metadata__':
+                                       {'version':'3.0.0'}
+                                       }
+                                      )
+                            )
 
     def get_model(
         self,
@@ -527,9 +538,9 @@ class ModelManager(object):
             model_dict = dict(
                 **model_config.dict(exclude_defaults=True),
                 # OpenAPIModelInfoBase
-                name=cur_model_name,
+                model_name=cur_model_name,
                 base_model=cur_base_model,
-                type=cur_model_type,
+                model_type=cur_model_type,
             )
 
             models.append(model_dict)
@@ -802,6 +813,8 @@ class ModelManager(object):
                                 model_config: ModelConfigBase = model_class.probe_config(str(model_path))
                                 self.models[model_key] = model_config
                                 new_models_found = True
+                            except InvalidModelException:
+                                self.logger.warning(f"Not a valid model: {model_path}")
                             except NotImplementedError as e:
                                 self.logger.warning(e)
 
@@ -853,16 +866,22 @@ class ModelManager(object):
                         scanned_dirs.add(path)
                         continue
                     if any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}]):
-                        new_models_found.update(installer.heuristic_import(path))
-                        scanned_dirs.add(path)
+                        try:
+                            new_models_found.update(installer.heuristic_import(path))
+                            scanned_dirs.add(path)
+                        except ValueError as e:
+                            self.logger.warning(str(e))
 
                 for f in files:
                     path = Path(root) / f
                     if path in known_paths or path.parent in scanned_dirs:
                         continue
                     if path.suffix in {'.ckpt','.bin','.pth','.safetensors','.pt'}:
-                        import_result = installer.heuristic_import(path)
-                        new_models_found.update(import_result)
+                        try:
+                            import_result = installer.heuristic_import(path)
+                            new_models_found.update(import_result)
+                        except ValueError as e:
+                            self.logger.warning(str(e))
 
             self.logger.info(f'Scanned {items_scanned} files and directories, imported {len(new_models_found)} models')
             installed.update(new_models_found)

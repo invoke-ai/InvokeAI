@@ -30,6 +30,7 @@ export const addSessionCreatedRejectedListener = () => {
     effect: (action, { getState, dispatch }) => {
       if (action.payload) {
         const { arg, error } = action.payload;
+        const stringifiedError = JSON.stringify(error);
         moduleLog.error(
           {
             data: {
@@ -37,7 +38,7 @@ export const addSessionCreatedRejectedListener = () => {
               error: serializeError(error),
             },
           },
-          `Problem creating session`
+          `Problem creating session: ${stringifiedError}`
         );
       }
     },
