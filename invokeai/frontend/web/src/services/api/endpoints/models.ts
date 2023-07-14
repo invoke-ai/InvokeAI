@@ -3,7 +3,9 @@ import { cloneDeep } from 'lodash-es';
 import {
   AnyModelConfig,
   BaseModelType,
+  CheckpointModelConfig,
   ControlNetModelConfig,
+  DiffusersModelConfig,
   LoRAModelConfig,
   MainModelConfig,
   MergeModelConfig,
@@ -14,7 +16,13 @@ import {
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
 import { paths } from '../schema';
 
-export type MainModelConfigEntity = MainModelConfig & { id: string };
+export type DiffusersModelConfigEntity = DiffusersModelConfig & { id: string };
+export type CheckpointModelConfigEntity = CheckpointModelConfig & {
+  id: string;
+};
+export type MainModelConfigEntity =
+  | DiffusersModelConfigEntity
+  | CheckpointModelConfigEntity;
 
 export type LoRAModelConfigEntity = LoRAModelConfig & { id: string };
 

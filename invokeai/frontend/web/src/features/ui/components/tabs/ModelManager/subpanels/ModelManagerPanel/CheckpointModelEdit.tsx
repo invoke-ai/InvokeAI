@@ -1,21 +1,20 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-
 import { Divider, Flex, Text } from '@chakra-ui/react';
-
-// import { addNewModel } from 'app/socketio/actions';
 import { useForm } from '@mantine/form';
-import { useTranslation } from 'react-i18next';
-
-import IAIButton from 'common/components/IAIButton';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
-
 import { makeToast } from 'app/components/Toaster';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
-import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
-import { components } from 'services/api/schema';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  CheckpointModelConfigEntity,
+  useUpdateMainModelsMutation,
+} from 'services/api/endpoints/models';
+import { CheckpointModelConfig } from 'services/api/types';
 import ModelConvert from './ModelConvert';
 
 const baseModelSelectData = [
@@ -29,36 +28,31 @@ const variantSelectData = [
   { value: 'depth', label: 'Depth' },
 ];
 
-export type CheckpointModelConfig =
-  | components['schemas']['StableDiffusion1ModelCheckpointConfig']
-  | components['schemas']['StableDiffusion2ModelCheckpointConfig'];
-
 type CheckpointModelEditProps = {
-  modelToEdit: string;
-  retrievedModel: CheckpointModelConfig;
+  model: CheckpointModelConfigEntity;
 };
 
 export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
   const isBusy = useAppSelector(selectIsBusy);
 
-  const { modelToEdit, retrievedModel } = props;
+  const { model } = props;
 
-  const [updateMainModel, { error, isLoading }] = useUpdateMainModelsMutation();
+  const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const checkpointEditForm = useForm<CheckpointModelConfig>({
     initialValues: {
-      model_name: retrievedModel.model_name ? retrievedModel.model_name : '',
-      base_model: retrievedModel.base_model,
+      model_name: model.model_name ? model.model_name : '',
+      base_model: model.base_model,
       model_type: 'main',
-      path: retrievedModel.path ? retrievedModel.path : '',
-      description: retrievedModel.description ? retrievedModel.description : '',
+      path: model.path ? model.path : '',
+      description: model.description ? model.description : '',
       model_format: 'checkpoint',
-      vae: retrievedModel.vae ? retrievedModel.vae : '',
-      config: retrievedModel.config ? retrievedModel.config : '',
-      variant: retrievedModel.variant,
+      vae: model.vae ? model.vae : '',
+      config: model.config ? model.config : '',
+      variant: model.variant,
     },
     validate: {
       path: (value) =>
@@ -66,50 +60,60 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
     },
   });
 
-  const editModelFormSubmitHandler = (values: CheckpointModelConfig) => {
-    const responseBody = {
-      base_model: retrievedModel.base_model,
-      model_name: retrievedModel.model_name,
-      body: values,
-    };
-    updateMainModel(responseBody)
-      .unwrap()
-      .then((payload) => {
-        checkpointEditForm.setValues(payload as CheckpointModelConfig);
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('modelManager.modelUpdated'),
-              status: 'success',
-            })
-          )
-        );
-      })
-      .catch((error) => {
-        checkpointEditForm.reset();
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('modelManager.modelUpdateFailed'),
-              status: 'error',
-            })
-          )
-        );
-      });
-  };
+  const editModelFormSubmitHandler = useCallback(
+    (values: CheckpointModelConfig) => {
+      const responseBody = {
+        base_model: model.base_model,
+        model_name: model.model_name,
+        body: values,
+      };
+      updateMainModel(responseBody)
+        .unwrap()
+        .then((payload) => {
+          checkpointEditForm.setValues(payload as CheckpointModelConfig);
+          dispatch(
+            addToast(
+              makeToast({
+                title: t('modelManager.modelUpdated'),
+                status: 'success',
+              })
+            )
+          );
+        })
+        .catch((error) => {
+          checkpointEditForm.reset();
+          dispatch(
+            addToast(
+              makeToast({
+                title: t('modelManager.modelUpdateFailed'),
+                status: 'error',
+              })
+            )
+          );
+        });
+    },
+    [
+      checkpointEditForm,
+      dispatch,
+      model.base_model,
+      model.model_name,
+      t,
+      updateMainModel,
+    ]
+  );
 
-  return modelToEdit ? (
+  return (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex justifyContent="space-between" alignItems="center">
         <Flex flexDirection="column">
           <Text fontSize="lg" fontWeight="bold">
-            {retrievedModel.model_name}
+            {model.model_name}
           </Text>
           <Text fontSize="sm" color="base.400">
-            {MODEL_TYPE_MAP[retrievedModel.base_model]} Model
+            {MODEL_TYPE_MAP[model.base_model]} Model
           </Text>
         </Flex>
-        <ModelConvert model={retrievedModel} />
+        <ModelConvert model={model} />
       </Flex>
       <Divider />
 
@@ -160,18 +164,6 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
           </Flex>
         </form>
       </Flex>
-    </Flex>
-  ) : (
-    <Flex
-      sx={{
-        width: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 'base',
-        bg: 'base.900',
-      }}
-    >
-      <Text fontWeight={500}>Pick A Model To Edit</Text>
     </Flex>
   );
 }
