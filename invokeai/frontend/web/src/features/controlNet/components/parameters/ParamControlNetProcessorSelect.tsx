@@ -1,8 +1,12 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 
-import IAIMantineSelect, {
+import { createSelector } from '@reduxjs/toolkit';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIMantineSearchableSelect, {
   IAISelectDataType,
-} from 'common/components/IAIMantineSelect';
+} from 'common/components/IAIMantineSearchableSelect';
+import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
+import { configSelector } from 'features/system/store/configSelectors';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { CONTROLNET_PROCESSORS } from '../../store/constants';
@@ -11,10 +15,6 @@ import {
   ControlNetProcessorNode,
   ControlNetProcessorType,
 } from '../../store/types';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
-import { createSelector } from '@reduxjs/toolkit';
-import { configSelector } from 'features/system/store/configSelectors';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 type ParamControlNetProcessorSelectProps = {
   controlNetId: string;
@@ -72,7 +72,7 @@ const ParamControlNetProcessorSelect = (
   );
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       label="Processor"
       value={processorNode.type ?? 'canny_image_processor'}
       data={controlNetProcessors}

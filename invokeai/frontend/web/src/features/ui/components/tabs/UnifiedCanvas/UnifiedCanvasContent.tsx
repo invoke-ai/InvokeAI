@@ -9,17 +9,15 @@ import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 
-import { memo, useCallback, useLayoutEffect } from 'react';
-import UnifiedCanvasToolbarBeta from './UnifiedCanvasBeta/UnifiedCanvasToolbarBeta';
-import UnifiedCanvasToolSettingsBeta from './UnifiedCanvasBeta/UnifiedCanvasToolSettingsBeta';
-import { ImageDTO } from 'services/api/types';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import IAIDropOverlay from 'common/components/IAIDropOverlay';
 import {
   CanvasInitialImageDropData,
   isValidDrop,
   useDroppable,
 } from 'app/components/ImageDnd/typesafeDnd';
+import IAIDropOverlay from 'common/components/IAIDropOverlay';
+import { memo, useLayoutEffect } from 'react';
+import UnifiedCanvasToolSettingsBeta from './UnifiedCanvasBeta/UnifiedCanvasToolSettingsBeta';
+import UnifiedCanvasToolbarBeta from './UnifiedCanvasBeta/UnifiedCanvasToolbarBeta';
 
 const selector = createSelector(
   [canvasSelector, uiSelector],

@@ -1,4 +1,4 @@
-import { Divider, Flex } from '@chakra-ui/react';
+import { Divider, Flex, useColorMode } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -12,6 +12,8 @@ export default function AddModelsPanel() {
     (state: RootState) => state.ui.addNewModelUIOption
   );
 
+  const { colorMode } = useColorMode();
+
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -20,27 +22,13 @@ export default function AddModelsPanel() {
       <Flex columnGap={4}>
         <IAIButton
           onClick={() => dispatch(setAddNewModelUIOption('ckpt'))}
-          sx={{
-            backgroundColor:
-              addNewModelUIOption == 'ckpt' ? 'accent.700' : 'base.700',
-            '&:hover': {
-              backgroundColor:
-                addNewModelUIOption == 'ckpt' ? 'accent.700' : 'base.600',
-            },
-          }}
+          isChecked={addNewModelUIOption == 'ckpt'}
         >
           {t('modelManager.addCheckpointModel')}
         </IAIButton>
         <IAIButton
           onClick={() => dispatch(setAddNewModelUIOption('diffusers'))}
-          sx={{
-            backgroundColor:
-              addNewModelUIOption == 'diffusers' ? 'accent.700' : 'base.700',
-            '&:hover': {
-              backgroundColor:
-                addNewModelUIOption == 'diffusers' ? 'accent.700' : 'base.600',
-            },
-          }}
+          isChecked={addNewModelUIOption == 'diffusers'}
         >
           {t('modelManager.addDiffuserModel')}
         </IAIButton>

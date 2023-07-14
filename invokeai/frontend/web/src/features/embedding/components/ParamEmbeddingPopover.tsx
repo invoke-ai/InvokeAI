@@ -9,7 +9,7 @@ import {
 import { SelectItem } from '@mantine/core';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { forEach } from 'lodash-es';
@@ -106,7 +106,7 @@ const ParamEmbeddingPopover = (props: Props) => {
               </Text>
             </Flex>
           ) : (
-            <IAIMantineSelect
+            <IAIMantineSearchableSelect
               inputRef={inputRef}
               autoFocus
               placeholder={'Add Embedding'}

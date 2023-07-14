@@ -12,10 +12,10 @@ import {
 } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
 
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { memo, useContext, useRef, useState } from 'react';
-import { AddImageToBoardContext } from '../../../../app/contexts/AddImageToBoardContext';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
+import { AddImageToBoardContext } from '../../../../app/contexts/AddImageToBoardContext';
 
 const UpdateImageBoardModal = () => {
   // const boards = useSelector(selectBoardsAll);
@@ -56,7 +56,7 @@ const UpdateImageBoardModal = () => {
                 {isFetching ? (
                   <Spinner />
                 ) : (
-                  <IAIMantineSelect
+                  <IAIMantineSearchableSelect
                     placeholder="Select Board"
                     onChange={(v) => setSelectedBoard(v)}
                     value={selectedBoard}

@@ -42,17 +42,20 @@ export type ControlNetModelConfig =
   components['schemas']['ControlNetModelConfig'];
 export type TextualInversionModelConfig =
   components['schemas']['TextualInversionModelConfig'];
-export type MainModelConfig =
-  | components['schemas']['StableDiffusion1ModelCheckpointConfig']
+export type DiffusersModelConfig =
   | components['schemas']['StableDiffusion1ModelDiffusersConfig']
-  | components['schemas']['StableDiffusion2ModelCheckpointConfig']
   | components['schemas']['StableDiffusion2ModelDiffusersConfig'];
+export type CheckpointModelConfig =
+  | components['schemas']['StableDiffusion1ModelCheckpointConfig']
+  | components['schemas']['StableDiffusion2ModelCheckpointConfig'];
+export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig
   | VaeModelConfig
   | ControlNetModelConfig
   | TextualInversionModelConfig
   | MainModelConfig;
+export type MergeModelConfig = components['schemas']['Body_merge_models'];
 
 // Graphs
 export type Graph = components['schemas']['Graph'];

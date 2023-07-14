@@ -24,7 +24,7 @@ import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash-es';
 
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import {
   canvasCopiedToClipboard,
   canvasDownloadedAsImage,
@@ -213,7 +213,7 @@ const IAICanvasToolbar = () => {
       }}
     >
       <Box w={24}>
-        <IAIMantineSelect
+        <IAIMantineSearchableSelect
           tooltip={`${t('unifiedCanvas.layer')} (Q)`}
           value={layer}
           data={LAYER_NAMES_DICT}

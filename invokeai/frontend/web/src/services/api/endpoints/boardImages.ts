@@ -4,7 +4,7 @@ import { paths } from '../schema';
 
 type ListBoardImagesArg =
   paths['/api/v1/board_images/{board_id}']['get']['parameters']['path'] &
-  paths['/api/v1/board_images/{board_id}']['get']['parameters']['query'];
+    paths['/api/v1/board_images/{board_id}']['get']['parameters']['query'];
 
 type AddImageToBoardArg =
   paths['/api/v1/board_images/']['post']['requestBody']['content']['application/json'];
@@ -25,11 +25,12 @@ export const boardImagesApi = api.injectEndpoints({
       query: ({ board_id, offset, limit }) => ({
         url: `board_images/${board_id}`,
         method: 'GET',
-
       }),
       providesTags: (result, error, arg) => {
         // any list of boardimages
-        const tags: ApiFullTagDescription[] = [{ id: 'BoardImage', type: `${arg.board_id}_${LIST_TAG}` }];
+        const tags: ApiFullTagDescription[] = [
+          { type: 'BoardImage', id: `${arg.board_id}_${LIST_TAG}` },
+        ];
 
         if (result) {
           // and individual tags for each boardimage
@@ -57,7 +58,7 @@ export const boardImagesApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, arg) => [
         { type: 'BoardImage' },
-        { type: 'Board', id: arg.board_id }
+        { type: 'Board', id: arg.board_id },
       ],
     }),
 
@@ -69,7 +70,7 @@ export const boardImagesApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, arg) => [
         { type: 'BoardImage' },
-        { type: 'Board', id: arg.board_id }
+        { type: 'Board', id: arg.board_id },
       ],
     }),
   }),
