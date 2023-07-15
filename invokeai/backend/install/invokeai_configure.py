@@ -30,8 +30,6 @@ from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
 from tqdm import tqdm
 from transformers import (
-    AutoProcessor,
-    CLIPSegForImageSegmentation,
     CLIPTextModel,
     CLIPTokenizer,
     AutoFeatureExtractor,
@@ -45,7 +43,6 @@ from invokeai.app.services.config import (
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 from invokeai.frontend.install.widgets import (
-    SingleSelectColumns,
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
@@ -248,20 +245,8 @@ def download_realesrgan():
         download_with_progress_bar(model['url'], config.models_path / model['dest'], model['description'])
 
 # ---------------------------------------------
-def download_clipseg():
-    logger.info("Installing clipseg model for text-based masking...")
-    CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
-    try:
-        hf_download_from_pretrained(AutoProcessor, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
-        hf_download_from_pretrained(CLIPSegForImageSegmentation, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
-    except Exception:
-        logger.info("Error installing clipseg model:")
-        logger.info(traceback.format_exc())
-
-
 def download_support_models():
     download_realesrgan()
-    download_clipseg()
     download_conversion_models()
 
 # -------------------------------------
