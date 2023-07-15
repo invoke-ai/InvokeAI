@@ -133,7 +133,7 @@ const ControlNetImagePreview = (props: Props) => {
         draggableData={draggableData}
         droppableData={droppableData}
         imageDTO={controlImage}
-        isDropDisabled={shouldShowProcessedImage}
+        isDropDisabled={shouldShowProcessedImage || !isEnabled}
         onClickReset={handleResetControlImage}
         postUploadAction={postUploadAction}
         resetTooltip="Reset Control Image"
@@ -157,6 +157,7 @@ const ControlNetImagePreview = (props: Props) => {
           droppableData={droppableData}
           imageDTO={processedControlImage}
           isUploadDisabled={true}
+          isDropDisabled={!isEnabled}
           onClickReset={handleResetControlImage}
           resetTooltip="Reset Control Image"
           withResetIcon={Boolean(controlImage)}
