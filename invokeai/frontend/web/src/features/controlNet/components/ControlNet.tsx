@@ -78,7 +78,7 @@ const ControlNet = (props: ControlNetProps) => {
         },
       }}
     >
-      <Flex sx={{ gap: 2 }}>
+      <Flex sx={{ gap: 2, alignItems: 'center' }}>
         <IAISwitch
           tooltip={'Toggle this ControlNet'}
           aria-label={'Toggle this ControlNet'}
