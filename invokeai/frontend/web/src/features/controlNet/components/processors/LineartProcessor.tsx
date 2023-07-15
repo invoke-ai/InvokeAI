@@ -1,24 +1,27 @@
+import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredLineartImageProcessorInvocation } from 'features/controlNet/store/types';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.lineart_image_processor.default;
+const DEFAULTS = CONTROLNET_PROCESSORS.lineart_image_processor
+  .default as RequiredLineartImageProcessorInvocation;
 
 type LineartProcessorProps = {
   controlNetId: string;
   processorNode: RequiredLineartImageProcessorInvocation;
+  isEnabled: boolean;
 };
 
 const LineartProcessor = (props: LineartProcessorProps) => {
-  const { controlNetId, processorNode } = props;
+  const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, detect_resolution, coarse } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isReady = useIsReadyToInvoke();
+  const isBusy = useAppSelector(selectIsBusy);
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -65,7 +68,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
       />
       <IAISlider
         label="Image Resolution"
@@ -77,13 +80,13 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
       />
       <IAISwitch
         label="Coarse"
         isChecked={coarse}
         onChange={handleCoarseChanged}
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
       />
     </ProcessorWrapper>
   );

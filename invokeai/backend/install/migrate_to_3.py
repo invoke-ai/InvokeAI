@@ -593,9 +593,12 @@ script, which will perform a full upgrade in place."""
     config = InvokeAIAppConfig.get_config()
     config.parse_args(['--root',str(dest_root)])
 
-    # TODO: revisit
-    # assert (dest_root / 'models').is_dir(), f"{dest_root} does not contain a 'models' subdirectory"
-    # assert (dest_root / 'invokeai.yaml').exists(), f"{dest_root} does not contain an InvokeAI init file."
+    # TODO: revisit - don't rely on invokeai.yaml to exist yet!
+    dest_is_setup = (dest_root / 'models/core').exists() and (dest_root / 'databases').exists()
+    if not dest_is_setup:
+        import invokeai.frontend.install.invokeai_configure
+        from invokeai.backend.install.invokeai_configure import initialize_rootdir
+        initialize_rootdir(dest_root, True)
 
     do_migrate(src_root,dest_root)
 

@@ -11,6 +11,7 @@ import {
 import { forEach, some } from 'lodash-es';
 import { modelsApi } from 'services/api/endpoints/models';
 import { startAppListening } from '..';
+import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
 
 const moduleLog = log.child({ module: 'models' });
 
@@ -127,7 +128,22 @@ export const addModelsLoadedListener = () => {
     matcher: modelsApi.endpoints.getControlNetModels.matchFulfilled,
     effect: async (action, { getState, dispatch }) => {
       // ControlNet models loaded - need to remove missing ControlNets from state
-      // TODO: pending model manager controlnet support
+      const controlNets = getState().controlNet.controlNets;
+
+      forEach(controlNets, (controlNet, controlNetId) => {
+        const isControlNetAvailable = some(
+          action.payload.entities,
+          (m) =>
+            m?.model_name === controlNet?.model?.model_name &&
+            m?.base_model === controlNet?.model?.base_model
+        );
+
+        if (isControlNetAvailable) {
+          return;
+        }
+
+        dispatch(controlNetRemoved({ controlNetId }));
+      });
     },
   });
 };

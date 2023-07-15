@@ -71,8 +71,6 @@ class ModelInstallList:
 class InstallSelections():
     install_models: List[str]= field(default_factory=list)
     remove_models: List[str]=field(default_factory=list)
-#    scan_directory: Path = None
-#    autoscan_on_startup: bool=False
 
 @dataclass
 class ModelLoadInfo():

@@ -1,4 +1,4 @@
-import { Tooltip } from '@chakra-ui/react';
+import { FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
 import { Select, SelectProps } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
@@ -11,13 +11,22 @@ export type IAISelectDataType = {
   tooltip?: string;
 };
 
-type IAISelectProps = SelectProps & {
+type IAISelectProps = Omit<SelectProps, 'label'> & {
   tooltip?: string;
+  label?: string;
   inputRef?: RefObject<HTMLInputElement>;
 };
 
 const IAIMantineSearchableSelect = (props: IAISelectProps) => {
-  const { searchable = true, tooltip, inputRef, onChange, ...rest } = props;
+  const {
+    searchable = true,
+    tooltip,
+    inputRef,
+    onChange,
+    label,
+    disabled,
+    ...rest
+  } = props;
   const dispatch = useAppDispatch();
 
   const [searchValue, setSearchValue] = useState('');
@@ -61,6 +70,14 @@ const IAIMantineSearchableSelect = (props: IAISelectProps) => {
     <Tooltip label={tooltip} placement="top" hasArrow>
       <Select
         ref={inputRef}
+        label={
+          label ? (
+            <FormControl isDisabled={disabled}>
+              <FormLabel>{label}</FormLabel>
+            </FormControl>
+          ) : undefined
+        }
+        disabled={disabled}
         searchValue={searchValue}
         onSearchChange={setSearchValue}
         onChange={handleChange}

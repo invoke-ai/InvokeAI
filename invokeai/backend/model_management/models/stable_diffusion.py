@@ -37,8 +37,7 @@ class StableDiffusion1Model(DiffusersModel):
         vae: Optional[str] = Field(None)
         config: str
         variant: ModelVariantType
-
-
+        
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion1
         assert model_type == ModelType.Main

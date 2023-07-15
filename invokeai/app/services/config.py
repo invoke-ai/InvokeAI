@@ -271,8 +271,8 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def _excluded(self)->List[str]:
-        # combination of deprecated parameters and internal ones
-        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version']
+        # combination of deprecated parameters and internal ones that shouldn't be exposed
+        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model', 'root']
 
     class Config:
         env_file_encoding = 'utf-8'

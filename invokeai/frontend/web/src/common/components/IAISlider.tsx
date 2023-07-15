@@ -43,11 +43,6 @@ import { useTranslation } from 'react-i18next';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
 
-const SLIDER_MARK_STYLES: ChakraProps['sx'] = {
-  mt: 1.5,
-  fontSize: '2xs',
-};
-
 export type IAIFullSliderProps = {
   label?: string;
   value: number;
@@ -207,7 +202,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
       {...sliderFormControlProps}
     >
       {label && (
-        <FormLabel {...sliderFormLabelProps} mb={-1}>
+        <FormLabel sx={withInput ? { mb: -1.5 } : {}} {...sliderFormLabelProps}>
           {label}
         </FormLabel>
       )}
@@ -233,7 +228,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
                 sx={{
                   insetInlineStart: '0 !important',
                   insetInlineEnd: 'unset !important',
-                  ...SLIDER_MARK_STYLES,
                 }}
                 {...sliderMarkProps}
               >
@@ -244,7 +238,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
                 sx={{
                   insetInlineStart: 'unset !important',
                   insetInlineEnd: '0 !important',
-                  ...SLIDER_MARK_STYLES,
                 }}
                 {...sliderMarkProps}
               >
@@ -263,7 +256,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
                       sx={{
                         insetInlineStart: '0 !important',
                         insetInlineEnd: 'unset !important',
-                        ...SLIDER_MARK_STYLES,
                       }}
                       {...sliderMarkProps}
                     >
@@ -278,7 +270,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
                       sx={{
                         insetInlineStart: 'unset !important',
                         insetInlineEnd: '0 !important',
-                        ...SLIDER_MARK_STYLES,
                       }}
                       {...sliderMarkProps}
                     >
@@ -291,7 +282,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
                       key={m}
                       value={m}
                       sx={{
-                        ...SLIDER_MARK_STYLES,
+                        transform: 'translateX(-50%)',
                       }}
                       {...sliderMarkProps}
                     >

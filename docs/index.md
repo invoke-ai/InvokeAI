@@ -153,6 +153,9 @@ This method is recommended for those familiar with running Docker containers
 - [Prompt Syntax](features/PROMPTS.md)
 - [Generating Variations](features/VARIATIONS.md)
 
+### InvokeAI Configuration
+- [Guide to InvokeAI Runtime Settings](features/CONFIGURATION.md)
+
 ## :octicons-log-16: Important Changes Since Version 2.3
 
 ### Nodes

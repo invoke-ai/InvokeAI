@@ -37,6 +37,7 @@ const ParamVAEModelSelect = () => {
       return [];
     }
 
+    // add a "default" option, this means use the main model's included VAE
     const data: SelectItem[] = [
       {
         value: 'default',
