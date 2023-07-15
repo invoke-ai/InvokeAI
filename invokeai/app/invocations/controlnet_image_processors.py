@@ -190,11 +190,7 @@ class ControlNetInvocation(BaseInvocation):
         return ControlOutput(
             control=ControlField(
                 image=self.image,
-                #control_model=self.control_model,
-                control_model=ControlNetModelField(
-                    model_name="canny",
-                    base_model=BaseModelType.StableDiffusion1,
-                ),
+                control_model=self.control_model,
                 control_weight=self.control_weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
