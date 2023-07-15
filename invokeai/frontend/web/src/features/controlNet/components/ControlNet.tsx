@@ -176,6 +176,7 @@ const ControlNet = (props: ControlNetProps) => {
                 h: 28,
                 w: 28,
                 aspectRatio: '1/1',
+                mt: 3,
               }}
             >
               <ControlNetImagePreview controlNetId={controlNetId} height={28} />
