@@ -415,6 +415,8 @@
         "convertToDiffusersHelpText5": "Please make sure you have enough disk space. Models generally vary between 2GB-7GB in size.",
         "convertToDiffusersHelpText6": "Do you wish to convert this model?",
         "convertToDiffusersSaveLocation": "Save Location",
+        "noCustomLocationProvided": "No Custom Location Provided",
+        "convertingModelBegin": "Converting Model. Please wait.",
         "v1": "v1",
         "v2_base": "v2 (512px)",
         "v2_768": "v2 (768px)",

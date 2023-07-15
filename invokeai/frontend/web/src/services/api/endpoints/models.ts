@@ -5,6 +5,7 @@ import {
   BaseModelType,
   CheckpointModelConfig,
   ControlNetModelConfig,
+  ConvertModelConfig,
   DiffusersModelConfig,
   LoRAModelConfig,
   MainModelConfig,
@@ -62,6 +63,7 @@ type DeleteMainModelResponse = void;
 type ConvertMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
+  body: ConvertModelConfig;
 };
 
 type ConvertMainModelResponse =
@@ -176,10 +178,11 @@ export const modelsApi = api.injectEndpoints({
       ConvertMainModelResponse,
       ConvertMainModelArg
     >({
-      query: ({ base_model, model_name }) => {
+      query: ({ base_model, model_name, body }) => {
         return {
           url: `models/convert/${base_model}/main/${model_name}`,
           method: 'PUT',
+          body: body,
         };
       },
       invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],

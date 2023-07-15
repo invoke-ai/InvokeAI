@@ -378,6 +378,14 @@ export type components = {
        */
       image_count: number;
     };
+    /** Body_convert_model */
+    Body_convert_model: {
+      /**
+       * Convert Dest Directory 
+       * @description Save the converted model to the designated directory
+       */
+      convert_dest_directory?: string;
+    };
     /** Body_create_board_image */
     Body_create_board_image: {
       /**
@@ -5200,10 +5208,6 @@ export type operations = {
    */
   convert_model: {
     parameters: {
-      query?: {
-        /** @description Save the converted model to the designated directory */
-        convert_dest_directory?: string;
-      };
       path: {
         /** @description Base model */
         base_model: components["schemas"]["BaseModelType"];
@@ -5211,6 +5215,11 @@ export type operations = {
         model_type: components["schemas"]["ModelType"];
         /** @description model name */
         model_name: string;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["Body_convert_model"];
       };
     };
     responses: {
