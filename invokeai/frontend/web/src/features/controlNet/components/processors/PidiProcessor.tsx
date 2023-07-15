@@ -1,24 +1,27 @@
+import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import IAISwitch from 'common/components/IAISwitch';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredPidiImageProcessorInvocation } from 'features/controlNet/store/types';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.pidi_image_processor.default;
+const DEFAULTS = CONTROLNET_PROCESSORS.pidi_image_processor
+  .default as RequiredPidiImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;
   processorNode: RequiredPidiImageProcessorInvocation;
+  isEnabled: boolean;
 };
 
 const PidiProcessor = (props: Props) => {
-  const { controlNetId, processorNode } = props;
+  const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, detect_resolution, scribble, safe } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isReady = useIsReadyToInvoke();
+  const isBusy = useAppSelector(selectIsBusy);
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -72,7 +75,7 @@ const PidiProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
       />
       <IAISlider
         label="Image Resolution"
@@ -84,7 +87,7 @@ const PidiProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
       />
       <IAISwitch
         label="Scribble"
@@ -95,7 +98,7 @@ const PidiProcessor = (props: Props) => {
         label="Safe"
         isChecked={safe}
         onChange={handleSafeChanged}
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
       />
     </ProcessorWrapper>
   );

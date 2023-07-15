@@ -1,23 +1,26 @@
+import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredMlsdImageProcessorInvocation } from 'features/controlNet/store/types';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.mlsd_image_processor.default;
+const DEFAULTS = CONTROLNET_PROCESSORS.mlsd_image_processor
+  .default as RequiredMlsdImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;
   processorNode: RequiredMlsdImageProcessorInvocation;
+  isEnabled: boolean;
 };
 
 const MlsdImageProcessor = (props: Props) => {
-  const { controlNetId, processorNode } = props;
+  const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, detect_resolution, thr_d, thr_v } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-  const isReady = useIsReadyToInvoke();
+  const isBusy = useAppSelector(selectIsBusy);
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -79,7 +82,7 @@ const MlsdImageProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
       />
       <IAISlider
         label="Image Resolution"
@@ -91,7 +94,7 @@ const MlsdImageProcessor = (props: Props) => {
         max={4096}
         withInput
         withSliderMarks
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
       />
       <IAISlider
         label="W"
@@ -104,7 +107,7 @@ const MlsdImageProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
       />
       <IAISlider
         label="H"
@@ -117,7 +120,7 @@ const MlsdImageProcessor = (props: Props) => {
         step={0.01}
         withInput
         withSliderMarks
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
       />
     </ProcessorWrapper>
   );

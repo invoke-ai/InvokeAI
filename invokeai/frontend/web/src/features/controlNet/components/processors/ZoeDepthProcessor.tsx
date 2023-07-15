@@ -4,6 +4,7 @@ import { memo } from 'react';
 type Props = {
   controlNetId: string;
   processorNode: RequiredZoeDepthImageProcessorInvocation;
+  isEnabled: boolean;
 };
 
 const ZoeDepthProcessor = (props: Props) => {
