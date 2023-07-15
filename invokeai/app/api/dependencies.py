@@ -20,7 +20,6 @@ from invokeai.version.invokeai_version import __version__
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState, LibraryGraph
 from ..services.image_file_storage import DiskImageFileStorage
 from ..services.invocation_queue import MemoryInvocationQueue
@@ -58,7 +57,7 @@ class ApiDependencies:
 
     @staticmethod
     def initialize(config, event_handler_id: int, logger: Logger = logger):
-        logger.debug(f'InvokeAI version {__version__}')
+        logger.debug(f"InvokeAI version {__version__}")
         logger.debug(f"Internet connectivity is {config.internet_available}")
 
         events = FastAPIEventService(event_handler_id)
@@ -117,7 +116,7 @@ class ApiDependencies:
         )
 
         services = InvocationServices(
-            model_manager=ModelManagerService(config,logger),
+            model_manager=ModelManagerService(config, logger),
             events=events,
             latents=latents,
             images=images,
@@ -129,7 +128,6 @@ class ApiDependencies:
             ),
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
-            restoration=RestorationServices(config, logger),
             configuration=config,
             logger=logger,
         )
