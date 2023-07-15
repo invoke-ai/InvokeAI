@@ -201,7 +201,11 @@ const IAISlider = (props: IAIFullSliderProps) => {
       isDisabled={isDisabled}
       {...sliderFormControlProps}
     >
-      {label && <FormLabel {...sliderFormLabelProps}>{label}</FormLabel>}
+      {label && (
+        <FormLabel sx={withInput ? { mb: -1.5 } : {}} {...sliderFormLabelProps}>
+          {label}
+        </FormLabel>
+      )}
 
       <HStack w="100%" gap={2} alignItems="center">
         <Slider
