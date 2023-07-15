@@ -5,7 +5,7 @@ import AddModelsPanel from './subpanels/AddModelsPanel';
 import MergeModelsPanel from './subpanels/MergeModelsPanel';
 import ModelManagerPanel from './subpanels/ModelManagerPanel';
 
-type ModelManagerTabName = 'modelManager' | 'addModels' | 'mergeModels';
+type ModelManagerTabName = 'modelManager' | 'importModels' | 'mergeModels';
 
 type ModelManagerTabInfo = {
   id: ModelManagerTabName;
@@ -20,8 +20,8 @@ const tabs: ModelManagerTabInfo[] = [
     content: <ModelManagerPanel />,
   },
   {
-    id: 'addModels',
-    label: i18n.t('modelManager.addModel'),
+    id: 'importModels',
+    label: i18n.t('modelManager.importModels'),
     content: <AddModelsPanel />,
   },
   {
@@ -46,7 +46,7 @@ const ModelManagerTab = () => {
           </Tab>
         ))}
       </TabList>
-      <TabPanels sx={{ w: 'full', h: 'full', p: 4 }}>
+      <TabPanels sx={{ w: 'full', h: 'full' }}>
         {tabs.map((tab) => (
           <TabPanel sx={{ w: 'full', h: 'full' }} key={tab.id}>
             {tab.content}

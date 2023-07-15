@@ -11,7 +11,9 @@ export default function SearchModels() {
   return (
     <Flex flexDirection="column" w="100%">
       <SearchFolderForm />
-      <FoundModelsList />
+      <Flex sx={{ maxHeight: window.innerHeight - 400, overflow: 'scroll' }}>
+        <FoundModelsList />
+      </Flex>
     </Flex>
   );
 }

@@ -60,7 +60,7 @@ export type AnyModelConfig =
 
 export type MergeModelConfig = components['schemas']['Body_merge_models'];
 export type ConvertModelConfig = components['schemas']['Body_convert_model'];
-export type SearchFolderConfig = components['schemas'];
+export type ImportModelConfig = components['schemas']['Body_import_model'];
 
 // Graphs
 export type Graph = components['schemas']['Graph'];

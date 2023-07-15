@@ -7,6 +7,7 @@ import {
   ControlNetModelConfig,
   ConvertModelConfig,
   DiffusersModelConfig,
+  ImportModelConfig,
   LoRAModelConfig,
   MainModelConfig,
   MergeModelConfig,
@@ -77,6 +78,13 @@ type MergeMainModelArg = {
 
 type MergeMainModelResponse =
   paths['/api/v1/models/merge/{base_model}']['put']['responses']['200']['content']['application/json'];
+
+type ImportMainModelArg = {
+  body: ImportModelConfig;
+};
+
+type ImportMainModelResponse =
+  paths['/api/v1/models/import']['post']['responses']['201']['content']['application/json'];
 
 type SearchFolderResponse =
   paths['/api/v1/models/search']['get']['responses']['200']['content']['application/json'];
@@ -163,6 +171,19 @@ export const modelsApi = api.injectEndpoints({
         return {
           url: `models/${base_model}/main/${model_name}`,
           method: 'PATCH',
+          body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+    }),
+    importMainModels: build.mutation<
+      ImportMainModelResponse,
+      ImportMainModelArg
+    >({
+      query: ({ body }) => {
+        return {
+          url: `models/import`,
+          method: 'POST',
           body: body,
         };
       },
@@ -356,6 +377,7 @@ export const {
   useGetVaeModelsQuery,
   useUpdateMainModelsMutation,
   useDeleteMainModelsMutation,
+  useImportMainModelsMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
   useGetModelsInFolderQuery,

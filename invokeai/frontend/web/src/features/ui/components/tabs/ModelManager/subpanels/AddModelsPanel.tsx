@@ -1,43 +1,39 @@
-import { Divider, Flex, useColorMode } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { ButtonGroup, Divider, Flex } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
-import { setAddNewModelUIOption } from 'features/ui/store/uiSlice';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import AddCheckpointModel from './AddModelsPanel/AddCheckpointModel';
-import AddDiffusersModel from './AddModelsPanel/AddDiffusersModel';
+import AddModels from './AddModelsPanel/AddModels';
+import ScanModels from './AddModelsPanel/ScanModels';
+
+type AddModelTabs = 'add' | 'scan';
 
 export default function AddModelsPanel() {
-  const addNewModelUIOption = useAppSelector(
-    (state: RootState) => state.ui.addNewModelUIOption
-  );
-
-  const { colorMode } = useColorMode();
-
-  const dispatch = useAppDispatch();
+  const [addModelTab, setAddModelTab] = useState<AddModelTabs>('add');
   const { t } = useTranslation();
 
   return (
     <Flex flexDirection="column" gap={4}>
-      <Flex columnGap={4}>
+      <ButtonGroup isAttached>
         <IAIButton
-          onClick={() => dispatch(setAddNewModelUIOption('ckpt'))}
-          isChecked={addNewModelUIOption == 'ckpt'}
+          onClick={() => setAddModelTab('add')}
+          isChecked={addModelTab == 'add'}
+          size="sm"
         >
-          {t('modelManager.addCheckpointModel')}
+          {t('modelManager.addModel')}
         </IAIButton>
         <IAIButton
-          onClick={() => dispatch(setAddNewModelUIOption('diffusers'))}
-          isChecked={addNewModelUIOption == 'diffusers'}
+          onClick={() => setAddModelTab('scan')}
+          isChecked={addModelTab == 'scan'}
+          size="sm"
         >
-          {t('modelManager.addDiffuserModel')}
+          {t('modelManager.scanForModels')}
         </IAIButton>
-      </Flex>
+      </ButtonGroup>
 
       <Divider />
 
-      {addNewModelUIOption == 'ckpt' && <AddCheckpointModel />}
-      {addNewModelUIOption == 'diffusers' && <AddDiffusersModel />}
+      {addModelTab == 'add' && <AddModels />}
+      {addModelTab == 'scan' && <ScanModels />}
     </Flex>
   );
 }

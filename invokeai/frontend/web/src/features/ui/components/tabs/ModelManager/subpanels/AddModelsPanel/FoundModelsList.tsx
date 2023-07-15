@@ -22,7 +22,11 @@ export default function FoundModelsList() {
     }
 
     return (
-      <Flex sx={{ flexDirection: 'column' }}>
+      <Flex
+        sx={{
+          flexDirection: 'column',
+        }}
+      >
         {foundModels.map((model) => (
           <Flex key={model}>{model}</Flex>
         ))}

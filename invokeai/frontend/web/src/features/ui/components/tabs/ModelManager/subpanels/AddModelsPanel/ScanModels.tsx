@@ -33,7 +33,7 @@ import SearchModels from './SearchModels';
 const MIN_MODEL_SIZE = 64;
 const MAX_MODEL_SIZE = 2048;
 
-export default function AddCheckpointModel() {
+export default function ScanModels() {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
