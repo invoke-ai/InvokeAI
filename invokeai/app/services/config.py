@@ -200,7 +200,7 @@ class InvokeAISettings(BaseSettings):
         type = get_args(get_type_hints(cls)['type'])[0]
         field_dict = dict({type:dict()})
         for name,field in self.__fields__.items():
-            if name in cls._excluded():
+            if name in cls._excluded_from_yaml():
                 continue
             category = field.field_info.extra.get("category") or "Uncategorized"
             value = getattr(self,name)
@@ -272,7 +272,12 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def _excluded(self)->List[str]:
         # combination of deprecated parameters and internal ones that shouldn't be exposed
-        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model', 'root']
+        return ['type','initconf']
+    
+    @classmethod
+    def _excluded_from_yaml(self)->List[str]:
+        # combination of deprecated parameters and internal ones that shouldn't be exposed
+        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model']
 
     class Config:
         env_file_encoding = 'utf-8'
