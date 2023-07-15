@@ -182,19 +182,16 @@ const ControlNet = (props: ControlNetProps) => {
             </Flex>
           )}
         </Flex>
+        <Box mt={2}>
+          <ParamControlNetControlMode controlNetId={controlNetId} />
+        </Box>
+        <ParamControlNetProcessorSelect controlNetId={controlNetId} />
       </Flex>
 
       {isExpanded && (
         <>
-          <ParamControlNetControlMode controlNetId={controlNetId} />
-          <Box mt={2}>
-            <ControlNetImagePreview
-              controlNetId={controlNetId}
-              height="392px"
-            />
-          </Box>
+          <ControlNetImagePreview controlNetId={controlNetId} height="392px" />
           <ParamControlNetShouldAutoConfig controlNetId={controlNetId} />
-          <ParamControlNetProcessorSelect controlNetId={controlNetId} />
           <ControlNetProcessorComponent controlNetId={controlNetId} />
         </>
       )}
