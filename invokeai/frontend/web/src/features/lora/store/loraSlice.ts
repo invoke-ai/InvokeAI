@@ -3,6 +3,7 @@ import { LoRAModelParam } from 'features/parameters/types/parameterSchemas';
 import { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 
 export type LoRA = LoRAModelParam & {
+  id: string;
   weight: number;
 };
 
@@ -24,7 +25,7 @@ export const loraSlice = createSlice({
   reducers: {
     loraAdded: (state, action: PayloadAction<LoRAModelConfigEntity>) => {
       const { model_name, id, base_model } = action.payload;
-      state.loras[id] = { model_name, base_model, ...defaultLoRAConfig };
+      state.loras[id] = { id, model_name, base_model, ...defaultLoRAConfig };
     },
     loraRemoved: (state, action: PayloadAction<string>) => {
       const id = action.payload;
