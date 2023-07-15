@@ -38,11 +38,11 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
       sliderFormLabelProps={{ pb: 2 }}
       value={weight}
       onChange={handleWeightChanged}
-      min={-1}
-      max={1}
+      min={0}
+      max={2}
       step={0.01}
       withSliderMarks={!mini}
-      sliderMarks={[-1, 0, 1]}
+      sliderMarks={[0, 1, 2]}
     />
   );
 };
