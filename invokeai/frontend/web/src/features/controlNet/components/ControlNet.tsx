@@ -80,8 +80,8 @@ const ControlNet = (props: ControlNetProps) => {
     >
       <Flex sx={{ gap: 2 }}>
         <IAISwitch
-          tooltip="Toggle"
-          aria-label="Toggle"
+          tooltip={'Toggle this ControlNet'}
+          aria-label={'Toggle this ControlNet'}
           isChecked={isEnabled}
           onChange={handleToggleIsEnabled}
         />
@@ -143,9 +143,9 @@ const ControlNet = (props: ControlNetProps) => {
               borderRadius: 'full',
               top: 4,
               insetInlineEnd: 4,
-              bg: 'error.700',
+              bg: 'accent.700',
               _dark: {
-                bg: 'error.200',
+                bg: 'accent.400',
               },
             }}
           />

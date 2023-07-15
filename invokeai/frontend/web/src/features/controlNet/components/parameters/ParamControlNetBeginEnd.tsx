@@ -34,16 +34,16 @@ const ParamControlNetBeginEnd = (props: Props) => {
       createSelector(
         stateSelector,
         ({ controlNet }) => {
-          const { beginStepPct, endStepPct } =
+          const { beginStepPct, endStepPct, isEnabled } =
             controlNet.controlNets[controlNetId];
-          return { beginStepPct, endStepPct };
+          return { beginStepPct, endStepPct, isEnabled };
         },
         defaultSelectorOptions
       ),
     [controlNetId]
   );
 
-  const { beginStepPct, endStepPct } = useAppSelector(selector);
+  const { beginStepPct, endStepPct, isEnabled } = useAppSelector(selector);
 
   const handleStepPctChanged = useCallback(
     (v: number[]) => {
@@ -61,7 +61,7 @@ const ParamControlNetBeginEnd = (props: Props) => {
   }, [controlNetId, dispatch]);
 
   return (
-    <FormControl>
+    <FormControl isDisabled={!isEnabled}>
       <FormLabel>Begin / End Step Percentage</FormLabel>
       <HStack w="100%" gap={2} alignItems="center">
         <RangeSlider
@@ -72,6 +72,7 @@ const ParamControlNetBeginEnd = (props: Props) => {
           max={1}
           step={0.01}
           minStepsBetweenThumbs={5}
+          isDisabled={!isEnabled}
         >
           <RangeSliderTrack>
             <RangeSliderFilledTrack />

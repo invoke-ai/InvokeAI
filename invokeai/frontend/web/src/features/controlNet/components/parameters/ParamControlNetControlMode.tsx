@@ -30,13 +30,17 @@ export default function ParamControlNetControlMode(
     () =>
       createSelector(
         stateSelector,
-        ({ controlNet }) => controlNet.controlNets[controlNetId]?.controlMode,
+        ({ controlNet }) => {
+          const { controlMode, isEnabled } =
+            controlNet.controlNets[controlNetId];
+          return { controlMode, isEnabled };
+        },
         defaultSelectorOptions
       ),
     [controlNetId]
   );
 
-  const controlMode = useAppSelector(selector);
+  const { controlMode, isEnabled } = useAppSelector(selector);
 
   const { t } = useTranslation();
 
@@ -49,6 +53,7 @@ export default function ParamControlNetControlMode(
 
   return (
     <IAIMantineSelect
+      disabled={!isEnabled}
       label={t('parameters.controlNetControlMode')}
       data={CONTROL_MODE_DATA}
       value={String(controlMode)}

@@ -17,13 +17,16 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
     () =>
       createSelector(
         stateSelector,
-        ({ controlNet }) => controlNet.controlNets[controlNetId]?.weight,
+        ({ controlNet }) => {
+          const { weight, isEnabled } = controlNet.controlNets[controlNetId];
+          return { weight, isEnabled };
+        },
         defaultSelectorOptions
       ),
     [controlNetId]
   );
 
-  const weight = useAppSelector(selector);
+  const { weight, isEnabled } = useAppSelector(selector);
   const handleWeightChanged = useCallback(
     (weight: number) => {
       dispatch(controlNetWeightChanged({ controlNetId, weight }));
@@ -33,6 +36,7 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
 
   return (
     <IAISlider
+      isDisabled={!isEnabled}
       label={'Weight'}
       value={weight}
       onChange={handleWeightChanged}

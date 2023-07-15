@@ -18,14 +18,17 @@ const ParamControlNetShouldAutoConfig = (props: Props) => {
     () =>
       createSelector(
         stateSelector,
-        ({ controlNet }) =>
-          controlNet.controlNets[controlNetId]?.shouldAutoConfig,
+        ({ controlNet }) => {
+          const { isEnabled, shouldAutoConfig } =
+            controlNet.controlNets[controlNetId];
+          return { isEnabled, shouldAutoConfig };
+        },
         defaultSelectorOptions
       ),
     [controlNetId]
   );
 
-  const shouldAutoConfig = useAppSelector(selector);
+  const { isEnabled, shouldAutoConfig } = useAppSelector(selector);
   const isBusy = useAppSelector(selectIsBusy);
 
   const handleShouldAutoConfigChanged = useCallback(() => {
@@ -38,7 +41,7 @@ const ParamControlNetShouldAutoConfig = (props: Props) => {
       aria-label="Auto configure processor"
       isChecked={shouldAutoConfig}
       onChange={handleShouldAutoConfigChanged}
-      isDisabled={isBusy}
+      isDisabled={isBusy || !isEnabled}
     />
   );
 };

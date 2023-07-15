@@ -29,13 +29,18 @@ const ControlNetImagePreview = (props: Props) => {
         stateSelector,
         ({ controlNet }) => {
           const { pendingControlImages } = controlNet;
-          const { controlImage, processedControlImage, processorType } =
-            controlNet.controlNets[controlNetId];
+          const {
+            controlImage,
+            processedControlImage,
+            processorType,
+            isEnabled,
+          } = controlNet.controlNets[controlNetId];
 
           return {
             controlImageName: controlImage,
             processedControlImageName: processedControlImage,
             processorType,
+            isEnabled,
             pendingControlImages,
           };
         },
@@ -49,6 +54,7 @@ const ControlNetImagePreview = (props: Props) => {
     processedControlImageName,
     processorType,
     pendingControlImages,
+    isEnabled,
   } = useAppSelector(selector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
@@ -119,6 +125,8 @@ const ControlNetImagePreview = (props: Props) => {
         h: height,
         alignItems: 'center',
         justifyContent: 'center',
+        pointerEvents: isEnabled ? 'auto' : 'none',
+        opacity: isEnabled ? 1 : 0.5,
       }}
     >
       <IAIDndImage

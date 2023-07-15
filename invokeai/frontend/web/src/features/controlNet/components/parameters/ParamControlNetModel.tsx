@@ -29,14 +29,15 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
         ({ generation, controlNet }) => {
           const { model } = generation;
           const controlNetModel = controlNet.controlNets[controlNetId]?.model;
-          return { mainModel: model, controlNetModel };
+          const isEnabled = controlNet.controlNets[controlNetId]?.isEnabled;
+          return { mainModel: model, controlNetModel, isEnabled };
         },
         defaultSelectorOptions
       ),
     [controlNetId]
   );
 
-  const { mainModel, controlNetModel } = useAppSelector(selector);
+  const { mainModel, controlNetModel, isEnabled } = useAppSelector(selector);
 
   const { data: controlNetModels } = useGetControlNetModelsQuery();
 
@@ -110,7 +111,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
       placeholder="Select a model"
       value={selectedModel?.id ?? null}
       onChange={handleModelChanged}
-      disabled={isBusy}
+      disabled={isBusy || !isEnabled}
       tooltip={selectedModel?.description}
     />
   );

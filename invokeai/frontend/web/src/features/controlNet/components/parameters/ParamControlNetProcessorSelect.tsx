@@ -57,16 +57,18 @@ const ParamControlNetProcessorSelect = (
     () =>
       createSelector(
         stateSelector,
-        ({ controlNet }) => ({
-          processorNode: controlNet.controlNets[controlNetId]?.processorNode,
-        }),
+        ({ controlNet }) => {
+          const { isEnabled, processorNode } =
+            controlNet.controlNets[controlNetId];
+          return { isEnabled, processorNode };
+        },
         defaultSelectorOptions
       ),
     [controlNetId]
   );
   const isBusy = useAppSelector(selectIsBusy);
   const controlNetProcessors = useAppSelector(selector);
-  const { processorNode } = useAppSelector(processorNodeSelector);
+  const { isEnabled, processorNode } = useAppSelector(processorNodeSelector);
 
   const handleProcessorTypeChanged = useCallback(
     (v: string | null) => {
@@ -86,7 +88,7 @@ const ParamControlNetProcessorSelect = (
       value={processorNode.type ?? 'canny_image_processor'}
       data={controlNetProcessors}
       onChange={handleProcessorTypeChanged}
-      disabled={isBusy}
+      disabled={isBusy || !isEnabled}
     />
   );
 };
