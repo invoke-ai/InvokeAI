@@ -170,12 +170,14 @@ const IAIDndImage = (props: IAIDndImageProps) => {
         </>
       )}
       {!imageDTO && isUploadDisabled && noContentFallback}
-      <IAIDroppable
-        data={droppableData}
-        disabled={isDropDisabled}
-        dropLabel={dropLabel}
-      />
-      {imageDTO && (
+      {!isDropDisabled && (
+        <IAIDroppable
+          data={droppableData}
+          disabled={isDropDisabled}
+          dropLabel={dropLabel}
+        />
+      )}
+      {imageDTO && !isDragDisabled && (
         <IAIDraggable
           data={draggableData}
           disabled={isDragDisabled || !imageDTO}

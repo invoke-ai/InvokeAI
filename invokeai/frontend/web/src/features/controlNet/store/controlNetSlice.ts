@@ -1,22 +1,20 @@
-import { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { ImageDTO } from 'services/api/types';
+import { ControlNetModelParam } from 'features/parameters/types/parameterSchemas';
+import { cloneDeep, forEach } from 'lodash-es';
+import { imageDeleted } from 'services/api/thunks/image';
+import { isAnySessionRejected } from 'services/api/thunks/session';
+import { appSocketInvocationError } from 'services/events/actions';
+import { controlNetImageProcessed } from './actions';
+import {
+  CONTROLNET_MODEL_DEFAULT_PROCESSORS,
+  CONTROLNET_PROCESSORS,
+} from './constants';
 import {
   ControlNetProcessorType,
   RequiredCannyImageProcessorInvocation,
   RequiredControlNetProcessorNode,
 } from './types';
-import {
-  CONTROLNET_MODELS,
-  CONTROLNET_PROCESSORS,
-  ControlNetModelName,
-} from './constants';
-import { controlNetImageProcessed } from './actions';
-import { imageDeleted, imageUrlsReceived } from 'services/api/thunks/image';
-import { forEach } from 'lodash-es';
-import { isAnySessionRejected } from 'services/api/thunks/session';
-import { appSocketInvocationError } from 'services/events/actions';
 
 export type ControlModes =
   | 'balanced'
@@ -26,7 +24,7 @@ export type ControlModes =
 
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   isEnabled: true,
-  model: CONTROLNET_MODELS['lllyasviel/control_v11p_sd15_canny'].type,
+  model: null,
   weight: 1,
   beginStepPct: 0,
   endStepPct: 1,
@@ -42,7 +40,7 @@ export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
 export type ControlNetConfig = {
   controlNetId: string;
   isEnabled: boolean;
-  model: ControlNetModelName;
+  model: ControlNetModelParam | null;
   weight: number;
   beginStepPct: number;
   endStepPct: number;
@@ -85,6 +83,19 @@ export const controlNetSlice = createSlice({
         ...(controlNet ?? initialControlNet),
         controlNetId,
       };
+    },
+    controlNetDuplicated: (
+      state,
+      action: PayloadAction<{
+        sourceControlNetId: string;
+        newControlNetId: string;
+      }>
+    ) => {
+      const { sourceControlNetId, newControlNetId } = action.payload;
+
+      const newControlnet = cloneDeep(state.controlNets[sourceControlNetId]);
+      newControlnet.controlNetId = newControlNetId;
+      state.controlNets[newControlNetId] = newControlnet;
     },
     controlNetAddedFromImage: (
       state,
@@ -147,7 +158,7 @@ export const controlNetSlice = createSlice({
       state,
       action: PayloadAction<{
         controlNetId: string;
-        model: ControlNetModelName;
+        model: ControlNetModelParam;
       }>
     ) => {
       const { controlNetId, model } = action.payload;
@@ -155,7 +166,15 @@ export const controlNetSlice = createSlice({
       state.controlNets[controlNetId].processedControlImage = null;
 
       if (state.controlNets[controlNetId].shouldAutoConfig) {
-        const processorType = CONTROLNET_MODELS[model].defaultProcessor;
+        let processorType: ControlNetProcessorType | undefined = undefined;
+
+        for (const modelSubstring in CONTROLNET_MODEL_DEFAULT_PROCESSORS) {
+          if (model.model_name.includes(modelSubstring)) {
+            processorType = CONTROLNET_MODEL_DEFAULT_PROCESSORS[modelSubstring];
+            break;
+          }
+        }
+
         if (processorType) {
           state.controlNets[controlNetId].processorType = processorType;
           state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
@@ -241,9 +260,19 @@ export const controlNetSlice = createSlice({
 
       if (newShouldAutoConfig) {
         // manage the processor for the user
-        const processorType =
-          CONTROLNET_MODELS[state.controlNets[controlNetId].model]
-            .defaultProcessor;
+        let processorType: ControlNetProcessorType | undefined = undefined;
+
+        for (const modelSubstring in CONTROLNET_MODEL_DEFAULT_PROCESSORS) {
+          if (
+            state.controlNets[controlNetId].model?.model_name.includes(
+              modelSubstring
+            )
+          ) {
+            processorType = CONTROLNET_MODEL_DEFAULT_PROCESSORS[modelSubstring];
+            break;
+          }
+        }
+
         if (processorType) {
           state.controlNets[controlNetId].processorType = processorType;
           state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
@@ -272,7 +301,8 @@ export const controlNetSlice = createSlice({
     });
 
     builder.addCase(imageDeleted.pending, (state, action) => {
-      // Preemptively remove the image from the gallery
+      // Preemptively remove the image from all controlnets
+      // TODO: doesn't the imageusage stuff do this for us?
       const { image_name } = action.meta.arg;
       forEach(state.controlNets, (c) => {
         if (c.controlImage === image_name) {
@@ -284,21 +314,6 @@ export const controlNetSlice = createSlice({
         }
       });
     });
-
-    // builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-    //   const { image_name, image_url, thumbnail_url } = action.payload;
-
-    //   forEach(state.controlNets, (c) => {
-    //     if (c.controlImage?.image_name === image_name) {
-    //       c.controlImage.image_url = image_url;
-    //       c.controlImage.thumbnail_url = thumbnail_url;
-    //     }
-    //     if (c.processedControlImage?.image_name === image_name) {
-    //       c.processedControlImage.image_url = image_url;
-    //       c.processedControlImage.thumbnail_url = thumbnail_url;
-    //     }
-    //   });
-    // });
 
     builder.addCase(appSocketInvocationError, (state, action) => {
       state.pendingControlImages = [];
@@ -313,6 +328,7 @@ export const controlNetSlice = createSlice({
 export const {
   isControlNetEnabledToggled,
   controlNetAdded,
+  controlNetDuplicated,
   controlNetAddedFromImage,
   controlNetRemoved,
   controlNetImageChanged,

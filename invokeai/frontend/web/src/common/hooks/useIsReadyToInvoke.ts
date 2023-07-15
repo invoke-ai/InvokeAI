@@ -5,6 +5,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { modelsApi } from '../../services/api/endpoints/models';
+import { forEach } from 'lodash-es';
 
 const readinessSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -51,6 +52,13 @@ const readinessSelector = createSelector(
       isReady = false;
       reasonsWhyNotReady.push('Seed-Weights badly formatted.');
     }
+
+    forEach(state.controlNet.controlNets, (controlNet, id) => {
+      if (!controlNet.model) {
+        isReady = false;
+        reasonsWhyNotReady.push('ControlNet ${id} has no model selected.');
+      }
+    });
 
     // All good
     return { isReady, reasonsWhyNotReady };
