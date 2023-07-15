@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import {
+  ControlNetModelParam,
   LoRAModelParam,
   MainModelParam,
   VaeModelParam,
@@ -81,7 +82,8 @@ const nodesSlice = createSlice({
           | ImageField[]
           | MainModelParam
           | VaeModelParam
-          | LoRAModelParam;
+          | LoRAModelParam
+          | ControlNetModelParam;
       }>
     ) => {
       const { nodeId, fieldName, value } = action.payload;

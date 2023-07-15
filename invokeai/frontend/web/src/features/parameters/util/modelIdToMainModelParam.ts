@@ -2,11 +2,14 @@ import {
   MainModelParam,
   zMainModel,
 } from 'features/parameters/types/parameterSchemas';
+import { log } from 'app/logging/useLogger';
+
+const moduleLog = log.child({ module: 'models' });
 
 export const modelIdToMainModelParam = (
-  modelId: string
+  mainModelId: string
 ): MainModelParam | undefined => {
-  const [base_model, model_type, model_name] = modelId.split('/');
+  const [base_model, model_type, model_name] = mainModelId.split('/');
 
   const result = zMainModel.safeParse({
     base_model,
@@ -14,6 +17,13 @@ export const modelIdToMainModelParam = (
   });
 
   if (!result.success) {
+    moduleLog.error(
+      {
+        mainModelId,
+        errors: result.error.format(),
+      },
+      'Failed to parse main model id'
+    );
     return;
   }
 

@@ -19,6 +19,8 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   model: 'model',
   vae_model: 'vae_model',
   lora_model: 'lora_model',
+  controlnet_model: 'controlnet_model',
+  ControlNetModelField: 'controlnet_model',
   array: 'array',
   item: 'item',
   ColorField: 'color',
@@ -128,6 +130,12 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'teal',
     colorCssVar: getColorTokenCssVariable('teal'),
     title: 'LoRA',
+    description: 'Models are models.',
+  },
+  controlnet_model: {
+    color: 'teal',
+    colorCssVar: getColorTokenCssVariable('teal'),
+    title: 'ControlNet',
     description: 'Models are models.',
   },
   array: {
