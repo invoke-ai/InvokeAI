@@ -271,13 +271,13 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def _excluded(self)->List[str]:
-        # combination of deprecated parameters and internal ones that shouldn't be exposed
+        # internal fields that shouldn't be exposed as command line options
         return ['type','initconf']
     
     @classmethod
     def _excluded_from_yaml(self)->List[str]:
-        # combination of deprecated parameters and internal ones that shouldn't be exposed
-        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model']
+        # combination of deprecated parameters and internal ones that shouldn't be exposed as invokeai.yaml options
+        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model', 'restore']
 
     class Config:
         env_file_encoding = 'utf-8'
