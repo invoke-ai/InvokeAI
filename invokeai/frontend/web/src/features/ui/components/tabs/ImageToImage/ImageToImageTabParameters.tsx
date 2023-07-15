@@ -19,9 +19,9 @@ const ImageToImageTabParameters = () => {
       <ParamNegativeConditioning />
       <ProcessButtons />
       <ImageToImageTabCoreParameters />
+      <ParamControlNetCollapse />
       <ParamLoraCollapse />
       <ParamDynamicPromptsCollapse />
-      <ParamControlNetCollapse />
       <ParamVariationCollapse />
       <ParamNoiseCollapse />
       <ParamSymmetryCollapse />
