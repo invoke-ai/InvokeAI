@@ -54,7 +54,7 @@ export default function ParamControlNetControlMode(
   return (
     <IAIMantineSelect
       disabled={!isEnabled}
-      label={t('parameters.controlNetControlMode')}
+      label="Control Mode"
       data={CONTROL_MODE_DATA}
       value={String(controlMode)}
       onChange={handleControlModeChange}

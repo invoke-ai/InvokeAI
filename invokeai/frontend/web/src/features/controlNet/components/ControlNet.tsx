@@ -187,15 +187,14 @@ const ControlNet = (props: ControlNetProps) => {
       {isExpanded && (
         <>
           <ParamControlNetControlMode controlNetId={controlNetId} />
-          <ParamControlNetProcessorSelect controlNetId={controlNetId} />
-          <ParamControlNetShouldAutoConfig controlNetId={controlNetId} />
-
           <Box mt={2}>
             <ControlNetImagePreview
               controlNetId={controlNetId}
               height="392px"
             />
           </Box>
+          <ParamControlNetShouldAutoConfig controlNetId={controlNetId} />
+          <ParamControlNetProcessorSelect controlNetId={controlNetId} />
           <ControlNetProcessorComponent controlNetId={controlNetId} />
         </>
       )}
