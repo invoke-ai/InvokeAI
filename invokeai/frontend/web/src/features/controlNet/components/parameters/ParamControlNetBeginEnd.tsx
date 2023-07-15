@@ -10,13 +10,15 @@ import {
   RangeSliderTrack,
   Tooltip,
 } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import {
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
 } from 'features/controlNet/store/controlNetSlice';
-import { memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { memo, useCallback, useMemo } from 'react';
 
 const SLIDER_MARK_STYLES: ChakraProps['sx'] = {
   mt: 1.5,
@@ -27,17 +29,30 @@ const SLIDER_MARK_STYLES: ChakraProps['sx'] = {
 
 type Props = {
   controlNetId: string;
-  beginStepPct: number;
-  endStepPct: number;
   mini?: boolean;
 };
 
 const formatPct = (v: number) => `${Math.round(v * 100)}%`;
 
 const ParamControlNetBeginEnd = (props: Props) => {
-  const { controlNetId, beginStepPct, mini = false, endStepPct } = props;
+  const { controlNetId, mini = false } = props;
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
+
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ controlNet }) => {
+          const { beginStepPct, endStepPct } =
+            controlNet.controlNets[controlNetId];
+          return { beginStepPct, endStepPct };
+        },
+        defaultSelectorOptions
+      ),
+    [controlNetId]
+  );
+
+  const { beginStepPct, endStepPct } = useAppSelector(selector);
 
   const handleStepPctChanged = useCallback(
     (v: number[]) => {

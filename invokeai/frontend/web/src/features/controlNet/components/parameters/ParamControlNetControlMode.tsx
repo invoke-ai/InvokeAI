@@ -1,15 +1,17 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   ControlModes,
   controlNetControlModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type ParamControlNetControlModeProps = {
   controlNetId: string;
-  controlMode: string;
 };
 
 const CONTROL_MODE_DATA = [
@@ -22,8 +24,19 @@ const CONTROL_MODE_DATA = [
 export default function ParamControlNetControlMode(
   props: ParamControlNetControlModeProps
 ) {
-  const { controlNetId, controlMode = false } = props;
+  const { controlNetId } = props;
   const dispatch = useAppDispatch();
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ controlNet }) => controlNet.controlNets[controlNetId]?.controlMode,
+        defaultSelectorOptions
+      ),
+    [controlNetId]
+  );
+
+  const controlMode = useAppSelector(selector);
 
   const { t } = useTranslation();
 

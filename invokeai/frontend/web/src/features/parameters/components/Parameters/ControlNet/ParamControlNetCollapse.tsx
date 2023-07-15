@@ -55,7 +55,7 @@ const ParamControlNetCollapse = () => {
         {controlNetsArray.map((c, i) => (
           <Fragment key={c.controlNetId}>
             {i > 0 && <Divider />}
-            <ControlNet controlNet={c} />
+            <ControlNet controlNetId={c.controlNetId} />
           </Fragment>
         ))}
         <IAIButton flexGrow={1} onClick={handleClickedAddControlNet}>

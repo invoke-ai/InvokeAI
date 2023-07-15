@@ -5,42 +5,51 @@ import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'app/components/ImageDnd/typesafeDnd';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/thunks/image';
-import {
-  ControlNetConfig,
-  controlNetImageChanged,
-  controlNetSelector,
-} from '../store/controlNetSlice';
-
-const selector = createSelector(
-  controlNetSelector,
-  (controlNet) => {
-    const { pendingControlImages } = controlNet;
-    return { pendingControlImages };
-  },
-  defaultSelectorOptions
-);
+import { controlNetImageChanged } from '../store/controlNetSlice';
 
 type Props = {
-  controlNet: ControlNetConfig;
+  controlNetId: string;
   height: SystemStyleObject['h'];
 };
 
 const ControlNetImagePreview = (props: Props) => {
-  const { height } = props;
-  const {
-    controlNetId,
-    controlImage: controlImageName,
-    processedControlImage: processedControlImageName,
-    processorType,
-  } = props.controlNet;
+  const { height, controlNetId } = props;
   const dispatch = useAppDispatch();
-  const { pendingControlImages } = useAppSelector(selector);
+
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ controlNet }) => {
+          const { pendingControlImages } = controlNet;
+          const { controlImage, processedControlImage, processorType } =
+            controlNet.controlNets[controlNetId];
+
+          return {
+            controlImageName: controlImage,
+            processedControlImageName: processedControlImage,
+            processorType,
+            pendingControlImages,
+          };
+        },
+        defaultSelectorOptions
+      ),
+    [controlNetId]
+  );
+
+  const {
+    controlImageName,
+    processedControlImageName,
+    processorType,
+    pendingControlImages,
+  } = useAppSelector(selector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 

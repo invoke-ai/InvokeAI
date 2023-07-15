@@ -1,7 +1,7 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { ControlNetModelParam } from 'features/parameters/types/parameterSchemas';
-import { forEach } from 'lodash-es';
+import { cloneDeep, forEach } from 'lodash-es';
 import { imageDeleted } from 'services/api/thunks/image';
 import { isAnySessionRejected } from 'services/api/thunks/session';
 import { appSocketInvocationError } from 'services/events/actions';
@@ -83,6 +83,19 @@ export const controlNetSlice = createSlice({
         ...(controlNet ?? initialControlNet),
         controlNetId,
       };
+    },
+    controlNetDuplicated: (
+      state,
+      action: PayloadAction<{
+        sourceControlNetId: string;
+        newControlNetId: string;
+      }>
+    ) => {
+      const { sourceControlNetId, newControlNetId } = action.payload;
+
+      const newControlnet = cloneDeep(state.controlNets[sourceControlNetId]);
+      newControlnet.controlNetId = newControlNetId;
+      state.controlNets[newControlNetId] = newControlnet;
     },
     controlNetAddedFromImage: (
       state,
@@ -315,6 +328,7 @@ export const controlNetSlice = createSlice({
 export const {
   isControlNetEnabledToggled,
   controlNetAdded,
+  controlNetDuplicated,
   controlNetAddedFromImage,
   controlNetRemoved,
   controlNetImageChanged,

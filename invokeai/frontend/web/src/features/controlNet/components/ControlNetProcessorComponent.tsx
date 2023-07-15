@@ -1,10 +1,13 @@
-import { memo } from 'react';
-import { RequiredControlNetProcessorNode } from '../store/types';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { memo, useMemo } from 'react';
 import CannyProcessor from './processors/CannyProcessor';
-import HedProcessor from './processors/HedProcessor';
-import LineartProcessor from './processors/LineartProcessor';
-import LineartAnimeProcessor from './processors/LineartAnimeProcessor';
 import ContentShuffleProcessor from './processors/ContentShuffleProcessor';
+import HedProcessor from './processors/HedProcessor';
+import LineartAnimeProcessor from './processors/LineartAnimeProcessor';
+import LineartProcessor from './processors/LineartProcessor';
 import MediapipeFaceProcessor from './processors/MediapipeFaceProcessor';
 import MidasDepthProcessor from './processors/MidasDepthProcessor';
 import MlsdImageProcessor from './processors/MlsdImageProcessor';
@@ -15,11 +18,23 @@ import ZoeDepthProcessor from './processors/ZoeDepthProcessor';
 
 export type ControlNetProcessorProps = {
   controlNetId: string;
-  processorNode: RequiredControlNetProcessorNode;
 };
 
 const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
-  const { controlNetId, processorNode } = props;
+  const { controlNetId } = props;
+
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ controlNet }) => controlNet.controlNets[controlNetId]?.processorNode,
+        defaultSelectorOptions
+      ),
+    [controlNetId]
+  );
+
+  const processorNode = useAppSelector(selector);
+
   if (processorNode.type === 'canny_image_processor') {
     return (
       <CannyProcessor

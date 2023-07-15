@@ -1,18 +1,33 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import { controlNetAutoConfigToggled } from 'features/controlNet/store/controlNetSlice';
-import { memo, useCallback } from 'react';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
+import { memo, useCallback, useMemo } from 'react';
 
 type Props = {
   controlNetId: string;
-  shouldAutoConfig: boolean;
 };
 
 const ParamControlNetShouldAutoConfig = (props: Props) => {
-  const { controlNetId, shouldAutoConfig } = props;
+  const { controlNetId } = props;
   const dispatch = useAppDispatch();
-  const isReady = useIsReadyToInvoke();
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ controlNet }) =>
+          controlNet.controlNets[controlNetId]?.shouldAutoConfig,
+        defaultSelectorOptions
+      ),
+    [controlNetId]
+  );
+
+  const shouldAutoConfig = useAppSelector(selector);
+  const isBusy = useAppSelector(selectIsBusy);
+
   const handleShouldAutoConfigChanged = useCallback(() => {
     dispatch(controlNetAutoConfigToggled({ controlNetId }));
   }, [controlNetId, dispatch]);
@@ -23,7 +38,7 @@ const ParamControlNetShouldAutoConfig = (props: Props) => {
       aria-label="Auto configure processor"
       isChecked={shouldAutoConfig}
       onChange={handleShouldAutoConfigChanged}
-      isDisabled={!isReady}
+      isDisabled={isBusy}
     />
   );
 };

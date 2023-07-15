@@ -1,18 +1,30 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
 import { controlNetWeightChanged } from 'features/controlNet/store/controlNetSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 
 type ParamControlNetWeightProps = {
   controlNetId: string;
-  weight: number;
   mini?: boolean;
 };
 
 const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
-  const { controlNetId, weight, mini = false } = props;
+  const { controlNetId, mini = false } = props;
   const dispatch = useAppDispatch();
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ controlNet }) => controlNet.controlNets[controlNetId]?.weight,
+        defaultSelectorOptions
+      ),
+    [controlNetId]
+  );
 
+  const weight = useAppSelector(selector);
   const handleWeightChanged = useCallback(
     (weight: number) => {
       dispatch(controlNetWeightChanged({ controlNetId, weight }));

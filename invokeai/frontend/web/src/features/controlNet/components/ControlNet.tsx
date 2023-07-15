@@ -1,10 +1,9 @@
-import { Box, ChakraProps, Flex, useColorMode } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { Box, Flex, useColorMode } from '@chakra-ui/react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { FaCopy, FaTrash } from 'react-icons/fa';
 import {
-  ControlNetConfig,
-  controlNetAdded,
+  controlNetDuplicated,
   controlNetRemoved,
   controlNetToggled,
 } from '../store/controlNetSlice';
@@ -12,9 +11,13 @@ import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
 
 import { ChevronUpIcon } from '@chakra-ui/icons';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { useToggle } from 'react-use';
+import { mode } from 'theme/util/mode';
 import { v4 as uuidv4 } from 'uuid';
 import ControlNetImagePreview from './ControlNetImagePreview';
 import ControlNetProcessorComponent from './ControlNetProcessorComponent';
@@ -22,30 +25,28 @@ import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ParamControlNetControlMode from './parameters/ParamControlNetControlMode';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
-import { mode } from 'theme/util/mode';
-
-const expandedControlImageSx: ChakraProps['sx'] = { maxH: 96 };
 
 type ControlNetProps = {
-  controlNet: ControlNetConfig;
+  controlNetId: string;
 };
 
 const ControlNet = (props: ControlNetProps) => {
-  const {
-    controlNetId,
-    isEnabled,
-    model,
-    weight,
-    beginStepPct,
-    endStepPct,
-    controlMode,
-    controlImage,
-    processedControlImage,
-    processorNode,
-    processorType,
-    shouldAutoConfig,
-  } = props.controlNet;
+  const { controlNetId } = props;
   const dispatch = useAppDispatch();
+
+  const selector = createSelector(
+    stateSelector,
+    ({ controlNet }) => {
+      const { isEnabled, shouldAutoConfig } =
+        controlNet.controlNets[controlNetId];
+
+      return { isEnabled, shouldAutoConfig };
+    },
+    defaultSelectorOptions
+  );
+
+  const { isEnabled, shouldAutoConfig } = useAppSelector(selector);
+
   const [isExpanded, toggleIsExpanded] = useToggle(false);
   const { colorMode } = useColorMode();
   const handleDelete = useCallback(() => {
@@ -54,9 +55,12 @@ const ControlNet = (props: ControlNetProps) => {
 
   const handleDuplicate = useCallback(() => {
     dispatch(
-      controlNetAdded({ controlNetId: uuidv4(), controlNet: props.controlNet })
+      controlNetDuplicated({
+        sourceControlNetId: controlNetId,
+        newControlNetId: uuidv4(),
+      })
     );
-  }, [dispatch, props.controlNet]);
+  }, [controlNetId, dispatch]);
 
   const handleToggleIsEnabled = useCallback(() => {
     dispatch(controlNetToggled({ controlNetId }));
@@ -140,14 +144,8 @@ const ControlNet = (props: ControlNetProps) => {
         )}
       </Flex>
       <Flex alignItems="flex-end" gap="2">
-        <ParamControlNetProcessorSelect
-          controlNetId={controlNetId}
-          processorNode={processorNode}
-        />
-        <ParamControlNetShouldAutoConfig
-          controlNetId={controlNetId}
-          shouldAutoConfig={shouldAutoConfig}
-        />
+        <ParamControlNetProcessorSelect controlNetId={controlNetId} />
+        <ParamControlNetShouldAutoConfig controlNetId={controlNetId} />
       </Flex>
       {isEnabled && (
         <>
@@ -166,13 +164,10 @@ const ControlNet = (props: ControlNetProps) => {
               >
                 <ParamControlNetWeight
                   controlNetId={controlNetId}
-                  weight={weight}
                   mini={!isExpanded}
                 />
                 <ParamControlNetBeginEnd
                   controlNetId={controlNetId}
-                  beginStepPct={beginStepPct}
-                  endStepPct={endStepPct}
                   mini={!isExpanded}
                 />
               </Flex>
@@ -187,30 +182,24 @@ const ControlNet = (props: ControlNetProps) => {
                   }}
                 >
                   <ControlNetImagePreview
-                    controlNet={props.controlNet}
+                    controlNetId={controlNetId}
                     height={24}
                   />
                 </Flex>
               )}
             </Flex>
-            <ParamControlNetControlMode
-              controlNetId={controlNetId}
-              controlMode={controlMode}
-            />
+            <ParamControlNetControlMode controlNetId={controlNetId} />
           </Flex>
 
           {isExpanded && (
             <>
               <Box mt={2}>
                 <ControlNetImagePreview
-                  controlNet={props.controlNet}
+                  controlNetId={controlNetId}
                   height={96}
                 />
               </Box>
-              <ControlNetProcessorComponent
-                controlNetId={controlNetId}
-                processorNode={processorNode}
-              />
+              <ControlNetProcessorComponent controlNetId={controlNetId} />
             </>
           )}
         </>
