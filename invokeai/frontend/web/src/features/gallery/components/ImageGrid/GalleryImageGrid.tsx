@@ -118,6 +118,20 @@ const GalleryImageGrid = () => {
     );
   }, [dispatch, imageNames.length, galleryView]);
 
+  useEffect(() => {
+    // Set up gallery scroler
+    const { current: root } = rootRef;
+    if (scroller && root) {
+      initialize({
+        target: root,
+        elements: {
+          viewport: scroller,
+        },
+      });
+    }
+    return () => osInstance()?.destroy();
+  }, [scroller, initialize, osInstance]);
+
   const handleEndReached = useMemo(() => {
     if (areMoreAvailable) {
       return handleLoadMoreImages;
