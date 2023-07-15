@@ -1,4 +1,5 @@
 import { Flex, Heading, Icon, Tooltip } from '@chakra-ui/react';
+import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/hooks/useBuildInvocation';
 import { memo } from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
 
@@ -12,6 +13,7 @@ const IAINodeHeader = (props: IAINodeHeaderProps) => {
   const { nodeId, title, description } = props;
   return (
     <Flex
+      className={DRAG_HANDLE_CLASSNAME}
       sx={{
         borderTopRadius: 'md',
         alignItems: 'center',
