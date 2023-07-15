@@ -125,15 +125,15 @@ class ControlField(BaseModel):
     # resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode to use")
 
     @validator("control_weight")
-    def abs_le_one(cls, v):
-        """validate that all abs(values) are <=1"""
+    def validate_control_weight(cls, v):
+        """Validate that all control weights in the valid range"""
         if isinstance(v, list):
             for i in v:
-                if abs(i) > 1:
-                    raise ValueError('all abs(control_weight) must be <= 1')
+                if i < -1 or i > 2:
+                    raise ValueError('Control weights must be within -1 to 2 range')
         else:
-            if abs(v) > 1:
-                raise ValueError('abs(control_weight) must be <= 1')
+            if v < -1 or v > 2:
+                raise ValueError('Control weights must be within -1 to 2 range')
         return v
     class Config:
         schema_extra = {
@@ -165,7 +165,7 @@ class ControlNetInvocation(BaseInvocation):
     control_model: ControlNetModelField = Field(default="lllyasviel/sd-controlnet-canny",
                                                   description="control model used")
     control_weight: Union[float, List[float]] = Field(default=1.0, description="The weight given to the ControlNet")
-    begin_step_percent: float = Field(default=0, ge=0, le=1,
+    begin_step_percent: float = Field(default=0, ge=-1, le=2,
                                       description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
