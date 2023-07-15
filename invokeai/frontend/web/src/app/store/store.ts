@@ -21,6 +21,7 @@ import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
 import configReducer from 'features/system/store/configSlice';
 import systemReducer from 'features/system/store/systemSlice';
+import modelmanagerReducer from 'features/ui/components/tabs/ModelManager/store/modelManagerSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import uiReducer from 'features/ui/store/uiSlice';
 
@@ -49,6 +50,7 @@ const allReducers = {
   dynamicPrompts: dynamicPromptsReducer,
   imageDeletion: imageDeletionReducer,
   lora: loraReducer,
+  modelmanager: modelmanagerReducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -67,6 +69,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'controlNet',
   'dynamicPrompts',
   'lora',
+  'modelmanager',
 ];
 
 export const store = configureStore({
