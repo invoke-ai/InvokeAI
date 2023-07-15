@@ -2,10 +2,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { SCHEDULER_LABEL_MAP, SCHEDULER_NAMES } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setScheduler } from 'features/parameters/store/generationSlice';
-import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
+import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -48,7 +48,7 @@ const ParamScheduler = () => {
   );
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       label={t('parameters.scheduler')}
       value={scheduler}
       data={data}

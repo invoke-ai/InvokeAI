@@ -1,186 +1,46 @@
-import { Box, Flex, Spinner, Text } from '@chakra-ui/react';
+import { ButtonGroup, Flex, Text } from '@chakra-ui/react';
+import { EntityState } from '@reduxjs/toolkit';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
-
+import { forEach } from 'lodash-es';
+import type { ChangeEvent } from 'react';
+import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  MainModelConfigEntity,
+  useGetMainModelsQuery,
+} from 'services/api/endpoints/models';
 import ModelListItem from './ModelListItem';
 
-import { useTranslation } from 'react-i18next';
+type ModelListProps = {
+  selectedModelId: string | undefined;
+  setSelectedModelId: (name: string | undefined) => void;
+};
 
-import type { ChangeEvent, ReactNode } from 'react';
-import React, { useMemo, useState, useTransition } from 'react';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+type ModelFormat = 'all' | 'checkpoint' | 'diffusers';
 
-function ModelFilterButton({
-  label,
-  isActive,
-  onClick,
-}: {
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <IAIButton
-      onClick={onClick}
-      isActive={isActive}
-      sx={{
-        _active: {
-          bg: 'accent.750',
-        },
-      }}
-      size="sm"
-    >
-      {label}
-    </IAIButton>
-  );
-}
+const ModelList = (props: ModelListProps) => {
+  const { selectedModelId, setSelectedModelId } = props;
+  const { t } = useTranslation();
+  const [nameFilter, setNameFilter] = useState<string>('');
+  const [modelFormatFilter, setModelFormatFilter] =
+    useState<ModelFormat>('all');
 
-const ModelList = () => {
-  const { data: mainModels } = useGetMainModelsQuery({
-    model_type: 'main',
-    base_models: ['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner'],
+  const { filteredDiffusersModels } = useGetMainModelsQuery(undefined, {
+    selectFromResult: ({ data }) => ({
+      filteredDiffusersModels: modelsFilter(data, 'diffusers', nameFilter),
+    }),
   });
 
-  const [renderModelList, setRenderModelList] = React.useState<boolean>(false);
+  const { filteredCheckpointModels } = useGetMainModelsQuery(undefined, {
+    selectFromResult: ({ data }) => ({
+      filteredCheckpointModels: modelsFilter(data, 'checkpoint', nameFilter),
+    }),
+  });
 
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setRenderModelList(true);
-    }, 200);
-
-    return () => clearTimeout(timer);
+  const handleSearchFilter = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setNameFilter(e.target.value);
   }, []);
-
-  const [searchText, setSearchText] = useState<string>('');
-  const [isSelectedFilter, setIsSelectedFilter] = useState<
-    'all' | 'ckpt' | 'diffusers'
-  >('all');
-  const [_, startTransition] = useTransition();
-
-  const { t } = useTranslation();
-
-  const handleSearchFilter = (e: ChangeEvent<HTMLInputElement>) => {
-    startTransition(() => {
-      setSearchText(e.target.value);
-    });
-  };
-
-  const renderModelListItems = useMemo(() => {
-    const ckptModelListItemsToRender: ReactNode[] = [];
-    const diffusersModelListItemsToRender: ReactNode[] = [];
-    const filteredModelListItemsToRender: ReactNode[] = [];
-    const localFilteredModelListItemsToRender: ReactNode[] = [];
-
-    if (!mainModels) return;
-
-    const modelList = mainModels.entities;
-
-    Object.keys(modelList).forEach((model, i) => {
-      if (
-        modelList[model].name.toLowerCase().includes(searchText.toLowerCase())
-      ) {
-        filteredModelListItemsToRender.push(
-          <ModelListItem
-            key={i}
-            modelKey={model}
-            name={modelList[model].name}
-            description={modelList[model].description}
-          />
-        );
-        if (modelList[model]?.model_format === isSelectedFilter) {
-          localFilteredModelListItemsToRender.push(
-            <ModelListItem
-              key={i}
-              modelKey={model}
-              name={modelList[model].name}
-              description={modelList[model].description}
-            />
-          );
-        }
-      }
-      if (modelList[model]?.model_format !== 'diffusers') {
-        ckptModelListItemsToRender.push(
-          <ModelListItem
-            key={i}
-            modelKey={model}
-            name={modelList[model].name}
-            description={modelList[model].description}
-          />
-        );
-      } else {
-        diffusersModelListItemsToRender.push(
-          <ModelListItem
-            key={i}
-            modelKey={model}
-            name={modelList[model].name}
-            description={modelList[model].description}
-          />
-        );
-      }
-    });
-
-    return searchText !== '' ? (
-      isSelectedFilter === 'all' ? (
-        <Box marginTop={4}>{filteredModelListItemsToRender}</Box>
-      ) : (
-        <Box marginTop={4}>{localFilteredModelListItemsToRender}</Box>
-      )
-    ) : (
-      <Flex flexDirection="column" rowGap={6}>
-        {isSelectedFilter === 'all' && (
-          <>
-            <Box>
-              <Text
-                sx={{
-                  fontWeight: '500',
-                  py: 2,
-                  px: 4,
-                  mb: 4,
-                  borderRadius: 'base',
-                  width: 'max-content',
-                  fontSize: 'sm',
-                  bg: 'base.750',
-                }}
-              >
-                {t('modelManager.diffusersModels')}
-              </Text>
-              {diffusersModelListItemsToRender}
-            </Box>
-            <Box>
-              <Text
-                sx={{
-                  fontWeight: '500',
-                  py: 2,
-                  px: 4,
-                  my: 4,
-                  mx: 0,
-                  borderRadius: 'base',
-                  width: 'max-content',
-                  fontSize: 'sm',
-                  bg: 'base.750',
-                }}
-              >
-                {t('modelManager.checkpointModels')}
-              </Text>
-              {ckptModelListItemsToRender}
-            </Box>
-          </>
-        )}
-
-        {isSelectedFilter === 'diffusers' && (
-          <Flex flexDirection="column" marginTop={4}>
-            {diffusersModelListItemsToRender}
-          </Flex>
-        )}
-
-        {isSelectedFilter === 'ckpt' && (
-          <Flex flexDirection="column" marginTop={4}>
-            {ckptModelListItemsToRender}
-          </Flex>
-        )}
-      </Flex>
-    );
-  }, [mainModels, searchText, t, isSelectedFilter]);
 
   return (
     <Flex flexDirection="column" rowGap={4} width="50%" minWidth="50%">
@@ -188,7 +48,6 @@ const ModelList = () => {
         onChange={handleSearchFilter}
         label={t('modelManager.search')}
       />
-
       <Flex
         flexDirection="column"
         gap={4}
@@ -196,39 +55,89 @@ const ModelList = () => {
         overflow="scroll"
         paddingInlineEnd={4}
       >
-        <Flex columnGap={2}>
-          <ModelFilterButton
-            label={t('modelManager.allModels')}
-            onClick={() => setIsSelectedFilter('all')}
-            isActive={isSelectedFilter === 'all'}
-          />
-          <ModelFilterButton
-            label={t('modelManager.diffusersModels')}
-            onClick={() => setIsSelectedFilter('diffusers')}
-            isActive={isSelectedFilter === 'diffusers'}
-          />
-          <ModelFilterButton
-            label={t('modelManager.checkpointModels')}
-            onClick={() => setIsSelectedFilter('ckpt')}
-            isActive={isSelectedFilter === 'ckpt'}
-          />
-        </Flex>
-
-        {renderModelList ? (
-          renderModelListItems
-        ) : (
-          <Flex
-            width="100%"
-            minHeight={96}
-            justifyContent="center"
-            alignItems="center"
+        <ButtonGroup isAttached>
+          <IAIButton
+            onClick={() => setModelFormatFilter('all')}
+            isChecked={modelFormatFilter === 'all'}
+            size="sm"
           >
-            <Spinner />
-          </Flex>
-        )}
+            {t('modelManager.allModels')}
+          </IAIButton>
+          <IAIButton
+            size="sm"
+            onClick={() => setModelFormatFilter('diffusers')}
+            isChecked={modelFormatFilter === 'diffusers'}
+          >
+            {t('modelManager.diffusersModels')}
+          </IAIButton>
+          <IAIButton
+            size="sm"
+            onClick={() => setModelFormatFilter('checkpoint')}
+            isChecked={modelFormatFilter === 'checkpoint'}
+          >
+            {t('modelManager.checkpointModels')}
+          </IAIButton>
+        </ButtonGroup>
+
+        {['all', 'diffusers'].includes(modelFormatFilter) &&
+          filteredDiffusersModels.length > 0 && (
+            <Flex sx={{ gap: 2, flexDir: 'column' }}>
+              <Text variant="subtext" fontSize="sm">
+                Diffusers
+              </Text>
+              {filteredDiffusersModels.map((model) => (
+                <ModelListItem
+                  key={model.id}
+                  model={model}
+                  isSelected={selectedModelId === model.id}
+                  setSelectedModelId={setSelectedModelId}
+                />
+              ))}
+            </Flex>
+          )}
+        {['all', 'checkpoint'].includes(modelFormatFilter) &&
+          filteredCheckpointModels.length > 0 && (
+            <Flex sx={{ gap: 2, flexDir: 'column' }}>
+              <Text variant="subtext" fontSize="sm">
+                Checkpoint
+              </Text>
+              {filteredCheckpointModels.map((model) => (
+                <ModelListItem
+                  key={model.id}
+                  model={model}
+                  isSelected={selectedModelId === model.id}
+                  setSelectedModelId={setSelectedModelId}
+                />
+              ))}
+            </Flex>
+          )}
       </Flex>
     </Flex>
   );
 };
 
 export default ModelList;
+
+const modelsFilter = (
+  data: EntityState<MainModelConfigEntity> | undefined,
+  model_format: ModelFormat,
+  nameFilter: string
+) => {
+  const filteredModels: MainModelConfigEntity[] = [];
+  forEach(data?.entities, (model) => {
+    if (!model) {
+      return;
+    }
+
+    const matchesFilter = model.model_name
+      .toLowerCase()
+      .includes(nameFilter.toLowerCase());
+
+    const matchesFormat = model.model_format === model_format;
+
+    if (matchesFilter && matchesFormat) {
+      filteredModels.push(model);
+    }
+  });
+  return filteredModels;
+};

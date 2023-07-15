@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { setBoundingBoxScaleMethod } from 'features/canvas/store/canvasSlice';
 import {
@@ -35,7 +35,7 @@ const ParamScaleBeforeProcessing = () => {
   };
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       label={t('parameters.scaleBeforeProcessing')}
       data={BOUNDING_BOX_SCALES_DICT}
       value={boundingBoxScale}

@@ -10,6 +10,7 @@ type TypeReq<T> = O.Required<T, 'type'>;
 
 // App Info
 export type AppVersion = components['schemas']['AppVersion'];
+export type AppConfig = components['schemas']['AppConfig'];
 
 // Images
 export type ImageDTO = components['schemas']['ImageDTO'];
@@ -19,6 +20,7 @@ export type ImageChanges = components['schemas']['ImageRecordChanges'];
 export type ImageCategory = components['schemas']['ImageCategory'];
 export type ResourceOrigin = components['schemas']['ResourceOrigin'];
 export type ImageField = components['schemas']['ImageField'];
+export type ImageMetadata = components['schemas']['ImageMetadata'];
 export type OffsetPaginatedResults_BoardDTO_ =
   components['schemas']['OffsetPaginatedResults_BoardDTO_'];
 export type OffsetPaginatedResults_ImageDTO_ =
@@ -30,7 +32,10 @@ export type BaseModelType = components['schemas']['BaseModelType'];
 export type MainModelField = components['schemas']['MainModelField'];
 export type VAEModelField = components['schemas']['VAEModelField'];
 export type LoRAModelField = components['schemas']['LoRAModelField'];
+export type ControlNetModelField =
+  components['schemas']['ControlNetModelField'];
 export type ModelsList = components['schemas']['ModelsList'];
+export type ControlField = components['schemas']['ControlField'];
 
 // Model Configs
 export type LoRAModelConfig = components['schemas']['LoRAModelConfig'];
@@ -39,17 +44,20 @@ export type ControlNetModelConfig =
   components['schemas']['ControlNetModelConfig'];
 export type TextualInversionModelConfig =
   components['schemas']['TextualInversionModelConfig'];
-export type MainModelConfig =
-  | components['schemas']['StableDiffusion1ModelCheckpointConfig']
+export type DiffusersModelConfig =
   | components['schemas']['StableDiffusion1ModelDiffusersConfig']
-  | components['schemas']['StableDiffusion2ModelCheckpointConfig']
   | components['schemas']['StableDiffusion2ModelDiffusersConfig'];
+export type CheckpointModelConfig =
+  | components['schemas']['StableDiffusion1ModelCheckpointConfig']
+  | components['schemas']['StableDiffusion2ModelCheckpointConfig'];
+export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig
   | VaeModelConfig
   | ControlNetModelConfig
   | TextualInversionModelConfig
   | MainModelConfig;
+export type MergeModelConfig = components['schemas']['Body_merge_models'];
 
 // Graphs
 export type Graph = components['schemas']['Graph'];
@@ -106,6 +114,9 @@ export type MainModelLoaderInvocation = TypeReq<
 >;
 export type LoraLoaderInvocation = TypeReq<
   components['schemas']['LoraLoaderInvocation']
+>;
+export type MetadataAccumulatorInvocation = TypeReq<
+  components['schemas']['MetadataAccumulatorInvocation']
 >;
 
 // ControlNet Nodes

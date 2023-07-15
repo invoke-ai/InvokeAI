@@ -71,8 +71,6 @@ class ModelInstallList:
 class InstallSelections():
     install_models: List[str]= field(default_factory=list)
     remove_models: List[str]=field(default_factory=list)
-#    scan_directory: Path = None
-#    autoscan_on_startup: bool=False
 
 @dataclass
 class ModelLoadInfo():
@@ -121,8 +119,8 @@ class ModelInstall(object):
         installed_models = self.mgr.list_models()
         for md in installed_models:
             base = md['base_model']
-            model_type = md['type']
-            name = md['name']
+            model_type = md['model_type']
+            name = md['model_name']
             key = ModelManager.create_key(name, base, model_type)
             if key in model_dict:
                 model_dict[key].installed = True

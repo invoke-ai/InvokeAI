@@ -4,8 +4,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
-import ParamBoundingBoxHeight from 'features/parameters/components/Parameters/Canvas/BoundingBox/ParamBoundingBoxHeight';
-import ParamBoundingBoxWidth from 'features/parameters/components/Parameters/Canvas/BoundingBox/ParamBoundingBoxWidth';
+import ParamBoundingBoxSize from 'features/parameters/components/Parameters/Canvas/BoundingBox/ParamBoundingBoxSize';
 import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
 import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
 import ParamModelandVAEandScheduler from 'features/parameters/components/Parameters/Core/ParamModelandVAEandScheduler';
@@ -51,8 +50,7 @@ const UnifiedCanvasCoreParameters = () => {
             <Box pt={2}>
               <ParamSeedFull />
             </Box>
-            <ParamBoundingBoxWidth />
-            <ParamBoundingBoxHeight />
+            <ParamBoundingBoxSize />
           </>
         ) : (
           <>
@@ -65,8 +63,7 @@ const UnifiedCanvasCoreParameters = () => {
             <Box pt={2}>
               <ParamSeedFull />
             </Box>
-            <ParamBoundingBoxWidth />
-            <ParamBoundingBoxHeight />
+            <ParamBoundingBoxSize />
           </>
         )}
         <ImageToImageStrength />

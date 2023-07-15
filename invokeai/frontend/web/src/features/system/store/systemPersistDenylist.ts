@@ -13,7 +13,6 @@ export const systemPersistDenylist: (keyof SystemState)[] = [
   'isProcessing',
   'totalIterations',
   'totalSteps',
-  'openModel',
   'isCancelScheduled',
   'progressImage',
   'wereModelsReceived',

@@ -16,6 +16,12 @@ from invokeai.backend.util.logging import InvokeAILogger
 config = InvokeAIAppConfig.get_config()
 config.parse_args()
 logger = InvokeAILogger().getLogger(config=config)
+from invokeai.version.invokeai_version import __version__
+
+# we call this early so that the message appears before other invokeai initialization messages
+if config.version:
+    print(f'InvokeAI version {__version__}')
+    sys.exit(0)
 
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
@@ -28,7 +34,6 @@ from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
 from invokeai.app.services.boards import BoardService, BoardServiceDependencies
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService, ImageServiceDependencies
-from invokeai.app.services.metadata import CoreMetadataService
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 from .services.default_graphs import (default_text_to_image_graph_id,
@@ -208,6 +213,7 @@ def invoke_all(context: CliContext):
         raise SessionError()
 
 def invoke_cli():
+    logger.info(f'InvokeAI version {__version__}')
     # get the optional list of invocations to execute on the command line
     parser = config.get_parser()
     parser.add_argument('commands',nargs='*')
@@ -237,7 +243,6 @@ def invoke_cli():
         )
 
     urls = LocalUrlService()
-    metadata = CoreMetadataService()
     image_record_storage = SqliteImageRecordStorage(db_location)
     image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
     names = SimpleNameService()
@@ -270,7 +275,6 @@ def invoke_cli():
             board_image_record_storage=board_image_record_storage,
             image_record_storage=image_record_storage,
             image_file_storage=image_file_storage,
-            metadata=metadata,
             url=urls,
             logger=logger,
             names=names,

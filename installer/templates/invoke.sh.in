@@ -93,7 +93,7 @@ do_choice() {
     9)
         clear
         printf "Update InvokeAI\n"
-        invokeai-update
+        python -m invokeai.frontend.install.invokeai_update
         ;;
     10)
         clear

@@ -1,3 +1,9 @@
+import {
+  ControlNetModelParam,
+  LoRAModelParam,
+  MainModelParam,
+  VaeModelParam,
+} from 'features/parameters/types/parameterSchemas';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Graph, ImageDTO, ImageField } from 'services/api/types';
@@ -66,6 +72,7 @@ export type FieldType =
   | 'model'
   | 'vae_model'
   | 'lora_model'
+  | 'controlnet_model'
   | 'array'
   | 'item'
   | 'color'
@@ -92,9 +99,10 @@ export type InputFieldValue =
   | VaeInputFieldValue
   | ControlInputFieldValue
   | EnumInputFieldValue
-  | ModelInputFieldValue
+  | MainModelInputFieldValue
   | VaeModelInputFieldValue
   | LoRAModelInputFieldValue
+  | ControlNetModelInputFieldValue
   | ArrayInputFieldValue
   | ItemInputFieldValue
   | ColorInputFieldValue
@@ -122,6 +130,7 @@ export type InputFieldTemplate =
   | ModelInputFieldTemplate
   | VaeModelInputFieldTemplate
   | LoRAModelInputFieldTemplate
+  | ControlNetModelInputFieldTemplate
   | ArrayInputFieldTemplate
   | ItemInputFieldTemplate
   | ColorInputFieldTemplate
@@ -229,19 +238,24 @@ export type ImageCollectionInputFieldValue = FieldValueBase & {
   value?: ImageField[];
 };
 
-export type ModelInputFieldValue = FieldValueBase & {
+export type MainModelInputFieldValue = FieldValueBase & {
   type: 'model';
-  value?: string;
+  value?: MainModelParam;
 };
 
 export type VaeModelInputFieldValue = FieldValueBase & {
   type: 'vae_model';
-  value?: string;
+  value?: VaeModelParam;
 };
 
 export type LoRAModelInputFieldValue = FieldValueBase & {
   type: 'lora_model';
-  value?: string;
+  value?: LoRAModelParam;
+};
+
+export type ControlNetModelInputFieldValue = FieldValueBase & {
+  type: 'controlnet_model';
+  value?: ControlNetModelParam;
 };
 
 export type ArrayInputFieldValue = FieldValueBase & {
@@ -361,6 +375,11 @@ export type VaeModelInputFieldTemplate = InputFieldTemplateBase & {
 export type LoRAModelInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'lora_model';
+};
+
+export type ControlNetModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
+  type: 'controlnet_model';
 };
 
 export type ArrayInputFieldTemplate = InputFieldTemplateBase & {

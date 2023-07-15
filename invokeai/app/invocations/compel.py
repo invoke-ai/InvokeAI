@@ -128,7 +128,7 @@ class CompelInvocation(BaseInvocation):
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=torch_dtype,
-                truncate_long_prompts=True,  # TODO:
+                truncate_long_prompts=False,
             )
 
             conjunction = Compel.parse_prompt_string(self.prompt)
@@ -140,9 +140,6 @@ class CompelInvocation(BaseInvocation):
             c, options = compel.build_conditioning_tensor_for_prompt_object(
                 prompt)
 
-            # TODO: long prompt support
-            # if not self.truncate_long_prompts:
-            #    [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
             ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
                 tokens_count_including_eos_bos=get_max_token_count(
                     tokenizer, conjunction),

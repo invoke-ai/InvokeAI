@@ -5,17 +5,21 @@ import {
   InputFieldTemplate,
   InvocationSchemaObject,
   InvocationTemplate,
-  isInvocationSchemaObject,
   OutputFieldTemplate,
+  isInvocationSchemaObject,
 } from '../types/types';
 import {
   buildInputFieldTemplate,
   buildOutputFieldTemplates,
 } from './fieldTemplateBuilders';
 
-const RESERVED_FIELD_NAMES = ['id', 'type', 'is_intermediate'];
+const RESERVED_FIELD_NAMES = ['id', 'type', 'is_intermediate', 'metadata'];
 
-const invocationDenylist = ['Graph', 'InvocationMeta'];
+const invocationDenylist = [
+  'Graph',
+  'InvocationMeta',
+  'MetadataAccumulatorInvocation',
+];
 
 export const parseSchema = (openAPI: OpenAPIV3.Document) => {
   // filter out non-invocation schemas, plus some tricky invocations for now

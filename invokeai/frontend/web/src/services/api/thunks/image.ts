@@ -1,9 +1,13 @@
-import queryString from 'query-string';
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { selectImagesAll } from 'features/gallery/store/gallerySlice';
+import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
+import {
+  ASSETS_CATEGORIES,
+  IMAGE_CATEGORIES,
+} from 'features/gallery/store/gallerySlice';
 import { size } from 'lodash-es';
-import { paths } from 'services/api/schema';
+import queryString from 'query-string';
 import { $client } from 'services/api/client';
+import { paths } from 'services/api/schema';
 
 type GetImageUrlsArg =
   paths['/api/v1/images/{image_name}/urls']['get']['parameters']['path'];
@@ -24,7 +28,7 @@ export const imageUrlsReceived = createAppAsyncThunk<
   GetImageUrlsResponse,
   GetImageUrlsArg,
   GetImageUrlsThunkConfig
->('api/imageUrlsReceived', async (arg, { rejectWithValue }) => {
+>('thunkApi/imageUrlsReceived', async (arg, { rejectWithValue }) => {
   const { image_name } = arg;
   const { get } = $client.get();
   const { data, error, response } = await get(
@@ -46,10 +50,10 @@ export const imageUrlsReceived = createAppAsyncThunk<
 });
 
 type GetImageMetadataArg =
-  paths['/api/v1/images/{image_name}/metadata']['get']['parameters']['path'];
+  paths['/api/v1/images/{image_name}']['get']['parameters']['path'];
 
 type GetImageMetadataResponse =
-  paths['/api/v1/images/{image_name}/metadata']['get']['responses']['200']['content']['application/json'];
+  paths['/api/v1/images/{image_name}']['get']['responses']['200']['content']['application/json'];
 
 type GetImageMetadataThunkConfig = {
   rejectValue: {
@@ -58,21 +62,18 @@ type GetImageMetadataThunkConfig = {
   };
 };
 
-export const imageMetadataReceived = createAppAsyncThunk<
+export const imageDTOReceived = createAppAsyncThunk<
   GetImageMetadataResponse,
   GetImageMetadataArg,
   GetImageMetadataThunkConfig
->('api/imageMetadataReceived', async (arg, { rejectWithValue }) => {
+>('thunkApi/imageMetadataReceived', async (arg, { rejectWithValue }) => {
   const { image_name } = arg;
   const { get } = $client.get();
-  const { data, error, response } = await get(
-    '/api/v1/images/{image_name}/metadata',
-    {
-      params: {
-        path: { image_name },
-      },
-    }
-  );
+  const { data, error, response } = await get('/api/v1/images/{image_name}', {
+    params: {
+      path: { image_name },
+    },
+  });
 
   if (error) {
     return rejectWithValue({ arg, error });
@@ -148,7 +149,7 @@ export const imageUploaded = createAppAsyncThunk<
   UploadImageResponse,
   UploadImageArg,
   UploadImageThunkConfig
->('api/imageUploaded', async (arg, { rejectWithValue }) => {
+>('thunkApi/imageUploaded', async (arg, { rejectWithValue }) => {
   const {
     postUploadAction,
     file,
@@ -199,7 +200,7 @@ export const imageDeleted = createAppAsyncThunk<
   DeleteImageResponse,
   DeleteImageArg,
   DeleteImageThunkConfig
->('api/imageDeleted', async (arg, { rejectWithValue }) => {
+>('thunkApi/imageDeleted', async (arg, { rejectWithValue }) => {
   const { image_name } = arg;
   const { del } = $client.get();
   const { data, error, response } = await del('/api/v1/images/{image_name}', {
@@ -235,7 +236,7 @@ export const imageUpdated = createAppAsyncThunk<
   UpdateImageResponse,
   UpdateImageArg,
   UpdateImageThunkConfig
->('api/imageUpdated', async (arg, { rejectWithValue }) => {
+>('thunkApi/imageUpdated', async (arg, { rejectWithValue }) => {
   const { image_name, image_category, is_intermediate, session_id } = arg;
   const { patch } = $client.get();
   const { data, error, response } = await patch('/api/v1/images/{image_name}', {
@@ -284,46 +285,46 @@ export const receivedPageOfImages = createAppAsyncThunk<
   ListImagesResponse,
   ListImagesArg,
   ListImagesThunkConfig
->('api/receivedPageOfImages', async (arg, { getState, rejectWithValue }) => {
-  const { get } = $client.get();
+>(
+  'thunkApi/receivedPageOfImages',
+  async (arg, { getState, rejectWithValue }) => {
+    const { get } = $client.get();
 
-  const state = getState();
-  const { categories, selectedBoardId } = state.gallery;
+    const state = getState();
 
-  const images = selectImagesAll(state).filter((i) => {
-    const isInCategory = categories.includes(i.image_category);
-    const isInSelectedBoard = selectedBoardId
-      ? i.board_id === selectedBoardId
-      : true;
-    return isInCategory && isInSelectedBoard;
-  });
+    const images = selectFilteredImages(state);
+    const categories =
+      state.gallery.galleryView === 'images'
+        ? IMAGE_CATEGORIES
+        : ASSETS_CATEGORIES;
 
-  let query: ListImagesArg = {};
+    let query: ListImagesArg = {};
 
-  if (size(arg)) {
-    query = {
-      ...DEFAULT_IMAGES_LISTED_ARG,
-      offset: images.length,
-      ...arg,
-    };
-  } else {
-    query = {
-      ...DEFAULT_IMAGES_LISTED_ARG,
-      categories,
-      offset: images.length,
-    };
+    if (size(arg)) {
+      query = {
+        ...DEFAULT_IMAGES_LISTED_ARG,
+        offset: images.length,
+        ...arg,
+      };
+    } else {
+      query = {
+        ...DEFAULT_IMAGES_LISTED_ARG,
+        categories,
+        offset: images.length,
+      };
+    }
+
+    const { data, error, response } = await get('/api/v1/images/', {
+      params: {
+        query,
+      },
+      querySerializer: (q) => queryString.stringify(q, { arrayFormat: 'none' }),
+    });
+
+    if (error) {
+      return rejectWithValue({ arg, error });
+    }
+
+    return data;
   }
-
-  const { data, error, response } = await get('/api/v1/images/', {
-    params: {
-      query,
-    },
-    querySerializer: (q) => queryString.stringify(q, { arrayFormat: 'none' }),
-  });
-
-  if (error) {
-    return rejectWithValue({ arg, error });
-  }
-
-  return data;
-});
+);

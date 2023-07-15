@@ -1,7 +1,7 @@
 import { FACETOOL_TYPES } from 'app/constants';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import {
   FacetoolType,
   setFacetoolType,
@@ -20,7 +20,7 @@ export default function FaceRestoreType() {
     dispatch(setFacetoolType(v as FacetoolType));
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       label={t('parameters.type')}
       data={FACETOOL_TYPES.concat()}
       value={facetoolType}

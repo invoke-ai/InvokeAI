@@ -5,14 +5,14 @@ import IAISlider from 'common/components/IAISlider';
 import { memo, useCallback } from 'react';
 import { FaTrash } from 'react-icons/fa';
 import {
-  Lora,
+  LoRA,
   loraRemoved,
   loraWeightChanged,
   loraWeightReset,
 } from '../store/loraSlice';
 
 type Props = {
-  lora: Lora;
+  lora: LoRA;
 };
 
 const ParamLora = (props: Props) => {
@@ -37,7 +37,7 @@ const ParamLora = (props: Props) => {
   return (
     <Flex sx={{ gap: 2.5, alignItems: 'flex-end' }}>
       <IAISlider
-        label={lora.name}
+        label={lora.model_name}
         value={lora.weight}
         onChange={handleChange}
         min={-1}

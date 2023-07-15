@@ -1,6 +1,7 @@
 import {
   AnyAction,
   ThunkDispatch,
+  autoBatchEnhancer,
   combineReducers,
   configureStore,
 } from '@reduxjs/toolkit';
@@ -8,14 +9,12 @@ import {
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import { rememberEnhancer, rememberReducer } from 'redux-remember';
 
-import batchReducer from 'features/batch/store/batchSlice';
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import controlNetReducer from 'features/controlNet/store/controlNetSlice';
 import dynamicPromptsReducer from 'features/dynamicPrompts/store/slice';
 import boardsReducer from 'features/gallery/store/boardSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
 import imageDeletionReducer from 'features/imageDeletion/store/imageDeletionSlice';
-import lightboxReducer from 'features/lightbox/store/lightboxSlice';
 import loraReducer from 'features/lora/store/loraSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
@@ -39,7 +38,6 @@ const allReducers = {
   canvas: canvasReducer,
   gallery: galleryReducer,
   generation: generationReducer,
-  lightbox: lightboxReducer,
   nodes: nodesReducer,
   postprocessing: postprocessingReducer,
   system: systemReducer,
@@ -49,7 +47,6 @@ const allReducers = {
   controlNet: controlNetReducer,
   boards: boardsReducer,
   dynamicPrompts: dynamicPromptsReducer,
-  batch: batchReducer,
   imageDeletion: imageDeletionReducer,
   lora: loraReducer,
   [api.reducerPath]: api.reducer,
@@ -63,30 +60,29 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'canvas',
   'gallery',
   'generation',
-  'lightbox',
   'nodes',
   'postprocessing',
   'system',
   'ui',
   'controlNet',
   'dynamicPrompts',
-  'batch',
   'lora',
-  // 'boards',
-  // 'hotkeys',
-  // 'config',
 ];
 
 export const store = configureStore({
   reducer: rememberedRootReducer,
-  enhancers: [
-    rememberEnhancer(window.localStorage, rememberedKeys, {
-      persistDebounce: 300,
-      serialize,
-      unserialize,
-      prefix: LOCALSTORAGE_PREFIX,
-    }),
-  ],
+  enhancers: (existingEnhancers) => {
+    return existingEnhancers
+      .concat(
+        rememberEnhancer(window.localStorage, rememberedKeys, {
+          persistDebounce: 300,
+          serialize,
+          unserialize,
+          prefix: LOCALSTORAGE_PREFIX,
+        })
+      )
+      .concat(autoBatchEnhancer());
+  },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       immutableCheck: false,
@@ -96,10 +92,27 @@ export const store = configureStore({
       .concat(dynamicMiddlewares)
       .prepend(listenerMiddleware.middleware),
   devTools: {
-    actionsDenylist,
     actionSanitizer,
     stateSanitizer,
     trace: true,
+    predicate: (state, action) => {
+      // TODO: hook up to the log level param in system slice
+      // manually type state, cannot type the arg
+      // const typedState = state as ReturnType<typeof rootReducer>;
+
+      // TODO: doing this breaks the rtk query devtools, commenting out for now
+      // if (action.type.startsWith('api/')) {
+      //   // don't log api actions, with manual cache updates they are extremely noisy
+      //   return false;
+      // }
+
+      if (actionsDenylist.includes(action.type)) {
+        // don't log other noisy actions
+        return false;
+      }
+
+      return true;
+    },
   },
 });
 

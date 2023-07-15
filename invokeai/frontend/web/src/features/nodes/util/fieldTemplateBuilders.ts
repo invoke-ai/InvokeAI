@@ -9,6 +9,7 @@ import {
   ColorInputFieldTemplate,
   ConditioningInputFieldTemplate,
   ControlInputFieldTemplate,
+  ControlNetModelInputFieldTemplate,
   EnumInputFieldTemplate,
   FieldType,
   FloatInputFieldTemplate,
@@ -199,6 +200,21 @@ const buildLoRAModelInputFieldTemplate = ({
   const template: LoRAModelInputFieldTemplate = {
     ...baseField,
     type: 'lora_model',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildControlNetModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): ControlNetModelInputFieldTemplate => {
+  const template: ControlNetModelInputFieldTemplate = {
+    ...baseField,
+    type: 'controlnet_model',
     inputRequirement: 'always',
     inputKind: 'direct',
     default: schemaObject.default ?? undefined,
@@ -478,6 +494,9 @@ export const buildInputFieldTemplate = (
   }
   if (['lora_model'].includes(fieldType)) {
     return buildLoRAModelInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['controlnet_model'].includes(fieldType)) {
+    return buildControlNetModelInputFieldTemplate({ schemaObject, baseField });
   }
   if (['enum'].includes(fieldType)) {
     return buildEnumInputFieldTemplate({ schemaObject, baseField });

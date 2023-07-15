@@ -15,6 +15,7 @@ from .base import (
     calc_model_size_by_fs,
     calc_model_size_by_data,
     classproperty,
+    InvalidModelException,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
 from diffusers.utils import is_safetensors_available
@@ -75,10 +76,18 @@ class VaeModel(ModelBase):
 
     @classmethod
     def detect_format(cls, path: str):
+        if not os.path.exists(path):
+            raise ModelNotFoundException()
+
         if os.path.isdir(path):
-            return VaeModelFormat.Diffusers
-        else:
-            return VaeModelFormat.Checkpoint
+            if os.path.exists(os.path.join(path, "config.json")):
+                return VaeModelFormat.Diffusers
+
+        if os.path.isfile(path):
+            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+                return VaeModelFormat.Checkpoint
+
+        raise InvalidModelException(f"Not a valid model: {path}")
 
     @classmethod
     def convert_if_required(

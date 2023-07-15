@@ -1,6 +1,6 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { modelIdToVAEModelField } from '../modelIdToVAEModelField';
+import { MetadataAccumulatorInvocation } from 'services/api/types';
 import {
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
@@ -8,24 +8,27 @@ import {
   INPAINT_GRAPH,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
+  METADATA_ACCUMULATOR,
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
 } from './constants';
 
 export const addVAEToGraph = (
-  graph: NonNullableGraph,
-  state: RootState
+  state: RootState,
+  graph: NonNullableGraph
 ): void => {
   const { vae } = state.generation;
-  const vae_model = modelIdToVAEModelField(vae?.id || '');
 
   const isAutoVae = !vae;
+  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+    | MetadataAccumulatorInvocation
+    | undefined;
 
   if (!isAutoVae) {
     graph.nodes[VAE_LOADER] = {
       type: 'vae_loader',
       id: VAE_LOADER,
-      vae_model,
+      vae_model: vae,
     };
   }
 
@@ -66,5 +69,9 @@ export const addVAEToGraph = (
         field: 'vae',
       },
     });
+  }
+
+  if (vae && metadataAccumulator) {
+    metadataAccumulator.vae = vae;
   }
 };

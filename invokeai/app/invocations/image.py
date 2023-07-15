@@ -5,6 +5,7 @@ from typing import Literal, Optional
 import numpy
 from PIL import Image, ImageFilter, ImageOps, ImageChops
 from pydantic import BaseModel, Field
+from typing import Union
 
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (
@@ -398,8 +399,8 @@ class ImageResizeInvocation(BaseInvocation, PILInvocationConfig):
 
     # Inputs
     image: Optional[ImageField]  = Field(default=None, description="The image to resize")
-    width:                         int = Field(ge=64, multiple_of=8, description="The width to resize to (px)")
-    height:                        int = Field(ge=64, multiple_of=8, description="The height to resize to (px)")
+    width:                         Union[int, None] = Field(ge=64, multiple_of=8, description="The width to resize to (px)")
+    height:                        Union[int, None] = Field(ge=64, multiple_of=8, description="The height to resize to (px)")
     resample_mode:  PIL_RESAMPLING_MODES = Field(default="bicubic", description="The resampling mode")
     # fmt: on
 

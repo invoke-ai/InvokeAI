@@ -1,10 +1,9 @@
-import { Box, ChakraProps, Flex, useColorMode } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { Box, Flex } from '@chakra-ui/react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { FaCopy, FaTrash } from 'react-icons/fa';
 import {
-  ControlNetConfig,
-  controlNetAdded,
+  controlNetDuplicated,
   controlNetRemoved,
   controlNetToggled,
 } from '../store/controlNetSlice';
@@ -12,6 +11,9 @@ import ParamControlNetModel from './parameters/ParamControlNetModel';
 import ParamControlNetWeight from './parameters/ParamControlNetWeight';
 
 import { ChevronUpIcon } from '@chakra-ui/icons';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { useToggle } from 'react-use';
@@ -22,41 +24,41 @@ import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ParamControlNetControlMode from './parameters/ParamControlNetControlMode';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
-import { mode } from 'theme/util/mode';
-
-const expandedControlImageSx: ChakraProps['sx'] = { maxH: 96 };
 
 type ControlNetProps = {
-  controlNet: ControlNetConfig;
+  controlNetId: string;
 };
 
 const ControlNet = (props: ControlNetProps) => {
-  const {
-    controlNetId,
-    isEnabled,
-    model,
-    weight,
-    beginStepPct,
-    endStepPct,
-    controlMode,
-    controlImage,
-    processedControlImage,
-    processorNode,
-    processorType,
-    shouldAutoConfig,
-  } = props.controlNet;
+  const { controlNetId } = props;
   const dispatch = useAppDispatch();
+
+  const selector = createSelector(
+    stateSelector,
+    ({ controlNet }) => {
+      const { isEnabled, shouldAutoConfig } =
+        controlNet.controlNets[controlNetId];
+
+      return { isEnabled, shouldAutoConfig };
+    },
+    defaultSelectorOptions
+  );
+
+  const { isEnabled, shouldAutoConfig } = useAppSelector(selector);
   const [isExpanded, toggleIsExpanded] = useToggle(false);
-  const { colorMode } = useColorMode();
+
   const handleDelete = useCallback(() => {
     dispatch(controlNetRemoved({ controlNetId }));
   }, [controlNetId, dispatch]);
 
   const handleDuplicate = useCallback(() => {
     dispatch(
-      controlNetAdded({ controlNetId: uuidv4(), controlNet: props.controlNet })
+      controlNetDuplicated({
+        sourceControlNetId: controlNetId,
+        newControlNetId: uuidv4(),
+      })
     );
-  }, [dispatch, props.controlNet]);
+  }, [controlNetId, dispatch]);
 
   const handleToggleIsEnabled = useCallback(() => {
     dispatch(controlNetToggled({ controlNetId }));
@@ -68,15 +70,18 @@ const ControlNet = (props: ControlNetProps) => {
         flexDir: 'column',
         gap: 2,
         p: 3,
-        bg: mode('base.200', 'base.850')(colorMode),
         borderRadius: 'base',
         position: 'relative',
+        bg: 'base.200',
+        _dark: {
+          bg: 'base.850',
+        },
       }}
     >
-      <Flex sx={{ gap: 2 }}>
+      <Flex sx={{ gap: 2, alignItems: 'center' }}>
         <IAISwitch
-          tooltip="Toggle"
-          aria-label="Toggle"
+          tooltip={'Toggle this ControlNet'}
+          aria-label={'Toggle this ControlNet'}
           isChecked={isEnabled}
           onChange={handleToggleIsEnabled}
         />
@@ -90,7 +95,7 @@ const ControlNet = (props: ControlNetProps) => {
             transitionDuration: '0.1s',
           }}
         >
-          <ParamControlNetModel controlNetId={controlNetId} model={model} />
+          <ParamControlNetModel controlNetId={controlNetId} />
         </Box>
         <IAIIconButton
           size="sm"
@@ -109,21 +114,26 @@ const ControlNet = (props: ControlNetProps) => {
         />
         <IAIIconButton
           size="sm"
-          aria-label="Show All Options"
+          tooltip={isExpanded ? 'Hide Advanced' : 'Show Advanced'}
+          aria-label={isExpanded ? 'Hide Advanced' : 'Show Advanced'}
           onClick={toggleIsExpanded}
           variant="link"
           icon={
             <ChevronUpIcon
               sx={{
                 boxSize: 4,
-                color: mode('base.700', 'base.300')(colorMode),
+                color: 'base.700',
                 transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
                 transitionProperty: 'common',
                 transitionDuration: 'normal',
+                _dark: {
+                  color: 'base.300',
+                },
               }}
             />
           }
         />
+
         {!shouldAutoConfig && (
           <Box
             sx={{
@@ -131,85 +141,59 @@ const ControlNet = (props: ControlNetProps) => {
               w: 1.5,
               h: 1.5,
               borderRadius: 'full',
-              bg: mode('error.700', 'error.200')(colorMode),
               top: 4,
               insetInlineEnd: 4,
+              bg: 'accent.700',
+              _dark: {
+                bg: 'accent.400',
+              },
             }}
           />
         )}
       </Flex>
-      {isEnabled && (
-        <>
-          <Flex sx={{ w: 'full', flexDirection: 'column' }}>
-            <Flex sx={{ gap: 4, w: 'full' }}>
-              <Flex
-                sx={{
-                  flexDir: 'column',
-                  gap: 3,
-                  w: 'full',
-                  paddingInlineStart: 1,
-                  paddingInlineEnd: isExpanded ? 1 : 0,
-                  pb: 2,
-                  justifyContent: 'space-between',
-                }}
-              >
-                <ParamControlNetWeight
-                  controlNetId={controlNetId}
-                  weight={weight}
-                  mini={!isExpanded}
-                />
-                <ParamControlNetBeginEnd
-                  controlNetId={controlNetId}
-                  beginStepPct={beginStepPct}
-                  endStepPct={endStepPct}
-                  mini={!isExpanded}
-                />
-              </Flex>
-              {!isExpanded && (
-                <Flex
-                  sx={{
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    h: 24,
-                    w: 24,
-                    aspectRatio: '1/1',
-                  }}
-                >
-                  <ControlNetImagePreview
-                    controlNet={props.controlNet}
-                    height={24}
-                  />
-                </Flex>
-              )}
-            </Flex>
-            <ParamControlNetControlMode
-              controlNetId={controlNetId}
-              controlMode={controlMode}
-            />
+      <Flex sx={{ w: 'full', flexDirection: 'column' }}>
+        <Flex sx={{ gap: 4, w: 'full', alignItems: 'center' }}>
+          <Flex
+            sx={{
+              flexDir: 'column',
+              gap: 3,
+              h: 28,
+              w: 'full',
+              paddingInlineStart: 1,
+              paddingInlineEnd: isExpanded ? 1 : 0,
+              pb: 2,
+              justifyContent: 'space-between',
+            }}
+          >
+            <ParamControlNetWeight controlNetId={controlNetId} />
+            <ParamControlNetBeginEnd controlNetId={controlNetId} />
           </Flex>
-
-          {isExpanded && (
-            <>
-              <Box mt={2}>
-                <ControlNetImagePreview
-                  controlNet={props.controlNet}
-                  height={96}
-                />
-              </Box>
-              <ParamControlNetProcessorSelect
-                controlNetId={controlNetId}
-                processorNode={processorNode}
-              />
-              <ControlNetProcessorComponent
-                controlNetId={controlNetId}
-                processorNode={processorNode}
-              />
-              <ParamControlNetShouldAutoConfig
-                controlNetId={controlNetId}
-                shouldAutoConfig={shouldAutoConfig}
-              />
-            </>
+          {!isExpanded && (
+            <Flex
+              sx={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                h: 28,
+                w: 28,
+                aspectRatio: '1/1',
+                mt: 3,
+              }}
+            >
+              <ControlNetImagePreview controlNetId={controlNetId} height={28} />
+            </Flex>
           )}
+        </Flex>
+        <Box mt={2}>
+          <ParamControlNetControlMode controlNetId={controlNetId} />
+        </Box>
+        <ParamControlNetProcessorSelect controlNetId={controlNetId} />
+      </Flex>
+
+      {isExpanded && (
+        <>
+          <ControlNetImagePreview controlNetId={controlNetId} height="392px" />
+          <ParamControlNetShouldAutoConfig controlNetId={controlNetId} />
+          <ControlNetProcessorComponent controlNetId={controlNetId} />
         </>
       )}
     </Flex>

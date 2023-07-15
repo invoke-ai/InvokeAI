@@ -15,6 +15,9 @@ from contextlib import suppress
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
 
+class InvalidModelException(Exception):
+    pass
+
 class ModelNotFoundException(Exception):
     pass
 
@@ -60,7 +63,6 @@ class ModelConfigBase(BaseModel):
     path: str # or Path
     description: Optional[str] = Field(None)
     model_format: Optional[str] = Field(None)
-    # do not save to config
     error: Optional[ModelError] = Field(None)
 
     class Config:

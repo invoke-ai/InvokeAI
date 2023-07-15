@@ -1,47 +1,60 @@
-import { Flex } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { Flex, Text } from '@chakra-ui/react';
 
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useState } from 'react';
+import {
+  MainModelConfigEntity,
+  useGetMainModelsQuery,
+} from 'services/api/endpoints/models';
 import CheckpointModelEdit from './ModelManagerPanel/CheckpointModelEdit';
 import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
 
 export default function ModelManagerPanel() {
-  const { data: mainModels } = useGetMainModelsQuery({
-    model_type: 'main',
-    base_models: ['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner'],
+  const [selectedModelId, setSelectedModelId] = useState<string>();
+  const { model } = useGetMainModelsQuery(undefined, {
+    selectFromResult: ({ data }) => ({
+      model: selectedModelId ? data?.entities[selectedModelId] : undefined,
+    }),
   });
 
-  const openModel = useAppSelector(
-    (state: RootState) => state.system.openModel
-  );
-
-  const renderModelEditTabs = () => {
-    if (!openModel || !mainModels) return;
-
-    if (mainModels['entities'][openModel]['model_format'] === 'diffusers') {
-      return (
-        <DiffusersModelEdit
-          modelToEdit={openModel}
-          retrievedModel={mainModels['entities'][openModel]}
-          key={openModel}
-        />
-      );
-    } else {
-      return (
-        <CheckpointModelEdit
-          modelToEdit={openModel}
-          retrievedModel={mainModels['entities'][openModel]}
-          key={openModel}
-        />
-      );
-    }
-  };
   return (
-    <Flex width="100%" columnGap={8}>
-      <ModelList />
-      {renderModelEditTabs()}
+    <Flex sx={{ gap: 8, w: 'full', h: 'full' }}>
+      <ModelList
+        selectedModelId={selectedModelId}
+        setSelectedModelId={setSelectedModelId}
+      />
+      <ModelEdit model={model} />
     </Flex>
   );
 }
+
+type ModelEditProps = {
+  model: MainModelConfigEntity | undefined;
+};
+
+const ModelEdit = (props: ModelEditProps) => {
+  const { model } = props;
+
+  if (model?.model_format === 'checkpoint') {
+    return <CheckpointModelEdit key={model.id} model={model} />;
+  }
+
+  if (model?.model_format === 'diffusers') {
+    return <DiffusersModelEdit key={model.id} model={model} />;
+  }
+
+  return (
+    <Flex
+      sx={{
+        w: 'full',
+        h: 'full',
+        justifyContent: 'center',
+        alignItems: 'center',
+        maxH: 96,
+        userSelect: 'none',
+      }}
+    >
+      <Text variant="subtext">No Model Selected</Text>
+    </Flex>
+  );
+};

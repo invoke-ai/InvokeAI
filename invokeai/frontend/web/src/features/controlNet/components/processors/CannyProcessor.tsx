@@ -1,22 +1,25 @@
+import { useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
 import { CONTROLNET_PROCESSORS } from 'features/controlNet/store/constants';
 import { RequiredCannyImageProcessorInvocation } from 'features/controlNet/store/types';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.canny_image_processor.default;
+const DEFAULTS = CONTROLNET_PROCESSORS.canny_image_processor
+  .default as RequiredCannyImageProcessorInvocation;
 
 type CannyProcessorProps = {
   controlNetId: string;
   processorNode: RequiredCannyImageProcessorInvocation;
+  isEnabled: boolean;
 };
 
 const CannyProcessor = (props: CannyProcessorProps) => {
-  const { controlNetId, processorNode } = props;
+  const { controlNetId, processorNode, isEnabled } = props;
   const { low_threshold, high_threshold } = processorNode;
-  const isReady = useIsReadyToInvoke();
+  const isBusy = useAppSelector(selectIsBusy);
   const processorChanged = useProcessorNodeChanged();
 
   const handleLowThresholdChanged = useCallback(
@@ -48,7 +51,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
   return (
     <ProcessorWrapper>
       <IAISlider
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
         label="Low Threshold"
         value={low_threshold}
         onChange={handleLowThresholdChanged}
@@ -60,7 +63,7 @@ const CannyProcessor = (props: CannyProcessorProps) => {
         withSliderMarks
       />
       <IAISlider
-        isDisabled={!isReady}
+        isDisabled={isBusy || !isEnabled}
         label="High Threshold"
         value={high_threshold}
         onChange={handleHighThresholdChanged}

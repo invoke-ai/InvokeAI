@@ -8,7 +8,7 @@ import {
   setShouldShowAdvancedOptions,
 } from 'features/ui/store/uiSlice';
 import { clamp } from 'lodash-es';
-import { ImageDTO } from 'services/api/types';
+import { ImageDTO, MainModelField } from 'services/api/types';
 import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
 import {
   CfgScaleParam,
@@ -23,7 +23,7 @@ import {
   VaeModelParam,
   WidthParam,
   zMainModel,
-} from './parameterZodSchemas';
+} from '../types/parameterSchemas';
 
 export interface GenerationState {
   cfgScale: CfgScaleParam;
@@ -54,7 +54,7 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: MainModelParam | null;
+  model: MainModelField | null;
   vae: VaeModelParam | null;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
@@ -227,24 +227,19 @@ export const generationSlice = createSlice({
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelSelected: (state, action: PayloadAction<string>) => {
-      const [base_model, type, name] = action.payload.split('/');
+    modelChanged: (state, action: PayloadAction<MainModelParam | null>) => {
+      state.model = action.payload;
 
-      state.model = zMainModel.parse({
-        id: action.payload,
-        base_model,
-        name,
-        type,
-      });
+      if (state.model === null) {
+        return;
+      }
 
       // Clamp ClipSkip Based On Selected Model
       const { maxClip } = clipSkipMap[state.model.base_model];
       state.clipSkip = clamp(state.clipSkip, 0, maxClip);
     },
-    modelChanged: (state, action: PayloadAction<MainModelParam>) => {
-      state.model = action.payload;
-    },
     vaeSelected: (state, action: PayloadAction<VaeModelParam | null>) => {
+      // null is a valid VAE!
       state.vae = action.payload;
     },
     setClipSkip: (state, action: PayloadAction<number>) => {
@@ -260,11 +255,15 @@ export const generationSlice = createSlice({
 
       if (defaultModel && !state.model) {
         const [base_model, model_type, model_name] = defaultModel.split('/');
-        state.model = zMainModel.parse({
-          id: defaultModel,
-          name: model_name,
+
+        const result = zMainModel.safeParse({
+          model_name,
           base_model,
         });
+
+        if (result.success) {
+          state.model = result.data;
+        }
       }
     });
     builder.addCase(setShouldShowAdvancedOptions, (state, action) => {

@@ -7,6 +7,7 @@ import ClipInputFieldComponent from './fields/ClipInputFieldComponent';
 import ColorInputFieldComponent from './fields/ColorInputFieldComponent';
 import ConditioningInputFieldComponent from './fields/ConditioningInputFieldComponent';
 import ControlInputFieldComponent from './fields/ControlInputFieldComponent';
+import ControlNetModelInputFieldComponent from './fields/ControlNetModelInputFieldComponent';
 import EnumInputFieldComponent from './fields/EnumInputFieldComponent';
 import ImageCollectionInputFieldComponent from './fields/ImageCollectionInputFieldComponent';
 import ImageInputFieldComponent from './fields/ImageInputFieldComponent';
@@ -16,7 +17,7 @@ import LoRAModelInputFieldComponent from './fields/LoRAModelInputFieldComponent'
 import ModelInputFieldComponent from './fields/ModelInputFieldComponent';
 import NumberInputFieldComponent from './fields/NumberInputFieldComponent';
 import StringInputFieldComponent from './fields/StringInputFieldComponent';
-import UNetInputFieldComponent from './fields/UNetInputFieldComponent';
+import UnetInputFieldComponent from './fields/UnetInputFieldComponent';
 import VaeInputFieldComponent from './fields/VaeInputFieldComponent';
 import VaeModelInputFieldComponent from './fields/VaeModelInputFieldComponent';
 
@@ -106,7 +107,7 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
 
   if (type === 'unet' && template.type === 'unet') {
     return (
-      <UNetInputFieldComponent
+      <UnetInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}
@@ -168,6 +169,16 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'lora_model' && template.type === 'lora_model') {
     return (
       <LoRAModelInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'controlnet_model' && template.type === 'controlnet_model') {
+    return (
+      <ControlNetModelInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}

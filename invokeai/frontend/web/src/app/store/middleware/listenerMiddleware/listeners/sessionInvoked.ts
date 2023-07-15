@@ -33,6 +33,7 @@ export const addSessionInvokedRejectedListener = () => {
     effect: (action, { getState, dispatch }) => {
       if (action.payload) {
         const { arg, error } = action.payload;
+        const stringifiedError = JSON.stringify(error);
         moduleLog.error(
           {
             data: {
@@ -40,7 +41,7 @@ export const addSessionInvokedRejectedListener = () => {
               error: serializeError(error),
             },
           },
-          `Problem invoking session`
+          `Problem invoking session: ${stringifiedError}`
         );
       }
     },

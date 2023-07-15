@@ -29,6 +29,9 @@ const ParamControlNetFeatureToggle = () => {
       label="Enable ControlNet"
       isChecked={isEnabled}
       onChange={handleChange}
+      formControlProps={{
+        width: '100%',
+      }}
     />
   );
 };
