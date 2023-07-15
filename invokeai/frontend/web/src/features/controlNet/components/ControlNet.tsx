@@ -90,7 +90,7 @@ const ControlNet = (props: ControlNetProps) => {
             transitionDuration: '0.1s',
           }}
         >
-          <ParamControlNetModel controlNetId={controlNetId} model={model} />
+          <ParamControlNetModel controlNetId={controlNetId} />
         </Box>
         <IAIIconButton
           size="sm"

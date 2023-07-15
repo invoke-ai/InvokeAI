@@ -1,38 +1,44 @@
 import { SelectItem } from '@mantine/core';
-import { RootState } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import { controlNetModelChanged } from 'features/controlNet/store/controlNetSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { modelIdToControlNetModelParam } from 'features/parameters/util/modelIdToControlNetModelParam';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 
 type ParamControlNetModelProps = {
   controlNetId: string;
-  model: string;
 };
 
 const ParamControlNetModel = (props: ParamControlNetModelProps) => {
-  const { controlNetId, model } = props;
+  const { controlNetId } = props;
   const dispatch = useAppDispatch();
-  const isReady = useIsReadyToInvoke();
+  const isBusy = useAppSelector(selectIsBusy);
 
-  const currentMainModel = useAppSelector(
-    (state: RootState) => state.generation.model
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ generation, controlNet }) => {
+          const { model } = generation;
+          const controlNetModel = controlNet.controlNets[controlNetId]?.model;
+          return { mainModel: model, controlNetModel };
+        },
+        defaultSelectorOptions
+      ),
+    [controlNetId]
   );
+
+  const { mainModel, controlNetModel } = useAppSelector(selector);
 
   const { data: controlNetModels } = useGetControlNetModelsQuery();
-
-  const handleModelChanged = useCallback(
-    (val: string | null) => {
-      if (!val) return;
-      dispatch(controlNetModelChanged({ controlNetId, model: val }));
-    },
-    [controlNetId, dispatch]
-  );
 
   const data = useMemo(() => {
     if (!controlNetModels) {
@@ -46,7 +52,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
         return;
       }
 
-      const disabled = currentMainModel?.base_model !== model.base_model;
+      const disabled = model?.base_model !== mainModel?.base_model;
 
       data.push({
         value: id,
@@ -60,16 +66,52 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
     });
 
     return data;
-  }, [controlNetModels, currentMainModel?.base_model]);
+  }, [controlNetModels, mainModel?.base_model]);
+
+  // grab the full model entity from the RTK Query cache
+  const selectedModel = useMemo(
+    () =>
+      controlNetModels?.entities[
+        `${controlNetModel?.base_model}/controlnet/${controlNetModel?.model_name}`
+      ] ?? null,
+    [
+      controlNetModel?.base_model,
+      controlNetModel?.model_name,
+      controlNetModels?.entities,
+    ]
+  );
+
+  const handleModelChanged = useCallback(
+    (v: string | null) => {
+      if (!v) {
+        return;
+      }
+
+      const newControlNetModel = modelIdToControlNetModelParam(v);
+
+      if (!newControlNetModel) {
+        return;
+      }
+
+      dispatch(
+        controlNetModelChanged({ controlNetId, model: newControlNetModel })
+      );
+    },
+    [controlNetId, dispatch]
+  );
 
   return (
     <IAIMantineSearchableSelect
       itemComponent={IAIMantineSelectItemWithTooltip}
       data={data}
-      value={model}
+      error={
+        !selectedModel || mainModel?.base_model !== selectedModel.base_model
+      }
+      placeholder="Select a model"
+      value={selectedModel?.id ?? null}
       onChange={handleModelChanged}
-      disabled={!isReady}
-      tooltip={model}
+      disabled={isBusy}
+      tooltip={selectedModel?.description}
     />
   );
 };

@@ -180,6 +180,23 @@ export type LoRAModelParam = z.infer<typeof zLoRAModel>;
  */
 export const isValidLoRAModel = (val: unknown): val is LoRAModelParam =>
   zLoRAModel.safeParse(val).success;
+/**
+ * Zod schema for ControlNet models
+ */
+export const zControlNetModel = z.object({
+  model_name: z.string().min(1),
+  base_model: zBaseModel,
+});
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type ControlNetModelParam = z.infer<typeof zLoRAModel>;
+/**
+ * Validates/type-guards a value as a model parameter
+ */
+export const isValidControlNetModel = (
+  val: unknown
+): val is ControlNetModelParam => zControlNetModel.safeParse(val).success;
 
 /**
  * Zod schema for l2l strength parameter

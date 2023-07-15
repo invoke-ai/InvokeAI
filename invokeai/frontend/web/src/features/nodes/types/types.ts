@@ -1,4 +1,5 @@
 import {
+  ControlNetModelParam,
   LoRAModelParam,
   MainModelParam,
   VaeModelParam,
@@ -254,7 +255,7 @@ export type LoRAModelInputFieldValue = FieldValueBase & {
 
 export type ControlNetModelInputFieldValue = FieldValueBase & {
   type: 'controlnet_model';
-  value?: string;
+  value?: ControlNetModelParam;
 };
 
 export type ArrayInputFieldValue = FieldValueBase & {

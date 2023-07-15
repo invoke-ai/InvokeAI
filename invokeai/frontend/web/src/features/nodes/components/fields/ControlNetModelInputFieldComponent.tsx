@@ -6,9 +6,10 @@ import {
   ControlNetModelInputFieldTemplate,
   ControlNetModelInputFieldValue,
 } from 'features/nodes/types/types';
-import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
-import { forEach, isString } from 'lodash-es';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { modelIdToControlNetModelParam } from 'features/parameters/util/modelIdToControlNetModelParam';
+import { forEach } from 'lodash-es';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
@@ -20,15 +21,23 @@ const ControlNetModelInputFieldComponent = (
   >
 ) => {
   const { nodeId, field } = props;
-
+  const controlNetModel = field.value;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const { data: controlNetModels } = useGetControlNetModelsQuery();
 
+  // grab the full model entity from the RTK Query cache
   const selectedModel = useMemo(
-    () => controlNetModels?.entities[field.value ?? controlNetModels.ids[0]],
-    [controlNetModels?.entities, controlNetModels?.ids, field.value]
+    () =>
+      controlNetModels?.entities[
+        `${controlNetModel?.base_model}/controlnet/${controlNetModel?.model_name}`
+      ] ?? null,
+    [
+      controlNetModel?.base_model,
+      controlNetModel?.model_name,
+      controlNetModels?.entities,
+    ]
   );
 
   const data = useMemo(() => {
@@ -45,8 +54,8 @@ const ControlNetModelInputFieldComponent = (
 
       data.push({
         value: id,
-        label: model.name,
-        group: BASE_MODEL_NAME_MAP[model.base_model],
+        label: model.model_name,
+        group: MODEL_TYPE_MAP[model.base_model],
       });
     });
 
@@ -59,40 +68,32 @@ const ControlNetModelInputFieldComponent = (
         return;
       }
 
+      const newControlNetModel = modelIdToControlNetModelParam(v);
+
+      if (!newControlNetModel) {
+        return;
+      }
+
       dispatch(
         fieldValueChanged({
           nodeId,
           fieldName: field.name,
-          value: v,
+          value: newControlNetModel,
         })
       );
     },
     [dispatch, field.name, nodeId]
   );
 
-  useEffect(() => {
-    if (field.value && controlNetModels?.ids.includes(field.value)) {
-      return;
-    }
-
-    const firstLora = controlNetModels?.ids[0];
-
-    if (!isString(firstLora)) {
-      return;
-    }
-
-    handleValueChanged(firstLora);
-  }, [field.value, handleValueChanged, controlNetModels?.ids]);
-
   return (
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={
-        selectedModel?.base_model &&
-        BASE_MODEL_NAME_MAP[selectedModel?.base_model]
+        selectedModel?.base_model && MODEL_TYPE_MAP[selectedModel?.base_model]
       }
-      value={field.value}
+      value={selectedModel?.id ?? null}
       placeholder="Pick one"
+      error={!selectedModel}
       data={data}
       onChange={handleValueChanged}
     />

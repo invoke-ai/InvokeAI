@@ -1,9 +1,12 @@
 import { VaeModelParam, zVaeModel } from '../types/parameterSchemas';
+import { log } from 'app/logging/useLogger';
+
+const moduleLog = log.child({ module: 'models' });
 
 export const modelIdToVAEModelParam = (
-  modelId: string
+  vaeModelId: string
 ): VaeModelParam | undefined => {
-  const [base_model, model_type, model_name] = modelId.split('/');
+  const [base_model, model_type, model_name] = vaeModelId.split('/');
 
   const result = zVaeModel.safeParse({
     base_model,
@@ -11,6 +14,13 @@ export const modelIdToVAEModelParam = (
   });
 
   if (!result.success) {
+    moduleLog.error(
+      {
+        vaeModelId,
+        errors: result.error.format(),
+      },
+      'Failed to parse VAE model id'
+    );
     return;
   }
 

@@ -10,6 +10,7 @@ import { zMainModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { forEach } from 'lodash-es';
 import { startAppListening } from '..';
+import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
 
 const moduleLog = log.child({ module: 'models' });
 
@@ -51,7 +52,14 @@ export const addModelSelectedListener = () => {
           modelsCleared += 1;
         }
 
-        // TODO: handle incompatible controlnet; pending model manager support
+        const { controlNets } = state.controlNet;
+        forEach(controlNets, (controlNet, controlNetId) => {
+          if (controlNet.model?.base_model !== base_model) {
+            dispatch(controlNetRemoved({ controlNetId }));
+            modelsCleared += 1;
+          }
+        });
+
         if (modelsCleared > 0) {
           dispatch(
             addToast(
