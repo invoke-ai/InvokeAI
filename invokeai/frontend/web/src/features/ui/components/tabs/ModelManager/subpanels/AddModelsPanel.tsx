@@ -18,6 +18,7 @@ export default function AddModelsPanel() {
           onClick={() => setAddModelTab('add')}
           isChecked={addModelTab == 'add'}
           size="sm"
+          width="100%"
         >
           {t('modelManager.addModel')}
         </IAIButton>
@@ -25,6 +26,7 @@ export default function AddModelsPanel() {
           onClick={() => setAddModelTab('scan')}
           isChecked={addModelTab == 'scan'}
           size="sm"
+          width="100%"
         >
           {t('modelManager.scanForModels')}
         </IAIButton>
