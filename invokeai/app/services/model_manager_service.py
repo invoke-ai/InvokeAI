@@ -168,6 +168,18 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
+    def rename_model(self,
+                     model_name: str,
+                     base_model: BaseModelType,
+                     model_type: ModelType,
+                     new_name: str,
+                     ):
+        """
+        Rename the indicated model.
+        """
+        pass
+
+    @abstractmethod
     def list_checkpoint_configs(
         self
     )->List[Path]:
@@ -615,3 +627,26 @@ class ModelManagerService(ModelManagerServiceBase):
         conf_path = config.legacy_conf_path
         root_path = config.root_path
         return [(conf_path / x).relative_to(root_path) for x in conf_path.glob('**/*.yaml')]
+
+    def rename_model(self,
+                     model_name: str,
+                     base_model: BaseModelType,
+                     model_type: ModelType,
+                     new_name: str = None,
+                     new_base: BaseModelType = None,
+                     ):
+        """
+        Rename the indicated model. Can provide a new name and/or a new base.
+        :param model_name: Current name of the model
+        :param base_model: Current base of the model
+        :param model_type: Model type (can't be changed)
+        :param new_name: New name for the model
+        :param new_base: New base for the model
+        """
+        self.mgr.rename_model(base_model = base_model,
+                              model_type = model_type,
+                              model_name = model_name,
+                              new_name = new_name,
+                              new_base = new_base,
+                              )
+        

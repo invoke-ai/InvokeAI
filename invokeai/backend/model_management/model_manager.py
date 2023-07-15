@@ -671,6 +671,55 @@ class ModelManager(object):
             config = model_config,
         )
 
+    def rename_model(
+            self,
+            model_name: str,
+            base_model: BaseModelType,
+            model_type: ModelType,
+            new_name: str = None,
+            new_base: BaseModelType = None,
+    ):
+        '''
+        Rename or rebase a model.
+        '''
+        if new_name is None and new_base is None:
+            self.logger.error("rename_model() called with neither a new_name nor a new_base. {model_name} unchanged.")
+            return
+        
+        model_key = self.create_key(model_name, base_model, model_type)
+        model_cfg = self.models.get(model_key, None)
+        if not model_cfg:
+            raise KeyError(f"Unknown model: {model_key}")
+        
+        old_path = self.app_config.root_path / model_cfg.path
+        new_name = new_name or model_name
+        new_base = new_base or base_model
+        new_key = self.create_key(new_name, new_base, model_type)
+        if new_key in self.models:
+            raise ValueError(f'Attempt to overwrite existing model definition "{new_key}"')
+
+        # if this is a model file/directory that we manage ourselves, we need to move it
+        if old_path.is_relative_to(self.app_config.models_path):
+            new_path = self.app_config.root_path / 'models' / new_base.value / model_type.value / new_name
+            move(old_path, new_path)
+            model_cfg.path = str(new_path.relative_to(self.app_config.root_path))
+
+        # clean up caches
+        old_model_cache = self._get_model_cache_path(old_path)
+        if old_model_cache.exists():
+            if old_model_cache.is_dir():
+                rmtree(str(old_model_cache))
+            else:
+                old_model_cache.unlink()
+
+        cache_ids = self.cache_keys.pop(model_key, [])
+        for cache_id in cache_ids:
+            self.cache.uncache_model(cache_id)
+
+        self.models.pop(model_key, None) # delete
+        self.models[new_key] = model_cfg
+        self.commit()
+        
     def convert_model (
             self,
             model_name: str,

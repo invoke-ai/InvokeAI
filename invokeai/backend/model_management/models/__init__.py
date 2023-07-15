@@ -48,7 +48,9 @@ for base_model, models in MODEL_CLASSES.items():
         model_configs.discard(None)
         MODEL_CONFIGS.extend(model_configs)
 
-        for cfg in model_configs:
+        # LS: sort to get the checkpoint configs first, which makes
+        # for a better template in the Swagger docs
+        for cfg in sorted(model_configs, key=lambda x: str(x)):
             model_name, cfg_name = cfg.__qualname__.split('.')[-2:]
             openapi_cfg_name = model_name + cfg_name
             if openapi_cfg_name in vars():

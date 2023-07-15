@@ -59,7 +59,6 @@ class ModelConfigBase(BaseModel):
     path: str # or Path
     description: Optional[str] = Field(None)
     model_format: Optional[str] = Field(None)
-    # do not save to config
     error: Optional[ModelError] = Field(None)
 
     class Config:
