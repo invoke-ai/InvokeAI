@@ -13,7 +13,11 @@ import { RootState } from 'app/store/store';
 
 const moduleLog = log.child({ namespace: 'controlNet' });
 
-const predicate: AnyListenerPredicate<RootState> = (action, state) => {
+const predicate: AnyListenerPredicate<RootState> = (
+  action,
+  state,
+  prevState
+) => {
   const isActionMatched =
     controlNetProcessorParamsChanged.match(action) ||
     controlNetModelChanged.match(action) ||
@@ -23,6 +27,16 @@ const predicate: AnyListenerPredicate<RootState> = (action, state) => {
 
   if (!isActionMatched) {
     return false;
+  }
+
+  if (controlNetAutoConfigToggled.match(action)) {
+    // do not process if the user just disabled auto-config
+    if (
+      prevState.controlNet.controlNets[action.payload.controlNetId]
+        .shouldAutoConfig === true
+    ) {
+      return false;
+    }
   }
 
   const { controlImage, processorType, shouldAutoConfig } =
