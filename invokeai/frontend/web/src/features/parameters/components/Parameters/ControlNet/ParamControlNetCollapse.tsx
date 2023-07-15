@@ -67,19 +67,20 @@ const ParamControlNetCollapse = () => {
     <IAICollapse label="ControlNet" activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 3 }}>
         <ParamControlNetFeatureToggle />
+        <IAIButton
+          isDisabled={!firstModel}
+          flexGrow={1}
+          size="sm"
+          onClick={handleClickedAddControlNet}
+        >
+          Add ControlNet
+        </IAIButton>
         {controlNetsArray.map((c, i) => (
           <Fragment key={c.controlNetId}>
             {i > 0 && <Divider />}
             <ControlNet controlNetId={c.controlNetId} />
           </Fragment>
         ))}
-        <IAIButton
-          isDisabled={!firstModel}
-          flexGrow={1}
-          onClick={handleClickedAddControlNet}
-        >
-          Add ControlNet
-        </IAIButton>
       </Flex>
     </IAICollapse>
   );
