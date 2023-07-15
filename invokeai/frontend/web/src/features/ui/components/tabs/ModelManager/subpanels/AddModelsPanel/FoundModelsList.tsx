@@ -12,8 +12,6 @@ export default function FoundModelsList() {
     search_path: searchFolder ? searchFolder : '',
   });
 
-  console.log(foundModels);
-
   const renderFoundModels = () => {
     if (!searchFolder) return;
 

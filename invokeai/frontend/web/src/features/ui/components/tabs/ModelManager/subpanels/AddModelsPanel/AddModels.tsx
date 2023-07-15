@@ -88,11 +88,12 @@ export default function AddModels() {
       >
         <IAIMantineTextInput
           label="Model Location"
+          placeholder="Provide a path to a local Diffusers model, local checkpoint / safetensors model or a HuggingFace Repo ID"
           w="100%"
           {...addModelForm.getInputProps('location')}
         />
         <IAIMantineSelect
-          label="Prediction Type (used for Stable Diffusion 2.x Models)"
+          label="Prediction Type (for Stable Diffusion 2.x Models only)"
           data={predictionSelectData}
           defaultValue="none"
           {...addModelForm.getInputProps('prediction_type')}
