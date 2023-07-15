@@ -1,4 +1,4 @@
-import { Box, Flex, useColorMode } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { FaCopy, FaTrash } from 'react-icons/fa';
@@ -17,7 +17,6 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { useToggle } from 'react-use';
-import { mode } from 'theme/util/mode';
 import { v4 as uuidv4 } from 'uuid';
 import ControlNetImagePreview from './ControlNetImagePreview';
 import ControlNetProcessorComponent from './ControlNetProcessorComponent';
@@ -46,9 +45,8 @@ const ControlNet = (props: ControlNetProps) => {
   );
 
   const { isEnabled, shouldAutoConfig } = useAppSelector(selector);
-
   const [isExpanded, toggleIsExpanded] = useToggle(false);
-  const { colorMode } = useColorMode();
+
   const handleDelete = useCallback(() => {
     dispatch(controlNetRemoved({ controlNetId }));
   }, [controlNetId, dispatch]);
@@ -72,9 +70,12 @@ const ControlNet = (props: ControlNetProps) => {
         flexDir: 'column',
         gap: 2,
         p: 3,
-        bg: mode('base.200', 'base.850')(colorMode),
         borderRadius: 'base',
         position: 'relative',
+        bg: 'base.200',
+        _dark: {
+          bg: 'base.850',
+        },
       }}
     >
       <Flex sx={{ gap: 2 }}>
@@ -120,10 +121,13 @@ const ControlNet = (props: ControlNetProps) => {
             <ChevronUpIcon
               sx={{
                 boxSize: 4,
-                color: mode('base.700', 'base.300')(colorMode),
+                color: 'base.700',
                 transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
                 transitionProperty: 'common',
                 transitionDuration: 'normal',
+                _dark: {
+                  color: 'base.300',
+                },
               }}
             />
           }
@@ -136,72 +140,62 @@ const ControlNet = (props: ControlNetProps) => {
               w: 1.5,
               h: 1.5,
               borderRadius: 'full',
-              bg: mode('error.700', 'error.200')(colorMode),
               top: 4,
               insetInlineEnd: 4,
+              bg: 'error.700',
+              _dark: {
+                bg: 'error.200',
+              },
             }}
           />
         )}
       </Flex>
-      <Flex alignItems="flex-end" gap="2">
-        <ParamControlNetProcessorSelect controlNetId={controlNetId} />
-        <ParamControlNetShouldAutoConfig controlNetId={controlNetId} />
-      </Flex>
-      {isEnabled && (
-        <>
-          <Flex sx={{ w: 'full', flexDirection: 'column' }}>
-            <Flex sx={{ gap: 4, w: 'full' }}>
-              <Flex
-                sx={{
-                  flexDir: 'column',
-                  gap: 3,
-                  w: 'full',
-                  paddingInlineStart: 1,
-                  paddingInlineEnd: isExpanded ? 1 : 0,
-                  pb: 2,
-                  justifyContent: 'space-between',
-                }}
-              >
-                <ParamControlNetWeight
-                  controlNetId={controlNetId}
-                  mini={!isExpanded}
-                />
-                <ParamControlNetBeginEnd
-                  controlNetId={controlNetId}
-                  mini={!isExpanded}
-                />
-              </Flex>
-              {!isExpanded && (
-                <Flex
-                  sx={{
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    h: 24,
-                    w: 24,
-                    aspectRatio: '1/1',
-                  }}
-                >
-                  <ControlNetImagePreview
-                    controlNetId={controlNetId}
-                    height={24}
-                  />
-                </Flex>
-              )}
-            </Flex>
-            <ParamControlNetControlMode controlNetId={controlNetId} />
+      <Flex sx={{ w: 'full', flexDirection: 'column' }}>
+        <Flex sx={{ gap: 4, w: 'full', alignItems: 'center' }}>
+          <Flex
+            sx={{
+              flexDir: 'column',
+              gap: 3,
+              h: 28,
+              w: 'full',
+              paddingInlineStart: 1,
+              paddingInlineEnd: isExpanded ? 1 : 0,
+              pb: 2,
+              justifyContent: 'space-between',
+            }}
+          >
+            <ParamControlNetWeight controlNetId={controlNetId} />
+            <ParamControlNetBeginEnd controlNetId={controlNetId} />
           </Flex>
-
-          {isExpanded && (
-            <>
-              <Box mt={2}>
-                <ControlNetImagePreview
-                  controlNetId={controlNetId}
-                  height={96}
-                />
-              </Box>
-              <ControlNetProcessorComponent controlNetId={controlNetId} />
-            </>
+          {!isExpanded && (
+            <Flex
+              sx={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                h: 28,
+                w: 28,
+                aspectRatio: '1/1',
+              }}
+            >
+              <ControlNetImagePreview controlNetId={controlNetId} height={28} />
+            </Flex>
           )}
+        </Flex>
+      </Flex>
+
+      {isExpanded && (
+        <>
+          <ParamControlNetControlMode controlNetId={controlNetId} />
+          <ParamControlNetProcessorSelect controlNetId={controlNetId} />
+          <ParamControlNetShouldAutoConfig controlNetId={controlNetId} />
+
+          <Box mt={2}>
+            <ControlNetImagePreview
+              controlNetId={controlNetId}
+              height="392px"
+            />
+          </Box>
+          <ControlNetProcessorComponent controlNetId={controlNetId} />
         </>
       )}
     </Flex>

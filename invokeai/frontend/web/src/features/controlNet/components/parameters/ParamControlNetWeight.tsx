@@ -8,11 +8,10 @@ import { memo, useCallback, useMemo } from 'react';
 
 type ParamControlNetWeightProps = {
   controlNetId: string;
-  mini?: boolean;
 };
 
 const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
-  const { controlNetId, mini = false } = props;
+  const { controlNetId } = props;
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
@@ -35,13 +34,12 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
   return (
     <IAISlider
       label={'Weight'}
-      sliderFormLabelProps={{ pb: 2 }}
       value={weight}
       onChange={handleWeightChanged}
       min={0}
       max={2}
       step={0.01}
-      withSliderMarks={!mini}
+      withSliderMarks
       sliderMarks={[0, 1, 2]}
     />
   );

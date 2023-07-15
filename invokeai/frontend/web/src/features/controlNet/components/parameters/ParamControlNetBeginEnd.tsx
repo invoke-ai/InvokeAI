@@ -1,5 +1,4 @@
 import {
-  ChakraProps,
   FormControl,
   FormLabel,
   HStack,
@@ -20,22 +19,14 @@ import {
 } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback, useMemo } from 'react';
 
-const SLIDER_MARK_STYLES: ChakraProps['sx'] = {
-  mt: 1.5,
-  fontSize: '2xs',
-  fontWeight: '500',
-  color: 'base.400',
-};
-
 type Props = {
   controlNetId: string;
-  mini?: boolean;
 };
 
 const formatPct = (v: number) => `${Math.round(v * 100)}%`;
 
 const ParamControlNetBeginEnd = (props: Props) => {
-  const { controlNetId, mini = false } = props;
+  const { controlNetId } = props;
   const dispatch = useAppDispatch();
 
   const selector = useMemo(
@@ -91,38 +82,33 @@ const ParamControlNetBeginEnd = (props: Props) => {
           <Tooltip label={formatPct(endStepPct)} placement="top" hasArrow>
             <RangeSliderThumb index={1} />
           </Tooltip>
-          {!mini && (
-            <>
-              <RangeSliderMark
-                value={0}
-                sx={{
-                  insetInlineStart: '0 !important',
-                  insetInlineEnd: 'unset !important',
-                  ...SLIDER_MARK_STYLES,
-                }}
-              >
-                0%
-              </RangeSliderMark>
-              <RangeSliderMark
-                value={0.5}
-                sx={{
-                  ...SLIDER_MARK_STYLES,
-                }}
-              >
-                50%
-              </RangeSliderMark>
-              <RangeSliderMark
-                value={1}
-                sx={{
-                  insetInlineStart: 'unset !important',
-                  insetInlineEnd: '0 !important',
-                  ...SLIDER_MARK_STYLES,
-                }}
-              >
-                100%
-              </RangeSliderMark>
-            </>
-          )}
+          <RangeSliderMark
+            value={0}
+            sx={{
+              insetInlineStart: '0 !important',
+              insetInlineEnd: 'unset !important',
+            }}
+          >
+            0%
+          </RangeSliderMark>
+          <RangeSliderMark
+            value={0.5}
+            sx={{
+              insetInlineStart: '50% !important',
+              transform: 'translateX(-50%)',
+            }}
+          >
+            50%
+          </RangeSliderMark>
+          <RangeSliderMark
+            value={1}
+            sx={{
+              insetInlineStart: 'unset !important',
+              insetInlineEnd: '0 !important',
+            }}
+          >
+            100%
+          </RangeSliderMark>
         </RangeSlider>
       </HStack>
     </FormControl>
