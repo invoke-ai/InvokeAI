@@ -114,7 +114,8 @@ const ControlNet = (props: ControlNetProps) => {
         />
         <IAIIconButton
           size="sm"
-          aria-label="Show All Options"
+          tooltip={isExpanded ? 'Hide Advanced' : 'Show Advanced'}
+          aria-label={isExpanded ? 'Hide Advanced' : 'Show Advanced'}
           onClick={toggleIsExpanded}
           variant="link"
           icon={
