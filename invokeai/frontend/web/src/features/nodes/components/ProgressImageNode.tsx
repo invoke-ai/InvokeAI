@@ -21,6 +21,7 @@ const ProgressImageNode = (props: NodeProps<InvocationValue>) => {
       />
 
       <Flex
+        className="nopan"
         sx={{
           flexDirection: 'column',
           borderBottomRadius: 'md',
