@@ -4,8 +4,14 @@ import * as InvokeAI from 'app/types/invokeai';
 
 import { InvokeLogLevel } from 'app/logging/useLogger';
 import { userInvoked } from 'app/store/actions';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { TFuncKey, t } from 'i18next';
 import { LogLevelName } from 'roarr';
+import { imageUploaded } from 'services/api/thunks/image';
+import {
+  isAnySessionRejected,
+  sessionCanceled,
+} from 'services/api/thunks/session';
 import {
   appSocketConnected,
   appSocketDisconnected,
@@ -18,18 +24,10 @@ import {
   appSocketUnsubscribed,
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
-import { imageUploaded } from 'services/api/thunks/image';
-import {
-  isAnySessionRejected,
-  sessionCanceled,
-} from 'services/api/thunks/session';
 import { makeToast } from '../../../app/components/Toaster';
 import { LANGUAGES } from '../components/LanguagePicker';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
-
-export type InfillMethod = 'tile' | 'patchmatch';
 
 export interface SystemState {
   isGFPGANAvailable: boolean;
@@ -48,7 +46,6 @@ export interface SystemState {
   toastQueue: UseToastOptions[];
   searchFolder: string | null;
   foundModels: InvokeAI.FoundModel[] | null;
-  openModel: string | null;
   /**
    * The current progress image
    */
@@ -87,10 +84,6 @@ export interface SystemState {
    * When a session is canceled, its ID is stored here until a new session is created.
    */
   canceledSession: string;
-  /**
-   * TODO: get this from backend
-   */
-  infillMethods: InfillMethod[];
   isPersisted: boolean;
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
@@ -115,7 +108,6 @@ export const initialSystemState: SystemState = {
   toastQueue: [],
   searchFolder: null,
   foundModels: null,
-  openModel: null,
   progressImage: null,
   shouldAntialiasProgressImage: false,
   sessionId: null,
@@ -128,7 +120,6 @@ export const initialSystemState: SystemState = {
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
   canceledSession: '',
-  infillMethods: ['tile', 'patchmatch'],
   isPersisted: false,
   language: 'en',
   isUploading: false,
@@ -170,9 +161,6 @@ export const systemSlice = createSlice({
       action: PayloadAction<InvokeAI.FoundModel[] | null>
     ) => {
       state.foundModels = action.payload;
-    },
-    setOpenModel: (state, action: PayloadAction<string | null>) => {
-      state.openModel = action.payload;
     },
     /**
      * A cancel was scheduled
@@ -440,7 +428,6 @@ export const {
   clearToastQueue,
   setSearchFolder,
   setFoundModels,
-  setOpenModel,
   cancelScheduled,
   scheduledCancelAborted,
   cancelTypeChanged,

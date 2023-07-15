@@ -1,24 +1,22 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 
-import IAIMantineSelect, {
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIMantineSearchableSelect, {
   IAISelectDataType,
-} from 'common/components/IAIMantineSelect';
+} from 'common/components/IAIMantineSearchableSelect';
+import { configSelector } from 'features/system/store/configSelectors';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { map } from 'lodash-es';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { CONTROLNET_PROCESSORS } from '../../store/constants';
 import { controlNetProcessorTypeChanged } from '../../store/controlNetSlice';
-import {
-  ControlNetProcessorNode,
-  ControlNetProcessorType,
-} from '../../store/types';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
-import { createSelector } from '@reduxjs/toolkit';
-import { configSelector } from 'features/system/store/configSelectors';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { ControlNetProcessorType } from '../../store/types';
+import { FormControl, FormLabel } from '@chakra-ui/react';
 
 type ParamControlNetProcessorSelectProps = {
   controlNetId: string;
-  processorNode: ControlNetProcessorNode;
 };
 
 const selector = createSelector(
@@ -54,10 +52,24 @@ const selector = createSelector(
 const ParamControlNetProcessorSelect = (
   props: ParamControlNetProcessorSelectProps
 ) => {
-  const { controlNetId, processorNode } = props;
   const dispatch = useAppDispatch();
-  const isReady = useIsReadyToInvoke();
+  const { controlNetId } = props;
+  const processorNodeSelector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ controlNet }) => {
+          const { isEnabled, processorNode } =
+            controlNet.controlNets[controlNetId];
+          return { isEnabled, processorNode };
+        },
+        defaultSelectorOptions
+      ),
+    [controlNetId]
+  );
+  const isBusy = useAppSelector(selectIsBusy);
   const controlNetProcessors = useAppSelector(selector);
+  const { isEnabled, processorNode } = useAppSelector(processorNodeSelector);
 
   const handleProcessorTypeChanged = useCallback(
     (v: string | null) => {
@@ -72,12 +84,12 @@ const ParamControlNetProcessorSelect = (
   );
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       label="Processor"
       value={processorNode.type ?? 'canny_image_processor'}
       data={controlNetProcessors}
       onChange={handleProcessorTypeChanged}
-      disabled={!isReady}
+      disabled={isBusy || !isEnabled}
     />
   );
 };

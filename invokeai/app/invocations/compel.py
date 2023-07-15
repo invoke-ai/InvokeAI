@@ -1,18 +1,16 @@
+from typing import Literal, Optional, Union, List
+from pydantic import BaseModel, Field
 import re
-from contextlib import ExitStack
-from typing import List, Literal, Optional, Union
-
 import torch
 from compel import Compel
 from compel.prompt_parser import (Blend, Conjunction,
                                   CrossAttentionControlSubstitute,
                                   FlattenedPrompt, Fragment)
-from pydantic import BaseModel, Field
-
-from ...backend.model_management import BaseModelType, ModelType, SubModelType
+from ...backend.util.devices import torch_dtype
+from ...backend.model_management import ModelType
+from ...backend.model_management.models import ModelNotFoundException
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
-from ...backend.util.devices import torch_dtype
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
 from .model import ClipField
@@ -86,14 +84,15 @@ class CompelInvocation(BaseInvocation):
                         model_type=ModelType.TextualInversion,
                     ).context.model
                 )
-            except Exception:
+            except ModelNotFoundException:
                 # print(e)
                 #import traceback
-                # print(traceback.format_exc())
+                #print(traceback.format_exc())
                 print(f"Warn: trigger: \"{trigger}\" not found")
 
         with ModelPatcher.apply_lora_text_encoder(text_encoder_info.context.model, _lora_loader()),\
                 ModelPatcher.apply_ti(tokenizer_info.context.model, text_encoder_info.context.model, ti_list) as (tokenizer, ti_manager),\
+                ModelPatcher.apply_clip_skip(text_encoder_info.context.model, self.clip.skipped_layers),\
                 text_encoder_info as text_encoder:
 
             compel = Compel(
@@ -101,7 +100,7 @@ class CompelInvocation(BaseInvocation):
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=torch_dtype,
-                truncate_long_prompts=True,  # TODO:
+                truncate_long_prompts=False,
             )
 
             conjunction = Compel.parse_prompt_string(self.prompt)
@@ -113,9 +112,6 @@ class CompelInvocation(BaseInvocation):
             c, options = compel.build_conditioning_tensor_for_prompt_object(
                 prompt)
 
-            # TODO: long prompt support
-            # if not self.truncate_long_prompts:
-            #    [c, uc] = compel.pad_conditioning_tensors_to_same_length([c, uc])
             ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
                 tokens_count_including_eos_bos=get_max_token_count(
                     tokenizer, conjunction),
@@ -131,6 +127,24 @@ class CompelInvocation(BaseInvocation):
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
             ),
+        )
+
+class ClipSkipInvocationOutput(BaseInvocationOutput):
+    """Clip skip node output"""
+    type: Literal["clip_skip_output"] = "clip_skip_output"
+    clip: ClipField = Field(None, description="Clip with skipped layers")
+
+class ClipSkipInvocation(BaseInvocation):
+    """Skip layers in clip text_encoder model."""
+    type: Literal["clip_skip"] = "clip_skip"
+
+    clip: ClipField = Field(None, description="Clip to use")
+    skipped_layers: int = Field(0, description="Number of layers to skip in text_encoder")
+
+    def invoke(self, context: InvocationContext) -> ClipSkipInvocationOutput:
+        self.clip.skipped_layers += self.skipped_layers
+        return ClipSkipInvocationOutput(
+            clip=self.clip,
         )
 
 

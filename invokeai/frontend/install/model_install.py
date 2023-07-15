@@ -691,9 +691,8 @@ def select_and_download_models(opt: Namespace):
 
     # this is where the TUI is called
     else:
-        # needed because the torch library is loaded, even though we don't use it
-        # currently commented out because it has started generating errors (?)
-        # torch.multiprocessing.set_start_method("spawn")
+        # needed to support the probe() method running under a subprocess
+        torch.multiprocessing.set_start_method("spawn")
 
         # the third argument is needed in the Windows 11 environment in
         # order to launch and resize a console window running this program
@@ -774,7 +773,7 @@ def main():
     config.parse_args(invoke_args)
     logger = InvokeAILogger().getLogger(config=config)
 
-    if not (config.root_dir / config.conf_path.parent).exists():
+    if not (config.conf_path / 'models.yaml').exists():
         logger.info(
             "Your InvokeAI root directory is not set up. Calling invokeai-configure."
         )

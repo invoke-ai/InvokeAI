@@ -15,7 +15,6 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
-import { setIsLightboxOpen } from 'features/lightbox/store/lightboxSlice';
 import { configSelector } from 'features/system/store/configSelectors';
 import { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
@@ -41,6 +40,7 @@ import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
+  translationKey: string;
   icon: ReactNode;
   content: ReactNode;
 }
@@ -48,26 +48,31 @@ export interface InvokeTabInfo {
 const tabs: InvokeTabInfo[] = [
   {
     id: 'txt2img',
+    translationKey: 'common.txt2img',
     icon: <Icon as={FaFont} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <TextToImageTab />,
   },
   {
     id: 'img2img',
+    translationKey: 'common.img2img',
     icon: <Icon as={FaImage} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <ImageTab />,
   },
   {
     id: 'unifiedCanvas',
+    translationKey: 'common.unifiedCanvas',
     icon: <Icon as={MdGridOn} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <UnifiedCanvasTab />,
   },
   {
     id: 'nodes',
+    translationKey: 'common.nodes',
     icon: <Icon as={MdDeviceHub} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <NodesTab />,
   },
   {
     id: 'modelManager',
+    translationKey: 'modelManager.modelManager',
     icon: <Icon as={FaCube} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <ModelManagerTab />,
   },
@@ -98,9 +103,6 @@ const InvokeTabs = () => {
   const activeTab = useAppSelector(activeTabIndexSelector);
   const activeTabName = useAppSelector(activeTabNameSelector);
   const enabledTabs = useAppSelector(enabledTabsSelector);
-  const isLightBoxOpen = useAppSelector(
-    (state: RootState) => state.lightbox.isLightboxOpen
-  );
 
   const { shouldPinGallery, shouldPinParametersPanel, shouldShowGallery } =
     useAppSelector((state: RootState) => state.ui);
@@ -108,15 +110,6 @@ const InvokeTabs = () => {
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
-
-  // Lightbox Hotkey
-  useHotkeys(
-    'z',
-    () => {
-      dispatch(setIsLightboxOpen(!isLightBoxOpen));
-    },
-    [isLightBoxOpen]
-  );
 
   useHotkeys(
     'f',
@@ -146,12 +139,12 @@ const InvokeTabs = () => {
         <Tooltip
           key={tab.id}
           hasArrow
-          label={String(t(`common.${tab.id}` as ResourceKey))}
+          label={String(t(tab.translationKey as ResourceKey))}
           placement="end"
         >
           <Tab onClick={handleClickTab}>
             <VisuallyHidden>
-              {String(t(`common.${tab.id}` as ResourceKey))}
+              {String(t(tab.translationKey as ResourceKey))}
             </VisuallyHidden>
             {tab.icon}
           </Tab>

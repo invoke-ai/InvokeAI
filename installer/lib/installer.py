@@ -149,7 +149,7 @@ class Installer:
 
         return venv_dir
 
-    def install(self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False, find_links: Path = None) -> None:
+    def install(self, root: str = "~/invokeai-3", version: str = "latest", yes_to_all=False, find_links: Path = None) -> None:
         """
         Install the InvokeAI application into the given runtime path
 
@@ -248,6 +248,7 @@ class InvokeAiInstance:
                 "install",
                 "--require-virtualenv",
                 "torch~=2.0.0",
+                "torchmetrics==0.11.4",
                 "torchvision>=0.14.1",
                 "--force-reinstall",
                 "--find-links" if find_links is not None else None,

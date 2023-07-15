@@ -1,23 +1,18 @@
-import {
-  Flex,
-  ListItem,
-  Radio,
-  RadioGroup,
-  Text,
-  Tooltip,
-  UnorderedList,
-} from '@chakra-ui/react';
+import { Flex, ListItem, Text, UnorderedList } from '@chakra-ui/react';
 // import { convertToDiffusers } from 'app/socketio/actions';
+import { makeToast } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
-import IAIInput from 'common/components/IAIInput';
+import { addToast } from 'features/system/store/systemSlice';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckpointModel } from './CheckpointModelEdit';
+
+import { useConvertMainModelsMutation } from 'services/api/endpoints/models';
+import { CheckpointModelConfig } from 'services/api/types';
 
 interface ModelConvertProps {
-  model: CheckpointModel;
+  model: CheckpointModelConfig;
 }
 
 export default function ModelConvert(props: ModelConvertProps) {
@@ -25,6 +20,8 @@ export default function ModelConvert(props: ModelConvertProps) {
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+
+  const [convertModel, { isLoading }] = useConvertMainModelsMutation();
 
   const [saveLocation, setSaveLocation] = useState<string>('same');
   const [customSaveLocation, setCustomSaveLocation] = useState<string>('');
@@ -38,20 +35,39 @@ export default function ModelConvert(props: ModelConvertProps) {
   };
 
   const modelConvertHandler = () => {
-    const modelToConvert = {
-      model_name: model,
-      save_location: saveLocation,
-      custom_location:
-        saveLocation === 'custom' && customSaveLocation !== ''
-          ? customSaveLocation
-          : null,
+    const responseBody = {
+      base_model: model.base_model,
+      model_name: model.model_name,
     };
-    dispatch(convertToDiffusers(modelToConvert));
+    convertModel(responseBody)
+      .unwrap()
+      .then((_) => {
+        dispatch(
+          addToast(
+            makeToast({
+              title: `${t('modelManager.modelConverted')}: ${model.model_name}`,
+              status: 'success',
+            })
+          )
+        );
+      })
+      .catch((_) => {
+        dispatch(
+          addToast(
+            makeToast({
+              title: `${t('modelManager.modelConversionFailed')}: ${
+                model.model_name
+              }`,
+              status: 'error',
+            })
+          )
+        );
+      });
   };
 
   return (
     <IAIAlertDialog
-      title={`${t('modelManager.convert')} ${model.name}`}
+      title={`${t('modelManager.convert')} ${model.model_name}`}
       acceptCallback={modelConvertHandler}
       cancelCallback={modelConvertCancelHandler}
       acceptButtonText={`${t('modelManager.convert')}`}
@@ -60,6 +76,7 @@ export default function ModelConvert(props: ModelConvertProps) {
           size={'sm'}
           aria-label={t('modelManager.convertToDiffusers')}
           className=" modal-close-btn"
+          isLoading={isLoading}
         >
           🧨 {t('modelManager.convertToDiffusers')}
         </IAIButton>
@@ -77,7 +94,7 @@ export default function ModelConvert(props: ModelConvertProps) {
         <Text>{t('modelManager.convertToDiffusersHelpText6')}</Text>
       </Flex>
 
-      <Flex flexDir="column" gap={4}>
+      {/* <Flex flexDir="column" gap={4}>
         <Flex marginTop={4} flexDir="column" gap={2}>
           <Text fontWeight="600">
             {t('modelManager.convertToDiffusersSaveLocation')}
@@ -103,9 +120,9 @@ export default function ModelConvert(props: ModelConvertProps) {
               </Radio>
             </Flex>
           </RadioGroup>
-        </Flex>
+        </Flex> */}
 
-        {saveLocation === 'custom' && (
+      {/* {saveLocation === 'custom' && (
           <Flex flexDirection="column" rowGap={2}>
             <Text fontWeight="500" fontSize="sm" variant="subtext">
               {t('modelManager.customSaveLocation')}
@@ -119,8 +136,7 @@ export default function ModelConvert(props: ModelConvertProps) {
               width="full"
             />
           </Flex>
-        )}
-      </Flex>
+        )} */}
     </IAIAlertDialog>
   );
 }

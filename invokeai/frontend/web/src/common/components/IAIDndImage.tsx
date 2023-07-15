@@ -6,30 +6,21 @@ import {
   useColorMode,
   useColorModeValue,
 } from '@chakra-ui/react';
-import { useCombinedRefs } from '@dnd-kit/utilities';
-import IAIIconButton from 'common/components/IAIIconButton';
-import {
-  IAILoadingImageFallback,
-  IAINoContentFallback,
-} from 'common/components/IAIImageFallback';
-import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
-import { AnimatePresence } from 'framer-motion';
-import { MouseEvent, ReactElement, SyntheticEvent } from 'react';
-import { memo, useRef } from 'react';
-import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
-import { ImageDTO } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
-import IAIDropOverlay from './IAIDropOverlay';
-import { PostUploadAction } from 'services/api/thunks/image';
-import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { mode } from 'theme/util/mode';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
-  isValidDrop,
-  useDraggable,
-  useDroppable,
 } from 'app/components/ImageDnd/typesafeDnd';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
+import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { MouseEvent, ReactElement, SyntheticEvent, memo } from 'react';
+import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
+import { PostUploadAction } from 'services/api/thunks/image';
+import { ImageDTO } from 'services/api/types';
+import { mode } from 'theme/util/mode';
+import IAIDraggable from './IAIDraggable';
+import IAIDroppable from './IAIDroppable';
 
 type IAIDndImageProps = {
   imageDTO: ImageDTO | undefined;
@@ -83,28 +74,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
 
   const { colorMode } = useColorMode();
 
-  const dndId = useRef(uuidv4());
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef: setDraggableRef,
-    isDragging,
-    active,
-  } = useDraggable({
-    id: dndId.current,
-    disabled: isDragDisabled || !imageDTO,
-    data: draggableData,
-  });
-
-  const { isOver, setNodeRef: setDroppableRef } = useDroppable({
-    id: dndId.current,
-    disabled: isDropDisabled,
-    data: droppableData,
-  });
-
-  const setDndRef = useCombinedRefs(setDroppableRef, setDraggableRef);
-
   const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
     postUploadAction,
     isDisabled: isUploadDisabled,
@@ -139,9 +108,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
         userSelect: 'none',
         cursor: isDragDisabled || !imageDTO ? 'default' : 'pointer',
       }}
-      {...attributes}
-      {...listeners}
-      ref={setDndRef}
     >
       {imageDTO && (
         <Flex
@@ -154,10 +120,13 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           }}
         >
           <Image
-            onClick={onClick}
             src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
             fallbackStrategy="beforeLoadOrError"
-            fallback={<IAILoadingImageFallback image={imageDTO} />}
+            // If we fall back to thumbnail, it feels much snappier than the skeleton...
+            fallbackSrc={imageDTO.thumbnail_url}
+            // fallback={<IAILoadingImageFallback image={imageDTO} />}
+            width={imageDTO.width}
+            height={imageDTO.height}
             onError={onError}
             draggable={false}
             sx={{
@@ -171,30 +140,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             }}
           />
           {withMetadataOverlay && <ImageMetadataOverlay image={imageDTO} />}
-          {onClickReset && withResetIcon && (
-            <IAIIconButton
-              onClick={onClickReset}
-              aria-label={resetTooltip}
-              tooltip={resetTooltip}
-              icon={resetIcon}
-              size="sm"
-              variant="link"
-              sx={{
-                position: 'absolute',
-                top: 1,
-                insetInlineEnd: 1,
-                p: 0,
-                minW: 0,
-                svg: {
-                  transitionProperty: 'common',
-                  transitionDuration: 'normal',
-                  fill: 'base.100',
-                  _hover: { fill: 'base.50' },
-                  filter: resetIconShadow,
-                },
-              }}
-            />
-          )}
         </Flex>
       )}
       {!imageDTO && !isUploadDisabled && (
@@ -225,11 +170,44 @@ const IAIDndImage = (props: IAIDndImageProps) => {
         </>
       )}
       {!imageDTO && isUploadDisabled && noContentFallback}
-      <AnimatePresence>
-        {isValidDrop(droppableData, active) && !isDragging && (
-          <IAIDropOverlay isOver={isOver} label={dropLabel} />
-        )}
-      </AnimatePresence>
+      {!isDropDisabled && (
+        <IAIDroppable
+          data={droppableData}
+          disabled={isDropDisabled}
+          dropLabel={dropLabel}
+        />
+      )}
+      {imageDTO && !isDragDisabled && (
+        <IAIDraggable
+          data={draggableData}
+          disabled={isDragDisabled || !imageDTO}
+          onClick={onClick}
+        />
+      )}
+      {onClickReset && withResetIcon && imageDTO && (
+        <IAIIconButton
+          onClick={onClickReset}
+          aria-label={resetTooltip}
+          tooltip={resetTooltip}
+          icon={resetIcon}
+          size="sm"
+          variant="link"
+          sx={{
+            position: 'absolute',
+            top: 1,
+            insetInlineEnd: 1,
+            p: 0,
+            minW: 0,
+            svg: {
+              transitionProperty: 'common',
+              transitionDuration: 'normal',
+              fill: 'base.100',
+              _hover: { fill: 'base.50' },
+              filter: resetIconShadow,
+            },
+          }}
+        />
+      )}
     </Flex>
   );
 };

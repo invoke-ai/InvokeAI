@@ -1,6 +1,6 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { modelIdToVAEModelField } from '../modelIdToVAEModelField';
+import { MetadataAccumulatorInvocation } from 'services/api/types';
 import {
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
@@ -8,29 +8,34 @@ import {
   INPAINT_GRAPH,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
+  METADATA_ACCUMULATOR,
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
 } from './constants';
 
 export const addVAEToGraph = (
-  graph: NonNullableGraph,
-  state: RootState
+  state: RootState,
+  graph: NonNullableGraph
 ): void => {
-  const { vae: vaeId } = state.generation;
-  const vae_model = modelIdToVAEModelField(vaeId);
+  const { vae } = state.generation;
 
-  if (vaeId !== 'auto') {
+  const isAutoVae = !vae;
+  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+    | MetadataAccumulatorInvocation
+    | undefined;
+
+  if (!isAutoVae) {
     graph.nodes[VAE_LOADER] = {
       type: 'vae_loader',
       id: VAE_LOADER,
-      vae_model,
+      vae_model: vae,
     };
   }
 
   if (graph.id === TEXT_TO_IMAGE_GRAPH || graph.id === IMAGE_TO_IMAGE_GRAPH) {
     graph.edges.push({
       source: {
-        node_id: vaeId === 'auto' ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -43,7 +48,7 @@ export const addVAEToGraph = (
   if (graph.id === IMAGE_TO_IMAGE_GRAPH) {
     graph.edges.push({
       source: {
-        node_id: vaeId === 'auto' ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -56,7 +61,7 @@ export const addVAEToGraph = (
   if (graph.id === INPAINT_GRAPH) {
     graph.edges.push({
       source: {
-        node_id: vaeId === 'auto' ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -64,5 +69,9 @@ export const addVAEToGraph = (
         field: 'vae',
       },
     });
+  }
+
+  if (vae && metadataAccumulator) {
+    metadataAccumulator.vae = vae;
   }
 };

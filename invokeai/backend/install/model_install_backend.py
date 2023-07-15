@@ -11,6 +11,7 @@ from typing import List, Dict, Callable, Union, Set
 
 import requests
 from diffusers import StableDiffusionPipeline
+from diffusers import logging as dlogging
 from huggingface_hub import hf_hub_url, HfFolder, HfApi
 from omegaconf import OmegaConf
 from tqdm import tqdm
@@ -70,8 +71,6 @@ class ModelInstallList:
 class InstallSelections():
     install_models: List[str]= field(default_factory=list)
     remove_models: List[str]=field(default_factory=list)
-#    scan_directory: Path = None
-#    autoscan_on_startup: bool=False
 
 @dataclass
 class ModelLoadInfo():
@@ -120,8 +119,8 @@ class ModelInstall(object):
         installed_models = self.mgr.list_models()
         for md in installed_models:
             base = md['base_model']
-            model_type = md['type']
-            name = md['name']
+            model_type = md['model_type']
+            name = md['model_name']
             key = ModelManager.create_key(name, base, model_type)
             if key in model_dict:
                 model_dict[key].installed = True
@@ -153,6 +152,9 @@ class ModelInstall(object):
         return defaults[0]
 
     def install(self, selections: InstallSelections):
+        verbosity = dlogging.get_verbosity()  # quench NSFW nags
+        dlogging.set_verbosity_error()
+
         job = 1
         jobs = len(selections.remove_models) + len(selections.install_models)
         
@@ -160,20 +162,28 @@ class ModelInstall(object):
         for key in selections.remove_models:
             name,base,mtype = self.mgr.parse_key(key)
             logger.info(f'Deleting {mtype} model {name} [{job}/{jobs}]')
-            self.mgr.del_model(name,base,mtype)
+            try:
+                self.mgr.del_model(name,base,mtype)
+            except FileNotFoundError as e:
+                logger.warning(e)
             job += 1
             
         # add requested models
         for path in selections.install_models:
             logger.info(f'Installing {path} [{job}/{jobs}]')
-            self.heuristic_import(path)
+            try:
+                self.heuristic_import(path)
+            except (ValueError, KeyError) as e:
+                logger.error(str(e))
             job += 1
-
+            
+        dlogging.set_verbosity(verbosity)
         self.mgr.commit()
 
     def heuristic_import(self,
-                          model_path_id_or_url: Union[str,Path],
-                          models_installed: Set[Path]=None)->Dict[str, AddModelResult]:
+                         model_path_id_or_url: Union[str,Path],
+                         models_installed: Set[Path]=None,
+                         )->Dict[str, AddModelResult]:
         '''
         :param model_path_id_or_url: A Path to a local model to import, or a string representing its repo_id or URL
         :param models_installed: Set of installed models, used for recursive invocation
@@ -186,59 +196,53 @@ class ModelInstall(object):
         # A little hack to allow nested routines to retrieve info on the requested ID
         self.current_id = model_path_id_or_url
         path = Path(model_path_id_or_url)
+        # checkpoint file, or similar
+        if path.is_file():
+            models_installed.update({str(path):self._install_path(path)})
 
-        try:
-            # checkpoint file, or similar
-            if path.is_file():
-                models_installed.update(self._install_path(path))
+        # folders style or similar
+        elif path.is_dir() and any([(path/x).exists() for x in \
+                                    {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}
+                                    ]
+                                   ):
+            models_installed.update(self._install_path(path))
 
-            # folders style or similar
-            elif path.is_dir() and any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin'}]):
-                models_installed.update(self._install_path(path))
+        # recursive scan
+        elif path.is_dir():
+            for child in path.iterdir():
+                self.heuristic_import(child, models_installed=models_installed)
 
-            # recursive scan
-            elif path.is_dir():
-                for child in path.iterdir():
-                    self.heuristic_import(child, models_installed=models_installed)
+        # huggingface repo
+        elif len(str(model_path_id_or_url).split('/')) == 2:
+            models_installed.update({str(model_path_id_or_url): self._install_repo(str(model_path_id_or_url))})
 
-            # huggingface repo
-            elif len(str(path).split('/')) == 2:
-                models_installed.update(self._install_repo(str(path)))
+        # a URL
+        elif str(model_path_id_or_url).startswith(("http:", "https:", "ftp:")):
+            models_installed.update({str(model_path_id_or_url): self._install_url(model_path_id_or_url)})
 
-            # a URL
-            elif model_path_id_or_url.startswith(("http:", "https:", "ftp:")):
-                models_installed.update(self._install_url(model_path_id_or_url))
-
-            else:
-                logger.warning(f'{str(model_path_id_or_url)} is not recognized as a local path, repo ID or URL. Skipping')
-            
-        except ValueError as e:
-            logger.error(str(e))
+        else:
+            raise KeyError(f'{str(model_path_id_or_url)} is not recognized as a local path, repo ID or URL. Skipping')
 
         return models_installed
 
     # install a model from a local path. The optional info parameter is there to prevent
     # the model from being probed twice in the event that it has already been probed.
-    def _install_path(self, path: Path, info: ModelProbeInfo=None)->Dict[str, AddModelResult]:
-        try:
-            model_result = None
-            info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
-            model_name = path.stem if path.is_file() else path.name
-            if self.mgr.model_exists(model_name, info.base_type, info.model_type):
-                raise ValueError(f'A model named "{model_name}" is already installed.')
-            attributes = self._make_attributes(path,info)
-            model_result = self.mgr.add_model(model_name = model_name,
-                                              base_model = info.base_type,
-                                              model_type = info.model_type,
-                                              model_attributes = attributes,
-                                              )
-        except Exception as e:
-            logger.warning(f'{str(e)} Skipping registration.')
-            return {}
-        return {str(path): model_result}
+    def _install_path(self, path: Path, info: ModelProbeInfo=None)->AddModelResult:
+        info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
+        if not info:
+            logger.warning(f'Unable to parse format of {path}')
+            return None
+        model_name = path.stem if path.is_file() else path.name
+        if self.mgr.model_exists(model_name, info.base_type, info.model_type):
+            raise ValueError(f'A model named "{model_name}" is already installed.')
+        attributes = self._make_attributes(path,info)
+        return self.mgr.add_model(model_name = model_name,
+                                  base_model = info.base_type,
+                                  model_type = info.model_type,
+                                  model_attributes = attributes,
+                                  )
 
-    def _install_url(self, url: str)->dict:
-        # copy to a staging area, probe, import and delete
+    def _install_url(self, url: str)->AddModelResult:
         with TemporaryDirectory(dir=self.config.models_path) as staging:
             location = download_with_resume(url,Path(staging))
             if not location:
@@ -250,7 +254,7 @@ class ModelInstall(object):
         # staged version will be garbage-collected at this time
         return self._install_path(Path(models_path), info)
 
-    def _install_repo(self, repo_id: str)->dict:
+    def _install_repo(self, repo_id: str)->AddModelResult:
         hinfo = HfApi().model_info(repo_id)
         
         # we try to figure out how to download this most economically

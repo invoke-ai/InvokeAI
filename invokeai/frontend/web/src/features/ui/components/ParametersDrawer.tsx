@@ -2,7 +2,6 @@ import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { lightboxSelector } from 'features/lightbox/store/lightboxSelectors';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import {
   activeTabNameSelector,
@@ -12,18 +11,15 @@ import { setShouldShowParametersPanel } from 'features/ui/store/uiSlice';
 import { memo, useMemo } from 'react';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 import PinParametersPanelButton from './PinParametersPanelButton';
-import OverlayScrollable from './common/OverlayScrollable';
 import ResizableDrawer from './common/ResizableDrawer/ResizableDrawer';
 import ImageToImageTabParameters from './tabs/ImageToImage/ImageToImageTabParameters';
 import TextToImageTabParameters from './tabs/TextToImage/TextToImageTabParameters';
 import UnifiedCanvasParameters from './tabs/UnifiedCanvas/UnifiedCanvasParameters';
 
 const selector = createSelector(
-  [uiSelector, activeTabNameSelector, lightboxSelector],
-  (ui, activeTabName, lightbox) => {
+  [uiSelector, activeTabNameSelector],
+  (ui, activeTabName) => {
     const { shouldPinParametersPanel, shouldShowParametersPanel } = ui;
-
-    const { isLightboxOpen } = lightbox;
 
     return {
       activeTabName,

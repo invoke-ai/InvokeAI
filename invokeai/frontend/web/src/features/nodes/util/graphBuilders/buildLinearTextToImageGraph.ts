@@ -1,13 +1,16 @@
+import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
-import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
-import { modelIdToMainModelField } from '../modelIdToMainModelField';
+import { initialGenerationState } from 'features/parameters/store/generationSlice';
+import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import {
+  CLIP_SKIP,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
+  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -15,21 +18,33 @@ import {
   TEXT_TO_LATENTS,
 } from './constants';
 
+const moduleLog = log.child({ namespace: 'nodes' });
+
 export const buildLinearTextToImageGraph = (
   state: RootState
 ): NonNullableGraph => {
   const {
     positivePrompt,
     negativePrompt,
-    model: modelId,
+    model,
     cfgScale: cfg_scale,
     scheduler,
     steps,
     width,
     height,
+    clipSkip,
+    shouldUseCpuNoise,
+    shouldUseNoiseSettings,
   } = state.generation;
 
-  const model = modelIdToMainModelField(modelId);
+  const use_cpu = shouldUseNoiseSettings
+    ? shouldUseCpuNoise
+    : initialGenerationState.shouldUseCpuNoise;
+
+  if (!model) {
+    moduleLog.error('No model found in state');
+    throw new Error('No model found in state');
+  }
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -44,6 +59,16 @@ export const buildLinearTextToImageGraph = (
   const graph: NonNullableGraph = {
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
+        model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
+      },
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
@@ -59,6 +84,7 @@ export const buildLinearTextToImageGraph = (
         id: NOISE,
         width,
         height,
+        use_cpu,
       },
       [TEXT_TO_LATENTS]: {
         type: 't2l',
@@ -66,11 +92,6 @@ export const buildLinearTextToImageGraph = (
         cfg_scale,
         scheduler,
         steps,
-      },
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
-        model,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -80,12 +101,42 @@ export const buildLinearTextToImageGraph = (
     edges: [
       {
         source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
+          node_id: MAIN_MODEL_LOADER,
+          field: 'clip',
+        },
+        destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: MAIN_MODEL_LOADER,
+          field: 'unet',
         },
         destination: {
           node_id: TEXT_TO_LATENTS,
-          field: 'negative_conditioning',
+          field: 'unet',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip',
         },
       },
       {
@@ -100,32 +151,12 @@ export const buildLinearTextToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'clip',
-        },
-        destination: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'clip',
-        },
-        destination: {
           node_id: NEGATIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'unet',
+          field: 'conditioning',
         },
         destination: {
           node_id: TEXT_TO_LATENTS,
-          field: 'unet',
+          field: 'negative_conditioning',
         },
       },
       {
@@ -151,16 +182,49 @@ export const buildLinearTextToImageGraph = (
     ],
   };
 
-  addLoRAsToGraph(graph, state, TEXT_TO_LATENTS);
+  // add metadata accumulator, which is only mostly populated - some fields are added later
+  graph.nodes[METADATA_ACCUMULATOR] = {
+    id: METADATA_ACCUMULATOR,
+    type: 'metadata_accumulator',
+    generation_mode: 'txt2img',
+    cfg_scale,
+    height,
+    width,
+    positive_prompt: '', // set in addDynamicPromptsToGraph
+    negative_prompt: negativePrompt,
+    model,
+    seed: 0, // set in addDynamicPromptsToGraph
+    steps,
+    rand_device: use_cpu ? 'cpu' : 'cuda',
+    scheduler,
+    vae: undefined, // option; set in addVAEToGraph
+    controlnets: [], // populated in addControlNetToLinearGraph
+    loras: [], // populated in addLoRAsToGraph
+    clip_skip: clipSkip,
+  };
 
-  // Add Custom VAE Support
-  addVAEToGraph(graph, state);
+  graph.edges.push({
+    source: {
+      node_id: METADATA_ACCUMULATOR,
+      field: 'metadata',
+    },
+    destination: {
+      node_id: LATENTS_TO_IMAGE,
+      field: 'metadata',
+    },
+  });
 
-  // add dynamic prompts, mutating `graph`
-  addDynamicPromptsToGraph(graph, state);
+  // add LoRA support
+  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS);
+
+  // optionally add custom VAE
+  addVAEToGraph(state, graph);
+
+  // add dynamic prompts - also sets up core iteration and seed
+  addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(graph, TEXT_TO_LATENTS, state);
+  addControlNetToLinearGraph(state, graph, TEXT_TO_LATENTS);
 
   return graph;
 };

@@ -1,35 +1,30 @@
+import { Flex, Text } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
-  VaeModelInputFieldTemplate,
-  VaeModelInputFieldValue,
+  LoRAModelInputFieldTemplate,
+  LoRAModelInputFieldValue,
 } from 'features/nodes/types/types';
-import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
-import { forEach, isString } from 'lodash-es';
-import { memo, useCallback, useEffect, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { modelIdToLoRAModelParam } from 'features/parameters/util/modelIdToLoRAModelParam';
+import { forEach } from 'lodash-es';
+import { memo, useCallback, useMemo } from 'react';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 
 const LoRAModelInputFieldComponent = (
   props: FieldComponentProps<
-    VaeModelInputFieldValue,
-    VaeModelInputFieldTemplate
+    LoRAModelInputFieldValue,
+    LoRAModelInputFieldTemplate
   >
 ) => {
   const { nodeId, field } = props;
-
+  const lora = field.value;
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
-
   const { data: loraModels } = useGetLoRAModelsQuery();
-
-  const selectedModel = useMemo(
-    () => loraModels?.entities[field.value ?? loraModels.ids[0]],
-    [loraModels?.entities, loraModels?.ids, field.value]
-  );
 
   const data = useMemo(() => {
     if (!loraModels) {
@@ -38,24 +33,37 @@ const LoRAModelInputFieldComponent = (
 
     const data: SelectItem[] = [];
 
-    forEach(loraModels.entities, (model, id) => {
-      if (!model) {
+    forEach(loraModels.entities, (lora, id) => {
+      if (!lora) {
         return;
       }
 
       data.push({
         value: id,
-        label: model.name,
-        group: BASE_MODEL_NAME_MAP[model.base_model],
+        label: lora.model_name,
+        group: MODEL_TYPE_MAP[lora.base_model],
       });
     });
 
-    return data;
+    return data.sort((a, b) => (a.disabled && !b.disabled ? 1 : -1));
   }, [loraModels]);
 
-  const handleValueChanged = useCallback(
+  const selectedLoRAModel = useMemo(
+    () =>
+      loraModels?.entities[`${lora?.base_model}/lora/${lora?.model_name}`] ??
+      null,
+    [loraModels?.entities, lora?.base_model, lora?.model_name]
+  );
+
+  const handleChange = useCallback(
     (v: string | null) => {
       if (!v) {
+        return;
+      }
+
+      const newLoRAModel = modelIdToLoRAModelParam(v);
+
+      if (!newLoRAModel) {
         return;
       }
 
@@ -63,38 +71,40 @@ const LoRAModelInputFieldComponent = (
         fieldValueChanged({
           nodeId,
           fieldName: field.name,
-          value: v,
+          value: newLoRAModel,
         })
       );
     },
     [dispatch, field.name, nodeId]
   );
 
-  useEffect(() => {
-    if (field.value && loraModels?.ids.includes(field.value)) {
-      return;
-    }
-
-    const firstLora = loraModels?.ids[0];
-
-    if (!isString(firstLora)) {
-      return;
-    }
-
-    handleValueChanged(firstLora);
-  }, [field.value, handleValueChanged, loraModels?.ids]);
+  if (loraModels?.ids.length === 0) {
+    return (
+      <Flex sx={{ justifyContent: 'center', p: 2 }}>
+        <Text sx={{ fontSize: 'sm', color: 'base.500', _dark: 'base.700' }}>
+          No LoRAs Loaded
+        </Text>
+      </Flex>
+    );
+  }
 
   return (
-    <IAIMantineSelect
-      tooltip={selectedModel?.description}
+    <IAIMantineSearchableSelect
+      value={selectedLoRAModel?.id ?? null}
       label={
-        selectedModel?.base_model &&
-        BASE_MODEL_NAME_MAP[selectedModel?.base_model]
+        selectedLoRAModel?.base_model &&
+        MODEL_TYPE_MAP[selectedLoRAModel?.base_model]
       }
-      value={field.value}
-      placeholder="Pick one"
+      placeholder={data.length > 0 ? 'Select a LoRA' : 'No LoRAs available'}
       data={data}
-      onChange={handleValueChanged}
+      nothingFound="No matching LoRAs"
+      itemComponent={IAIMantineSelectItemWithTooltip}
+      disabled={data.length === 0}
+      filter={(value, item: SelectItem) =>
+        item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
+        item.value.toLowerCase().includes(value.toLowerCase().trim())
+      }
+      onChange={handleChange}
     />
   );
 };

@@ -1,5 +1,5 @@
 import {
-  CONTROLNET_MODELS,
+  // CONTROLNET_MODELS,
   CONTROLNET_PROCESSORS,
 } from 'features/controlNet/store/constants';
 import { InvokeTabName } from 'features/ui/store/tabMap';
@@ -93,7 +93,9 @@ export type AppFeature =
   | 'discordLink'
   | 'bugLink'
   | 'localization'
-  | 'consoleLogging';
+  | 'consoleLogging'
+  | 'dynamicPrompting'
+  | 'batches';
 
 /**
  * A disable-able Stable Diffusion feature
@@ -101,10 +103,15 @@ export type AppFeature =
 export type SDFeature =
   | 'controlNet'
   | 'noise'
+  | 'perlinNoise'
+  | 'noiseThreshold'
   | 'variation'
   | 'symmetry'
   | 'seamless'
-  | 'hires';
+  | 'hires'
+  | 'lora'
+  | 'embedding'
+  | 'vae';
 
 /**
  * Configuration options for the InvokeAI UI.
@@ -121,7 +128,7 @@ export type AppConfig = {
   canRestoreDeletedImagesFromBin: boolean;
   sd: {
     defaultModel?: string;
-    disabledControlNetModels: (keyof typeof CONTROLNET_MODELS)[];
+    disabledControlNetModels: string[];
     disabledControlNetProcessors: (keyof typeof CONTROLNET_PROCESSORS)[];
     iterations: {
       initial: number;

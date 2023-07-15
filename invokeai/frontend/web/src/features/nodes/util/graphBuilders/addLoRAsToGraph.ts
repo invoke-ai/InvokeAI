@@ -1,18 +1,22 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { forEach, size } from 'lodash-es';
-import { LoraLoaderInvocation } from 'services/api/types';
-import { modelIdToLoRAModelField } from '../modelIdToLoRAName';
 import {
+  LoraLoaderInvocation,
+  MetadataAccumulatorInvocation,
+} from 'services/api/types';
+import {
+  CLIP_SKIP,
   LORA_LOADER,
   MAIN_MODEL_LOADER,
+  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
 } from './constants';
 
 export const addLoRAsToGraph = (
-  graph: NonNullableGraph,
   state: RootState,
+  graph: NonNullableGraph,
   baseNodeId: string
 ): void => {
   /**
@@ -25,15 +29,23 @@ export const addLoRAsToGraph = (
 
   const { loras } = state.lora;
   const loraCount = size(loras);
+  const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
+    | MetadataAccumulatorInvocation
+    | undefined;
 
   if (loraCount > 0) {
-    // remove any existing connections from main model loader, we need to insert the lora nodes
+    // Remove MAIN_MODEL_LOADER unet connection to feed it to LoRAs
     graph.edges = graph.edges.filter(
       (e) =>
         !(
           e.source.node_id === MAIN_MODEL_LOADER &&
-          ['unet', 'clip'].includes(e.source.field)
+          ['unet'].includes(e.source.field)
         )
+    );
+    // Remove CLIP_SKIP connections to conditionings to feed it through LoRAs
+    graph.edges = graph.edges.filter(
+      (e) =>
+        !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field))
     );
   }
 
@@ -42,20 +54,25 @@ export const addLoRAsToGraph = (
   let currentLoraIndex = 0;
 
   forEach(loras, (lora) => {
-    const { id, name, weight } = lora;
-    const loraField = modelIdToLoRAModelField(id);
-    const currentLoraNodeId = `${LORA_LOADER}_${loraField.model_name.replace(
-      '.',
-      '_'
-    )}`;
+    const { model_name, base_model, weight } = lora;
+    const currentLoraNodeId = `${LORA_LOADER}_${model_name.replace('.', '_')}`;
 
     const loraLoaderNode: LoraLoaderInvocation = {
       type: 'lora_loader',
       id: currentLoraNodeId,
-      lora: loraField,
+      lora: { model_name, base_model },
       weight,
     };
 
+    // add the lora to the metadata accumulator
+    if (metadataAccumulator) {
+      metadataAccumulator.loras.push({
+        lora: { model_name, base_model },
+        weight,
+      });
+    }
+
+    // add to graph
     graph.nodes[currentLoraNodeId] = loraLoaderNode;
 
     if (currentLoraIndex === 0) {
@@ -73,7 +90,7 @@ export const addLoRAsToGraph = (
 
       graph.edges.push({
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {

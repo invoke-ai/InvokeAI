@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from diffusers import ModelMixin, ConfigMixin
 from pathlib import Path
-from typing import Callable, Literal, Union, Dict
+from typing import Callable, Literal, Union, Dict, Optional
 from picklescan.scanner import scan_file_path
 
 from .models import (
@@ -59,7 +59,7 @@ class ModelProbe(object):
         elif isinstance(model,(dict,ModelMixin,ConfigMixin)):
             return cls.probe(model_path=None, model=model, prediction_type_helper=prediction_type_helper)
         else:
-            raise Exception("model parameter {model} is neither a Path, nor a model")
+            raise ValueError("model parameter {model} is neither a Path, nor a model")
 
     @classmethod
     def probe(cls,
@@ -78,7 +78,6 @@ class ModelProbe(object):
             format_type = 'diffusers' if model_path.is_dir() else 'checkpoint'
         else:
             format_type = 'diffusers' if isinstance(model,(ConfigMixin,ModelMixin)) else 'checkpoint'
-
         model_info = None
         try:
             model_type = cls.get_model_type_from_folder(model_path, model) \
@@ -105,7 +104,7 @@ class ModelProbe(object):
                                      ) else 512,
             )
         except Exception:
-            return None
+            raise
 
         return model_info
 
@@ -127,6 +126,8 @@ class ModelProbe(object):
                 return ModelType.Vae
             elif any(key.startswith(v) for v in {"lora_te_", "lora_unet_"}):
                 return ModelType.Lora
+            elif any(key.endswith(v) for v in {"to_k_lora.up.weight", "to_q_lora.down.weight"}):
+                return ModelType.Lora
             elif any(key.startswith(v) for v in {"control_model", "input_blocks"}):
                 return ModelType.ControlNet
             elif key in {"emb_params", "string_to_param"}:
@@ -137,7 +138,7 @@ class ModelProbe(object):
             if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
                 return ModelType.TextualInversion
         
-        raise ValueError("Unable to determine model type")
+        raise ValueError(f"Unable to determine model type for {model_path}")
 
     @classmethod
     def get_model_type_from_folder(cls, folder_path: Path, model: ModelMixin)->ModelType:
@@ -167,7 +168,7 @@ class ModelProbe(object):
             return type
 
         # give up
-        raise ValueError("Unable to determine model type")
+        raise ValueError(f"Unable to determine model type for {folder_path}")
 
     @classmethod
     def _scan_and_load_checkpoint(cls,model_path: Path)->dict:
@@ -236,7 +237,7 @@ class CheckpointProbeBase(ProbeBase):
         elif in_channels == 4:
             return ModelVariantType.Normal
         else:
-            raise Exception("Cannot determine variant type")
+            raise ValueError(f"Cannot determine variant type (in_channels={in_channels}) at {self.checkpoint_path}")
 
 class PipelineCheckpointProbe(CheckpointProbeBase):
     def get_base_type(self)->BaseModelType:
@@ -247,7 +248,7 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
             return BaseModelType.StableDiffusion1
         if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
             return BaseModelType.StableDiffusion2
-        raise Exception("Cannot determine base type")
+        raise ValueError("Cannot determine base type")
 
     def get_scheduler_prediction_type(self)->SchedulerPredictionType:
         type = self.get_base_type()
@@ -328,7 +329,7 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
                 return BaseModelType.StableDiffusion2
             elif self.checkpoint_path and self.helper:
                 return self.helper(self.checkpoint_path)
-        raise Exception("Unable to determine base type for {self.checkpoint_path}")
+        raise ValueError("Unable to determine base type for {self.checkpoint_path}")
 
 ########################################################
 # classes for probing folders
@@ -417,7 +418,7 @@ class ControlNetFolderProbe(FolderProbeBase):
     def get_base_type(self)->BaseModelType:
         config_file = self.folder_path / 'config.json'
         if not config_file.exists():
-            raise Exception(f"Cannot determine base type for {self.folder_path}")
+            raise ValueError(f"Cannot determine base type for {self.folder_path}")
         with open(config_file,'r') as file:
             config = json.load(file)
         # no obvious way to distinguish between sd2-base and sd2-768
@@ -434,7 +435,7 @@ class LoRAFolderProbe(FolderProbeBase):
                 model_file = base_file
                 break
         if not model_file:
-            raise Exception('Unknown LoRA format encountered')
+            raise ValueError('Unknown LoRA format encountered')
         return LoRACheckpointProbe(model_file,None).get_base_type()
 
 ############## register probe classes ######

@@ -1,3 +1,4 @@
+import { FullTagDescription } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
 import {
   BaseQueryFn,
   FetchArgs,
@@ -5,10 +6,9 @@ import {
   createApi,
   fetchBaseQuery,
 } from '@reduxjs/toolkit/query/react';
-import { FullTagDescription } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
 import { $authToken, $baseUrl } from 'services/api/client';
 
-export const tagTypes = ['Board', 'Image', 'Model'];
+export const tagTypes = ['Board', 'Image', 'ImageMetadata', 'Model'];
 export type ApiFullTagDescription = FullTagDescription<
   (typeof tagTypes)[number]
 >;

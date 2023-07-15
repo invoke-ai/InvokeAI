@@ -18,13 +18,36 @@ const templatesSelector = createSelector(
   (nodes) => nodes.invocationTemplates
 );
 
+export const DRAG_HANDLE_CLASSNAME = 'node-drag-handle';
+
+export const SHARED_NODE_PROPERTIES: Partial<Node> = {
+  dragHandle: `.${DRAG_HANDLE_CLASSNAME}`,
+};
+
 export const useBuildInvocation = () => {
   const invocationTemplates = useAppSelector(templatesSelector);
 
   const flow = useReactFlow();
 
   return useCallback(
-    (type: AnyInvocationType) => {
+    (type: AnyInvocationType | 'progress_image') => {
+      if (type === 'progress_image') {
+        const { x, y } = flow.project({
+          x: window.innerWidth / 2.5,
+          y: window.innerHeight / 8,
+        });
+
+        const node: Node = {
+          ...SHARED_NODE_PROPERTIES,
+          id: 'progress_image',
+          type: 'progress_image',
+          position: { x: x, y: y },
+          data: {},
+        };
+
+        return node;
+      }
+
       const template = invocationTemplates[type];
 
       if (template === undefined) {
@@ -75,6 +98,7 @@ export const useBuildInvocation = () => {
       });
 
       const invocation: Node<InvocationValue> = {
+        ...SHARED_NODE_PROPERTIES,
         id: nodeId,
         type: 'invocation',
         position: { x: x, y: y },

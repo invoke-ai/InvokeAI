@@ -2,7 +2,7 @@ import inspect
 from enum import Enum
 from pydantic import BaseModel
 from typing import Literal, get_origin
-from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings
+from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings, ModelNotFoundException, InvalidModelException
 from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
 from .vae import VaeModel
 from .lora import LoRAModel
@@ -37,9 +37,9 @@ MODEL_CONFIGS = list()
 OPENAPI_MODEL_CONFIGS = list()
 
 class OpenAPIModelInfoBase(BaseModel):
-    name: str
+    model_name: str
     base_model: BaseModelType
-    type: ModelType
+    model_type: ModelType
 
 
 for base_model, models in MODEL_CLASSES.items():
@@ -48,7 +48,9 @@ for base_model, models in MODEL_CLASSES.items():
         model_configs.discard(None)
         MODEL_CONFIGS.extend(model_configs)
 
-        for cfg in model_configs:
+        # LS: sort to get the checkpoint configs first, which makes
+        # for a better template in the Swagger docs
+        for cfg in sorted(model_configs, key=lambda x: str(x)):
             model_name, cfg_name = cfg.__qualname__.split('.')[-2:]
             openapi_cfg_name = model_name + cfg_name
             if openapi_cfg_name in vars():
@@ -56,7 +58,7 @@ for base_model, models in MODEL_CLASSES.items():
 
             api_wrapper = type(openapi_cfg_name, (cfg, OpenAPIModelInfoBase), dict(
                 __annotations__ = dict(
-                    type=Literal[model_type.value],
+                    model_type=Literal[model_type.value],
                 ),
             ))
 
@@ -68,7 +70,11 @@ def get_model_config_enums():
     enums = list()
 
     for model_config in MODEL_CONFIGS:
-        fields = inspect.get_annotations(model_config)
+
+        if hasattr(inspect,'get_annotations'):
+            fields = inspect.get_annotations(model_config)
+        else:
+            fields = model_config.__annotations__
         try:
             field = fields["model_format"]
         except:

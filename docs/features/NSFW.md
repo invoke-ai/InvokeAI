@@ -31,10 +31,22 @@ turned on and off on the command line using `--nsfw_checker` and
 
 At installation time, InvokeAI will ask whether the checker should be
 activated by default (neither argument given on the command line). The
-response is stored in the InvokeAI initialization file (usually
-`invokeai.init` in your home directory). You can change the default at any
-time by opening this file in a text editor and commenting or
-uncommenting the line `--nsfw_checker`.
+response is stored in the InvokeAI initialization file
+(`invokeai.yaml` in the InvokeAI root directory).  You can change the
+default at any time by opening this file in a text editor and
+changing the line `nsfw_checker:` from true to false or vice-versa:
+
+
+```
+...
+  Features:
+    esrgan: true
+    internet_available: true
+    log_tokenization: false
+    nsfw_checker: true
+    patchmatch: true
+    restore: true
+```
 
 ## Caveats
 
@@ -79,11 +91,3 @@ generates. However, it does write metadata into the PNG data area,
 including the prompt used to generate the image and relevant parameter
 settings. These fields can be examined using the `sd-metadata.py`
 script that comes with the InvokeAI package.
-
-Note that several other Stable Diffusion distributions offer
-wavelet-based "invisible" watermarking. We have experimented with the
-library used to generate these watermarks and have reached the
-conclusion that while the watermarking library may be adding
-watermarks to PNG images, the currently available version is unable to
-retrieve them successfully. If and when a functioning version of the
-library becomes available, we will offer this feature as well.

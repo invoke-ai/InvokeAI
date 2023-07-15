@@ -4,12 +4,10 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import ParamCFGScale from 'features/parameters/components/Parameters/Core/ParamCFGScale';
-import ParamHeight from 'features/parameters/components/Parameters/Core/ParamHeight';
 import ParamIterations from 'features/parameters/components/Parameters/Core/ParamIterations';
-import ParamModelandVAE from 'features/parameters/components/Parameters/Core/ParamModelandVAE';
-import ParamScheduler from 'features/parameters/components/Parameters/Core/ParamScheduler';
+import ParamModelandVAEandScheduler from 'features/parameters/components/Parameters/Core/ParamModelandVAEandScheduler';
+import ParamSize from 'features/parameters/components/Parameters/Core/ParamSize';
 import ParamSteps from 'features/parameters/components/Parameters/Core/ParamSteps';
-import ParamWidth from 'features/parameters/components/Parameters/Core/ParamWidth';
 import ImageToImageFit from 'features/parameters/components/Parameters/ImageToImage/ImageToImageFit';
 import ImageToImageStrength from 'features/parameters/components/Parameters/ImageToImage/ImageToImageStrength';
 import ParamSeedFull from 'features/parameters/components/Parameters/Seed/ParamSeedFull';
@@ -48,15 +46,14 @@ const ImageToImageTabCoreParameters = () => {
       >
         {shouldUseSliders ? (
           <>
-            <ParamModelandVAE />
-            <Box pt={2}>
-              <ParamSeedFull />
-            </Box>
             <ParamIterations />
             <ParamSteps />
             <ParamCFGScale />
-            <ParamWidth isDisabled={!shouldFitToWidthHeight} />
-            <ParamHeight isDisabled={!shouldFitToWidthHeight} />
+            <ParamModelandVAEandScheduler />
+            <Box pt={2}>
+              <ParamSeedFull />
+            </Box>
+            <ParamSize />
           </>
         ) : (
           <>
@@ -65,13 +62,11 @@ const ImageToImageTabCoreParameters = () => {
               <ParamSteps />
               <ParamCFGScale />
             </Flex>
-            <ParamModelandVAE />
-            <ParamScheduler />
+            <ParamModelandVAEandScheduler />
             <Box pt={2}>
               <ParamSeedFull />
             </Box>
-            <ParamWidth isDisabled={!shouldFitToWidthHeight} />
-            <ParamHeight isDisabled={!shouldFitToWidthHeight} />
+            <ParamSize />
           </>
         )}
         <ImageToImageStrength />
