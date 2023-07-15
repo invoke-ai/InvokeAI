@@ -8,6 +8,7 @@ import ControlNet from 'features/controlNet/components/ControlNet';
 import ParamControlNetFeatureToggle from 'features/controlNet/components/parameters/ParamControlNetFeatureToggle';
 import {
   controlNetAdded,
+  controlNetModelChanged,
   controlNetSelector,
 } from 'features/controlNet/store/controlNetSlice';
 import { getValidControlNets } from 'features/controlNet/util/getValidControlNets';
@@ -15,6 +16,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { map } from 'lodash-es';
 import { Fragment, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 import { v4 as uuidv4 } from 'uuid';
 
 const selector = createSelector(
@@ -39,10 +41,23 @@ const ParamControlNetCollapse = () => {
   const { controlNetsArray, activeLabel } = useAppSelector(selector);
   const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
   const dispatch = useAppDispatch();
+  const { firstModel } = useGetControlNetModelsQuery(undefined, {
+    selectFromResult: (result) => {
+      const firstModel = result.data?.entities[result.data?.ids[0]];
+      return {
+        firstModel,
+      };
+    },
+  });
 
   const handleClickedAddControlNet = useCallback(() => {
-    dispatch(controlNetAdded({ controlNetId: uuidv4() }));
-  }, [dispatch]);
+    if (!firstModel) {
+      return;
+    }
+    const controlNetId = uuidv4();
+    dispatch(controlNetAdded({ controlNetId }));
+    dispatch(controlNetModelChanged({ controlNetId, model: firstModel }));
+  }, [dispatch, firstModel]);
 
   if (isControlNetDisabled) {
     return null;
@@ -58,7 +73,11 @@ const ParamControlNetCollapse = () => {
             <ControlNet controlNetId={c.controlNetId} />
           </Fragment>
         ))}
-        <IAIButton flexGrow={1} onClick={handleClickedAddControlNet}>
+        <IAIButton
+          isDisabled={!firstModel}
+          flexGrow={1}
+          onClick={handleClickedAddControlNet}
+        >
           Add ControlNet
         </IAIButton>
       </Flex>
