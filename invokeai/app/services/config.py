@@ -361,7 +361,7 @@ setting environment variables INVOKEAI_<setting>.
     log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", category='Features')
     nsfw_checker        : bool = Field(default=True, description="Enable/disable the NSFW checker", category='Features')
     patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
-    restore             : bool = Field(default=True, description="Enable/disable face restoration code", category='Features')
+    restore             : bool = Field(default=True, description="Enable/disable face restoration code (DEPRECATED)", category='DEPRECATED')
 
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
     free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
