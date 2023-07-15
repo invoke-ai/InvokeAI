@@ -14,8 +14,9 @@ import {
   VaeModelConfig,
 } from 'services/api/types';
 
+import queryString from 'query-string';
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
-import { paths } from '../schema';
+import { operations, paths } from '../schema';
 
 export type DiffusersModelConfigEntity = DiffusersModelConfig & { id: string };
 export type CheckpointModelConfigEntity = CheckpointModelConfig & {
@@ -76,6 +77,11 @@ type MergeMainModelArg = {
 
 type MergeMainModelResponse =
   paths['/api/v1/models/merge/{base_model}']['put']['responses']['200']['content']['application/json'];
+
+type SearchFolderResponse =
+  paths['/api/v1/models/search']['get']['responses']['200']['content']['application/json'];
+
+type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 
 const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
@@ -331,6 +337,14 @@ export const modelsApi = api.injectEndpoints({
         );
       },
     }),
+    getModelsInFolder: build.query<SearchFolderResponse, SearchFolderArg>({
+      query: (arg) => {
+        const folderQueryStr = queryString.stringify(arg, {});
+        return {
+          url: `/models/search?${folderQueryStr}`,
+        };
+      },
+    }),
   }),
 });
 
@@ -344,4 +358,5 @@ export const {
   useDeleteMainModelsMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
+  useGetModelsInFolderQuery,
 } = modelsApi;
