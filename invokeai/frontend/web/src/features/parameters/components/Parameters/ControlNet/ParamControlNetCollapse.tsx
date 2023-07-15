@@ -2,8 +2,8 @@ import { Divider, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIButton from 'common/components/IAIButton';
 import IAICollapse from 'common/components/IAICollapse';
+import IAIIconButton from 'common/components/IAIIconButton';
 import ControlNet from 'features/controlNet/components/ControlNet';
 import ParamControlNetFeatureToggle from 'features/controlNet/components/parameters/ParamControlNetFeatureToggle';
 import {
@@ -16,6 +16,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { map } from 'lodash-es';
 import { Fragment, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FaPlus } from 'react-icons/fa';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -66,15 +67,33 @@ const ParamControlNetCollapse = () => {
   return (
     <IAICollapse label="ControlNet" activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 3 }}>
-        <ParamControlNetFeatureToggle />
-        <IAIButton
-          isDisabled={!firstModel}
-          flexGrow={1}
-          size="sm"
-          onClick={handleClickedAddControlNet}
-        >
-          Add ControlNet
-        </IAIButton>
+        <Flex gap={2} alignItems="center">
+          <Flex
+            sx={{
+              flexDirection: 'column',
+              w: '100%',
+              gap: 2,
+              px: 4,
+              py: 2,
+              borderRadius: 4,
+              bg: 'base.200',
+              _dark: {
+                bg: 'base.850',
+              },
+            }}
+          >
+            <ParamControlNetFeatureToggle />
+          </Flex>
+          <IAIIconButton
+            tooltip="Add ControlNet"
+            aria-label="Add ControlNet"
+            icon={<FaPlus />}
+            isDisabled={!firstModel}
+            flexGrow={1}
+            size="md"
+            onClick={handleClickedAddControlNet}
+          />
+        </Flex>
         {controlNetsArray.map((c, i) => (
           <Fragment key={c.controlNetId}>
             {i > 0 && <Divider />}
