@@ -629,7 +629,7 @@ def run_console_ui(
 
     # The third argument is needed in the Windows 11 environment to
     # launch a console window running this program.
-    set_min_terminal_size(MIN_COLS, MIN_LINES,'invokeai-configure')
+    set_min_terminal_size(MIN_COLS, MIN_LINES)
 
     # the install-models application spawns a subprocess to install
     # models, and will crash unless this is set before running.
