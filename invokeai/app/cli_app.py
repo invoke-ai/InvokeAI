@@ -58,6 +58,7 @@ from .services.restoration_services import RestorationServices
 from .services.sqlite import SqliteItemStorage
 
 import torch
+import invokeai.backend.util.hotfixes
 if torch.backends.mps.is_available():
     import invokeai.backend.util.mps_fixes
 

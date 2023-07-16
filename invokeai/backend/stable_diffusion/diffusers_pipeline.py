@@ -507,6 +507,40 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         control_data: List[ControlNetData] = None,
         **kwargs,
     ):
+        def _pad_conditioning(cond, target_len, encoder_attention_mask):
+            conditioning_attention_mask = torch.ones((cond.shape[0], cond.shape[1]), device=cond.device, dtype=cond.dtype)
+
+            if cond.shape[1] < max_len:
+                conditioning_attention_mask = torch.cat([
+                    conditioning_attention_mask,
+                    torch.zeros((cond.shape[0], max_len - cond.shape[1]), device=cond.device, dtype=cond.dtype),
+                ], dim=1)
+
+                cond = torch.cat([
+                    cond,
+                    torch.zeros((cond.shape[0], max_len - cond.shape[1], cond.shape[2]), device=cond.device, dtype=cond.dtype),
+                ], dim=1)
+
+            if encoder_attention_mask is None:
+                encoder_attention_mask = conditioning_attention_mask
+            else:
+                encoder_attention_mask = torch.cat([
+                    encoder_attention_mask,
+                    conditioning_attention_mask,
+                ])
+            
+            return cond, encoder_attention_mask
+
+        encoder_attention_mask = None
+        if conditioning_data.unconditioned_embeddings.shape[1] != conditioning_data.text_embeddings.shape[1]:
+            max_len = max(conditioning_data.unconditioned_embeddings.shape[1], conditioning_data.text_embeddings.shape[1])
+            conditioning_data.unconditioned_embeddings, encoder_attention_mask = _pad_conditioning(
+                conditioning_data.unconditioned_embeddings, max_len, encoder_attention_mask
+            )
+            conditioning_data.text_embeddings, encoder_attention_mask = _pad_conditioning(
+                conditioning_data.text_embeddings, max_len, encoder_attention_mask
+            )
+
         self._adjust_memory_efficient_attention(latents)
         if run_id is None:
             run_id = secrets.token_urlsafe(self.ID_LENGTH)
@@ -546,6 +580,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     total_step_count=len(timesteps),
                     additional_guidance=additional_guidance,
                     control_data=control_data,
+                    encoder_attention_mask=encoder_attention_mask,
                     **kwargs,
                 )
                 latents = step_output.prev_sample
@@ -603,6 +638,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         down_block_res_samples, mid_block_res_sample = None, None
 
         if control_data is not None:
+            # TODO: rewrite to pass with conditionings
+            encoder_attention_mask = kwargs.get("encoder_attention_mask", None)
             # control_data should be type List[ControlNetData]
             # this loop covers both ControlNet (one ControlNetData in list)
             #      and MultiControlNet (multiple ControlNetData in list)
@@ -649,6 +686,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                         encoder_hidden_states=encoder_hidden_states,
                         controlnet_cond=control_datum.image_tensor,
                         conditioning_scale=controlnet_weight, # controlnet specific, NOT the guidance scale
+                        encoder_attention_mask=encoder_attention_mask,
                         guess_mode=soft_injection, # this is still called guess_mode in diffusers ControlNetModel
                         return_dict=False,
                     )
