@@ -688,6 +688,8 @@
         "reloadSchema": "Reload Schema",
         "saveNodes": "Save Nodes",
         "loadNodes": "Load Nodes",
-        "clearNodes": "Clear Nodes"
+        "clearNodes": "Clear Nodes",
+        "closeLegend": "Close Legend",
+        "openLegend": "Open Legend"
     }
 }
