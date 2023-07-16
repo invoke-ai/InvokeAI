@@ -131,6 +131,10 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
         >
           <Flex flexDirection="column" overflowY="scroll" gap={4}>
             <IAIMantineTextInput
+              label={t('modelManager.name')}
+              {...checkpointEditForm.getInputProps('model_name')}
+            />
+            <IAIMantineTextInput
               label={t('modelManager.description')}
               {...checkpointEditForm.getInputProps('description')}
             />

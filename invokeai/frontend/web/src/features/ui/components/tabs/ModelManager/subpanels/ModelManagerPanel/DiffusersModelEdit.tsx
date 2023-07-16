@@ -55,6 +55,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
         model_name: model.model_name,
         body: values,
       };
+
       updateMainModel(responseBody)
         .unwrap()
         .then((payload) => {
@@ -108,6 +109,10 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
         )}
       >
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
+          <IAIMantineTextInput
+            label={t('modelManager.name')}
+            {...diffusersEditForm.getInputProps('model_name')}
+          />
           <IAIMantineTextInput
             label={t('modelManager.description')}
             {...diffusersEditForm.getInputProps('description')}
