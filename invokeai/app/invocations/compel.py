@@ -147,11 +147,17 @@ class CompelInvocation(BaseInvocation):
                 cross_attention_control_args=options.get(
                     "cross_attention_control", None),)
 
-        raise NotImplementedError("TODO: redo to new conditionings")
+        conditioning_data = ConditioningFieldData(
+            conditionings=[
+                BasicConditioningInfo(
+                    embeds=c,
+                    extra_conditioning=ec,
+                )
+            ]
+        )
 
         conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
-        # TODO: hacky but works ;D maybe rename latents somehow?
-        context.services.latents.save(conditioning_name, (c, ec))
+        context.services.latents.save(conditioning_name, conditioning_data)
 
         return CompelOutput(
             conditioning=ConditioningField(
