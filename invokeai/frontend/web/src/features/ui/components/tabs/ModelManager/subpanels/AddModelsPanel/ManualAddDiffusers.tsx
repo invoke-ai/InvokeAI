@@ -31,7 +31,6 @@ export default function ManualAddDiffusers() {
     },
   });
   const manualAddDiffusersFormHandler = (values: DiffusersModelConfig) => {
-    console.log(values);
     addMainModel({
       body: values,
     })
@@ -80,6 +79,7 @@ export default function ManualAddDiffusers() {
         <IAIMantineTextInput
           required
           label="Model Location"
+          placeholder="Provide the path to a local folder where your Diffusers Model is stored"
           {...manualAddDiffusersForm.getInputProps('path')}
         />
         <IAIMantineTextInput

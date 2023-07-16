@@ -96,6 +96,9 @@ type AddMainModelResponse =
 type SearchFolderResponse =
   paths['/api/v1/models/search']['get']['responses']['200']['content']['application/json'];
 
+type CheckpointConfigsResponse =
+  paths['/api/v1/models/ckpt_confs']['get']['responses']['200']['content']['application/json'];
+
 type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 
 const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
@@ -383,6 +386,13 @@ export const modelsApi = api.injectEndpoints({
         };
       },
     }),
+    getCheckpointConfigs: build.query<CheckpointConfigsResponse, void>({
+      query: () => {
+        return {
+          url: `/models/ckpt_confs`,
+        };
+      },
+    }),
   }),
 });
 
@@ -399,4 +409,5 @@ export const {
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
   useGetModelsInFolderQuery,
+  useGetCheckpointConfigsQuery,
 } = modelsApi;

@@ -13,7 +13,7 @@ export default function AddModels() {
       flexDirection="column"
       width="100%"
       overflow="scroll"
-      maxHeight={window.innerHeight - 270}
+      maxHeight={window.innerHeight - 250}
       gap={4}
     >
       <ButtonGroup isAttached>
