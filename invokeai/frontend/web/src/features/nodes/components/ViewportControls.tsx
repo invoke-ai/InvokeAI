@@ -2,15 +2,27 @@ import { ButtonGroup } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { memo, useCallback } from 'react';
-import { FaCode, FaExpand, FaMinus, FaPlus } from 'react-icons/fa';
+import {
+  FaCode,
+  FaExpand,
+  FaMinus,
+  FaPlus,
+  FaGripVertical,
+} from 'react-icons/fa';
 import { useReactFlow } from 'reactflow';
-import { shouldShowGraphOverlayChanged } from '../store/nodesSlice';
+import {
+  shouldShowGraphOverlayChanged,
+  shouldShowFieldTypeLegendChanged,
+} from '../store/nodesSlice';
 
 const ViewportControls = () => {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
   const shouldShowGraphOverlay = useAppSelector(
     (state) => state.nodes.shouldShowGraphOverlay
+  );
+  const shouldShowFieldTypeLegend = useAppSelector(
+    (state) => state.nodes.shouldShowFieldTypeLegend
   );
 
   const handleClickedZoomIn = useCallback(() => {
@@ -28,6 +40,10 @@ const ViewportControls = () => {
   const handleClickedToggleGraphOverlay = useCallback(() => {
     dispatch(shouldShowGraphOverlayChanged(!shouldShowGraphOverlay));
   }, [shouldShowGraphOverlay, dispatch]);
+
+  const handleClickedToggleFieldTypeLegend = useCallback(() => {
+    dispatch(shouldShowFieldTypeLegendChanged(!shouldShowFieldTypeLegend));
+  }, [shouldShowFieldTypeLegend, dispatch]);
 
   return (
     <ButtonGroup isAttached orientation="vertical">
@@ -51,6 +67,12 @@ const ViewportControls = () => {
         onClick={handleClickedToggleGraphOverlay}
         aria-label="Show/Hide Graph"
         icon={<FaCode />}
+      />
+      <IAIIconButton
+        isChecked={shouldShowFieldTypeLegend}
+        onClick={handleClickedToggleFieldTypeLegend}
+        aria-label="Show/Hide Field Type Legend"
+        icon={<FaGripVertical />}
       />
     </ButtonGroup>
   );
