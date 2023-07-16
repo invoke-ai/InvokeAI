@@ -527,6 +527,7 @@ class OnnxModelLoaderInvocation(BaseInvocation):
                     submodel=SubModelType.TextEncoder,
                 ),
                 loras=[],
+                skipped_layers=0,
             ),
             vae_decoder=VaeField(
                 vae=ModelInfo(
