@@ -128,6 +128,9 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
     """Loads an sdxl refiner model, outputting its submodels."""
     type: Literal["sdxl_refiner_model_loader"] = "sdxl_refiner_model_loader"
 
+    model: MainModelField = Field(description="The model to load")
+    # TODO: precision?
+
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
