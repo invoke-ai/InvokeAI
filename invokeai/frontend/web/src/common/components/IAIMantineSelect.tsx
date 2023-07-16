@@ -9,7 +9,7 @@ export type IAISelectDataType = {
   tooltip?: string;
 };
 
-type IAISelectProps = Omit<SelectProps, 'label'> & {
+export type IAISelectProps = Omit<SelectProps, 'label'> & {
   tooltip?: string;
   inputRef?: RefObject<HTMLInputElement>;
   label?: string;

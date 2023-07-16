@@ -4,7 +4,6 @@ import { makeToast } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
@@ -15,18 +14,9 @@ import {
   useUpdateMainModelsMutation,
 } from 'services/api/endpoints/models';
 import { CheckpointModelConfig } from 'services/api/types';
+import BaseModelSelect from '../shared/BaseModelSelect';
+import ModelVariantSelect from '../shared/ModelVariantSelect';
 import ModelConvert from './ModelConvert';
-
-const baseModelSelectData = [
-  { value: 'sd-1', label: MODEL_TYPE_MAP['sd-1'] },
-  { value: 'sd-2', label: MODEL_TYPE_MAP['sd-2'] },
-];
-
-const variantSelectData = [
-  { value: 'normal', label: 'Normal' },
-  { value: 'inpaint', label: 'Inpaint' },
-  { value: 'depth', label: 'Depth' },
-];
 
 type CheckpointModelEditProps = {
   model: CheckpointModelConfigEntity;
@@ -80,7 +70,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
             )
           );
         })
-        .catch((error) => {
+        .catch((_) => {
           checkpointEditForm.reset();
           dispatch(
             addToast(
@@ -132,14 +122,10 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               label={t('modelManager.description')}
               {...checkpointEditForm.getInputProps('description')}
             />
-            <IAIMantineSelect
-              label={t('modelManager.baseModel')}
-              data={baseModelSelectData}
+            <BaseModelSelect
               {...checkpointEditForm.getInputProps('base_model')}
             />
-            <IAIMantineSelect
-              label={t('modelManager.variant')}
-              data={variantSelectData}
+            <ModelVariantSelect
               {...checkpointEditForm.getInputProps('variant')}
             />
             <IAIMantineTextInput
