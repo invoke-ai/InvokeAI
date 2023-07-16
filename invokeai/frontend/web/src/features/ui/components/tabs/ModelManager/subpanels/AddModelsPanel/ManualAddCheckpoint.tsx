@@ -102,6 +102,7 @@ export default function ManualAddCheckpoint() {
         <Flex flexDirection="column" width="100%" gap={2}>
           {!useCustomConfig ? (
             <CheckpointConfigsSelect
+              required
               width="100%"
               {...manualAddCheckpointForm.getInputProps('config')}
             />
