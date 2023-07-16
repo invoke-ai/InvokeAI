@@ -650,6 +650,8 @@ class ImageToLatentsInvocation(BaseInvocation):
     tiled: bool = Field(
         default=False,
         description="Encode latents by overlaping tiles(less memory consumption)")
+    fp32: bool = Field(False, description="Decode in full precision")
+
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -676,6 +678,32 @@ class ImageToLatentsInvocation(BaseInvocation):
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
         with vae_info as vae:
+            orig_dtype = vae.dtype
+            if self.fp32:
+                vae.to(dtype=torch.float32)
+
+                use_torch_2_0_or_xformers = isinstance(
+                    vae.decoder.mid_block.attentions[0].processor,
+                    (
+                        AttnProcessor2_0,
+                        XFormersAttnProcessor,
+                        LoRAXFormersAttnProcessor,
+                        LoRAAttnProcessor2_0,
+                    ),
+                )
+                # if xformers or torch_2_0 is used attention block does not need
+                # to be in float32 which can save lots of memory
+                if use_torch_2_0_or_xformers:
+                    vae.post_quant_conv.to(orig_dtype)
+                    vae.decoder.conv_in.to(orig_dtype)
+                    vae.decoder.mid_block.to(orig_dtype)
+                #else:
+                #    latents = latents.float()
+
+            else:
+                vae.to(dtype=torch.float16)
+                #latents = latents.half()
+
             if self.tiled:
                 vae.enable_tiling()
             else:
@@ -690,6 +718,7 @@ class ImageToLatentsInvocation(BaseInvocation):
                 )  # FIXME: uses torch.randn. make reproducible!
 
             latents = 0.18215 * latents
+            latents = latents.to(dtype=orig_dtype)
 
         name = f"{context.graph_execution_state_id}__{self.id}"
         # context.services.latents.set(name, latents)
