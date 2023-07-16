@@ -132,8 +132,10 @@ and go to http://localhost:9090.
 
 ### Command-Line Installation (for developers and users familiar with Terminals)
 
-You must have Python 3.9 or 3.10 installed on your machine. Earlier or later versions are
-not supported.
+You must have Python 3.9 or 3.10 installed on your machine. Earlier or
+later versions are not supported.
+Node.js also needs to be installed along with yarn (can be installed with
+the command `npm install -g yarn` if needed)
 
 1. Open a command-line window on your machine. The PowerShell is recommended for Windows.
 2. Create a directory to install InvokeAI into. You'll need at least 15 GB of free space:
@@ -197,11 +199,18 @@ not supported.
 7. Launch the web server (do it every time you run InvokeAI):
 
     ```terminal
-    invokeai --web
+    invokeai-web
     ```
 
-8. Point your browser to http://localhost:9090 to bring up the web interface.
-9. Type `banana sushi` in the box on the top left and click `Invoke`.
+8. Build Node.js assets
+
+  ```terminal
+  cd invokeai/frontend/web/
+  yarn vite build
+  ```
+
+9. Point your browser to http://localhost:9090 to bring up the web interface.
+10. Type `banana sushi` in the box on the top left and click `Invoke`.
 
 Be sure to activate the virtual environment each time before re-launching InvokeAI,
 using `source .venv/bin/activate` or `.venv\Scripts\activate`.
