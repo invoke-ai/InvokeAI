@@ -46,7 +46,6 @@ class ModelLoaderOutput(BaseInvocationOutput):
 
     unet: UNetField = Field(default=None, description="UNet submodel")
     clip: ClipField = Field(default=None, description="Tokenizer and text_encoder submodels")
-    clip2: ClipField = Field(default=None, description="Tokenizer and text_encoder submodels (SDXL only)")
     vae: VaeField = Field(default=None, description="Vae submodel")
     # fmt: on
 
