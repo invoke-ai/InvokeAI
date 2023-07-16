@@ -86,6 +86,13 @@ type ImportMainModelArg = {
 type ImportMainModelResponse =
   paths['/api/v1/models/import']['post']['responses']['201']['content']['application/json'];
 
+type AddMainModelArg = {
+  body: MainModelConfig;
+};
+
+type AddMainModelResponse =
+  paths['/api/v1/models/add']['post']['responses']['201']['content']['application/json'];
+
 type SearchFolderResponse =
   paths['/api/v1/models/search']['get']['responses']['200']['content']['application/json'];
 
@@ -183,6 +190,16 @@ export const modelsApi = api.injectEndpoints({
       query: ({ body }) => {
         return {
           url: `models/import`,
+          method: 'POST',
+          body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+    }),
+    addMainModels: build.mutation<AddMainModelResponse, AddMainModelArg>({
+      query: ({ body }) => {
+        return {
+          url: `models/add`,
           method: 'POST',
           body: body,
         };
@@ -378,6 +395,7 @@ export const {
   useUpdateMainModelsMutation,
   useDeleteMainModelsMutation,
   useImportMainModelsMutation,
+  useAddMainModelsMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
   useGetModelsInFolderQuery,

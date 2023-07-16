@@ -2,6 +2,7 @@ import { ButtonGroup, Flex } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
 import { useState } from 'react';
 import AutoAddModels from './AutoAddModels';
+import ManualAddModels from './ManualAddModels';
 
 export default function AddModels() {
   const [addModelMode, setAddModelMode] = useState<'simple' | 'advanced'>(
@@ -40,7 +41,7 @@ export default function AddModels() {
         }}
       >
         {addModelMode === 'simple' && <AutoAddModels />}
-        {addModelMode === 'advanced' && null}
+        {addModelMode === 'advanced' && <ManualAddModels />}
       </Flex>
     </Flex>
   );
