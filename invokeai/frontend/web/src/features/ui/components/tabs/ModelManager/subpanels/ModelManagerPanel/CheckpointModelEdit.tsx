@@ -4,17 +4,20 @@ import { makeToast } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CheckpointModelConfigEntity,
+  useGetCheckpointConfigsQuery,
   useUpdateMainModelsMutation,
 } from 'services/api/endpoints/models';
 import { CheckpointModelConfig } from 'services/api/types';
 import BaseModelSelect from '../shared/BaseModelSelect';
+import CheckpointConfigsSelect from '../shared/CheckpointConfigsSelect';
 import ModelVariantSelect from '../shared/ModelVariantSelect';
 import ModelConvert from './ModelConvert';
 
@@ -28,6 +31,15 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
   const { model } = props;
 
   const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
+  const { data: availableCheckpointConfigs } = useGetCheckpointConfigsQuery();
+
+  const [useCustomConfig, setUseCustomConfig] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!availableCheckpointConfigs?.includes(model.config)) {
+      setUseCustomConfig(true);
+    }
+  }, [availableCheckpointConfigs, model.config]);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -123,12 +135,15 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               {...checkpointEditForm.getInputProps('description')}
             />
             <BaseModelSelect
+              required
               {...checkpointEditForm.getInputProps('base_model')}
             />
             <ModelVariantSelect
+              required
               {...checkpointEditForm.getInputProps('variant')}
             />
             <IAIMantineTextInput
+              required
               label={t('modelManager.modelLocation')}
               {...checkpointEditForm.getInputProps('path')}
             />
@@ -136,10 +151,27 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
               label={t('modelManager.vaeLocation')}
               {...checkpointEditForm.getInputProps('vae')}
             />
-            <IAIMantineTextInput
-              label={t('modelManager.config')}
-              {...checkpointEditForm.getInputProps('config')}
-            />
+
+            <Flex flexDirection="column" gap={2}>
+              {!useCustomConfig ? (
+                <CheckpointConfigsSelect
+                  required
+                  {...checkpointEditForm.getInputProps('config')}
+                />
+              ) : (
+                <IAIMantineTextInput
+                  required
+                  label={t('modelManager.config')}
+                  {...checkpointEditForm.getInputProps('config')}
+                />
+              )}
+              <IAISimpleCheckbox
+                isChecked={useCustomConfig}
+                onChange={() => setUseCustomConfig(!useCustomConfig)}
+                label="Use Custom Config"
+              />
+            </Flex>
+
             <IAIButton
               type="submit"
               isDisabled={isBusy || isLoading}

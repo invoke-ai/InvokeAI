@@ -112,9 +112,16 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
             label={t('modelManager.description')}
             {...diffusersEditForm.getInputProps('description')}
           />
-          <BaseModelSelect {...diffusersEditForm.getInputProps('base_model')} />
-          <ModelVariantSelect {...diffusersEditForm.getInputProps('variant')} />
+          <BaseModelSelect
+            required
+            {...diffusersEditForm.getInputProps('base_model')}
+          />
+          <ModelVariantSelect
+            required
+            {...diffusersEditForm.getInputProps('variant')}
+          />
           <IAIMantineTextInput
+            required
             label={t('modelManager.modelLocation')}
             {...diffusersEditForm.getInputProps('path')}
           />
