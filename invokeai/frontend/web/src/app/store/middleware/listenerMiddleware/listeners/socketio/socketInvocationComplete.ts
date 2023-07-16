@@ -1,7 +1,9 @@
 import { log } from 'app/logging/useLogger';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
+import { IMAGE_CATEGORIES } from 'features/gallery/store/gallerySlice';
 import { progressImageSet } from 'features/system/store/systemSlice';
 import { boardImagesApi } from 'services/api/endpoints/boardImages';
+import { imagesAdapter, imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
 import { imageDTOReceived } from 'services/api/thunks/image';
 import { sessionCanceled } from 'services/api/thunks/session';
@@ -59,11 +61,29 @@ export const addInvocationCompleteEventListener = () => {
           dispatch(addImageToStagingArea(imageDTO));
         }
 
-        if (boardIdToAddTo && !imageDTO.is_intermediate) {
+        if (!imageDTO.is_intermediate) {
+          // add image to the board
+          if (
+            boardIdToAddTo &&
+            !['all', 'none', 'batch'].includes(boardIdToAddTo)
+          ) {
+            dispatch(
+              boardImagesApi.endpoints.addImageToBoard.initiate({
+                board_id: boardIdToAddTo,
+                image_name,
+              })
+            );
+          }
+
+          // update the cache
+          const queryArg = {
+            categories: IMAGE_CATEGORIES,
+          };
+
           dispatch(
-            boardImagesApi.endpoints.addImageToBoard.initiate({
-              board_id: boardIdToAddTo,
-              image_name,
+            imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
+              imagesAdapter.addOne(draft, imageDTO);
+              draft.total = draft.total + 1;
             })
           );
         }

@@ -14,7 +14,7 @@ const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
   const droppableData: MoveBoardDropData = {
     id: 'all-images-board',
     actionType: 'MOVE_BOARD',
-    context: { boardId: null },
+    context: { boardId: 'all' },
   };
 
   return (

@@ -11,6 +11,7 @@ import {
   useDraggable as useOriginalDraggable,
   useDroppable as useOriginalDroppable,
 } from '@dnd-kit/core';
+import { BoardId } from 'features/gallery/store/gallerySlice';
 import { ImageDTO } from 'services/api/types';
 
 type BaseDropData = {
@@ -55,7 +56,7 @@ export type AddToBatchDropData = BaseDropData & {
 
 export type MoveBoardDropData = BaseDropData & {
   actionType: 'MOVE_BOARD';
-  context: { boardId: string | null };
+  context: { boardId: BoardId };
 };
 
 export type TypesafeDroppableData =

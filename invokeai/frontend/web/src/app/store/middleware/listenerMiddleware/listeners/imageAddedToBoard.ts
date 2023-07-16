@@ -10,6 +10,8 @@ export const addImageAddedToBoardFulfilledListener = () => {
     effect: (action, { getState, dispatch }) => {
       const { board_id, image_name } = action.meta.arg.originalArgs;
 
+      // TODO: update listImages cache for this board
+
       moduleLog.debug(
         { data: { board_id, image_name } },
         'Image added to board'

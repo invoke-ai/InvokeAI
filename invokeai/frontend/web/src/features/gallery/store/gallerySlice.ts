@@ -71,30 +71,34 @@ export const gallerySlice = createSlice({
   initialState: initialGalleryState,
   reducers: {
     imageUpserted: (state, action: PayloadAction<ImageDTO>) => {
-      imagesAdapter.upsertOne(state, action.payload);
-      if (
-        state.shouldAutoSwitch &&
-        action.payload.image_category === 'general'
-      ) {
-        state.selection = [action.payload.image_name];
-        state.galleryView = 'images';
-        state.selectedBoardId = 'all';
-      }
+      // TODO: port all instances of this to use RTK Query cache
+      // imagesAdapter.upsertOne(state, action.payload);
+      // if (
+      //   state.shouldAutoSwitch &&
+      //   action.payload.image_category === 'general'
+      // ) {
+      //   state.selection = [action.payload.image_name];
+      //   state.galleryView = 'images';
+      //   state.selectedBoardId = 'all';
+      // }
     },
     imageUpdatedOne: (state, action: PayloadAction<Update<ImageDTO>>) => {
-      imagesAdapter.updateOne(state, action.payload);
+      // TODO: port all instances of this to use RTK Query cache
+      // imagesAdapter.updateOne(state, action.payload);
     },
     imageRemoved: (state, action: PayloadAction<string>) => {
-      imagesAdapter.removeOne(state, action.payload);
-      state.batchImageNames = state.batchImageNames.filter(
-        (name) => name !== action.payload
-      );
+      // TODO: port all instances of this to use RTK Query cache
+      // imagesAdapter.removeOne(state, action.payload);
+      // state.batchImageNames = state.batchImageNames.filter(
+      //   (name) => name !== action.payload
+      // );
     },
     imagesRemoved: (state, action: PayloadAction<string[]>) => {
-      imagesAdapter.removeMany(state, action.payload);
-      state.batchImageNames = state.batchImageNames.filter(
-        (name) => !action.payload.includes(name)
-      );
+      // TODO: port all instances of this to use RTK Query cache
+      // imagesAdapter.removeMany(state, action.payload);
+      // state.batchImageNames = state.batchImageNames.filter(
+      //   (name) => !action.payload.includes(name)
+      // );
     },
     imageRangeEndSelected: (state, action: PayloadAction<string>) => {
       const rangeEndImageName = action.payload;
@@ -182,42 +186,42 @@ export const gallerySlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(receivedPageOfImages.pending, (state) => {
-      state.isFetching = true;
-    });
-    builder.addCase(receivedPageOfImages.rejected, (state) => {
-      state.isFetching = false;
-    });
-    builder.addCase(receivedPageOfImages.fulfilled, (state, action) => {
-      state.isFetching = false;
-      const { board_id, categories, image_origin, is_intermediate } =
-        action.meta.arg;
+    // builder.addCase(receivedPageOfImages.pending, (state) => {
+    //   state.isFetching = true;
+    // });
+    // builder.addCase(receivedPageOfImages.rejected, (state) => {
+    //   state.isFetching = false;
+    // });
+    // builder.addCase(receivedPageOfImages.fulfilled, (state, action) => {
+    //   state.isFetching = false;
+    //   const { board_id, categories, image_origin, is_intermediate } =
+    //     action.meta.arg;
 
-      const { items, offset, limit, total } = action.payload;
+    //   const { items, offset, limit, total } = action.payload;
 
-      imagesAdapter.upsertMany(state, items);
+    //   imagesAdapter.upsertMany(state, items);
 
-      if (state.selection.length === 0 && items.length) {
-        state.selection = [items[0].image_name];
-      }
+    //   if (state.selection.length === 0 && items.length) {
+    //     state.selection = [items[0].image_name];
+    //   }
 
-      if (!categories?.includes('general') || board_id) {
-        // need to skip updating the total images count if the images recieved were for a specific board
-        // TODO: this doesn't work when on the Asset tab/category...
-        return;
-      }
+    //   if (!categories?.includes('general') || board_id) {
+    //     // need to skip updating the total images count if the images recieved were for a specific board
+    //     // TODO: this doesn't work when on the Asset tab/category...
+    //     return;
+    //   }
 
-      state.offset = offset;
-      state.total = total;
-    });
-    builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-      const { image_name, image_url, thumbnail_url } = action.payload;
+    //   state.offset = offset;
+    //   state.total = total;
+    // });
+    // builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
+    //   const { image_name, image_url, thumbnail_url } = action.payload;
 
-      imagesAdapter.updateOne(state, {
-        id: image_name,
-        changes: { image_url, thumbnail_url },
-      });
-    });
+    //   imagesAdapter.updateOne(state, {
+    //     id: image_name,
+    //     changes: { image_url, thumbnail_url },
+    //   });
+    // });
     builder.addMatcher(
       boardsApi.endpoints.deleteBoard.matchFulfilled,
       (state, action) => {
