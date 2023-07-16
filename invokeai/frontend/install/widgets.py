@@ -28,17 +28,7 @@ def set_terminal_size(columns: int, lines: int, launch_command: str=None):
 
     OS = platform.uname().system
     if OS == "Windows":
-        # The new Windows Terminal doesn't resize, so we relaunch in a CMD window.
-        # Would prefer to use execvpe() here, but somehow it is not working properly
-        # in the Windows 10 environment.
-        if 'IA_RELAUNCHED' not in os.environ:
-            args=['conhost']
-            args.extend([launch_command] if launch_command else [sys.argv[0]])
-            args.extend(sys.argv[1:])
-            os.environ['IA_RELAUNCHED'] = 'True'
-            os.execvp('conhost',args)
-        else:
-            _set_terminal_size_powershell(width,height)
+        _set_terminal_size_powershell(width,height)
     elif OS in ["Darwin", "Linux"]:
         _set_terminal_size_unix(width,height)
 

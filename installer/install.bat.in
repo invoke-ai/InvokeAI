@@ -38,7 +38,7 @@ echo    https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist
 echo.
 echo See %INSTRUCTIONS% for more details.
 echo.
-echo "For the best user experience we suggest enlarging or maximizing this window now."
+echo FOR THE BEST USER EXPERIENCE WE SUGGEST MAXIMIZING THIS WINDOW NOW.
 pause
 
 @rem ---------------------------- check Python version ---------------
