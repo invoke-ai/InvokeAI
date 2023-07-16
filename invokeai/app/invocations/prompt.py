@@ -75,7 +75,7 @@ class PromptsFromFileInvocation(BaseInvocation):
     @validator("file_path")
     def file_path_exists(cls, v):
         if not exists(v):
-            raise ValueError("file path not found")
+            raise ValueError(FileNotFoundError)
         return v
 
     def promptsFromFile(self, file_path: str, pre_prompt: str, post_prompt: str, start_line: int, max_prompts: int):
