@@ -221,7 +221,7 @@ class ControlNetData:
     control_mode: str = Field(default="balanced")
 
 
-@dataclass(frozen=True)
+@dataclass
 class ConditioningData:
     unconditioned_embeddings: torch.Tensor
     text_embeddings: torch.Tensor
