@@ -120,11 +120,11 @@ async def import_model(
     Add a model using its local path, repo_id, or remote URL. Model characteristics will be probed and configured automatically.
     This call launches a background thread to process the imported model and always succeeds. Results are reported in the background
     as the following events:
-    - model_import_started(import_path)
-    - model_import_completed(import_path, AddModelResults)
-    - download_started(url)
-    - download_progress(url,downloaded_bytes,total_bytes)
-    - download_completed(url,status_code,download_path)
+    - model_import_started(import_path:str)
+    - model_import_completed(import_path:str, import_info:AddModelResults, success:bool, error:str)
+    - download_started(url:str)
+    - download_progress(url:str, downloaded_bytes:int, total_bytes:int)
+    - download_completed(url:str, status_code:int, download_path:str)
     """
     
     items_to_import = {location}
