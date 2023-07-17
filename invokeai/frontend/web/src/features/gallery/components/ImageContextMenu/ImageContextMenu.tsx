@@ -11,7 +11,7 @@ import SingleSelectionMenuItems from './SingleSelectionMenuItems';
 import { MotionProps } from 'framer-motion';
 
 type Props = {
-  imageDTO: ImageDTO;
+  imageDTO: ImageDTO | undefined;
   children: ContextMenuProps<HTMLDivElement>['children'];
 };
 
@@ -64,20 +64,25 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
   return (
     <ContextMenu<HTMLDivElement>
       menuProps={{ size: 'sm', isLazy: true }}
-      menuButtonProps={{ bg: 'transparent', _hover: { bg: 'transparent' } }}
-      renderMenu={() => (
-        <MenuList
-          sx={{ visibility: 'visible !important' }}
-          motionProps={motionProps}
-          onContextMenu={handleContextMenu}
-        >
-          {selectionCount === 1 ? (
-            <SingleSelectionMenuItems imageDTO={imageDTO} />
-          ) : (
-            <MultipleSelectionMenuItems />
-          )}
-        </MenuList>
-      )}
+      menuButtonProps={{
+        bg: 'transparent',
+        _hover: { bg: 'transparent' },
+      }}
+      renderMenu={() =>
+        imageDTO ? (
+          <MenuList
+            sx={{ visibility: 'visible !important' }}
+            motionProps={motionProps}
+            onContextMenu={handleContextMenu}
+          >
+            {selectionCount === 1 ? (
+              <SingleSelectionMenuItems imageDTO={imageDTO} />
+            ) : (
+              <MultipleSelectionMenuItems />
+            )}
+          </MenuList>
+        ) : null
+      }
     >
       {children}
     </ContextMenu>

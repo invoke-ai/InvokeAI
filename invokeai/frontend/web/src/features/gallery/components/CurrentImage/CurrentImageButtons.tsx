@@ -20,6 +20,7 @@ import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/U
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
   setActiveTab,
@@ -120,6 +121,9 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
+  const { isClipboardAPIAvailable, copyImageToClipboard } =
+    useCopyImageToClipboard();
+
   const { recallBothPrompts, recallSeed, recallAllParameters } =
     useRecallParameters();
 
@@ -128,7 +132,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     500
   );
 
-  const { currentData: image, isFetching } = useGetImageDTOQuery(
+  const { currentData: imageDTO, isFetching } = useGetImageDTOQuery(
     lastSelectedImage ?? skipToken
   );
 
@@ -142,15 +146,15 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
   const handleCopyImageLink = useCallback(() => {
     const getImageUrl = () => {
-      if (!image) {
+      if (!imageDTO) {
         return;
       }
 
-      if (image.image_url.startsWith('http')) {
-        return image.image_url;
+      if (imageDTO.image_url.startsWith('http')) {
+        return imageDTO.image_url;
       }
 
-      return window.location.toString() + image.image_url;
+      return window.location.toString() + imageDTO.image_url;
     };
 
     const url = getImageUrl();
@@ -174,7 +178,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         isClosable: true,
       });
     });
-  }, [toaster, t, image]);
+  }, [toaster, t, imageDTO]);
 
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);
@@ -192,31 +196,31 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     recallSeed(metadata?.seed);
   }, [metadata?.seed, recallSeed]);
 
-  useHotkeys('s', handleUseSeed, [image]);
+  useHotkeys('s', handleUseSeed, [imageDTO]);
 
   const handleUsePrompt = useCallback(() => {
     recallBothPrompts(metadata?.positive_prompt, metadata?.negative_prompt);
   }, [metadata?.negative_prompt, metadata?.positive_prompt, recallBothPrompts]);
 
-  useHotkeys('p', handleUsePrompt, [image]);
+  useHotkeys('p', handleUsePrompt, [imageDTO]);
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
-    dispatch(initialImageSelected(image));
-  }, [dispatch, image]);
+    dispatch(initialImageSelected(imageDTO));
+  }, [dispatch, imageDTO]);
 
-  useHotkeys('shift+i', handleSendToImageToImage, [image]);
+  useHotkeys('shift+i', handleSendToImageToImage, [imageDTO]);
 
   const handleClickUpscale = useCallback(() => {
     // selectedImage && dispatch(runESRGAN(selectedImage));
   }, []);
 
   const handleDelete = useCallback(() => {
-    if (!image) {
+    if (!imageDTO) {
       return;
     }
-    dispatch(imageToDeleteSelected(image));
-  }, [dispatch, image]);
+    dispatch(imageToDeleteSelected(imageDTO));
+  }, [dispatch, imageDTO]);
 
   useHotkeys(
     'Shift+U',
@@ -236,7 +240,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     },
     [
       isUpscalingEnabled,
-      image,
+      imageDTO,
       isESRGANAvailable,
       shouldDisableToolbarButtons,
       isConnected,
@@ -268,7 +272,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
     [
       isFaceRestoreEnabled,
-      image,
+      imageDTO,
       isGFPGANAvailable,
       shouldDisableToolbarButtons,
       isConnected,
@@ -283,10 +287,10 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   );
 
   const handleSendToCanvas = useCallback(() => {
-    if (!image) return;
+    if (!imageDTO) return;
     dispatch(sentImageToCanvas());
 
-    dispatch(setInitialCanvasImage(image));
+    dispatch(setInitialCanvasImage(imageDTO));
     dispatch(requestCanvasRescale());
 
     if (activeTabName !== 'unifiedCanvas') {
@@ -299,12 +303,12 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       duration: 2500,
       isClosable: true,
     });
-  }, [image, dispatch, activeTabName, toaster, t]);
+  }, [imageDTO, dispatch, activeTabName, toaster, t]);
 
   useHotkeys(
     'i',
     () => {
-      if (image) {
+      if (imageDTO) {
         handleClickShowImageDetails();
       } else {
         toaster({
@@ -315,12 +319,19 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         });
       }
     },
-    [image, shouldShowImageDetails, toaster]
+    [imageDTO, shouldShowImageDetails, toaster]
   );
 
   const handleClickProgressImagesToggle = useCallback(() => {
     dispatch(setShouldShowProgressInViewer(!shouldShowProgressInViewer));
   }, [dispatch, shouldShowProgressInViewer]);
+
+  const handleCopyImage = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
+    copyImageToClipboard(imageDTO.image_url);
+  }, [copyImageToClipboard, imageDTO]);
 
   return (
     <>
@@ -339,7 +350,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
               <IAIIconButton
                 aria-label={`${t('parameters.sendTo')}...`}
                 tooltip={`${t('parameters.sendTo')}...`}
-                isDisabled={!image}
+                isDisabled={!imageDTO}
                 icon={<FaShareAlt />}
               />
             }
@@ -369,13 +380,15 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 </IAIButton>
               )}
 
-              {/* <IAIButton
-                size="sm"
-                onClick={handleCopyImage}
-                leftIcon={<FaCopy />}
-              >
-                {t('parameters.copyImage')}
-              </IAIButton> */}
+              {isClipboardAPIAvailable && (
+                <IAIButton
+                  size="sm"
+                  onClick={handleCopyImage}
+                  leftIcon={<FaCopy />}
+                >
+                  {t('parameters.copyImage')}
+                </IAIButton>
+              )}
               <IAIButton
                 size="sm"
                 onClick={handleCopyImageLink}
@@ -384,7 +397,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                 {t('parameters.copyImageToLink')}
               </IAIButton>
 
-              <Link download={true} href={image?.image_url} target="_blank">
+              <Link download={true} href={imageDTO?.image_url} target="_blank">
                 <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
                   {t('parameters.downloadImage')}
                 </IAIButton>
@@ -443,7 +456,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                   <IAIButton
                     isDisabled={
                       !isGFPGANAvailable ||
-                      !image ||
+                      !imageDTO ||
                       !(isConnected && !isProcessing) ||
                       !facetoolStrength
                     }
@@ -474,7 +487,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
                   <IAIButton
                     isDisabled={
                       !isESRGANAvailable ||
-                      !image ||
+                      !imageDTO ||
                       !(isConnected && !isProcessing) ||
                       !upscalingLevel
                     }

@@ -14,10 +14,11 @@ import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletio
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaFolder, FaShare, FaTrash } from 'react-icons/fa';
+import { FaCopy, FaFolder, FaShare, FaTrash } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
 import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
@@ -60,6 +61,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { onClickAddToBoard } = useContext(AddImageToBoardContext);
 
   const { currentData } = useGetImageMetadataQuery(imageDTO.image_name);
+
+  const { isClipboardAPIAvailable, copyImageToClipboard } =
+    useCopyImageToClipboard();
 
   const metadata = currentData?.metadata;
 
@@ -130,11 +134,20 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     dispatch(imagesAddedToBatch([imageDTO.image_name]));
   }, [dispatch, imageDTO.image_name]);
 
+  const handleCopyImage = useCallback(() => {
+    copyImageToClipboard(imageDTO.image_url);
+  }, [copyImageToClipboard, imageDTO.image_url]);
+
   return (
     <>
       <MenuItem icon={<ExternalLinkIcon />} onClickCapture={handleOpenInNewTab}>
         {t('common.openInNewTab')}
       </MenuItem>
+      {isClipboardAPIAvailable && (
+        <MenuItem icon={<FaCopy />} onClickCapture={handleCopyImage}>
+          {t('parameters.copyImage')}
+        </MenuItem>
+      )}
       <MenuItem
         icon={<IoArrowUndoCircleOutline />}
         onClickCapture={handleRecallPrompt}
