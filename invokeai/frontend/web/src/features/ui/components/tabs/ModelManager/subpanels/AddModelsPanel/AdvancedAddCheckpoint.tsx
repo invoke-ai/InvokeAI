@@ -10,20 +10,28 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAddMainModelsMutation } from 'services/api/endpoints/models';
 import { CheckpointModelConfig } from 'services/api/types';
+import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
 import BaseModelSelect from '../shared/BaseModelSelect';
 import CheckpointConfigsSelect from '../shared/CheckpointConfigsSelect';
 import ModelVariantSelect from '../shared/ModelVariantSelect';
 
-export default function AdvancedAddCheckpoint() {
+type AdvancedAddCheckpointProps = {
+  model_path?: string;
+};
+
+export default function AdvancedAddCheckpoint(
+  props: AdvancedAddCheckpointProps
+) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const { model_path } = props;
 
   const advancedAddCheckpointForm = useForm<CheckpointModelConfig>({
     initialValues: {
-      model_name: '',
+      model_name: model_path ? model_path.split('\\').splice(-1)[0] : '',
       base_model: 'sd-1',
       model_type: 'main',
-      path: '',
+      path: model_path ? model_path : '',
       description: '',
       model_format: 'checkpoint',
       error: undefined,
@@ -52,6 +60,11 @@ export default function AdvancedAddCheckpoint() {
           )
         );
         advancedAddCheckpointForm.reset();
+
+        // Close Advanced Panel in Scan Models tab
+        if (model_path) {
+          dispatch(setAdvancedAddScanModel(null));
+        }
       })
       .catch((error) => {
         if (error) {

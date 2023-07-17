@@ -11,6 +11,7 @@ import {
   useGetModelsInFolderQuery,
   useImportMainModelsMutation,
 } from 'services/api/endpoints/models';
+import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
 
 export default function FoundModelsList() {
   const searchFolder = useAppSelector(
@@ -137,7 +138,12 @@ export default function FoundModelsList() {
               >
                 Quick Add
               </IAIButton>
-              <IAIButton>Advanced</IAIButton>
+              <IAIButton
+                onClick={() => dispatch(setAdvancedAddScanModel(model))}
+                isLoading={isLoading}
+              >
+                Advanced
+              </IAIButton>
             </Flex>
           </Flex>
         ))}
