@@ -157,13 +157,13 @@ class InpaintInvocation(BaseInvocation):
         def _lora_loader():
             for lora in self.unet.loras:
                 lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"}))
+                    **lora.dict(exclude={"weight"}), context=context,)
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
         
-        unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
-        vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
+        unet_info = context.services.model_manager.get_model(**self.unet.unet.dict(), context=context,)
+        vae_info = context.services.model_manager.get_model(**self.vae.vae.dict(), context=context,)
 
         with vae_info as vae,\
                 ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),\

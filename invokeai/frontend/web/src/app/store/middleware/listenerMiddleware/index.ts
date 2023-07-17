@@ -88,6 +88,8 @@ import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
+import { addModelLoadStartedEventListener } from './listeners/socketio/socketModelLoadStarted';
+import { addModelLoadCompletedEventListener } from './listeners/socketio/socketModelLoadCompleted';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -177,6 +179,8 @@ addSocketConnectedListener();
 addSocketDisconnectedListener();
 addSocketSubscribedListener();
 addSocketUnsubscribedListener();
+addModelLoadStartedEventListener();
+addModelLoadCompletedEventListener();
 
 // Session Created
 addSessionCreatedPendingListener();
