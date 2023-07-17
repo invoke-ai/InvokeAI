@@ -385,6 +385,21 @@ export const modelsApi = api.injectEndpoints({
           url: `/models/search?${folderQueryStr}`,
         };
       },
+      providesTags: (result, error, arg) => {
+        const tags: ApiFullTagDescription[] = [
+          { type: 'ScannedModels', id: LIST_TAG },
+        ];
+
+        if (result) {
+          tags.push(
+            ...result.map((id) => ({
+              type: 'ScannedModels' as const,
+              id,
+            }))
+          );
+        }
+        return tags;
+      },
     }),
     getCheckpointConfigs: build.query<CheckpointConfigsResponse, void>({
       query: () => {
