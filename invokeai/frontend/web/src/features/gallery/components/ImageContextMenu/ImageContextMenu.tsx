@@ -6,38 +6,13 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { ImageDTO } from 'services/api/types';
+import { menuListMotionProps } from 'theme/components/menu';
 import MultipleSelectionMenuItems from './MultipleSelectionMenuItems';
 import SingleSelectionMenuItems from './SingleSelectionMenuItems';
-import { MotionProps } from 'framer-motion';
 
 type Props = {
   imageDTO: ImageDTO | undefined;
   children: ContextMenuProps<HTMLDivElement>['children'];
-};
-
-const motionProps: MotionProps = {
-  variants: {
-    enter: {
-      visibility: 'visible',
-      opacity: 1,
-      scale: 1,
-      transition: {
-        duration: 0.07,
-        ease: [0.4, 0, 0.2, 1],
-      },
-    },
-    exit: {
-      transitionEnd: {
-        visibility: 'hidden',
-      },
-      opacity: 0,
-      scale: 0.8,
-      transition: {
-        duration: 0.07,
-        easings: 'easeOut',
-      },
-    },
-  },
 };
 
 const ImageContextMenu = ({ imageDTO, children }: Props) => {
@@ -72,7 +47,7 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
         imageDTO ? (
           <MenuList
             sx={{ visibility: 'visible !important' }}
-            motionProps={motionProps}
+            motionProps={menuListMotionProps}
             onContextMenu={handleContextMenu}
           >
             {selectionCount === 1 ? (
