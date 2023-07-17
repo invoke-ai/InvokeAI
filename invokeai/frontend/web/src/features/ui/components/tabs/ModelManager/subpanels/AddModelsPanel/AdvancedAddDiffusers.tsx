@@ -11,13 +11,13 @@ import { DiffusersModelConfig } from 'services/api/types';
 import BaseModelSelect from '../shared/BaseModelSelect';
 import ModelVariantSelect from '../shared/ModelVariantSelect';
 
-export default function ManualAddDiffusers() {
+export default function AdvancedAddDiffusers() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const [addMainModel] = useAddMainModelsMutation();
 
-  const manualAddDiffusersForm = useForm<DiffusersModelConfig>({
+  const advancedAddDiffusersForm = useForm<DiffusersModelConfig>({
     initialValues: {
       model_name: '',
       base_model: 'sd-1',
@@ -30,7 +30,7 @@ export default function ManualAddDiffusers() {
       variant: 'normal',
     },
   });
-  const manualAddDiffusersFormHandler = (values: DiffusersModelConfig) => {
+  const advancedAddDiffusersFormHandler = (values: DiffusersModelConfig) => {
     addMainModel({
       body: values,
     })
@@ -44,7 +44,7 @@ export default function ManualAddDiffusers() {
             })
           )
         );
-        manualAddDiffusersForm.reset();
+        advancedAddDiffusersForm.reset();
       })
       .catch((error) => {
         if (error) {
@@ -62,8 +62,8 @@ export default function ManualAddDiffusers() {
 
   return (
     <form
-      onSubmit={manualAddDiffusersForm.onSubmit((v) =>
-        manualAddDiffusersFormHandler(v)
+      onSubmit={advancedAddDiffusersForm.onSubmit((v) =>
+        advancedAddDiffusersFormHandler(v)
       )}
       style={{ width: '100%' }}
     >
@@ -71,27 +71,27 @@ export default function ManualAddDiffusers() {
         <IAIMantineTextInput
           required
           label="Model Name"
-          {...manualAddDiffusersForm.getInputProps('model_name')}
+          {...advancedAddDiffusersForm.getInputProps('model_name')}
         />
         <BaseModelSelect
-          {...manualAddDiffusersForm.getInputProps('base_model')}
+          {...advancedAddDiffusersForm.getInputProps('base_model')}
         />
         <IAIMantineTextInput
           required
           label="Model Location"
           placeholder="Provide the path to a local folder where your Diffusers Model is stored"
-          {...manualAddDiffusersForm.getInputProps('path')}
+          {...advancedAddDiffusersForm.getInputProps('path')}
         />
         <IAIMantineTextInput
           label="Description"
-          {...manualAddDiffusersForm.getInputProps('description')}
+          {...advancedAddDiffusersForm.getInputProps('description')}
         />
         <IAIMantineTextInput
           label="VAE Location"
-          {...manualAddDiffusersForm.getInputProps('vae')}
+          {...advancedAddDiffusersForm.getInputProps('vae')}
         />
         <ModelVariantSelect
-          {...manualAddDiffusersForm.getInputProps('variant')}
+          {...advancedAddDiffusersForm.getInputProps('variant')}
         />
         <IAIButton mt={2} type="submit">
           {t('modelManager.addModel')}

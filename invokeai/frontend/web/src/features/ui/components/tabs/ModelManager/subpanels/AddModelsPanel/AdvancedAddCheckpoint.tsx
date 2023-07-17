@@ -14,11 +14,11 @@ import BaseModelSelect from '../shared/BaseModelSelect';
 import CheckpointConfigsSelect from '../shared/CheckpointConfigsSelect';
 import ModelVariantSelect from '../shared/ModelVariantSelect';
 
-export default function ManualAddCheckpoint() {
+export default function AdvancedAddCheckpoint() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const manualAddCheckpointForm = useForm<CheckpointModelConfig>({
+  const advancedAddCheckpointForm = useForm<CheckpointModelConfig>({
     initialValues: {
       model_name: '',
       base_model: 'sd-1',
@@ -37,7 +37,7 @@ export default function ManualAddCheckpoint() {
 
   const [useCustomConfig, setUseCustomConfig] = useState<boolean>(false);
 
-  const manualAddCheckpointFormHandler = (values: CheckpointModelConfig) => {
+  const advancedAddCheckpointFormHandler = (values: CheckpointModelConfig) => {
     addMainModel({
       body: values,
     })
@@ -51,7 +51,7 @@ export default function ManualAddCheckpoint() {
             })
           )
         );
-        manualAddCheckpointForm.reset();
+        advancedAddCheckpointForm.reset();
       })
       .catch((error) => {
         if (error) {
@@ -69,8 +69,8 @@ export default function ManualAddCheckpoint() {
 
   return (
     <form
-      onSubmit={manualAddCheckpointForm.onSubmit((v) =>
-        manualAddCheckpointFormHandler(v)
+      onSubmit={advancedAddCheckpointForm.onSubmit((v) =>
+        advancedAddCheckpointFormHandler(v)
       )}
       style={{ width: '100%' }}
     >
@@ -78,39 +78,39 @@ export default function ManualAddCheckpoint() {
         <IAIMantineTextInput
           label="Model Name"
           required
-          {...manualAddCheckpointForm.getInputProps('model_name')}
+          {...advancedAddCheckpointForm.getInputProps('model_name')}
         />
         <BaseModelSelect
-          {...manualAddCheckpointForm.getInputProps('base_model')}
+          {...advancedAddCheckpointForm.getInputProps('base_model')}
         />
         <IAIMantineTextInput
           label="Model Location"
           required
-          {...manualAddCheckpointForm.getInputProps('path')}
+          {...advancedAddCheckpointForm.getInputProps('path')}
         />
         <IAIMantineTextInput
           label="Description"
-          {...manualAddCheckpointForm.getInputProps('description')}
+          {...advancedAddCheckpointForm.getInputProps('description')}
         />
         <IAIMantineTextInput
           label="VAE Location"
-          {...manualAddCheckpointForm.getInputProps('vae')}
+          {...advancedAddCheckpointForm.getInputProps('vae')}
         />
         <ModelVariantSelect
-          {...manualAddCheckpointForm.getInputProps('variant')}
+          {...advancedAddCheckpointForm.getInputProps('variant')}
         />
         <Flex flexDirection="column" width="100%" gap={2}>
           {!useCustomConfig ? (
             <CheckpointConfigsSelect
               required
               width="100%"
-              {...manualAddCheckpointForm.getInputProps('config')}
+              {...advancedAddCheckpointForm.getInputProps('config')}
             />
           ) : (
             <IAIMantineTextInput
               required
               label="Custom Config File Location"
-              {...manualAddCheckpointForm.getInputProps('config')}
+              {...advancedAddCheckpointForm.getInputProps('config')}
             />
           )}
           <IAISimpleCheckbox

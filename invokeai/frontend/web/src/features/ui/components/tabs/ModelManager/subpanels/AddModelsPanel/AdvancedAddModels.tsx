@@ -2,29 +2,29 @@ import { Flex } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { useState } from 'react';
-import ManualAddCheckpoint from './ManualAddCheckpoint';
-import ManualAddDiffusers from './ManualAddDiffusers';
+import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
+import AdvancedAddDiffusers from './AdvancedAddDiffusers';
 
-const manualAddModeData: SelectItem[] = [
+const advancedAddModeData: SelectItem[] = [
   { label: 'Diffusers', value: 'diffusers' },
   { label: 'Checkpoint / Safetensors', value: 'checkpoint' },
 ];
 
 type ManualAddMode = 'diffusers' | 'checkpoint';
 
-export default function ManualAddModels() {
-  const [manualAddMode, setManualAddMode] =
+export default function AdvancedAddModels() {
+  const [advancedAddMode, setAdvancedAddMode] =
     useState<ManualAddMode>('diffusers');
 
   return (
     <Flex flexDirection="column" gap={4} width="100%">
       <IAIMantineSelect
         label="Model Type"
-        value={manualAddMode}
-        data={manualAddModeData}
+        value={advancedAddMode}
+        data={advancedAddModeData}
         onChange={(v) => {
           if (!v) return;
-          setManualAddMode(v as ManualAddMode);
+          setAdvancedAddMode(v as ManualAddMode);
         }}
       />
 
@@ -38,8 +38,8 @@ export default function ManualAddModels() {
           },
         }}
       >
-        {manualAddMode === 'diffusers' && <ManualAddDiffusers />}
-        {manualAddMode === 'checkpoint' && <ManualAddCheckpoint />}
+        {advancedAddMode === 'diffusers' && <AdvancedAddDiffusers />}
+        {advancedAddMode === 'checkpoint' && <AdvancedAddCheckpoint />}
       </Flex>
     </Flex>
   );

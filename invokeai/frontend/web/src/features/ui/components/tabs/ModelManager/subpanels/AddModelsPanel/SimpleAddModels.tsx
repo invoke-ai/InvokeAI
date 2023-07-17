@@ -25,7 +25,7 @@ type ExtendedImportModelConfig = {
   prediction_type?: 'v_prediction' | 'epsilon' | 'sample' | 'none' | undefined;
 };
 
-export default function AutoAddModels() {
+export default function SimpleAddModels() {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
