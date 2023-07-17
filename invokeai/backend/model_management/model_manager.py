@@ -639,7 +639,6 @@ class ModelManager(object):
         model_info().
         """
         # relativize paths as they go in - this makes it easier to move the root directory around
-        self.logger.debug(model_attributes)
         if path := model_attributes.get('path'):
             if Path(path).is_relative_to(self.app_config.root_path):
                 model_attributes['path'] = str(Path(path).relative_to(self.app_config.root_path))
@@ -708,7 +707,7 @@ class ModelManager(object):
 
         # if this is a model file/directory that we manage ourselves, we need to move it
         if old_path.is_relative_to(self.app_config.models_path):
-            new_path = self.app_config.root_path / 'models' / new_base.value / model_type.value / new_name
+            new_path = self.app_config.root_path / 'models' / BaseModelType(new_base).value / ModelType(model_type).value / new_name
             move(old_path, new_path)
             model_cfg.path = str(new_path.relative_to(self.app_config.root_path))
 
