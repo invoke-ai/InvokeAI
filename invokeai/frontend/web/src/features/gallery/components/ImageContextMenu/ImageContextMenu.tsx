@@ -50,11 +50,11 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
             motionProps={menuListMotionProps}
             onContextMenu={handleContextMenu}
           >
-            {selectionCount === 1 ? (
+            {selectionCount === 0 && <></>}
+            {selectionCount === 1 && (
               <SingleSelectionMenuItems imageDTO={imageDTO} />
-            ) : (
-              <MultipleSelectionMenuItems />
             )}
+            {selectionCount > 1 && <MultipleSelectionMenuItems />}
           </MenuList>
         ) : null
       }
