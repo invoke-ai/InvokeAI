@@ -1,7 +1,7 @@
 import { useDisclosure } from '@chakra-ui/react';
 import { PropsWithChildren, createContext, useCallback, useState } from 'react';
 import { ImageDTO } from 'services/api/types';
-import { useAddImageToBoardMutation } from 'services/api/endpoints/boardImages';
+import { useAddImageToBoardMutation } from 'services/api/endpoints/images';
 
 export type ImageUsage = {
   isInitialImage: boolean;

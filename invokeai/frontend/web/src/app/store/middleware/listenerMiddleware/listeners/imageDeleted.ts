@@ -15,6 +15,7 @@ import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { api } from 'services/api';
 import { imageDeleted } from 'services/api/thunks/image';
 import { startAppListening } from '..';
+import { imagesApi } from 'services/api/endpoints/images';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -67,12 +68,15 @@ export const addRequestedImageDeletionListener = () => {
       dispatch(imageRemoved(image_name));
 
       // Delete from server
-      const { requestId } = dispatch(imageDeleted({ image_name }));
+      // const { requestId } = dispatch(imageDeleted({ image_name }));
+      const { requestId } = dispatch(
+        imagesApi.endpoints.deleteImage.initiate(imageDTO)
+      );
 
       // Wait for successful deletion, then trigger boards to re-fetch
       const wasImageDeleted = await condition(
-        (action): action is ReturnType<typeof imageDeleted.fulfilled> =>
-          imageDeleted.fulfilled.match(action) &&
+        (action) =>
+          imagesApi.endpoints.deleteImage.matchFulfilled(action) &&
           action.meta.requestId === requestId,
         30000
       );

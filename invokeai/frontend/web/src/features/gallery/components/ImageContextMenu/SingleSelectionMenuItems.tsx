@@ -28,8 +28,10 @@ import {
   FaShare,
   FaTrash,
 } from 'react-icons/fa';
-import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
-import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
+import {
+  useGetImageMetadataQuery,
+  useRemoveImageFromBoardMutation,
+} from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { AddImageToBoardContext } from '../../../../app/contexts/AddImageToBoardContext';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
@@ -128,11 +130,8 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     if (!imageDTO.board_id) {
       return;
     }
-    removeFromBoard({
-      board_id: imageDTO.board_id,
-      image_name: imageDTO.image_name,
-    });
-  }, [imageDTO.board_id, imageDTO.image_name, removeFromBoard]);
+    removeFromBoard({ imageDTO });
+  }, [imageDTO, removeFromBoard]);
 
   const handleOpenInNewTab = useCallback(() => {
     window.open(imageDTO.image_url, '_blank');

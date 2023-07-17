@@ -16,11 +16,11 @@ export const addReceivedPageOfImagesFulfilledListener = () => {
         `Received ${items.length} images`
       );
 
-      items.forEach((image) => {
-        dispatch(
-          imagesApi.util.upsertQueryData('getImageDTO', image.image_name, image)
-        );
-      });
+      // items.forEach((image) => {
+      //   dispatch(
+      //     imagesApi.util.upsertQueryData('getImageDTO', image.image_name, image)
+      //   );
+      // });
     },
   });
 };

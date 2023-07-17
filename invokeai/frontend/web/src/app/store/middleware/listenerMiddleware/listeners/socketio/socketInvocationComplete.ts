@@ -68,9 +68,9 @@ export const addInvocationCompleteEventListener = () => {
             !['all', 'none', 'batch'].includes(boardIdToAddTo)
           ) {
             dispatch(
-              boardImagesApi.endpoints.addImageToBoard.initiate({
+              imagesApi.endpoints.addImageToBoard.initiate({
                 board_id: boardIdToAddTo,
-                image_name,
+                imageDTO,
               })
             );
           }

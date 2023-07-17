@@ -1,16 +1,14 @@
 import { log } from 'app/logging/useLogger';
-import { boardImagesApi } from 'services/api/endpoints/boardImages';
+import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'boards' });
 
 export const addImageRemovedFromBoardFulfilledListener = () => {
   startAppListening({
-    matcher: boardImagesApi.endpoints.removeImageFromBoard.matchFulfilled,
+    matcher: imagesApi.endpoints.removeImageFromBoard.matchFulfilled,
     effect: (action, { getState, dispatch }) => {
       const { board_id, image_name } = action.meta.arg.originalArgs;
-
-      // TODO: update listImages cache for this board
 
       moduleLog.debug(
         { data: { board_id, image_name } },
@@ -22,7 +20,7 @@ export const addImageRemovedFromBoardFulfilledListener = () => {
 
 export const addImageRemovedFromBoardRejectedListener = () => {
   startAppListening({
-    matcher: boardImagesApi.endpoints.removeImageFromBoard.matchRejected,
+    matcher: imagesApi.endpoints.removeImageFromBoard.matchRejected,
     effect: (action, { getState, dispatch }) => {
       const { board_id, image_name } = action.meta.arg.originalArgs;
 

@@ -159,8 +159,26 @@ export const isValidDrop = (
       return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
     case 'ADD_TO_BATCH':
       return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
-    case 'MOVE_BOARD':
-      return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
+    case 'MOVE_BOARD': {
+      // If the board is the same, don't allow the drop
+
+      // Check the payload types
+      const isPayloadValid = payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
+
+      // Check if the image's board is the board we are dragging onto
+      if (payloadType === 'IMAGE_DTO') {
+        const isBoardValid =
+          overData.context.boardId !==
+          active.data.current.payload.imageDTO.board_id;
+        return isPayloadValid && isBoardValid;
+      }
+
+      if (payloadType === 'IMAGE_NAMES') {
+        // TODO (multi-select)
+      }
+
+      return true;
+    }
     default:
       return false;
   }

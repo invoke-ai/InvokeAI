@@ -12,6 +12,12 @@ type GenericBoardProps = {
   badgeCount?: number;
 };
 
+const formatBadgeCount = (count: number) =>
+  Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(count);
+
 const GenericBoard = (props: GenericBoardProps) => {
   const { droppableData, onClick, isSelected, icon, label, badgeCount } = props;
 
@@ -59,7 +65,7 @@ const GenericBoard = (props: GenericBoardProps) => {
           }}
         >
           {badgeCount !== undefined && (
-            <Badge variant="solid">{badgeCount}</Badge>
+            <Badge variant="solid">{formatBadgeCount(badgeCount)}</Badge>
           )}
         </Flex>
         <IAIDroppable data={droppableData} />

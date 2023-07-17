@@ -34,34 +34,22 @@ export type BoardId =
   | (string & Record<never, never>);
 
 type AdditionaGalleryState = {
-  offset: number;
-  limit: number;
-  total: number;
-  isLoading: boolean;
-  isFetching: boolean;
   selection: string[];
   shouldAutoSwitch: boolean;
   galleryImageMinimumWidth: number;
   galleryView: GalleryView;
   selectedBoardId: BoardId;
-  isInitialized: boolean;
   batchImageNames: string[];
   isBatchEnabled: boolean;
 };
 
 export const initialGalleryState =
   imagesAdapter.getInitialState<AdditionaGalleryState>({
-    offset: 0,
-    limit: 0,
-    total: 0,
-    isLoading: true,
-    isFetching: true,
     selection: [],
     shouldAutoSwitch: true,
     galleryImageMinimumWidth: 96,
     galleryView: 'images',
     selectedBoardId: 'all',
-    isInitialized: false,
     batchImageNames: [],
     isBatchEnabled: false,
   });
@@ -152,9 +140,6 @@ export const gallerySlice = createSlice({
     },
     boardIdSelected: (state, action: PayloadAction<BoardId>) => {
       state.selectedBoardId = action.payload;
-    },
-    isLoadingChanged: (state, action: PayloadAction<boolean>) => {
-      state.isLoading = action.payload;
     },
     isBatchEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isBatchEnabled = action.payload;
@@ -253,7 +238,6 @@ export const {
   setGalleryImageMinimumWidth,
   setGalleryView,
   boardIdSelected,
-  isLoadingChanged,
   isBatchEnabledChanged,
   imagesAddedToBatch,
   imagesRemovedFromBatch,

@@ -7,6 +7,7 @@ import {
   ASSETS_CATEGORIES,
   BoardId,
   IMAGE_CATEGORIES,
+  INITIAL_IMAGE_LIMIT,
   imagesAdapter,
   initialGalleryState,
 } from './gallerySlice';
@@ -131,6 +132,43 @@ export const selectNextImageToSelect = createSelector(
   ],
   (state, image_name) => {
     return selectNextImageToSelectLocal(state.gallery, image_name);
+  },
+  defaultSelectorOptions
+);
+
+export const selectListImagesBaseQueryArgs = createSelector(
+  [(state: RootState) => state],
+  (state) => {
+    const { selectedBoardId, galleryView } = state.gallery;
+
+    const listImagesBaseQueryArgs = {
+      categories:
+        galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+      board_id: selectedBoardId === 'all' ? undefined : selectedBoardId,
+      offset: 0,
+      limit: INITIAL_IMAGE_LIMIT,
+      is_intermediate: false,
+    };
+
+    return listImagesBaseQueryArgs;
+  },
+  defaultSelectorOptions
+);
+
+export const selectListAllImagesBaseQueryArgs = createSelector(
+  [(state: RootState) => state],
+  (state) => {
+    const { galleryView } = state.gallery;
+
+    const listImagesBaseQueryArgs = {
+      categories:
+        galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+      offset: 0,
+      limit: INITIAL_IMAGE_LIMIT,
+      is_intermediate: false,
+    };
+
+    return listImagesBaseQueryArgs;
   },
   defaultSelectorOptions
 );

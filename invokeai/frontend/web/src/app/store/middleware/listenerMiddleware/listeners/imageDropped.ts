@@ -17,6 +17,7 @@ import {
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { boardImagesApi } from 'services/api/endpoints/boardImages';
 import { startAppListening } from '../';
+import { imagesApi } from 'services/api/endpoints/images';
 
 const moduleLog = log.child({ namespace: 'dnd' });
 
@@ -162,33 +163,31 @@ export const addImageDroppedListener = () => {
         activeData.payload.imageDTO &&
         overData.context.boardId
       ) {
-        const { image_name } = activeData.payload.imageDTO;
+        const { imageDTO } = activeData.payload;
         const { boardId } = overData.context;
+
+        // if the board is "All Images" or "No Board", this is a remove action
+        if (boardId === 'all' || boardId === 'none') {
+          dispatch(
+            imagesApi.endpoints.removeImageFromBoard.initiate({
+              imageDTO,
+            })
+          );
+          return;
+        }
+
+        // Handle adding image to batch
+        if (boardId === 'batch') {
+          // TODO
+        }
+
+        // Otherwise, add the image to the board
         dispatch(
-          boardImagesApi.endpoints.addImageToBoard.initiate({
-            image_name,
+          imagesApi.endpoints.addImageToBoard.initiate({
+            imageDTO,
             board_id: boardId,
           })
         );
-        return;
-      }
-
-      // remove image from board
-      if (
-        overData.actionType === 'MOVE_BOARD' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO &&
-        overData.context.boardId === null
-      ) {
-        const { image_name, board_id } = activeData.payload.imageDTO;
-        if (board_id) {
-          dispatch(
-            boardImagesApi.endpoints.removeImageFromBoard.initiate({
-              image_name,
-              board_id,
-            })
-          );
-        }
         return;
       }
 

@@ -1,17 +1,8 @@
 import { Box, Spinner } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIButton from 'common/components/IAIButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
-  IMAGE_LIMIT,
-} from 'features/gallery//store/gallerySlice';
-import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
+import { IMAGE_LIMIT } from 'features/gallery//store/gallerySlice';
 import {
   UseOverlayScrollbarsParams,
   useOverlayScrollbars,
@@ -27,29 +18,7 @@ import {
 import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
-
-const selector = createSelector(
-  [stateSelector, selectFilteredImages],
-  (state, filteredImages) => {
-    const {
-      galleryImageMinimumWidth,
-      selectedBoardId,
-      galleryView,
-      total,
-      isLoading,
-    } = state.gallery;
-
-    return {
-      imageNames: filteredImages.map((i) => i.image_name),
-      total,
-      selectedBoardId,
-      galleryView,
-      galleryImageMinimumWidth,
-      isLoading,
-    };
-  },
-  defaultSelectorOptions
-);
+import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 
 const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   defer: true,
@@ -73,43 +42,27 @@ const GalleryImageGrid = () => {
     overlayScrollbarsConfig
   );
 
-  const { galleryImageMinimumWidth, selectedBoardId, galleryView } =
-    useAppSelector(selector);
+  const queryArgs = useAppSelector(selectListImagesBaseQueryArgs);
 
-  const [initialImageCount, setInitialImageCount] = useState(0);
+  const { currentData, isFetching, isSuccess, isError } =
+    useListImagesQuery(queryArgs);
 
   const [listImages] = useLazyListImagesQuery();
-
-  const listImagesBaseArgs = useMemo(
-    () => ({
-      categories:
-        galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
-      board_id: selectedBoardId === 'all' ? undefined : selectedBoardId,
-      offset: 0,
-      limit: initialImageCount,
-      is_intermediate: false,
-    }),
-    [galleryView, initialImageCount, selectedBoardId]
-  );
-
-  const { currentData, isFetching, isSuccess, isError } = useListImagesQuery(
-    initialImageCount ? listImagesBaseArgs : skipToken
-  );
 
   const areMoreAvailable = useMemo(() => {
     if (!currentData) {
       return false;
     }
-    return currentData.total > currentData.ids.length;
+    return currentData.ids.length < currentData.total;
   }, [currentData]);
 
   const handleLoadMoreImages = useCallback(() => {
     listImages({
-      ...listImagesBaseArgs,
+      ...queryArgs,
       offset: currentData?.ids.length ?? 0,
       limit: IMAGE_LIMIT,
     });
-  }, [listImages, listImagesBaseArgs, currentData?.ids.length]);
+  }, [listImages, queryArgs, currentData?.ids.length]);
 
   useEffect(() => {
     // Initialize the gallery's custom scrollbar
@@ -124,24 +77,6 @@ const GalleryImageGrid = () => {
     }
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
-
-  useEffect(() => {
-    // rough calculation of how many images will fill up the gallery
-    const galleryHeight = emptyGalleryRef.current?.clientHeight ?? 0;
-    const galleryWidth = emptyGalleryRef.current?.clientHeight ?? 0;
-
-    const rows = galleryHeight / galleryImageMinimumWidth;
-    const columns = galleryWidth / galleryImageMinimumWidth;
-
-    const count = Math.ceil(rows * columns);
-
-    if (count === 0) {
-      // in case there is a rendering issue, default to 100 images
-      setInitialImageCount(100);
-    } else {
-      setInitialImageCount(count);
-    }
-  }, [galleryImageMinimumWidth]);
 
   if (!currentData) {
     return (
