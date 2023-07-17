@@ -7,7 +7,7 @@ import {
   FaExpand,
   FaMinus,
   FaPlus,
-  FaGripVertical,
+  FaInfo,
 } from 'react-icons/fa';
 import { useReactFlow } from 'reactflow';
 import {
@@ -72,7 +72,7 @@ const ViewportControls = () => {
         isChecked={shouldShowFieldTypeLegend}
         onClick={handleClickedToggleFieldTypeLegend}
         aria-label="Show/Hide Field Type Legend"
-        icon={<FaGripVertical />}
+        icon={<FaInfo />}
       />
     </ButtonGroup>
   );
