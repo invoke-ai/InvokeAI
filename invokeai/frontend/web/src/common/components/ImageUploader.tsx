@@ -17,17 +17,21 @@ import ImageUploadOverlay from './ImageUploadOverlay';
 import { useAppToaster } from 'app/components/Toaster';
 import { createSelector } from '@reduxjs/toolkit';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import { gallerySelector } from '../../features/gallery/store/gallerySelectors';
 
 const selector = createSelector(
-  [systemSelector, activeTabNameSelector],
-  (system, activeTabName) => {
+  [systemSelector, activeTabNameSelector, gallerySelector],
+  (system, activeTabName, gallery) => {
     const { isConnected, isUploading } = system;
+
+    const { selectedBoardId } = gallery;
 
     const isUploaderDisabled = !isConnected || isUploading;
 
     return {
       isUploaderDisabled,
       activeTabName,
+      selectedBoardId,
     };
   }
 );
@@ -39,7 +43,8 @@ type ImageUploaderProps = {
 const ImageUploader = (props: ImageUploaderProps) => {
   const { children } = props;
   const dispatch = useAppDispatch();
-  const { isUploaderDisabled, activeTabName } = useAppSelector(selector);
+  const { isUploaderDisabled, activeTabName, selectedBoardId } =
+    useAppSelector(selector);
   const toaster = useAppToaster();
   const { t } = useTranslation();
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
@@ -65,11 +70,14 @@ const ImageUploader = (props: ImageUploaderProps) => {
           file,
           image_category: 'user',
           is_intermediate: false,
+          // used in listener only, not sent to back-end
           postUploadAction: { type: 'TOAST_UPLOADED' },
+          // used in listener only, not sent to back-end
+          boardId: selectedBoardId,
         })
       );
     },
-    [dispatch]
+    [dispatch, selectedBoardId]
   );
 
   const onDrop = useCallback(

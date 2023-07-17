@@ -2,7 +2,8 @@ import { log } from 'app/logging/useLogger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
 import {
-  imageUpserted,
+  ASSETS_CATEGORIES,
+  INITIAL_IMAGE_LIMIT,
   imagesAddedToBatch,
 } from 'features/gallery/store/gallerySlice';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
@@ -10,6 +11,10 @@ import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { imageUploaded } from 'services/api/thunks/image';
 import { startAppListening } from '..';
+import {
+  imagesAdapter,
+  imagesApi,
+} from '../../../../../services/api/endpoints/images';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -26,7 +31,43 @@ export const addImageUploadedFulfilledListener = () => {
         return;
       }
 
-      dispatch(imageUpserted(image));
+      const { boardId } = action.meta.arg;
+
+      // add image to the board
+      if (boardId && !['all', 'none', 'batch'].includes(boardId)) {
+        dispatch(
+          imagesApi.endpoints.addImageToBoard.initiate({
+            board_id: boardId,
+            imageDTO: image,
+          })
+        );
+        // update board asset list
+        const queryArg = {
+          categories: ASSETS_CATEGORIES,
+          board_id: boardId === 'all' ? undefined : boardId,
+          offset: 0,
+          limit: INITIAL_IMAGE_LIMIT,
+          is_intermediate: false,
+        };
+        dispatch(
+          imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
+            imagesAdapter.addOne(draft, image);
+            draft.total = draft.total + 1;
+          })
+        );
+      }
+
+      // update the main list
+      const queryArg = {
+        categories: ASSETS_CATEGORIES,
+      };
+
+      dispatch(
+        imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
+          imagesAdapter.addOne(draft, image);
+          draft.total = draft.total + 1;
+        })
+      );
 
       const { postUploadAction } = action.meta.arg;
 

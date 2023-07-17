@@ -131,6 +131,7 @@ type UploadImageArg =
   paths['/api/v1/images/']['post']['parameters']['query'] & {
     file: File;
     postUploadAction?: PostUploadAction;
+    boardId?: string;
   };
 
 type UploadImageResponse =
@@ -218,7 +219,7 @@ export const imageDeleted = createAppAsyncThunk<
 
 type UpdateImageArg =
   paths['/api/v1/images/{image_name}']['patch']['requestBody']['content']['application/json'] &
-    paths['/api/v1/images/{image_name}']['patch']['parameters']['path'];
+  paths['/api/v1/images/{image_name}']['patch']['parameters']['path'];
 
 type UpdateImageResponse =
   paths['/api/v1/images/{image_name}']['patch']['responses']['200']['content']['application/json'];
