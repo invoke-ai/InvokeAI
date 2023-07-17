@@ -908,7 +908,6 @@ class ModelManager(object):
         from invokeai.backend.install.model_install_backend import ModelInstall
         from invokeai.frontend.install.model_install import ask_user_for_prediction_type
 
-
         class ScanAndImport(ModelSearch):
             def __init__(self, directories, logger, ignore: Set[Path], installer: ModelInstall):
                 super().__init__(directories, logger)

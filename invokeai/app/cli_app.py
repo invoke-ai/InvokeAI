@@ -54,10 +54,10 @@ from .services.invocation_services import InvocationServices
 from .services.invoker import Invoker
 from .services.model_manager_service import ModelManagerService
 from .services.processor import DefaultInvocationProcessor
-from .services.restoration_services import RestorationServices
 from .services.sqlite import SqliteItemStorage
 
 import torch
+import invokeai.backend.util.hotfixes
 if torch.backends.mps.is_available():
     import invokeai.backend.util.mps_fixes
 
@@ -295,7 +295,6 @@ def invoke_cli():
         ),
         graph_execution_manager=graph_execution_manager,
         processor=DefaultInvocationProcessor(),
-        restoration=RestorationServices(config,logger=logger),
         logger=logger,
         configuration=config,
     )
