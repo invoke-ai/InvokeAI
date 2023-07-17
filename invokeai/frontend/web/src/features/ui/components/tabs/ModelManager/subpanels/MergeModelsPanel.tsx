@@ -125,9 +125,9 @@ export default function MergeModelsPanel() {
         mergedModelName !== '' ? mergedModelName : models_names.join('-'),
       alpha: modelMergeAlpha,
       interp: modelMergeInterp,
-      // model_merge_save_path:
-      //   modelMergeSaveLocType === 'root' ? null : modelMergeCustomSaveLoc,
       force: modelMergeForce,
+      merge_dest_directory:
+        modelMergeSaveLocType === 'root' ? undefined : modelMergeCustomSaveLoc,
     };
 
     mergeModels({
@@ -288,7 +288,7 @@ export default function MergeModelsPanel() {
         </RadioGroup>
       </Flex>
 
-      {/* <Flex
+      <Flex
         sx={{
           flexDirection: 'column',
           padding: 4,
@@ -324,7 +324,7 @@ export default function MergeModelsPanel() {
             onChange={(e) => setModelMergeCustomSaveLoc(e.target.value)}
           />
         )}
-      </Flex> */}
+      </Flex>
 
       <IAISimpleCheckbox
         label={t('modelManager.ignoreMismatch')}
