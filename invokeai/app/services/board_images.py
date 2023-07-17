@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import Logger
-from typing import List, Union
+from typing import List, Union, Optional
 from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
 from invokeai.app.services.board_record_storage import (
     BoardRecord,
@@ -49,7 +49,7 @@ class BoardImagesServiceABC(ABC):
     def get_board_for_image(
         self,
         image_name: str,
-    ) -> Union[str, None]:
+    ) -> Optional[str]:
         """Gets an image's board id, if it has one."""
         pass
 
@@ -126,13 +126,13 @@ class BoardImagesService(BoardImagesServiceABC):
     def get_board_for_image(
         self,
         image_name: str,
-    ) -> Union[str, None]:
+    ) -> Optional[str]:
         board_id = self._services.board_image_records.get_board_for_image(image_name)
         return board_id
 
 
 def board_record_to_dto(
-    board_record: BoardRecord, cover_image_name: str | None, image_count: int
+    board_record: BoardRecord, cover_image_name: Optional[str], image_count: int
 ) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(

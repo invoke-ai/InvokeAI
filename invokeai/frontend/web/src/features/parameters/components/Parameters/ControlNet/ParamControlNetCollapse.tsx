@@ -1,66 +1,105 @@
 import { Divider, Flex } from '@chakra-ui/react';
-import { useTranslation } from 'react-i18next';
-import IAICollapse from 'common/components/IAICollapse';
-import { Fragment, memo, useCallback } from 'react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAICollapse from 'common/components/IAICollapse';
+import IAIIconButton from 'common/components/IAIIconButton';
+import ControlNet from 'features/controlNet/components/ControlNet';
+import ParamControlNetFeatureToggle from 'features/controlNet/components/parameters/ParamControlNetFeatureToggle';
 import {
   controlNetAdded,
+  controlNetModelChanged,
   controlNetSelector,
-  isControlNetEnabledToggled,
 } from 'features/controlNet/store/controlNetSlice';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { map } from 'lodash-es';
-import { v4 as uuidv4 } from 'uuid';
+import { getValidControlNets } from 'features/controlNet/util/getValidControlNets';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import IAIButton from 'common/components/IAIButton';
-import ControlNet from 'features/controlNet/components/ControlNet';
+import { map } from 'lodash-es';
+import { Fragment, memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FaPlus } from 'react-icons/fa';
+import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
+import { v4 as uuidv4 } from 'uuid';
 
 const selector = createSelector(
   controlNetSelector,
   (controlNet) => {
     const { controlNets, isEnabled } = controlNet;
 
-    return { controlNetsArray: map(controlNets), isEnabled };
+    const validControlNets = getValidControlNets(controlNets);
+
+    const activeLabel =
+      isEnabled && validControlNets.length > 0
+        ? `${validControlNets.length} Active`
+        : undefined;
+
+    return { controlNetsArray: map(controlNets), activeLabel };
   },
   defaultSelectorOptions
 );
 
 const ParamControlNetCollapse = () => {
   const { t } = useTranslation();
-  const { controlNetsArray, isEnabled } = useAppSelector(selector);
+  const { controlNetsArray, activeLabel } = useAppSelector(selector);
   const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
   const dispatch = useAppDispatch();
-
-  const handleClickControlNetToggle = useCallback(() => {
-    dispatch(isControlNetEnabledToggled());
-  }, [dispatch]);
+  const { firstModel } = useGetControlNetModelsQuery(undefined, {
+    selectFromResult: (result) => {
+      const firstModel = result.data?.entities[result.data?.ids[0]];
+      return {
+        firstModel,
+      };
+    },
+  });
 
   const handleClickedAddControlNet = useCallback(() => {
-    dispatch(controlNetAdded({ controlNetId: uuidv4() }));
-  }, [dispatch]);
+    if (!firstModel) {
+      return;
+    }
+    const controlNetId = uuidv4();
+    dispatch(controlNetAdded({ controlNetId }));
+    dispatch(controlNetModelChanged({ controlNetId, model: firstModel }));
+  }, [dispatch, firstModel]);
 
   if (isControlNetDisabled) {
     return null;
   }
 
   return (
-    <IAICollapse
-      label={'ControlNet'}
-      isOpen={isEnabled}
-      onToggle={handleClickControlNetToggle}
-      withSwitch
-    >
+    <IAICollapse label="ControlNet" activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 3 }}>
+        <Flex gap={2} alignItems="center">
+          <Flex
+            sx={{
+              flexDirection: 'column',
+              w: '100%',
+              gap: 2,
+              px: 4,
+              py: 2,
+              borderRadius: 4,
+              bg: 'base.200',
+              _dark: {
+                bg: 'base.850',
+              },
+            }}
+          >
+            <ParamControlNetFeatureToggle />
+          </Flex>
+          <IAIIconButton
+            tooltip="Add ControlNet"
+            aria-label="Add ControlNet"
+            icon={<FaPlus />}
+            isDisabled={!firstModel}
+            flexGrow={1}
+            size="md"
+            onClick={handleClickedAddControlNet}
+          />
+        </Flex>
         {controlNetsArray.map((c, i) => (
           <Fragment key={c.controlNetId}>
             {i > 0 && <Divider />}
-            <ControlNet controlNet={c} />
+            <ControlNet controlNetId={c.controlNetId} />
           </Fragment>
         ))}
-        <IAIButton flexGrow={1} onClick={handleClickedAddControlNet}>
-          Add ControlNet
-        </IAIButton>
       </Flex>
     </IAICollapse>
   );

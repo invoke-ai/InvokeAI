@@ -13,7 +13,7 @@ export const addInvocationErrorEventListener = () => {
     effect: (action, { dispatch, getState }) => {
       moduleLog.error(
         action.payload,
-        `Invocation error (${action.payload.data.node.type})`
+        `Invocation error (${action.payload.data.node.type}): ${action.payload.data.error}`
       );
       dispatch(appSocketInvocationError(action.payload));
     },

@@ -1,4 +1,4 @@
-import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
+import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
 
 export type AddNewModelType = 'ckpt' | 'diffusers' | null;
 
@@ -27,5 +27,8 @@ export interface UIState {
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;
   shouldShowProgressInViewer: boolean;
+  shouldShowEmbeddingPicker: boolean;
+  shouldShowAdvancedOptions: boolean;
+  aspectRatio: number | null;
   favoriteSchedulers: SchedulerParam[];
 }

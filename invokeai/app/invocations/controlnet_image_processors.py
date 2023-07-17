@@ -6,9 +6,10 @@ from builtins import float, bool
 import cv2
 import numpy as np
 from typing import Literal, Optional, Union, List, Dict
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image
 from pydantic import BaseModel, Field, validator
 
+from ...backend.model_management import BaseModelType, ModelType
 from ..models.image import ImageField, ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
@@ -105,9 +106,15 @@ CONTROLNET_MODE_VALUES = Literal[tuple(["balanced", "more_prompt", "more_control
 # CONTROLNET_RESIZE_VALUES = Literal[tuple(["just_resize", "crop_resize", "fill_resize"])]
 
 
+class ControlNetModelField(BaseModel):
+    """ControlNet model field"""
+
+    model_name: str = Field(description="Name of the ControlNet model")
+    base_model: BaseModelType = Field(description="Base model")
+
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="The control image")
-    control_model: Optional[str] = Field(default=None, description="The ControlNet model to use")
+    control_model: Optional[ControlNetModelField] = Field(default=None, description="The ControlNet model to use")
     # control_weight: Optional[float] = Field(default=1, description="weight given to controlnet")
     control_weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(default=0, ge=0, le=1,
@@ -118,15 +125,15 @@ class ControlField(BaseModel):
     # resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode to use")
 
     @validator("control_weight")
-    def abs_le_one(cls, v):
-        """validate that all abs(values) are <=1"""
+    def validate_control_weight(cls, v):
+        """Validate that all control weights in the valid range"""
         if isinstance(v, list):
             for i in v:
-                if abs(i) > 1:
-                    raise ValueError('all abs(control_weight) must be <= 1')
+                if i < -1 or i > 2:
+                    raise ValueError('Control weights must be within -1 to 2 range')
         else:
-            if abs(v) > 1:
-                raise ValueError('abs(control_weight) must be <= 1')
+            if v < -1 or v > 2:
+                raise ValueError('Control weights must be within -1 to 2 range')
         return v
     class Config:
         schema_extra = {
@@ -134,6 +141,7 @@ class ControlField(BaseModel):
             "ui": {
                 "type_hints": {
                     "control_weight": "float",
+                    "control_model": "controlnet_model",
                     # "control_weight": "number",
                 }
             }
@@ -154,10 +162,10 @@ class ControlNetInvocation(BaseInvocation):
     type: Literal["controlnet"] = "controlnet"
     # Inputs
     image: ImageField = Field(default=None, description="The control image")
-    control_model: CONTROLNET_NAME_VALUES = Field(default="lllyasviel/sd-controlnet-canny",
+    control_model: ControlNetModelField = Field(default="lllyasviel/sd-controlnet-canny",
                                                   description="control model used")
     control_weight: Union[float, List[float]] = Field(default=1.0, description="The weight given to the ControlNet")
-    begin_step_percent: float = Field(default=0, ge=0, le=1,
+    begin_step_percent: float = Field(default=0, ge=-1, le=2,
                                       description="When the ControlNet is first applied (% of total steps)")
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
@@ -422,9 +430,9 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvoca
     # Inputs
     detect_resolution: int = Field(default=512, ge=0, description="The pixel resolution for detection")
     image_resolution: int = Field(default=512, ge=0, description="The pixel resolution for the output image")
-    h: Union[int, None] = Field(default=512, ge=0, description="Content shuffle `h` parameter")
-    w: Union[int, None] = Field(default=512, ge=0, description="Content shuffle `w` parameter")
-    f: Union[int, None] = Field(default=256, ge=0, description="Content shuffle `f` parameter")
+    h: Optional[int] = Field(default=512, ge=0, description="Content shuffle `h` parameter")
+    w: Optional[int] = Field(default=512, ge=0, description="Content shuffle `w` parameter")
+    f: Optional[int] = Field(default=256, ge=0, description="Content shuffle `f` parameter")
     # fmt: on
 
     def run_processor(self, image):

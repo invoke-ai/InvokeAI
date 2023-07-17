@@ -1,0 +1,254 @@
+{
+    "accessibility": {
+        "copyMetadataJson": "Kopiera metadata JSON",
+        "zoomIn": "Zooma in",
+        "exitViewer": "Avslutningsvisare",
+        "modelSelect": "Välj modell",
+        "uploadImage": "Ladda upp bild",
+        "invokeProgressBar": "Invoke förloppsmätare",
+        "nextImage": "Nästa bild",
+        "toggleAutoscroll": "Växla automatisk rullning",
+        "flipHorizontally": "Vänd vågrätt",
+        "flipVertically": "Vänd lodrätt",
+        "zoomOut": "Zooma ut",
+        "toggleLogViewer": "Växla logvisare",
+        "reset": "Starta om",
+        "previousImage": "Föregående bild",
+        "useThisParameter": "Använd denna parametern",
+        "showGallery": "Visa galleri",
+        "rotateCounterClockwise": "Rotera moturs",
+        "rotateClockwise": "Rotera medurs",
+        "modifyConfig": "Ändra konfiguration",
+        "showOptionsPanel": "Visa inställningspanelen"
+    },
+    "common": {
+        "hotkeysLabel": "Snabbtangenter",
+        "reportBugLabel": "Rapportera bugg",
+        "githubLabel": "Github",
+        "discordLabel": "Discord",
+        "settingsLabel": "Inställningar",
+        "darkTheme": "Mörk",
+        "lightTheme": "Ljus",
+        "greenTheme": "Grön",
+        "oceanTheme": "Hav",
+        "langEnglish": "Engelska",
+        "langDutch": "Nederländska",
+        "langFrench": "Franska",
+        "langGerman": "Tyska",
+        "langItalian": "Italienska",
+        "langArabic": "العربية",
+        "langHebrew": "עברית",
+        "langPolish": "Polski",
+        "langPortuguese": "Português",
+        "langBrPortuguese": "Português do Brasil",
+        "langSimplifiedChinese": "简体中文",
+        "langJapanese": "日本語",
+        "langKorean": "한국어",
+        "langRussian": "Русский",
+        "unifiedCanvas": "Förenad kanvas",
+        "nodesDesc": "Ett nodbaserat system för bildgenerering är under utveckling. Håll utkik för uppdateringar om denna fantastiska funktion.",
+        "langUkranian": "Украї́нська",
+        "langSpanish": "Español",
+        "postProcessDesc2": "Ett dedikerat användargränssnitt kommer snart att släppas för att underlätta mer avancerade arbetsflöden av efterbehandling.",
+        "trainingDesc1": "Ett dedikerat arbetsflöde för träning av dina egna inbäddningar och kontrollpunkter genom Textual Inversion eller Dreambooth från webbgränssnittet.",
+        "trainingDesc2": "InvokeAI stöder redan träning av anpassade inbäddningar med hjälp av Textual Inversion genom huvudscriptet.",
+        "upload": "Ladda upp",
+        "close": "Stäng",
+        "cancel": "Avbryt",
+        "accept": "Acceptera",
+        "statusDisconnected": "Frånkopplad",
+        "statusGeneratingTextToImage": "Genererar text till bild",
+        "statusGeneratingImageToImage": "Genererar Bild till bild",
+        "statusGeneratingInpainting": "Genererar Måla i",
+        "statusGenerationComplete": "Generering klar",
+        "statusModelConverted": "Modell konverterad",
+        "statusMergingModels": "Sammanfogar modeller",
+        "pinOptionsPanel": "Nåla fast inställningspanelen",
+        "loading": "Laddar",
+        "loadingInvokeAI": "Laddar Invoke AI",
+        "statusRestoringFaces": "Återskapar ansikten",
+        "languagePickerLabel": "Språkväljare",
+        "themeLabel": "Tema",
+        "txt2img": "Text till bild",
+        "nodes": "Noder",
+        "img2img": "Bild till bild",
+        "postprocessing": "Efterbehandling",
+        "postProcessing": "Efterbehandling",
+        "load": "Ladda",
+        "training": "Träning",
+        "postProcessDesc1": "Invoke AI erbjuder ett brett utbud av efterbehandlingsfunktioner. Uppskalning och ansiktsåterställning finns redan tillgängligt i webbgränssnittet. Du kommer åt dem ifrån Avancerade inställningar-menyn under Bild till bild-fliken. Du kan också behandla bilder direkt genom att använda knappen bildåtgärder ovanför nuvarande bild eller i bildvisaren.",
+        "postProcessDesc3": "Invoke AI's kommandotolk erbjuder många olika funktioner, bland annat \"Förstora\".",
+        "statusGenerating": "Genererar",
+        "statusError": "Fel",
+        "back": "Bakåt",
+        "statusConnected": "Ansluten",
+        "statusPreparing": "Förbereder",
+        "statusProcessingCanceled": "Bearbetning avbruten",
+        "statusProcessingComplete": "Bearbetning färdig",
+        "statusGeneratingOutpainting": "Genererar Fyll ut",
+        "statusIterationComplete": "Itterering klar",
+        "statusSavingImage": "Sparar bild",
+        "statusRestoringFacesGFPGAN": "Återskapar ansikten (GFPGAN)",
+        "statusRestoringFacesCodeFormer": "Återskapar ansikten (CodeFormer)",
+        "statusUpscaling": "Skala upp",
+        "statusUpscalingESRGAN": "Uppskalning (ESRGAN)",
+        "statusModelChanged": "Modell ändrad",
+        "statusLoadingModel": "Laddar modell",
+        "statusConvertingModel": "Konverterar modell",
+        "statusMergedModels": "Modeller sammanfogade"
+    },
+    "gallery": {
+        "generations": "Generationer",
+        "showGenerations": "Visa generationer",
+        "uploads": "Uppladdningar",
+        "showUploads": "Visa uppladdningar",
+        "galleryImageSize": "Bildstorlek",
+        "allImagesLoaded": "Alla bilder laddade",
+        "loadMore": "Ladda mer",
+        "galleryImageResetSize": "Återställ storlek",
+        "gallerySettings": "Galleriinställningar",
+        "maintainAspectRatio": "Behåll bildförhållande",
+        "pinGallery": "Nåla fast galleri",
+        "noImagesInGallery": "Inga bilder i galleriet",
+        "autoSwitchNewImages": "Ändra automatiskt till nya bilder",
+        "singleColumnLayout": "Enkolumnslayout"
+    },
+    "hotkeys": {
+        "generalHotkeys": "Allmänna snabbtangenter",
+        "galleryHotkeys": "Gallerisnabbtangenter",
+        "unifiedCanvasHotkeys": "Snabbtangenter för sammanslagskanvas",
+        "invoke": {
+            "title": "Anropa",
+            "desc": "Genererar en bild"
+        },
+        "cancel": {
+            "title": "Avbryt",
+            "desc": "Avbryt bildgenerering"
+        },
+        "focusPrompt": {
+            "desc": "Fokusera området för promptinmatning",
+            "title": "Fokusprompt"
+        },
+        "pinOptions": {
+            "desc": "Nåla fast alternativpanelen",
+            "title": "Nåla fast alternativ"
+        },
+        "toggleOptions": {
+            "title": "Växla inställningar",
+            "desc": "Öppna och stäng alternativpanelen"
+        },
+        "toggleViewer": {
+            "title": "Växla visaren",
+            "desc": "Öppna och stäng bildvisaren"
+        },
+        "toggleGallery": {
+            "title": "Växla galleri",
+            "desc": "Öppna eller stäng galleribyrån"
+        },
+        "maximizeWorkSpace": {
+            "title": "Maximera arbetsyta",
+            "desc": "Stäng paneler och maximera arbetsyta"
+        },
+        "changeTabs": {
+            "title": "Växla flik",
+            "desc": "Byt till en annan arbetsyta"
+        },
+        "consoleToggle": {
+            "title": "Växla konsol",
+            "desc": "Öppna och stäng konsol"
+        },
+        "setSeed": {
+            "desc": "Använd seed för nuvarande bild",
+            "title": "välj seed"
+        },
+        "setParameters": {
+            "title": "Välj parametrar",
+            "desc": "Använd alla parametrar från nuvarande bild"
+        },
+        "setPrompt": {
+            "desc": "Använd prompt för nuvarande bild",
+            "title": "Välj prompt"
+        },
+        "restoreFaces": {
+            "title": "Återskapa ansikten",
+            "desc": "Återskapa nuvarande bild"
+        },
+        "upscale": {
+            "title": "Skala upp",
+            "desc": "Skala upp nuvarande bild"
+        },
+        "showInfo": {
+            "title": "Visa info",
+            "desc": "Visa metadata för nuvarande bild"
+        },
+        "sendToImageToImage": {
+            "title": "Skicka till Bild till bild",
+            "desc": "Skicka nuvarande bild till Bild till bild"
+        },
+        "deleteImage": {
+            "title": "Radera bild",
+            "desc": "Radera nuvarande bild"
+        },
+        "closePanels": {
+            "title": "Stäng paneler",
+            "desc": "Stäng öppna paneler"
+        },
+        "previousImage": {
+            "title": "Föregående bild",
+            "desc": "Visa föregående bild"
+        },
+        "nextImage": {
+            "title": "Nästa bild",
+            "desc": "Visa nästa bild"
+        },
+        "toggleGalleryPin": {
+            "title": "Växla gallerinål",
+            "desc": "Nålar fast eller nålar av galleriet i gränssnittet"
+        },
+        "increaseGalleryThumbSize": {
+            "title": "Förstora galleriets bildstorlek",
+            "desc": "Förstora miniatyrbildernas storlek"
+        },
+        "decreaseGalleryThumbSize": {
+            "title": "Minska gelleriets bildstorlek",
+            "desc": "Minska miniatyrbildernas storlek i galleriet"
+        },
+        "decreaseBrushSize": {
+            "desc": "Förminska storleken på kanvas- pensel eller suddgummi",
+            "title": "Minska penselstorlek"
+        },
+        "increaseBrushSize": {
+            "title": "Öka penselstorlek",
+            "desc": "Öka stoleken på kanvas- pensel eller suddgummi"
+        },
+        "increaseBrushOpacity": {
+            "title": "Öka penselns opacitet",
+            "desc": "Öka opaciteten för kanvaspensel"
+        },
+        "decreaseBrushOpacity": {
+            "desc": "Minska kanvaspenselns opacitet",
+            "title": "Minska penselns opacitet"
+        },
+        "moveTool": {
+            "title": "Flytta",
+            "desc": "Tillåt kanvasnavigation"
+        },
+        "fillBoundingBox": {
+            "title": "Fyll ram",
+            "desc": "Fyller ramen med pensels färg"
+        },
+        "keyboardShortcuts": "Snabbtangenter",
+        "appHotkeys": "Appsnabbtangenter",
+        "selectBrush": {
+            "desc": "Välj kanvaspensel",
+            "title": "Välj pensel"
+        },
+        "selectEraser": {
+            "desc": "Välj kanvassuddgummi",
+            "title": "Välj suddgummi"
+        },
+        "eraseBoundingBox": {
+            "title": "Ta bort ram"
+        }
+    }
+}

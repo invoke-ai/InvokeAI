@@ -30,7 +30,7 @@ const invokeAIThumb = defineStyle((props) => {
 
 const invokeAIMark = defineStyle((props) => {
   return {
-    fontSize: 'xs',
+    fontSize: '2xs',
     fontWeight: '500',
     color: mode('base.700', 'base.400')(props),
     mt: 2,

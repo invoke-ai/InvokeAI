@@ -11,16 +11,16 @@ from invokeai.app.services.board_images import (
 )
 from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
 from invokeai.app.services.boards import BoardService, BoardServiceDependencies
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService, ImageServiceDependencies
-from invokeai.app.services.metadata import CoreMetadataService
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.version.invokeai_version import __version__
 
 from ..services.default_graphs import create_system_graphs
 from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
-from ..services.restoration_services import RestorationServices
 from ..services.graph import GraphExecutionState, LibraryGraph
 from ..services.image_file_storage import DiskImageFileStorage
 from ..services.invocation_queue import MemoryInvocationQueue
@@ -57,8 +57,9 @@ class ApiDependencies:
     invoker: Invoker = None
 
     @staticmethod
-    def initialize(config, event_handler_id: int, logger: Logger = logger):
-        logger.info(f"Internet connectivity is {config.internet_available}")
+    def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger):
+        logger.debug(f"InvokeAI version {__version__}")
+        logger.debug(f"Internet connectivity is {config.internet_available}")
 
         events = FastAPIEventService(event_handler_id)
 
@@ -73,7 +74,6 @@ class ApiDependencies:
         )
 
         urls = LocalUrlService()
-        metadata = CoreMetadataService()
         image_record_storage = SqliteImageRecordStorage(db_location)
         image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
         names = SimpleNameService()
@@ -109,7 +109,6 @@ class ApiDependencies:
                 board_image_record_storage=board_image_record_storage,
                 image_record_storage=image_record_storage,
                 image_file_storage=image_file_storage,
-                metadata=metadata,
                 url=urls,
                 logger=logger,
                 names=names,
@@ -118,7 +117,7 @@ class ApiDependencies:
         )
 
         services = InvocationServices(
-            model_manager=ModelManagerService(config,logger),
+            model_manager=ModelManagerService(config, logger),
             events=events,
             latents=latents,
             images=images,
@@ -130,7 +129,6 @@ class ApiDependencies:
             ),
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
-            restoration=RestorationServices(config, logger),
             configuration=config,
             logger=logger,
         )

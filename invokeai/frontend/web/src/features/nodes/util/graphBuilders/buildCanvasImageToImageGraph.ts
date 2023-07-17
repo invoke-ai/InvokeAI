@@ -1,31 +1,29 @@
+import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
+import { NonNullableGraph } from 'features/nodes/types/types';
+import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   ImageDTO,
   ImageResizeInvocation,
   ImageToLatentsInvocation,
-  RandomIntInvocation,
-  RangeOfSizeInvocation,
 } from 'services/api/types';
-import { NonNullableGraph } from 'features/nodes/types/types';
-import { log } from 'app/logging/useLogger';
+import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
+import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addVAEToGraph } from './addVAEToGraph';
 import {
-  ITERATE,
+  CLIP_SKIP,
+  IMAGE_TO_IMAGE_GRAPH,
+  IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
-  PIPELINE_MODEL_LOADER,
+  LATENTS_TO_LATENTS,
+  MAIN_MODEL_LOADER,
+  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  RANDOM_INT,
-  RANGE_OF_SIZE,
-  IMAGE_TO_IMAGE_GRAPH,
-  IMAGE_TO_LATENTS,
-  LATENTS_TO_LATENTS,
   RESIZE,
 } from './constants';
-import { set } from 'lodash-es';
-import { addControlNetToLinearGraph } from '../addControlNetToLinearGraph';
-import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 
 const moduleLog = log.child({ namespace: 'nodes' });
 
@@ -39,20 +37,27 @@ export const buildCanvasImageToImageGraph = (
   const {
     positivePrompt,
     negativePrompt,
-    model: modelId,
+    model,
     cfgScale: cfg_scale,
     scheduler,
     steps,
     img2imgStrength: strength,
-    iterations,
-    seed,
-    shouldRandomizeSeed,
+    clipSkip,
+    shouldUseCpuNoise,
+    shouldUseNoiseSettings,
   } = state.generation;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const model = modelIdToPipelineModelField(modelId);
+  if (!model) {
+    moduleLog.error('No model found in state');
+    throw new Error('No model found in state');
+  }
+
+  const use_cpu = shouldUseNoiseSettings
+    ? shouldUseCpuNoise
+    : initialGenerationState.shouldUseCpuNoise;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -80,11 +85,17 @@ export const buildCanvasImageToImageGraph = (
       [NOISE]: {
         type: 'noise',
         id: NOISE,
+        use_cpu,
       },
-      [PIPELINE_MODEL_LOADER]: {
-        type: 'pipeline_model_loader',
-        id: PIPELINE_MODEL_LOADER,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -110,7 +121,17 @@ export const buildCanvasImageToImageGraph = (
     edges: [
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
+          field: 'clip',
+        },
+        destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
@@ -120,22 +141,12 @@ export const buildCanvasImageToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
           node_id: NEGATIVE_CONDITIONING,
           field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: PIPELINE_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'vae',
         },
       },
       {
@@ -170,17 +181,7 @@ export const buildCanvasImageToImageGraph = (
       },
       {
         source: {
-          node_id: PIPELINE_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'vae',
-        },
-      },
-      {
-        source: {
-          node_id: PIPELINE_MODEL_LOADER,
+          node_id: MAIN_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
@@ -277,11 +278,51 @@ export const buildCanvasImageToImageGraph = (
     });
   }
 
-  // add dynamic prompts, mutating `graph`
-  addDynamicPromptsToGraph(graph, state);
+  // add metadata accumulator, which is only mostly populated - some fields are added later
+  graph.nodes[METADATA_ACCUMULATOR] = {
+    id: METADATA_ACCUMULATOR,
+    type: 'metadata_accumulator',
+    generation_mode: 'img2img',
+    cfg_scale,
+    height,
+    width,
+    positive_prompt: '', // set in addDynamicPromptsToGraph
+    negative_prompt: negativePrompt,
+    model,
+    seed: 0, // set in addDynamicPromptsToGraph
+    steps,
+    rand_device: use_cpu ? 'cpu' : 'cuda',
+    scheduler,
+    vae: undefined, // option; set in addVAEToGraph
+    controlnets: [], // populated in addControlNetToLinearGraph
+    loras: [], // populated in addLoRAsToGraph
+    clip_skip: clipSkip,
+    strength,
+    init_image: initialImage.image_name,
+  };
+
+  graph.edges.push({
+    source: {
+      node_id: METADATA_ACCUMULATOR,
+      field: 'metadata',
+    },
+    destination: {
+      node_id: LATENTS_TO_IMAGE,
+      field: 'metadata',
+    },
+  });
+
+  // add LoRA support
+  addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
+
+  // optionally add custom VAE
+  addVAEToGraph(state, graph);
+
+  // add dynamic prompts - also sets up core iteration and seed
+  addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(graph, LATENTS_TO_LATENTS, state);
+  addControlNetToLinearGraph(state, graph, LATENTS_TO_LATENTS);
 
   return graph;
 };

@@ -1,25 +1,25 @@
 import {
-  InputFieldTemplate,
-  InputFieldValue,
-  InvocationTemplate,
-} from 'features/nodes/types/types';
-import { memo, ReactNode, useCallback } from 'react';
-import { map } from 'lodash-es';
-import { useAppSelector } from 'app/store/storeHooks';
-import { RootState } from 'app/store/store';
-import {
   Box,
+  Divider,
   Flex,
   FormControl,
   FormLabel,
   HStack,
   Tooltip,
-  Divider,
 } from '@chakra-ui/react';
-import FieldHandle from '../FieldHandle';
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
-import InputFieldComponent from '../InputFieldComponent';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
+import {
+  InputFieldTemplate,
+  InputFieldValue,
+  InvocationTemplate,
+} from 'features/nodes/types/types';
+import { map } from 'lodash-es';
+import { ReactNode, memo, useCallback } from 'react';
+import FieldHandle from '../FieldHandle';
+import InputFieldComponent from '../InputFieldComponent';
 
 interface IAINodeInputProps {
   nodeId: string;
@@ -35,6 +35,7 @@ function IAINodeInput(props: IAINodeInputProps) {
 
   return (
     <Box
+      className="nopan"
       position="relative"
       borderColor={
         !template
@@ -136,7 +137,7 @@ const IAINodeInputs = (props: IAINodeInputsProps) => {
     });
 
     return (
-      <Flex flexDir="column" gap={2} p={2}>
+      <Flex className="nopan" flexDir="column" gap={2} p={2}>
         {IAINodeInputsToRender}
       </Flex>
     );

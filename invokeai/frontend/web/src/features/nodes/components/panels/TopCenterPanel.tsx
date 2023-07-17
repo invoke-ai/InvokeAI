@@ -1,23 +1,23 @@
 import { HStack } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
-import { memo, useCallback } from 'react';
+import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
+import { memo } from 'react';
 import { Panel } from 'reactflow';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import LoadNodesButton from '../ui/LoadNodesButton';
 import NodeInvokeButton from '../ui/NodeInvokeButton';
+import ReloadSchemaButton from '../ui/ReloadSchemaButton';
+import SaveNodesButton from '../ui/SaveNodesButton';
+import ClearNodesButton from '../ui/ClearNodesButton';
 
 const TopCenterPanel = () => {
-  const dispatch = useAppDispatch();
-
-  const handleReloadSchema = useCallback(() => {
-    dispatch(receivedOpenAPISchema());
-  }, [dispatch]);
-
   return (
     <Panel position="top-center">
       <HStack>
         <NodeInvokeButton />
-        <IAIButton onClick={handleReloadSchema}>Reload Schema</IAIButton>
+        <CancelButton />
+        <ReloadSchemaButton />
+        <SaveNodesButton />
+        <LoadNodesButton />
+        <ClearNodesButton />
       </HStack>
     </Panel>
   );

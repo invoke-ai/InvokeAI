@@ -26,9 +26,12 @@ import {
 } from '@chakra-ui/react';
 import { clamp } from 'lodash-es';
 
-import { useTranslation } from 'react-i18next';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
+import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
 import {
   FocusEvent,
+  KeyboardEvent,
   memo,
   MouseEvent,
   useCallback,
@@ -36,14 +39,9 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BiReset } from 'react-icons/bi';
 import IAIIconButton, { IAIIconButtonProps } from './IAIIconButton';
-import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
-
-const SLIDER_MARK_STYLES: ChakraProps['sx'] = {
-  mt: 1.5,
-  fontSize: '2xs',
-};
 
 export type IAIFullSliderProps = {
   label?: string;
@@ -56,7 +54,6 @@ export type IAIFullSliderProps = {
   withInput?: boolean;
   isInteger?: boolean;
   inputWidth?: string | number;
-  inputReadOnly?: boolean;
   withReset?: boolean;
   handleReset?: () => void;
   tooltipSuffix?: string;
@@ -90,7 +87,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
     withInput = false,
     isInteger = false,
     inputWidth = 16,
-    inputReadOnly = false,
     withReset = false,
     hideTooltip = false,
     isCompact = false,
@@ -109,7 +105,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
     sliderIAIIconButtonProps,
     ...rest
   } = props;
-
+  const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const [localInputValue, setLocalInputValue] = useState<
@@ -152,6 +148,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
   );
 
   const handleInputChange = useCallback((v: number | string) => {
+    console.log('input');
     setLocalInputValue(v);
   }, []);
 
@@ -167,6 +164,24 @@ const IAISlider = (props: IAIFullSliderProps) => {
       e.target.focus();
     }
   }, []);
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.shiftKey) {
+        dispatch(shiftKeyPressed(true));
+      }
+    },
+    [dispatch]
+  );
+
+  const handleKeyUp = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (!e.shiftKey) {
+        dispatch(shiftKeyPressed(false));
+      }
+    },
+    [dispatch]
+  );
 
   return (
     <FormControl
@@ -187,7 +202,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
       {...sliderFormControlProps}
     >
       {label && (
-        <FormLabel {...sliderFormLabelProps} mb={-1}>
+        <FormLabel sx={withInput ? { mb: -1.5 } : {}} {...sliderFormLabelProps}>
           {label}
         </FormLabel>
       )}
@@ -213,7 +228,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
                 sx={{
                   insetInlineStart: '0 !important',
                   insetInlineEnd: 'unset !important',
-                  ...SLIDER_MARK_STYLES,
                 }}
                 {...sliderMarkProps}
               >
@@ -224,7 +238,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
                 sx={{
                   insetInlineStart: 'unset !important',
                   insetInlineEnd: '0 !important',
-                  ...SLIDER_MARK_STYLES,
                 }}
                 {...sliderMarkProps}
               >
@@ -243,7 +256,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
                       sx={{
                         insetInlineStart: '0 !important',
                         insetInlineEnd: 'unset !important',
-                        ...SLIDER_MARK_STYLES,
                       }}
                       {...sliderMarkProps}
                     >
@@ -258,7 +270,6 @@ const IAISlider = (props: IAIFullSliderProps) => {
                       sx={{
                         insetInlineStart: 'unset !important',
                         insetInlineEnd: '0 !important',
-                        ...SLIDER_MARK_STYLES,
                       }}
                       {...sliderMarkProps}
                     >
@@ -271,7 +282,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
                       key={m}
                       value={m}
                       sx={{
-                        ...SLIDER_MARK_STYLES,
+                        transform: 'translateX(-50%)',
                       }}
                       {...sliderMarkProps}
                     >
@@ -311,7 +322,8 @@ const IAISlider = (props: IAIFullSliderProps) => {
             {...sliderNumberInputProps}
           >
             <NumberInputField
-              readOnly={inputReadOnly}
+              onKeyDown={handleKeyDown}
+              onKeyUp={handleKeyUp}
               minWidth={inputWidth}
               {...sliderNumberInputFieldProps}
             />

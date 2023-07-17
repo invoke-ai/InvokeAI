@@ -1,61 +1,71 @@
-import { SelectItem } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
+  MainModelInputFieldValue,
   ModelInputFieldTemplate,
-  ModelInputFieldValue,
 } from 'features/nodes/types/types';
 
-import { memo, useCallback, useEffect, useMemo } from 'react';
-import { FieldComponentProps } from './types';
-import { forEach, isString } from 'lodash-es';
-import { MODEL_TYPE_MAP as BASE_MODEL_NAME_MAP } from 'features/system/components/ModelSelect';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { SelectItem } from '@mantine/core';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
+import { forEach } from 'lodash-es';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useListModelsQuery } from 'services/api/endpoints/models';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { FieldComponentProps } from './types';
 
 const ModelInputFieldComponent = (
-  props: FieldComponentProps<ModelInputFieldValue, ModelInputFieldTemplate>
+  props: FieldComponentProps<MainModelInputFieldValue, ModelInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { data: pipelineModels } = useListModelsQuery({
-    model_type: 'main',
-  });
+  const { data: mainModels, isLoading } = useGetMainModelsQuery();
 
   const data = useMemo(() => {
-    if (!pipelineModels) {
+    if (!mainModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(pipelineModels.entities, (model, id) => {
+    forEach(mainModels.entities, (model, id) => {
       if (!model) {
         return;
       }
 
       data.push({
         value: id,
-        label: model.name,
-        group: BASE_MODEL_NAME_MAP[model.base_model],
+        label: model.model_name,
+        group: MODEL_TYPE_MAP[model.base_model],
       });
     });
 
     return data;
-  }, [pipelineModels]);
+  }, [mainModels]);
 
+  // grab the full model entity from the RTK Query cache
+  // TODO: maybe we should just store the full model entity in state?
   const selectedModel = useMemo(
-    () => pipelineModels?.entities[field.value ?? pipelineModels.ids[0]],
-    [pipelineModels?.entities, pipelineModels?.ids, field.value]
+    () =>
+      mainModels?.entities[
+        `${field.value?.base_model}/main/${field.value?.model_name}`
+      ] ?? null,
+    [field.value?.base_model, field.value?.model_name, mainModels?.entities]
   );
 
-  const handleValueChanged = useCallback(
+  const handleChangeModel = useCallback(
     (v: string | null) => {
       if (!v) {
+        return;
+      }
+
+      const newModel = modelIdToMainModelParam(v);
+
+      if (!newModel) {
         return;
       }
 
@@ -63,38 +73,32 @@ const ModelInputFieldComponent = (
         fieldValueChanged({
           nodeId,
           fieldName: field.name,
-          value: v,
+          value: newModel,
         })
       );
     },
     [dispatch, field.name, nodeId]
   );
 
-  useEffect(() => {
-    if (field.value && pipelineModels?.ids.includes(field.value)) {
-      return;
-    }
-
-    const firstModel = pipelineModels?.ids[0];
-
-    if (!isString(firstModel)) {
-      return;
-    }
-
-    handleValueChanged(firstModel);
-  }, [field.value, handleValueChanged, pipelineModels?.ids]);
-
-  return (
-    <IAIMantineSelect
+  return isLoading ? (
+    <IAIMantineSearchableSelect
+      label={t('modelManager.model')}
+      placeholder="Loading..."
+      disabled={true}
+      data={[]}
+    />
+  ) : (
+    <IAIMantineSearchableSelect
       tooltip={selectedModel?.description}
       label={
-        selectedModel?.base_model &&
-        BASE_MODEL_NAME_MAP[selectedModel?.base_model]
+        selectedModel?.base_model && MODEL_TYPE_MAP[selectedModel?.base_model]
       }
-      value={field.value}
-      placeholder="Pick one"
+      value={selectedModel?.id}
+      placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
       data={data}
-      onChange={handleValueChanged}
+      error={data.length === 0}
+      disabled={data.length === 0}
+      onChange={handleChangeModel}
     />
   );
 };

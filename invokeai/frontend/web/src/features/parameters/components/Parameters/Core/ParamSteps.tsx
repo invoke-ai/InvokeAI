@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAINumberInput from 'common/components/IAINumberInput';
 
 import IAISlider from 'common/components/IAISlider';
@@ -33,7 +34,8 @@ const selector = createSelector(
       step,
       shouldUseSliders,
     };
-  }
+  },
+  defaultSelectorOptions
 );
 
 const ParamSteps = () => {

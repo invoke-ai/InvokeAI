@@ -9,7 +9,6 @@ const VaeInputFieldComponent = (
   props: FieldComponentProps<VaeInputFieldValue, VaeInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
-
   return null;
 };
 

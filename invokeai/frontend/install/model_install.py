@@ -256,6 +256,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         widgets = dict()
         model_list = [x for x in self.all_models if self.all_models[x].model_type==model_type and not x in exclude]
         model_labels = [self.model_labels[x] for x in model_list]
+
+        show_recommended = len(self.installed_models)==0
         if len(model_list) > 0:
             max_width = max([len(x) for x in model_labels])
             columns = window_width // (max_width+8)  # 8 characters for "[x] " and padding
@@ -280,7 +282,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                     value=[
                         model_list.index(x)
                         for x in model_list
-                        if self.all_models[x].installed
+                        if (show_recommended and self.all_models[x].recommended) \
+                            or self.all_models[x].installed
                     ],
                     max_height=len(model_list)//columns + 1,
                     relx=4,
@@ -382,10 +385,21 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         )
         return min(cols, len(self.installed_models))
 
+    def confirm_deletions(self, selections: InstallSelections)->bool:
+        remove_models = selections.remove_models
+        if len(remove_models) > 0:
+            mods = "\n".join([ModelManager.parse_key(x)[0] for x in remove_models])
+            return npyscreen.notify_ok_cancel(f"These unchecked models will be deleted from disk. Continue?\n---------\n{mods}")
+        else:
+            return True
+
     def on_execute(self):
-        self.monitor.entry_widget.buffer(['Processing...'],scroll_end=True)
         self.marshall_arguments()
         app = self.parentApp
+        if not self.confirm_deletions(app.install_selections):
+            return
+            
+        self.monitor.entry_widget.buffer(['Processing...'],scroll_end=True)
         self.ok_button.hidden = True
         self.display()
         
@@ -417,6 +431,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         
     def on_done(self):
         self.marshall_arguments()
+        if not self.confirm_deletions(self.parentApp.install_selections):
+            return
         self.parentApp.setNextForm(None)
         self.parentApp.user_cancelled = False
         self.editing = False
@@ -659,7 +675,9 @@ def select_and_download_models(opt: Namespace):
     # pass
     
     installer = ModelInstall(config, prediction_type_helper=helper)
-    if opt.add or opt.delete:
+    if opt.list_models:
+        installer.list_models(opt.list_models)
+    elif opt.add or opt.delete:
         selections = InstallSelections(
             install_models = opt.add or [],
             remove_models = opt.delete or []
@@ -678,9 +696,8 @@ def select_and_download_models(opt: Namespace):
 
     # this is where the TUI is called
     else:
-        # needed because the torch library is loaded, even though we don't use it
-        # currently commented out because it has started generating errors (?)
-        # torch.multiprocessing.set_start_method("spawn")
+        # needed to support the probe() method running under a subprocess
+        torch.multiprocessing.set_start_method("spawn")
 
         # the third argument is needed in the Windows 11 environment in
         # order to launch and resize a console window running this program
@@ -733,7 +750,7 @@ def main():
     )
     parser.add_argument(
         "--list-models",
-        choices=["diffusers","loras","controlnets","tis"],
+        choices=[x.value for x in ModelType],
         help="list installed models",
     )
     parser.add_argument(
@@ -761,7 +778,7 @@ def main():
     config.parse_args(invoke_args)
     logger = InvokeAILogger().getLogger(config=config)
 
-    if not (config.root_dir / config.conf_path.parent).exists():
+    if not config.model_conf_path.exists():
         logger.info(
             "Your InvokeAI root directory is not set up. Calling invokeai-configure."
         )

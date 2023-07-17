@@ -1,7 +1,6 @@
 import { log } from 'app/logging/useLogger';
-import { startAppListening } from '..';
-import { imageMetadataReceived } from 'services/api/thunks/image';
 import { boardImagesApi } from 'services/api/endpoints/boardImages';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'boards' });
 
@@ -14,12 +13,6 @@ export const addImageAddedToBoardFulfilledListener = () => {
       moduleLog.debug(
         { data: { board_id, image_name } },
         'Image added to board'
-      );
-
-      dispatch(
-        imageMetadataReceived({
-          image_name,
-        })
       );
     },
   });

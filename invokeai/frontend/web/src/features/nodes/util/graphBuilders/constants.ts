@@ -7,7 +7,10 @@ export const NOISE = 'noise';
 export const RANDOM_INT = 'rand_int';
 export const RANGE_OF_SIZE = 'range_of_size';
 export const ITERATE = 'iterate';
-export const PIPELINE_MODEL_LOADER = 'pipeline_model_loader';
+export const MAIN_MODEL_LOADER = 'main_model_loader';
+export const VAE_LOADER = 'vae_loader';
+export const LORA_LOADER = 'lora_loader';
+export const CLIP_SKIP = 'clip_skip';
 export const IMAGE_TO_LATENTS = 'image_to_latents';
 export const LATENTS_TO_LATENTS = 'latents_to_latents';
 export const RESIZE = 'resize_image';
@@ -16,6 +19,7 @@ export const CONTROL_NET_COLLECT = 'control_net_collect';
 export const DYNAMIC_PROMPT = 'dynamic_prompt';
 export const IMAGE_COLLECTION = 'image_collection';
 export const IMAGE_COLLECTION_ITERATE = 'image_collection_iterate';
+export const METADATA_ACCUMULATOR = 'metadata_accumulator';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';

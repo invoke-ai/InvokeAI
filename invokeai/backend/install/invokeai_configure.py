@@ -30,8 +30,6 @@ from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
 from tqdm import tqdm
 from transformers import (
-    AutoProcessor,
-    CLIPSegForImageSegmentation,
     CLIPTextModel,
     CLIPTokenizer,
     AutoFeatureExtractor,
@@ -76,7 +74,7 @@ Weights_dir = "ldm/stable-diffusion-v1/"
 Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
 
-PRECISION_CHOICES = ['auto','float16','float32','autocast']
+PRECISION_CHOICES = ['auto','float16','float32']
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -225,64 +223,30 @@ def download_conversion_models():
 
 # ---------------------------------------------
 def download_realesrgan():
-    logger.info("Installing models from RealESRGAN...")
-    model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
-    wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
-
-    model_dest = config.root_path / "models/core/upscaling/realesrgan/realesr-general-x4v3.pth"
-    wdn_model_dest = config.root_path / "models/core/upscaling/realesrgan/realesr-general-wdn-x4v3.pth"
-
-    download_with_progress_bar(model_url, str(model_dest), "RealESRGAN")
-    download_with_progress_bar(wdn_model_url, str(wdn_model_dest), "RealESRGANwdn")
-
-
-def download_gfpgan():
-    logger.info("Installing GFPGAN models...")
-    for model in (
-        [
-            "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
-            "./models/core/face_restoration/gfpgan/GFPGANv1.4.pth",
-        ],
-        [
-            "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
-            "./models/core/face_restoration/gfpgan/weights/detection_Resnet50_Final.pth",
-        ],
-        [
-            "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
-            "./models/core/face_restoration/gfpgan/weights/parsing_parsenet.pth",
-        ],
-    ):
-        model_url, model_dest = model[0], config.root_path / model[1]
-        download_with_progress_bar(model_url, str(model_dest), "GFPGAN weights")
-
+    logger.info("Installing RealESRGAN models...")
+    URLs = [
+        dict(
+            url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+            dest = "core/upscaling/realesrgan/RealESRGAN_x4plus.pth",
+            description = "RealESRGAN_x4plus.pth",
+        ),
+        dict(
+            url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+            dest = "core/upscaling/realesrgan/RealESRGAN_x4plus_anime_6B.pth",
+            description = "RealESRGAN_x4plus_anime_6B.pth",
+        ),
+        dict(
+            url= "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+            dest= "core/upscaling/realesrgan/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+            description = "ESRGAN_SRx4_DF2KOST_official.pth",
+        ),
+    ]
+    for model in URLs:
+        download_with_progress_bar(model['url'], config.models_path / model['dest'], model['description'])
 
 # ---------------------------------------------
-def download_codeformer():
-    logger.info("Installing CodeFormer model file...")
-    model_url = (
-        "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
-    )
-    model_dest = config.root_path / "models/core/face_restoration/codeformer/codeformer.pth"
-    download_with_progress_bar(model_url, str(model_dest), "CodeFormer")
-
-
-# ---------------------------------------------
-def download_clipseg():
-    logger.info("Installing clipseg model for text-based masking...")
-    CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
-    try:
-        hf_download_from_pretrained(AutoProcessor, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
-        hf_download_from_pretrained(CLIPSegForImageSegmentation, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
-    except Exception:
-        logger.info("Error installing clipseg model:")
-        logger.info(traceback.format_exc())
-
-
 def download_support_models():
     download_realesrgan()
-    download_gfpgan()
-    download_codeformer()
-    download_clipseg()
     download_conversion_models()
 
 # -------------------------------------
@@ -359,9 +323,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             scroll_exit=True,
         )
         self.nextrely += 1
-        label = """If you have an account at HuggingFace you may optionally paste your access token here
-to allow InvokeAI to download restricted styles & subjects from the "Concept Library". See https://huggingface.co/settings/tokens.
-"""
+        label = """HuggingFace access token (OPTIONAL) for automatic model downloads. See https://huggingface.co/settings/tokens."""
         for line in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
                 npyscreen.FixedText,
@@ -423,6 +385,7 @@ to allow InvokeAI to download restricted styles & subjects from the "Concept Lib
         )
         self.precision = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
+            columns = 2,
             name="Precision",
             values=PRECISION_CHOICES,
             value=PRECISION_CHOICES.index(precision),
@@ -430,13 +393,13 @@ to allow InvokeAI to download restricted styles & subjects from the "Concept Lib
             max_height=len(PRECISION_CHOICES) + 1,
             scroll_exit=True,
         )
-        self.max_loaded_models = self.add_widget_intelligent(
+        self.max_cache_size = self.add_widget_intelligent(
             IntTitleSlider,
-            name="Number of models to cache in CPU memory (each will use 2-4 GB!)",
-            value=old_opts.max_loaded_models,
-            out_of=10,
-            lowest=1,
-            begin_entry_at=4,
+            name="Size of the RAM cache used for fast model switching (GB)",
+            value=old_opts.max_cache_size,
+            out_of=20,
+            lowest=3,
+            begin_entry_at=6,
             scroll_exit=True,
         )
         self.nextrely += 1
@@ -539,7 +502,7 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
                 "outdir",
                 "nsfw_checker",
                 "free_gpu_mem",
-                "max_loaded_models",
+                "max_cache_size",
                 "xformers_enabled",
                 "always_use_cpu",
         ]:
@@ -555,9 +518,6 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
         new_opts.license_acceptance = self.license_acceptance.value
         new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
         
-        # widget library workaround to make max_loaded_models an int rather than a float
-        new_opts.max_loaded_models = int(new_opts.max_loaded_models)
-
         return new_opts
 
 
@@ -861,9 +821,9 @@ def main():
             download_support_models()
 
         if opt.skip_sd_weights:
-            logger.info("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
+            logger.warning("SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST")
         elif models_to_download:
-            logger.info("\n** DOWNLOADING DIFFUSION WEIGHTS **")
+            logger.info("DOWNLOADING DIFFUSION WEIGHTS")
             process_and_execute(opt, models_to_download)
 
         postscript(errors=errors)

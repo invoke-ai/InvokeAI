@@ -6,30 +6,22 @@ import {
   useColorMode,
   useColorModeValue,
 } from '@chakra-ui/react';
-import { useCombinedRefs } from '@dnd-kit/utilities';
-import IAIIconButton from 'common/components/IAIIconButton';
-import {
-  IAILoadingImageFallback,
-  IAINoContentFallback,
-} from 'common/components/IAIImageFallback';
-import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
-import { AnimatePresence } from 'framer-motion';
-import { MouseEvent, ReactElement, SyntheticEvent } from 'react';
-import { memo, useRef } from 'react';
-import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
-import { ImageDTO } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
-import IAIDropOverlay from './IAIDropOverlay';
-import { PostUploadAction } from 'services/api/thunks/image';
-import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { mode } from 'theme/util/mode';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
-  isValidDrop,
-  useDraggable,
-  useDroppable,
 } from 'app/components/ImageDnd/typesafeDnd';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
+import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { MouseEvent, ReactElement, SyntheticEvent, memo } from 'react';
+import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
+import { PostUploadAction } from 'services/api/thunks/image';
+import { ImageDTO } from 'services/api/types';
+import { mode } from 'theme/util/mode';
+import IAIDraggable from './IAIDraggable';
+import IAIDroppable from './IAIDroppable';
+import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 
 type IAIDndImageProps = {
   imageDTO: ImageDTO | undefined;
@@ -83,28 +75,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
 
   const { colorMode } = useColorMode();
 
-  const dndId = useRef(uuidv4());
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef: setDraggableRef,
-    isDragging,
-    active,
-  } = useDraggable({
-    id: dndId.current,
-    disabled: isDragDisabled || !imageDTO,
-    data: draggableData,
-  });
-
-  const { isOver, setNodeRef: setDroppableRef } = useDroppable({
-    id: dndId.current,
-    disabled: isDropDisabled,
-    data: droppableData,
-  });
-
-  const setDndRef = useCombinedRefs(setDroppableRef, setDraggableRef);
-
   const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
     postUploadAction,
     isDisabled: isUploadDisabled,
@@ -127,51 +97,98 @@ const IAIDndImage = (props: IAIDndImageProps) => {
       };
 
   return (
-    <Flex
-      sx={{
-        width: 'full',
-        height: 'full',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        minW: minSize ? minSize : undefined,
-        minH: minSize ? minSize : undefined,
-        userSelect: 'none',
-        cursor: isDragDisabled || !imageDTO ? 'default' : 'pointer',
-      }}
-      {...attributes}
-      {...listeners}
-      ref={setDndRef}
-    >
-      {imageDTO && (
+    <ImageContextMenu imageDTO={imageDTO}>
+      {(ref) => (
         <Flex
+          ref={ref}
           sx={{
-            w: 'full',
-            h: 'full',
-            position: fitContainer ? 'absolute' : 'relative',
+            width: 'full',
+            height: 'full',
             alignItems: 'center',
             justifyContent: 'center',
+            position: 'relative',
+            minW: minSize ? minSize : undefined,
+            minH: minSize ? minSize : undefined,
+            userSelect: 'none',
+            cursor: isDragDisabled || !imageDTO ? 'default' : 'pointer',
           }}
         >
-          <Image
-            onClick={onClick}
-            src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
-            fallbackStrategy="beforeLoadOrError"
-            fallback={<IAILoadingImageFallback image={imageDTO} />}
-            onError={onError}
-            draggable={false}
-            sx={{
-              objectFit: 'contain',
-              maxW: 'full',
-              maxH: 'full',
-              borderRadius: 'base',
-              shadow: isSelected ? 'selected.light' : undefined,
-              _dark: { shadow: isSelected ? 'selected.dark' : undefined },
-              ...imageSx,
-            }}
-          />
-          {withMetadataOverlay && <ImageMetadataOverlay image={imageDTO} />}
-          {onClickReset && withResetIcon && (
+          {imageDTO && (
+            <Flex
+              sx={{
+                w: 'full',
+                h: 'full',
+                position: fitContainer ? 'absolute' : 'relative',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Image
+                src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
+                fallbackStrategy="beforeLoadOrError"
+                // If we fall back to thumbnail, it feels much snappier than the skeleton...
+                fallbackSrc={imageDTO.thumbnail_url}
+                // fallback={<IAILoadingImageFallback image={imageDTO} />}
+                width={imageDTO.width}
+                height={imageDTO.height}
+                onError={onError}
+                draggable={false}
+                sx={{
+                  objectFit: 'contain',
+                  maxW: 'full',
+                  maxH: 'full',
+                  borderRadius: 'base',
+                  shadow: isSelected ? 'selected.light' : undefined,
+                  _dark: { shadow: isSelected ? 'selected.dark' : undefined },
+                  ...imageSx,
+                }}
+              />
+              {withMetadataOverlay && <ImageMetadataOverlay image={imageDTO} />}
+            </Flex>
+          )}
+          {!imageDTO && !isUploadDisabled && (
+            <>
+              <Flex
+                sx={{
+                  minH: minSize,
+                  w: 'full',
+                  h: 'full',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 'base',
+                  transitionProperty: 'common',
+                  transitionDuration: '0.1s',
+                  color: mode('base.500', 'base.500')(colorMode),
+                  ...uploadButtonStyles,
+                }}
+                {...getUploadButtonProps()}
+              >
+                <input {...getUploadInputProps()} />
+                <Icon
+                  as={FaUpload}
+                  sx={{
+                    boxSize: 16,
+                  }}
+                />
+              </Flex>
+            </>
+          )}
+          {!imageDTO && isUploadDisabled && noContentFallback}
+          {!isDropDisabled && (
+            <IAIDroppable
+              data={droppableData}
+              disabled={isDropDisabled}
+              dropLabel={dropLabel}
+            />
+          )}
+          {imageDTO && !isDragDisabled && (
+            <IAIDraggable
+              data={draggableData}
+              disabled={isDragDisabled || !imageDTO}
+              onClick={onClick}
+            />
+          )}
+          {onClickReset && withResetIcon && imageDTO && (
             <IAIIconButton
               onClick={onClickReset}
               aria-label={resetTooltip}
@@ -197,40 +214,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           )}
         </Flex>
       )}
-      {!imageDTO && !isUploadDisabled && (
-        <>
-          <Flex
-            sx={{
-              minH: minSize,
-              w: 'full',
-              h: 'full',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 'base',
-              transitionProperty: 'common',
-              transitionDuration: '0.1s',
-              color: mode('base.500', 'base.500')(colorMode),
-              ...uploadButtonStyles,
-            }}
-            {...getUploadButtonProps()}
-          >
-            <input {...getUploadInputProps()} />
-            <Icon
-              as={FaUpload}
-              sx={{
-                boxSize: 16,
-              }}
-            />
-          </Flex>
-        </>
-      )}
-      {!imageDTO && isUploadDisabled && noContentFallback}
-      <AnimatePresence>
-        {isValidDrop(droppableData, active) && !isDragging && (
-          <IAIDropOverlay isOver={isOver} label={dropLabel} />
-        )}
-      </AnimatePresence>
-    </Flex>
+    </ImageContextMenu>
   );
 };
 

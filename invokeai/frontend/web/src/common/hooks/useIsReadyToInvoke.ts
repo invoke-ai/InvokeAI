@@ -3,33 +3,32 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { modelsApi } from '../../services/api/endpoints/models';
+import { forEach } from 'lodash-es';
 
 const readinessSelector = createSelector(
   [stateSelector, activeTabNameSelector],
-  ({ generation, system, batch }, activeTabName) => {
+  (state, activeTabName) => {
+    const { generation, system } = state;
     const { shouldGenerateVariations, seedWeights, initialImage, seed } =
       generation;
 
     const { isProcessing, isConnected } = system;
-    const {
-      isEnabled: isBatchEnabled,
-      asInitialImage,
-      imageNames: batchImageNames,
-    } = batch;
 
     let isReady = true;
     const reasonsWhyNotReady: string[] = [];
 
-    if (
-      activeTabName === 'img2img' &&
-      !initialImage &&
-      !(asInitialImage && batchImageNames.length > 1)
-    ) {
+    if (activeTabName === 'img2img' && !initialImage) {
       isReady = false;
       reasonsWhyNotReady.push('No initial image selected');
+    }
+
+    const { isSuccess: mainModelsSuccessfullyLoaded } =
+      modelsApi.endpoints.getMainModels.select()(state);
+    if (!mainModelsSuccessfullyLoaded) {
+      isReady = false;
+      reasonsWhyNotReady.push('Models are not loaded');
     }
 
     // TODO: job queue
@@ -53,6 +52,13 @@ const readinessSelector = createSelector(
       isReady = false;
       reasonsWhyNotReady.push('Seed-Weights badly formatted.');
     }
+
+    forEach(state.controlNet.controlNets, (controlNet, id) => {
+      if (!controlNet.model) {
+        isReady = false;
+        reasonsWhyNotReady.push('ControlNet ${id} has no model selected.');
+      }
+    });
 
     // All good
     return { isReady, reasonsWhyNotReady };

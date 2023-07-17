@@ -1,10 +1,9 @@
-import { Graph } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
-import { cloneDeep, omit, reduce } from 'lodash-es';
 import { RootState } from 'app/store/store';
 import { InputFieldValue } from 'features/nodes/types/types';
+import { cloneDeep, omit, reduce } from 'lodash-es';
+import { Graph } from 'services/api/types';
 import { AnyInvocation } from 'services/events/types';
-import { modelIdToPipelineModelField } from '../modelIdToPipelineModelField';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * We need to do special handling for some fields
@@ -25,12 +24,6 @@ export const parseFieldValue = (field: InputFieldValue) => {
     }
   }
 
-  if (field.type === 'model') {
-    if (field.value) {
-      return modelIdToPipelineModelField(field.value);
-    }
-  }
-
   return field.value;
 };
 
@@ -40,8 +33,10 @@ export const parseFieldValue = (field: InputFieldValue) => {
 export const buildNodesGraph = (state: RootState): Graph => {
   const { nodes, edges } = state.nodes;
 
+  const filteredNodes = nodes.filter((n) => n.type !== 'progress_image');
+
   // Reduce the node editor nodes into invocation graph nodes
-  const parsedNodes = nodes.reduce<NonNullable<Graph['nodes']>>(
+  const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>(
     (nodesAccumulator, node, nodeIndex) => {
       const { id, data } = node;
       const { type, inputs } = data;

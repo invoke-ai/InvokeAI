@@ -1,50 +1,61 @@
-import { memo, useCallback, useMemo, useState } from 'react';
-import { ImageDTO } from 'services/api/types';
-import {
-  ControlNetConfig,
-  controlNetImageChanged,
-  controlNetSelector,
-} from '../store/controlNetSlice';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { Box, Flex, SystemStyleObject } from '@chakra-ui/react';
-import IAIDndImage from 'common/components/IAIDndImage';
+import { Box, Flex, Spinner, SystemStyleObject } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { IAILoadingImageFallback } from 'common/components/IAIImageFallback';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { FaUndo } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'app/components/ImageDnd/typesafeDnd';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIDndImage from 'common/components/IAIDndImage';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/thunks/image';
-
-const selector = createSelector(
-  controlNetSelector,
-  (controlNet) => {
-    const { pendingControlImages } = controlNet;
-    return { pendingControlImages };
-  },
-  defaultSelectorOptions
-);
+import { controlNetImageChanged } from '../store/controlNetSlice';
 
 type Props = {
-  controlNet: ControlNetConfig;
+  controlNetId: string;
   height: SystemStyleObject['h'];
 };
 
 const ControlNetImagePreview = (props: Props) => {
-  const { height } = props;
-  const {
-    controlNetId,
-    controlImage: controlImageName,
-    processedControlImage: processedControlImageName,
-    processorType,
-  } = props.controlNet;
+  const { height, controlNetId } = props;
   const dispatch = useAppDispatch();
-  const { pendingControlImages } = useAppSelector(selector);
+
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ controlNet }) => {
+          const { pendingControlImages } = controlNet;
+          const {
+            controlImage,
+            processedControlImage,
+            processorType,
+            isEnabled,
+          } = controlNet.controlNets[controlNetId];
+
+          return {
+            controlImageName: controlImage,
+            processedControlImageName: processedControlImage,
+            processorType,
+            isEnabled,
+            pendingControlImages,
+          };
+        },
+        defaultSelectorOptions
+      ),
+    [controlNetId]
+  );
+
+  const {
+    controlImageName,
+    processedControlImageName,
+    processorType,
+    pendingControlImages,
+    isEnabled,
+  } = useAppSelector(selector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
@@ -83,15 +94,14 @@ const ControlNetImagePreview = (props: Props) => {
     }
   }, [controlImage, controlNetId]);
 
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(() => {
-    if (controlNetId) {
-      return {
-        id: controlNetId,
-        actionType: 'SET_CONTROLNET_IMAGE',
-        context: { controlNetId },
-      };
-    }
-  }, [controlNetId]);
+  const droppableData = useMemo<TypesafeDroppableData | undefined>(
+    () => ({
+      id: controlNetId,
+      actionType: 'SET_CONTROLNET_IMAGE',
+      context: { controlNetId },
+    }),
+    [controlNetId]
+  );
 
   const postUploadAction = useMemo<PostUploadAction>(
     () => ({ type: 'SET_CONTROLNET_IMAGE', controlNetId }),
@@ -115,13 +125,15 @@ const ControlNetImagePreview = (props: Props) => {
         h: height,
         alignItems: 'center',
         justifyContent: 'center',
+        pointerEvents: isEnabled ? 'auto' : 'none',
+        opacity: isEnabled ? 1 : 0.5,
       }}
     >
       <IAIDndImage
         draggableData={draggableData}
         droppableData={droppableData}
         imageDTO={controlImage}
-        isDropDisabled={shouldShowProcessedImage}
+        isDropDisabled={shouldShowProcessedImage || !isEnabled}
         onClickReset={handleResetControlImage}
         postUploadAction={postUploadAction}
         resetTooltip="Reset Control Image"
@@ -145,24 +157,35 @@ const ControlNetImagePreview = (props: Props) => {
           droppableData={droppableData}
           imageDTO={processedControlImage}
           isUploadDisabled={true}
+          isDropDisabled={!isEnabled}
           onClickReset={handleResetControlImage}
           resetTooltip="Reset Control Image"
           withResetIcon={Boolean(controlImage)}
         />
       </Box>
       {pendingControlImages.includes(controlNetId) && (
-        <Box
+        <Flex
           sx={{
             position: 'absolute',
             top: 0,
             insetInlineStart: 0,
             w: 'full',
             h: 'full',
-            objectFit: 'contain',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.8,
+            borderRadius: 'base',
+            bg: 'base.400',
+            _dark: {
+              bg: 'base.900',
+            },
           }}
         >
-          <IAILoadingImageFallback image={controlImage} />
-        </Box>
+          <Spinner
+            size="xl"
+            sx={{ color: 'base.100', _dark: { color: 'base.400' } }}
+          />
+        </Flex>
       )}
     </Flex>
   );

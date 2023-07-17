@@ -1,21 +1,20 @@
-import { startAppListening } from '..';
-import { imageDeleted } from 'services/api/thunks/image';
 import { log } from 'app/logging/useLogger';
-import { clamp } from 'lodash-es';
-import {
-  imageSelected,
-  imageRemoved,
-  selectImagesIds,
-} from 'features/gallery/store/gallerySlice';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
-import { api } from 'services/api';
+import { selectNextImageToSelect } from 'features/gallery/store/gallerySelectors';
+import {
+  imageRemoved,
+  imageSelected,
+} from 'features/gallery/store/gallerySlice';
 import {
   imageDeletionConfirmed,
   isModalOpenChanged,
 } from 'features/imageDeletion/store/imageDeletionSlice';
+import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import { api } from 'services/api';
+import { imageDeleted } from 'services/api/thunks/image';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -37,24 +36,10 @@ export const addRequestedImageDeletionListener = () => {
         state.gallery.selection[state.gallery.selection.length - 1];
 
       if (lastSelectedImage === image_name) {
-        const ids = selectImagesIds(state);
-
-        const deletedImageIndex = ids.findIndex(
-          (result) => result.toString() === image_name
-        );
-
-        const filteredIds = ids.filter((id) => id.toString() !== image_name);
-
-        const newSelectedImageIndex = clamp(
-          deletedImageIndex,
-          0,
-          filteredIds.length - 1
-        );
-
-        const newSelectedImageId = filteredIds[newSelectedImageIndex];
+        const newSelectedImageId = selectNextImageToSelect(state, image_name);
 
         if (newSelectedImageId) {
-          dispatch(imageSelected(newSelectedImageId as string));
+          dispatch(imageSelected(newSelectedImageId));
         } else {
           dispatch(imageSelected(null));
         }

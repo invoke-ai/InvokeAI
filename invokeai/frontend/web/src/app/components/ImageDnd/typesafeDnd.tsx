@@ -79,7 +79,7 @@ export type ImageDraggableData = BaseDragData & {
 
 export type ImageNamesDraggableData = BaseDragData & {
   payloadType: 'IMAGE_NAMES';
-  payload: { imageNames: string[] };
+  payload: { image_names: string[] };
 };
 
 export type TypesafeDraggableData =
