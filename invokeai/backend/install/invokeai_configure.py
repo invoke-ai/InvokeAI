@@ -69,7 +69,6 @@ transformers.logging.set_verbosity_error()
 config = InvokeAIAppConfig.get_config()
 
 Model_dir = "models"
-Weights_dir = "ldm/stable-diffusion-v1/"
 
 Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
@@ -706,7 +705,7 @@ def migrate_if_needed(opt: Namespace, root: Path)->bool:
     old_init_file = root / 'invokeai.init'
     new_init_file = root / 'invokeai.yaml'
     old_hub = root / 'models/hub'
-    migration_needed =  old_init_file.exists() and not new_init_file.exists() or old_hub.exists()
+    migration_needed =  (old_init_file.exists() and not new_init_file.exists()) and old_hub.exists()
     
     if migration_needed:
         if opt.yes_to_all or \
