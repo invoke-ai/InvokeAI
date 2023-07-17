@@ -18,6 +18,7 @@ from invokeai.backend.model_management import (
     SchedulerPredictionType,
     ModelMerger,
     MergeInterpolationMethod,
+    ModelNotFoundException,
 )
 from invokeai.backend.model_management.model_search import FindModels
 
@@ -145,7 +146,7 @@ class ModelManagerServiceBase(ABC):
     ) -> AddModelResult:
         """
         Update the named model with a dictionary of attributes. Will fail with a
-        KeyErrorException if the name does not already exist.
+        ModelNotFoundException if the name does not already exist.
 
         On a successful update, the config will be changed in memory. Will fail 
         with an assertion error if provided attributes are incorrect or 
@@ -451,14 +452,14 @@ class ModelManagerService(ModelManagerServiceBase):
     ) -> AddModelResult:
         """
         Update the named model with a dictionary of attributes. Will fail with a
-        KeyError exception if the name does not already exist.
+        ModelNotFoundException exception if the name does not already exist.
         On a successful update, the config will be changed in memory. Will fail 
         with an assertion error if provided attributes are incorrect or 
         the model name is missing. Call commit() to write changes to disk.
         """
         self.logger.debug(f'update model {model_name}')
         if not self.model_exists(model_name, base_model, model_type):
-            raise KeyError(f"Unknown model {model_name}")
+            raise ModelNotFoundException(f"Unknown model {model_name}")
         return self.add_model(model_name, base_model, model_type, model_attributes, clobber=True)
     
     def del_model(
