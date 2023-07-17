@@ -568,7 +568,7 @@ class ModelManager(object):
                 model_type=cur_model_type,
             )
 
-            # expose paths as absolute
+            # expose paths as absolute to help web UI
             if path := model_dict.get('path'):
                 model_dict['path'] = str(self.app_config.root_path / path)
             models.append(model_dict)
