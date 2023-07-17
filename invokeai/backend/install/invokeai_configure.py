@@ -30,8 +30,6 @@ from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
 from tqdm import tqdm
 from transformers import (
-    AutoProcessor,
-    CLIPSegForImageSegmentation,
     CLIPTextModel,
     CLIPTokenizer,
     AutoFeatureExtractor,
@@ -45,7 +43,6 @@ from invokeai.app.services.config import (
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 from invokeai.frontend.install.widgets import (
-    SingleSelectColumns,
     CenteredButtonPress,
     IntTitleSlider,
     set_min_terminal_size,
@@ -226,64 +223,30 @@ def download_conversion_models():
 
 # ---------------------------------------------
 def download_realesrgan():
-    logger.info("Installing models from RealESRGAN...")
-    model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth"
-    wdn_model_url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth"
-
-    model_dest = config.root_path / "models/core/upscaling/realesrgan/realesr-general-x4v3.pth"
-    wdn_model_dest = config.root_path / "models/core/upscaling/realesrgan/realesr-general-wdn-x4v3.pth"
-
-    download_with_progress_bar(model_url, str(model_dest), "RealESRGAN")
-    download_with_progress_bar(wdn_model_url, str(wdn_model_dest), "RealESRGANwdn")
-
-
-def download_gfpgan():
-    logger.info("Installing GFPGAN models...")
-    for model in (
-        [
-            "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
-            "./models/core/face_restoration/gfpgan/GFPGANv1.4.pth",
-        ],
-        [
-            "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
-            "./models/core/face_restoration/gfpgan/weights/detection_Resnet50_Final.pth",
-        ],
-        [
-            "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
-            "./models/core/face_restoration/gfpgan/weights/parsing_parsenet.pth",
-        ],
-    ):
-        model_url, model_dest = model[0], config.root_path / model[1]
-        download_with_progress_bar(model_url, str(model_dest), "GFPGAN weights")
-
+    logger.info("Installing RealESRGAN models...")
+    URLs = [
+        dict(
+            url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+            dest = "core/upscaling/realesrgan/RealESRGAN_x4plus.pth",
+            description = "RealESRGAN_x4plus.pth",
+        ),
+        dict(
+            url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+            dest = "core/upscaling/realesrgan/RealESRGAN_x4plus_anime_6B.pth",
+            description = "RealESRGAN_x4plus_anime_6B.pth",
+        ),
+        dict(
+            url= "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+            dest= "core/upscaling/realesrgan/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+            description = "ESRGAN_SRx4_DF2KOST_official.pth",
+        ),
+    ]
+    for model in URLs:
+        download_with_progress_bar(model['url'], config.models_path / model['dest'], model['description'])
 
 # ---------------------------------------------
-def download_codeformer():
-    logger.info("Installing CodeFormer model file...")
-    model_url = (
-        "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth"
-    )
-    model_dest = config.root_path / "models/core/face_restoration/codeformer/codeformer.pth"
-    download_with_progress_bar(model_url, str(model_dest), "CodeFormer")
-
-
-# ---------------------------------------------
-def download_clipseg():
-    logger.info("Installing clipseg model for text-based masking...")
-    CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
-    try:
-        hf_download_from_pretrained(AutoProcessor, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
-        hf_download_from_pretrained(CLIPSegForImageSegmentation, CLIPSEG_MODEL, config.root_path / 'models/core/misc/clipseg')
-    except Exception:
-        logger.info("Error installing clipseg model:")
-        logger.info(traceback.format_exc())
-
-
 def download_support_models():
     download_realesrgan()
-    download_gfpgan()
-    download_codeformer()
-    download_clipseg()
     download_conversion_models()
 
 # -------------------------------------
@@ -858,9 +821,9 @@ def main():
             download_support_models()
 
         if opt.skip_sd_weights:
-            logger.info("\n** SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST **")
+            logger.warning("SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST")
         elif models_to_download:
-            logger.info("\n** DOWNLOADING DIFFUSION WEIGHTS **")
+            logger.info("DOWNLOADING DIFFUSION WEIGHTS")
             process_and_execute(opt, models_to_download)
 
         postscript(errors=errors)
