@@ -572,6 +572,7 @@
         "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
         "downloadImageStarted": "Image Download Started",
         "imageCopied": "Image Copied",
+        "problemCopyingImage": "Unable to Copy Image",
         "imageLinkCopied": "Image Link Copied",
         "problemCopyingImageLink": "Unable to Copy Image Link",
         "imageNotLoaded": "No Image Loaded",
