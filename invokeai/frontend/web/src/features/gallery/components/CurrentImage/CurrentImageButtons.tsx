@@ -1,7 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { isEqual } from 'lodash-es';
 
-import { ButtonGroup, Flex, FlexProps, Link } from '@chakra-ui/react';
+import {
+  ButtonGroup,
+  Flex,
+  FlexProps,
+  Link,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+} from '@chakra-ui/react';
 // import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -49,6 +58,8 @@ import {
 } from 'services/api/endpoints/images';
 import { useDebounce } from 'use-debounce';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import { menuListMotionProps } from 'theme/components/menu';
+import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -345,65 +356,18 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         {...props}
       >
         <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
-          <IAIPopover
-            triggerComponent={
-              <IAIIconButton
-                aria-label={`${t('parameters.sendTo')}...`}
-                tooltip={`${t('parameters.sendTo')}...`}
-                isDisabled={!imageDTO}
-                icon={<FaShareAlt />}
-              />
-            }
-          >
-            <Flex
-              sx={{
-                flexDirection: 'column',
-                rowGap: 2,
-              }}
-            >
-              <IAIButton
-                size="sm"
-                onClick={handleSendToImageToImage}
-                leftIcon={<FaShare />}
-                id="send-to-img2img"
-              >
-                {t('parameters.sendToImg2Img')}
-              </IAIButton>
-              {isCanvasEnabled && (
-                <IAIButton
-                  size="sm"
-                  onClick={handleSendToCanvas}
-                  leftIcon={<FaShare />}
-                  id="send-to-canvas"
-                >
-                  {t('parameters.sendToUnifiedCanvas')}
-                </IAIButton>
-              )}
-
-              {isClipboardAPIAvailable && (
-                <IAIButton
-                  size="sm"
-                  onClick={handleCopyImage}
-                  leftIcon={<FaCopy />}
-                >
-                  {t('parameters.copyImage')}
-                </IAIButton>
-              )}
-              <IAIButton
-                size="sm"
-                onClick={handleCopyImageLink}
-                leftIcon={<FaCopy />}
-              >
-                {t('parameters.copyImageToLink')}
-              </IAIButton>
-
-              <Link download={true} href={imageDTO?.image_url} target="_blank">
-                <IAIButton leftIcon={<FaDownload />} size="sm" w="100%">
-                  {t('parameters.downloadImage')}
-                </IAIButton>
-              </Link>
-            </Flex>
-          </IAIPopover>
+          <Menu>
+            <MenuButton
+              as={IAIIconButton}
+              aria-label={`${t('parameters.sendTo')}...`}
+              tooltip={`${t('parameters.sendTo')}...`}
+              isDisabled={!imageDTO}
+              icon={<FaShareAlt />}
+            />
+            <MenuList motionProps={menuListMotionProps}>
+              {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
+            </MenuList>
+          </Menu>
         </ButtonGroup>
 
         <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
