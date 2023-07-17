@@ -195,7 +195,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
             latents = latents.cpu().numpy()
 
         # TODO: better execution device handling
-        latents = latents.astype(np.float32)
+        latents = latents.astype(np.float16)
 
         # get the initial random noise unless the user supplied it
         do_classifier_free_guidance = True
@@ -232,10 +232,11 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
                 unet.create_session()
 
                 timestep_dtype = next(
-                    (input.type for input in unet.session.get_inputs() if input.name == "timestep"), "tensor(float)"
+                    (input.type for input in unet.session.get_inputs() if input.name == "timestep"), "tensor(float16)"
                 )
                 timestep_dtype = ORT_TO_NP_TYPE[timestep_dtype]
-
+                import time
+                times = []
                 for i in tqdm(range(len(scheduler.timesteps))):
                     t = scheduler.timesteps[i]
                     # expand the latents if we are doing classifier free guidance
@@ -245,7 +246,9 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
                     # predict the noise residual
                     timestep = np.array([t], dtype=timestep_dtype)
+                    start_time = time.time()
                     noise_pred = unet(sample=latent_model_input, timestep=timestep, encoder_hidden_states=prompt_embeds)
+                    times.append(time.time() - start_time)
                     noise_pred = noise_pred[0]
 
                     # perform guidance
@@ -262,14 +265,14 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
                     # call the callback, if provided
                     #if callback is not None and i % callback_steps == 0:
                     #    callback(i, t, latents)
-
+                print(times)
                 unet.release_session()
 
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
         context.services.latents.save(name, latents)
-        return build_latents_output(latents_name=name, latents=latents)
+        return build_latents_output(latents_name=name, latents=torch.from_numpy(latents))
 
 # Latent to image
 class ONNXLatentsToImageInvocation(BaseInvocation):

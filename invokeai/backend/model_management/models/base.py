@@ -20,7 +20,7 @@ from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callab
 import onnx
 from onnx import numpy_helper
 from onnx.external_data_helper import set_external_data
-from onnxruntime import InferenceSession, OrtValue, SessionOptions
+from onnxruntime import InferenceSession, OrtValue, SessionOptions, ExecutionMode, GraphOptimizationLevel
 class InvalidModelException(Exception):
     pass
 
@@ -552,6 +552,8 @@ class IAIOnnxRuntimeModel:
             sess = SessionOptions()
             #self._external_data.update(**external_data)
             # sess.add_external_initializers(list(self.data.keys()), list(self.data.values()))
+            sess.execution_mode = ExecutionMode.ORT_PARALLEL
+            sess.graph_optimization_level = GraphOptimizationLevel.ORT_ENABLE_ALL
             self.session = InferenceSession(self.proto.SerializeToString(), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'], sess_options=sess)
             #self.session = InferenceSession("tmp.onnx", providers=[self.provider], sess_options=self.sess_options)
 
