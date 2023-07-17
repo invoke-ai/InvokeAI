@@ -68,7 +68,7 @@ class TextualInversionModel(ModelBase):
                 return None # diffusers-ti
 
         if os.path.isfile(path):
-            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt", "bin"]]):
                 return None
 
         raise InvalidModelException(f"Not a valid model: {path}")
