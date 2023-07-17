@@ -6,7 +6,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import IAIInput from 'common/components/IAIInput';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSearch, FaTrash } from 'react-icons/fa';
+import { FaSearch, FaSync, FaTrash } from 'react-icons/fa';
 import { setSearchFolder } from '../../store/modelManagerSlice';
 
 type SearchFolderForm = {
@@ -91,7 +91,7 @@ function SearchFolderForm() {
           <IAIIconButton
             aria-label={t('modelManager.scanAgain')}
             tooltip={t('modelManager.scanAgain')}
-            icon={<FaSearch />}
+            icon={!searchFolder ? <FaSearch /> : <FaSync />}
             fontSize={18}
             size="sm"
             type="submit"

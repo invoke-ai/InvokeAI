@@ -1,7 +1,7 @@
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from '@chakra-ui/react';
 import i18n from 'i18n';
 import { ReactNode, memo } from 'react';
-import AddModelsPanel from './subpanels/AddModelsPanel';
+import ImportModelsPanel from './subpanels/ImportModelsPanel';
 import MergeModelsPanel from './subpanels/MergeModelsPanel';
 import ModelManagerPanel from './subpanels/ModelManagerPanel';
 
@@ -22,7 +22,7 @@ const tabs: ModelManagerTabInfo[] = [
   {
     id: 'importModels',
     label: i18n.t('modelManager.importModels'),
-    content: <AddModelsPanel />,
+    content: <ImportModelsPanel />,
   },
   {
     id: 'mergeModels',

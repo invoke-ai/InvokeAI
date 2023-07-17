@@ -36,6 +36,7 @@ export default function FoundModelsList() {
 
   const quickAddHandler = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
+      const model_name = e.currentTarget.id.split('\\').splice(-1)[0];
       importMainModel({
         body: {
           location: e.currentTarget.id,
@@ -46,7 +47,7 @@ export default function FoundModelsList() {
           dispatch(
             addToast(
               makeToast({
-                title: 'Added Model',
+                title: `Added Model: ${model_name}`,
                 status: 'success',
               })
             )
@@ -72,7 +73,24 @@ export default function FoundModelsList() {
     if (!searchFolder) return;
 
     if (!foundModels || foundModels.length === 0) {
-      return <Flex>No Models Found</Flex>;
+      return (
+        <Flex
+          sx={{
+            w: 'full',
+            h: 'full',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: 96,
+            userSelect: 'none',
+            bg: 'base.200',
+            _dark: {
+              bg: 'base.900',
+            },
+          }}
+        >
+          <Text variant="subtext">No Models Found</Text>
+        </Flex>
+      );
     }
 
     return (
@@ -81,6 +99,7 @@ export default function FoundModelsList() {
           flexDirection: 'column',
           gap: 2,
           w: '100%',
+          minW: '50%',
         }}
       >
         <Flex p={2} gap={2}>
@@ -114,7 +133,7 @@ export default function FoundModelsList() {
             }}
             key={model}
           >
-            <Flex w="100%" sx={{ flexDirection: 'column' }}>
+            <Flex w="100%" sx={{ flexDirection: 'column', minW: '25%' }}>
               <Text sx={{ fontWeight: 600 }}>
                 {model.split('\\').slice(-1)[0]}
               </Text>
