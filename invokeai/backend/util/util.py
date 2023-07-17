@@ -21,7 +21,6 @@ from tqdm import tqdm
 import invokeai.backend.util.logging as logger
 from .devices import torch_dtype
 
-
 def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)
     # xc a list of captions to plot
@@ -285,7 +284,11 @@ def ask_user(question: str, answers: list):
 
 
 # -------------------------------------
-def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path:
+def download_with_resume(url: str,
+                         dest: Path,
+                         access_token: str = None,
+                         event_bus = None, # EventServiceBase (circular import issues)
+                         ) -> Path:
     """
     Download a model file.
     :param url:  https, http or ftp URL
@@ -323,8 +326,13 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
         os.remove(dest)
         exist_size = 0
         
+    if event_bus:
+        event_bus.emit_download_started(url)
+        
     if resp.status_code == 416 or (content_length > 0 and exist_size == content_length):
         logger.warning(f"{dest}: complete file found. Skipping.")
+        if event_bus:
+            event_bus.emit_download_completed(url,resp.status_code,dest)
         return dest
     elif resp.status_code == 206 or exist_size > 0:
         logger.warning(f"{dest}: partial file found. Resuming...")
@@ -333,10 +341,19 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
     else:
         logger.info(f"{dest}: Downloading...")
 
-    try:
-        if content_length < 2000:
-            logger.error(f"ERROR DOWNLOADING {url}: {resp.text}")
+    # If less than 2K, it's not a model - usually an HTML document of some sort
+    if content_length < 2000:
+        logger.error(f"ERROR DOWNLOADING {url}: {resp.text}")
+        if event_bus:
+            event_bus.emit_download_completed(url, 500, None)
             return None
+
+    # these variables are used in progress reporting events
+    MB10 = 10 * 1048576
+    downloaded = exist_size
+    previous_interval = 0   
+    
+    try:
 
         with open(dest, open_mode) as file, tqdm(
             desc=str(dest),
@@ -349,10 +366,20 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
             for data in resp.iter_content(chunk_size=1024):
                 size = file.write(data)
                 bar.update(size)
+                downloaded += size
+                if event_bus and downloaded // MB10 > previous_interval:
+                    previous_interval = downloaded // MB10
+                    event_bus.emit_download_progress(url, downloaded, content_length)
+
     except Exception as e:
         logger.error(f"An error occurred while downloading {dest}: {str(e)}")
+        if event_bus:
+            event_bus.emit_download_completed(url,500,None)
         return None
 
+    if event_bus:
+        event_bus.emit_download_completed(url,resp.status_code,dest)
+        
     return dest
 
 

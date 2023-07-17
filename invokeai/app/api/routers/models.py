@@ -2,6 +2,7 @@
 
 
 import pathlib
+import threading
 from typing import Literal, List, Optional, Union
 
 from fastapi import Body, Path, Query, Response
@@ -106,50 +107,43 @@ async def update_model(
     "/import",
     operation_id="import_model",
     responses= {
-        201: {"description" : "The model imported successfully"},
-        404: {"description" : "The model could not be found"},
-        424: {"description" : "The model appeared to import successfully, but could not be found in the model manager"},
-        409: {"description" : "There is already a model corresponding to this path or repo_id"},
+        200: {"description" : "The path was queued for import"},
     },
-    status_code=201,
-    response_model=ImportModelResponse
+    status_code=200
 )
 async def import_model(
         location: str = Body(description="A model path, repo_id or URL to import"),
         prediction_type: Optional[Literal['v_prediction','epsilon','sample']] = \
                 Body(description='Prediction type for SDv2 checkpoint files', default="v_prediction"),
-) -> ImportModelResponse:
-    """ Add a model using its local path, repo_id, or remote URL. Model characteristics will be probed and configured automatically """
+) -> str:
+    """ 
+    Add a model using its local path, repo_id, or remote URL. Model characteristics will be probed and configured automatically.
+    This call launches a background thread to process the imported model and always succeeds. Results are reported in the background
+    as the following events:
+    - model_import_started(import_path)
+    - model_import_completed(import_path, AddModelResults)
+    - download_started(url)
+    - download_progress(url,downloaded_bytes,total_bytes)
+    - download_completed(url,status_code,download_path)
+    """
     
     items_to_import = {location}
     prediction_types = { x.value: x for x in SchedulerPredictionType }
     logger = ApiDependencies.invoker.services.logger
+    events = ApiDependencies.invoker.services.events
 
     try:
-        installed_models = ApiDependencies.invoker.services.model_manager.heuristic_import(
-            items_to_import = items_to_import,
-            prediction_type_helper = lambda x: prediction_types.get(prediction_type)
-        )
-        info = installed_models.get(location)
-
-        if not info:
-            logger.error("Import failed")
-            raise HTTPException(status_code=424)
-        
-        logger.info(f'Successfully imported {location}, got {info}')
-        model_raw = ApiDependencies.invoker.services.model_manager.list_model(
-            model_name=info.name,
-            base_model=info.base_model,
-            model_type=info.model_type
-        )
-        return parse_obj_as(ImportModelResponse, model_raw)
-    
-    except ModelNotFoundException as e:
+        import_thread = threading.Thread(target = ApiDependencies.invoker.services.model_manager.heuristic_import,
+                                         kwargs = dict(items_to_import = items_to_import,
+                                                       prediction_type_helper = lambda x: prediction_types.get(prediction_type),
+                                                       event_bus = events,
+                                                       )
+                                         )
+        import_thread.start()
+        return 'request queued'
+    except Exception as e:
         logger.error(str(e))
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
         
 @models_router.post(
     "/add",

@@ -89,13 +89,16 @@ class ModelInstall(object):
                  config:InvokeAIAppConfig,
                  prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
                  model_manager: ModelManager = None,
-                 access_token:str = None):
+                 access_token:str = None,
+                 event_bus = None, # EventServicesBase - getting circular import errors
+                 ):
         self.config = config
         self.mgr = model_manager or ModelManager(config.model_conf_path)
         self.datasets = OmegaConf.load(Dataset_path)
         self.prediction_helper = prediction_type_helper
         self.access_token = access_token or HfFolder.get_token()
         self.reverse_paths = self._reverse_paths(self.datasets)
+        self.event_bus = event_bus
 
     def all_models(self)->Dict[str,ModelLoadInfo]:
         '''
@@ -197,39 +200,63 @@ class ModelInstall(object):
         Returns a set of dict objects corresponding to newly-created stanzas in models.yaml.
         '''
 
+        if self.event_bus:
+            self.event_bus.emit_model_import_started(str(model_path_id_or_url))
+
         if not models_installed:
             models_installed = dict()
             
         # A little hack to allow nested routines to retrieve info on the requested ID
         self.current_id = model_path_id_or_url
         path = Path(model_path_id_or_url)
-        # checkpoint file, or similar
-        if path.is_file():
-            models_installed.update({str(path):self._install_path(path)})
 
-        # folders style or similar
-        elif path.is_dir() and any([(path/x).exists() for x in \
-                                    {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}
-                                    ]
-                                   ):
-            models_installed.update(self._install_path(path))
+        try:
+            # checkpoint file, or similar
+            if path.is_file():
+                models_installed.update({str(path):self._install_path(path)})
 
-        # recursive scan
-        elif path.is_dir():
-            for child in path.iterdir():
-                self.heuristic_import(child, models_installed=models_installed)
+            # folders style or similar
+            elif path.is_dir() and any([(path/x).exists() for x in \
+                                        {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}
+                                        ]
+                                       ):
+                models_installed.update(self._install_path(path))
 
-        # huggingface repo
-        elif len(str(model_path_id_or_url).split('/')) == 2:
-            models_installed.update({str(model_path_id_or_url): self._install_repo(str(model_path_id_or_url))})
+            # recursive scan
+            elif path.is_dir():
+                for child in path.iterdir():
+                    self.heuristic_import(child, models_installed=models_installed)
 
-        # a URL
-        elif str(model_path_id_or_url).startswith(("http:", "https:", "ftp:")):
-            models_installed.update({str(model_path_id_or_url): self._install_url(model_path_id_or_url)})
+            # huggingface repo
+            elif len(str(model_path_id_or_url).split('/')) == 2:
+                models_installed.update({str(model_path_id_or_url): self._install_repo(str(model_path_id_or_url))})
 
-        else:
-            raise KeyError(f'{str(model_path_id_or_url)} is not recognized as a local path, repo ID or URL. Skipping')
+            # a URL
+            elif str(model_path_id_or_url).startswith(("http:", "https:", "ftp:")):
+                models_installed.update({str(model_path_id_or_url): self._install_url(model_path_id_or_url)})
 
+            else:
+                errmsg = f'{str(model_path_id_or_url)} is not recognized as a local path, repo ID or URL. Skipping'
+                raise KeyError(errmsg)
+            
+            if self.event_bus:
+                for path, add_model_result in models_installed.items():
+                    self.event_bus.emit_model_import_completed(
+                        str(path),
+                        import_info = add_model_result,
+                    )
+        except Exception as e:
+            if self.event_bus:
+                self.event_bus.emit_model_import_completed(
+                    str(path),
+                    import_info = None,
+                    success = False,
+                    error = str(e),
+                )
+                return models_installed
+            else:
+                raise
+                
         return models_installed
 
     # install a model from a local path. The optional info parameter is there to prevent
@@ -238,10 +265,14 @@ class ModelInstall(object):
         info = info or ModelProbe().heuristic_probe(path,self.prediction_helper)
         if not info:
             logger.warning(f'Unable to parse format of {path}')
-            return None
+            raise ValueError(f'Unable to parse format of {path}')
+        
         model_name = path.stem if path.is_file() else path.name
+        
         if self.mgr.model_exists(model_name, info.base_type, info.model_type):
-            raise ValueError(f'A model named "{model_name}" is already installed.')
+            errmsg = f'A model named "{model_name}" is already installed.'
+            raise ValueError(errmsg)
+            
         attributes = self._make_attributes(path,info)
         return self.mgr.add_model(model_name = model_name,
                                   base_model = info.base_type,
@@ -251,7 +282,7 @@ class ModelInstall(object):
 
     def _install_url(self, url: str)->AddModelResult:
         with TemporaryDirectory(dir=self.config.models_path) as staging:
-            location = download_with_resume(url,Path(staging))
+            location = download_with_resume(url,Path(staging),event_bus=self.event_bus)
             if not location:
                 logger.error(f'Unable to download {url}. Skipping.')
             info = ModelProbe().heuristic_probe(location)
@@ -384,7 +415,8 @@ class ModelInstall(object):
             p = hf_download_with_resume(repo_id,
                                         model_dir=location,
                                         model_name=filename,
-                                        access_token = self.access_token
+                                        access_token = self.access_token,
+                                        event_bus = self.event_bus,
                                         )
             if p:
                 paths.append(p)
@@ -425,12 +457,15 @@ def hf_download_from_pretrained(
     return destination
 
 # ---------------------------------------------
+# TODO: This function is almost identical to invokeai.backend.util.download_with_resume
+# and should be merged
 def hf_download_with_resume(
         repo_id: str,
         model_dir: str,
         model_name: str,
         model_dest: Path = None,
         access_token: str = None,
+        event_bus = None,
 ) -> Path:
     model_dest = model_dest or Path(os.path.join(model_dir, model_name))
     os.makedirs(model_dir, exist_ok=True)
@@ -447,15 +482,22 @@ def hf_download_with_resume(
         open_mode = "ab"
 
     resp = requests.get(url, headers=header, stream=True)
-    total = int(resp.headers.get("content-length", 0))
+    content_length = int(resp.headers.get("content-length", 0))
+
+    if event_bus:
+        event_bus.emit_download_started(url)
 
     if (
         resp.status_code == 416
     ):  # "range not satisfiable", which means nothing to return
         logger.info(f"{model_name}: complete file found. Skipping.")
+        if event_bus:
+            event_bus.emit_download_completed(url,resp.status_code,model_dest)
         return model_dest
     elif resp.status_code == 404:
         logger.warning("File not found")
+        if event_bus:
+            event_bus.emit_download_completed(url,resp.status_code,None)
         return None
     elif resp.status_code != 200:
         logger.warning(f"{model_name}: {resp.reason}")
@@ -464,11 +506,15 @@ def hf_download_with_resume(
     else:
         logger.info(f"{model_name}: Downloading...")
 
+    MB10 = 10 * 1048576
+    downloaded = exist_size
+    previous_interval = 0   
+    
     try:
         with open(model_dest, open_mode) as file, tqdm(
             desc=model_name,
             initial=exist_size,
-            total=total + exist_size,
+            total=content_length + exist_size,
             unit="iB",
             unit_scale=True,
             unit_divisor=1000,
@@ -476,9 +522,20 @@ def hf_download_with_resume(
             for data in resp.iter_content(chunk_size=1024):
                 size = file.write(data)
                 bar.update(size)
+                downloaded += size
+                if event_bus and downloaded // MB10 > previous_interval:
+                    previous_interval = downloaded // MB10
+                    event_bus.emit_download_progress(url, downloaded, content_length)
+                    
     except Exception as e:
         logger.error(f"An error occurred while downloading {model_name}: {str(e)}")
+        if event_bus:
+            event_bus.emit_download_completed(url,500,None)
         return None
+    
+    if event_bus:
+        event_bus.emit_download_completed(url,resp.status_code,model_dest)
+
     return model_dest
 
 

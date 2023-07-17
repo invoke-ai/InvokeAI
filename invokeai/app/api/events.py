@@ -9,7 +9,6 @@ from fastapi_events.dispatcher import dispatch
 
 from ..services.events import EventServiceBase
 
-
 class FastAPIEventService(EventServiceBase):
     event_handler_id: int
     __queue: Queue
@@ -28,6 +27,9 @@ class FastAPIEventService(EventServiceBase):
         self.__queue.put(None)
 
     def dispatch(self, event_name: str, payload: Any) -> None:
+        # TODO: Remove next two debugging lines
+        from .dependencies import ApiDependencies
+        ApiDependencies.invoker.services.logger.debug(f'dispatch {event_name} / {payload}')
         self.__queue.put(dict(event_name=event_name, payload=payload))
 
     async def __dispatch_from_queue(self, stop_event: threading.Event):

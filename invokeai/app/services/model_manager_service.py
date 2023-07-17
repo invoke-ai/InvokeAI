@@ -26,6 +26,7 @@ import torch
 from invokeai.app.models.exceptions import CanceledException
 from ...backend.util import choose_precision, choose_torch_device
 from .config import InvokeAIAppConfig
+from .events import EventServiceBase
 
 if TYPE_CHECKING:
     from ..invocations.baseinvocation import BaseInvocation, InvocationContext
@@ -552,6 +553,7 @@ class ModelManagerService(ModelManagerServiceBase):
     def heuristic_import(self,
                          items_to_import: set[str],
                          prediction_type_helper: Optional[Callable[[Path],SchedulerPredictionType]]=None,
+                         event_bus: Optional[EventServiceBase]=None,
                          )->dict[str, AddModelResult]:
         '''Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.
@@ -569,7 +571,7 @@ class ModelManagerService(ModelManagerServiceBase):
         of the set is a dict corresponding to the newly-created OmegaConf stanza for
         that model.
         '''
-        return self.mgr.heuristic_import(items_to_import, prediction_type_helper)        
+        return self.mgr.heuristic_import(items_to_import, prediction_type_helper, event_bus=event_bus)
 
     def merge_models(
             self,

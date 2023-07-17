@@ -946,6 +946,7 @@ class ModelManager(object):
     def heuristic_import(self,
                          items_to_import: Set[str],
                          prediction_type_helper: Callable[[Path],SchedulerPredictionType]=None,
+                         event_bus = None,   # EventServiceBase, with circular dependency issues
                          )->Dict[str, AddModelResult]:
         '''Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.
@@ -973,10 +974,13 @@ class ModelManager(object):
         
         installer = ModelInstall(config = self.app_config,
                                  prediction_type_helper = prediction_type_helper,
-                                 model_manager = self)
+                                 model_manager = self,
+                                 event_bus = event_bus,
+                                 )
         for thing in items_to_import:
             installed = installer.heuristic_import(thing)
             successfully_installed.update(installed)
+                
         self.commit()                
         return successfully_installed
 
