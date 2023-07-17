@@ -297,8 +297,32 @@ class InvokeAIDiffuserComponent:
         **kwargs,
     ):
         # low-memory sequential path
-        unconditioned_next_x = self.model_forward_callback(x, sigma, unconditioning, **kwargs)
-        conditioned_next_x = self.model_forward_callback(x, sigma, conditioning, **kwargs)
+        uncond_down_block, cond_down_block = None, None
+        down_block_additional_residuals = kwargs.pop("down_block_additional_residuals", None)
+        if down_block_additional_residuals is not None:
+            uncond_down_block, cond_down_block = [], []
+            for down_block in down_block_additional_residuals:
+                _uncond_down, _cond_down = down_block.chunk(2)
+                uncond_down_block.append(_uncond_down)
+                cond_down_block.append(_cond_down)
+
+        uncond_mid_block, cond_mid_block = None, None
+        mid_block_additional_residual = kwargs.pop("mid_block_additional_residual", None)
+        if mid_block_additional_residual is not None:
+            uncond_mid_block, cond_mid_block = mid_block_additional_residual.chunk(2)
+
+        unconditioned_next_x = self.model_forward_callback(
+            x, sigma, unconditioning,
+            down_block_additional_residuals=uncond_down_block,
+            mid_block_additional_residual=uncond_mid_block,
+            **kwargs,
+        )
+        conditioned_next_x = self.model_forward_callback(
+            x, sigma, conditioning,
+            down_block_additional_residuals=cond_down_block,
+            mid_block_additional_residual=cond_mid_block,
+            **kwargs,
+        )
         return unconditioned_next_x, conditioned_next_x
 
     # TODO: looks unused
@@ -332,6 +356,20 @@ class InvokeAIDiffuserComponent:
     ):
         context: Context = self.cross_attention_control_context
 
+        uncond_down_block, cond_down_block = None, None
+        down_block_additional_residuals = kwargs.pop("down_block_additional_residuals", None)
+        if down_block_additional_residuals is not None:
+            uncond_down_block, cond_down_block = [], []
+            for down_block in down_block_additional_residuals:
+                _uncond_down, _cond_down = down_block.chunk(2)
+                uncond_down_block.append(_uncond_down)
+                cond_down_block.append(_cond_down)
+
+        uncond_mid_block, cond_mid_block = None, None
+        mid_block_additional_residual = kwargs.pop("mid_block_additional_residual", None)
+        if mid_block_additional_residual is not None:
+            uncond_mid_block, cond_mid_block = mid_block_additional_residual.chunk(2)
+
         cross_attn_processor_context = SwapCrossAttnContext(
             modified_text_embeddings=context.arguments.edited_conditioning,
             index_map=context.cross_attention_index_map,
@@ -344,6 +382,8 @@ class InvokeAIDiffuserComponent:
             sigma,
             unconditioning,
             {"swap_cross_attn_context": cross_attn_processor_context},
+            down_block_additional_residuals=uncond_down_block,
+            mid_block_additional_residual=uncond_mid_block,
             **kwargs,
         )
 
@@ -356,6 +396,8 @@ class InvokeAIDiffuserComponent:
             sigma,
             conditioning,
             {"swap_cross_attn_context": cross_attn_processor_context},
+            down_block_additional_residuals=cond_down_block,
+            mid_block_additional_residual=cond_mid_block,
             **kwargs,
         )
         return unconditioned_next_x, conditioned_next_x
