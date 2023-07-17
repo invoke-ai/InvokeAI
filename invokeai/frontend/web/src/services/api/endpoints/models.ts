@@ -93,7 +93,7 @@ type AddMainModelArg = {
 type AddMainModelResponse =
   paths['/api/v1/models/add']['post']['responses']['201']['content']['application/json'];
 
-type SearchFolderResponse =
+export type SearchFolderResponse =
   paths['/api/v1/models/search']['get']['responses']['200']['content']['application/json'];
 
 type CheckpointConfigsResponse =
