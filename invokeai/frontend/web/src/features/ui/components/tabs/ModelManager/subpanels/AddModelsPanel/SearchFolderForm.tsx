@@ -47,7 +47,7 @@ function SearchFolderForm() {
           gap: 2,
           p: 4,
           borderRadius: 4,
-          background: 'base.400',
+          background: 'base.300',
           alignItems: 'center',
           _dark: {
             background: 'base.800',
