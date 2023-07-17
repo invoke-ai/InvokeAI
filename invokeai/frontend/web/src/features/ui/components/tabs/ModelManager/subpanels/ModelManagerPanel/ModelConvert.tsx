@@ -50,7 +50,7 @@ export default function ModelConvert(props: ModelConvertProps) {
     const responseBody = {
       base_model: model.base_model,
       model_name: model.model_name,
-      body: {
+      params: {
         convert_dest_directory:
           saveLocation === 'Custom' ? customSaveLocation : undefined,
       },

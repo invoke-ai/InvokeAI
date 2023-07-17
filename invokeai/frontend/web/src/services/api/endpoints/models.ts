@@ -65,7 +65,7 @@ type DeleteMainModelResponse = void;
 type ConvertMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
-  body: ConvertModelConfig;
+  params: ConvertModelConfig;
 };
 
 type ConvertMainModelResponse =
@@ -225,11 +225,11 @@ export const modelsApi = api.injectEndpoints({
       ConvertMainModelResponse,
       ConvertMainModelArg
     >({
-      query: ({ base_model, model_name, body }) => {
+      query: ({ base_model, model_name, params }) => {
         return {
           url: `models/convert/${base_model}/main/${model_name}`,
           method: 'PUT',
-          body: body,
+          params: params,
         };
       },
       invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
