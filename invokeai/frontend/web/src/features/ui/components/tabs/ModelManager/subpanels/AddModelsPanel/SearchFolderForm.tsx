@@ -50,7 +50,7 @@ function SearchFolderForm() {
           gap: 2,
           p: 4,
           borderRadius: 4,
-          background: 'base.300',
+          background: 'base.200',
           alignItems: 'center',
           _dark: {
             background: 'base.800',
@@ -60,6 +60,7 @@ function SearchFolderForm() {
         <Flex w="100%" alignItems="center" gap={4} minH={12}>
           <Text
             sx={{
+              fontSize: 'sm',
               fontWeight: 600,
               color: 'base.700',
               minW: 'max-content',
@@ -80,8 +81,10 @@ function SearchFolderForm() {
                 w: '100%',
                 p: 2,
                 px: 4,
-                bg: 'base.200',
+                bg: 'base.300',
                 borderRadius: 4,
+                fontSize: 'sm',
+                fontWeight: 'bold',
                 _dark: { bg: 'base.700' },
               }}
             >
