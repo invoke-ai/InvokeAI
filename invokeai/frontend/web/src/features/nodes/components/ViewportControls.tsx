@@ -2,13 +2,7 @@ import { ButtonGroup } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { memo, useCallback } from 'react';
-import {
-  FaCode,
-  FaExpand,
-  FaMinus,
-  FaPlus,
-  FaInfo,
-} from 'react-icons/fa';
+import { FaCode, FaExpand, FaMinus, FaPlus, FaInfo } from 'react-icons/fa';
 import { useReactFlow } from 'reactflow';
 import {
   shouldShowGraphOverlayChanged,
