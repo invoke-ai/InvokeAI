@@ -8,6 +8,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { useTranslation } from 'react-i18next';
 import { useAddMainModelsMutation } from 'services/api/endpoints/models';
 import { DiffusersModelConfig } from 'services/api/types';
+import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
 import BaseModelSelect from '../shared/BaseModelSelect';
 import ModelVariantSelect from '../shared/ModelVariantSelect';
 
@@ -51,6 +52,10 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
           )
         );
         advancedAddDiffusersForm.reset();
+        // Close Advanced Panel in Scan Models tab
+        if (model_path) {
+          dispatch(setAdvancedAddScanModel(null));
+        }
       })
       .catch((error) => {
         if (error) {
