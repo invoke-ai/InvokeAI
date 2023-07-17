@@ -38,7 +38,7 @@ class SDXLRefinerModelLoaderOutput(BaseInvocationOutput):
 class SDXLModelLoaderInvocation(BaseInvocation):
     """Loads an sdxl base model, outputting its submodels."""
 
-    type: Literal["sdxl_model_loader"] = "sdxl_main_model_loader"
+    type: Literal["sdxl_model_loader"] = "sdxl_model_loader"
 
     model: MainModelField = Field(description="The model to load")
     # TODO: precision?
