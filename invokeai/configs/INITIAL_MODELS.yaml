@@ -58,22 +58,29 @@ sd-1/main/waifu-diffusion:
    recommended: False
 sd-1/controlnet/canny:
    repo_id: lllyasviel/control_v11p_sd15_canny
+   recommended: True
 sd-1/controlnet/inpaint:
    repo_id: lllyasviel/control_v11p_sd15_inpaint
 sd-1/controlnet/mlsd:
    repo_id: lllyasviel/control_v11p_sd15_mlsd
 sd-1/controlnet/depth:
    repo_id: lllyasviel/control_v11f1p_sd15_depth
+   recommended: True
 sd-1/controlnet/normal_bae:
    repo_id: lllyasviel/control_v11p_sd15_normalbae
 sd-1/controlnet/seg:
    repo_id: lllyasviel/control_v11p_sd15_seg
 sd-1/controlnet/lineart:
    repo_id: lllyasviel/control_v11p_sd15_lineart
+   recommended: True
 sd-1/controlnet/lineart_anime:
    repo_id: lllyasviel/control_v11p_sd15s2_lineart_anime
+sd-1/controlnet/openpose:
+   repo_id: lllyasviel/control_v11p_sd15_openpose
+   recommended: True
 sd-1/controlnet/scribble:
    repo_id: lllyasviel/control_v11p_sd15_scribble
+   recommended: False
 sd-1/controlnet/softedge:
    repo_id: lllyasviel/control_v11p_sd15_softedge
 sd-1/controlnet/shuffle:
@@ -84,6 +91,7 @@ sd-1/controlnet/ip2p:
    repo_id: lllyasviel/control_v11e_sd15_ip2p
 sd-1/embedding/EasyNegative:
    path: https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors
+   recommended: True
 sd-1/embedding/ahx-beta-453407d:
    repo_id: sd-concepts-library/ahx-beta-453407d
 sd-1/lora/LowRA:
