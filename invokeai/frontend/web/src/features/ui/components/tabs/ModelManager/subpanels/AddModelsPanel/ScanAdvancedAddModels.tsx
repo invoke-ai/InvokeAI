@@ -2,15 +2,35 @@ import { Box, Flex, Text } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { FaTimes } from 'react-icons/fa';
 import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
+import AdvancedAddDiffusers from './AdvancedAddDiffusers';
+import { ManualAddMode, advancedAddModeData } from './AdvancedAddModels';
 
 export default function ScanAdvancedAddModels() {
   const advancedAddScanModel = useAppSelector(
     (state: RootState) => state.modelmanager.advancedAddScanModel
   );
+
+  const [advancedAddMode, setAdvancedAddMode] =
+    useState<ManualAddMode>('diffusers');
+
+  const [isCheckpoint, setIsCheckpoint] = useState(
+    advancedAddScanModel &&
+      ['.ckpt', '.safetensors', '.pth', '.pt'].some((ext) =>
+        advancedAddScanModel.endsWith(ext)
+      )
+  );
+
+  useEffect(() => {
+    isCheckpoint
+      ? setAdvancedAddMode('checkpoint')
+      : setAdvancedAddMode('diffusers');
+  }, [setAdvancedAddMode, isCheckpoint]);
 
   const dispatch = useAppDispatch();
 
@@ -37,7 +57,9 @@ export default function ScanAdvancedAddModels() {
       >
         <Flex justifyContent="space-between" alignItems="center">
           <Text size="xl" fontWeight={600}>
-            Add Checkpoint Model
+            {isCheckpoint || advancedAddMode === 'checkpoint'
+              ? 'Add Checkpoint Model'
+              : 'Add Diffusers Model'}
           </Text>
           <IAIIconButton
             icon={<FaTimes />}
@@ -46,10 +68,31 @@ export default function ScanAdvancedAddModels() {
             size="sm"
           />
         </Flex>
-        <AdvancedAddCheckpoint
-          key={advancedAddScanModel}
-          model_path={advancedAddScanModel}
+        <IAIMantineSelect
+          label="Model Type"
+          value={advancedAddMode}
+          data={advancedAddModeData}
+          onChange={(v) => {
+            if (!v) return;
+            setAdvancedAddMode(v as ManualAddMode);
+            if (v === 'checkpoint') {
+              setIsCheckpoint(true);
+            } else {
+              setIsCheckpoint(false);
+            }
+          }}
         />
+        {isCheckpoint ? (
+          <AdvancedAddCheckpoint
+            key={advancedAddScanModel}
+            model_path={advancedAddScanModel}
+          />
+        ) : (
+          <AdvancedAddDiffusers
+            key={advancedAddScanModel}
+            model_path={advancedAddScanModel}
+          />
+        )}
       </Box>
     )
   );

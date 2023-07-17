@@ -7,7 +7,10 @@ import IAIInput from 'common/components/IAIInput';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaSearch, FaSync, FaTrash } from 'react-icons/fa';
-import { setSearchFolder } from '../../store/modelManagerSlice';
+import {
+  setAdvancedAddScanModel,
+  setSearchFolder,
+} from '../../store/modelManagerSlice';
 
 type SearchFolderForm = {
   folder: string;
@@ -101,7 +104,10 @@ function SearchFolderForm() {
             tooltip={t('modelManager.clearCheckpointFolder')}
             icon={<FaTrash />}
             size="sm"
-            onClick={() => dispatch(setSearchFolder(null))}
+            onClick={() => {
+              dispatch(setSearchFolder(null));
+              dispatch(setAdvancedAddScanModel(null));
+            }}
             isDisabled={!searchFolder}
             colorScheme="red"
           />

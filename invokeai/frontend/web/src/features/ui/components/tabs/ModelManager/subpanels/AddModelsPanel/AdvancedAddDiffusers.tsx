@@ -11,18 +11,23 @@ import { DiffusersModelConfig } from 'services/api/types';
 import BaseModelSelect from '../shared/BaseModelSelect';
 import ModelVariantSelect from '../shared/ModelVariantSelect';
 
-export default function AdvancedAddDiffusers() {
+type AdvancedAddDiffusersProps = {
+  model_path?: string;
+};
+
+export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const { model_path } = props;
 
   const [addMainModel] = useAddMainModelsMutation();
 
   const advancedAddDiffusersForm = useForm<DiffusersModelConfig>({
     initialValues: {
-      model_name: '',
+      model_name: model_path ? model_path.split('\\').splice(-1)[0] : '',
       base_model: 'sd-1',
       model_type: 'main',
-      path: '',
+      path: model_path ? model_path : '',
       description: '',
       model_format: 'diffusers',
       error: undefined,
@@ -30,6 +35,7 @@ export default function AdvancedAddDiffusers() {
       variant: 'normal',
     },
   });
+
   const advancedAddDiffusersFormHandler = (values: DiffusersModelConfig) => {
     addMainModel({
       body: values,

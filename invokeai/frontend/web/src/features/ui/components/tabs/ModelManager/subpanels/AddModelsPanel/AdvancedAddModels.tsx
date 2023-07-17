@@ -5,12 +5,12 @@ import { useState } from 'react';
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
 import AdvancedAddDiffusers from './AdvancedAddDiffusers';
 
-const advancedAddModeData: SelectItem[] = [
+export const advancedAddModeData: SelectItem[] = [
   { label: 'Diffusers', value: 'diffusers' },
   { label: 'Checkpoint / Safetensors', value: 'checkpoint' },
 ];
 
-type ManualAddMode = 'diffusers' | 'checkpoint';
+export type ManualAddMode = 'diffusers' | 'checkpoint';
 
 export default function AdvancedAddModels() {
   const [advancedAddMode, setAdvancedAddMode] =
