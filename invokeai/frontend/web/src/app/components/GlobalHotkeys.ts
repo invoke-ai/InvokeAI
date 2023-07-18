@@ -1,7 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
   setActiveTab,
   toggleGalleryPanel,
@@ -35,6 +37,7 @@ const globalHotkeysSelector = createSelector(
 const GlobalHotkeys: React.FC = () => {
   const dispatch = useAppDispatch();
   const { shift } = useAppSelector(globalHotkeysSelector);
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
   useHotkeys(
     '*',
@@ -51,6 +54,9 @@ const GlobalHotkeys: React.FC = () => {
 
   useHotkeys('o', () => {
     dispatch(toggleParametersPanel());
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(requestCanvasRescale());
+    }
   });
 
   useHotkeys(['shift+o'], () => {
@@ -59,6 +65,9 @@ const GlobalHotkeys: React.FC = () => {
 
   useHotkeys('g', () => {
     dispatch(toggleGalleryPanel());
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(requestCanvasRescale());
+    }
   });
 
   useHotkeys(['shift+g'], () => {
