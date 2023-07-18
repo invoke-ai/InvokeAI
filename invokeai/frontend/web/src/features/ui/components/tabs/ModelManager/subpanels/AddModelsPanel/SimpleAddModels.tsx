@@ -85,7 +85,7 @@ export default function SimpleAddModels() {
       <Flex flexDirection="column" width="100%" gap={4}>
         <IAIMantineTextInput
           label="Model Location"
-          placeholder="Provide a path to a local Diffusers model, local checkpoint / safetensors model or a HuggingFace Repo ID"
+          placeholder="Provide a path to a local Diffusers model, local checkpoint / safetensors model a HuggingFace Repo ID, or a checkpoint/diffusers model URL."
           w="100%"
           {...addModelForm.getInputProps('location')}
         />
