@@ -125,7 +125,7 @@ To make a workspace:
 
 Should look something like this:
 
-```json
+```jsonc
 {
   // I like to have all InvokeAI-related folders in my workspace
   "folders": [
@@ -164,7 +164,7 @@ to set up your `launch.json` and try it out.
 
 Now we can create the InvokeAI debugging configs:
 
-```json
+```jsonc
 {
   // Use IntelliSense to learn about possible attributes.
   // Hover to view descriptions of existing attributes.
