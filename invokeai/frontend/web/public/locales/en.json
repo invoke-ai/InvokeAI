@@ -703,6 +703,6 @@
         "hideLegendNodes": "Hide Field Type Legend",
         "showLegendNodes": "Show Field Type Legend",
         "hideMinimapnodes": "Hide MiniMap",
-        "ShpwMinimapnodes": "Show MiniMap"
+        "showMinimapnodes": "Show MiniMap"
     }
 }
