@@ -167,7 +167,7 @@ export type paths = {
   "/api/v1/images/clear-intermediates": {
     /**
      * Clear Intermediates 
-     * @description Clears all intermediates
+     * @description Clears first 100 intermediates
      */
     post: operations["clear_intermediates"];
   };
@@ -5259,11 +5259,11 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion1ModelFormat 
+     * StableDiffusionXLModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion2ModelFormat 
      * @description An enumeration. 
@@ -5271,11 +5271,11 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusionXLModelFormat 
+     * StableDiffusion1ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -6060,7 +6060,7 @@ export type operations = {
   };
   /**
    * Clear Intermediates 
-   * @description Clears all intermediates
+   * @description Clears first 100 intermediates
    */
   clear_intermediates: {
     responses: {

@@ -1,10 +1,7 @@
 import { ApiFullTagDescription, api } from '..';
-import { components, paths } from '../schema';
+import { components } from '../schema';
 import { ImageDTO } from '../types';
 
-type ClearIntermediatesArg = NonNullable<
-  paths['/api/v1/images/clear-intermediates']['post']['parameters']['query']
->;
 
 /**
  * This is an unsafe type; the object inside is not guaranteed to be valid.
