@@ -11,6 +11,7 @@ import {
   setIsMouseOverBoundingBox,
   setIsMovingBoundingBox,
   setIsTransformingBoundingBox,
+  setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
 import { uiSelector } from 'features/ui/store/uiSelectors';
 import Konva from 'konva';
@@ -20,6 +21,7 @@ import { Vector2d } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { Group, Rect, Transformer } from 'react-konva';
 
 const boundingBoxPreviewSelector = createSelector(
@@ -90,6 +92,10 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   }, []);
 
   const scaledStep = 64 * stageScale;
+
+  useHotkeys('N', () => {
+    dispatch(setShouldSnapToGrid(!shouldSnapToGrid));
+  });
 
   const handleOnDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {

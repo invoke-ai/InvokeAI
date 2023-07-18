@@ -59,7 +59,7 @@ export const InvocationComponent = memo((props: NodeProps<InvocationValue>) => {
           flexDirection: 'column',
           borderBottomRadius: 'md',
           py: 2,
-          bg: 'base.200',
+          bg: 'base.150',
           _dark: { bg: 'base.800' },
         }}
       >
