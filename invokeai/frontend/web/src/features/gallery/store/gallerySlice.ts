@@ -4,10 +4,6 @@ import { RootState } from 'app/store/store';
 import { dateComparator } from 'common/util/dateComparator';
 import { uniq } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
-import {
-  imageUrlsReceived,
-  receivedPageOfImages,
-} from 'services/api/thunks/image';
 import { ImageCategory, ImageDTO } from 'services/api/types';
 import { selectFilteredImagesLocal } from './gallerySelectors';
 
@@ -171,42 +167,6 @@ export const gallerySlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // builder.addCase(receivedPageOfImages.pending, (state) => {
-    //   state.isFetching = true;
-    // });
-    // builder.addCase(receivedPageOfImages.rejected, (state) => {
-    //   state.isFetching = false;
-    // });
-    // builder.addCase(receivedPageOfImages.fulfilled, (state, action) => {
-    //   state.isFetching = false;
-    //   const { board_id, categories, image_origin, is_intermediate } =
-    //     action.meta.arg;
-
-    //   const { items, offset, limit, total } = action.payload;
-
-    //   imagesAdapter.upsertMany(state, items);
-
-    //   if (state.selection.length === 0 && items.length) {
-    //     state.selection = [items[0].image_name];
-    //   }
-
-    //   if (!categories?.includes('general') || board_id) {
-    //     // need to skip updating the total images count if the images recieved were for a specific board
-    //     // TODO: this doesn't work when on the Asset tab/category...
-    //     return;
-    //   }
-
-    //   state.offset = offset;
-    //   state.total = total;
-    // });
-    // builder.addCase(imageUrlsReceived.fulfilled, (state, action) => {
-    //   const { image_name, image_url, thumbnail_url } = action.payload;
-
-    //   imagesAdapter.updateOne(state, {
-    //     id: image_name,
-    //     changes: { image_url, thumbnail_url },
-    //   });
-    // });
     builder.addMatcher(
       boardsApi.endpoints.deleteBoard.matchFulfilled,
       (state, action) => {

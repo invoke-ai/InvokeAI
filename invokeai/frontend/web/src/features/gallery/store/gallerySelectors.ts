@@ -11,6 +11,7 @@ import {
   imagesAdapter,
   initialGalleryState,
 } from './gallerySlice';
+import { ListImagesArgs } from 'services/api/endpoints/images';
 
 export const gallerySelector = (state: RootState) => state.gallery;
 
@@ -141,7 +142,7 @@ export const selectListImagesBaseQueryArgs = createSelector(
   (state) => {
     const { selectedBoardId, galleryView } = state.gallery;
 
-    const listImagesBaseQueryArgs = {
+    const listImagesBaseQueryArgs: ListImagesArgs = {
       categories:
         galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
       board_id: selectedBoardId === 'all' ? undefined : selectedBoardId,

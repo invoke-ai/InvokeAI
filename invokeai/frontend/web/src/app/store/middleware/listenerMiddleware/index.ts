@@ -55,10 +55,6 @@ import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
 import {
-  addReceivedPageOfImagesFulfilledListener,
-  addReceivedPageOfImagesRejectedListener,
-} from './listeners/receivedPageOfImages';
-import {
   addSessionCanceledFulfilledListener,
   addSessionCanceledPendingListener,
   addSessionCanceledRejectedListener,
@@ -197,10 +193,6 @@ addSessionInvokedRejectedListener();
 addSessionCanceledPendingListener();
 addSessionCanceledFulfilledListener();
 addSessionCanceledRejectedListener();
-
-// Fetching images
-addReceivedPageOfImagesFulfilledListener();
-addReceivedPageOfImagesRejectedListener();
 
 // ControlNet
 addControlNetImageProcessedListener();

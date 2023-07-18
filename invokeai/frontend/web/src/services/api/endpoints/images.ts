@@ -19,7 +19,7 @@ import {
 } from '../types';
 import { getIsImageInDateRange } from './util';
 
-type ListImagesArgs = NonNullable<
+export type ListImagesArgs = NonNullable<
   paths['/api/v1/images/']['get']['parameters']['query']
 >;
 

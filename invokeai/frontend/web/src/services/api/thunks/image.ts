@@ -1,11 +1,4 @@
 import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
-import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
-} from 'features/gallery/store/gallerySlice';
-import { size } from 'lodash-es';
-import queryString from 'query-string';
 import { $client } from 'services/api/client';
 import { paths } from 'services/api/schema';
 
@@ -159,73 +152,3 @@ export const imageUpdated = createAppAsyncThunk<
 
   return data;
 });
-
-export const IMAGES_PER_PAGE = 20;
-
-const DEFAULT_IMAGES_LISTED_ARG = {
-  limit: IMAGES_PER_PAGE,
-};
-
-type ListImagesArg = NonNullable<
-  paths['/api/v1/images/']['get']['parameters']['query']
->;
-
-type ListImagesResponse =
-  paths['/api/v1/images/']['get']['responses']['200']['content']['application/json'];
-
-type ListImagesThunkConfig = {
-  rejectValue: {
-    arg: ListImagesArg;
-    error: unknown;
-  };
-};
-/**
- * `ImagesService.listImagesWithMetadata()` thunk
- */
-export const receivedPageOfImages = createAppAsyncThunk<
-  ListImagesResponse,
-  ListImagesArg,
-  ListImagesThunkConfig
->(
-  'thunkApi/receivedPageOfImages',
-  async (arg, { getState, rejectWithValue }) => {
-    const { get } = $client.get();
-
-    const state = getState();
-
-    const images = selectFilteredImages(state);
-    const categories =
-      state.gallery.galleryView === 'images'
-        ? IMAGE_CATEGORIES
-        : ASSETS_CATEGORIES;
-
-    let query: ListImagesArg = {};
-
-    if (size(arg)) {
-      query = {
-        ...DEFAULT_IMAGES_LISTED_ARG,
-        offset: images.length,
-        ...arg,
-      };
-    } else {
-      query = {
-        ...DEFAULT_IMAGES_LISTED_ARG,
-        categories,
-        offset: images.length,
-      };
-    }
-
-    const { data, error, response } = await get('/api/v1/images/', {
-      params: {
-        query,
-      },
-      querySerializer: (q) => queryString.stringify(q, { arrayFormat: 'none' }),
-    });
-
-    if (error) {
-      return rejectWithValue({ arg, error });
-    }
-
-    return data;
-  }
-);
