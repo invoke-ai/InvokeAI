@@ -9,10 +9,13 @@ const TopRightPanel = () => {
   const shouldShowGraphOverlay = useAppSelector(
     (state: RootState) => state.nodes.shouldShowGraphOverlay
   );
+  const shouldShowFieldTypeLegend = useAppSelector(
+    (state: RootState) => state.nodes.shouldShowFieldTypeLegend
+  );
 
   return (
     <Panel position="top-right">
-      <FieldTypeLegend />
+      {shouldShowFieldTypeLegend && <FieldTypeLegend />}
       {shouldShowGraphOverlay && <NodeGraphOverlay />}
     </Panel>
   );
