@@ -146,13 +146,13 @@ class InpaintInvocation(BaseInvocation):
             source_node_id=source_node_id,
         )
 
-    def get_conditioning(self, context):
+    def get_conditioning(self, context, unet):
         positive_cond_data = context.services.latents.get(self.positive_conditioning.conditioning_name)
-        c = positive_cond_data.conditionings[0].embeds
+        c = positive_cond_data.conditionings[0].embeds.to(device=unet.device, dtype=unet.dtype)
         extra_conditioning_info = positive_cond_data.conditionings[0].extra_conditioning
 
         negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
-        uc = negative_cond_data.conditionings[0].embeds
+        uc = negative_cond_data.conditionings[0].embeds.to(device=unet.device, dtype=unet.dtype)
 
         return (uc, c, extra_conditioning_info)
 
@@ -213,7 +213,6 @@ class InpaintInvocation(BaseInvocation):
         )
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
-        conditioning = self.get_conditioning(context)
         scheduler = get_scheduler(
             context=context,
             scheduler_info=self.unet.scheduler,
@@ -221,6 +220,8 @@ class InpaintInvocation(BaseInvocation):
         )
 
         with self.load_model_old_way(context, scheduler) as model:
+            conditioning = self.get_conditioning(context, model.context.model.unet)
+
             outputs = Inpaint(model).generate(
                 conditioning=conditioning,
                 scheduler=scheduler,
