@@ -11,6 +11,7 @@ from invokeai.app.services.board_images import (
 )
 from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
 from invokeai.app.services.boards import BoardService, BoardServiceDependencies
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService, ImageServiceDependencies
 from invokeai.app.services.resource_name import SimpleNameService
@@ -56,7 +57,7 @@ class ApiDependencies:
     invoker: Invoker = None
 
     @staticmethod
-    def initialize(config, event_handler_id: int, logger: Logger = logger):
+    def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger):
         logger.debug(f"InvokeAI version {__version__}")
         logger.debug(f"Internet connectivity is {config.internet_available}")
 

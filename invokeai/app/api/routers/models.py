@@ -13,8 +13,11 @@ from invokeai.backend import BaseModelType, ModelType
 from invokeai.backend.model_management.models import (
     OPENAPI_MODEL_CONFIGS,
     SchedulerPredictionType,
+    ModelNotFoundException,
+    InvalidModelException,
 )
 from invokeai.backend.model_management import MergeInterpolationMethod
+
 from ..dependencies import ApiDependencies
 
 models_router = APIRouter(prefix="/v1/models", tags=["models"])
@@ -34,11 +37,16 @@ class ModelsList(BaseModel):
     responses={200: {"model": ModelsList }},
 )
 async def list_models(
-    base_model: Optional[BaseModelType] = Query(default=None, description="Base model"),
+    base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
     model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
 ) -> ModelsList:
     """Gets a list of models"""
-    models_raw = ApiDependencies.invoker.services.model_manager.list_models(base_model, model_type)
+    if base_models and len(base_models)>0:
+        models_raw = list()
+        for base_model in base_models:
+            models_raw.extend(ApiDependencies.invoker.services.model_manager.list_models(base_model, model_type))
+    else:
+        models_raw = ApiDependencies.invoker.services.model_manager.list_models(None, model_type)
     models = parse_obj_as(ModelsList, { "models": models_raw })
     return models
 
@@ -46,8 +54,9 @@ async def list_models(
     "/{base_model}/{model_type}/{model_name}",
     operation_id="update_model",
     responses={200: {"description" : "The model was updated successfully"},
+               400: {"description" : "Bad request"},
                404: {"description" : "The model could not be found"},
-               400: {"description" : "Bad request"}
+               409: {"description" : "There is already a model corresponding to the new name"},
                },
     status_code = 200,
     response_model = UpdateModelResponse,
@@ -58,23 +67,58 @@ async def update_model(
         model_name: str = Path(description="model name"),
         info: Union[tuple(OPENAPI_MODEL_CONFIGS)] = Body(description="Model configuration"),
 ) -> UpdateModelResponse:
-    """ Add Model """
+    """ Update model contents with a new config. If the model name or base fields are changed, then the model is renamed. """
+    logger = ApiDependencies.invoker.services.logger
+
+    
     try:
+        previous_info = ApiDependencies.invoker.services.model_manager.list_model(
+            model_name=model_name,
+            base_model=base_model,
+            model_type=model_type,
+        )
+
+        # rename operation requested
+        if info.model_name != model_name or info.base_model != base_model:
+            ApiDependencies.invoker.services.model_manager.rename_model(
+                base_model = base_model,
+                model_type = model_type,
+                model_name = model_name,
+                new_name = info.model_name,
+                new_base = info.base_model,
+            )
+            logger.info(f'Successfully renamed {base_model}/{model_name}=>{info.base_model}/{info.model_name}')
+            # update information to support an update of attributes
+            model_name = info.model_name
+            base_model = info.base_model
+            new_info = ApiDependencies.invoker.services.model_manager.list_model(
+                model_name=model_name,
+                base_model=base_model,
+                model_type=model_type,
+            )
+            if new_info.get('path') != previous_info.get('path'):  # model manager moved model path during rename - don't overwrite it
+                info.path = new_info.get('path')
+            
         ApiDependencies.invoker.services.model_manager.update_model(
             model_name=model_name,
             base_model=base_model,
             model_type=model_type,
             model_attributes=info.dict()
         )
+            
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
             model_name=model_name,
             base_model=base_model,
             model_type=model_type,
         )
         model_response = parse_obj_as(UpdateModelResponse, model_raw)
-    except KeyError as e:
+    except ModelNotFoundException as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.error(str(e))
         raise HTTPException(status_code=400, detail=str(e))
 
     return model_response
@@ -85,6 +129,7 @@ async def update_model(
     responses= {
         201: {"description" : "The model imported successfully"},
         404: {"description" : "The model could not be found"},
+        415: {"description" : "Unrecognized file/folder format"},
         424: {"description" : "The model appeared to import successfully, but could not be found in the model manager"},
         409: {"description" : "There is already a model corresponding to this path or repo_id"},
     },
@@ -111,7 +156,7 @@ async def import_model(
 
         if not info:
             logger.error("Import failed")
-            raise HTTPException(status_code=424)
+            raise HTTPException(status_code=415)
         
         logger.info(f'Successfully imported {location}, got {info}')
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
@@ -121,9 +166,12 @@ async def import_model(
         )
         return parse_obj_as(ImportModelResponse, model_raw)
     
-    except KeyError as e:
+    except ModelNotFoundException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
+    except InvalidModelException as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=415)
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
@@ -161,57 +209,13 @@ async def add_model(
             model_type=info.model_type
         )
         return parse_obj_as(ImportModelResponse, model_raw)
-    except KeyError as e:
+    except ModelNotFoundException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
 
-@models_router.post(
-    "/rename/{base_model}/{model_type}/{model_name}",
-    operation_id="rename_model",
-    responses= {
-        201: {"description" : "The model was renamed successfully"},
-        404: {"description" : "The model could not be found"},
-        409: {"description" : "There is already a model corresponding to the new name"},
-    },
-    status_code=201,
-    response_model=ImportModelResponse
-)
-async def rename_model(
-        base_model: BaseModelType = Path(description="Base model"),
-        model_type: ModelType = Path(description="The type of model"),
-        model_name: str = Path(description="current model name"),
-        new_name: Optional[str] = Query(description="new model name", default=None),
-        new_base: Optional[BaseModelType] = Query(description="new model base", default=None),
-) -> ImportModelResponse:
-    """ Rename a model"""
-    
-    logger = ApiDependencies.invoker.services.logger
-
-    try:
-        result = ApiDependencies.invoker.services.model_manager.rename_model(
-            base_model = base_model,
-            model_type = model_type,
-            model_name = model_name,
-            new_name = new_name,
-            new_base = new_base,
-        )
-        logger.debug(result)
-        logger.info(f'Successfully renamed {model_name}=>{new_name}')
-        model_raw = ApiDependencies.invoker.services.model_manager.list_model(
-            model_name=new_name or model_name,
-            base_model=new_base or base_model,
-            model_type=model_type
-        )
-        return parse_obj_as(ImportModelResponse, model_raw)
-    except KeyError as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=409, detail=str(e))
     
 @models_router.delete(
     "/{base_model}/{model_type}/{model_name}",
@@ -238,9 +242,9 @@ async def delete_model(
                                                                  )
         logger.info(f"Deleted model: {model_name}")
         return Response(status_code=204)
-    except KeyError:
-        logger.error(f"Model not found: {model_name}")
-        raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
+    except ModelNotFoundException as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=404, detail=str(e))
 
 @models_router.put(
     "/convert/{base_model}/{model_type}/{model_name}",
@@ -273,8 +277,8 @@ async def convert_model(
                                                                               base_model = base_model,
                                                                               model_type = model_type)
         response = parse_obj_as(ConvertModelResponse, model_raw)
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
+    except ModelNotFoundException as e:
+        raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found: {str(e)}")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return response
@@ -364,8 +368,55 @@ async def merge_models(
                                                                               model_type = ModelType.Main,
                                                                               )
         response = parse_obj_as(ConvertModelResponse, model_raw)
-    except KeyError:
+    except ModelNotFoundException:
         raise HTTPException(status_code=404, detail=f"One or more of the models '{model_names}' not found")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return response
+
+# The rename operation is now supported by update_model and no longer needs to be
+# a standalone route.
+# @models_router.post(
+#     "/rename/{base_model}/{model_type}/{model_name}",
+#     operation_id="rename_model",
+#     responses= {
+#         201: {"description" : "The model was renamed successfully"},
+#         404: {"description" : "The model could not be found"},
+#         409: {"description" : "There is already a model corresponding to the new name"},
+#     },
+#     status_code=201,
+#     response_model=ImportModelResponse
+# )
+# async def rename_model(
+#         base_model: BaseModelType = Path(description="Base model"),
+#         model_type: ModelType = Path(description="The type of model"),
+#         model_name: str = Path(description="current model name"),
+#         new_name: Optional[str] = Query(description="new model name", default=None),
+#         new_base: Optional[BaseModelType] = Query(description="new model base", default=None),
+# ) -> ImportModelResponse:
+#     """ Rename a model"""
+    
+#     logger = ApiDependencies.invoker.services.logger
+
+#     try:
+#         result = ApiDependencies.invoker.services.model_manager.rename_model(
+#             base_model = base_model,
+#             model_type = model_type,
+#             model_name = model_name,
+#             new_name = new_name,
+#             new_base = new_base,
+#         )
+#         logger.debug(result)
+#         logger.info(f'Successfully renamed {model_name}=>{new_name}')
+#         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
+#             model_name=new_name or model_name,
+#             base_model=new_base or base_model,
+#             model_type=model_type
+#         )
+#         return parse_obj_as(ImportModelResponse, model_raw)
+#     except ModelNotFoundException as e:
+#         logger.error(str(e))
+#         raise HTTPException(status_code=404, detail=str(e))
+#     except ValueError as e:
+#         logger.error(str(e))
+#         raise HTTPException(status_code=409, detail=str(e))

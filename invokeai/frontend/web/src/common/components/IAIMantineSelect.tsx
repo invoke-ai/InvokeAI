@@ -9,14 +9,14 @@ export type IAISelectDataType = {
   tooltip?: string;
 };
 
-type IAISelectProps = Omit<SelectProps, 'label'> & {
+export type IAISelectProps = Omit<SelectProps, 'label'> & {
   tooltip?: string;
   inputRef?: RefObject<HTMLInputElement>;
   label?: string;
 };
 
 const IAIMantineSelect = (props: IAISelectProps) => {
-  const { tooltip, inputRef, label, disabled, ...rest } = props;
+  const { tooltip, inputRef, label, disabled, required, ...rest } = props;
 
   const styles = useMantineSelectStyles();
 
@@ -25,7 +25,7 @@ const IAIMantineSelect = (props: IAISelectProps) => {
       <Select
         label={
           label ? (
-            <FormControl isDisabled={disabled}>
+            <FormControl isRequired={required} isDisabled={disabled}>
               <FormLabel>{label}</FormLabel>
             </FormControl>
           ) : undefined

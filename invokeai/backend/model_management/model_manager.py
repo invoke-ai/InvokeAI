@@ -552,7 +552,7 @@ class ModelManager(object):
             model_config = self.models.get(model_key)
             if not model_config:
                 self.logger.error(f'Unknown model {model_name}')
-                raise KeyError(f'Unknown model {model_name}')
+                raise ModelNotFoundException(f'Unknown model {model_name}')
 
             cur_model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
             if base_model is not None and cur_base_model != base_model:
@@ -568,6 +568,9 @@ class ModelManager(object):
                 model_type=cur_model_type,
             )
 
+            # expose paths as absolute to help web UI
+            if path := model_dict.get('path'):
+                model_dict['path'] = str(self.app_config.root_path / path)
             models.append(model_dict)
 
         return models
@@ -596,7 +599,7 @@ class ModelManager(object):
         model_cfg = self.models.pop(model_key, None)
 
         if model_cfg is None:
-            raise KeyError(f"Unknown model {model_key}")
+            raise ModelNotFoundException(f"Unknown model {model_key}")
 
         # note: it not garantie to release memory(model can has other references)
         cache_ids = self.cache_keys.pop(model_key, [])
@@ -635,6 +638,10 @@ class ModelManager(object):
         The returned dict has the same format as the dict returned by
         model_info().
         """
+        # relativize paths as they go in - this makes it easier to move the root directory around
+        if path := model_attributes.get('path'):
+            if Path(path).is_relative_to(self.app_config.root_path):
+                model_attributes['path'] = str(Path(path).relative_to(self.app_config.root_path))
 
         model_class = MODEL_CLASSES[base_model][model_type]
         model_config = model_class.create_config(**model_attributes)
@@ -689,7 +696,7 @@ class ModelManager(object):
         model_key = self.create_key(model_name, base_model, model_type)
         model_cfg = self.models.get(model_key, None)
         if not model_cfg:
-            raise KeyError(f"Unknown model: {model_key}")
+            raise ModelNotFoundException(f"Unknown model: {model_key}")
         
         old_path = self.app_config.root_path / model_cfg.path
         new_name = new_name or model_name
@@ -700,7 +707,7 @@ class ModelManager(object):
 
         # if this is a model file/directory that we manage ourselves, we need to move it
         if old_path.is_relative_to(self.app_config.models_path):
-            new_path = self.app_config.root_path / 'models' / new_base.value / model_type.value / new_name
+            new_path = self.app_config.root_path / 'models' / BaseModelType(new_base).value / ModelType(model_type).value / new_name
             move(old_path, new_path)
             model_cfg.path = str(new_path.relative_to(self.app_config.root_path))
 
@@ -964,7 +971,7 @@ class ModelManager(object):
         that model.
 
         May return the following exceptions:
-        - KeyError   - one or more of the items to import is not a valid path, repo_id or URL
+        - ModelNotFoundException   - one or more of the items to import is not a valid path, repo_id or URL
         - ValueError - a corresponding model already exists
         '''
         # avoid circular import here

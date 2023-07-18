@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.latent_storage import LatentsStorageBase
     from invokeai.app.services.invocation_queue import InvocationQueueABC
     from invokeai.app.services.item_storage import ItemStorageABC
-    from invokeai.app.services.config import InvokeAISettings
+    from invokeai.app.services.config import InvokeAIAppConfig
     from invokeai.app.services.graph import GraphExecutionState, LibraryGraph
     from invokeai.app.services.invoker import InvocationProcessorABC
 
@@ -23,7 +23,7 @@ class InvocationServices:
     # TODO: Just forward-declared everything due to circular dependencies. Fix structure.
     board_images: "BoardImagesServiceABC"
     boards: "BoardServiceABC"
-    configuration: "InvokeAISettings"
+    configuration: "InvokeAIAppConfig"
     events: "EventServiceBase"
     graph_execution_manager: "ItemStorageABC"["GraphExecutionState"]
     graph_library: "ItemStorageABC"["LibraryGraph"]
@@ -38,7 +38,7 @@ class InvocationServices:
         self,
         board_images: "BoardImagesServiceABC",
         boards: "BoardServiceABC",
-        configuration: "InvokeAISettings",
+        configuration: "InvokeAIAppConfig",
         events: "EventServiceBase",
         graph_execution_manager: "ItemStorageABC"["GraphExecutionState"],
         graph_library: "ItemStorageABC"["LibraryGraph"],

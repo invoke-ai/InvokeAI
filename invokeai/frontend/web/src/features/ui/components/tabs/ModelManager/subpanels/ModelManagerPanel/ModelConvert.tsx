@@ -1,9 +1,18 @@
-import { Flex, ListItem, Text, UnorderedList } from '@chakra-ui/react';
-// import { convertToDiffusers } from 'app/socketio/actions';
+import {
+  Flex,
+  ListItem,
+  Radio,
+  RadioGroup,
+  Text,
+  Tooltip,
+  UnorderedList,
+} from '@chakra-ui/react';
 import { makeToast } from 'app/components/Toaster';
+// import { convertToDiffusers } from 'app/socketio/actions';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
+import IAIInput from 'common/components/IAIInput';
 import { addToast } from 'features/system/store/systemSlice';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +24,8 @@ interface ModelConvertProps {
   model: CheckpointModelConfig;
 }
 
+type SaveLocation = 'InvokeAIRoot' | 'Custom';
+
 export default function ModelConvert(props: ModelConvertProps) {
   const { model } = props;
 
@@ -23,22 +34,51 @@ export default function ModelConvert(props: ModelConvertProps) {
 
   const [convertModel, { isLoading }] = useConvertMainModelsMutation();
 
-  const [saveLocation, setSaveLocation] = useState<string>('same');
+  const [saveLocation, setSaveLocation] =
+    useState<SaveLocation>('InvokeAIRoot');
   const [customSaveLocation, setCustomSaveLocation] = useState<string>('');
 
   useEffect(() => {
-    setSaveLocation('same');
+    setSaveLocation('InvokeAIRoot');
   }, [model]);
 
   const modelConvertCancelHandler = () => {
-    setSaveLocation('same');
+    setSaveLocation('InvokeAIRoot');
   };
 
   const modelConvertHandler = () => {
     const responseBody = {
       base_model: model.base_model,
       model_name: model.model_name,
+      params: {
+        convert_dest_directory:
+          saveLocation === 'Custom' ? customSaveLocation : undefined,
+      },
     };
+
+    if (saveLocation === 'Custom' && customSaveLocation === '') {
+      dispatch(
+        addToast(
+          makeToast({
+            title: t('modelManager.noCustomLocationProvided'),
+            status: 'error',
+          })
+        )
+      );
+      return;
+    }
+
+    dispatch(
+      addToast(
+        makeToast({
+          title: `${t('modelManager.convertingModelBegin')}: ${
+            model.model_name
+          }`,
+          status: 'success',
+        })
+      )
+    );
+
     convertModel(responseBody)
       .unwrap()
       .then((_) => {
@@ -94,35 +134,30 @@ export default function ModelConvert(props: ModelConvertProps) {
         <Text>{t('modelManager.convertToDiffusersHelpText6')}</Text>
       </Flex>
 
-      {/* <Flex flexDir="column" gap={4}>
+      <Flex flexDir="column" gap={2}>
         <Flex marginTop={4} flexDir="column" gap={2}>
           <Text fontWeight="600">
             {t('modelManager.convertToDiffusersSaveLocation')}
           </Text>
-          <RadioGroup value={saveLocation} onChange={(v) => setSaveLocation(v)}>
+          <RadioGroup
+            value={saveLocation}
+            onChange={(v) => setSaveLocation(v as SaveLocation)}
+          >
             <Flex gap={4}>
-              <Radio value="same">
-                <Tooltip label="Save converted model in the same folder">
-                  {t('modelManager.sameFolder')}
-                </Tooltip>
-              </Radio>
-
-              <Radio value="root">
+              <Radio value="InvokeAIRoot">
                 <Tooltip label="Save converted model in the InvokeAI root folder">
                   {t('modelManager.invokeRoot')}
                 </Tooltip>
               </Radio>
-
-              <Radio value="custom">
+              <Radio value="Custom">
                 <Tooltip label="Save converted model in a custom folder">
                   {t('modelManager.custom')}
                 </Tooltip>
               </Radio>
             </Flex>
           </RadioGroup>
-        </Flex> */}
-
-      {/* {saveLocation === 'custom' && (
+        </Flex>
+        {saveLocation === 'Custom' && (
           <Flex flexDirection="column" rowGap={2}>
             <Text fontWeight="500" fontSize="sm" variant="subtext">
               {t('modelManager.customSaveLocation')}
@@ -130,13 +165,13 @@ export default function ModelConvert(props: ModelConvertProps) {
             <IAIInput
               value={customSaveLocation}
               onChange={(e) => {
-                if (e.target.value !== '')
-                  setCustomSaveLocation(e.target.value);
+                setCustomSaveLocation(e.target.value);
               }}
               width="full"
             />
           </Flex>
-        )} */}
+        )}
+      </Flex>
     </IAIAlertDialog>
   );
 }

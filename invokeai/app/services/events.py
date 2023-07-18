@@ -105,8 +105,6 @@ class EventServiceBase:
     def emit_model_load_started (
             self,
             graph_execution_state_id: str,
-            node: dict,
-            source_node_id: str,
             model_name: str,
             base_model: BaseModelType,
             model_type: ModelType,
@@ -117,8 +115,6 @@ class EventServiceBase:
             event_name="model_load_started",
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
-                node=node,
-                source_node_id=source_node_id,
                 model_name=model_name,
                 base_model=base_model,
                 model_type=model_type,
@@ -129,8 +125,6 @@ class EventServiceBase:
     def emit_model_load_completed(
             self,
             graph_execution_state_id: str,
-            node: dict,
-            source_node_id: str,
             model_name: str,
             base_model: BaseModelType,
             model_type: ModelType,
@@ -142,12 +136,12 @@ class EventServiceBase:
             event_name="model_load_completed",
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
-                node=node,
-                source_node_id=source_node_id,
                 model_name=model_name,
                 base_model=base_model,
                 model_type=model_type,
                 submodel=submodel,
-                model_info=model_info,
+                hash=model_info.hash,
+                location=model_info.location,
+                precision=str(model_info.precision),
             ),
         )

@@ -18,6 +18,7 @@ from invokeai.backend.model_management import (
     SchedulerPredictionType,
     ModelMerger,
     MergeInterpolationMethod,
+    ModelNotFoundException,
 )
 from invokeai.backend.model_management.model_search import FindModels
 
@@ -145,7 +146,7 @@ class ModelManagerServiceBase(ABC):
     ) -> AddModelResult:
         """
         Update the named model with a dictionary of attributes. Will fail with a
-        KeyErrorException if the name does not already exist.
+        ModelNotFoundException if the name does not already exist.
 
         On a successful update, the config will be changed in memory. Will fail 
         with an assertion error if provided attributes are incorrect or 
@@ -338,7 +339,6 @@ class ModelManagerService(ModelManagerServiceBase):
         base_model: BaseModelType,
         model_type: ModelType,
         submodel: Optional[SubModelType] = None,
-        node: Optional[BaseInvocation] = None,
         context: Optional[InvocationContext] = None,
     ) -> ModelInfo:
         """
@@ -346,11 +346,9 @@ class ModelManagerService(ModelManagerServiceBase):
         part (such as the vae) of a diffusers mode.
         """
 
-        # if we are called from within a node, then we get to emit
-        # load start and complete events
-        if node and context:
+        # we can emit model loading events if we are executing with access to the invocation context
+        if context:
             self._emit_load_event(
-                node=node,
                 context=context,
                 model_name=model_name,
                 base_model=base_model,
@@ -365,9 +363,8 @@ class ModelManagerService(ModelManagerServiceBase):
             submodel,
         )
 
-        if node and context:
+        if context:
             self._emit_load_event(
-                node=node,
                 context=context,
                 model_name=model_name,
                 base_model=base_model,
@@ -451,14 +448,14 @@ class ModelManagerService(ModelManagerServiceBase):
     ) -> AddModelResult:
         """
         Update the named model with a dictionary of attributes. Will fail with a
-        KeyError exception if the name does not already exist.
+        ModelNotFoundException exception if the name does not already exist.
         On a successful update, the config will be changed in memory. Will fail 
         with an assertion error if provided attributes are incorrect or 
         the model name is missing. Call commit() to write changes to disk.
         """
         self.logger.debug(f'update model {model_name}')
         if not self.model_exists(model_name, base_model, model_type):
-            raise KeyError(f"Unknown model {model_name}")
+            raise ModelNotFoundException(f"Unknown model {model_name}")
         return self.add_model(model_name, base_model, model_type, model_attributes, clobber=True)
     
     def del_model(
@@ -509,23 +506,19 @@ class ModelManagerService(ModelManagerServiceBase):
 
     def _emit_load_event(
         self,
-        node,
         context,
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-        submodel: SubModelType,
+        submodel: Optional[SubModelType] = None,
         model_info: Optional[ModelInfo] = None,
     ):
         if context.services.queue.is_canceled(context.graph_execution_state_id):
             raise CanceledException()
-        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
-        source_node_id = graph_execution_state.prepared_source_mapping[node.id]
+
         if model_info:
             context.services.events.emit_model_load_completed(
                 graph_execution_state_id=context.graph_execution_state_id,
-                node=node.dict(),
-                source_node_id=source_node_id,
                 model_name=model_name,
                 base_model=base_model,
                 model_type=model_type,
@@ -535,8 +528,6 @@ class ModelManagerService(ModelManagerServiceBase):
         else:
             context.services.events.emit_model_load_started(
                 graph_execution_state_id=context.graph_execution_state_id,
-                node=node.dict(),
-                source_node_id=source_node_id,
                 model_name=model_name,
                 base_model=base_model,
                 model_type=model_type,

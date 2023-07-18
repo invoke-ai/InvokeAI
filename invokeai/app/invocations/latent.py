@@ -31,6 +31,13 @@ from .controlnet_image_processors import ControlField
 from .image import ImageOutput
 from .model import ModelInfo, UNetField, VaeField
 
+from diffusers.models.attention_processor import (
+    AttnProcessor2_0,
+    LoRAAttnProcessor2_0,
+    LoRAXFormersAttnProcessor,
+    XFormersAttnProcessor,
+)
+
 
 class LatentsField(BaseModel):
     """A latents field used for passing latents between invocations"""
@@ -76,7 +83,7 @@ def get_scheduler(
         scheduler_name, SCHEDULER_MAP['ddim']
     )
     orig_scheduler_info = context.services.model_manager.get_model(
-        **scheduler_info.dict()
+        **scheduler_info.dict(), context=context,
     )
     with orig_scheduler_info as orig_scheduler:
         scheduler_config = orig_scheduler.config
@@ -161,12 +168,12 @@ class TextToLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         scheduler,
     ) -> ConditioningData:
-        c, extra_conditioning_info = context.services.latents.get(
-            self.positive_conditioning.conditioning_name
-        )
-        uc, _ = context.services.latents.get(
-            self.negative_conditioning.conditioning_name
-        )
+        positive_cond_data = context.services.latents.get(self.positive_conditioning.conditioning_name)
+        c = positive_cond_data.conditionings[0].embeds
+        extra_conditioning_info = positive_cond_data.conditionings[0].extra_conditioning
+
+        negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
+        uc = negative_cond_data.conditionings[0].embeds
 
         conditioning_data = ConditioningData(
             unconditioned_embeddings=uc,
@@ -262,6 +269,7 @@ class TextToLatentsInvocation(BaseInvocation):
                         model_name=control_info.control_model.model_name,
                         model_type=ModelType.ControlNet,
                         base_model=control_info.control_model.base_model,
+                        context=context,
                     )
                 )
 
@@ -313,14 +321,14 @@ class TextToLatentsInvocation(BaseInvocation):
         def _lora_loader():
             for lora in self.unet.loras:
                 lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"})
+                    **lora.dict(exclude={"weight"}), context=context,
                 )
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
 
         unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict()
+            **self.unet.unet.dict(), context=context,
         )
         with ExitStack() as exit_stack,\
                 ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),\
@@ -403,14 +411,14 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         def _lora_loader():
             for lora in self.unet.loras:
                 lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"})
+                    **lora.dict(exclude={"weight"}), context=context,
                 )
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
 
         unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict()
+            **self.unet.unet.dict(), context=context,
         )
         with ExitStack() as exit_stack,\
                 ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),\
@@ -475,8 +483,8 @@ class LatentsToImageInvocation(BaseInvocation):
     tiled: bool = Field(
         default=False,
         description="Decode latents by overlaping tiles(less memory consumption)")
+    fp32: bool = Field(False, description="Decode in full precision")
     metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")
-    
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -491,10 +499,35 @@ class LatentsToImageInvocation(BaseInvocation):
         latents = context.services.latents.get(self.latents.latents_name)
 
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(),
+            **self.vae.vae.dict(), context=context,
         )
 
         with vae_info as vae:
+            if self.fp32:
+                vae.to(dtype=torch.float32)
+
+                use_torch_2_0_or_xformers = isinstance(
+                    vae.decoder.mid_block.attentions[0].processor,
+                    (
+                        AttnProcessor2_0,
+                        XFormersAttnProcessor,
+                        LoRAXFormersAttnProcessor,
+                        LoRAAttnProcessor2_0,
+                    ),
+                )
+                # if xformers or torch_2_0 is used attention block does not need
+                # to be in float32 which can save lots of memory
+                if use_torch_2_0_or_xformers:
+                    vae.post_quant_conv.to(latents.dtype)
+                    vae.decoder.conv_in.to(latents.dtype)
+                    vae.decoder.mid_block.to(latents.dtype)
+                else:
+                    latents = latents.float()
+
+            else:
+                vae.to(dtype=torch.float16)
+                latents = latents.half()
+
             if self.tiled or context.services.configuration.tiled_decode:
                 vae.enable_tiling()
             else:
@@ -618,6 +651,8 @@ class ImageToLatentsInvocation(BaseInvocation):
     tiled: bool = Field(
         default=False,
         description="Encode latents by overlaping tiles(less memory consumption)")
+    fp32: bool = Field(False, description="Decode in full precision")
+
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -636,7 +671,7 @@ class ImageToLatentsInvocation(BaseInvocation):
 
         #vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(),
+            **self.vae.vae.dict(), context=context,
         )
 
         image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
@@ -644,6 +679,32 @@ class ImageToLatentsInvocation(BaseInvocation):
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
         with vae_info as vae:
+            orig_dtype = vae.dtype
+            if self.fp32:
+                vae.to(dtype=torch.float32)
+
+                use_torch_2_0_or_xformers = isinstance(
+                    vae.decoder.mid_block.attentions[0].processor,
+                    (
+                        AttnProcessor2_0,
+                        XFormersAttnProcessor,
+                        LoRAXFormersAttnProcessor,
+                        LoRAAttnProcessor2_0,
+                    ),
+                )
+                # if xformers or torch_2_0 is used attention block does not need
+                # to be in float32 which can save lots of memory
+                if use_torch_2_0_or_xformers:
+                    vae.post_quant_conv.to(orig_dtype)
+                    vae.decoder.conv_in.to(orig_dtype)
+                    vae.decoder.mid_block.to(orig_dtype)
+                #else:
+                #    latents = latents.float()
+
+            else:
+                vae.to(dtype=torch.float16)
+                #latents = latents.half()
+
             if self.tiled:
                 vae.enable_tiling()
             else:
@@ -658,6 +719,7 @@ class ImageToLatentsInvocation(BaseInvocation):
                 )  # FIXME: uses torch.randn. make reproducible!
 
             latents = 0.18215 * latents
+            latents = latents.to(dtype=orig_dtype)
 
         name = f"{context.graph_execution_state_id}__{self.id}"
         # context.services.latents.set(name, latents)
