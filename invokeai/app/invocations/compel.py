@@ -147,6 +147,8 @@ class CompelInvocation(BaseInvocation):
                     tokenizer, conjunction),
                 cross_attention_control_args=options.get(
                     "cross_attention_control", None),)
+            
+        c = c.to('cpu')
 
         conditioning_data = ConditioningFieldData(
             conditionings=[
@@ -230,6 +232,10 @@ class SDXLPromptInvocationBase:
         del tokenizer_info
         del text_encoder_info
 
+        c = c.detach().to('cpu')
+        if c_pooled is not None:
+            c_pooled = c_pooled.detach().to('cpu')
+
         return c, c_pooled, None
 
     def run_clip_compel(self, context, clip_field, prompt, get_pooled):
@@ -305,6 +311,10 @@ class SDXLPromptInvocationBase:
         del text_encoder
         del tokenizer_info
         del text_encoder_info
+
+        c = c.detach().to('cpu')
+        if c_pooled is not None:
+            c_pooled = c_pooled.detach().to('cpu')
 
         return c, c_pooled, ec
 

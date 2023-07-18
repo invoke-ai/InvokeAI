@@ -415,6 +415,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
 
         #################
 
+        latents = latents.to('cpu')
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
@@ -650,7 +651,8 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
 
 
         #################
-
+        
+        latents = latents.to('cpu')
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'

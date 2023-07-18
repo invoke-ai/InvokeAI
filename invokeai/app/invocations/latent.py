@@ -503,6 +503,7 @@ class LatentsToImageInvocation(BaseInvocation):
         )
 
         with vae_info as vae:
+            latents = latents.to(vae.device)
             if self.fp32:
                 vae.to(dtype=torch.float32)
 

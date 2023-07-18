@@ -104,7 +104,7 @@ class ModelCache(object):
         :param sha_chunksize: Chunksize to use when calculating sha256 model hash
         '''
         self.model_infos: Dict[str, ModelBase] = dict()
-        self.lazy_offloading = lazy_offloading
+        self.lazy_offloading = lazy_offloading or max_vram_cache_size > 0
         self.precision: torch.dtype=precision
         self.max_cache_size: float=max_cache_size
         self.max_vram_cache_size: float=max_vram_cache_size
