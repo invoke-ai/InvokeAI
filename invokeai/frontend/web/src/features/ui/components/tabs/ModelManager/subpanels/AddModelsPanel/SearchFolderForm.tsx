@@ -48,13 +48,8 @@ function SearchFolderForm() {
         sx={{
           w: '100%',
           gap: 2,
-          p: 4,
           borderRadius: 4,
-          background: 'base.200',
           alignItems: 'center',
-          _dark: {
-            background: 'base.800',
-          },
         }}
       >
         <Flex w="100%" alignItems="center" gap={4} minH={12}>
@@ -67,7 +62,7 @@ function SearchFolderForm() {
               _dark: { color: 'base.300' },
             }}
           >
-            Search Folder
+            Folder
           </Text>
           {!searchFolder ? (
             <IAIInput

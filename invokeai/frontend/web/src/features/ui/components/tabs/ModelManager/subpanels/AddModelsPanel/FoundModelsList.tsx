@@ -4,8 +4,9 @@ import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
+import IAIScrollArea from 'common/components/IAIScrollArea';
 import { addToast } from 'features/system/store/systemSlice';
-import { difference, forEach, map, values } from 'lodash-es';
+import { difference, forEach, intersection, map, values } from 'lodash-es';
 import { ChangeEvent, MouseEvent, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -26,7 +27,7 @@ export default function FoundModelsList() {
   const { data: installedModels } = useGetMainModelsQuery();
 
   // Get all model paths from a given directory
-  const { foundModels, notInstalledModels, filteredModels } =
+  const { foundModels, alreadyInstalled, filteredModels } =
     useGetModelsInFolderQuery(
       {
         search_path: searchFolder ? searchFolder : '',
@@ -37,9 +38,10 @@ export default function FoundModelsList() {
           const installedModelPaths = map(installedModelValues, 'path');
           // Only select models those that aren't already installed to Invoke
           const notInstalledModels = difference(data, installedModelPaths);
+          const alreadyInstalled = intersection(data, installedModelPaths);
           return {
             foundModels: data,
-            notInstalledModels: notInstalledModels,
+            alreadyInstalled: foundModelsFilter(alreadyInstalled, nameFilter),
             filteredModels: foundModelsFilter(notInstalledModels, nameFilter),
           };
         },
@@ -89,6 +91,82 @@ export default function FoundModelsList() {
     setNameFilter(e.target.value);
   }, []);
 
+  const renderModels = ({
+    models,
+    showActions = true,
+  }: {
+    models: string[];
+    showActions?: boolean;
+  }) => {
+    return models.map((model) => {
+      return (
+        <Flex
+          sx={{
+            p: 4,
+            gap: 4,
+            alignItems: 'center',
+            borderRadius: 4,
+            bg: 'base.200',
+            _dark: {
+              bg: 'base.800',
+            },
+          }}
+          key={model}
+        >
+          <Flex w="100%" sx={{ flexDirection: 'column', minW: '25%' }}>
+            <Text sx={{ fontWeight: 600 }}>
+              {model.split('\\').slice(-1)[0]}
+            </Text>
+            <Text
+              sx={{
+                fontSize: 'sm',
+                color: 'base.600',
+                _dark: {
+                  color: 'base.400',
+                },
+              }}
+            >
+              {model}
+            </Text>
+          </Flex>
+          {showActions ? (
+            <Flex gap={2}>
+              <IAIButton
+                id={model}
+                onClick={quickAddHandler}
+                isLoading={isLoading}
+              >
+                Quick Add
+              </IAIButton>
+              <IAIButton
+                onClick={() => dispatch(setAdvancedAddScanModel(model))}
+                isLoading={isLoading}
+              >
+                Advanced
+              </IAIButton>
+            </Flex>
+          ) : (
+            <Text
+              sx={{
+                fontWeight: 600,
+                p: 2,
+                borderRadius: 4,
+                color: 'accent.50',
+                bg: 'accent.400',
+                _dark: {
+                  color: 'accent.100',
+                  bg: 'accent.600',
+                },
+              }}
+            >
+              Installed
+            </Text>
+          )}
+        </Flex>
+      );
+    });
+  };
+
   const renderFoundModels = () => {
     if (!searchFolder) return;
 
@@ -125,8 +203,12 @@ export default function FoundModelsList() {
         <IAIInput
           onChange={handleSearchFilter}
           label={t('modelManager.search')}
+          labelPos="side"
         />
         <Flex p={2} gap={2}>
+          <Text sx={{ fontWeight: 600 }}>
+            Models Found: {foundModels.length}
+          </Text>
           <Text
             sx={{
               fontWeight: 600,
@@ -136,60 +218,16 @@ export default function FoundModelsList() {
               },
             }}
           >
-            Found Models: {foundModels.length}
-          </Text>
-          <Text sx={{ fontWeight: 600 }}>
-            Not Installed: {notInstalledModels.length}
+            Not Installed: {filteredModels.length}
           </Text>
         </Flex>
 
-        {filteredModels.map((model) => (
-          <Flex
-            sx={{
-              p: 4,
-              gap: 4,
-              alignItems: 'center',
-              borderRadius: 4,
-              bg: 'base.200',
-              _dark: {
-                bg: 'base.800',
-              },
-            }}
-            key={model}
-          >
-            <Flex w="100%" sx={{ flexDirection: 'column', minW: '25%' }}>
-              <Text sx={{ fontWeight: 600 }}>
-                {model.split('\\').slice(-1)[0]}
-              </Text>
-              <Text
-                sx={{
-                  fontSize: 'sm',
-                  color: 'base.600',
-                  _dark: {
-                    color: 'base.400',
-                  },
-                }}
-              >
-                {model}
-              </Text>
-            </Flex>
-            <Flex gap={2}>
-              <IAIButton
-                id={model}
-                onClick={quickAddHandler}
-                isLoading={isLoading}
-              >
-                Quick Add
-              </IAIButton>
-              <IAIButton
-                onClick={() => dispatch(setAdvancedAddScanModel(model))}
-                isLoading={isLoading}
-              >
-                Advanced
-              </IAIButton>
-            </Flex>
+        <IAIScrollArea offsetScrollbars>
+          <Flex gap={2} flexDirection="column">
+            {renderModels({ models: filteredModels })}
+            {renderModels({ models: alreadyInstalled, showActions: false })}
           </Flex>
-        ))}
+        </IAIScrollArea>
       </Flex>
     );
   };

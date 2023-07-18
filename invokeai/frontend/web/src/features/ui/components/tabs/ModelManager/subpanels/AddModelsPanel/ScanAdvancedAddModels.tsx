@@ -43,8 +43,8 @@ export default function ScanAdvancedAddModels() {
         sx={{
           display: 'flex',
           flexDirection: 'column',
-          minWidth: '50%',
-          maxHeight: window.innerHeight - 330,
+          minWidth: '40%',
+          maxHeight: window.innerHeight - 300,
           overflow: 'scroll',
           p: 4,
           gap: 4,

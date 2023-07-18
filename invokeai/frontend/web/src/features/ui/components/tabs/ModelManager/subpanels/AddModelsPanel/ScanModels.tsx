@@ -10,7 +10,7 @@ export default function ScanModels() {
       <Flex gap={4}>
         <Flex
           sx={{
-            maxHeight: window.innerHeight - 330,
+            maxHeight: window.innerHeight - 300,
             overflow: 'scroll',
             gap: 4,
             w: '100%',
