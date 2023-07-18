@@ -429,7 +429,7 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
         )
 
 class SDXLRawPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
-    """Parse prompt using compel package to conditioning."""
+    """Pass unmodified prompt to conditioning without compel processing."""
 
     type: Literal["sdxl_raw_prompt"] = "sdxl_raw_prompt"
 
