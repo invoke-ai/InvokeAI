@@ -334,6 +334,8 @@ class TextToLatentsInvocation(BaseInvocation):
                 ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),\
                 unet_info as unet:
 
+            noise = noise.to(device=unet.device, dtype=unet.dtype)
+
             scheduler = get_scheduler(
                 context=context,
                 scheduler_info=self.unet.scheduler,
@@ -424,6 +426,9 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
         with ExitStack() as exit_stack,\
                 ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),\
                 unet_info as unet:
+
+            noise = noise.to(device=unet.device, dtype=unet.dtype)
+            latent = latent.to(device=unet.device, dtype=unet.dtype)
 
             scheduler = get_scheduler(
                 context=context,
