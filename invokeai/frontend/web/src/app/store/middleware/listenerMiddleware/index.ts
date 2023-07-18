@@ -46,10 +46,6 @@ import {
   addImageUploadedFulfilledListener,
   addImageUploadedRejectedListener,
 } from './listeners/imageUploaded';
-import {
-  addImageUrlsReceivedFulfilledListener,
-  addImageUrlsReceivedRejectedListener,
-} from './listeners/imageUrlsReceived';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
@@ -135,10 +131,6 @@ addImageToDeleteSelectedListener();
 addImageMetadataReceivedFulfilledListener();
 addImageMetadataReceivedRejectedListener();
 
-// Image URLs
-addImageUrlsReceivedFulfilledListener();
-addImageUrlsReceivedRejectedListener();
-
 // User Invoked
 addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
@@ -197,9 +189,6 @@ addSessionCanceledRejectedListener();
 // ControlNet
 addControlNetImageProcessedListener();
 addControlNetAutoProcessListener();
-
-// Update image URLs on connect
-// addUpdateImageUrlsOnConnectListener();
 
 // Boards
 addImageAddedToBoardFulfilledListener();

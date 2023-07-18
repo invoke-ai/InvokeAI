@@ -2,46 +2,6 @@ import { createAppAsyncThunk } from 'app/store/storeUtils';
 import { $client } from 'services/api/client';
 import { paths } from 'services/api/schema';
 
-type GetImageUrlsArg =
-  paths['/api/v1/images/{image_name}/urls']['get']['parameters']['path'];
-
-type GetImageUrlsResponse =
-  paths['/api/v1/images/{image_name}/urls']['get']['responses']['200']['content']['application/json'];
-
-type GetImageUrlsThunkConfig = {
-  rejectValue: {
-    arg: GetImageUrlsArg;
-    error: unknown;
-  };
-};
-/**
- * Thunk to get image URLs
- */
-export const imageUrlsReceived = createAppAsyncThunk<
-  GetImageUrlsResponse,
-  GetImageUrlsArg,
-  GetImageUrlsThunkConfig
->('thunkApi/imageUrlsReceived', async (arg, { rejectWithValue }) => {
-  const { image_name } = arg;
-  const { get } = $client.get();
-  const { data, error, response } = await get(
-    '/api/v1/images/{image_name}/urls',
-    {
-      params: {
-        path: {
-          image_name,
-        },
-      },
-    }
-  );
-
-  if (error) {
-    return rejectWithValue({ arg, error });
-  }
-
-  return data;
-});
-
 type GetImageMetadataArg =
   paths['/api/v1/images/{image_name}']['get']['parameters']['path'];
 
