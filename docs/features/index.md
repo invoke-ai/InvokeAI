@@ -37,7 +37,7 @@ guide also covers optimizing models to load quickly.
 Teach an old model new tricks. Merge 2-3 models together to create a
 new model that combines characteristics of the originals.
 
-## * [Textual Inversion](TEXTUAL_INVERSION.md)
+## * [Textual Inversion](TRAINING.md)
 Personalize models by adding your own style or subjects.
 
 # Other Features
