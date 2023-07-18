@@ -7,6 +7,7 @@ import IAIInput from 'common/components/IAIInput';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaSearch, FaSync, FaTrash } from 'react-icons/fa';
+import { useGetModelsInFolderQuery } from 'services/api/endpoints/models';
 import {
   setAdvancedAddScanModel,
   setSearchFolder,
@@ -24,6 +25,10 @@ function SearchFolderForm() {
     (state: RootState) => state.modelmanager.searchFolder
   );
 
+  const { refetch: refetchFoundModels } = useGetModelsInFolderQuery({
+    search_path: searchFolder ? searchFolder : '',
+  });
+
   const searchFolderForm = useForm<SearchFolderForm>({
     initialValues: {
       folder: '',
@@ -36,6 +41,10 @@ function SearchFolderForm() {
     },
     [dispatch]
   );
+
+  const scanAgainHandler = () => {
+    refetchFoundModels();
+  };
 
   return (
     <form
@@ -89,14 +98,26 @@ function SearchFolderForm() {
         </Flex>
 
         <Flex gap={2}>
-          <IAIIconButton
-            aria-label={t('modelManager.scanAgain')}
-            tooltip={t('modelManager.scanAgain')}
-            icon={!searchFolder ? <FaSearch /> : <FaSync />}
-            fontSize={18}
-            size="sm"
-            type="submit"
-          />
+          {!searchFolder ? (
+            <IAIIconButton
+              aria-label={t('modelManager.findModels')}
+              tooltip={t('modelManager.findModels')}
+              icon={<FaSearch />}
+              fontSize={18}
+              size="sm"
+              type="submit"
+            />
+          ) : (
+            <IAIIconButton
+              aria-label={t('modelManager.scanAgain')}
+              tooltip={t('modelManager.scanAgain')}
+              icon={<FaSync />}
+              onClick={scanAgainHandler}
+              fontSize={18}
+              size="sm"
+            />
+          )}
+
           <IAIIconButton
             aria-label={t('modelManager.clearCheckpointFolder')}
             tooltip={t('modelManager.clearCheckpointFolder')}
