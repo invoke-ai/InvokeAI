@@ -128,6 +128,7 @@ async def update_model(
     responses= {
         201: {"description" : "The model imported successfully"},
         404: {"description" : "The model could not be found"},
+        415: {"description" : "Unrecognized file/folder format"},
         424: {"description" : "The model appeared to import successfully, but could not be found in the model manager"},
         409: {"description" : "There is already a model corresponding to this path or repo_id"},
     },
@@ -154,7 +155,7 @@ async def import_model(
 
         if not info:
             logger.error("Import failed")
-            raise HTTPException(status_code=424)
+            raise HTTPException(status_code=415)
         
         logger.info(f'Successfully imported {location}, got {info}')
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
