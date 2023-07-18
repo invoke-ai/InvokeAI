@@ -1,7 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
   setActiveTab,
   toggleGalleryPanel,
@@ -14,10 +16,11 @@ import React, { memo } from 'react';
 import { isHotkeyPressed, useHotkeys } from 'react-hotkeys-hook';
 
 const globalHotkeysSelector = createSelector(
-  (state: RootState) => state.hotkeys,
-  (hotkeys) => {
+  [(state: RootState) => state.hotkeys, (state: RootState) => state.ui],
+  (hotkeys, ui) => {
     const { shift } = hotkeys;
-    return { shift };
+    const { shouldPinParametersPanel, shouldPinGallery } = ui;
+    return { shift, shouldPinGallery, shouldPinParametersPanel };
   },
   {
     memoizeOptions: {
@@ -34,7 +37,10 @@ const globalHotkeysSelector = createSelector(
  */
 const GlobalHotkeys: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { shift } = useAppSelector(globalHotkeysSelector);
+  const { shift, shouldPinParametersPanel, shouldPinGallery } = useAppSelector(
+    globalHotkeysSelector
+  );
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
   useHotkeys(
     '*',
@@ -51,18 +57,30 @@ const GlobalHotkeys: React.FC = () => {
 
   useHotkeys('o', () => {
     dispatch(toggleParametersPanel());
+    if (activeTabName === 'unifiedCanvas' && shouldPinParametersPanel) {
+      dispatch(requestCanvasRescale());
+    }
   });
 
   useHotkeys(['shift+o'], () => {
     dispatch(togglePinParametersPanel());
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(requestCanvasRescale());
+    }
   });
 
   useHotkeys('g', () => {
     dispatch(toggleGalleryPanel());
+    if (activeTabName === 'unifiedCanvas' && shouldPinGallery) {
+      dispatch(requestCanvasRescale());
+    }
   });
 
   useHotkeys(['shift+g'], () => {
     dispatch(togglePinGalleryPanel());
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(requestCanvasRescale());
+    }
   });
 
   useHotkeys('1', () => {

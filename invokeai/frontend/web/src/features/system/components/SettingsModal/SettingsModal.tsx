@@ -183,7 +183,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
       >
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>{t('common.settingsLabel')}</ModalHeader>
+          <ModalHeader bg="none">{t('common.settingsLabel')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <Flex sx={{ gap: 4, flexDirection: 'column' }}>
@@ -331,12 +331,15 @@ export default SettingsModal;
 const StyledFlex = (props: PropsWithChildren) => {
   return (
     <Flex
-      layerStyle="second"
       sx={{
         flexDirection: 'column',
         gap: 2,
         p: 4,
         borderRadius: 'base',
+        bg: 'base.100',
+        _dark: {
+          bg: 'base.900',
+        },
       }}
     >
       {props.children}

@@ -13,13 +13,13 @@ import { popoverTheme } from './components/popover';
 import { progressTheme } from './components/progress';
 import { no_scrollbar } from './components/scrollbar';
 import { selectTheme } from './components/select';
+import { skeletonTheme } from './components/skeleton';
 import { sliderTheme } from './components/slider';
 import { switchTheme } from './components/switch';
 import { tabsTheme } from './components/tabs';
 import { textTheme } from './components/text';
 import { textareaTheme } from './components/textarea';
 import { tooltipTheme } from './components/tooltip';
-import { skeletonTheme } from './components/skeleton';
 
 export const theme: ThemeOverride = {
   config: {
@@ -74,7 +74,7 @@ export const theme: ThemeOverride = {
         '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
       dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
     },
-    nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-base-500)`,
+    nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-accent-450)`,
   },
   colors: InvokeAIColors,
   components: {
