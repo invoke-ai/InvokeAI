@@ -19,7 +19,7 @@ export default function ScanAdvancedAddModels() {
   const [advancedAddMode, setAdvancedAddMode] =
     useState<ManualAddMode>('diffusers');
 
-  const [isCheckpoint, setIsCheckpoint] = useState<boolean>(false);
+  const [isCheckpoint, setIsCheckpoint] = useState<boolean>(true);
 
   useEffect(() => {
     advancedAddScanModel &&
@@ -28,7 +28,7 @@ export default function ScanAdvancedAddModels() {
     )
       ? setAdvancedAddMode('checkpoint')
       : setAdvancedAddMode('diffusers');
-  }, [advancedAddScanModel, setAdvancedAddMode]);
+  }, [advancedAddScanModel, setAdvancedAddMode, isCheckpoint]);
 
   const dispatch = useAppDispatch();
 
