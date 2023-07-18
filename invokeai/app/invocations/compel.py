@@ -86,10 +86,10 @@ class CompelInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CompelOutput:
         tokenizer_info = context.services.model_manager.get_model(
-            **self.clip.tokenizer.dict(),
+            **self.clip.tokenizer.dict(), context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **self.clip.text_encoder.dict(),
+            **self.clip.text_encoder.dict(), context=context,
         )
 
         def _lora_loader():
@@ -111,6 +111,7 @@ class CompelInvocation(BaseInvocation):
                         model_name=name,
                         base_model=self.clip.text_encoder.base_model,
                         model_type=ModelType.TextualInversion,
+                        context=context,
                     ).context.model
                 )
             except ModelNotFoundException:
@@ -129,7 +130,7 @@ class CompelInvocation(BaseInvocation):
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=torch_dtype,
-                truncate_long_prompts=False,
+                truncate_long_prompts=True,
             )
 
             conjunction = Compel.parse_prompt_string(self.prompt)
@@ -438,7 +439,7 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
         )
 
 class SDXLRawPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
-    """Parse prompt using compel package to conditioning."""
+    """Pass unmodified prompt to conditioning without compel processing."""
 
     type: Literal["sdxl_raw_prompt"] = "sdxl_raw_prompt"
 

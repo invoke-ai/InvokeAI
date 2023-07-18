@@ -20,8 +20,8 @@ const IAINodeHeader = (props: IAINodeHeaderProps) => {
         justifyContent: 'space-between',
         px: 2,
         py: 1,
-        bg: 'base.300',
-        _dark: { bg: 'base.700' },
+        bg: 'base.100',
+        _dark: { bg: 'base.900' },
       }}
     >
       <Tooltip label={nodeId}>
@@ -30,7 +30,7 @@ const IAINodeHeader = (props: IAINodeHeaderProps) => {
           sx={{
             fontWeight: 600,
             color: 'base.900',
-            _dark: { color: 'base.100' },
+            _dark: { color: 'base.200' },
           }}
         >
           {title}

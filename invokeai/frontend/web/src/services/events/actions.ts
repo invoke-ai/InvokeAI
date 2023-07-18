@@ -5,6 +5,8 @@ import {
   InvocationCompleteEvent,
   InvocationErrorEvent,
   InvocationStartedEvent,
+  ModelLoadCompletedEvent,
+  ModelLoadStartedEvent,
 } from 'services/events/types';
 
 // Common socket action payload data
@@ -162,3 +164,35 @@ export const socketGeneratorProgress = createAction<
 export const appSocketGeneratorProgress = createAction<
   BaseSocketPayload & { data: GeneratorProgressEvent }
 >('socket/appSocketGeneratorProgress');
+
+/**
+ * Socket.IO Model Load Started
+ *
+ * Do not use. Only for use in middleware.
+ */
+export const socketModelLoadStarted = createAction<
+  BaseSocketPayload & { data: ModelLoadStartedEvent }
+>('socket/socketModelLoadStarted');
+
+/**
+ * App-level Model Load Started
+ */
+export const appSocketModelLoadStarted = createAction<
+  BaseSocketPayload & { data: ModelLoadStartedEvent }
+>('socket/appSocketModelLoadStarted');
+
+/**
+ * Socket.IO Model Load Started
+ *
+ * Do not use. Only for use in middleware.
+ */
+export const socketModelLoadCompleted = createAction<
+  BaseSocketPayload & { data: ModelLoadCompletedEvent }
+>('socket/socketModelLoadCompleted');
+
+/**
+ * App-level Model Load Completed
+ */
+export const appSocketModelLoadCompleted = createAction<
+  BaseSocketPayload & { data: ModelLoadCompletedEvent }
+>('socket/appSocketModelLoadCompleted');

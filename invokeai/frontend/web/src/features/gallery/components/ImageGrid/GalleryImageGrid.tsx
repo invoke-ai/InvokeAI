@@ -16,14 +16,13 @@ import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
   IMAGE_LIMIT,
-  selectImagesAll,
 } from 'features/gallery//store/gallerySlice';
 import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { receivedPageOfImages } from 'services/api/thunks/image';
+import { useListBoardImagesQuery } from '../../../../services/api/endpoints/boardImages';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
-import { useListBoardImagesQuery } from '../../../../services/api/endpoints/boardImages';
 
 const selector = createSelector(
   [stateSelector, selectFilteredImages],
@@ -180,7 +179,6 @@ const GalleryImageGrid = () => {
       </Box>
     );
   }
-  console.log({ selectedBoardId });
 
   if (status !== 'rejected') {
     return (

@@ -36,6 +36,7 @@ export default function IAIMantineTextInput(props: IAIMantineTextInputProps) {
         label: {
           color: mode(base700, base300)(colorMode),
           fontWeight: 'normal',
+          marginBottom: 4,
         },
       })}
       {...rest}

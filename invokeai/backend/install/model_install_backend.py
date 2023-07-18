@@ -117,6 +117,7 @@ class ModelInstall(object):
 
         # supplement with entries in models.yaml
         installed_models = self.mgr.list_models()
+        
         for md in installed_models:
             base = md['base_model']
             model_type = md['model_type']
@@ -133,6 +134,12 @@ class ModelInstall(object):
                     installed = True,
                 )
         return {x : model_dict[x] for x in sorted(model_dict.keys(),key=lambda y: model_dict[y].name.lower())}
+
+    def list_models(self, model_type):
+        installed = self.mgr.list_models(model_type=model_type)
+        print(f'Installed models of type `{model_type}`:')
+        for i in installed:
+            print(f"{i['model_name']}\t{i['base_model']}\t{i['path']}")
 
     def starter_models(self)->Set[str]:
         models = set()
@@ -205,7 +212,7 @@ class ModelInstall(object):
                                     {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}
                                     ]
                                    ):
-            models_installed.update(self._install_path(path))
+            models_installed.update({str(model_path_id_or_url): self._install_path(path)})
 
         # recursive scan
         elif path.is_dir():

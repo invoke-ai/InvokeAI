@@ -17,28 +17,20 @@ from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 
 # minimum size for UIs
-MIN_COLS = 130
+MIN_COLS = 136
 MIN_LINES = 45
 
 # -------------------------------------
-def set_terminal_size(columns: int, lines: int, launch_command: str=None):
+def set_terminal_size(columns: int, lines: int):
     ts = get_terminal_size()
     width = max(columns,ts.columns)
     height = max(lines,ts.lines)
 
     OS = platform.uname().system
     if OS == "Windows":
-        # The new Windows Terminal doesn't resize, so we relaunch in a CMD window.
-        # Would prefer to use execvpe() here, but somehow it is not working properly
-        # in the Windows 10 environment.
-        if 'IA_RELAUNCHED' not in os.environ:
-            args=['conhost']
-            args.extend([launch_command] if launch_command else [sys.argv[0]])
-            args.extend(sys.argv[1:])
-            os.environ['IA_RELAUNCHED'] = 'True'
-            os.execvp('conhost',args)
-        else:
-            _set_terminal_size_powershell(width,height)
+        pass
+        # not working reliably - ask user to adjust the window
+        #_set_terminal_size_powershell(width,height)
     elif OS in ["Darwin", "Linux"]:
         _set_terminal_size_unix(width,height)
 
@@ -84,20 +76,14 @@ def _set_terminal_size_unix(width: int, height: int):
     sys.stdout.write("\x1b[8;{height};{width}t".format(height=height, width=width))
     sys.stdout.flush()
 
-def set_min_terminal_size(min_cols: int, min_lines: int, launch_command: str=None):
+def set_min_terminal_size(min_cols: int, min_lines: int):
     # make sure there's enough room for the ui
     term_cols, term_lines = get_terminal_size()
     if term_cols >= min_cols and term_lines >= min_lines:
         return
     cols = max(term_cols, min_cols)
     lines = max(term_lines, min_lines)
-    set_terminal_size(cols, lines, launch_command)
-
-    # did it work?
-    term_cols, term_lines = get_terminal_size()
-    if term_cols < cols or term_lines < lines:
-        print(f'This window is too small for optimal display. For best results please enlarge it.')
-        input('After resizing, press any key to continue...')
+    set_terminal_size(cols, lines)
 
 class IntSlider(npyscreen.Slider):
     def translate_value(self):

@@ -28,6 +28,7 @@ export type OffsetPaginatedResults_ImageDTO_ =
 
 // Models
 export type ModelType = components['schemas']['ModelType'];
+export type SubModelType = components['schemas']['SubModelType'];
 export type BaseModelType = components['schemas']['BaseModelType'];
 export type MainModelField = components['schemas']['MainModelField'];
 export type VAEModelField = components['schemas']['VAEModelField'];
@@ -46,10 +47,12 @@ export type TextualInversionModelConfig =
   components['schemas']['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
   | components['schemas']['StableDiffusion1ModelDiffusersConfig']
-  | components['schemas']['StableDiffusion2ModelDiffusersConfig'];
+  | components['schemas']['StableDiffusion2ModelDiffusersConfig']
+  | components['schemas']['StableDiffusionXLModelDiffusersConfig'];
 export type CheckpointModelConfig =
   | components['schemas']['StableDiffusion1ModelCheckpointConfig']
-  | components['schemas']['StableDiffusion2ModelCheckpointConfig'];
+  | components['schemas']['StableDiffusion2ModelCheckpointConfig']
+  | components['schemas']['StableDiffusionXLModelCheckpointConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig
@@ -57,7 +60,10 @@ export type AnyModelConfig =
   | ControlNetModelConfig
   | TextualInversionModelConfig
   | MainModelConfig;
+
 export type MergeModelConfig = components['schemas']['Body_merge_models'];
+export type ConvertModelConfig = components['schemas']['Body_convert_model'];
+export type ImportModelConfig = components['schemas']['Body_import_model'];
 
 // Graphs
 export type Graph = components['schemas']['Graph'];
