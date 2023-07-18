@@ -47,10 +47,12 @@ export type TextualInversionModelConfig =
   components['schemas']['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
   | components['schemas']['StableDiffusion1ModelDiffusersConfig']
-  | components['schemas']['StableDiffusion2ModelDiffusersConfig'];
+  | components['schemas']['StableDiffusion2ModelDiffusersConfig']
+  | components['schemas']['StableDiffusionXLModelDiffusersConfig'];
 export type CheckpointModelConfig =
   | components['schemas']['StableDiffusion1ModelCheckpointConfig']
-  | components['schemas']['StableDiffusion2ModelCheckpointConfig'];
+  | components['schemas']['StableDiffusion2ModelCheckpointConfig']
+  | components['schemas']['StableDiffusionXLModelCheckpointConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig

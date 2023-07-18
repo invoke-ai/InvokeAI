@@ -212,7 +212,7 @@ class ModelInstall(object):
                                     {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}
                                     ]
                                    ):
-            models_installed.update(self._install_path(path))
+            models_installed.update({str(model_path_id_or_url): self._install_path(path)})
 
         # recursive scan
         elif path.is_dir():

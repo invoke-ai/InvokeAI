@@ -33,7 +33,6 @@ class ClipField(BaseModel):
     skipped_layers: int = Field(description="Number of skipped layers in text_encoder")
     loras: List[LoraInfo] = Field(description="Loras to apply on model loading")
 
-
 class VaeField(BaseModel):
     # TODO: better naming?
     vae: ModelInfo = Field(description="Info to load vae submodel")
@@ -50,7 +49,6 @@ class ModelLoaderOutput(BaseInvocationOutput):
     vae: VaeField = Field(default=None, description="Vae submodel")
     # fmt: on
 
-
 class MainModelField(BaseModel):
     """Main model field"""
 
@@ -63,7 +61,6 @@ class LoRAModelField(BaseModel):
 
     model_name: str = Field(description="Name of the LoRA model")
     base_model: BaseModelType = Field(description="Base model")
-
 
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
@@ -157,6 +154,22 @@ class MainModelLoaderInvocation(BaseInvocation):
                 loras=[],
                 skipped_layers=0,
             ),
+            clip2=ClipField(
+                tokenizer=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Tokenizer2,
+                ),
+                text_encoder=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.TextEncoder2,
+                ),
+                loras=[],
+                skipped_layers=0,
+            ),
             vae=VaeField(
                 vae=ModelInfo(
                     model_name=model_name,
@@ -167,7 +180,7 @@ class MainModelLoaderInvocation(BaseInvocation):
             ),
         )
 
-
+    
 class LoraLoaderOutput(BaseInvocationOutput):
     """Model loader output"""
 
