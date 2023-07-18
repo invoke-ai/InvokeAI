@@ -44,10 +44,6 @@ const ModelList = (props: ModelListProps) => {
 
   return (
     <Flex flexDirection="column" rowGap={4} width="50%" minWidth="50%">
-      <IAIInput
-        onChange={handleSearchFilter}
-        label={t('modelManager.search')}
-      />
       <Flex
         flexDirection="column"
         gap={4}
@@ -78,6 +74,12 @@ const ModelList = (props: ModelListProps) => {
             {t('modelManager.checkpointModels')}
           </IAIButton>
         </ButtonGroup>
+
+        <IAIInput
+          onChange={handleSearchFilter}
+          label={t('modelManager.search')}
+          labelPos="side"
+        />
 
         {['all', 'diffusers'].includes(modelFormatFilter) &&
           filteredDiffusersModels.length > 0 && (
