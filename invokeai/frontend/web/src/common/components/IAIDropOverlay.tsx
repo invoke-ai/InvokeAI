@@ -1,12 +1,12 @@
 import { Flex, Text, useColorMode } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
-import { memo, useRef } from 'react';
+import { ReactNode, memo, useRef } from 'react';
 import { mode } from 'theme/util/mode';
 import { v4 as uuidv4 } from 'uuid';
 
 type Props = {
   isOver: boolean;
-  label?: string;
+  label?: ReactNode;
 };
 
 export const IAIDropOverlay = (props: Props) => {

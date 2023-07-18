@@ -6,7 +6,6 @@ import { userInvoked } from 'app/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { t } from 'i18next';
 import { LogLevelName } from 'roarr';
-import { imageUploaded } from 'services/api/thunks/image';
 import {
   isAnySessionRejected,
   sessionCanceled,
@@ -358,27 +357,6 @@ export const systemSlice = createSlice({
      */
     builder.addCase(nodeTemplatesBuilt, (state) => {
       state.wasSchemaParsed = true;
-    });
-
-    /**
-     * Image Uploading Started
-     */
-    builder.addCase(imageUploaded.pending, (state) => {
-      state.isUploading = true;
-    });
-
-    /**
-     * Image Uploading Complete
-     */
-    builder.addCase(imageUploaded.rejected, (state) => {
-      state.isUploading = false;
-    });
-
-    /**
-     * Image Uploading Complete
-     */
-    builder.addCase(imageUploaded.fulfilled, (state) => {
-      state.isUploading = false;
     });
 
     // *** Matchers - must be after all cases ***

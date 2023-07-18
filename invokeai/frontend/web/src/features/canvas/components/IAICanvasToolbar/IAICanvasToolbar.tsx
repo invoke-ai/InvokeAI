@@ -2,7 +2,6 @@ import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import useImageUploader from 'common/hooks/useImageUploader';
 import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
 import {
   canvasSelector,
@@ -25,6 +24,7 @@ import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash-es';
 
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import {
   canvasCopiedToClipboard,
   canvasDownloadedAsImage,
@@ -82,7 +82,9 @@ const IAICanvasToolbar = () => {
   const { t } = useTranslation();
   const { isClipboardAPIAvailable } = useCopyImageToClipboard();
 
-  const { openUploader } = useImageUploader();
+  const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
+    postUploadAction: { type: 'SET_CANVAS_INITIAL_IMAGE' },
+  });
 
   useHotkeys(
     ['v'],
@@ -288,9 +290,10 @@ const IAICanvasToolbar = () => {
           aria-label={`${t('common.upload')}`}
           tooltip={`${t('common.upload')}`}
           icon={<FaUpload />}
-          onClick={openUploader}
           isDisabled={isStaging}
+          {...getUploadButtonProps()}
         />
+        <input {...getUploadInputProps()} />
         <IAIIconButton
           aria-label={`${t('unifiedCanvas.clearCanvas')}`}
           tooltip={`${t('unifiedCanvas.clearCanvas')}`}

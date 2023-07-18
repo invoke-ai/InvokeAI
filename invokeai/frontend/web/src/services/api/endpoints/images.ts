@@ -15,6 +15,7 @@ import {
   ImageChanges,
   ImageDTO,
   OffsetPaginatedResults_ImageDTO_,
+  PostUploadAction,
 } from '../types';
 import { getIsImageInDateRange } from './util';
 
@@ -232,24 +233,18 @@ export const imagesApi = api.injectEndpoints({
     uploadImage: build.mutation<
       ImageDTO,
       {
-        image_name: string;
         file: File;
         image_category: ImageCategory;
         is_intermediate: boolean;
+        postUploadAction?: PostUploadAction;
         session_id?: string;
       }
     >({
-      query: ({
-        image_name,
-        file,
-        image_category,
-        is_intermediate,
-        session_id,
-      }) => {
+      query: ({ file, image_category, is_intermediate, session_id }) => {
         const formData = new FormData();
         formData.append('file', file);
         return {
-          url: `images/${image_name}`,
+          url: `images/`,
           method: 'POST',
           body: formData,
           params: {

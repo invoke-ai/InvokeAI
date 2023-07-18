@@ -82,106 +82,6 @@ export const imageDTOReceived = createAppAsyncThunk<
   return data;
 });
 
-type ControlNetAction = {
-  type: 'SET_CONTROLNET_IMAGE';
-  controlNetId: string;
-};
-
-type InitialImageAction = {
-  type: 'SET_INITIAL_IMAGE';
-};
-
-type NodesAction = {
-  type: 'SET_NODES_IMAGE';
-  nodeId: string;
-  fieldName: string;
-};
-
-type CanvasInitialImageAction = {
-  type: 'SET_CANVAS_INITIAL_IMAGE';
-};
-
-type CanvasMergedAction = {
-  type: 'TOAST_CANVAS_MERGED';
-};
-
-type CanvasSavedToGalleryAction = {
-  type: 'TOAST_CANVAS_SAVED_TO_GALLERY';
-};
-
-type UploadedToastAction = {
-  type: 'TOAST_UPLOADED';
-};
-
-type AddToBatchAction = {
-  type: 'ADD_TO_BATCH';
-};
-
-export type PostUploadAction =
-  | ControlNetAction
-  | InitialImageAction
-  | NodesAction
-  | CanvasInitialImageAction
-  | CanvasMergedAction
-  | CanvasSavedToGalleryAction
-  | UploadedToastAction
-  | AddToBatchAction;
-
-type UploadImageArg =
-  paths['/api/v1/images/']['post']['parameters']['query'] & {
-    file: File;
-    postUploadAction?: PostUploadAction;
-    boardId?: string;
-  };
-
-type UploadImageResponse =
-  paths['/api/v1/images/']['post']['responses']['201']['content']['application/json'];
-
-type UploadImageThunkConfig = {
-  rejectValue: {
-    arg: UploadImageArg;
-    error: unknown;
-  };
-};
-/**
- * `ImagesService.uploadImage()` thunk
- */
-export const imageUploaded = createAppAsyncThunk<
-  UploadImageResponse,
-  UploadImageArg,
-  UploadImageThunkConfig
->('thunkApi/imageUploaded', async (arg, { rejectWithValue }) => {
-  const {
-    postUploadAction,
-    file,
-    image_category,
-    is_intermediate,
-    session_id,
-  } = arg;
-  const { post } = $client.get();
-  const { data, error, response } = await post('/api/v1/images/', {
-    params: {
-      query: {
-        image_category,
-        is_intermediate,
-        session_id,
-      },
-    },
-    body: { file },
-    bodySerializer: (body) => {
-      const formData = new FormData();
-      formData.append('file', body.file);
-      return formData;
-    },
-  });
-
-  if (error) {
-    return rejectWithValue({ arg, error });
-  }
-
-  return data;
-});
-
 type DeleteImageArg =
   paths['/api/v1/images/{image_name}']['delete']['parameters']['path'];
 
@@ -219,7 +119,7 @@ export const imageDeleted = createAppAsyncThunk<
 
 type UpdateImageArg =
   paths['/api/v1/images/{image_name}']['patch']['requestBody']['content']['application/json'] &
-  paths['/api/v1/images/{image_name}']['patch']['parameters']['path'];
+    paths['/api/v1/images/{image_name}']['patch']['parameters']['path'];
 
 type UpdateImageResponse =
   paths['/api/v1/images/{image_name}']['patch']['responses']['200']['content']['application/json'];

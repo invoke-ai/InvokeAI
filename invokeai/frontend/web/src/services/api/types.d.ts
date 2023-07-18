@@ -1,3 +1,4 @@
+import { UseToastOptions } from '@chakra-ui/react';
 import { O } from 'ts-toolbelt';
 import { components } from './schema';
 
@@ -208,16 +209,9 @@ export type CanvasInitialImageAction = {
   type: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
-export type CanvasMergedAction = {
-  type: 'TOAST_CANVAS_MERGED';
-};
-
-export type CanvasSavedToGalleryAction = {
-  type: 'TOAST_CANVAS_SAVED_TO_GALLERY';
-};
-
-export type UploadedToastAction = {
-  type: 'TOAST_UPLOADED';
+export type ToastAction = {
+  type: 'TOAST';
+  toastOptions?: UseToastOptions;
 };
 
 export type AddToBatchAction = {
@@ -229,7 +223,5 @@ export type PostUploadAction =
   | InitialImageAction
   | NodesAction
   | CanvasInitialImageAction
-  | CanvasMergedAction
-  | CanvasSavedToGalleryAction
-  | UploadedToastAction
+  | ToastAction
   | AddToBatchAction;
