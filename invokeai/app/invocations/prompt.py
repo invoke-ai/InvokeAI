@@ -4,7 +4,7 @@ from typing import Literal, Optional
 import numpy as np
 from pydantic import Field, validator
 
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
 from dynamicprompts.generators import RandomPromptGenerator, CombinatorialPromptGenerator
 
 class PromptOutput(BaseInvocationOutput):
@@ -48,6 +48,14 @@ class DynamicPromptInvocation(BaseInvocation):
         default=False, description="Whether to use the combinatorial generator"
     )
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Dynamic Prompt",
+                "tags": ["prompt", "dynamic"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> PromptCollectionOutput:
         if self.combinatorial:
             generator = CombinatorialPromptGenerator()
@@ -71,6 +79,14 @@ class PromptsFromFileInvocation(BaseInvocation):
     start_line: int = Field(default=1, ge=1, description="Line in the file to start start from")
     max_prompts: int = Field(default=1, ge=0, description="Max lines to read from file (0=all)")
     #fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Prompts From File",
+                "tags": ["prompt", "file"]
+            },
+        }
 
     @validator("file_path")
     def file_path_exists(cls, v):

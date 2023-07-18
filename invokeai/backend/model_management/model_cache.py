@@ -104,7 +104,8 @@ class ModelCache(object):
         :param sha_chunksize: Chunksize to use when calculating sha256 model hash
         '''
         self.model_infos: Dict[str, ModelBase] = dict()
-        self.lazy_offloading = lazy_offloading
+        # allow lazy offloading only when vram cache enabled
+        self.lazy_offloading = lazy_offloading and max_vram_cache_size > 0
         self.precision: torch.dtype=precision
         self.max_cache_size: float=max_cache_size
         self.max_vram_cache_size: float=max_vram_cache_size
@@ -327,6 +328,25 @@ class ModelCache(object):
 
             refs = sys.getrefcount(cache_entry.model)
 
+            # manualy clear local variable references of just finished function calls
+            # for some reason python don't want to collect it even by gc.collect() immidiately
+            if refs > 2:
+                while True:
+                    cleared = False
+                    for referrer in gc.get_referrers(cache_entry.model):
+                        if type(referrer).__name__ == "frame":
+                            # RuntimeError: cannot clear an executing frame
+                            with suppress(RuntimeError):
+                                referrer.clear()
+                                cleared = True
+                                #break
+
+                    # repeat if referrers changes(due to frame clear), else exit loop
+                    if cleared:
+                        gc.collect()
+                    else:
+                        break
+
             device = cache_entry.model.device if hasattr(cache_entry.model, "device") else None
             self.logger.debug(f"Model: {model_key}, locks: {cache_entry._locks}, device: {device}, loaded: {cache_entry.loaded}, refs: {refs}")
 
@@ -362,6 +382,9 @@ class ModelCache(object):
                 self.logger.debug(f'GPU VRAM freed: {(mem.vram_used/GIG):.2f} GB')
                 vram_in_use += mem.vram_used  # note vram_used is negative
                 self.logger.debug(f'{(vram_in_use/GIG):.2f}GB VRAM used for models; max allowed={(reserved/GIG):.2f}GB')
+
+        gc.collect()
+        torch.cuda.empty_cache()
         
     def _local_model_hash(self, model_path: Union[str, Path]) -> str:
         sha = hashlib.sha256()
