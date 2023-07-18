@@ -1,6 +1,10 @@
 import { ApiFullTagDescription, api } from '..';
-import { components } from '../schema';
+import { components, paths } from '../schema';
 import { ImageDTO } from '../types';
+
+type ClearIntermediatesArg = NonNullable<
+  paths['/api/v1/images/clear-intermediates']['post']['parameters']['query']
+>;
 
 /**
  * This is an unsafe type; the object inside is not guaranteed to be valid.
@@ -36,7 +40,10 @@ export const imagesApi = api.injectEndpoints({
       },
       keepUnusedDataFor: 86400, // 24 hours
     }),
+    clearIntermediates: build.mutation({
+      query: () => ({ url: `images/clear-intermediates`, method: 'POST' }),
+    }),
   }),
 });
 
-export const { useGetImageDTOQuery, useGetImageMetadataQuery } = imagesApi;
+export const { useGetImageDTOQuery, useGetImageMetadataQuery, useClearIntermediatesMutation } = imagesApi;

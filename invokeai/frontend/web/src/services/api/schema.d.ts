@@ -164,6 +164,13 @@ export type paths = {
      */
     patch: operations["update_image"];
   };
+  "/api/v1/images/clear-intermediates": {
+    /**
+     * Clear Intermediates 
+     * @description Clears all intermediates
+     */
+    post: operations["clear_intermediates"];
+  };
   "/api/v1/images/{image_name}/metadata": {
     /**
      * Get Image Metadata 
@@ -4300,7 +4307,7 @@ export type components = {
     };
     /**
      * SDXLRawPromptInvocation 
-     * @description Parse prompt using compel package to conditioning.
+     * @description Pass unmodified prompt to conditioning without compel processing.
      */
     SDXLRawPromptInvocation: {
       /**
@@ -5252,6 +5259,12 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
+     * StableDiffusion1ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
      * StableDiffusion2ModelFormat 
      * @description An enumeration. 
      * @enum {string}
@@ -5263,12 +5276,6 @@ export type components = {
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusion1ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -6047,6 +6054,20 @@ export type operations = {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Clear Intermediates 
+   * @description Clears all intermediates
+   */
+  clear_intermediates: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
         };
       };
     };

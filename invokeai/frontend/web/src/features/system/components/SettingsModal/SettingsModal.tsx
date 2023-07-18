@@ -48,6 +48,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import SettingsSchedulers from './SettingsSchedulers';
+import SettingsClearIntermediates from './SettingsClearIntermediates';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
@@ -91,6 +92,7 @@ type ConfigOptions = {
   shouldShowResetWebUiText: boolean;
   shouldShowBetaLayout: boolean;
   shouldShowAdvancedOptionsSettings: boolean;
+  shouldShowClearIntermediates: boolean;
 };
 
 type SettingsModalProps = {
@@ -109,6 +111,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
   const shouldShowAdvancedOptionsSettings =
     config?.shouldShowAdvancedOptionsSettings ?? true;
+  const shouldShowClearIntermediates =
+    config?.shouldShowClearIntermediates ?? true;
 
   useEffect(() => {
     if (!shouldShowDeveloperSettings) {
@@ -280,6 +284,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                 </StyledFlex>
               )}
 
+              {shouldShowClearIntermediates && <SettingsClearIntermediates />}
+
               <StyledFlex>
                 <Heading size="sm">{t('settings.resetWebUI')}</Heading>
                 <IAIButton colorScheme="error" onClick={handleClickResetWebUI}>
@@ -328,7 +334,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
 export default SettingsModal;
 
-const StyledFlex = (props: PropsWithChildren) => {
+export const StyledFlex = (props: PropsWithChildren) => {
   return (
     <Flex
       sx={{
