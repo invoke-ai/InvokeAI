@@ -1,11 +1,11 @@
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from '@chakra-ui/react';
 import i18n from 'i18n';
 import { ReactNode, memo } from 'react';
-import AddModelsPanel from './subpanels/AddModelsPanel';
+import ImportModelsPanel from './subpanels/ImportModelsPanel';
 import MergeModelsPanel from './subpanels/MergeModelsPanel';
 import ModelManagerPanel from './subpanels/ModelManagerPanel';
 
-type ModelManagerTabName = 'modelManager' | 'addModels' | 'mergeModels';
+type ModelManagerTabName = 'modelManager' | 'importModels' | 'mergeModels';
 
 type ModelManagerTabInfo = {
   id: ModelManagerTabName;
@@ -20,9 +20,9 @@ const tabs: ModelManagerTabInfo[] = [
     content: <ModelManagerPanel />,
   },
   {
-    id: 'addModels',
-    label: i18n.t('modelManager.addModel'),
-    content: <AddModelsPanel />,
+    id: 'importModels',
+    label: i18n.t('modelManager.importModels'),
+    content: <ImportModelsPanel />,
   },
   {
     id: 'mergeModels',
@@ -46,7 +46,7 @@ const ModelManagerTab = () => {
           </Tab>
         ))}
       </TabList>
-      <TabPanels sx={{ w: 'full', h: 'full', p: 4 }}>
+      <TabPanels sx={{ w: 'full', h: 'full' }}>
         {tabs.map((tab) => (
           <TabPanel sx={{ w: 'full', h: 'full' }} key={tab.id}>
             {tab.content}

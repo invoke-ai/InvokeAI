@@ -5,7 +5,9 @@ import {
   BaseModelType,
   CheckpointModelConfig,
   ControlNetModelConfig,
+  ConvertModelConfig,
   DiffusersModelConfig,
+  ImportModelConfig,
   LoRAModelConfig,
   MainModelConfig,
   MergeModelConfig,
@@ -13,8 +15,9 @@ import {
   VaeModelConfig,
 } from 'services/api/types';
 
+import queryString from 'query-string';
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
-import { paths } from '../schema';
+import { operations, paths } from '../schema';
 
 export type DiffusersModelConfigEntity = DiffusersModelConfig & { id: string };
 export type CheckpointModelConfigEntity = CheckpointModelConfig & {
@@ -62,6 +65,7 @@ type DeleteMainModelResponse = void;
 type ConvertMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
+  params: ConvertModelConfig;
 };
 
 type ConvertMainModelResponse =
@@ -74,6 +78,28 @@ type MergeMainModelArg = {
 
 type MergeMainModelResponse =
   paths['/api/v1/models/merge/{base_model}']['put']['responses']['200']['content']['application/json'];
+
+type ImportMainModelArg = {
+  body: ImportModelConfig;
+};
+
+type ImportMainModelResponse =
+  paths['/api/v1/models/import']['post']['responses']['201']['content']['application/json'];
+
+type AddMainModelArg = {
+  body: MainModelConfig;
+};
+
+type AddMainModelResponse =
+  paths['/api/v1/models/add']['post']['responses']['201']['content']['application/json'];
+
+export type SearchFolderResponse =
+  paths['/api/v1/models/search']['get']['responses']['200']['content']['application/json'];
+
+type CheckpointConfigsResponse =
+  paths['/api/v1/models/ckpt_confs']['get']['responses']['200']['content']['application/json'];
+
+type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 
 const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
@@ -160,6 +186,29 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
     }),
+    importMainModels: build.mutation<
+      ImportMainModelResponse,
+      ImportMainModelArg
+    >({
+      query: ({ body }) => {
+        return {
+          url: `models/import`,
+          method: 'POST',
+          body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+    }),
+    addMainModels: build.mutation<AddMainModelResponse, AddMainModelArg>({
+      query: ({ body }) => {
+        return {
+          url: `models/add`,
+          method: 'POST',
+          body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+    }),
     deleteMainModels: build.mutation<
       DeleteMainModelResponse,
       DeleteMainModelArg
@@ -176,10 +225,11 @@ export const modelsApi = api.injectEndpoints({
       ConvertMainModelResponse,
       ConvertMainModelArg
     >({
-      query: ({ base_model, model_name }) => {
+      query: ({ base_model, model_name, params }) => {
         return {
           url: `models/convert/${base_model}/main/${model_name}`,
           method: 'PUT',
+          params: params,
         };
       },
       invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
@@ -328,6 +378,36 @@ export const modelsApi = api.injectEndpoints({
         );
       },
     }),
+    getModelsInFolder: build.query<SearchFolderResponse, SearchFolderArg>({
+      query: (arg) => {
+        const folderQueryStr = queryString.stringify(arg, {});
+        return {
+          url: `/models/search?${folderQueryStr}`,
+        };
+      },
+      providesTags: (result, error, arg) => {
+        const tags: ApiFullTagDescription[] = [
+          { type: 'ScannedModels', id: LIST_TAG },
+        ];
+
+        if (result) {
+          tags.push(
+            ...result.map((id) => ({
+              type: 'ScannedModels' as const,
+              id,
+            }))
+          );
+        }
+        return tags;
+      },
+    }),
+    getCheckpointConfigs: build.query<CheckpointConfigsResponse, void>({
+      query: () => {
+        return {
+          url: `/models/ckpt_confs`,
+        };
+      },
+    }),
   }),
 });
 
@@ -339,6 +419,10 @@ export const {
   useGetVaeModelsQuery,
   useUpdateMainModelsMutation,
   useDeleteMainModelsMutation,
+  useImportMainModelsMutation,
+  useAddMainModelsMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
+  useGetModelsInFolderQuery,
+  useGetCheckpointConfigsQuery,
 } = modelsApi;

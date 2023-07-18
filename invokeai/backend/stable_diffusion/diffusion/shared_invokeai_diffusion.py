@@ -237,6 +237,39 @@ class InvokeAIDiffuserComponent:
             )
         return latents
 
+    def _concat_conditionings_for_batch(self, unconditioning, conditioning):
+        def _pad_conditioning(cond, target_len, encoder_attention_mask):
+            conditioning_attention_mask = torch.ones((cond.shape[0], cond.shape[1]), device=cond.device, dtype=cond.dtype)
+
+            if cond.shape[1] < max_len:
+                conditioning_attention_mask = torch.cat([
+                    conditioning_attention_mask,
+                    torch.zeros((cond.shape[0], max_len - cond.shape[1]), device=cond.device, dtype=cond.dtype),
+                ], dim=1)
+
+                cond = torch.cat([
+                    cond,
+                    torch.zeros((cond.shape[0], max_len - cond.shape[1], cond.shape[2]), device=cond.device, dtype=cond.dtype),
+                ], dim=1)
+
+            if encoder_attention_mask is None:
+                encoder_attention_mask = conditioning_attention_mask
+            else:
+                encoder_attention_mask = torch.cat([
+                    encoder_attention_mask,
+                    conditioning_attention_mask,
+                ])
+            
+            return cond, encoder_attention_mask
+
+        encoder_attention_mask = None
+        if unconditioning.shape[1] != conditioning.shape[1]:
+            max_len = max(unconditioning.shape[1], conditioning.shape[1])
+            unconditioning, encoder_attention_mask = _pad_conditioning(unconditioning, max_len, encoder_attention_mask)
+            conditioning, encoder_attention_mask = _pad_conditioning(conditioning, max_len, encoder_attention_mask)
+
+        return torch.cat([unconditioning, conditioning]), encoder_attention_mask
+
     # methods below are called from do_diffusion_step and should be considered private to this class.
 
     def _apply_standard_conditioning(self, x, sigma, unconditioning, conditioning, **kwargs):
@@ -244,9 +277,13 @@ class InvokeAIDiffuserComponent:
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
 
-        both_conditionings = torch.cat([unconditioning, conditioning])
+        both_conditionings, encoder_attention_mask = self._concat_conditionings_for_batch(
+            unconditioning, conditioning
+        )
         both_results = self.model_forward_callback(
-            x_twice, sigma_twice, both_conditionings, **kwargs,
+            x_twice, sigma_twice, both_conditionings,
+            encoder_attention_mask=encoder_attention_mask,
+            **kwargs,
         )
         unconditioned_next_x, conditioned_next_x = both_results.chunk(2)
         return unconditioned_next_x, conditioned_next_x
@@ -260,8 +297,32 @@ class InvokeAIDiffuserComponent:
         **kwargs,
     ):
         # low-memory sequential path
-        unconditioned_next_x = self.model_forward_callback(x, sigma, unconditioning, **kwargs)
-        conditioned_next_x = self.model_forward_callback(x, sigma, conditioning, **kwargs)
+        uncond_down_block, cond_down_block = None, None
+        down_block_additional_residuals = kwargs.pop("down_block_additional_residuals", None)
+        if down_block_additional_residuals is not None:
+            uncond_down_block, cond_down_block = [], []
+            for down_block in down_block_additional_residuals:
+                _uncond_down, _cond_down = down_block.chunk(2)
+                uncond_down_block.append(_uncond_down)
+                cond_down_block.append(_cond_down)
+
+        uncond_mid_block, cond_mid_block = None, None
+        mid_block_additional_residual = kwargs.pop("mid_block_additional_residual", None)
+        if mid_block_additional_residual is not None:
+            uncond_mid_block, cond_mid_block = mid_block_additional_residual.chunk(2)
+
+        unconditioned_next_x = self.model_forward_callback(
+            x, sigma, unconditioning,
+            down_block_additional_residuals=uncond_down_block,
+            mid_block_additional_residual=uncond_mid_block,
+            **kwargs,
+        )
+        conditioned_next_x = self.model_forward_callback(
+            x, sigma, conditioning,
+            down_block_additional_residuals=cond_down_block,
+            mid_block_additional_residual=cond_mid_block,
+            **kwargs,
+        )
         return unconditioned_next_x, conditioned_next_x
 
     # TODO: looks unused
@@ -295,6 +356,20 @@ class InvokeAIDiffuserComponent:
     ):
         context: Context = self.cross_attention_control_context
 
+        uncond_down_block, cond_down_block = None, None
+        down_block_additional_residuals = kwargs.pop("down_block_additional_residuals", None)
+        if down_block_additional_residuals is not None:
+            uncond_down_block, cond_down_block = [], []
+            for down_block in down_block_additional_residuals:
+                _uncond_down, _cond_down = down_block.chunk(2)
+                uncond_down_block.append(_uncond_down)
+                cond_down_block.append(_cond_down)
+
+        uncond_mid_block, cond_mid_block = None, None
+        mid_block_additional_residual = kwargs.pop("mid_block_additional_residual", None)
+        if mid_block_additional_residual is not None:
+            uncond_mid_block, cond_mid_block = mid_block_additional_residual.chunk(2)
+
         cross_attn_processor_context = SwapCrossAttnContext(
             modified_text_embeddings=context.arguments.edited_conditioning,
             index_map=context.cross_attention_index_map,
@@ -307,6 +382,8 @@ class InvokeAIDiffuserComponent:
             sigma,
             unconditioning,
             {"swap_cross_attn_context": cross_attn_processor_context},
+            down_block_additional_residuals=uncond_down_block,
+            mid_block_additional_residual=uncond_mid_block,
             **kwargs,
         )
 
@@ -319,6 +396,8 @@ class InvokeAIDiffuserComponent:
             sigma,
             conditioning,
             {"swap_cross_attn_context": cross_attn_processor_context},
+            down_block_additional_residuals=cond_down_block,
+            mid_block_additional_residual=cond_mid_block,
             **kwargs,
         )
         return unconditioned_next_x, conditioned_next_x

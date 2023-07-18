@@ -16,6 +16,7 @@ from .base import (
     calc_model_size_by_data,
     classproperty,
     InvalidModelException,
+    ModelNotFoundException,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
 from diffusers.utils import is_safetensors_available
