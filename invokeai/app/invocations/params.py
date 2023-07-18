@@ -65,6 +65,6 @@ class ParamStringInvocation(BaseInvocation):
           },
       }
 
-    def invoke(self) -> StringOutput:
+    def invoke(self, context: InvocationContext) -> StringOutput:
         return StringOutput(text=self.text)
     
