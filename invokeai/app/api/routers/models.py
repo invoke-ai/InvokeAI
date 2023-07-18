@@ -14,6 +14,7 @@ from invokeai.backend.model_management.models import (
     OPENAPI_MODEL_CONFIGS,
     SchedulerPredictionType,
     ModelNotFoundException,
+    InvalidModelException,
 )
 from invokeai.backend.model_management import MergeInterpolationMethod
 
@@ -168,6 +169,9 @@ async def import_model(
     except ModelNotFoundException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
+    except InvalidModelException as e:
+        log.error(str(e))
+        raise HTTPException(status_code=415)
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
