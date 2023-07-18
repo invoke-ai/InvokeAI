@@ -71,6 +71,15 @@ class LoadImageInvocation(BaseInvocation):
         default=None, description="The image to load"
     )
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Load Image",
+                "tags": ["image", "load"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
@@ -90,6 +99,14 @@ class ShowImageInvocation(BaseInvocation):
     image: Optional[ImageField] = Field(
         default=None, description="The image to show"
     )
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Show Image",
+                "tags": ["image", "show"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -118,6 +135,14 @@ class ImageCropInvocation(BaseInvocation, PILInvocationConfig):
     width:  int = Field(default=512, gt=0, description="The width of the crop rectangle")
     height: int = Field(default=512, gt=0, description="The height of the crop rectangle")
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Crop Image",
+                "tags": ["image", "crop"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -156,6 +181,14 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
     x:                     int = Field(default=0, description="The left x coordinate at which to paste the image")
     y:                     int = Field(default=0, description="The top y coordinate at which to paste the image")
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Paste Image",
+                "tags": ["image", "paste"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         base_image = context.services.images.get_pil_image(self.base_image.image_name)
@@ -207,6 +240,14 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
     invert:      bool = Field(default=False, description="Whether or not to invert the mask")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Mask From Alpha",
+                "tags": ["image", "mask", "alpha"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> MaskOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
@@ -240,6 +281,14 @@ class ImageMultiplyInvocation(BaseInvocation, PILInvocationConfig):
     image1: Optional[ImageField]  = Field(default=None, description="The first image to multiply")
     image2: Optional[ImageField]  = Field(default=None, description="The second image to multiply")
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Multiply Images",
+                "tags": ["image", "multiply"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image1 = context.services.images.get_pil_image(self.image1.image_name)
@@ -277,6 +326,14 @@ class ImageChannelInvocation(BaseInvocation, PILInvocationConfig):
     channel: IMAGE_CHANNELS  = Field(default="A", description="The channel to get")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Image Channel",
+                "tags": ["image", "channel"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
@@ -312,6 +369,14 @@ class ImageConvertInvocation(BaseInvocation, PILInvocationConfig):
     mode: IMAGE_MODES  = Field(default="L", description="The mode to convert to")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Convert Image",
+                "tags": ["image", "convert"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
@@ -344,6 +409,14 @@ class ImageBlurInvocation(BaseInvocation, PILInvocationConfig):
     radius:     float = Field(default=8.0, ge=0, description="The blur radius")
     blur_type: Literal["gaussian", "box"] = Field(default="gaussian", description="The type of blur")
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Blur Image",
+                "tags": ["image", "blur"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -404,6 +477,14 @@ class ImageResizeInvocation(BaseInvocation, PILInvocationConfig):
     resample_mode:  PIL_RESAMPLING_MODES = Field(default="bicubic", description="The resampling mode")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Resize Image",
+                "tags": ["image", "resize"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
@@ -441,6 +522,14 @@ class ImageScaleInvocation(BaseInvocation, PILInvocationConfig):
     scale_factor:                  float = Field(gt=0, description="The factor by which to scale the image")
     resample_mode:  PIL_RESAMPLING_MODES = Field(default="bicubic", description="The resampling mode")
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Scale Image",
+                "tags": ["image", "scale"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -482,6 +571,14 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
     max: int = Field(default=255, ge=0, le=255, description="The maximum output value")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Image Linear Interpolation",
+                "tags": ["image", "linear", "interpolation", "lerp"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
@@ -517,6 +614,14 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
     min: int = Field(default=0, ge=0, le=255, description="The minimum input value")
     max: int = Field(default=255, ge=0, le=255, description="The maximum input value")
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Image Inverse Linear Interpolation",
+                "tags": ["image", "linear", "interpolation", "inverse"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)

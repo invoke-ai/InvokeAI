@@ -3,7 +3,7 @@ from typing import Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.baseinvocation import (BaseInvocation,
-                                                     BaseInvocationOutput,
+                                                     BaseInvocationOutput, InvocationConfig,
                                                      InvocationContext)
 from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.model import (LoRAModelField, MainModelField,
@@ -96,6 +96,14 @@ class MetadataAccumulatorInvocation(BaseInvocation):
         default=None,
         description="The VAE used for decoding, if the main model's default was not used",
     )
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Metadata Accumulator",
+                "tags": ["image", "metadata", "generation"]
+            },
+        }
 
 
     def invoke(self, context: InvocationContext) -> MetadataAccumulatorOutput:

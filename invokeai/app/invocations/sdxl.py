@@ -233,6 +233,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "SDXL Text To Latents",
                 "tags": ["latents"],
                 "type_hints": {
                   "model": "model",
@@ -462,6 +463,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "SDXL Latents to Latents",
                 "tags": ["latents"],
                 "type_hints": {
                   "model": "model",
