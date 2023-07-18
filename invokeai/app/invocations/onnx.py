@@ -23,6 +23,7 @@ from .controlnet_image_processors import ControlField
 from .image import ImageOutput
 from .model import ModelInfo, UNetField, VaeField
 
+from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.backend import BaseModelType, ModelType, SubModelType
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from ...backend.stable_diffusion import PipelineIntermediateState
@@ -318,6 +319,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to generate an image from")
     vae: VaeField = Field(default=None, description="Vae submodel")
+    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")
     #tiled: bool = Field(default=False, description="Decode latents by overlaping tiles(less memory consumption)")
 
     # Schema customisation
@@ -367,6 +369,8 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+            metadata=self.metadata.dict() if self.metadata else None,
         )
 
         return ImageOutput(
