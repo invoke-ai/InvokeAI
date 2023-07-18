@@ -1,4 +1,4 @@
-import { ButtonGroup } from '@chakra-ui/react';
+import { ButtonGroup, Tooltip } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { memo, useCallback } from 'react';
@@ -11,6 +11,7 @@ import {
   FaMapMarkerAlt,
 } from 'react-icons/fa';
 import { useReactFlow } from 'reactflow';
+import { useTranslation } from 'react-i18next';
 import {
   shouldShowGraphOverlayChanged,
   shouldShowFieldTypeLegendChanged,
@@ -18,6 +19,7 @@ import {
 } from '../store/nodesSlice';
 
 const ViewportControls = () => {
+  const { t } = useTranslation();
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
   const shouldShowGraphOverlay = useAppSelector(
@@ -26,7 +28,6 @@ const ViewportControls = () => {
   const shouldShowFieldTypeLegend = useAppSelector(
     (state) => state.nodes.shouldShowFieldTypeLegend
   );
-
   const shouldShowMinimapPanel = useAppSelector(
     (state) => state.nodes.shouldShowMinimapPanel
   );
@@ -57,39 +58,54 @@ const ViewportControls = () => {
 
   return (
     <ButtonGroup isAttached orientation="vertical">
-      <IAIIconButton
-        onClick={handleClickedZoomIn}
-        aria-label="Zoom In"
-        icon={<FaPlus />}
-      />
-      <IAIIconButton
-        onClick={handleClickedZoomOut}
-        aria-label="Zoom Out"
-        icon={<FaMinus />}
-      />
-      <IAIIconButton
-        onClick={handleClickedFitView}
-        aria-label="Fit to Viewport"
-        icon={<FaExpand />}
-      />
-      <IAIIconButton
-        isChecked={shouldShowGraphOverlay}
-        onClick={handleClickedToggleGraphOverlay}
-        aria-label="Show/Hide Graph"
-        icon={<FaCode />}
-      />
-      <IAIIconButton
-        isChecked={shouldShowFieldTypeLegend}
-        onClick={handleClickedToggleFieldTypeLegend}
-        aria-label="Show/Hide Field Type Legend"
-        icon={<FaInfo />}
-      />
-      <IAIIconButton
-        isChecked={shouldShowMinimapPanel}
-        onClick={handleClickedToggleMiniMapPanel}
-        aria-label="Show/Hide Minimap"
-        icon={<FaMapMarkerAlt />}
-      />
+      <Tooltip label={t('nodes.zoomInNodes')}>
+        <IAIIconButton onClick={handleClickedZoomIn} icon={<FaPlus />} />
+      </Tooltip>
+      <Tooltip label={t('nodes.zoomOutNodes')}>
+        <IAIIconButton onClick={handleClickedZoomOut} icon={<FaMinus />} />
+      </Tooltip>
+      <Tooltip label={t('nodes.fitViewportNodes')}>
+        <IAIIconButton onClick={handleClickedFitView} icon={<FaExpand />} />
+      </Tooltip>
+      <Tooltip
+        label={
+          shouldShowGraphOverlay
+            ? t('nodes.hideGraphNodes')
+            : t('nodes.showGraphNodes')
+        }
+      >
+        <IAIIconButton
+          isChecked={shouldShowGraphOverlay}
+          onClick={handleClickedToggleGraphOverlay}
+          icon={<FaCode />}
+        />
+      </Tooltip>
+      <Tooltip
+        label={
+          shouldShowFieldTypeLegend
+            ? t('nodes.hideLegendNodes')
+            : t('nodes.showLegendNodes')
+        }
+      >
+        <IAIIconButton
+          isChecked={shouldShowFieldTypeLegend}
+          onClick={handleClickedToggleFieldTypeLegend}
+          icon={<FaInfo />}
+        />
+      </Tooltip>
+      <Tooltip
+        label={
+          shouldShowMinimapPanel
+            ? t('nodes.hideMinimapnodes')
+            : t('nodes.showMinimapnodes')
+        }
+      >
+        <IAIIconButton
+          isChecked={shouldShowMinimapPanel}
+          onClick={handleClickedToggleMiniMapPanel}
+          icon={<FaMapMarkerAlt />}
+        />
+      </Tooltip>
     </ButtonGroup>
   );
 };
