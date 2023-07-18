@@ -170,7 +170,7 @@ async def import_model(
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
     except InvalidModelException as e:
-        log.error(str(e))
+        logger.error(str(e))
         raise HTTPException(status_code=415)
     except ValueError as e:
         logger.error(str(e))
