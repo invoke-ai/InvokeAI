@@ -35,6 +35,14 @@ class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
     mask: ImageField = Field(default=None, description="The mask to use when inpainting")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "OpenCV Inpaint",
+                "tags": ["opencv", "inpaint"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
         mask = context.services.images.get_pil_image(self.mask.image_name)
