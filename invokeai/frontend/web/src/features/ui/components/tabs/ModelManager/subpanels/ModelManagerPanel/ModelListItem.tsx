@@ -20,6 +20,13 @@ type ModelListItemProps = {
   setSelectedModelId: (v: string | undefined) => void;
 };
 
+const modelBaseTypeMap = {
+  'sd-1': 'SD1',
+  'sd-2': 'SD2',
+  sdxl: 'SDXL',
+  'sdxl-refiner': 'SDXLR',
+};
+
 export default function ModelListItem(props: ModelListItemProps) {
   const isBusy = useAppSelector(selectIsBusy);
   const { t } = useTranslation();
@@ -76,7 +83,7 @@ export default function ModelListItem(props: ModelListItemProps) {
           bg: isSelected ? 'accent.400' : 'base.100',
           color: isSelected ? 'base.50' : 'base.800',
           _hover: {
-            bg: isSelected ? 'accent.500' : 'base.200',
+            bg: isSelected ? 'accent.500' : 'base.300',
             color: isSelected ? 'base.50' : 'base.800',
           },
           _dark: {
@@ -84,15 +91,34 @@ export default function ModelListItem(props: ModelListItemProps) {
             bg: isSelected ? 'accent.600' : 'base.850',
             _hover: {
               color: isSelected ? 'base.50' : 'base.100',
-              bg: isSelected ? 'accent.550' : 'base.800',
+              bg: isSelected ? 'accent.550' : 'base.700',
             },
           },
         }}
         onClick={handleSelectModel}
       >
-        <Tooltip label={model.description} hasArrow placement="bottom">
-          <Text sx={{ fontWeight: 500 }}>{model.model_name}</Text>
-        </Tooltip>
+        <Flex gap={4} alignItems="center">
+          <Text
+            fontSize="xs"
+            p={1}
+            borderRadius={2}
+            minWidth={14}
+            sx={{
+              bg: 'accent.350',
+              color: 'base.100',
+              _dark: { bg: 'accent.500' },
+            }}
+          >
+            {
+              modelBaseTypeMap[
+                model.base_model as keyof typeof modelBaseTypeMap
+              ]
+            }
+          </Text>
+          <Tooltip label={model.description} hasArrow placement="bottom">
+            <Text sx={{ fontWeight: 500 }}>{model.model_name}</Text>
+          </Tooltip>
+        </Flex>
       </Flex>
       <IAIAlertDialog
         title={t('modelManager.deleteModel')}
