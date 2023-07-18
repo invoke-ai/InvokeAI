@@ -4,7 +4,6 @@ import { makeToast } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
@@ -15,21 +14,12 @@ import {
   useUpdateMainModelsMutation,
 } from 'services/api/endpoints/models';
 import { DiffusersModelConfig } from 'services/api/types';
+import BaseModelSelect from '../shared/BaseModelSelect';
+import ModelVariantSelect from '../shared/ModelVariantSelect';
 
 type DiffusersModelEditProps = {
   model: DiffusersModelConfigEntity;
 };
-
-const baseModelSelectData = [
-  { value: 'sd-1', label: MODEL_TYPE_MAP['sd-1'] },
-  { value: 'sd-2', label: MODEL_TYPE_MAP['sd-2'] },
-];
-
-const variantSelectData = [
-  { value: 'normal', label: 'Normal' },
-  { value: 'inpaint', label: 'Inpaint' },
-  { value: 'depth', label: 'Depth' },
-];
 
 export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
   const isBusy = useAppSelector(selectIsBusy);
@@ -65,6 +55,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
         model_name: model.model_name,
         body: values,
       };
+
       updateMainModel(responseBody)
         .unwrap()
         .then((payload) => {
@@ -78,7 +69,7 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
             )
           );
         })
-        .catch((error) => {
+        .catch((_) => {
           diffusersEditForm.reset();
           dispatch(
             addToast(
@@ -119,20 +110,23 @@ export default function DiffusersModelEdit(props: DiffusersModelEditProps) {
       >
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
           <IAIMantineTextInput
+            label={t('modelManager.name')}
+            {...diffusersEditForm.getInputProps('model_name')}
+          />
+          <IAIMantineTextInput
             label={t('modelManager.description')}
             {...diffusersEditForm.getInputProps('description')}
           />
-          <IAIMantineSelect
-            label={t('modelManager.baseModel')}
-            data={baseModelSelectData}
+          <BaseModelSelect
+            required
             {...diffusersEditForm.getInputProps('base_model')}
           />
-          <IAIMantineSelect
-            label={t('modelManager.variant')}
-            data={variantSelectData}
+          <ModelVariantSelect
+            required
             {...diffusersEditForm.getInputProps('variant')}
           />
           <IAIMantineTextInput
+            required
             label={t('modelManager.modelLocation')}
             {...diffusersEditForm.getInputProps('path')}
           />
