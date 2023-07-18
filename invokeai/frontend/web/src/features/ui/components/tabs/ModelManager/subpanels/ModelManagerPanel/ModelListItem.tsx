@@ -1,5 +1,5 @@
 import { DeleteIcon } from '@chakra-ui/icons';
-import { Flex, Text, Tooltip } from '@chakra-ui/react';
+import { Badge, Flex, Text, Tooltip } from '@chakra-ui/react';
 import { makeToast } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
@@ -98,15 +98,14 @@ export default function ModelListItem(props: ModelListItemProps) {
         onClick={handleSelectModel}
       >
         <Flex gap={4} alignItems="center">
-          <Text
-            fontSize="xs"
-            p={1}
-            borderRadius={2}
+          <Badge
             minWidth={14}
+            p={1}
+            fontSize="sm"
             sx={{
-              bg: 'accent.350',
-              color: 'base.100',
-              _dark: { bg: 'accent.500' },
+              bg: 'base.350',
+              color: 'base.900',
+              _dark: { bg: 'base.500' },
             }}
           >
             {
@@ -114,7 +113,7 @@ export default function ModelListItem(props: ModelListItemProps) {
                 model.base_model as keyof typeof modelBaseTypeMap
               ]
             }
-          </Text>
+          </Badge>
           <Tooltip label={model.description} hasArrow placement="bottom">
             <Text sx={{ fontWeight: 500 }}>{model.model_name}</Text>
           </Tooltip>
