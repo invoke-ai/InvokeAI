@@ -15,6 +15,7 @@ from .baseinvocation import (
     InvocationConfig,
 )
 
+import cv2
 
 class PILInvocationConfig(BaseModel):
     """Helper class to provide all PIL invocations with additional config"""
@@ -647,6 +648,58 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
 
         return ImageOutput(
             image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+
+
+class MaskEdgeInvocation(BaseInvocation, PILInvocationConfig):
+    """Applies an edge mask to an image"""
+
+    # fmt: off
+    type: Literal["mask_edge"] = "mask_edge"
+
+    # Inputs
+    image: Optional[ImageField] = Field(default=None, description="The image to apply the mask to")
+    edge_size: int = Field(description="The size of the edge")
+    edge_blur: int = Field(description="The amount of blur on the edge")
+    low_threshold: int = Field(description="First threshold for the hysteresis procedure in Canny edge detection")
+    high_threshold: int = Field(description="Second threshold for the hysteresis procedure in Canny edge detection")
+    # fmt: on
+
+    def invoke(self, context: InvocationContext) -> MaskOutput:
+        mask = context.services.images.get_pil_image(self.image.image_name)
+
+        npimg = numpy.asarray(mask, dtype=np.uint8)
+        npgradient = numpy.uint8(
+            255 * (1.0 - numpy.floor(numpy.abs(0.5 - numpy.float32(npimg) / 255.0) * 2.0))
+        )
+        npedge = cv2.Canny(npimg, threshold1=self.low_threshold, threshold2=self.high_threshold)
+        npmask = npgradient + npedge
+        npmask = cv2.dilate(
+            npmask, numpy.ones((3, 3), numpy.uint8), iterations=int(self.edge_size / 2)
+        )
+
+        new_mask = Image.fromarray(npmask)
+
+        if self.edge_blur > 0:
+            new_mask = new_mask.filter(ImageFilter.BoxBlur(self.edge_blur))
+
+        new_mask = ImageOps.invert(new_mask)
+
+        image_dto = context.services.images.create(
+            image=new_mask,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.MASK,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+        )
+
+        return MaskOutput(
+            mask=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )
