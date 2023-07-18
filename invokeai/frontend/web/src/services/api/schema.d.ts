@@ -5252,17 +5252,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusionXLModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion2ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionXLModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
@@ -5725,6 +5725,8 @@ export type operations = {
       404: never;
       /** @description There is already a model corresponding to this path or repo_id */
       409: never;
+      /** @description Unrecognized file/folder format */
+      415: never;
       /** @description Validation Error */
       422: {
         content: {
