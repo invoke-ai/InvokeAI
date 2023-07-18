@@ -677,7 +677,7 @@ class FaceMaskInvocation(BaseInvocation, PILInvocationConfig):
     image: Optional[ImageField]  = Field(default=None, description="Image to apply transparency to")
     x_offset: float = Field(default=0.0, description="Offset for the X-axis of the oval mask")
     y_offset: float = Field(default=0.0, description="Offset for the Y-axis of the oval mask")
-    reverse_mask: bool = Field(default=False, description="Toggle to reverse the detected area")
+    invert_mask: bool = Field(default=False, description="Toggle to invert the mask")
     cascade_file_path: Optional[str] = Field(default=None, description="Path to the cascade XML file for detection")
     # fmt: on
 
@@ -708,7 +708,7 @@ class FaceMaskInvocation(BaseInvocation, PILInvocationConfig):
         # Create an RGBA image with transparency
         rgba_image = image.convert("RGBA")
 
-        if self.reverse_mask:
+        if self.invert_mask:
             # Apply the transparent mask to the image
             composite_image = Image.composite(rgba_image, Image.new("RGBA", image.size, (0, 0, 0, 0)), transparent_mask)
 
