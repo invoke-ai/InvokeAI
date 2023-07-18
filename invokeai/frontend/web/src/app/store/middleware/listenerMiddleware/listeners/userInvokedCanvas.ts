@@ -12,7 +12,6 @@ import { canvasGraphBuilt } from 'features/nodes/store/actions';
 import { buildCanvasGraph } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
 import { imagesApi } from 'services/api/endpoints/images';
-import { imageUpdated } from 'services/api/thunks/image';
 import { sessionCreated } from 'services/api/thunks/session';
 import { ImageDTO } from 'services/api/types';
 import { startAppListening } from '..';
@@ -147,9 +146,9 @@ export const addUserInvokedCanvasListener = () => {
       // Associate the init image with the session, now that we have the session ID
       if (['img2img', 'inpaint'].includes(generationMode) && canvasInitImage) {
         dispatch(
-          imageUpdated({
-            image_name: canvasInitImage.image_name,
-            session_id: sessionId,
+          imagesApi.endpoints.updateImage.initiate({
+            imageDTO: canvasInitImage,
+            changes: { session_id: sessionId },
           })
         );
       }
@@ -157,9 +156,9 @@ export const addUserInvokedCanvasListener = () => {
       // Associate the mask image with the session, now that we have the session ID
       if (['inpaint'].includes(generationMode) && canvasMaskImage) {
         dispatch(
-          imageUpdated({
-            image_name: canvasMaskImage.image_name,
-            session_id: sessionId,
+          imagesApi.endpoints.updateImage.initiate({
+            imageDTO: canvasMaskImage,
+            changes: { session_id: sessionId },
           })
         );
       }

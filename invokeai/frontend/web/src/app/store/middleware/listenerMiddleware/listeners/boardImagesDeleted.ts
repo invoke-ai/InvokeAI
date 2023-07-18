@@ -1,16 +1,12 @@
-import { requestedBoardImagesDeletion } from 'features/gallery/store/actions';
-import { startAppListening } from '..';
-import {
-  imageSelected,
-  imagesRemoved,
-  selectImagesAll,
-  selectImagesById,
-} from 'features/gallery/store/gallerySlice';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import { requestedBoardImagesDeletion } from 'features/gallery/store/actions';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { LIST_TAG, api } from 'services/api';
+import { ImageDTO } from 'services/api/types';
+import { startAppListening } from '..';
 import { boardsApi } from '../../../../../services/api/endpoints/boards';
 
 export const addRequestedBoardImageDeletionListener = () => {
@@ -25,9 +21,11 @@ export const addRequestedBoardImageDeletionListener = () => {
       const selectedImageName =
         state.gallery.selection[state.gallery.selection.length - 1];
 
-      const selectedImage = selectedImageName
-        ? selectImagesById(state, selectedImageName)
-        : undefined;
+      // TODO: implement this with RTK Query
+      // const selectedImage = selectedImageName
+      //   ? selectImagesById(state, selectedImageName)
+      //   : undefined;
+      const selectedImage: ImageDTO | undefined = undefined; // bodge to get it to compile
 
       if (selectedImage && selectedImage.board_id === board_id) {
         dispatch(imageSelected(null));
@@ -50,15 +48,6 @@ export const addRequestedBoardImageDeletionListener = () => {
       if (imagesUsage.isNodesImage) {
         dispatch(nodeEditorReset());
       }
-
-      // Preemptively remove from gallery
-      const images = selectImagesAll(state).reduce((acc: string[], img) => {
-        if (img.board_id === board_id) {
-          acc.push(img.image_name);
-        }
-        return acc;
-      }, []);
-      dispatch(imagesRemoved(images));
 
       // Delete from server
       dispatch(boardsApi.endpoints.deleteBoardAndImages.initiate(board_id));

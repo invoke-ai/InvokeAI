@@ -13,16 +13,12 @@ export const getIsImageInDateRange = (
 
   if (cacheImageDTOS.length > 1) {
     // Images are sorted by `created_at` DESC
-    const start = new Date(
+    // check if the image is newer than the oldest image in the cache
+    const createdDate = new Date(imageDTO.created_at);
+    const oldestDate = new Date(
       cacheImageDTOS[cacheImageDTOS.length - 1].created_at
     );
-    const end = new Date(cacheImageDTOS[0].created_at);
-    if (
-      new Date(imageDTO.created_at) >= start &&
-      new Date(imageDTO.created_at) <= end
-    ) {
-      return true;
-    }
+    return createdDate >= oldestDate;
   } else if ([0, 1].includes(cacheImageDTOS.length)) {
     return true;
   }

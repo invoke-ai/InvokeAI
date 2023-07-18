@@ -1,15 +1,20 @@
-import { startAppListening } from '..';
-import { imageUpdated } from 'services/api/thunks/image';
 import { log } from 'app/logging/useLogger';
+import { imagesApi } from 'services/api/endpoints/images';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'image' });
 
 export const addImageUpdatedFulfilledListener = () => {
   startAppListening({
-    actionCreator: imageUpdated.fulfilled,
+    matcher: imagesApi.endpoints.updateImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
       moduleLog.debug(
-        { oldImage: action.meta.arg, updatedImage: action.payload },
+        {
+          data: {
+            oldImage: action.meta.arg.originalArgs,
+            updatedImage: action.payload,
+          },
+        },
         'Image updated'
       );
     },
@@ -18,9 +23,12 @@ export const addImageUpdatedFulfilledListener = () => {
 
 export const addImageUpdatedRejectedListener = () => {
   startAppListening({
-    actionCreator: imageUpdated.rejected,
+    matcher: imagesApi.endpoints.updateImage.matchRejected,
     effect: (action, { dispatch }) => {
-      moduleLog.debug({ oldImage: action.meta.arg }, 'Image update failed');
+      moduleLog.debug(
+        { data: action.meta.arg.originalArgs },
+        'Image update failed'
+      );
     },
   });
 };

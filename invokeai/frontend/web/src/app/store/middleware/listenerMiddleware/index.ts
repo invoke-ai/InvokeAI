@@ -30,10 +30,6 @@ import {
 } from './listeners/imageDeleted';
 import { addImageDroppedListener } from './listeners/imageDropped';
 import {
-  addImageMetadataReceivedFulfilledListener,
-  addImageMetadataReceivedRejectedListener,
-} from './listeners/imageMetadataReceived';
-import {
   addImageRemovedFromBoardFulfilledListener,
   addImageRemovedFromBoardRejectedListener,
 } from './listeners/imageRemovedFromBoard';
@@ -126,10 +122,6 @@ addImageDeletedFulfilledListener();
 addImageDeletedRejectedListener();
 addRequestedBoardImageDeletionListener();
 addImageToDeleteSelectedListener();
-
-// Image metadata
-addImageMetadataReceivedFulfilledListener();
-addImageMetadataReceivedRejectedListener();
 
 // User Invoked
 addUserInvokedCanvasListener();

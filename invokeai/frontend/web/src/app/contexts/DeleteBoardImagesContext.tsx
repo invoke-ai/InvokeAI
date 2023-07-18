@@ -25,47 +25,55 @@ export const selectBoardImagesUsage = createSelector(
     (state: RootState, board_id?: string) => board_id,
   ],
   (state, generation, canvas, nodes, controlNet, board_id) => {
-    const initialImage = generation.initialImage
-      ? selectImagesById(state, generation.initialImage.imageName)
-      : undefined;
-    const isInitialImage = initialImage?.board_id === board_id;
+    // TODO: implement with RTK Query
+    // const initialImage = generation.initialImage
+    //   ? selectImagesById(state, generation.initialImage.imageName)
+    //   : undefined;
+    // const isInitialImage = initialImage?.board_id === board_id;
 
-    const isCanvasImage = canvas.layerState.objects.some((obj) => {
-      if (obj.kind === 'image') {
-        const image = selectImagesById(state, obj.imageName);
-        return image?.board_id === board_id;
-      }
-      return false;
-    });
+    // const isCanvasImage = canvas.layerState.objects.some((obj) => {
+    //   if (obj.kind === 'image') {
+    //     const image = selectImagesById(state, obj.imageName);
+    //     return image?.board_id === board_id;
+    //   }
+    //   return false;
+    // });
 
-    const isNodesImage = nodes.nodes.some((node) => {
-      return some(node.data.inputs, (input) => {
-        if (input.type === 'image' && input.value) {
-          const image = selectImagesById(state, input.value.image_name);
-          return image?.board_id === board_id;
-        }
-        return false;
-      });
-    });
+    // const isNodesImage = nodes.nodes.some((node) => {
+    //   return some(node.data.inputs, (input) => {
+    //     if (input.type === 'image' && input.value) {
+    //       const image = selectImagesById(state, input.value.image_name);
+    //       return image?.board_id === board_id;
+    //     }
+    //     return false;
+    //   });
+    // });
 
-    const isControlNetImage = some(controlNet.controlNets, (c) => {
-      const controlImage = c.controlImage
-        ? selectImagesById(state, c.controlImage)
-        : undefined;
-      const processedControlImage = c.processedControlImage
-        ? selectImagesById(state, c.processedControlImage)
-        : undefined;
-      return (
-        controlImage?.board_id === board_id ||
-        processedControlImage?.board_id === board_id
-      );
-    });
+    // const isControlNetImage = some(controlNet.controlNets, (c) => {
+    //   const controlImage = c.controlImage
+    //     ? selectImagesById(state, c.controlImage)
+    //     : undefined;
+    //   const processedControlImage = c.processedControlImage
+    //     ? selectImagesById(state, c.processedControlImage)
+    //     : undefined;
+    //   return (
+    //     controlImage?.board_id === board_id ||
+    //     processedControlImage?.board_id === board_id
+    //   );
+    // });
+
+    // const imageUsage: ImageUsage = {
+    //   isInitialImage,
+    //   isCanvasImage,
+    //   isNodesImage,
+    //   isControlNetImage,
+    // };
 
     const imageUsage: ImageUsage = {
-      isInitialImage,
-      isCanvasImage,
-      isNodesImage,
-      isControlNetImage,
+      isInitialImage: true,
+      isCanvasImage: true,
+      isNodesImage: true,
+      isControlNetImage: true,
     };
 
     return imageUsage;

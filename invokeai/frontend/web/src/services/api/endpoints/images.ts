@@ -211,23 +211,169 @@ export const imagesApi = api.injectEndpoints({
       },
     }),
     updateImage: build.mutation<
-      void,
-      { image_name: string; changes: ImageChanges }
+      ImageDTO,
+      { imageDTO: ImageDTO; changes: ImageChanges }
     >({
-      query: ({ image_name, changes }) => ({
-        url: `images/${image_name}`,
+      query: ({ imageDTO, changes }) => ({
+        url: `images/${imageDTO.image_name}`,
         method: 'PATCH',
         body: changes,
       }),
-      invalidatesTags: (result, error, { image_name }) => [
-        { type: 'Image', id: image_name },
+      invalidatesTags: (result, error, { imageDTO }) => [
+        { type: 'Image', id: imageDTO.image_name },
       ],
       async onQueryStarted(
-        { image_name, changes },
+        { imageDTO: oldImageDTO, changes },
         { dispatch, queryFulfilled, getState }
       ) {
-        // TODO: Update caches for updateImage
-        // TODO: Should we handle changes to boards in this also?
+        // TODO: Should we handle changes to boards via this mutation? Seems reasonable...
+
+        /**
+         * Cache changes for `updateImage`:
+         * - Update the ImageDTO
+         * - Update the image in "All Images" board:
+         *   - IF it is in the date range represented by the cache:
+         *     - ADD the image IF it is not already in the cache & update the total
+         *     - UPDATE the image IF it is already in the cache
+         * - EITHER:
+         *   - Update the image in it's own board
+         *   - OR Update the image in the "No Board" board
+         * - IF the image's categories changed:
+         *   - Remove from the old category cache
+         *   - Add to the new category cache & total IF it is in the date range represented by the cache
+         */
+
+        const patches: PatchCollection[] = [];
+        const {
+          image_name,
+          board_id,
+          image_category: oldCategory,
+        } = oldImageDTO;
+        const newCategory = changes.image_category;
+
+        // patch
+        patches.push(
+          dispatch(
+            imagesApi.util.updateQueryData(
+              'getImageDTO',
+              oldImageDTO.image_name,
+              (draft) => {
+                Object.assign(draft, changes);
+              }
+            )
+          )
+        );
+
+        if (changes.is_intermediate === true) {
+          // Image was made intermediate, so remove from all boards
+          // TODO: We don't have any logic that does this yet, no-op
+        } else {
+          const oldCategories = IMAGE_CATEGORIES.includes(oldCategory)
+            ? IMAGE_CATEGORIES
+            : ASSETS_CATEGORIES;
+
+          const newCategories = IMAGE_CATEGORIES.includes(
+            newCategory ?? oldCategory
+          )
+            ? IMAGE_CATEGORIES
+            : ASSETS_CATEGORIES;
+
+          // - IF the image's categories changed:
+          //   - Remove from the old category cache
+          //   - Add to the new category cache IF it is in the date range represented by the cache
+          if (newCategory) {
+            // remove from the old category
+            const oldCategoryQueryArg = { board_id, categories: oldCategories };
+            patches.push(
+              dispatch(
+                imagesApi.util.updateQueryData(
+                  'listImages',
+                  oldCategoryQueryArg,
+                  (draft) => {
+                    imagesAdapter.removeOne(draft, image_name);
+                  }
+                )
+              )
+            );
+
+            // Add to the new category, checking if we should insert it into the cache or not
+            const newCategoryQueryArg = {
+              categories: newCategories,
+              board_id,
+            };
+            const { data } = imagesApi.endpoints.listImages.select(
+              newCategoryQueryArg
+            )(getState());
+
+            const isInDateRange = getIsImageInDateRange(data, oldImageDTO);
+            const isCacheFullyPopulated =
+              data && data.ids.length === data.total;
+
+            if (isCacheFullyPopulated || isInDateRange) {
+              // Add it to the cache
+              patches.push(
+                dispatch(
+                  imagesApi.util.updateQueryData(
+                    'listImages',
+                    newCategoryQueryArg,
+                    (draft) => {
+                      if (newCategory) {
+                        imagesAdapter.upsertOne(draft, {
+                          ...oldImageDTO,
+                          ...changes,
+                        });
+                        draft.total += 1;
+                      }
+                    }
+                  )
+                )
+              );
+            }
+          }
+
+          // Update the "All Image" board
+          const allImagesQueryArg = { categories: newCategories };
+          const { data } = imagesApi.endpoints.listImages.select(
+            allImagesQueryArg
+          )(getState());
+
+          const isInDateRange = getIsImageInDateRange(data, oldImageDTO);
+          const isCacheFullyPopulated = data && data.ids.length === data.total;
+          const isAlreadyInCache = data && data.ids.includes(image_name);
+          console.log({
+            oldImageDTO,
+            isInDateRange,
+            isCacheFullyPopulated,
+            isAlreadyInCache,
+          });
+
+          if (isCacheFullyPopulated || isInDateRange) {
+            patches.push(
+              dispatch(
+                imagesApi.util.updateQueryData(
+                  'listImages',
+                  allImagesQueryArg,
+                  (draft) => {
+                    imagesAdapter.upsertOne(draft, {
+                      ...oldImageDTO,
+                      ...changes,
+                    });
+
+                    if (!isAlreadyInCache) {
+                      draft.total += 1;
+                    }
+                  }
+                )
+              )
+            );
+          }
+        }
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patches.forEach((patchResult) => patchResult.undo());
+        }
       },
     }),
     uploadImage: build.mutation<
@@ -253,6 +399,36 @@ export const imagesApi = api.injectEndpoints({
             session_id,
           },
         };
+      },
+      async onQueryStarted(
+        { file, image_category, is_intermediate, postUploadAction },
+        { dispatch, queryFulfilled }
+      ) {
+        try {
+          const { data: imageDTO } = await queryFulfilled;
+
+          if (imageDTO.is_intermediate) {
+            // Don't add it to anything
+            return;
+          }
+
+          // Add the image to the All Images board
+          const queryArg = {
+            categories:
+              image_category === 'general'
+                ? IMAGE_CATEGORIES
+                : ASSETS_CATEGORIES,
+          };
+
+          dispatch(
+            imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
+              imagesAdapter.addOne(draft, imageDTO);
+              draft.total = draft.total + 1;
+            })
+          );
+        } catch {
+          // no-op
+        }
       },
     }),
     addImageToBoard: build.mutation<

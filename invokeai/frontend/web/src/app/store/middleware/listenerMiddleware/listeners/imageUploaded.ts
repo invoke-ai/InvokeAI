@@ -1,22 +1,17 @@
+import { UseToastOptions } from '@chakra-ui/react';
 import { log } from 'app/logging/useLogger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
-import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
-  imagesAddedToBatch,
-} from 'features/gallery/store/gallerySlice';
+import { imagesAddedToBatch } from 'features/gallery/store/gallerySlice';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
 import {
   SYSTEM_BOARDS,
-  imagesAdapter,
   imagesApi,
 } from '../../../../../services/api/endpoints/images';
-import { boardsApi } from 'services/api/endpoints/boards';
-import { UseToastOptions } from '@chakra-ui/react';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -45,18 +40,6 @@ export const addImageUploadedFulfilledListener = () => {
       ) {
         return;
       }
-
-      // Always add the image to the All Images board
-      const queryArg = {
-        categories: IMAGE_CATEGORIES,
-      };
-
-      dispatch(
-        imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
-          imagesAdapter.addOne(draft, imageDTO);
-          draft.total = draft.total + 1;
-        })
-      );
 
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {

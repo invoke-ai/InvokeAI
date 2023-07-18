@@ -4,13 +4,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   IMAGE_LIMIT,
   imageSelected,
-  imagesAdapter,
   selectImagesById,
 } from 'features/gallery/store/gallerySlice';
 import { clamp, isEqual } from 'lodash-es';
 import { useCallback } from 'react';
 import {
   ListImagesArgs,
+  imagesAdapter,
   imagesApi,
   useLazyListImagesQuery,
 } from 'services/api/endpoints/images';
@@ -42,7 +42,9 @@ export const nextPrevImageButtonsSelector = createSelector(
       limit: IMAGE_LIMIT,
     };
 
-    const images = imagesAdapter.getSelectors().selectAll(data);
+    const selectors = imagesAdapter.getSelectors();
+
+    const images = selectors.selectAll(data);
 
     const currentImageIndex = images.findIndex(
       (i) => i.image_name === lastSelectedImage
@@ -54,8 +56,8 @@ export const nextPrevImageButtonsSelector = createSelector(
     const nextImageId = images[nextImageIndex].image_name;
     const prevImageId = images[prevImageIndex].image_name;
 
-    const nextImage = selectImagesById(state, nextImageId);
-    const prevImage = selectImagesById(state, prevImageId);
+    const nextImage = selectors.selectById(data, nextImageId);
+    const prevImage = selectors.selectById(data, prevImageId);
 
     const imagesLength = images.length;
 
