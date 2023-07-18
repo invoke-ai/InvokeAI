@@ -144,4 +144,19 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
       })
     );
   });
+
+  /**
+   * Model import started
+   */
+  socket.on('model_import_started', (import_path) => {
+    dispatch(
+      addToast(
+        makeToast({
+          title: 'Importing model ${import_path}',
+          status: 'info',
+          duration: 10000,
+        })
+      )
+    );
+  });
 };
