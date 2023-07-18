@@ -57,10 +57,10 @@ class CompelInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CompelOutput:
         tokenizer_info = context.services.model_manager.get_model(
-            **self.clip.tokenizer.dict(),
+            **self.clip.tokenizer.dict(), context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **self.clip.text_encoder.dict(),
+            **self.clip.text_encoder.dict(), context=context,
         )
 
         def _lora_loader():
@@ -82,6 +82,7 @@ class CompelInvocation(BaseInvocation):
                         model_name=name,
                         base_model=self.clip.text_encoder.base_model,
                         model_type=ModelType.TextualInversion,
+                        context=context,
                     ).context.model
                 )
             except ModelNotFoundException:

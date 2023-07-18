@@ -11,6 +11,8 @@ import {
   socketConnected,
   socketDisconnected,
   socketSubscribed,
+  socketModelLoadStarted,
+  socketModelLoadCompleted,
 } from '../actions';
 import { ClientToServerEvents, ServerToClientEvents } from '../types';
 import { Logger } from 'roarr';
@@ -44,7 +46,7 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
         socketSubscribed({
           sessionId,
           timestamp: getTimestamp(),
-          boardId: getState().boards.selectedBoardId,
+          boardId: getState().gallery.selectedBoardId,
         })
       );
     }
@@ -113,6 +115,30 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
   socket.on('graph_execution_state_complete', (data) => {
     dispatch(
       socketGraphExecutionStateComplete({
+        data,
+        timestamp: getTimestamp(),
+      })
+    );
+  });
+
+  /**
+   * Model load started
+   */
+  socket.on('model_load_started', (data) => {
+    dispatch(
+      socketModelLoadStarted({
+        data,
+        timestamp: getTimestamp(),
+      })
+    );
+  });
+
+  /**
+   * Model load completed
+   */
+  socket.on('model_load_completed', (data) => {
+    dispatch(
+      socketModelLoadCompleted({
         data,
         timestamp: getTimestamp(),
       })

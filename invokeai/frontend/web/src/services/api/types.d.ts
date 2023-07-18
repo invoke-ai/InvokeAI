@@ -28,6 +28,7 @@ export type OffsetPaginatedResults_ImageDTO_ =
 
 // Models
 export type ModelType = components['schemas']['ModelType'];
+export type SubModelType = components['schemas']['SubModelType'];
 export type BaseModelType = components['schemas']['BaseModelType'];
 export type MainModelField = components['schemas']['MainModelField'];
 export type VAEModelField = components['schemas']['VAEModelField'];
