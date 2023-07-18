@@ -80,12 +80,6 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       desc: t('hotkeys.changeTabs.desc'),
       hotkey: '1-5',
     },
-
-    {
-      title: t('hotkeys.consoleToggle.title'),
-      desc: t('hotkeys.consoleToggle.desc'),
-      hotkey: '`',
-    },
   ];
 
   const generalHotkeys = [
