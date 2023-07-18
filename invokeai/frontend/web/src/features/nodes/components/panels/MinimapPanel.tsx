@@ -1,3 +1,5 @@
+import { RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useColorModeValue } from '@chakra-ui/react';
 import { memo } from 'react';
 import { MiniMap } from 'reactflow';
@@ -12,6 +14,10 @@ const MinimapPanel = () => {
     }
   );
 
+  const shouldShowMinimapPanel = useAppSelector(
+    (state: RootState) => state.nodes.shouldShowMinimapPanel
+  );
+
   const nodeColor = useColorModeValue(
     'var(--invokeai-colors-accent-300)',
     'var(--invokeai-colors-accent-700)'
@@ -23,15 +29,19 @@ const MinimapPanel = () => {
   );
 
   return (
-    <MiniMap
-      nodeStrokeWidth={3}
-      pannable
-      zoomable
-      nodeBorderRadius={30}
-      style={miniMapStyle}
-      nodeColor={nodeColor}
-      maskColor={maskColor}
-    />
+    <>
+      {shouldShowMinimapPanel && (
+        <MiniMap
+          nodeStrokeWidth={3}
+          pannable
+          zoomable
+          nodeBorderRadius={30}
+          style={miniMapStyle}
+          nodeColor={nodeColor}
+          maskColor={maskColor}
+        />
+      )}
+    </>
   );
 };
 

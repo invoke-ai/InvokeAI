@@ -126,7 +126,7 @@ export type HeightParam = z.infer<typeof zHeight>;
 export const isValidHeight = (val: unknown): val is HeightParam =>
   zHeight.safeParse(val).success;
 
-const zBaseModel = z.enum(['sd-1', 'sd-2']);
+const zBaseModel = z.enum(['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
 
 export type BaseModelParam = z.infer<typeof zBaseModel>;
 

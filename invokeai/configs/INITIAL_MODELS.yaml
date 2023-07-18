@@ -1,4 +1,10 @@
 # This file predefines a few models that the user may want to install.
+sd-1/main/stable-diffusion-xdl-base:
+   description: Stable Diffusion XL base model - NOT YET RELEASED!! (70 GB)
+   repo_id: stabilityai/stable-diffusion-xl-base
+sd-1/main/stable-diffusion-xdl-refiner:
+   description: Stable Diffusion XL refiner model - NOT YET RELEASED!! (60 GB)
+   repo_id: stabilityai/stable-diffusion-xl-refiner
 sd-1/main/stable-diffusion-v1-5:
    description: Stable Diffusion version 1.5 diffusers model (4.27 GB)
    repo_id: runwayml/stable-diffusion-v1-5
@@ -96,5 +102,6 @@ sd-1/embedding/ahx-beta-453407d:
    repo_id: sd-concepts-library/ahx-beta-453407d
 sd-1/lora/LowRA:
    path: https://civitai.com/api/download/models/63006
+   recommended: True
 sd-1/lora/Ink scenery:
    path: https://civitai.com/api/download/models/83390

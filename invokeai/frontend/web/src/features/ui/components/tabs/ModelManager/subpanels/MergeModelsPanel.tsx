@@ -1,11 +1,4 @@
-import {
-  Flex,
-  Radio,
-  RadioGroup,
-  Text,
-  Tooltip,
-  useColorMode,
-} from '@chakra-ui/react';
+import { Flex, Radio, RadioGroup, Text, Tooltip } from '@chakra-ui/react';
 import { makeToast } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -23,7 +16,6 @@ import {
   useMergeMainModelsMutation,
 } from 'services/api/endpoints/models';
 import { BaseModelType, MergeModelConfig } from 'services/api/types';
-import { mode } from 'theme/util/mode';
 
 const baseModelTypeSelectData = [
   { label: 'Stable Diffusion 1', value: 'sd-1' },
@@ -38,7 +30,6 @@ type MergeInterpolationMethods =
 
 export default function MergeModelsPanel() {
   const { t } = useTranslation();
-  const { colorMode } = useColorMode();
   const dispatch = useAppDispatch();
 
   const { data } = useGetMainModelsQuery();
@@ -67,10 +58,10 @@ export default function MergeModelsPanel() {
   }, [sd1DiffusersModels, sd2DiffusersModels]);
 
   const [modelOne, setModelOne] = useState<string | null>(
-    Object.keys(modelsMap[baseModel])[0]
+    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])[0]
   );
   const [modelTwo, setModelTwo] = useState<string | null>(
-    Object.keys(modelsMap[baseModel])[1]
+    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])[1]
   );
 
   const [modelThree, setModelThree] = useState<string | null>(null);
@@ -98,9 +89,9 @@ export default function MergeModelsPanel() {
     modelsMap[baseModel as keyof typeof modelsMap]
   ).filter((model) => model !== modelOne && model !== modelThree);
 
-  const modelThreeList = Object.keys(modelsMap[baseModel]).filter(
-    (model) => model !== modelOne && model !== modelTwo
-  );
+  const modelThreeList = Object.keys(
+    modelsMap[baseModel as keyof typeof modelsMap]
+  ).filter((model) => model !== modelOne && model !== modelTwo);
 
   const handleBaseModelChange = (v: string) => {
     setBaseModel(v as BaseModelType);
@@ -125,9 +116,9 @@ export default function MergeModelsPanel() {
         mergedModelName !== '' ? mergedModelName : models_names.join('-'),
       alpha: modelMergeAlpha,
       interp: modelMergeInterp,
-      // model_merge_save_path:
-      //   modelMergeSaveLocType === 'root' ? null : modelMergeCustomSaveLoc,
       force: modelMergeForce,
+      merge_dest_directory:
+        modelMergeSaveLocType === 'root' ? undefined : modelMergeCustomSaveLoc,
     };
 
     mergeModels({
@@ -227,7 +218,10 @@ export default function MergeModelsPanel() {
           padding: 4,
           borderRadius: 'base',
           gap: 4,
-          bg: mode('base.100', 'base.800')(colorMode),
+          bg: 'base.200',
+          _dark: {
+            bg: 'base.800',
+          },
         }}
       >
         <IAISlider
@@ -252,7 +246,10 @@ export default function MergeModelsPanel() {
           padding: 4,
           borderRadius: 'base',
           gap: 4,
-          bg: mode('base.100', 'base.800')(colorMode),
+          bg: 'base.200',
+          _dark: {
+            bg: 'base.800',
+          },
         }}
       >
         <Text fontWeight={500} fontSize="sm" variant="subtext">
@@ -288,13 +285,16 @@ export default function MergeModelsPanel() {
         </RadioGroup>
       </Flex>
 
-      {/* <Flex
+      <Flex
         sx={{
           flexDirection: 'column',
           padding: 4,
           borderRadius: 'base',
           gap: 4,
-          bg: 'base.900',
+          bg: 'base.200',
+          _dark: {
+            bg: 'base.900',
+          },
         }}
       >
         <Flex columnGap={4}>
@@ -324,7 +324,7 @@ export default function MergeModelsPanel() {
             onChange={(e) => setModelMergeCustomSaveLoc(e.target.value)}
           />
         )}
-      </Flex> */}
+      </Flex>
 
       <IAISimpleCheckbox
         label={t('modelManager.ignoreMismatch')}

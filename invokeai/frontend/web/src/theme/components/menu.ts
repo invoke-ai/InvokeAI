@@ -1,6 +1,7 @@
 import { menuAnatomy } from '@chakra-ui/anatomy';
 import { createMultiStyleConfigHelpers } from '@chakra-ui/react';
 import { mode } from '@chakra-ui/theme-tools';
+import { MotionProps } from 'framer-motion';
 
 const { definePartsStyle, defineMultiStyleConfig } =
   createMultiStyleConfigHelpers(menuAnatomy.keys);
@@ -21,6 +22,7 @@ const invokeAI = definePartsStyle((props) => ({
   },
   list: {
     zIndex: 9999,
+    color: mode('base.900', 'base.150')(props),
     bg: mode('base.200', 'base.800')(props),
     shadow: 'dark-lg',
     border: 'none',
@@ -35,6 +37,9 @@ const invokeAI = definePartsStyle((props) => ({
     _focus: {
       bg: mode('base.400', 'base.600')(props),
     },
+    svg: {
+      opacity: 0.5,
+    },
   },
 }));
 
@@ -46,3 +51,28 @@ export const menuTheme = defineMultiStyleConfig({
     variant: 'invokeAI',
   },
 });
+
+export const menuListMotionProps: MotionProps = {
+  variants: {
+    enter: {
+      visibility: 'visible',
+      opacity: 1,
+      scale: 1,
+      transition: {
+        duration: 0.07,
+        ease: [0.4, 0, 0.2, 1],
+      },
+    },
+    exit: {
+      transitionEnd: {
+        visibility: 'hidden',
+      },
+      opacity: 0,
+      scale: 0.8,
+      transition: {
+        duration: 0.07,
+        easings: 'easeOut',
+      },
+    },
+  },
+};

@@ -1,5 +1,4 @@
-import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { MenuItem } from '@chakra-ui/react';
+import { Link, MenuItem } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
 import { stateSelector } from 'app/store/store';
@@ -14,11 +13,21 @@ import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletio
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaFolder, FaShare, FaTrash } from 'react-icons/fa';
-import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import {
+  FaAsterisk,
+  FaCopy,
+  FaDownload,
+  FaExternalLinkAlt,
+  FaFolder,
+  FaQuoteRight,
+  FaSeedling,
+  FaShare,
+  FaTrash,
+} from 'react-icons/fa';
 import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
 import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
@@ -60,6 +69,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { onClickAddToBoard } = useContext(AddImageToBoardContext);
 
   const { currentData } = useGetImageMetadataQuery(imageDTO.image_name);
+
+  const { isClipboardAPIAvailable, copyImageToClipboard } =
+    useCopyImageToClipboard();
 
   const metadata = currentData?.metadata;
 
@@ -130,13 +142,27 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     dispatch(imagesAddedToBatch([imageDTO.image_name]));
   }, [dispatch, imageDTO.image_name]);
 
+  const handleCopyImage = useCallback(() => {
+    copyImageToClipboard(imageDTO.image_url);
+  }, [copyImageToClipboard, imageDTO.image_url]);
+
   return (
     <>
-      <MenuItem icon={<ExternalLinkIcon />} onClickCapture={handleOpenInNewTab}>
-        {t('common.openInNewTab')}
-      </MenuItem>
+      <Link href={imageDTO.image_url} target="_blank">
+        <MenuItem
+          icon={<FaExternalLinkAlt />}
+          onClickCapture={handleOpenInNewTab}
+        >
+          {t('common.openInNewTab')}
+        </MenuItem>
+      </Link>
+      {isClipboardAPIAvailable && (
+        <MenuItem icon={<FaCopy />} onClickCapture={handleCopyImage}>
+          {t('parameters.copyImage')}
+        </MenuItem>
+      )}
       <MenuItem
-        icon={<IoArrowUndoCircleOutline />}
+        icon={<FaQuoteRight />}
         onClickCapture={handleRecallPrompt}
         isDisabled={
           metadata?.positive_prompt === undefined &&
@@ -147,14 +173,14 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       </MenuItem>
 
       <MenuItem
-        icon={<IoArrowUndoCircleOutline />}
+        icon={<FaSeedling />}
         onClickCapture={handleRecallSeed}
         isDisabled={metadata?.seed === undefined}
       >
         {t('parameters.useSeed')}
       </MenuItem>
       <MenuItem
-        icon={<IoArrowUndoCircleOutline />}
+        icon={<FaAsterisk />}
         onClickCapture={handleUseAllParameters}
         isDisabled={!metadata}
       >
@@ -193,6 +219,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           Remove from Board
         </MenuItem>
       )}
+      <Link download={true} href={imageDTO.image_url} target="_blank">
+        <MenuItem icon={<FaDownload />} w="100%">
+          {t('parameters.downloadImage')}
+        </MenuItem>
+      </Link>
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
         icon={<FaTrash />}
