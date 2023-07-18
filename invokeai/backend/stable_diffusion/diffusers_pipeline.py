@@ -221,7 +221,7 @@ class ControlNetData:
     control_mode: str = Field(default="balanced")
 
 
-@dataclass(frozen=True)
+@dataclass
 class ConditioningData:
     unconditioned_embeddings: torch.Tensor
     text_embeddings: torch.Tensor
@@ -422,7 +422,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise: torch.Tensor,
         callback: Callable[[PipelineIntermediateState], None] = None,
         run_id=None,
-        **kwargs,
     ) -> InvokeAIStableDiffusionPipelineOutput:
         r"""
         Function invoked when calling the pipeline for generation.
@@ -443,7 +442,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             noise=noise,
             run_id=run_id,
             callback=callback,
-            **kwargs,
         )
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         torch.cuda.empty_cache()
@@ -469,7 +467,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         run_id=None,
         callback: Callable[[PipelineIntermediateState], None] = None,
         control_data: List[ControlNetData] = None,
-        **kwargs,
     ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
         if self.scheduler.config.get("cpu_only", False):
             scheduler_device = torch.device('cpu')
@@ -487,11 +484,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             timesteps,
             conditioning_data,
             noise=noise,
-            additional_guidance=additional_guidance,
             run_id=run_id,
-            callback=callback,
+            additional_guidance=additional_guidance,
             control_data=control_data,
-            **kwargs,
+
+            callback=callback,
         )
         return result.latents, result.attention_map_saver
 
@@ -505,7 +502,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         run_id: str = None,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
-        **kwargs,
     ):
         self._adjust_memory_efficient_attention(latents)
         if run_id is None:
@@ -546,7 +542,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     total_step_count=len(timesteps),
                     additional_guidance=additional_guidance,
                     control_data=control_data,
-                    **kwargs,
                 )
                 latents = step_output.prev_sample
 
@@ -588,7 +583,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         total_step_count: int,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
-        **kwargs,
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
@@ -632,9 +626,12 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
                     if cfg_injection:  # only applying ControlNet to conditional instead of in unconditioned
                         encoder_hidden_states = conditioning_data.text_embeddings
+                        encoder_attention_mask = None
                     else:
-                        encoder_hidden_states = torch.cat([conditioning_data.unconditioned_embeddings,
-                                                           conditioning_data.text_embeddings])
+                        encoder_hidden_states, encoder_attention_mask = self.invokeai_diffuser._concat_conditionings_for_batch(
+                            conditioning_data.unconditioned_embeddings,
+                            conditioning_data.text_embeddings,
+                        )
                     if isinstance(control_datum.weight, list):
                         # if controlnet has multiple weights, use the weight for the current step
                         controlnet_weight = control_datum.weight[step_index]
@@ -649,6 +646,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                         encoder_hidden_states=encoder_hidden_states,
                         controlnet_cond=control_datum.image_tensor,
                         conditioning_scale=controlnet_weight, # controlnet specific, NOT the guidance scale
+                        encoder_attention_mask=encoder_attention_mask,
                         guess_mode=soft_injection, # this is still called guess_mode in diffusers ControlNetModel
                         return_dict=False,
                     )

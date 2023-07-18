@@ -16,7 +16,7 @@ const invokeAI = defineStyle((props) => {
     };
 
     return {
-      bg: mode('base.200', 'base.600')(props),
+      bg: mode('base.250', 'base.600')(props),
       color: mode('base.850', 'base.100')(props),
       borderRadius: 'base',
       svg: {

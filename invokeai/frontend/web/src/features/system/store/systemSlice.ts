@@ -1,11 +1,10 @@
 import { UseToastOptions } from '@chakra-ui/react';
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import * as InvokeAI from 'app/types/invokeai';
 
 import { InvokeLogLevel } from 'app/logging/useLogger';
 import { userInvoked } from 'app/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
-import { TFuncKey, t } from 'i18next';
+import { t } from 'i18next';
 import { LogLevelName } from 'roarr';
 import { imageUploaded } from 'services/api/thunks/image';
 import {
@@ -44,8 +43,6 @@ export interface SystemState {
   isCancelable: boolean;
   enableImageDebugging: boolean;
   toastQueue: UseToastOptions[];
-  searchFolder: string | null;
-  foundModels: InvokeAI.FoundModel[] | null;
   /**
    * The current progress image
    */
@@ -79,7 +76,7 @@ export interface SystemState {
    */
   consoleLogLevel: InvokeLogLevel;
   shouldLogToConsole: boolean;
-  statusTranslationKey: TFuncKey;
+  statusTranslationKey: any;
   /**
    * When a session is canceled, its ID is stored here until a new session is created.
    */
@@ -106,8 +103,6 @@ export const initialSystemState: SystemState = {
   isCancelable: true,
   enableImageDebugging: false,
   toastQueue: [],
-  searchFolder: null,
-  foundModels: null,
   progressImage: null,
   shouldAntialiasProgressImage: false,
   sessionId: null,
@@ -132,7 +127,7 @@ export const systemSlice = createSlice({
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
     },
-    setCurrentStatus: (state, action: PayloadAction<TFuncKey>) => {
+    setCurrentStatus: (state, action: any) => {
       state.statusTranslationKey = action.payload;
     },
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
@@ -152,15 +147,6 @@ export const systemSlice = createSlice({
     },
     clearToastQueue: (state) => {
       state.toastQueue = [];
-    },
-    setSearchFolder: (state, action: PayloadAction<string | null>) => {
-      state.searchFolder = action.payload;
-    },
-    setFoundModels: (
-      state,
-      action: PayloadAction<InvokeAI.FoundModel[] | null>
-    ) => {
-      state.foundModels = action.payload;
     },
     /**
      * A cancel was scheduled
@@ -426,8 +412,6 @@ export const {
   setEnableImageDebugging,
   addToast,
   clearToastQueue,
-  setSearchFolder,
-  setFoundModels,
   cancelScheduled,
   scheduledCancelAborted,
   cancelTypeChanged,

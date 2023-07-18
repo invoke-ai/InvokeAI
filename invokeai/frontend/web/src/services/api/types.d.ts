@@ -28,6 +28,7 @@ export type OffsetPaginatedResults_ImageDTO_ =
 
 // Models
 export type ModelType = components['schemas']['ModelType'];
+export type SubModelType = components['schemas']['SubModelType'];
 export type BaseModelType = components['schemas']['BaseModelType'];
 export type MainModelField = components['schemas']['MainModelField'];
 export type VAEModelField = components['schemas']['VAEModelField'];
@@ -57,7 +58,10 @@ export type AnyModelConfig =
   | ControlNetModelConfig
   | TextualInversionModelConfig
   | MainModelConfig;
+
 export type MergeModelConfig = components['schemas']['Body_merge_models'];
+export type ConvertModelConfig = components['schemas']['Body_convert_model'];
+export type ImportModelConfig = components['schemas']['Body_import_model'];
 
 // Graphs
 export type Graph = components['schemas']['Graph'];
