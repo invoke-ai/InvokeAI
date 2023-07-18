@@ -69,7 +69,6 @@ transformers.logging.set_verbosity_error()
 config = InvokeAIAppConfig.get_config()
 
 Model_dir = "models"
-Weights_dir = "ldm/stable-diffusion-v1/"
 
 Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
@@ -629,7 +628,7 @@ def run_console_ui(
 
     # The third argument is needed in the Windows 11 environment to
     # launch a console window running this program.
-    set_min_terminal_size(MIN_COLS, MIN_LINES,'invokeai-configure')
+    set_min_terminal_size(MIN_COLS, MIN_LINES)
 
     # the install-models application spawns a subprocess to install
     # models, and will crash unless this is set before running.
@@ -706,7 +705,7 @@ def migrate_if_needed(opt: Namespace, root: Path)->bool:
     old_init_file = root / 'invokeai.init'
     new_init_file = root / 'invokeai.yaml'
     old_hub = root / 'models/hub'
-    migration_needed =  old_init_file.exists() and not new_init_file.exists() or old_hub.exists()
+    migration_needed =  (old_init_file.exists() and not new_init_file.exists()) and old_hub.exists()
     
     if migration_needed:
         if opt.yes_to_all or \

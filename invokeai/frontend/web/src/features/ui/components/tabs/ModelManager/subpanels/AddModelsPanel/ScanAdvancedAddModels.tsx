@@ -19,18 +19,16 @@ export default function ScanAdvancedAddModels() {
   const [advancedAddMode, setAdvancedAddMode] =
     useState<ManualAddMode>('diffusers');
 
-  const [isCheckpoint, setIsCheckpoint] = useState(
-    advancedAddScanModel &&
-      ['.ckpt', '.safetensors', '.pth', '.pt'].some((ext) =>
-        advancedAddScanModel.endsWith(ext)
-      )
-  );
+  const [isCheckpoint, setIsCheckpoint] = useState<boolean>(true);
 
   useEffect(() => {
-    isCheckpoint
+    advancedAddScanModel &&
+    ['.ckpt', '.safetensors', '.pth', '.pt'].some((ext) =>
+      advancedAddScanModel.endsWith(ext)
+    )
       ? setAdvancedAddMode('checkpoint')
       : setAdvancedAddMode('diffusers');
-  }, [setAdvancedAddMode, isCheckpoint]);
+  }, [advancedAddScanModel, setAdvancedAddMode, isCheckpoint]);
 
   const dispatch = useAppDispatch();
 

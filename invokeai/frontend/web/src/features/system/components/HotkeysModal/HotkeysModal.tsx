@@ -15,7 +15,7 @@ import {
   ModalOverlay,
   useDisclosure,
 } from '@chakra-ui/react';
-import { cloneElement, ReactElement } from 'react';
+import { ReactElement, cloneElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import HotkeysModalItem from './HotkeysModalItem';
 
@@ -66,11 +66,6 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'Shift+O',
     },
     {
-      title: t('hotkeys.toggleViewer.title'),
-      desc: t('hotkeys.toggleViewer.desc'),
-      hotkey: 'Z',
-    },
-    {
       title: t('hotkeys.toggleGallery.title'),
       desc: t('hotkeys.toggleGallery.desc'),
       hotkey: 'G',
@@ -84,12 +79,6 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       title: t('hotkeys.changeTabs.title'),
       desc: t('hotkeys.changeTabs.desc'),
       hotkey: '1-5',
-    },
-
-    {
-      title: t('hotkeys.consoleToggle.title'),
-      desc: t('hotkeys.consoleToggle.desc'),
-      hotkey: '`',
     },
   ];
 
@@ -108,11 +97,6 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       title: t('hotkeys.setParameters.title'),
       desc: t('hotkeys.setParameters.desc'),
       hotkey: 'A',
-    },
-    {
-      title: t('hotkeys.restoreFaces.title'),
-      desc: t('hotkeys.restoreFaces.desc'),
-      hotkey: 'Shift+R',
     },
     {
       title: t('hotkeys.upscale.title'),

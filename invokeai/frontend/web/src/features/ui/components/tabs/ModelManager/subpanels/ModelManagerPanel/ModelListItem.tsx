@@ -1,5 +1,5 @@
 import { DeleteIcon } from '@chakra-ui/icons';
-import { Flex, Text, Tooltip } from '@chakra-ui/react';
+import { Badge, Flex, Text, Tooltip } from '@chakra-ui/react';
 import { makeToast } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
@@ -18,6 +18,13 @@ type ModelListItemProps = {
   model: MainModelConfigEntity;
   isSelected: boolean;
   setSelectedModelId: (v: string | undefined) => void;
+};
+
+const modelBaseTypeMap = {
+  'sd-1': 'SD1',
+  'sd-2': 'SD2',
+  sdxl: 'SDXL',
+  'sdxl-refiner': 'SDXLR',
 };
 
 export default function ModelListItem(props: ModelListItemProps) {
@@ -76,7 +83,7 @@ export default function ModelListItem(props: ModelListItemProps) {
           bg: isSelected ? 'accent.400' : 'base.100',
           color: isSelected ? 'base.50' : 'base.800',
           _hover: {
-            bg: isSelected ? 'accent.500' : 'base.200',
+            bg: isSelected ? 'accent.500' : 'base.300',
             color: isSelected ? 'base.50' : 'base.800',
           },
           _dark: {
@@ -84,15 +91,33 @@ export default function ModelListItem(props: ModelListItemProps) {
             bg: isSelected ? 'accent.600' : 'base.850',
             _hover: {
               color: isSelected ? 'base.50' : 'base.100',
-              bg: isSelected ? 'accent.550' : 'base.800',
+              bg: isSelected ? 'accent.550' : 'base.700',
             },
           },
         }}
         onClick={handleSelectModel}
       >
-        <Tooltip label={model.description} hasArrow placement="bottom">
-          <Text sx={{ fontWeight: 500 }}>{model.model_name}</Text>
-        </Tooltip>
+        <Flex gap={4} alignItems="center">
+          <Badge
+            minWidth={14}
+            p={1}
+            fontSize="sm"
+            sx={{
+              bg: 'base.350',
+              color: 'base.900',
+              _dark: { bg: 'base.500' },
+            }}
+          >
+            {
+              modelBaseTypeMap[
+                model.base_model as keyof typeof modelBaseTypeMap
+              ]
+            }
+          </Badge>
+          <Tooltip label={model.description} hasArrow placement="bottom">
+            <Text sx={{ fontWeight: 500 }}>{model.model_name}</Text>
+          </Tooltip>
+        </Flex>
       </Flex>
       <IAIAlertDialog
         title={t('modelManager.deleteModel')}

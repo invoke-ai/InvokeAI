@@ -14,6 +14,7 @@ from invokeai.backend.image_util.patchmatch import PatchMatch
 from ..models.image import ColorField, ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
+    InvocationConfig,
     InvocationContext,
 )
 
@@ -133,6 +134,14 @@ class InfillColorInvocation(BaseInvocation):
         description="The color to use to infill",
     )
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Color Infill",
+                "tags": ["image", "inpaint", "color", "infill"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
@@ -173,6 +182,14 @@ class InfillTileInvocation(BaseInvocation):
         default_factory=get_random_seed,
     )
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Tile Infill",
+                "tags": ["image", "inpaint", "tile", "infill"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
@@ -205,6 +222,14 @@ class InfillPatchMatchInvocation(BaseInvocation):
     image: Optional[ImageField] = Field(
         default=None, description="The image to infill"
     )
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Patch Match Infill",
+                "tags": ["image", "inpaint", "patchmatch", "infill"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)

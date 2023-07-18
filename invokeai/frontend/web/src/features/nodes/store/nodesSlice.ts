@@ -33,6 +33,7 @@ export type NodesState = {
   connectionStartParams: OnConnectStartParams | null;
   shouldShowGraphOverlay: boolean;
   shouldShowFieldTypeLegend: boolean;
+  shouldShowMinimapPanel: boolean;
   editorInstance: ReactFlowInstance | undefined;
 };
 
@@ -44,6 +45,7 @@ export const initialNodesState: NodesState = {
   connectionStartParams: null,
   shouldShowGraphOverlay: false,
   shouldShowFieldTypeLegend: false,
+  shouldShowMinimapPanel: true,
   editorInstance: undefined,
 };
 
@@ -133,6 +135,9 @@ const nodesSlice = createSlice({
     ) => {
       state.shouldShowFieldTypeLegend = action.payload;
     },
+    shouldShowMinimapPanelChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowMinimapPanel = action.payload;
+    },
     nodeTemplatesBuilt: (
       state,
       action: PayloadAction<Record<string, InvocationTemplate>>
@@ -170,6 +175,7 @@ export const {
   connectionEnded,
   shouldShowGraphOverlayChanged,
   shouldShowFieldTypeLegendChanged,
+  shouldShowMinimapPanelChanged,
   nodeTemplatesBuilt,
   nodeEditorReset,
   imageCollectionFieldValueChanged,
