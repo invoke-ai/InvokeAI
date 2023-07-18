@@ -694,6 +694,15 @@
         "reloadSchema": "Reload Schema",
         "saveNodes": "Save Nodes",
         "loadNodes": "Load Nodes",
-        "clearNodes": "Clear Nodes"
+        "clearNodes": "Clear Nodes",
+        "zoomInNodes": "Zoom In",
+        "zoomOutNodes": "Zoom Out",
+        "fitViewportNodes": "Fit View",
+        "hideGraphNodes": "Hide Graph Overlay",
+        "showGraphNodes": "Show Graph Overlay",
+        "hideLegendNodes": "Hide Field Type Legend",
+        "showLegendNodes": "Show Field Type Legend",
+        "hideMinimapnodes": "Hide MiniMap",
+        "ShpwMinimapnodes": "Show MiniMap"
     }
 }
