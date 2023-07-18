@@ -130,6 +130,7 @@ class InpaintInvocation(BaseInvocation):
         schema_extra = {
             "ui": {
                 "tags": ["stable-diffusion", "image"],
+                "title": "Inpaint"
             },
         }
 

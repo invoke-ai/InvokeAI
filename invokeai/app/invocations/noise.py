@@ -112,6 +112,7 @@ class NoiseInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "Noise",
                 "tags": ["latents", "noise"],
             },
         }
