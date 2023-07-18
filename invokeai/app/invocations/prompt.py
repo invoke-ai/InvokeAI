@@ -95,3 +95,64 @@ class PromptsFromFileInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> PromptCollectionOutput:
         prompts = self.promptsFromFile(self.file_path, self.pre_prompt, self.post_prompt, self.start_line, self.max_prompts)
         return PromptCollectionOutput(prompt_collection=prompts, count=len(prompts))
+
+
+class PromptPosNegOutput(BaseInvocationOutput):
+    """Base class for invocations that output a posirtive and negative prompt"""
+
+    # fmt: off
+    type: Literal["prompt_pos_neg_output"] = "prompt_pos_neg_output"
+
+    positive_prompt: str = Field(description="Positive prompt")
+    negative_prompt: str = Field(description="Negative prompt")
+    # fmt: on
+
+    class Config:
+        schema_extra = {"required": ["type", "positive_prompt", "negative_prompt"]}
+
+
+class PromptSplitNegInvocation(BaseInvocation):
+    """Splits prompt into two prompts, inside [] goes into negative prompt everthing else goes into positive prompt. All [ and ] characters are stripped out of prompt"""
+
+    type: Literal["prompt_split_neg"] = "prompt_split_neg"
+    prompt: str = Field(default='', description="Prompt to split")
+
+    def invoke(self, context: InvocationContext) -> PromptPosNegOutput:
+        p_prompt = ""
+        n_prompt = ""
+        in_brackets = False
+
+        for char in (self.prompt or ''):
+            if char == "[":
+                in_brackets = True
+            elif char == "]":
+                in_brackets = False
+            elif in_brackets:
+                n_prompt += char
+            else:
+                p_prompt += char            
+
+        return PromptPosNegOutput(positive_prompt=p_prompt, negative_prompt=n_prompt)
+
+
+class PromptJoinInvocation(BaseInvocation):
+    """Joins prompt a to prompt b"""
+
+    type: Literal["prompt_join"] = "prompt_join"
+    prompt_a: str = Field(default='', description="Prompt a - (Left)")
+    prompt_b: str = Field(default='', description="Prompt b - (Right)")
+
+    def invoke(self, context: InvocationContext) -> PromptOutput:
+        return PromptOutput(prompt=((self.prompt_a or '') + (self.prompt_b or '')))  
+
+
+class PromptReplaceInvocation(BaseInvocation):
+    """Replaces the search string with the replace string in the prompt"""
+
+    type: Literal["prompt_replace"] = "prompt_replace"
+    prompt: str = Field(default='', description="Prompt to work on")
+    search_string : str = Field(default='', description="String to search for")
+    replace_string : str = Field(default='', description="String to replace the search")
+
+    def invoke(self, context: InvocationContext) -> PromptOutput:
+        return PromptOutput(prompt=(self.prompt or '').replace((self.search_string or ''), (self.replace_string or '')))  
