@@ -554,6 +554,8 @@ class IAIOnnxRuntimeModel:
             # sess.add_external_initializers(list(self.data.keys()), list(self.data.values()))
             sess.execution_mode = ExecutionMode.ORT_PARALLEL
             sess.graph_optimization_level = GraphOptimizationLevel.ORT_ENABLE_ALL
+            # sess.add_free_dimension_override_by_name("unet_sample_height", 64)
+            # sess.add_free_dimension_override_by_name("unet_sample_width", 64)
             self.session = InferenceSession(self.proto.SerializeToString(), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'], sess_options=sess)
             #self.session = InferenceSession("tmp.onnx", providers=[self.provider], sess_options=self.sess_options)
 

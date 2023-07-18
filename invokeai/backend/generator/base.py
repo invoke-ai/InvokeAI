@@ -466,7 +466,6 @@ class Generator:
             dtype=samples.dtype,
             device=samples.device,
         )
-
         latent_image = samples[0].permute(1, 2, 0) @ v1_5_latent_rgb_factors
         latents_ubyte = (
             ((latent_image + 1) / 2)

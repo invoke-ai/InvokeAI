@@ -63,6 +63,8 @@ dependencies = [
   "npyscreen",
   "numpy<1.24",
   "omegaconf",
+  "onnx",
+  "onnxruntime-gpu",
   "opencv-python",
   "picklescan",
   "pillow",
