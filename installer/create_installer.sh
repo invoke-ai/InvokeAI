@@ -24,7 +24,8 @@ read -e -p "Tag this repo with '${VERSION}' and '${LATEST_TAG}'? [n]: " input
 RESPONSE=${input:='n'}
 if [ "$RESPONSE" == 'y' ]; then
 
-    if ! git tag $VERSION ; then
+    git push origin :refs/tags/$VERSION
+    if ! git tag -fa $VERSION ; then
 	    echo "Existing/invalid tag"
 	    exit -1
     fi
