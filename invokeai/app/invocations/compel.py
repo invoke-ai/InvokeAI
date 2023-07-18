@@ -130,7 +130,7 @@ class CompelInvocation(BaseInvocation):
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=torch_dtype,
-                truncate_long_prompts=False,
+                truncate_long_prompts=True,
             )
 
             conjunction = Compel.parse_prompt_string(self.prompt)

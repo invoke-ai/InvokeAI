@@ -110,8 +110,11 @@ const SelectItem = forwardRef<HTMLDivElement, ItemProps>(
     return (
       <div ref={ref} {...others}>
         <div>
-          <Text>{label}</Text>
-          <Text size="xs" color="base.600">
+          <Text fontWeight={600}>{label}</Text>
+          <Text
+            size="xs"
+            sx={{ color: 'base.600', _dark: { color: 'base.500' } }}
+          >
             {description}
           </Text>
         </div>

@@ -701,7 +701,7 @@ def select_and_download_models(opt: Namespace):
 
         # the third argument is needed in the Windows 11 environment in
         # order to launch and resize a console window running this program
-        set_min_terminal_size(MIN_COLS, MIN_LINES,'invokeai-model-install')
+        set_min_terminal_size(MIN_COLS, MIN_LINES)
         installApp = AddModelApplication(opt)
         try:
             installApp.run()
