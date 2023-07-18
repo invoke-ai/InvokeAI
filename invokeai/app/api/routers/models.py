@@ -14,6 +14,7 @@ from invokeai.backend.model_management.models import (
     OPENAPI_MODEL_CONFIGS,
     SchedulerPredictionType,
     ModelNotFoundException,
+    InvalidModelException,
 )
 from invokeai.backend.model_management import MergeInterpolationMethod
 
@@ -36,11 +37,16 @@ class ModelsList(BaseModel):
     responses={200: {"model": ModelsList }},
 )
 async def list_models(
-    base_model: Optional[BaseModelType] = Query(default=None, description="Base model"),
+    base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
     model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
 ) -> ModelsList:
     """Gets a list of models"""
-    models_raw = ApiDependencies.invoker.services.model_manager.list_models(base_model, model_type)
+    if base_models and len(base_models)>0:
+        models_raw = list()
+        for base_model in base_models:
+            models_raw.extend(ApiDependencies.invoker.services.model_manager.list_models(base_model, model_type))
+    else:
+        models_raw = ApiDependencies.invoker.services.model_manager.list_models(None, model_type)
     models = parse_obj_as(ModelsList, { "models": models_raw })
     return models
 
@@ -123,6 +129,7 @@ async def update_model(
     responses= {
         201: {"description" : "The model imported successfully"},
         404: {"description" : "The model could not be found"},
+        415: {"description" : "Unrecognized file/folder format"},
         424: {"description" : "The model appeared to import successfully, but could not be found in the model manager"},
         409: {"description" : "There is already a model corresponding to this path or repo_id"},
     },
@@ -149,7 +156,7 @@ async def import_model(
 
         if not info:
             logger.error("Import failed")
-            raise HTTPException(status_code=424)
+            raise HTTPException(status_code=415)
         
         logger.info(f'Successfully imported {location}, got {info}')
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
@@ -162,6 +169,9 @@ async def import_model(
     except ModelNotFoundException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
+    except InvalidModelException as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=415)
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))

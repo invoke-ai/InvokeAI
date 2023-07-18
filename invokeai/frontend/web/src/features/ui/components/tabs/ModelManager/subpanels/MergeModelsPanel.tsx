@@ -58,10 +58,10 @@ export default function MergeModelsPanel() {
   }, [sd1DiffusersModels, sd2DiffusersModels]);
 
   const [modelOne, setModelOne] = useState<string | null>(
-    Object.keys(modelsMap[baseModel])[0]
+    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])[0]
   );
   const [modelTwo, setModelTwo] = useState<string | null>(
-    Object.keys(modelsMap[baseModel])[1]
+    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])[1]
   );
 
   const [modelThree, setModelThree] = useState<string | null>(null);
@@ -89,9 +89,9 @@ export default function MergeModelsPanel() {
     modelsMap[baseModel as keyof typeof modelsMap]
   ).filter((model) => model !== modelOne && model !== modelThree);
 
-  const modelThreeList = Object.keys(modelsMap[baseModel]).filter(
-    (model) => model !== modelOne && model !== modelTwo
-  );
+  const modelThreeList = Object.keys(
+    modelsMap[baseModel as keyof typeof modelsMap]
+  ).filter((model) => model !== modelOne && model !== modelTwo);
 
   const handleBaseModelChange = (v: string) => {
     setBaseModel(v as BaseModelType);

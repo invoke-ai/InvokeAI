@@ -14,6 +14,14 @@ export const clipSkipMap = {
     maxClip: 24,
     markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
   },
+  sdxl: {
+    maxClip: 24,
+    markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
+  },
+  'sdxl-refiner': {
+    maxClip: 24,
+    markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
+  },
 };
 
 export default function ParamClipSkip() {

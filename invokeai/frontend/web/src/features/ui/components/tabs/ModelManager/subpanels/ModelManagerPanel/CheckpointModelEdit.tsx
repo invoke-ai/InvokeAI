@@ -1,4 +1,4 @@
-import { Divider, Flex, Text } from '@chakra-ui/react';
+import { Badge, Divider, Flex, Text } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
 import { makeToast } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -115,7 +115,20 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
             {MODEL_TYPE_MAP[model.base_model]} Model
           </Text>
         </Flex>
-        <ModelConvert model={model} />
+        {!['sdxl', 'sdxl-refiner'].includes(model.base_model) ? (
+          <ModelConvert model={model} />
+        ) : (
+          <Badge
+            sx={{
+              p: 2,
+              borderRadius: 4,
+              bg: 'error.200',
+              _dark: { bg: 'error.400' },
+            }}
+          >
+            Conversion Not Supported
+          </Badge>
+        )}
       </Flex>
       <Divider />
 
