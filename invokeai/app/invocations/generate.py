@@ -147,8 +147,12 @@ class InpaintInvocation(BaseInvocation):
         )
 
     def get_conditioning(self, context):
-        c, extra_conditioning_info = context.services.latents.get(self.positive_conditioning.conditioning_name)
-        uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
+        positive_cond_data = context.services.latents.get(self.positive_conditioning.conditioning_name)
+        c = positive_cond_data.conditionings[0].embeds
+        extra_conditioning_info = positive_cond_data.conditionings[0].extra_conditioning
+
+        negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
+        uc = negative_cond_data.conditionings[0].embeds
 
         return (uc, c, extra_conditioning_info)
 
