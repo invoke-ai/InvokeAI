@@ -824,10 +824,14 @@ class ModelManager(object):
         assert config_file_path is not None,'no config file path to write to'
         config_file_path = self.app_config.root_path / config_file_path
         tmpfile = os.path.join(os.path.dirname(config_file_path), "new_config.tmp")
-        with open(tmpfile, "w", encoding="utf-8") as outfile:
-            outfile.write(self.preamble())
-            outfile.write(yaml_str)
-        os.replace(tmpfile, config_file_path)
+        try:
+            with open(tmpfile, "w", encoding="utf-8") as outfile:
+                outfile.write(self.preamble())
+                outfile.write(yaml_str)
+            os.replace(tmpfile, config_file_path)
+        except OSError as err:
+            self.logger.warning(f"Could not modify the config file at {config_file_path}")
+            self.logger.warning(err)
 
     def preamble(self) -> str:
         """
