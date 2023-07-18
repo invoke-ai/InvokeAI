@@ -571,6 +571,14 @@ class ClipSkipInvocation(BaseInvocation):
     clip: ClipField = Field(None, description="Clip to use")
     skipped_layers: int = Field(0, description="Number of layers to skip in text_encoder")
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "CLIP Skip",
+                "tags": ["clip", "skip"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> ClipSkipInvocationOutput:
         self.clip.skipped_layers += self.skipped_layers
         return ClipSkipInvocationOutput(

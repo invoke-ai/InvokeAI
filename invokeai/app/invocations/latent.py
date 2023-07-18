@@ -139,6 +139,7 @@ class TextToLatentsInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "Text To Latents",
                 "tags": ["latents"],
                 "type_hints": {
                     "model": "model",
@@ -389,6 +390,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "Latent To Latents",
                 "tags": ["latents"],
                 "type_hints": {
                     "model": "model",
@@ -498,6 +500,7 @@ class LatentsToImageInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "Latents To Image",
                 "tags": ["latents", "image"],
             },
         }
@@ -595,6 +598,14 @@ class ResizeLatentsInvocation(BaseInvocation):
     antialias: bool = Field(
         default=False,
         description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
+    
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Resize Latents",
+                "tags": ["latents", "resize"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.services.latents.get(self.latents.latents_name)
@@ -633,6 +644,14 @@ class ScaleLatentsInvocation(BaseInvocation):
     antialias: bool = Field(
         default=False,
         description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
+    
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Scale Latents",
+                "tags": ["latents", "scale"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.services.latents.get(self.latents.latents_name)
@@ -675,7 +694,8 @@ class ImageToLatentsInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
-                "tags": ["latents", "image"],
+                "title": "Image To Latents",
+                "tags": ["latents", "image"]
             },
         }
 
