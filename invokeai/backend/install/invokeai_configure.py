@@ -560,7 +560,6 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
     editApp.run()
     return editApp.new_opts()
 
-
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
     if not init_file.exists():
@@ -663,6 +662,9 @@ def write_opts(opts: Namespace, init_file: Path):
 
     with open(init_file,'w', encoding='utf-8') as file:
         file.write(new_config.to_yaml())
+
+    if opts.hf_token:
+        HfLogin(opts.hf_token)
 
 # -------------------------------------
 def default_output_dir() -> Path:
