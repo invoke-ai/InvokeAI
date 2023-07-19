@@ -2,6 +2,7 @@ import { log } from 'app/logging/useLogger';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
   IMAGE_CATEGORIES,
+  boardIdSelected,
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
 import { progressImageSet } from 'features/system/store/systemSlice';
@@ -45,7 +46,7 @@ export const addInvocationCompleteEventListener = () => {
       // This complete event has an associated image output
       if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
         const { image_name } = result.image;
-        const { canvas } = getState();
+        const { canvas, gallery } = getState();
 
         const imageDTO = await dispatch(
           imagesApi.endpoints.getImageDTO.initiate(image_name)
@@ -95,6 +96,14 @@ export const addInvocationCompleteEventListener = () => {
                 imageDTO,
               })
             );
+          }
+
+          const { selectedBoardId } = gallery;
+
+          if (boardIdToAddTo && boardIdToAddTo !== selectedBoardId) {
+            dispatch(boardIdSelected(boardIdToAddTo));
+          } else if (!boardIdToAddTo) {
+            dispatch(boardIdSelected('all'));
           }
 
           // If auto-switch is enabled, select the new image
