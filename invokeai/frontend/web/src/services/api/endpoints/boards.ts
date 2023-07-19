@@ -167,7 +167,14 @@ export const boardsApi = api.injectEndpoints({
                 'listImages',
                 queryArgs,
                 (draft) => {
-                  imagesAdapter.updateMany(draft, updates);
+                  const oldCount = imagesAdapter
+                    .getSelectors()
+                    .selectTotal(draft);
+                  const newState = imagesAdapter.updateMany(draft, updates);
+                  const newCount = imagesAdapter
+                    .getSelectors()
+                    .selectTotal(newState);
+                  draft.total = draft.total - (oldCount - newCount);
                 }
               )
             );
@@ -221,7 +228,17 @@ export const boardsApi = api.injectEndpoints({
                 'listImages',
                 queryArgs,
                 (draft) => {
-                  imagesAdapter.removeMany(draft, deleted_images);
+                  const oldCount = imagesAdapter
+                    .getSelectors()
+                    .selectTotal(draft);
+                  const newState = imagesAdapter.removeMany(
+                    draft,
+                    deleted_images
+                  );
+                  const newCount = imagesAdapter
+                    .getSelectors()
+                    .selectTotal(newState);
+                  draft.total = draft.total - (oldCount - newCount);
                 }
               )
             );
