@@ -1,5 +1,5 @@
 import { Flex, Image } from '@chakra-ui/react';
-import { NodeProps } from 'react-flow-renderer';
+import { NodeProps } from 'reactflow';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from 'app/store/store';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -18,8 +18,7 @@ const ProgressImageNode = (props: NodeProps) => {
   const { selected } = props;
 
   const handleResize: OnResize = (_, { width, height }) => {
-    const newSize =
-      width > height ? { width, height: width } : { width: height, height };
+    const newSize = { width, height };
     dispatch(nodeSizeChanged(newSize));
   };
 
