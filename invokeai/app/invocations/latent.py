@@ -39,7 +39,6 @@ from diffusers.models.attention_processor import (
 )
 
 def choose_torch_device() -> str:
-    # Your device selection logic here
     device = "cuda" if torch.cuda.is_available() else "cpu"
     return device
 
