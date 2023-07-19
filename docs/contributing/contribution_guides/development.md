@@ -66,7 +66,7 @@ git commit -m "Insert a short message of the changes made here"
 git push origin branch-name-here
 ```
 
-1. Submit a pull request to the **development** branch of the InvokeAI repository.
+1. Submit a pull request to the **main** branch of the InvokeAI repository.
 2. Title the pull request with a short description of the changes made and the issue or bug number associated with your change. For example, you can title an issue like so "Added more log outputting to resolve #1234".
 3. In the description of the pull request, explain the changes that you made, any issues you think exist with the pull request you made, and any questions you have for the maintainer. It's OK if your pull request is not perfect (no pull request is), the reviewer will be able to help you fix any problems and improve it!
 4. Wait for the pull request to be reviewed by other collaborators.
