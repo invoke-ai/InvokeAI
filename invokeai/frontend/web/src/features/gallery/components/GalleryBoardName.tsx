@@ -32,6 +32,8 @@ const GalleryBoardName = (props: Props) => {
       let selectedBoardName = '';
       if (selectedBoardId === 'images') {
         selectedBoardName = 'All Images';
+      } else if (selectedBoardId === 'assets') {
+        selectedBoardName = 'All Assets';
       } else if (selectedBoardId === 'no_board') {
         selectedBoardName = 'No Board';
       } else if (selectedBoardId === 'batch') {
