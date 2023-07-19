@@ -1,8 +1,8 @@
 ---
-title: Concepts 
+title: Textual Inversion Embeddings and LoRAs
 ---
 
-# :material-library-shelves: The Hugging Face Concepts Library and Importing Textual Inversion files
+# :material-library-shelves: Textual Inversions and LoRAs
 
 With the advances in research, many new capabilities are available to customize the knowledge and understanding of novel concepts not originally contained in the base model. 
 
@@ -64,21 +64,25 @@ select the embedding you'd like to use. This UI has type-ahead support, so you c
 
 ## Using LoRAs
 
-LoRA files are models that customize the output of Stable Diffusion image generation.
-Larger than embeddings, but much smaller than full models, they augment SD with improved
-understanding of subjects and artistic styles.
+LoRA files are models that customize the output of Stable Diffusion
+image generation.  Larger than embeddings, but much smaller than full
+models, they augment SD with improved understanding of subjects and
+artistic styles.
 
-Unlike TI files, LoRAs do not introduce novel vocabulary into the model's known tokens. Instead,
-LoRAs augment the model's weights that are applied to generate imagery. LoRAs may be supplied
-with a "trigger" word that they have been explicitly trained on, or may simply apply their 
-effect without being triggered.
+Unlike TI files, LoRAs do not introduce novel vocabulary into the
+model's known tokens. Instead, LoRAs augment the model's weights that
+are applied to generate imagery. LoRAs may be supplied with a
+"trigger" word that they have been explicitly trained on, or may
+simply apply their effect without being triggered.
 
-LoRAs are typically stored in .safetensors files, which are the most secure way to store and transmit
-these types of weights. You may install any number of `.safetensors` LoRA files simply by copying them into
-the `lora` directory of the corresponding InvokeAI models directory (usually `invokeai`
-in your home directory). For example, you can simply move a Stable Diffusion 1.5 LoRA file to
-the `sd-1/lora` folder.
+LoRAs are typically stored in .safetensors files, which are the most
+secure way to store and transmit these types of weights. You may
+install any number of `.safetensors` LoRA files simply by copying them
+into the `autoimport/lora` directory of the corresponding InvokeAI models
+directory (usually `invokeai` in your home directory).
 
-To use these when generating, open the LoRA menu item in the options panel, select the LoRAs you want to apply
-and ensure that they have the appropriate weight recommended by the model provider. Typically, most LoRAs perform best at a weight of .75-1. 
+To use these when generating, open the LoRA menu item in the options
+panel, select the LoRAs you want to apply and ensure that they have
+the appropriate weight recommended by the model provider. Typically,
+most LoRAs perform best at a weight of .75-1.
 

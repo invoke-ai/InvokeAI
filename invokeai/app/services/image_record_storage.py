@@ -10,7 +10,10 @@ from pydantic.generics import GenericModel
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.models.image_record import (
-    ImageRecord, ImageRecordChanges, deserialize_image_record)
+    ImageRecord,
+    ImageRecordChanges,
+    deserialize_image_record,
+)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -97,8 +100,8 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get_many(
         self,
-        offset: int = 0,
-        limit: int = 10,
+        offset: Optional[int] = None,
+        limit: Optional[int] = None,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
@@ -322,8 +325,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def get_many(
         self,
-        offset: int = 0,
-        limit: int = 10,
+        offset: Optional[int] = None,
+        limit: Optional[int] = None,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
@@ -377,11 +380,15 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
                 query_params.append(is_intermediate)
 
-            if board_id is not None:
+            # board_id of "none" is reserved for images without a board
+            if board_id == "none":
+                query_conditions += """--sql
+                AND board_images.board_id IS NULL
+                """
+            elif board_id is not None:
                 query_conditions += """--sql
                 AND board_images.board_id = ?
                 """
-
                 query_params.append(board_id)
 
             query_pagination = """--sql
@@ -392,8 +399,12 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             images_query += query_conditions + query_pagination + ";"
             # Add all the parameters
             images_params = query_params.copy()
-            images_params.append(limit)
-            images_params.append(offset)
+
+            if limit is not None:
+                images_params.append(limit)
+            if offset is not None:
+                images_params.append(offset)
+
             # Build the list of images, deserializing each row
             self._cursor.execute(images_query, images_params)
             result = cast(list[sqlite3.Row], self._cursor.fetchall())

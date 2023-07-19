@@ -145,6 +145,7 @@ This method is recommended for those familiar with running Docker containers
 ### Model Management
 - [Installing](installation/050_INSTALLING_MODELS.md)
 - [Model Merging](features/MODEL_MERGING.md)
+- [ControlNet Models](features/CONTROLNET.md)
 - [Style/Subject Concepts and Embeddings](features/CONCEPTS.md)
 - [Not Safe for Work (NSFW) Checker](features/NSFW.md)
 <!-- seperator -->

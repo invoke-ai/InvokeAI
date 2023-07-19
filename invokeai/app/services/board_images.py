@@ -38,11 +38,11 @@ class BoardImagesServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_images_for_board(
+    def get_all_board_image_names_for_board(
         self,
         board_id: str,
-    ) -> OffsetPaginatedResults[ImageDTO]:
-        """Gets images for a board."""
+    ) -> list[str]:
+        """Gets all board images for a board, as a list of the image names."""
         pass
 
     @abstractmethod
@@ -98,29 +98,12 @@ class BoardImagesService(BoardImagesServiceABC):
     ) -> None:
         self._services.board_image_records.remove_image_from_board(board_id, image_name)
 
-    def get_images_for_board(
+    def get_all_board_image_names_for_board(
         self,
         board_id: str,
-    ) -> OffsetPaginatedResults[ImageDTO]:
-        image_records = self._services.board_image_records.get_images_for_board(
+    ) -> list[str]:
+        return self._services.board_image_records.get_all_board_image_names_for_board(
             board_id
-        )
-        image_dtos = list(
-            map(
-                lambda r: image_record_to_dto(
-                    r,
-                    self._services.urls.get_image_url(r.image_name),
-                    self._services.urls.get_image_url(r.image_name, True),
-                    board_id,
-                ),
-                image_records.items,
-            )
-        )
-        return OffsetPaginatedResults[ImageDTO](
-            items=image_dtos,
-            offset=image_records.offset,
-            limit=image_records.limit,
-            total=image_records.total,
         )
 
     def get_board_for_image(
@@ -136,7 +119,7 @@ def board_record_to_dto(
 ) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
-        **board_record.dict(exclude={'cover_image_name'}),
+        **board_record.dict(exclude={"cover_image_name"}),
         cover_image_name=cover_image_name,
         image_count=image_count,
     )

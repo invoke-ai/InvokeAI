@@ -28,6 +28,7 @@ export const addVAEToGraph = (
     graph.nodes[VAE_LOADER] = {
       type: 'vae_loader',
       id: VAE_LOADER,
+      is_intermediate: true,
       vae_model: vae,
     };
   }

@@ -1,85 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { clamp, keyBy } from 'lodash-es';
-import { ImageDTO } from 'services/api/types';
+import { ListImagesArgs } from 'services/api/endpoints/images';
+import { INITIAL_IMAGE_LIMIT } from './gallerySlice';
 import {
-  ASSETS_CATEGORIES,
-  BoardId,
-  IMAGE_CATEGORIES,
-  imagesAdapter,
-  initialGalleryState,
-} from './gallerySlice';
+  getBoardIdQueryParamForBoard,
+  getCategoriesQueryParamForBoard,
+} from './util';
 
 export const gallerySelector = (state: RootState) => state.gallery;
-
-const isInSelectedBoard = (
-  selectedBoardId: BoardId,
-  imageDTO: ImageDTO,
-  batchImageNames: string[]
-) => {
-  if (selectedBoardId === 'all') {
-    // all images are in the "All Images" board
-    return true;
-  }
-
-  if (selectedBoardId === 'none' && !imageDTO.board_id) {
-    // Only images without a board are in the "No Board" board
-    return true;
-  }
-
-  if (
-    selectedBoardId === 'batch' &&
-    batchImageNames.includes(imageDTO.image_name)
-  ) {
-    // Only images with is_batch are in the "Batch" board
-    return true;
-  }
-
-  return selectedBoardId === imageDTO.board_id;
-};
-
-export const selectFilteredImagesLocal = createSelector(
-  [(state: typeof initialGalleryState) => state],
-  (galleryState) => {
-    const allImages = imagesAdapter.getSelectors().selectAll(galleryState);
-    const { galleryView, selectedBoardId } = galleryState;
-
-    const categories =
-      galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES;
-
-    const filteredImages = allImages.filter((i) => {
-      const isInCategory = categories.includes(i.image_category);
-
-      const isInBoard = isInSelectedBoard(
-        selectedBoardId,
-        i,
-        galleryState.batchImageNames
-      );
-      return isInCategory && isInBoard;
-    });
-
-    return filteredImages;
-  }
-);
-
-export const selectFilteredImages = createSelector(
-  (state: RootState) => state,
-  (state) => {
-    return selectFilteredImagesLocal(state.gallery);
-  },
-  defaultSelectorOptions
-);
-
-export const selectFilteredImagesAsObject = createSelector(
-  selectFilteredImages,
-  (filteredImages) => keyBy(filteredImages, 'image_name')
-);
-
-export const selectFilteredImagesIds = createSelector(
-  selectFilteredImages,
-  (filteredImages) => filteredImages.map((i) => i.image_name)
-);
 
 export const selectLastSelectedImage = createSelector(
   (state: RootState) => state,
@@ -87,50 +16,23 @@ export const selectLastSelectedImage = createSelector(
   defaultSelectorOptions
 );
 
-export const selectSelectedImages = createSelector(
-  (state: RootState) => state,
-  (state) =>
-    imagesAdapter
-      .getSelectors()
-      .selectAll(state.gallery)
-      .filter((i) => state.gallery.selection.includes(i.image_name)),
-  defaultSelectorOptions
-);
+export const selectListImagesBaseQueryArgs = createSelector(
+  [(state: RootState) => state],
+  (state) => {
+    const { selectedBoardId } = state.gallery;
 
-export const selectNextImageToSelectLocal = createSelector(
-  [
-    (state: typeof initialGalleryState) => state,
-    (state: typeof initialGalleryState, image_name: string) => image_name,
-  ],
-  (state, image_name) => {
-    const filteredImages = selectFilteredImagesLocal(state);
-    const ids = filteredImages.map((i) => i.image_name);
+    const categories = getCategoriesQueryParamForBoard(selectedBoardId);
+    const board_id = getBoardIdQueryParamForBoard(selectedBoardId);
 
-    const deletedImageIndex = ids.findIndex(
-      (result) => result.toString() === image_name
-    );
+    const listImagesBaseQueryArgs: ListImagesArgs = {
+      categories,
+      board_id,
+      offset: 0,
+      limit: INITIAL_IMAGE_LIMIT,
+      is_intermediate: false,
+    };
 
-    const filteredIds = ids.filter((id) => id.toString() !== image_name);
-
-    const newSelectedImageIndex = clamp(
-      deletedImageIndex,
-      0,
-      filteredIds.length - 1
-    );
-
-    const newSelectedImageId = filteredIds[newSelectedImageIndex];
-
-    return newSelectedImageId;
-  }
-);
-
-export const selectNextImageToSelect = createSelector(
-  [
-    (state: RootState) => state,
-    (state: RootState, image_name: string) => image_name,
-  ],
-  (state, image_name) => {
-    return selectNextImageToSelectLocal(state.gallery, image_name);
+    return listImagesBaseQueryArgs;
   },
   defaultSelectorOptions
 );

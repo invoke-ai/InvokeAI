@@ -11,8 +11,8 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { PostUploadAction } from 'services/api/thunks/image';
 import { controlNetImageChanged } from '../store/controlNetSlice';
+import { PostUploadAction } from 'services/api/types';
 
 type Props = {
   controlNetId: string;

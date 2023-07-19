@@ -15,10 +15,7 @@ const STYLES: ChakraProps['sx'] = {
   maxH: BOX_SIZE,
   shadow: 'dark-lg',
   borderRadius: 'lg',
-  borderWidth: 2,
-  borderStyle: 'dashed',
-  borderColor: 'base.100',
-  opacity: 0.5,
+  opacity: 0.3,
   bg: 'base.800',
   color: 'base.50',
   _dark: {

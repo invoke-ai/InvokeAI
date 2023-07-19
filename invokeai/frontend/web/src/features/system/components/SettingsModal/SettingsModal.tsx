@@ -11,7 +11,7 @@ import {
   Text,
   useDisclosure,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createSelector, current } from '@reduxjs/toolkit';
 import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
 import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -23,6 +23,7 @@ import {
   SystemState,
   consoleLogLevelChanged,
   setEnableImageDebugging,
+  setIsNodesEnabled,
   setShouldConfirmOnDelete,
   setShouldDisplayGuides,
   shouldAntialiasProgressImageChanged,
@@ -48,6 +49,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import SettingsSchedulers from './SettingsSchedulers';
+import SettingsClearIntermediates from './SettingsClearIntermediates';
 
 const selector = createSelector(
   [systemSelector, uiSelector],
@@ -59,6 +61,7 @@ const selector = createSelector(
       consoleLogLevel,
       shouldLogToConsole,
       shouldAntialiasProgressImage,
+      isNodesEnabled,
     } = system;
 
     const {
@@ -79,6 +82,7 @@ const selector = createSelector(
       shouldLogToConsole,
       shouldAntialiasProgressImage,
       shouldShowAdvancedOptions,
+      isNodesEnabled,
     };
   },
   {
@@ -91,6 +95,8 @@ type ConfigOptions = {
   shouldShowResetWebUiText: boolean;
   shouldShowBetaLayout: boolean;
   shouldShowAdvancedOptionsSettings: boolean;
+  shouldShowClearIntermediates: boolean;
+  shouldShowNodesToggle: boolean;
 };
 
 type SettingsModalProps = {
@@ -109,6 +115,9 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
   const shouldShowAdvancedOptionsSettings =
     config?.shouldShowAdvancedOptionsSettings ?? true;
+  const shouldShowClearIntermediates =
+    config?.shouldShowClearIntermediates ?? true;
+  const shouldShowNodesToggle = config?.shouldShowNodesToggle ?? true;
 
   useEffect(() => {
     if (!shouldShowDeveloperSettings) {
@@ -139,6 +148,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     shouldLogToConsole,
     shouldAntialiasProgressImage,
     shouldShowAdvancedOptions,
+    isNodesEnabled,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -165,6 +175,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const handleLogToConsoleChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldLogToConsoleChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+
+  const handleToggleNodes = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setIsNodesEnabled(e.target.checked));
     },
     [dispatch]
   );
@@ -253,6 +270,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     )
                   }
                 />
+                {shouldShowNodesToggle && (
+                  <IAISwitch
+                    label="Enable Nodes Editor (Experimental)"
+                    isChecked={isNodesEnabled}
+                    onChange={handleToggleNodes}
+                  />
+                )}
               </StyledFlex>
 
               {shouldShowDeveloperSettings && (
@@ -279,6 +303,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                   />
                 </StyledFlex>
               )}
+
+              {shouldShowClearIntermediates && <SettingsClearIntermediates />}
 
               <StyledFlex>
                 <Heading size="sm">{t('settings.resetWebUI')}</Heading>
@@ -328,7 +354,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
 export default SettingsModal;
 
-const StyledFlex = (props: PropsWithChildren) => {
+export const StyledFlex = (props: PropsWithChildren) => {
   return (
     <Flex
       sx={{

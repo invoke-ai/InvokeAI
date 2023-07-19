@@ -141,7 +141,7 @@ class EventServiceBase:
                 model_type=model_type,
                 submodel=submodel,
                 hash=model_info.hash,
-                location=model_info.location,
+                location=str(model_info.location),
                 precision=str(model_info.precision),
             ),
         )

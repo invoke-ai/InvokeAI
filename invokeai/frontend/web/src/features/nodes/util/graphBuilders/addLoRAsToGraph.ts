@@ -60,6 +60,7 @@ export const addLoRAsToGraph = (
     const loraLoaderNode: LoraLoaderInvocation = {
       type: 'lora_loader',
       id: currentLoraNodeId,
+      is_intermediate: true,
       lora: { model_name, base_model },
       weight,
     };

@@ -15,7 +15,6 @@ import InvokeTabs from 'features/ui/components/InvokeTabs';
 import ParametersDrawer from 'features/ui/components/ParametersDrawer';
 import i18n from 'i18n';
 import { ReactNode, memo, useEffect } from 'react';
-import DeleteBoardImagesModal from '../../features/gallery/components/Boards/DeleteBoardImagesModal';
 import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
@@ -84,7 +83,6 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
       </Grid>
       <DeleteImageModal />
       <UpdateImageBoardModal />
-      <DeleteBoardImagesModal />
       <Toaster />
       <GlobalHotkeys />
     </>
