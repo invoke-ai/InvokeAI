@@ -14,6 +14,7 @@ export const modelIdToMainModelParam = (
   const result = zMainModel.safeParse({
     base_model,
     model_name,
+    model_type,
   });
 
   if (!result.success) {

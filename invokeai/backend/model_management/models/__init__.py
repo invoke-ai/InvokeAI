@@ -36,6 +36,7 @@ MODEL_CLASSES = {
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
+        ModelType.ONNX: ONNXStableDiffusion2Model,
     },
     BaseModelType.StableDiffusionXLRefiner: {
         ModelType.Main: StableDiffusionXLModel,
@@ -44,6 +45,7 @@ MODEL_CLASSES = {
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
+        ModelType.ONNX: ONNXStableDiffusion2Model,
     },
     #BaseModelType.Kandinsky2_1: {
     #    ModelType.Main: Kandinsky2_1Model,
