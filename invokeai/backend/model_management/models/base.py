@@ -577,7 +577,7 @@ class IAIOnnxRuntimeModel:
             sess.add_free_dimension_override_by_name("unet_time_batch", 1)
             self.session = InferenceSession(self.proto.SerializeToString(), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'], sess_options=sess)
             #self.session = InferenceSession("tmp.onnx", providers=[self.provider], sess_options=self.sess_options)
-            self.io_binding = self.session.io_binding()
+            # self.io_binding = self.session.io_binding()
 
     def release_session(self):
         self.session = None
@@ -590,12 +590,13 @@ class IAIOnnxRuntimeModel:
 
         inputs = {k: np.array(v) for k, v in kwargs.items()}
         output_names = self.session.get_outputs()
-        for k in inputs:
-            self.io_binding.bind_cpu_input(k, inputs[k])
-        for name in output_names:
-            self.io_binding.bind_output(name.name)
-        self.session.run_with_iobinding(self.io_binding, None)
-        return self.io_binding.copy_outputs_to_cpu()
+        # for k in inputs:
+        #     self.io_binding.bind_cpu_input(k, inputs[k])
+        # for name in output_names:
+        #     self.io_binding.bind_output(name.name)
+        # self.session.run_with_iobinding(self.io_binding, None)
+        # return self.io_binding.copy_outputs_to_cpu()
+        return self.session.run(None, inputs)
 
     # compatability with diffusers load code
     @classmethod
