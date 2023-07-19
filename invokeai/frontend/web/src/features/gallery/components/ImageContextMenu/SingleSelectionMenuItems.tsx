@@ -160,6 +160,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           {t('parameters.copyImage')}
         </MenuItem>
       )}
+      <Link download={true} href={imageDTO.image_url} target="_blank">
+        <MenuItem icon={<FaDownload />} w="100%">
+          {t('parameters.downloadImage')}
+        </MenuItem>
+      </Link>
       <MenuItem
         icon={<FaQuoteRight />}
         onClickCapture={handleRecallPrompt}
@@ -218,11 +223,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           Remove from Board
         </MenuItem>
       )}
-      <Link download={true} href={imageDTO.image_url} target="_blank">
-        <MenuItem icon={<FaDownload />} w="100%">
-          {t('parameters.downloadImage')}
-        </MenuItem>
-      </Link>
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
         icon={<FaTrash />}
