@@ -8,6 +8,7 @@ import {
   Image,
   MenuItem,
   MenuList,
+  Text,
   useColorMode,
 } from '@chakra-ui/react';
 
@@ -172,7 +173,10 @@ const GalleryBoard = memo(({ board, isSelected }: GalleryBoardProps) => {
               >
                 <Badge variant="solid">{board.image_count}</Badge>
               </Flex>
-              <IAIDroppable data={droppableData} />
+              <IAIDroppable
+                data={droppableData}
+                dropLabel={<Text fontSize="md">Move</Text>}
+              />
             </Flex>
 
             <Flex

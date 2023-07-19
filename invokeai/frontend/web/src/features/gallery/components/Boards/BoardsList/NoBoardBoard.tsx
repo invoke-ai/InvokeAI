@@ -10,6 +10,7 @@ import {
 } from 'services/api/endpoints/images';
 import GenericBoard from './GenericBoard';
 import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
+import { Text } from '@chakra-ui/react';
 
 const baseQueryArg: ListImagesArgs = {
   board_id: 'none',
@@ -39,6 +40,7 @@ const NoBoardBoard = ({ isSelected }: { isSelected: boolean }) => {
   return (
     <GenericBoard
       droppableData={droppableData}
+      dropLabel={<Text fontSize="md">Move</Text>}
       onClick={handleClick}
       isSelected={isSelected}
       icon={FaFolder}
