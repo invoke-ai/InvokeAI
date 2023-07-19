@@ -6,6 +6,7 @@ import {
   AlertDialogHeader,
   AlertDialogOverlay,
   Flex,
+  Skeleton,
   Text,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
@@ -39,9 +40,8 @@ const DeleteImageModal = (props: Props) => {
   const canRestoreDeletedImagesFromBin = useAppSelector(
     (state) => state.config.canRestoreDeletedImagesFromBin
   );
-  const { currentData: boardImageNames } = useListAllImageNamesForBoardQuery(
-    boardToDelete?.board_id ?? skipToken
-  );
+  const { currentData: boardImageNames, isFetching: isFetchingBoardNames } =
+    useListAllImageNamesForBoardQuery(boardToDelete?.board_id ?? skipToken);
 
   const selectImageUsageSummary = useMemo(
     () =>
@@ -94,6 +94,18 @@ const DeleteImageModal = (props: Props) => {
 
   const cancelRef = useRef<HTMLButtonElement>(null);
 
+  const isLoading = useMemo(
+    () =>
+      isDeleteBoardAndImagesLoading ||
+      isDeleteBoardOnlyLoading ||
+      isFetchingBoardNames,
+    [
+      isDeleteBoardAndImagesLoading,
+      isDeleteBoardOnlyLoading,
+      isFetchingBoardNames,
+    ]
+  );
+
   if (!boardToDelete) {
     return null;
   }
@@ -113,11 +125,22 @@ const DeleteImageModal = (props: Props) => {
 
           <AlertDialogBody>
             <Flex direction="column" gap={3}>
-              <ImageUsageMessage
-                imageUsage={imageUsageSummary}
-                topMessage="This board contains images used in the following features:"
-                bottomMessage="Deleting this board and its images will reset any features currently using them."
-              />
+              {isFetchingBoardNames ? (
+                <Skeleton>
+                  <Flex
+                    sx={{
+                      w: 'full',
+                      h: 32,
+                    }}
+                  />
+                </Skeleton>
+              ) : (
+                <ImageUsageMessage
+                  imageUsage={imageUsageSummary}
+                  topMessage="This board contains images used in the following features:"
+                  bottomMessage="Deleting this board and its images will reset any features currently using them."
+                />
+              )}
               <Text>Deleted boards cannot be restored.</Text>
               <Text>
                 {canRestoreDeletedImagesFromBin
@@ -135,14 +158,14 @@ const DeleteImageModal = (props: Props) => {
               </IAIButton>
               <IAIButton
                 colorScheme="warning"
-                isLoading={isDeleteBoardOnlyLoading}
+                isLoading={isLoading}
                 onClick={handleDeleteBoardOnly}
               >
                 Delete Board Only
               </IAIButton>
               <IAIButton
                 colorScheme="error"
-                isLoading={isDeleteBoardAndImagesLoading}
+                isLoading={isLoading}
                 onClick={handleDeleteBoardAndImages}
               >
                 Delete Board and Images
