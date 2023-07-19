@@ -1,17 +1,31 @@
 import { Flex, Image } from '@chakra-ui/react';
-import { NodeProps } from 'reactflow';
-import { InvocationValue } from '../types/types';
-
-import { useAppSelector } from 'app/store/storeHooks';
+import { NodeProps } from 'react-flow-renderer';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from 'app/store/store';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import IAINodeHeader from './IAINode/IAINodeHeader';
-import IAINodeResizer from './IAINode/IAINodeResizer';
+import IAINodeResizer, { OnResize } from './IAINode/IAINodeResizer';
 import NodeWrapper from './NodeWrapper';
+import { nodeSizeChanged } from '../store/nodesSlice';
 
-const ProgressImageNode = (props: NodeProps<InvocationValue>) => {
-  const progressImage = useAppSelector((state) => state.system.progressImage);
+const ProgressImageNode = (props: NodeProps) => {
+  const progressImage = useSelector(
+    (state: RootState) => state.system.progressImage
+  );
+  const nodeSize = useSelector((state: RootState) => state.nodes.nodeSize);
+  const dispatch = useDispatch();
   const { selected } = props;
+
+  useEffect(() => {
+    localStorage.setItem('nodeSize', JSON.stringify(nodeSize));
+  }, [nodeSize]);
+
+  const handleResize: OnResize = (_, { width, height }) => {
+    const newSize =
+      width > height ? { width, height: width } : { width: height, height };
+    dispatch(nodeSizeChanged(newSize));
+  };
 
   return (
     <NodeWrapper selected={selected}>
@@ -21,13 +35,16 @@ const ProgressImageNode = (props: NodeProps<InvocationValue>) => {
       />
 
       <Flex
-        className="nopan"
         sx={{
           flexDirection: 'column',
           borderBottomRadius: 'md',
           p: 2,
           bg: 'base.200',
           _dark: { bg: 'base.800' },
+          width: nodeSize.width,
+          height: nodeSize.height,
+          overflow: 'hidden',
+          flexShrink: 0,
         }}
       >
         {progressImage ? (
@@ -37,6 +54,8 @@ const ProgressImageNode = (props: NodeProps<InvocationValue>) => {
               w: 'full',
               h: 'full',
               objectFit: 'contain',
+              maxWidth: '100%',
+              maxHeight: '100%',
             }}
           />
         ) : (
@@ -44,8 +63,8 @@ const ProgressImageNode = (props: NodeProps<InvocationValue>) => {
             sx={{
               w: 'full',
               h: 'full',
-              minW: 32,
-              minH: 32,
+              width: nodeSize.width,
+              height: nodeSize.height,
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -54,10 +73,7 @@ const ProgressImageNode = (props: NodeProps<InvocationValue>) => {
           </Flex>
         )}
       </Flex>
-      <IAINodeResizer
-        maxHeight={progressImage?.height ?? 512}
-        maxWidth={progressImage?.width ?? 512}
-      />
+      <IAINodeResizer onResize={handleResize} />
     </NodeWrapper>
   );
 };
