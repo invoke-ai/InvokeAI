@@ -24,7 +24,6 @@ import {
   setEnableImageDebugging,
   setIsNodesEnabled,
   setShouldConfirmOnDelete,
-  setShouldDisplayGuides,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
 } from 'features/system/store/systemSlice';
@@ -56,7 +55,6 @@ const selector = createSelector(
   (system: SystemState, ui: UIState) => {
     const {
       shouldConfirmOnDelete,
-      shouldDisplayGuides,
       enableImageDebugging,
       consoleLogLevel,
       shouldLogToConsole,
@@ -73,7 +71,6 @@ const selector = createSelector(
 
     return {
       shouldConfirmOnDelete,
-      shouldDisplayGuides,
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
@@ -139,7 +136,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
   const {
     shouldConfirmOnDelete,
-    shouldDisplayGuides,
     enableImageDebugging,
     shouldUseCanvasBetaLayout,
     shouldUseSliders,
@@ -231,14 +227,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
               <StyledFlex>
                 <Heading size="sm">{t('settings.ui')}</Heading>
-                <SettingSwitch
-                  label={t('settings.displayHelpIcons')}
-                  isChecked={shouldDisplayGuides}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldDisplayGuides(e.target.checked))
-                  }
-                />
-
                 <SettingSwitch
                   label={t('settings.useSlidersForAll')}
                   isChecked={shouldUseSliders}

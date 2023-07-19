@@ -38,7 +38,6 @@ export interface SystemState {
   currentIteration: number;
   totalIterations: number;
   currentStatusHasSteps: boolean;
-  shouldDisplayGuides: boolean;
   isCancelable: boolean;
   enableImageDebugging: boolean;
   toastQueue: UseToastOptions[];
@@ -91,7 +90,6 @@ export interface SystemState {
 export const initialSystemState: SystemState = {
   isConnected: false,
   isProcessing: false,
-  shouldDisplayGuides: true,
   isGFPGANAvailable: true,
   isESRGANAvailable: true,
   shouldConfirmOnDelete: true,
@@ -133,9 +131,6 @@ export const systemSlice = createSlice({
     },
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
-    },
-    setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
-      state.shouldDisplayGuides = action.payload;
     },
     setIsCancelable: (state, action: PayloadAction<boolean>) => {
       state.isCancelable = action.payload;
@@ -390,7 +385,6 @@ export const {
   setIsProcessing,
   setShouldConfirmOnDelete,
   setCurrentStatus,
-  setShouldDisplayGuides,
   setIsCancelable,
   setEnableImageDebugging,
   addToast,
