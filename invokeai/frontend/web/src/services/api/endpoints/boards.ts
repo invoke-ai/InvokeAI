@@ -80,6 +80,7 @@ export const boardsApi = api.injectEndpoints({
       providesTags: (result, error, arg) => [
         { type: 'ImageNameList', id: arg },
       ],
+      keepUnusedDataFor: 0,
     }),
 
     /**
@@ -188,7 +189,7 @@ export const boardsApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, arg) => [
         { type: 'Board', id: arg },
-        { type: 'Image', id: LIST_TAG },
+        { type: 'ImageList', id: getListImagesUrl({ board_id: 'none' }) },
       ],
       async onQueryStarted(board_id, { dispatch, queryFulfilled, getState }) {
         /**
