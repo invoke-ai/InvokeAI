@@ -35,7 +35,7 @@ export type NodesState = {
   shouldShowFieldTypeLegend: boolean;
   shouldShowMinimapPanel: boolean;
   editorInstance: ReactFlowInstance | undefined;
-  nodeSize: { width: number; height: number };
+  progressNodeSize: { width: number; height: number };
 };
 
 export const initialNodesState: NodesState = {
@@ -48,7 +48,7 @@ export const initialNodesState: NodesState = {
   shouldShowFieldTypeLegend: false,
   shouldShowMinimapPanel: true,
   editorInstance: undefined,
-  nodeSize: { width: 512, height: 512 },
+  progressNodeSize: { width: 512, height: 512 },
 };
 
 const nodesSlice = createSlice({
@@ -159,11 +159,11 @@ const nodesSlice = createSlice({
     loadFileEdges: (state, action: PayloadAction<Edge[]>) => {
       state.edges = action.payload;
     },
-    nodeSizeChanged: (
+    setProgressNodeSize: (
       state,
       action: PayloadAction<{ width: number; height: number }>
     ) => {
-      state.nodeSize = action.payload;
+      state.progressNodeSize = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -190,7 +190,7 @@ export const {
   setEditorInstance,
   loadFileNodes,
   loadFileEdges,
-  nodeSizeChanged,
+  setProgressNodeSize,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

@@ -1,25 +1,26 @@
 import { Flex, Image } from '@chakra-ui/react';
-import { NodeProps } from 'reactflow';
-import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from 'app/store/store';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { memo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { NodeProps, OnResize } from 'reactflow';
+import { setProgressNodeSize } from '../store/nodesSlice';
 import IAINodeHeader from './IAINode/IAINodeHeader';
-import IAINodeResizer, { OnResize } from './IAINode/IAINodeResizer';
+import IAINodeResizer from './IAINode/IAINodeResizer';
 import NodeWrapper from './NodeWrapper';
-import { nodeSizeChanged } from '../store/nodesSlice';
 
 const ProgressImageNode = (props: NodeProps) => {
   const progressImage = useSelector(
     (state: RootState) => state.system.progressImage
   );
-  const nodeSize = useSelector((state: RootState) => state.nodes.nodeSize);
+  const progressNodeSize = useSelector(
+    (state: RootState) => state.nodes.progressNodeSize
+  );
   const dispatch = useDispatch();
   const { selected } = props;
 
-  const handleResize: OnResize = (_, { width, height }) => {
-    const newSize = { width, height };
-    dispatch(nodeSizeChanged(newSize));
+  const handleResize: OnResize = (_, newSize) => {
+    dispatch(setProgressNodeSize(newSize));
   };
 
   return (
@@ -28,18 +29,18 @@ const ProgressImageNode = (props: NodeProps) => {
         title="Progress Image"
         description="Displays the progress image in the Node Editor"
       />
-
       <Flex
         sx={{
           flexDirection: 'column',
+          flexShrink: 0,
           borderBottomRadius: 'md',
-          p: 2,
           bg: 'base.200',
           _dark: { bg: 'base.800' },
-          width: nodeSize.width,
-          height: nodeSize.height,
+          width: progressNodeSize.width - 2,
+          height: progressNodeSize.height - 2,
+          minW: 250,
+          minH: 250,
           overflow: 'hidden',
-          flexShrink: 0,
         }}
       >
         {progressImage ? (
@@ -49,19 +50,15 @@ const ProgressImageNode = (props: NodeProps) => {
               w: 'full',
               h: 'full',
               objectFit: 'contain',
-              maxWidth: '100%',
-              maxHeight: '100%',
             }}
           />
         ) : (
           <Flex
             sx={{
-              w: 'full',
-              h: 'full',
-              width: nodeSize.width,
-              height: nodeSize.height,
-              alignItems: 'center',
-              justifyContent: 'center',
+              minW: 250,
+              minH: 250,
+              width: progressNodeSize.width - 2,
+              height: progressNodeSize.height - 2,
             }}
           >
             <IAINoContentFallback />
