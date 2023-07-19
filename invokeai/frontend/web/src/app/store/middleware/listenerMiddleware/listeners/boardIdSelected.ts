@@ -26,7 +26,7 @@ export const addBoardIdSelectedListener = () => {
           ? IMAGE_CATEGORIES
           : ASSETS_CATEGORIES;
 
-      if (board_id === 'all') {
+      if (board_id === 'images') {
         // Selected all images
         const { data: allImagesData } = imagesApi.endpoints.listImages.select({
           categories,

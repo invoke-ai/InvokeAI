@@ -2,11 +2,11 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { ListImagesArgs } from 'services/api/endpoints/images';
+import { INITIAL_IMAGE_LIMIT } from './gallerySlice';
 import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
-  INITIAL_IMAGE_LIMIT,
-} from './gallerySlice';
+  getBoardIdQueryParamForBoard,
+  getCategoriesQueryParamForBoard,
+} from './util';
 
 export const gallerySelector = (state: RootState) => state.gallery;
 
@@ -19,30 +19,14 @@ export const selectLastSelectedImage = createSelector(
 export const selectListImagesBaseQueryArgs = createSelector(
   [(state: RootState) => state],
   (state) => {
-    const { selectedBoardId, galleryView } = state.gallery;
+    const { selectedBoardId } = state.gallery;
+
+    const categories = getCategoriesQueryParamForBoard(selectedBoardId);
+    const board_id = getBoardIdQueryParamForBoard(selectedBoardId);
 
     const listImagesBaseQueryArgs: ListImagesArgs = {
-      categories:
-        galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
-      board_id: selectedBoardId === 'all' ? undefined : selectedBoardId,
-      offset: 0,
-      limit: INITIAL_IMAGE_LIMIT,
-      is_intermediate: false,
-    };
-
-    return listImagesBaseQueryArgs;
-  },
-  defaultSelectorOptions
-);
-
-export const selectListAllImagesBaseQueryArgs = createSelector(
-  [(state: RootState) => state],
-  (state) => {
-    const { galleryView } = state.gallery;
-
-    const listImagesBaseQueryArgs = {
-      categories:
-        galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+      categories,
+      board_id,
       offset: 0,
       limit: INITIAL_IMAGE_LIMIT,
       is_intermediate: false,

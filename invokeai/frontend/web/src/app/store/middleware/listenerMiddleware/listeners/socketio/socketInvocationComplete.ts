@@ -5,7 +5,11 @@ import {
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
 import { progressImageSet } from 'features/system/store/systemSlice';
-import { imagesAdapter, imagesApi } from 'services/api/endpoints/images';
+import {
+  SYSTEM_BOARDS,
+  imagesAdapter,
+  imagesApi,
+} from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
 import { sessionCanceled } from 'services/api/thunks/session';
 import {
@@ -56,10 +60,7 @@ export const addInvocationCompleteEventListener = () => {
 
         if (!imageDTO.is_intermediate) {
           // add image to the board
-          if (
-            boardIdToAddTo &&
-            !['all', 'none', 'batch'].includes(boardIdToAddTo)
-          ) {
+          if (boardIdToAddTo && !SYSTEM_BOARDS.includes(boardIdToAddTo)) {
             dispatch(
               imagesApi.endpoints.addImageToBoard.initiate({
                 board_id: boardIdToAddTo,

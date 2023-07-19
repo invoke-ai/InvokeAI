@@ -36,7 +36,6 @@ const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
 const GalleryImageGrid = () => {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
-  const emptyGalleryRef = useRef<HTMLDivElement>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars(
     overlayScrollbarsConfig
@@ -80,11 +79,7 @@ const GalleryImageGrid = () => {
 
   if (!currentData) {
     return (
-      <Box
-        id="emptyGalleryRef"
-        ref={emptyGalleryRef}
-        sx={{ w: 'full', h: 'full' }}
-      >
+      <Box sx={{ w: 'full', h: 'full' }}>
         <Spinner size="2xl" opacity={0.5} />
       </Box>
     );
@@ -92,11 +87,7 @@ const GalleryImageGrid = () => {
 
   if (isSuccess && currentData?.ids.length === 0) {
     return (
-      <Box
-        id="emptyGalleryRef"
-        ref={emptyGalleryRef}
-        sx={{ w: 'full', h: 'full' }}
-      >
+      <Box sx={{ w: 'full', h: 'full' }}>
         <IAINoContentFallback
           label={t('gallery.noImagesInGallery')}
           icon={FaImage}
@@ -140,7 +131,7 @@ const GalleryImageGrid = () => {
 
   if (isError) {
     return (
-      <Box ref={emptyGalleryRef} sx={{ w: 'full', h: 'full' }}>
+      <Box sx={{ w: 'full', h: 'full' }}>
         <IAINoContentFallback
           label="Unable to load Gallery"
           icon={FaExclamationCircle}

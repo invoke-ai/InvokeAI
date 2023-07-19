@@ -14,10 +14,11 @@ export const ASSETS_CATEGORIES: ImageCategory[] = [
 export const INITIAL_IMAGE_LIMIT = 100;
 export const IMAGE_LIMIT = 20;
 
-export type GalleryView = 'images' | 'assets';
+// export type GalleryView = 'images' | 'assets';
 export type BoardId =
-  | 'all'
-  | 'none'
+  | 'images'
+  | 'assets'
+  | 'no_board'
   | 'batch'
   | (string & Record<never, never>);
 
@@ -25,7 +26,6 @@ type GalleryState = {
   selection: string[];
   shouldAutoSwitch: boolean;
   galleryImageMinimumWidth: number;
-  galleryView: GalleryView;
   selectedBoardId: BoardId;
   batchImageNames: string[];
   isBatchEnabled: boolean;
@@ -35,8 +35,7 @@ export const initialGalleryState: GalleryState = {
   selection: [],
   shouldAutoSwitch: true,
   galleryImageMinimumWidth: 96,
-  galleryView: 'images',
-  selectedBoardId: 'all',
+  selectedBoardId: 'images',
   batchImageNames: [],
   isBatchEnabled: false,
 };
@@ -93,9 +92,6 @@ export const gallerySlice = createSlice({
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
     },
-    setGalleryView: (state, action: PayloadAction<GalleryView>) => {
-      state.galleryView = action.payload;
-    },
     boardIdSelected: (state, action: PayloadAction<BoardId>) => {
       state.selectedBoardId = action.payload;
     },
@@ -133,7 +129,7 @@ export const gallerySlice = createSlice({
       boardsApi.endpoints.deleteBoard.matchFulfilled,
       (state, action) => {
         if (action.meta.arg.originalArgs === state.selectedBoardId) {
-          state.selectedBoardId = 'all';
+          state.selectedBoardId = 'images';
         }
       }
     );
@@ -147,7 +143,6 @@ export const {
   imageSelected,
   shouldAutoSwitchChanged,
   setGalleryImageMinimumWidth,
-  setGalleryView,
   boardIdSelected,
   isBatchEnabledChanged,
   imagesAddedToBatch,

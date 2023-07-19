@@ -51,7 +51,7 @@ export const imagesSelectors = imagesAdapter.getSelectors();
 export const getListImagesUrl = (queryArgs: ListImagesArgs) =>
   `images/?${queryString.stringify(queryArgs, { arrayFormat: 'none' })}`;
 
-export const SYSTEM_BOARDS = ['all', 'none', 'batch'];
+export const SYSTEM_BOARDS = ['images', 'assets', 'no_board', 'batch'];
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -411,24 +411,20 @@ export const imagesApi = api.injectEndpoints({
          * TODO: maybe total should just be updated in the boards endpoints?
          */
 
-        const {
-          image_name,
-          image_category,
-          board_id: old_board_id,
-        } = oldImageDTO;
+        const { image_name, board_id: old_board_id } = oldImageDTO;
 
         // Figure out the `listImages` caches that we need to update
         const removeFromQueryArgs: ListImagesArgs[] = [];
-        const categories = IMAGE_CATEGORIES.includes(image_category)
-          ? IMAGE_CATEGORIES
-          : ASSETS_CATEGORIES;
 
         // TODO: No Board
         // TODO: Batch
 
+        // Remove from No Board
+        removeFromQueryArgs.push({ board_id: 'none' });
+
         // Remove from old board
         if (old_board_id) {
-          removeFromQueryArgs.push({ board_id: old_board_id, categories });
+          removeFromQueryArgs.push({ board_id: old_board_id });
         }
 
         // Store all patch results in case we need to roll back
@@ -458,8 +454,11 @@ export const imagesApi = api.injectEndpoints({
                 'listImages',
                 queryArgs,
                 (draft) => {
-                  imagesAdapter.removeOne(draft, image_name);
-                  draft.total -= 1;
+                  // sanity check
+                  if (draft.ids.includes(image_name)) {
+                    imagesAdapter.removeOne(draft, image_name);
+                    draft.total -= 1;
+                  }
                 }
               )
             )
@@ -468,10 +467,10 @@ export const imagesApi = api.injectEndpoints({
 
         // We only need to add to the cache if the board is not a system board
         if (!SYSTEM_BOARDS.includes(board_id)) {
-          const { data } = imagesApi.endpoints.listImages.select({
-            categories,
-            board_id,
-          })(getState());
+          const queryArgs = { board_id };
+          const { data } = imagesApi.endpoints.listImages.select(queryArgs)(
+            getState()
+          );
 
           const cacheAction = getCacheAction(data, oldImageDTO);
 
@@ -481,7 +480,7 @@ export const imagesApi = api.injectEndpoints({
               dispatch(
                 imagesApi.util.updateQueryData(
                   'listImages',
-                  { board_id, categories },
+                  queryArgs,
                   (draft) => {
                     if (cacheAction === 'add') {
                       imagesAdapter.addOne(draft, newImageDTO);
@@ -527,19 +526,12 @@ export const imagesApi = api.injectEndpoints({
          * Cache changes for removeImageFromBoard:
          * - Add to "No Board"
          *    - IF the image's `created_at` is within the range of the board's cached images
-         * - Add to "All Images"
-         *    - IF the image's `created_at` is within the range of the board's cached images
          * - Remove from `old_board_id`
          * - Update the ImageDTO
          */
 
-        const { image_name, image_category, board_id: old_board_id } = imageDTO;
+        const { image_name, board_id: old_board_id } = imageDTO;
 
-        const categories = IMAGE_CATEGORIES.includes(image_category)
-          ? IMAGE_CATEGORIES
-          : ASSETS_CATEGORIES;
-
-        // TODO: No Board
         // TODO: Batch
 
         const patches: PatchCollection[] = [];
@@ -562,34 +554,39 @@ export const imagesApi = api.injectEndpoints({
 
         // Remove from old board
         if (old_board_id) {
+          const oldBoardQueryArgs = { board_id: old_board_id };
           patches.push(
             dispatch(
               imagesApi.util.updateQueryData(
                 'listImages',
-                { board_id: old_board_id, categories },
+                oldBoardQueryArgs,
                 (draft) => {
-                  imagesAdapter.removeOne(draft, image_name);
-                  draft.total -= 1;
+                  // sanity check
+                  if (draft.ids.includes(image_name)) {
+                    imagesAdapter.removeOne(draft, image_name);
+                    draft.total -= 1;
+                  }
                 }
               )
             )
           );
         }
 
-        // All Images
-        const { data: allImagesData } = imagesApi.endpoints.listImages.select({
-          categories,
-        })(getState());
+        // Add to "No Board"
+        const noBoardQueryArgs = { board_id: 'none' };
+        const { data } = imagesApi.endpoints.listImages.select(
+          noBoardQueryArgs
+        )(getState());
 
         // Check if we need to make any cache changes
-        const cacheAction = getCacheAction(allImagesData, imageDTO);
+        const cacheAction = getCacheAction(data, imageDTO);
 
         if (['add', 'update'].includes(cacheAction)) {
           patches.push(
             dispatch(
               imagesApi.util.updateQueryData(
                 'listImages',
-                { categories },
+                noBoardQueryArgs,
                 (draft) => {
                   if (cacheAction === 'add') {
                     imagesAdapter.addOne(draft, imageDTO);

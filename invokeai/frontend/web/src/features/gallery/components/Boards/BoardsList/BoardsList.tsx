@@ -22,6 +22,8 @@ import AllImagesBoard from './AllImagesBoard';
 import BatchBoard from './BatchBoard';
 import GalleryBoard from './GalleryBoard';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
+import AllAssetsBoard from './AllAssetsBoard';
+import NoBoardBoard from './NoBoardBoard';
 
 const selector = createSelector(
   [stateSelector],
@@ -121,7 +123,13 @@ const BoardsList = (props: Props) => {
             {!searchMode && (
               <>
                 <GridItem sx={{ p: 1.5 }}>
-                  <AllImagesBoard isSelected={selectedBoardId === 'all'} />
+                  <AllImagesBoard isSelected={selectedBoardId === 'images'} />
+                </GridItem>
+                <GridItem sx={{ p: 1.5 }}>
+                  <AllAssetsBoard isSelected={selectedBoardId === 'assets'} />
+                </GridItem>
+                <GridItem sx={{ p: 1.5 }}>
+                  <NoBoardBoard isSelected={selectedBoardId === 'no_board'} />
                 </GridItem>
                 {isBatchEnabled && (
                   <GridItem sx={{ p: 1.5 }}>

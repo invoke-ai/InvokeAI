@@ -4,7 +4,7 @@ import IAIDroppable from 'common/components/IAIDroppable';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 
 type GenericBoardProps = {
-  droppableData: TypesafeDroppableData;
+  droppableData?: TypesafeDroppableData;
   onClick: () => void;
   isSelected: boolean;
   icon: As;

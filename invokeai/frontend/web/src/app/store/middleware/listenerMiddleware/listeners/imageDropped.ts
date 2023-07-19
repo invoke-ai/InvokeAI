@@ -166,8 +166,8 @@ export const addImageDroppedListener = () => {
         const { imageDTO } = activeData.payload;
         const { boardId } = overData.context;
 
-        // if the board is "All Images" or "No Board", this is a remove action
-        if (boardId === 'all' || boardId === 'none') {
+        // if the board is "No Board", this is a remove action
+        if (boardId === 'no_board') {
           dispatch(
             imagesApi.endpoints.removeImageFromBoard.initiate({
               imageDTO,
