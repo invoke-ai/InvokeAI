@@ -19,7 +19,7 @@ import IAIDroppable from 'common/components/IAIDroppable';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
-import { FaImages, FaTrash, FaUser } from 'react-icons/fa';
+import { FaTrash, FaUser } from 'react-icons/fa';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
@@ -129,10 +129,10 @@ const GalleryBoard = memo(
                   flexShrink: 0,
                 }}
               >
-                {board.cover_image_name && coverImage?.image_url && (
-                  <Image src={coverImage?.image_url} draggable={false} />
+                {board.cover_image_name && coverImage?.thumbnail_url && (
+                  <Image src={coverImage?.thumbnail_url} draggable={false} />
                 )}
-                {!(board.cover_image_name && coverImage?.image_url) && (
+                {!(board.cover_image_name && coverImage?.thumbnail_url) && (
                   <IAINoContentFallback
                     boxSize={8}
                     icon={FaUser}
