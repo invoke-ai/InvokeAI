@@ -104,10 +104,10 @@ nav:
     - Installation: 
       - Overview: 'installation/index.md'
       - Installing with the Automated Installer: 'installation/010_INSTALL_AUTOMATED.md'
-      - Installing manually: 'installation/010_INSTALL_AUTOMATED.md'
+      - Installing manually: 'installation/020_INSTALL_MANUAL.md'
       - NVIDIA Cuda / AMD ROCm: 'installation/030_INSTALL_CUDA_AND_ROCM.md'
       - Installing with Docker: 'installation/040_INSTALL_DOCKER.md'
-      - Installing Models: 'installation/040_INSTALL_DOCKER.md'
+      - Installing Models: 'installation/050_INSTALLING_MODELS.md'
       - Installing PyPatchMatch: 'installation/060_INSTALL_PATCHMATCH.md'
       - Installing xFormers: 'installation/070_INSTALL_XFORMERS.md'
       - Developers Documentation: 'installation/Developers_documentation/BUILDING_BINARY_INSTALLERS.md'
@@ -115,10 +115,13 @@ nav:
         - Binary Installer: 'installation/deprecated_documentation/INSTALL_BINARY.md'
         - Runninng InvokeAI on Google Colab: 'installation/deprecated_documentation/INSTALL_JUPYTER.md'
         - Manual Installation on Linux: 'installation/deprecated_documentation/INSTALL_LINUX.md'
-        - Manual Installation on macOS: 'installation/deprecated_documentation/INSTALL_macOS.md'
+        - Manual Installation on macOS: 'installation/deprecated_documentation/INSTALL_MAC.md'
         - Manual Installation on Windows: 'installation/deprecated_documentation/INSTALL_WINDOWS.md'
         - Installing Invoke with pip: 'installation/deprecated_documentation/INSTALL_PCP.md'
         - Source Installer: 'installation/deprecated_documentation/INSTALL_SOURCE.md'
+    - Community Nodes:
+      - Community Nodes: 'nodes/communityNodes.md'
+      - Overview: 'nodes/overview.md'
     - Features: 
       - Overview: 'features/index.md'
       - Concepts: 'features/CONCEPTS.md'
@@ -139,18 +142,24 @@ nav:
       - Other: 'features/OTHER.md'
     - Contributing: 
       - How to Contribute: 'contributing/CONTRIBUTING.md'
-      - Development: 'contributing/contribution_guides/development.md'
+      - Development: 
+        - Overview: 'contributing/contribution_guides/development.md'
+        - InvokeAI Architecture: 'contributing/ARCHITECTURE.md'
+        - Frontend Documentation: 'contributing/contribution_guides/development_guides/contributingToFrontend.md'
+        - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Translation: 'contributing/contribution_guides/translation.md'
       - Tutorials: 'contributing/contribution_guides/tutorials.md'
-      - Local Development: contributing/LOCAL_DEVELOPMENT.md
     - Changelog: 'CHANGELOG.md'
     - Deprecated:
       - Command Line Interface: 'deprecated/CLI.md'
       - Embiggen: 'deprecated/EMBIGGEN.md'
-      - Inpainting: 'deprecated/INPAINTING.MD'
-      - Outpainting: 'deprecated/OUTPAINTING.MD'
+      - Inpainting: 'deprecated/INPAINTING.md'
+      - Outpainting: 'deprecated/OUTPAINTING.md'
     - Help:
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
+    - Other:
+      - Contributors: 'other/CONTRIBUTORS.md'
+      - CompViz-README: 'other/README-CompViz.md'
 
 
