@@ -59,7 +59,35 @@ export const addInvocationCompleteEventListener = () => {
         }
 
         if (!imageDTO.is_intermediate) {
-          // add image to the board
+          // update the cache for 'All Images'
+          dispatch(
+            imagesApi.util.updateQueryData(
+              'listImages',
+              {
+                categories: IMAGE_CATEGORIES,
+              },
+              (draft) => {
+                imagesAdapter.addOne(draft, imageDTO);
+                draft.total = draft.total + 1;
+              }
+            )
+          );
+
+          // update the cache for 'No Board'
+          dispatch(
+            imagesApi.util.updateQueryData(
+              'listImages',
+              {
+                board_id: 'none',
+              },
+              (draft) => {
+                imagesAdapter.addOne(draft, imageDTO);
+                draft.total = draft.total + 1;
+              }
+            )
+          );
+
+          // add image to the board if we had one selected
           if (boardIdToAddTo && !SYSTEM_BOARDS.includes(boardIdToAddTo)) {
             dispatch(
               imagesApi.endpoints.addImageToBoard.initiate({
@@ -68,18 +96,6 @@ export const addInvocationCompleteEventListener = () => {
               })
             );
           }
-
-          // update the cache
-          const queryArg = {
-            categories: IMAGE_CATEGORIES,
-          };
-
-          dispatch(
-            imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
-              imagesAdapter.addOne(draft, imageDTO);
-              draft.total = draft.total + 1;
-            })
-          );
 
           // If auto-switch is enabled, select the new image
           if (getState().gallery.shouldAutoSwitch) {
