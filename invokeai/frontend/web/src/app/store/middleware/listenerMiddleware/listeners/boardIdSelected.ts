@@ -1,10 +1,12 @@
 import { log } from 'app/logging/useLogger';
 import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
   boardIdSelected,
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
+import {
+  getBoardIdQueryParamForBoard,
+  getCategoriesQueryParamForBoard,
+} from 'features/gallery/store/util';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
 
@@ -14,43 +16,20 @@ export const addBoardIdSelectedListener = () => {
   startAppListening({
     actionCreator: boardIdSelected,
     effect: (action, { getState, dispatch }) => {
-      const board_id = action.payload;
-
-      // we need to check if we need to fetch more images
-
+      const _board_id = action.payload;
       const state = getState();
-      // const allImages = selectImagesAll(state);
+      const categories = getCategoriesQueryParamForBoard(_board_id);
+      const board_id = getBoardIdQueryParamForBoard(_board_id);
+      const queryArgs = { board_id, categories };
 
-      const categories =
-        state.gallery.galleryView === 'images'
-          ? IMAGE_CATEGORIES
-          : ASSETS_CATEGORIES;
+      const { data: boardImagesData } =
+        imagesApi.endpoints.listImages.select(queryArgs)(state);
 
-      if (board_id === 'images') {
-        // Selected all images
-        const { data: allImagesData } = imagesApi.endpoints.listImages.select({
-          categories,
-        })(state);
-        if (allImagesData?.ids.length) {
-          dispatch(imageSelected((allImagesData.ids[0] as string) ?? null));
-        }
-        return;
-      }
-
-      if (board_id === 'batch') {
-        // Selected the batch
-        // TODO
-        return;
-      }
-
-      const { data: boardImagesData } = imagesApi.endpoints.listImages.select({
-        board_id,
-        categories,
-      })(state);
       if (boardImagesData?.ids.length) {
         dispatch(imageSelected((boardImagesData.ids[0] as string) ?? null));
+      } else {
+        dispatch(imageSelected(null));
       }
-      return;
     },
   });
 };

@@ -2,6 +2,7 @@ import { Update } from '@reduxjs/toolkit';
 import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
+  boardIdSelected,
 } from 'features/gallery/store/gallerySlice';
 import {
   BoardDTO,
@@ -170,6 +171,9 @@ export const boardsApi = api.injectEndpoints({
               )
             );
           });
+
+          // after deleting a board, select the 'All Images' board
+          dispatch(boardIdSelected('images'));
         } catch {
           //no-op
         }
@@ -221,6 +225,9 @@ export const boardsApi = api.injectEndpoints({
               )
             );
           });
+
+          // after deleting a board, select the 'All Images' board
+          dispatch(boardIdSelected('images'));
         } catch {
           //no-op
         }
