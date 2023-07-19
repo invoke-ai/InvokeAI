@@ -4,6 +4,13 @@ title: InvokeAI Web Server
 
 # :material-web: InvokeAI Web Server
 
+## Quick guided walkthrough of the WebUI's features
+
+While most of the WebUI's features are intuitive, here is a guided walkthrough
+through its various components.
+
+### Launching the WebUI
+
 To run the InvokeAI web server, start the `invoke.sh`/`invoke.bat`
 script and select option (1). Alternatively, with the InvokeAI
 environment active, run `invokeai-web`:
@@ -28,10 +35,7 @@ or
 invokeai-web --host 0.0.0.0
 ```
 
-## Quick guided walkthrough of the WebUI's features
-
-While most of the WebUI's features are intuitive, here is a guided walkthrough
-through its various components.
+### The InvokeAI Web Interface
 
 ![Invoke Web Server - Major Components](../assets/invoke-web-server-1.png){:width="640px"}
 
