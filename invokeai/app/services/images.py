@@ -110,6 +110,13 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def delete_many(self, is_intermediate: bool) -> int:
+        """Deletes many images."""
+        pass
+
+
+
+    @abstractmethod
     def delete_images_on_board(self, board_id: str):
         """Deletes all images on a board."""
         pass
@@ -388,6 +395,31 @@ class ImageService(ImageServiceABC):
             for image_name in image_name_list:
                 self._services.image_files.delete(image_name)
             self._services.image_records.delete_many(image_name_list)
+        except ImageRecordDeleteException:
+            self._services.logger.error(f"Failed to delete image records")
+            raise
+        except ImageFileDeleteException:
+            self._services.logger.error(f"Failed to delete image files")
+            raise
+        except Exception as e:
+            self._services.logger.error("Problem deleting image records and files")
+            raise e
+        
+    def delete_many(self, is_intermediate: bool):
+        try:
+            # only clears 100 at a time
+            images = self._services.image_records.get_many(offset=0, limit=100, is_intermediate=is_intermediate,)
+            count = len(images.items)
+            image_name_list = list(
+                map(
+                    lambda r: r.image_name,
+                    images.items,
+                )
+            )
+            for image_name in image_name_list:
+                self._services.image_files.delete(image_name)
+            self._services.image_records.delete_many(image_name_list)
+            return count
         except ImageRecordDeleteException:
             self._services.logger.error(f"Failed to delete image records")
             raise

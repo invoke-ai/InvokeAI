@@ -2,6 +2,7 @@ import { ApiFullTagDescription, api } from '..';
 import { components } from '../schema';
 import { ImageDTO } from '../types';
 
+
 /**
  * This is an unsafe type; the object inside is not guaranteed to be valid.
  */
@@ -36,7 +37,10 @@ export const imagesApi = api.injectEndpoints({
       },
       keepUnusedDataFor: 86400, // 24 hours
     }),
+    clearIntermediates: build.mutation({
+      query: () => ({ url: `images/clear-intermediates`, method: 'POST' }),
+    }),
   }),
 });
 
-export const { useGetImageDTOQuery, useGetImageMetadataQuery } = imagesApi;
+export const { useGetImageDTOQuery, useGetImageMetadataQuery, useClearIntermediatesMutation } = imagesApi;

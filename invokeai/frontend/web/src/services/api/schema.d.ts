@@ -164,6 +164,13 @@ export type paths = {
      */
     patch: operations["update_image"];
   };
+  "/api/v1/images/clear-intermediates": {
+    /**
+     * Clear Intermediates 
+     * @description Clears first 100 intermediates
+     */
+    post: operations["clear_intermediates"];
+  };
   "/api/v1/images/{image_name}/metadata": {
     /**
      * Get Image Metadata 
@@ -5299,17 +5306,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionXLModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
@@ -6094,6 +6101,20 @@ export type operations = {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Clear Intermediates 
+   * @description Clears first 100 intermediates
+   */
+  clear_intermediates: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
         };
       };
     };

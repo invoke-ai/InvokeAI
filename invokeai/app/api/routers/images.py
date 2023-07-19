@@ -84,6 +84,17 @@ async def delete_image(
         # TODO: Does this need any exception handling at all?
         pass
 
+@images_router.post("/clear-intermediates", operation_id="clear_intermediates")
+async def clear_intermediates() -> int:
+    """Clears first 100 intermediates"""
+
+    try:
+        count_deleted = ApiDependencies.invoker.services.images.delete_many(is_intermediate=True)
+        return count_deleted
+    except Exception as e:
+        # TODO: Does this need any exception handling at all?
+        pass
+
 
 @images_router.patch(
     "/{image_name}",
