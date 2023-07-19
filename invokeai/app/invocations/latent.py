@@ -22,7 +22,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import \
     PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from ...backend.util.devices import torch_dtype
+from ...backend.util.devices import choose_torch_device, torch_dtype
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
@@ -37,10 +37,6 @@ from diffusers.models.attention_processor import (
     LoRAXFormersAttnProcessor,
     XFormersAttnProcessor,
 )
-
-def choose_torch_device() -> str:
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    return device
 
 class LatentsField(BaseModel):
     """A latents field used for passing latents between invocations"""
