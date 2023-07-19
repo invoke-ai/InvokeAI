@@ -5,6 +5,7 @@ import { Heading, Text } from '@chakra-ui/react';
 import IAIButton from '../../../../common/components/IAIButton';
 import { useClearIntermediatesMutation } from '../../../../services/api/endpoints/images';
 import { addToast } from '../../store/systemSlice';
+import { resetCanvas } from '../../../canvas/store/canvasSlice';
 
 export default function SettingsClearIntermediates() {
   const dispatch = useAppDispatch();
@@ -17,6 +18,7 @@ export default function SettingsClearIntermediates() {
     clearIntermediates({})
       .unwrap()
       .then((response) => {
+        dispatch(resetCanvas());
         dispatch(
           addToast({
             title:
@@ -47,6 +49,7 @@ export default function SettingsClearIntermediates() {
         Will permanently delete first 100 intermediates found on disk and in
         database
       </Text>
+      <Text fontWeight="bold">This will also clear your canvas state.</Text>
       <Text>
         Intermediate images are byproducts of generation, different from the
         result images in the gallery. Purging intermediates will free disk
