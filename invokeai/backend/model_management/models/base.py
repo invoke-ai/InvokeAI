@@ -494,7 +494,7 @@ class IAIOnnxRuntimeModel:
 
         def __setitem__(self, key: str, value):
             index = self.indexes[key]
-            # del self.raw_proto[index]
+            del self.raw_proto[index]
             self.raw_proto.insert(index, value)
 
         # __delitem__
@@ -559,13 +559,13 @@ class IAIOnnxRuntimeModel:
             # sess.add_external_initializers(list(self.data.keys()), list(self.data.values()))
             # sess.enable_profiling = True
 
-            sess.intra_op_num_threads = 1
-            sess.inter_op_num_threads = 1
-            sess.execution_mode = ExecutionMode.ORT_SEQUENTIAL
-            sess.graph_optimization_level = GraphOptimizationLevel.ORT_ENABLE_ALL
-            sess.enable_cpu_mem_arena = True
-            sess.enable_mem_pattern = True
-            sess.add_session_config_entry("session.intra_op.use_xnnpack_threadpool", "1") ########### It's the key code
+            # sess.intra_op_num_threads = 1
+            # sess.inter_op_num_threads = 1
+            # sess.execution_mode = ExecutionMode.ORT_SEQUENTIAL
+            # sess.graph_optimization_level = GraphOptimizationLevel.ORT_ENABLE_ALL
+            # sess.enable_cpu_mem_arena = True
+            # sess.enable_mem_pattern = True
+            # sess.add_session_config_entry("session.intra_op.use_xnnpack_threadpool", "1") ########### It's the key code
 
 
             sess.add_free_dimension_override_by_name("unet_sample_batch", 2)
