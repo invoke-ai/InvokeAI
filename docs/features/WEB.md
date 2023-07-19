@@ -303,7 +303,9 @@ Try adjusting the weight slider for larger and smaller weights and
 generate the image after each adjustment. The higher the weight, the
 more influence the LoRA will have.
 
-Multiple LoRAs can be mixed together and combined with textual
+To remove the LoRA completely, just click on its trash can icon.
+
+Multiple LoRAs can be added simultaneously and combined with textual
 inversions and ControlNet models. Please see [Textual Inversions and
 LoRAs](CONCEPTS.md) and [Using ControlNet](CONTROLNET.md) for details.
 
