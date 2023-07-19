@@ -6,7 +6,6 @@ import { userInvoked } from 'app/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { t } from 'i18next';
 import { LogLevelName } from 'roarr';
-import { imageUploaded } from 'services/api/thunks/image';
 import {
   isAnySessionRejected,
   sessionCanceled,
@@ -86,6 +85,7 @@ export interface SystemState {
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
   boardIdToAddTo?: string;
+  isNodesEnabled: boolean;
 }
 
 export const initialSystemState: SystemState = {
@@ -118,6 +118,7 @@ export const initialSystemState: SystemState = {
   isPersisted: false,
   language: 'en',
   isUploading: false,
+  isNodesEnabled: false,
 };
 
 export const systemSlice = createSlice({
@@ -192,6 +193,9 @@ export const systemSlice = createSlice({
     },
     progressImageSet(state, action: PayloadAction<ProgressImage | null>) {
       state.progressImage = action.payload;
+    },
+    setIsNodesEnabled(state, action: PayloadAction<boolean>) {
+      state.isNodesEnabled = action.payload;
     },
   },
   extraReducers(builder) {
@@ -360,27 +364,6 @@ export const systemSlice = createSlice({
       state.wasSchemaParsed = true;
     });
 
-    /**
-     * Image Uploading Started
-     */
-    builder.addCase(imageUploaded.pending, (state) => {
-      state.isUploading = true;
-    });
-
-    /**
-     * Image Uploading Complete
-     */
-    builder.addCase(imageUploaded.rejected, (state) => {
-      state.isUploading = false;
-    });
-
-    /**
-     * Image Uploading Complete
-     */
-    builder.addCase(imageUploaded.fulfilled, (state) => {
-      state.isUploading = false;
-    });
-
     // *** Matchers - must be after all cases ***
 
     /**
@@ -422,6 +405,7 @@ export const {
   shouldAntialiasProgressImageChanged,
   languageChanged,
   progressImageSet,
+  setIsNodesEnabled,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

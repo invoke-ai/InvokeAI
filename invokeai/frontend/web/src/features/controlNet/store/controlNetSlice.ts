@@ -2,7 +2,7 @@ import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { ControlNetModelParam } from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, forEach } from 'lodash-es';
-import { imageDeleted } from 'services/api/thunks/image';
+import { imagesApi } from 'services/api/endpoints/images';
 import { isAnySessionRejected } from 'services/api/thunks/session';
 import { appSocketInvocationError } from 'services/events/actions';
 import { controlNetImageProcessed } from './actions';
@@ -300,21 +300,6 @@ export const controlNetSlice = createSlice({
       }
     });
 
-    builder.addCase(imageDeleted.pending, (state, action) => {
-      // Preemptively remove the image from all controlnets
-      // TODO: doesn't the imageusage stuff do this for us?
-      const { image_name } = action.meta.arg;
-      forEach(state.controlNets, (c) => {
-        if (c.controlImage === image_name) {
-          c.controlImage = null;
-          c.processedControlImage = null;
-        }
-        if (c.processedControlImage === image_name) {
-          c.processedControlImage = null;
-        }
-      });
-    });
-
     builder.addCase(appSocketInvocationError, (state, action) => {
       state.pendingControlImages = [];
     });
@@ -322,6 +307,24 @@ export const controlNetSlice = createSlice({
     builder.addMatcher(isAnySessionRejected, (state, action) => {
       state.pendingControlImages = [];
     });
+
+    builder.addMatcher(
+      imagesApi.endpoints.deleteImage.matchFulfilled,
+      (state, action) => {
+        // Preemptively remove the image from all controlnets
+        // TODO: doesn't the imageusage stuff do this for us?
+        const { image_name } = action.meta.arg.originalArgs;
+        forEach(state.controlNets, (c) => {
+          if (c.controlImage === image_name) {
+            c.controlImage = null;
+            c.processedControlImage = null;
+          }
+          if (c.processedControlImage === image_name) {
+            c.processedControlImage = null;
+          }
+        });
+      }
+    );
   },
 });
 

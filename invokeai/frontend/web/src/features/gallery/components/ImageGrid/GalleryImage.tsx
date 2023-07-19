@@ -1,16 +1,13 @@
-import { Box, Spinner } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { TypesafeDraggableData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
+import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
 import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
-import {
-  imageRangeEndSelected,
-  imageSelected,
-  imageSelectionToggled,
-} from 'features/gallery/store/gallerySlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -84,7 +81,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   }, [imageDTO, selection, selectionCount]);
 
   if (!imageDTO) {
-    return <Spinner />;
+    return <IAIFillSkeleton />;
   }
 
   return (

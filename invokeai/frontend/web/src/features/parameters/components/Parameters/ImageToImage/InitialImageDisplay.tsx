@@ -5,12 +5,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import useImageUploader from 'common/hooks/useImageUploader';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { useCallback } from 'react';
 import { FaUndo, FaUpload } from 'react-icons/fa';
-import { PostUploadAction } from 'services/api/thunks/image';
 import InitialImage from './InitialImage';
+import { PostUploadAction } from 'services/api/types';
 
 const selector = createSelector(
   [stateSelector],
@@ -30,7 +29,6 @@ const postUploadAction: PostUploadAction = {
 const InitialImageDisplay = () => {
   const { isResetButtonDisabled } = useAppSelector(selector);
   const dispatch = useAppDispatch();
-  const { openUploader } = useImageUploader();
 
   const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
     postUploadAction,
@@ -39,10 +37,6 @@ const InitialImageDisplay = () => {
   const handleReset = useCallback(() => {
     dispatch(clearInitialImage());
   }, [dispatch]);
-
-  const handleUpload = useCallback(() => {
-    openUploader();
-  }, [openUploader]);
 
   return (
     <Flex
@@ -85,7 +79,6 @@ const InitialImageDisplay = () => {
           tooltip={'Upload Initial Image'}
           aria-label={'Upload Initial Image'}
           icon={<FaUpload />}
-          onClick={handleUpload}
           {...getUploadButtonProps()}
         />
         <IAIIconButton

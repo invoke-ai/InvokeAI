@@ -29,6 +29,7 @@ export const addControlNetToLinearGraph = (
       const controlNetIterateNode: CollectInvocation = {
         id: CONTROL_NET_COLLECT,
         type: 'collect',
+        is_intermediate: true,
       };
       graph.nodes[CONTROL_NET_COLLECT] = controlNetIterateNode;
       graph.edges.push({
@@ -55,6 +56,7 @@ export const addControlNetToLinearGraph = (
         const controlNetNode: ControlNetInvocation = {
           id: `control_net_${controlNetId}`,
           type: 'controlnet',
+          is_intermediate: true,
           begin_step_percent: beginStepPct,
           end_step_percent: endStepPct,
           control_mode: controlMode,

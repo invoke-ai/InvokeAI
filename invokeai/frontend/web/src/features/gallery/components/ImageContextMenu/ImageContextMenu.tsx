@@ -1,13 +1,8 @@
 import { MenuList } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
-import { MouseEvent, memo, useCallback, useMemo } from 'react';
+import { MouseEvent, memo, useCallback } from 'react';
 import { ImageDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
-import MultipleSelectionMenuItems from './MultipleSelectionMenuItems';
 import SingleSelectionMenuItems from './SingleSelectionMenuItems';
 
 type Props = {
@@ -16,23 +11,23 @@ type Props = {
 };
 
 const ImageContextMenu = ({ imageDTO, children }: Props) => {
-  const selector = useMemo(
-    () =>
-      createSelector(
-        [stateSelector],
-        ({ gallery }) => {
-          const selectionCount = gallery.selection.length;
+  // const selector = useMemo(
+  //   () =>
+  //     createSelector(
+  //       [stateSelector],
+  //       ({ gallery }) => {
+  //         const selectionCount = gallery.selection.length;
 
-          return { selectionCount };
-        },
-        defaultSelectorOptions
-      ),
-    []
-  );
+  //         return { selectionCount };
+  //       },
+  //       defaultSelectorOptions
+  //     ),
+  //   []
+  // );
 
-  const { selectionCount } = useAppSelector(selector);
+  // const { selectionCount } = useAppSelector(selector);
 
-  const handleContextMenu = useCallback((e: MouseEvent<HTMLDivElement>) => {
+  const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
   }, []);
 
@@ -48,13 +43,9 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
           <MenuList
             sx={{ visibility: 'visible !important' }}
             motionProps={menuListMotionProps}
-            onContextMenu={handleContextMenu}
+            onContextMenu={skipEvent}
           >
-            {selectionCount === 1 ? (
-              <SingleSelectionMenuItems imageDTO={imageDTO} />
-            ) : (
-              <MultipleSelectionMenuItems />
-            )}
+            <SingleSelectionMenuItems imageDTO={imageDTO} />
           </MenuList>
         ) : null
       }

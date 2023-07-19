@@ -32,27 +32,57 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
     >
       <Flex
         sx={{
-          opacity: 0.4,
-          width: '100%',
-          height: '100%',
-          flexDirection: 'column',
-          rowGap: 4,
+          position: 'absolute',
+          top: 0,
+          insetInlineStart: 0,
+          w: 'full',
+          h: 'full',
+          bg: 'base.700',
+          _dark: { bg: 'base.900' },
+          opacity: 0.7,
           alignItems: 'center',
           justifyContent: 'center',
-          bg: 'base.900',
-          boxShadow: `inset 0 0 20rem 1rem var(--invokeai-colors-${
-            isDragAccept ? 'accent' : 'error'
-          }-500)`,
+          transitionProperty: 'common',
+          transitionDuration: '0.1s',
+        }}
+      />
+      <Flex
+        sx={{
+          position: 'absolute',
+          top: 0,
+          insetInlineStart: 0,
+          width: 'full',
+          height: 'full',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 4,
         }}
       >
-        {isDragAccept ? (
-          <Heading size="lg">Drop to Upload</Heading>
-        ) : (
-          <>
-            <Heading size="lg">Invalid Upload</Heading>
-            <Heading size="md">Must be single JPEG or PNG image</Heading>
-          </>
-        )}
+        <Flex
+          sx={{
+            width: 'full',
+            height: 'full',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDir: 'column',
+            gap: 4,
+            borderWidth: 3,
+            borderRadius: 'xl',
+            borderStyle: 'dashed',
+            color: 'base.100',
+            borderColor: 'base.100',
+            _dark: { borderColor: 'base.200' },
+          }}
+        >
+          {isDragAccept ? (
+            <Heading size="lg">Drop to Upload</Heading>
+          ) : (
+            <>
+              <Heading size="lg">Invalid Upload</Heading>
+              <Heading size="md">Must be single JPEG or PNG image</Heading>
+            </>
+          )}
+        </Flex>
       </Flex>
     </Box>
   );
