@@ -6,7 +6,7 @@ import {
   BoardId,
   IMAGE_CATEGORIES,
 } from 'features/gallery/store/gallerySlice';
-import { forEach } from 'lodash-es';
+import { forEach, omit } from 'lodash-es';
 import queryString from 'query-string';
 import { ApiFullTagDescription, api } from '..';
 import { components, paths } from '../schema';
@@ -212,7 +212,11 @@ export const imagesApi = api.injectEndpoints({
     }),
     updateImage: build.mutation<
       ImageDTO,
-      { imageDTO: ImageDTO; changes: ImageChanges }
+      {
+        imageDTO: ImageDTO;
+        // For now, we will not allow image categories to change
+        changes: Omit<ImageChanges, 'image_category'>;
+      }
     >({
       query: ({ imageDTO, changes }) => ({
         url: `images/${imageDTO.image_name}`,
@@ -223,40 +227,38 @@ export const imagesApi = api.injectEndpoints({
         { type: 'Image', id: imageDTO.image_name },
       ],
       async onQueryStarted(
-        { imageDTO: oldImageDTO, changes },
+        { imageDTO: oldImageDTO, changes: _changes },
         { dispatch, queryFulfilled, getState }
       ) {
         // TODO: Should we handle changes to boards via this mutation? Seems reasonable...
+
+        // let's be extra-sure we do not accidentally change categories
+        const changes = omit(_changes, 'image_category');
 
         /**
          * Cache changes for `updateImage`:
          * - Update the ImageDTO
          * - Update the image in "All Images" board:
          *   - IF it is in the date range represented by the cache:
-         *     - ADD the image IF it is not already in the cache & update the total
-         *     - UPDATE the image IF it is already in the cache
-         * - EITHER:
+         *     - add the image IF it is not already in the cache & update the total
+         *     - ELSE update the image IF it is already in the cache
+         * - IF the image has a board:
          *   - Update the image in it's own board
-         *   - OR Update the image in the "No Board" board
-         * - IF the image's categories changed:
-         *   - Remove from the old category cache
-         *   - Add to the new category cache & total IF it is in the date range represented by the cache
+         *   - ELSE Update the image in the "No Board" board (TODO)
          */
 
         const patches: PatchCollection[] = [];
-        const {
-          image_name,
-          board_id,
-          image_category: oldCategory,
-        } = oldImageDTO;
-        const newCategory = changes.image_category;
+        const { image_name, board_id, image_category } = oldImageDTO;
+        const categories = IMAGE_CATEGORIES.includes(image_category)
+          ? IMAGE_CATEGORIES
+          : ASSETS_CATEGORIES;
 
-        // patch
+        // Update `getImageDTO` cache
         patches.push(
           dispatch(
             imagesApi.util.updateQueryData(
               'getImageDTO',
-              oldImageDTO.image_name,
+              image_name,
               (draft) => {
                 Object.assign(draft, changes);
               }
@@ -264,110 +266,56 @@ export const imagesApi = api.injectEndpoints({
           )
         );
 
-        if (changes.is_intermediate === true) {
-          // Image was made intermediate, so remove from all boards
-          // TODO: We don't have any logic that does this yet, no-op
-        } else {
-          const oldCategories = IMAGE_CATEGORIES.includes(oldCategory)
-            ? IMAGE_CATEGORIES
-            : ASSETS_CATEGORIES;
+        // Update the "All Image" board
+        const queryArgsToUpdate: ListImagesArgs[] = [{ categories }];
 
-          const newCategories = IMAGE_CATEGORIES.includes(
-            newCategory ?? oldCategory
-          )
-            ? IMAGE_CATEGORIES
-            : ASSETS_CATEGORIES;
+        // TODO: No Board
+        // queryArgsToUpdate.push({ board_id: 'none', categories });
 
-          // - IF the image's categories changed:
-          //   - Remove from the old category cache
-          //   - Add to the new category cache IF it is in the date range represented by the cache
-          if (newCategory) {
-            // remove from the old category
-            const oldCategoryQueryArg = { board_id, categories: oldCategories };
-            patches.push(
-              dispatch(
-                imagesApi.util.updateQueryData(
-                  'listImages',
-                  oldCategoryQueryArg,
-                  (draft) => {
-                    imagesAdapter.removeOne(draft, image_name);
-                  }
-                )
-              )
-            );
+        if (board_id) {
+          // We also need to update the user board
+          queryArgsToUpdate.push({ categories, board_id });
+        }
 
-            // Add to the new category, checking if we should insert it into the cache or not
-            const newCategoryQueryArg = {
-              categories: newCategories,
-              board_id,
-            };
-            const { data } = imagesApi.endpoints.listImages.select(
-              newCategoryQueryArg
-            )(getState());
-
-            const isInDateRange = getIsImageInDateRange(data, oldImageDTO);
-            const isCacheFullyPopulated =
-              data && data.ids.length === data.total;
-
-            if (isCacheFullyPopulated || isInDateRange) {
-              // Add it to the cache
-              patches.push(
-                dispatch(
-                  imagesApi.util.updateQueryData(
-                    'listImages',
-                    newCategoryQueryArg,
-                    (draft) => {
-                      if (newCategory) {
-                        imagesAdapter.upsertOne(draft, {
-                          ...oldImageDTO,
-                          ...changes,
-                        });
-                        draft.total += 1;
-                      }
-                    }
-                  )
-                )
-              );
-            }
-          }
-
-          // Update the "All Image" board
-          const allImagesQueryArg = { categories: newCategories };
-          const { data } = imagesApi.endpoints.listImages.select(
-            allImagesQueryArg
-          )(getState());
+        queryArgsToUpdate.forEach((queryArg) => {
+          const { data } = imagesApi.endpoints.listImages.select(queryArg)(
+            getState()
+          );
 
           const isInDateRange = getIsImageInDateRange(data, oldImageDTO);
           const isCacheFullyPopulated = data && data.ids.length === data.total;
-          const isAlreadyInCache = data && data.ids.includes(image_name);
-          console.log({
-            oldImageDTO,
-            isInDateRange,
-            isCacheFullyPopulated,
-            isAlreadyInCache,
-          });
 
           if (isCacheFullyPopulated || isInDateRange) {
             patches.push(
               dispatch(
                 imagesApi.util.updateQueryData(
                   'listImages',
-                  allImagesQueryArg,
+                  queryArg,
                   (draft) => {
-                    imagesAdapter.upsertOne(draft, {
-                      ...oldImageDTO,
-                      ...changes,
-                    });
-
-                    if (!isAlreadyInCache) {
+                    // One of the common changes is to make a canvas intermediate a non-intermediate,
+                    // i.e. save a canvas image to the gallery.
+                    // If that was the change, need to add the image to the cache instead of updating
+                    // the existing cache entry.
+                    if (changes.is_intermediate === false) {
+                      // add it to the cache
+                      imagesAdapter.addOne(draft, {
+                        ...oldImageDTO,
+                        ...changes,
+                      });
                       draft.total += 1;
+                    } else {
+                      // just update it
+                      imagesAdapter.updateOne(draft, {
+                        id: image_name,
+                        changes,
+                      });
                     }
                   }
                 )
               )
             );
           }
-        }
+        });
 
         try {
           await queryFulfilled;

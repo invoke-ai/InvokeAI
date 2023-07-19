@@ -20,6 +20,7 @@ export const getIsImageInDateRange = (
     );
     return createdDate >= oldestDate;
   } else if ([0, 1].includes(cacheImageDTOS.length)) {
+    // if there are only 1 or 0 images in the cache, we consider the image to be in the date range
     return true;
   }
   return false;
