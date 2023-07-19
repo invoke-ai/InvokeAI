@@ -3,7 +3,7 @@ import { NodeProps } from 'react-flow-renderer';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from 'app/store/store';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { memo, useEffect, useState } from 'react';
+import { memo } from 'react';
 import IAINodeHeader from './IAINode/IAINodeHeader';
 import IAINodeResizer, { OnResize } from './IAINode/IAINodeResizer';
 import NodeWrapper from './NodeWrapper';
@@ -16,10 +16,6 @@ const ProgressImageNode = (props: NodeProps) => {
   const nodeSize = useSelector((state: RootState) => state.nodes.nodeSize);
   const dispatch = useDispatch();
   const { selected } = props;
-
-  useEffect(() => {
-    localStorage.setItem('nodeSize', JSON.stringify(nodeSize));
-  }, [nodeSize]);
 
   const handleResize: OnResize = (_, { width, height }) => {
     const newSize =
