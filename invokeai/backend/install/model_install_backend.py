@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from typing import List, Dict, Callable, Union, Set
 
 import requests
-from diffusers import StableDiffusionPipeline
+from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
 from huggingface_hub import hf_hub_url, HfFolder, HfApi
 from omegaconf import OmegaConf
@@ -310,6 +310,8 @@ class ModelInstall(object):
         if key := self.reverse_paths.get(path_name):
             (name, base, mtype) = ModelManager.parse_key(key)
             return name
+        elif location.is_dir():
+            return location.name
         else:
             return location.stem
 
@@ -365,7 +367,7 @@ class ModelInstall(object):
         model = None
         for revision in revisions:
             try:
-                model = StableDiffusionPipeline.from_pretrained(repo_id,revision=revision,safety_checker=None)
+                model = DiffusionPipeline.from_pretrained(repo_id,revision=revision,safety_checker=None)
             except:  # most errors are due to fp16 not being present. Fix this to catch other errors
                 pass
             if model:

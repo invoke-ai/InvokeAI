@@ -146,7 +146,6 @@ This method is recommended for those familiar with running Docker containers
 - [Installing](installation/050_INSTALLING_MODELS.md)
 - [Model Merging](features/MODEL_MERGING.md)
 - [Style/Subject Concepts and Embeddings](features/CONCEPTS.md)
-- [Textual Inversion](features/TEXTUAL_INVERSION.md)
 - [Not Safe for Work (NSFW) Checker](features/NSFW.md)
 <!-- seperator -->
 ### Prompt Engineering

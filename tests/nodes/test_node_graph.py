@@ -1,6 +1,6 @@
 from .test_nodes import ImageToImageTestInvocation, TextToImageTestInvocation, ListPassThroughInvocation, PromptTestInvocation
 from invokeai.app.services.graph import Edge, Graph, GraphInvocation, InvalidEdgeError, NodeAlreadyInGraphError, NodeNotFoundError, are_connections_compatible, EdgeConnection, CollectInvocation, IterateInvocation
-from invokeai.app.invocations.upscale import RealESRGANInvocation
+from invokeai.app.invocations.upscale import ESRGANInvocation
 from invokeai.app.invocations.image import *
 from invokeai.app.invocations.math import AddInvocation, SubtractInvocation
 from invokeai.app.invocations.params import ParamIntInvocation
@@ -19,7 +19,7 @@ def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edg
 def test_connections_are_compatible():
     from_node = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     from_field = "image"
-    to_node = RealESRGANInvocation(id = "2")
+    to_node = ESRGANInvocation(id = "2")
     to_field = "image"
 
     result = are_connections_compatible(from_node, from_field, to_node, to_field)
@@ -29,7 +29,7 @@ def test_connections_are_compatible():
 def test_connections_are_incompatible():
     from_node = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     from_field = "image"
-    to_node = RealESRGANInvocation(id = "2")
+    to_node = ESRGANInvocation(id = "2")
     to_field = "strength"
 
     result = are_connections_compatible(from_node, from_field, to_node, to_field)
@@ -39,7 +39,7 @@ def test_connections_are_incompatible():
 def test_connections_incompatible_with_invalid_fields():
     from_node = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     from_field = "invalid_field"
-    to_node = RealESRGANInvocation(id = "2")
+    to_node = ESRGANInvocation(id = "2")
     to_field = "image"
 
     # From field is invalid
@@ -86,10 +86,10 @@ def test_graph_fails_to_update_node_if_type_changes():
     g = Graph()
     n = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     g.add_node(n)
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.add_node(n2)
 
-    nu = RealESRGANInvocation(id = "1")
+    nu = ESRGANInvocation(id = "1")
 
     with pytest.raises(TypeError):
         g.update_node("1", nu)
@@ -98,7 +98,7 @@ def test_graph_allows_non_conflicting_id_change():
     g = Graph()
     n = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
     g.add_node(n)
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.add_node(n2)
     e1 = create_edge(n.id,"image",n2.id,"image")
     g.add_edge(e1)
@@ -128,7 +128,7 @@ def test_graph_fails_to_update_node_id_if_conflict():
 def test_graph_adds_edge():
     g = Graph()
     n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
     e = create_edge(n1.id,"image",n2.id,"image")
@@ -139,7 +139,7 @@ def test_graph_adds_edge():
 
 def test_graph_fails_to_add_edge_with_cycle():
     g = Graph()
-    n1 = RealESRGANInvocation(id = "1")
+    n1 = ESRGANInvocation(id = "1")
     g.add_node(n1)
     e = create_edge(n1.id,"image",n1.id,"image")
     with pytest.raises(InvalidEdgeError):
@@ -148,8 +148,8 @@ def test_graph_fails_to_add_edge_with_cycle():
 def test_graph_fails_to_add_edge_with_long_cycle():
     g = Graph()
     n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
-    n2 = RealESRGANInvocation(id = "2")
-    n3 = RealESRGANInvocation(id = "3")
+    n2 = ESRGANInvocation(id = "2")
+    n3 = ESRGANInvocation(id = "3")
     g.add_node(n1)
     g.add_node(n2)
     g.add_node(n3)
@@ -164,7 +164,7 @@ def test_graph_fails_to_add_edge_with_long_cycle():
 def test_graph_fails_to_add_edge_with_missing_node_id():
     g = Graph()
     n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
     e1 = create_edge("1","image","3","image")
@@ -177,8 +177,8 @@ def test_graph_fails_to_add_edge_with_missing_node_id():
 def test_graph_fails_to_add_edge_when_destination_exists():
     g = Graph()
     n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
-    n2 = RealESRGANInvocation(id = "2")
-    n3 = RealESRGANInvocation(id = "3")
+    n2 = ESRGANInvocation(id = "2")
+    n3 = ESRGANInvocation(id = "3")
     g.add_node(n1)
     g.add_node(n2)
     g.add_node(n3)
@@ -194,7 +194,7 @@ def test_graph_fails_to_add_edge_when_destination_exists():
 def test_graph_fails_to_add_edge_with_mismatched_types():
     g = Graph()
     n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
     e1 = create_edge("1","image","2","strength")
@@ -344,7 +344,7 @@ def test_graph_iterator_invalid_if_output_and_input_types_different():
 def test_graph_validates():
     g = Graph()
     n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
     e1 = create_edge("1","image","2","image")
@@ -377,8 +377,8 @@ def test_graph_invalid_if_subgraph_invalid():
 
 def test_graph_invalid_if_has_cycle():
     g = Graph()
-    n1 = RealESRGANInvocation(id = "1")
-    n2 = RealESRGANInvocation(id = "2")
+    n1 = ESRGANInvocation(id = "1")
+    n2 = ESRGANInvocation(id = "2")
     g.nodes[n1.id] = n1
     g.nodes[n2.id] = n2
     e1 = create_edge("1","image","2","image")
@@ -391,7 +391,7 @@ def test_graph_invalid_if_has_cycle():
 def test_graph_invalid_with_invalid_connection():
     g = Graph()
     n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.nodes[n1.id] = n1
     g.nodes[n2.id] = n2
     e1 = create_edge("1","image","2","strength")
@@ -503,7 +503,7 @@ def test_graph_fails_to_enumerate_non_subgraph_node():
 
     g.add_node(n1)
     
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.add_node(n2)
 
     with pytest.raises(NodeNotFoundError):
@@ -512,7 +512,7 @@ def test_graph_fails_to_enumerate_non_subgraph_node():
 def test_graph_gets_networkx_graph():
     g = Graph()
     n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
     e = create_edge(n1.id,"image",n2.id,"image")
@@ -529,7 +529,7 @@ def test_graph_gets_networkx_graph():
 def test_graph_can_serialize():
     g = Graph()
     n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
     e = create_edge(n1.id,"image",n2.id,"image")
@@ -541,7 +541,7 @@ def test_graph_can_serialize():
 def test_graph_can_deserialize():
     g = Graph()
     n1 = TextToImageTestInvocation(id = "1", prompt = "Banana sushi")
-    n2 = RealESRGANInvocation(id = "2")
+    n2 = ESRGANInvocation(id = "2")
     g.add_node(n1)
     g.add_node(n2)
     e = create_edge(n1.id,"image",n2.id,"image")

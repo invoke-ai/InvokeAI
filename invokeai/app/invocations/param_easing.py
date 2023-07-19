@@ -43,6 +43,14 @@ class FloatLinearRangeInvocation(BaseInvocation):
     stop: float = Field(default=10, description="The last value of the range")
     steps: int = Field(default=30, description="number of values to interpolate over (including start and stop)")
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Linear Range (Float)",
+                "tags": ["math", "float", "linear", "range"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         param_list = list(np.linspace(self.start, self.stop, self.steps))
         return FloatCollectionOutput(
@@ -112,6 +120,14 @@ class StepParamEasingInvocation(BaseInvocation):
     # alt_mirror: bool = Field(default=False, description="alternative mirroring by dual easing")
     show_easing_plot: bool = Field(default=False, description="show easing plot")
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Param Easing By Step",
+                "tags": ["param", "step", "easing"]
+            },
+        }
 
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
