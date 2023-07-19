@@ -79,6 +79,7 @@ import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextTo
 import { addModelLoadStartedEventListener } from './listeners/socketio/socketModelLoadStarted';
 import { addModelLoadCompletedEventListener } from './listeners/socketio/socketModelLoadCompleted';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
+import { addFirstListImagesListener } from './listeners/addFirstListImagesListener.ts';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -202,5 +203,7 @@ addModelSelectedListener();
 addAppStartedListener();
 addModelsLoadedListener();
 addAppConfigReceivedListener();
+addFirstListImagesListener();
 
+// Ad-hoc upscale workflwo
 addUpscaleRequestedListener();
