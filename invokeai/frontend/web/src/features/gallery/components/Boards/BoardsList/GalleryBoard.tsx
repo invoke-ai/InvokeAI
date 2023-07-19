@@ -176,6 +176,7 @@ const GalleryBoard = memo(
                   onSubmit={(nextValue) => {
                     handleUpdateBoardName(nextValue);
                   }}
+                  sx={{ maxW: 'full' }}
                 >
                   <EditablePreview
                     sx={{
@@ -186,6 +187,8 @@ const GalleryBoard = memo(
                       fontSize: 'xs',
                       textAlign: 'center',
                       p: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                     }}
                     noOfLines={1}
                   />
