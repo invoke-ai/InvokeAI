@@ -1,10 +1,11 @@
 from os.path import exists
-from typing import Literal, Optional
+from typing import Literal, Optional, Union, List
 
 import numpy as np
+import re
 from pydantic import Field, validator
 
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext, InvocationConfig
 from dynamicprompts.generators import RandomPromptGenerator, CombinatorialPromptGenerator
 
 class PromptOutput(BaseInvocationOutput):
@@ -97,6 +98,42 @@ class PromptsFromFileInvocation(BaseInvocation):
         return PromptCollectionOutput(prompt_collection=prompts, count=len(prompts))
 
 
+class PromptsToFileInvocation(BaseInvocation):
+    '''Save prompts to a text file'''
+    # fmt: off
+    type: Literal['prompt_to_file'] = 'prompt_to_file'
+
+    # Inputs
+    file_path: str = Field(description="Path to prompt text file")
+    prompts: Union[str, list[str], None] = Field(default=None, description="Collection of prompts to write")
+    append: bool = Field(default=True, description="Append or overwrite file")
+    #fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "type_hints": {
+                    "prompts": "string",
+                }
+            },
+        }
+        
+    def invoke(self, context: InvocationContext) -> BaseInvocationOutput:
+        if self.append:
+            file_mode = 'a'
+        else:
+            file_mode = 'w'
+
+        with open(self.file_path, file_mode) as f:
+            if isinstance(self.prompts, list):
+                for line in (self.prompts):
+                    f.write ( line + '\n' )
+            else:
+                f.write((self.prompts or '') + '\n')
+ 
+        return BaseInvocationOutput()
+
+
 class PromptPosNegOutput(BaseInvocationOutput):
     """Base class for invocations that output a posirtive and negative prompt"""
 
@@ -112,7 +149,7 @@ class PromptPosNegOutput(BaseInvocationOutput):
 
 
 class PromptSplitNegInvocation(BaseInvocation):
-    """Splits prompt into two prompts, inside [] goes into negative prompt everthing else goes into positive prompt. All [ and ] characters are stripped out of prompt"""
+    """Splits prompt into two prompts, inside [] goes into negative prompt everthing else goes into positive prompt. Each [ and ] character is replaced with a space"""
 
     type: Literal["prompt_split_neg"] = "prompt_split_neg"
     prompt: str = Field(default='', description="Prompt to split")
@@ -120,17 +157,26 @@ class PromptSplitNegInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> PromptPosNegOutput:
         p_prompt = ""
         n_prompt = ""
-        in_brackets = False
+        brackets_depth = 0
+        escaped = False
 
         for char in (self.prompt or ''):
-            if char == "[":
-                in_brackets = True
-            elif char == "]":
-                in_brackets = False
-            elif in_brackets:
+            if char == "[" and not escaped:
+                n_prompt += ' '
+                brackets_depth += 1 
+            elif char == "]" and not escaped:
+                brackets_depth -= 1 
+                char = ' ' 
+            elif brackets_depth > 0:
                 n_prompt += char
             else:
                 p_prompt += char            
+
+            #keep track of the escape char but only if it isn't escaped already
+            if char == "\\" and not escaped:
+                escaped = True
+            else:
+                escaped = False
 
         return PromptPosNegOutput(positive_prompt=p_prompt, negative_prompt=n_prompt)
 
@@ -153,6 +199,14 @@ class PromptReplaceInvocation(BaseInvocation):
     prompt: str = Field(default='', description="Prompt to work on")
     search_string : str = Field(default='', description="String to search for")
     replace_string : str = Field(default='', description="String to replace the search")
+    use_regex: bool = Field(default=False, description="Use search string as a regex expression (non regex is case insensitive)")
 
     def invoke(self, context: InvocationContext) -> PromptOutput:
-        return PromptOutput(prompt=(self.prompt or '').replace((self.search_string or ''), (self.replace_string or '')))  
+        pattern = (self.search_string or '')
+        new_prompt = (self.prompt or '')
+        if len(pattern) > 0: 
+            if not self.use_regex:
+                #None regex so make case insensitve 
+                pattern = "(?i)" + re.escape(pattern)
+            new_prompt = re.sub(pattern, (self.replace_string or ''), new_prompt)
+        return PromptOutput(prompt=new_prompt)  
