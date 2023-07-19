@@ -1,9 +1,8 @@
-import { EntityState } from '@reduxjs/toolkit';
 import { ImageDTO } from '../types';
-import { imagesSelectors } from './images';
+import { ImageCache, imagesSelectors } from './images';
 
 export const getIsImageInDateRange = (
-  data: (EntityState<ImageDTO> & { total: number }) | undefined,
+  data: ImageCache | undefined,
   imageDTO: ImageDTO
 ) => {
   if (!data) {
@@ -24,4 +23,29 @@ export const getIsImageInDateRange = (
     return true;
   }
   return false;
+};
+
+/**
+ * Determines the action we should take when an image may need to be added or updated in a cache.
+ */
+export const getCacheAction = (
+  data: ImageCache | undefined,
+  imageDTO: ImageDTO
+): 'add' | 'update' | 'none' => {
+  const isInDateRange = getIsImageInDateRange(data, imageDTO);
+  const isCacheFullyPopulated = data && data.total === data.ids.length;
+  const shouldUpdateCache =
+    Boolean(isInDateRange) || Boolean(isCacheFullyPopulated);
+
+  const isImageInCache = data && data.ids.includes(imageDTO.image_name);
+
+  if (shouldUpdateCache && isImageInCache) {
+    return 'update';
+  }
+
+  if (shouldUpdateCache && !isImageInCache) {
+    return 'add';
+  }
+
+  return 'none';
 };

@@ -6,7 +6,7 @@ import {
   BoardId,
   IMAGE_CATEGORIES,
 } from 'features/gallery/store/gallerySlice';
-import { forEach, omit } from 'lodash-es';
+import { omit } from 'lodash-es';
 import queryString from 'query-string';
 import { ApiFullTagDescription, api } from '..';
 import { components, paths } from '../schema';
@@ -17,7 +17,7 @@ import {
   OffsetPaginatedResults_ImageDTO_,
   PostUploadAction,
 } from '../types';
-import { getIsImageInDateRange } from './util';
+import { getCacheAction } from './util';
 
 export type ListImagesArgs = NonNullable<
   paths['/api/v1/images/']['get']['parameters']['query']
@@ -30,6 +30,8 @@ export type UnsafeImageMetadata = {
   metadata: components['schemas']['CoreMetadata'];
   graph: NonNullable<components['schemas']['Graph']>;
 };
+
+export type ImageCache = EntityState<ImageDTO> & { total: number };
 
 // The adapter is not actually the data store - it just provides helper functions to interact
 // with some other store of data. We will use the RTK Query cache as that store.
@@ -103,11 +105,9 @@ export const imagesApi = api.injectEndpoints({
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          forEach(data.entities, (imageDTO) => {
-            if (!imageDTO) {
-              return;
-            }
 
+          // update the `getImageDTO` cache for each image
+          imagesSelectors.selectAll(data).forEach((imageDTO) => {
             dispatch(
               imagesApi.util.upsertQueryData(
                 'getImageDTO',
@@ -181,11 +181,9 @@ export const imagesApi = api.injectEndpoints({
           removeFromCacheKeys.push({ board_id, categories });
         } else {
           // TODO: No Board
-          // cacheKeys.push({ board_id: 'none', categories });
         }
 
-        // TODO: Batch - do we want to artificially create an RTK query cache for batch?
-        // cacheKeys.push({ board_id: 'batch', categories });
+        // TODO: Batch
 
         const patches: PatchCollection[] = [];
         removeFromCacheKeys.forEach((cacheKey) => {
@@ -253,6 +251,8 @@ export const imagesApi = api.injectEndpoints({
           ? IMAGE_CATEGORIES
           : ASSETS_CATEGORIES;
 
+        // TODO: No Board
+
         // Update `getImageDTO` cache
         patches.push(
           dispatch(
@@ -269,9 +269,6 @@ export const imagesApi = api.injectEndpoints({
         // Update the "All Image" board
         const queryArgsToUpdate: ListImagesArgs[] = [{ categories }];
 
-        // TODO: No Board
-        // queryArgsToUpdate.push({ board_id: 'none', categories });
-
         if (board_id) {
           // We also need to update the user board
           queryArgsToUpdate.push({ categories, board_id });
@@ -282,10 +279,9 @@ export const imagesApi = api.injectEndpoints({
             getState()
           );
 
-          const isInDateRange = getIsImageInDateRange(data, oldImageDTO);
-          const isCacheFullyPopulated = data && data.ids.length === data.total;
+          const cacheAction = getCacheAction(data, oldImageDTO);
 
-          if (isCacheFullyPopulated || isInDateRange) {
+          if (['update', 'add'].includes(cacheAction)) {
             patches.push(
               dispatch(
                 imagesApi.util.updateQueryData(
@@ -296,14 +292,17 @@ export const imagesApi = api.injectEndpoints({
                     // i.e. save a canvas image to the gallery.
                     // If that was the change, need to add the image to the cache instead of updating
                     // the existing cache entry.
-                    if (changes.is_intermediate === false) {
+                    if (
+                      changes.is_intermediate === false ||
+                      cacheAction === 'add'
+                    ) {
                       // add it to the cache
                       imagesAdapter.addOne(draft, {
                         ...oldImageDTO,
                         ...changes,
                       });
                       draft.total += 1;
-                    } else {
+                    } else if (cacheAction === 'update') {
                       // just update it
                       imagesAdapter.updateOne(draft, {
                         id: image_name,
@@ -425,10 +424,7 @@ export const imagesApi = api.injectEndpoints({
           : ASSETS_CATEGORIES;
 
         // TODO: No Board
-        // removeFromCacheKeys.push({ board_id: 'none', categories });
-
-        // TODO: Batch - do we want to artificially create an RTK query cache for batch?
-        // cacheKeys.push({ board_id: 'batch', categories });
+        // TODO: Batch
 
         // Remove from old board
         if (old_board_id) {
@@ -477,10 +473,9 @@ export const imagesApi = api.injectEndpoints({
             board_id,
           })(getState());
 
-          const isInDateRange = getIsImageInDateRange(data, oldImageDTO);
-          const isCacheFullyPopulated = data && data.ids.length === data.total;
+          const cacheAction = getCacheAction(data, oldImageDTO);
 
-          if (isCacheFullyPopulated || isInDateRange) {
+          if (['add', 'update'].includes(cacheAction)) {
             // Do the "Add to" cache updates
             patches.push(
               dispatch(
@@ -488,8 +483,15 @@ export const imagesApi = api.injectEndpoints({
                   'listImages',
                   { board_id, categories },
                   (draft) => {
-                    imagesAdapter.addOne(draft, newImageDTO);
-                    draft.total += 1;
+                    if (cacheAction === 'add') {
+                      imagesAdapter.addOne(draft, newImageDTO);
+                      draft.total += 1;
+                    } else {
+                      imagesAdapter.updateOne(draft, {
+                        id: image_name,
+                        changes: { board_id },
+                      });
+                    }
                   }
                 )
               )
@@ -537,8 +539,8 @@ export const imagesApi = api.injectEndpoints({
           ? IMAGE_CATEGORIES
           : ASSETS_CATEGORIES;
 
-        // TODO: Batch - do we want to artificially create an RTK query cache for batch?
-        // cacheKeys.push({ board_id: 'batch', categories });
+        // TODO: No Board
+        // TODO: Batch
 
         const patches: PatchCollection[] = [];
 
@@ -579,29 +581,30 @@ export const imagesApi = api.injectEndpoints({
           categories,
         })(getState());
 
-        const shouldAddToAllImagesCache = getIsImageInDateRange(
-          allImagesData,
-          imageDTO
-        );
+        // Check if we need to make any cache changes
+        const cacheAction = getCacheAction(allImagesData, imageDTO);
 
-        if (shouldAddToAllImagesCache) {
-          // Do the "Add to" cache updates
+        if (['add', 'update'].includes(cacheAction)) {
           patches.push(
             dispatch(
               imagesApi.util.updateQueryData(
                 'listImages',
                 { categories },
                 (draft) => {
-                  imagesAdapter.addOne(draft, imageDTO);
-                  draft.total += 1;
+                  if (cacheAction === 'add') {
+                    imagesAdapter.addOne(draft, imageDTO);
+                    draft.total += 1;
+                  } else {
+                    imagesAdapter.updateOne(draft, {
+                      id: image_name,
+                      changes: { board_id: undefined },
+                    });
+                  }
                 }
               )
             )
           );
         }
-
-        // TODO: No Board
-        // same same but diffrent
 
         try {
           await queryFulfilled;
