@@ -1,16 +1,16 @@
+import { Text } from '@chakra-ui/react';
+import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
 import {
   INITIAL_IMAGE_LIMIT,
   boardIdSelected,
 } from 'features/gallery/store/gallerySlice';
-import { FaFolder } from 'react-icons/fa';
+import { FaFolderOpen } from 'react-icons/fa';
 import { useDispatch } from 'react-redux';
 import {
   ListImagesArgs,
   useListImagesQuery,
 } from 'services/api/endpoints/images';
 import GenericBoard from './GenericBoard';
-import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
-import { Text } from '@chakra-ui/react';
 
 const baseQueryArg: ListImagesArgs = {
   board_id: 'none',
@@ -43,8 +43,8 @@ const NoBoardBoard = ({ isSelected }: { isSelected: boolean }) => {
       dropLabel={<Text fontSize="md">Move</Text>}
       onClick={handleClick}
       isSelected={isSelected}
-      icon={FaFolder}
-      label="Unfiled"
+      icon={FaFolderOpen}
+      label="No Board"
       badgeCount={total}
     />
   );
