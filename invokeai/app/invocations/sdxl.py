@@ -233,6 +233,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "SDXL Text To Latents",
                 "tags": ["latents"],
                 "type_hints": {
                   "model": "model",
@@ -305,7 +306,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
                 add_time_ids = add_time_ids.to(device=unet.device, dtype=unet.dtype)
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
 
-                with tqdm(total=self.steps) as progress_bar:
+                with tqdm(total=num_inference_steps) as progress_bar:
                     for i, t in enumerate(timesteps):
                         # expand the latents if we are doing classifier free guidance
                         latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
@@ -351,7 +352,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
                 add_time_ids = add_time_ids.to(device=unet.device, dtype=unet.dtype)
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
 
-                with tqdm(total=self.steps) as progress_bar:
+                with tqdm(total=num_inference_steps) as progress_bar:
                     for i, t in enumerate(timesteps):
                         # expand the latents if we are doing classifier free guidance
                         #latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
@@ -415,6 +416,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
 
         #################
 
+        latents = latents.to("cpu")
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'
@@ -461,6 +463,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "SDXL Latents to Latents",
                 "tags": ["latents"],
                 "type_hints": {
                   "model": "model",
@@ -651,6 +654,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
 
         #################
 
+        latents = latents.to("cpu")
         torch.cuda.empty_cache()
 
         name = f'{context.graph_execution_state_id}__{self.id}'

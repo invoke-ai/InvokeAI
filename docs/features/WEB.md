@@ -76,10 +76,10 @@ From top to bottom, these are:
    with outpainting,and modify interior portions of the image with
    inpainting, erase portions of a starting image and have the AI fill in
    the erased region from a text prompt.
-4. Workflow Management (not yet implemented) - this panel will allow you to create
+4. Node Editor - this panel allows you to create
    pipelines of common operations and combine them into workflows.
-5. Training (not yet implemented) - this panel will provide an interface to [textual
-   inversion training](TEXTUAL_INVERSION.md) and fine tuning.
+5. Model Manager - this panel allows you to import and configure new
+   models using URLs, local paths, or HuggingFace diffusers repo_ids.
 
 The inpainting, outpainting and postprocessing tabs are currently in
 development. However, limited versions of their features can already be accessed

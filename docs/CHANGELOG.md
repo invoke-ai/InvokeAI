@@ -617,8 +617,6 @@ sections describe what's new for InvokeAI.
 - `dream.py` script renamed `invoke.py`. A `dream.py` script wrapper remains for
   backward compatibility.
 - Completely new WebGUI - launch with `python3 scripts/invoke.py --web`
-- Support for [inpainting](deprecated/INPAINTING.md) and
-  [outpainting](features/OUTPAINTING.md)
 - img2img runs on all k\* samplers
 - Support for
   [negative prompts](features/PROMPTS.md#negative-and-unconditioned-prompts)

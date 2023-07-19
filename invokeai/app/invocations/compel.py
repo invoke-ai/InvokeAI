@@ -148,6 +148,8 @@ class CompelInvocation(BaseInvocation):
                 cross_attention_control_args=options.get(
                     "cross_attention_control", None),)
 
+        c = c.detach().to("cpu")
+
         conditioning_data = ConditioningFieldData(
             conditionings=[
                 BasicConditioningInfo(
@@ -230,6 +232,10 @@ class SDXLPromptInvocationBase:
         del tokenizer_info
         del text_encoder_info
 
+        c = c.detach().to("cpu")
+        if c_pooled is not None:
+            c_pooled = c_pooled.detach().to("cpu")
+
         return c, c_pooled, None
 
     def run_clip_compel(self, context, clip_field, prompt, get_pooled):
@@ -306,6 +312,10 @@ class SDXLPromptInvocationBase:
         del tokenizer_info
         del text_encoder_info
 
+        c = c.detach().to("cpu")
+        if c_pooled is not None:
+            c_pooled = c_pooled.detach().to("cpu")
+
         return c, c_pooled, ec
 
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
@@ -321,8 +331,8 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     crop_left: int = Field(0, description="")
     target_width: int = Field(1024, description="")
     target_height: int = Field(1024, description="")
-    clip1: ClipField = Field(None, description="Clip to use")
-    clip2: ClipField = Field(None, description="Clip to use")
+    clip: ClipField = Field(None, description="Clip to use")
+    clip2: ClipField = Field(None, description="Clip2 to use")
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -338,7 +348,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CompelOutput:
-        c1, c1_pooled, ec1 = self.run_clip_compel(context, self.clip1, self.prompt, False)
+        c1, c1_pooled, ec1 = self.run_clip_compel(context, self.clip, self.prompt, False)
         if self.style.strip() == "":
             c2, c2_pooled, ec2 = self.run_clip_compel(context, self.clip2, self.prompt, True)
         else:
@@ -441,8 +451,8 @@ class SDXLRawPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     crop_left: int = Field(0, description="")
     target_width: int = Field(1024, description="")
     target_height: int = Field(1024, description="")
-    clip1: ClipField = Field(None, description="Clip to use")
-    clip2: ClipField = Field(None, description="Clip to use")
+    clip: ClipField = Field(None, description="Clip to use")
+    clip2: ClipField = Field(None, description="Clip2 to use")
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -458,7 +468,7 @@ class SDXLRawPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CompelOutput:
-        c1, c1_pooled, ec1 = self.run_clip_raw(context, self.clip1, self.prompt, False)
+        c1, c1_pooled, ec1 = self.run_clip_raw(context, self.clip, self.prompt, False)
         if self.style.strip() == "":
             c2, c2_pooled, ec2 = self.run_clip_raw(context, self.clip2, self.prompt, True)
         else:
@@ -560,6 +570,14 @@ class ClipSkipInvocation(BaseInvocation):
 
     clip: ClipField = Field(None, description="Clip to use")
     skipped_layers: int = Field(0, description="Number of layers to skip in text_encoder")
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "CLIP Skip",
+                "tags": ["clip", "skip"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ClipSkipInvocationOutput:
         self.clip.skipped_layers += self.skipped_layers

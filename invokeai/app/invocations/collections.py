@@ -4,17 +4,12 @@ from typing import Literal
 
 import numpy as np
 from pydantic import Field, validator
-from invokeai.app.models.image import ImageField
 
+from invokeai.app.models.image import ImageField
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
-from .baseinvocation import (
-    BaseInvocation,
-    InvocationConfig,
-    InvocationContext,
-    BaseInvocationOutput,
-    UIConfig,
-)
+from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
+                             InvocationConfig, InvocationContext, UIConfig)
 
 
 class IntCollectionOutput(BaseInvocationOutput):
@@ -32,7 +27,8 @@ class FloatCollectionOutput(BaseInvocationOutput):
     type: Literal["float_collection"] = "float_collection"
 
     # Outputs
-    collection: list[float] = Field(default=[], description="The float collection")
+    collection: list[float] = Field(
+        default=[], description="The float collection")
 
 
 class ImageCollectionOutput(BaseInvocationOutput):
@@ -41,7 +37,8 @@ class ImageCollectionOutput(BaseInvocationOutput):
     type: Literal["image_collection"] = "image_collection"
 
     # Outputs
-    collection: list[ImageField] = Field(default=[], description="The output images")
+    collection: list[ImageField] = Field(
+        default=[], description="The output images")
 
     class Config:
         schema_extra = {"required": ["type", "collection"]}
@@ -56,6 +53,14 @@ class RangeInvocation(BaseInvocation):
     start: int = Field(default=0, description="The start of the range")
     stop: int = Field(default=10, description="The stop of the range")
     step: int = Field(default=1, description="The step of the range")
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Range",
+                "tags": ["range", "integer", "collection"]
+            },
+        }
 
     @validator("stop")
     def stop_gt_start(cls, v, values):
@@ -79,10 +84,20 @@ class RangeOfSizeInvocation(BaseInvocation):
     size: int = Field(default=1, description="The number of values")
     step: int = Field(default=1, description="The step of the range")
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Sized Range",
+                "tags": ["range", "integer", "size", "collection"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> IntCollectionOutput:
         return IntCollectionOutput(
-            collection=list(range(self.start, self.start + self.size, self.step))
-        )
+            collection=list(
+                range(
+                    self.start, self.start + self.size,
+                    self.step)))
 
 
 class RandomRangeInvocation(BaseInvocation):
@@ -103,11 +118,21 @@ class RandomRangeInvocation(BaseInvocation):
         default_factory=get_random_seed,
     )
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Random Range",
+                "tags": ["range", "integer", "random", "collection"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> IntCollectionOutput:
         rng = np.random.default_rng(self.seed)
         return IntCollectionOutput(
-            collection=list(rng.integers(low=self.low, high=self.high, size=self.size))
-        )
+            collection=list(
+                rng.integers(
+                    low=self.low, high=self.high,
+                    size=self.size)))
 
 
 class ImageCollectionInvocation(BaseInvocation):
@@ -121,6 +146,7 @@ class ImageCollectionInvocation(BaseInvocation):
         default=[], description="The image collection to load"
     )
     # fmt: on
+
     def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
         return ImageCollectionOutput(collection=self.images)
 
@@ -128,6 +154,7 @@ class ImageCollectionInvocation(BaseInvocation):
         schema_extra = {
             "ui": {
                 "type_hints": {
+                    "title": "Image Collection",
                     "images": "image_collection",
                 }
             },
