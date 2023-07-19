@@ -1,35 +1,43 @@
 import { Box } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import useImageUploader from 'common/hooks/useImageUploader';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppToaster } from 'app/components/Toaster';
+import { useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
   KeyboardEvent,
-  memo,
   ReactNode,
+  memo,
   useCallback,
   useEffect,
   useState,
 } from 'react';
 import { FileRejection, useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { imageUploaded } from 'services/api/thunks/image';
+import { useUploadImageMutation } from 'services/api/endpoints/images';
+import { PostUploadAction } from 'services/api/types';
 import ImageUploadOverlay from './ImageUploadOverlay';
-import { useAppToaster } from 'app/components/Toaster';
-import { createSelector } from '@reduxjs/toolkit';
-import { systemSelector } from 'features/system/store/systemSelectors';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const selector = createSelector(
-  [systemSelector, activeTabNameSelector],
-  (system, activeTabName) => {
-    const { isConnected, isUploading } = system;
+  [activeTabNameSelector],
+  (activeTabName) => {
+    let postUploadAction: PostUploadAction = { type: 'TOAST' };
 
-    const isUploaderDisabled = !isConnected || isUploading;
+    if (activeTabName === 'unifiedCanvas') {
+      postUploadAction = { type: 'SET_CANVAS_INITIAL_IMAGE' };
+    }
+
+    if (activeTabName === 'img2img') {
+      postUploadAction = { type: 'SET_INITIAL_IMAGE' };
+    }
 
     return {
-      isUploaderDisabled,
-      activeTabName,
+      postUploadAction,
     };
-  }
+  },
+  defaultSelectorOptions
 );
 
 type ImageUploaderProps = {
@@ -38,12 +46,13 @@ type ImageUploaderProps = {
 
 const ImageUploader = (props: ImageUploaderProps) => {
   const { children } = props;
-  const dispatch = useAppDispatch();
-  const { isUploaderDisabled, activeTabName } = useAppSelector(selector);
+  const { postUploadAction } = useAppSelector(selector);
+  const isBusy = useAppSelector(selectIsBusy);
   const toaster = useAppToaster();
   const { t } = useTranslation();
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
-  const { setOpenUploaderFunction } = useImageUploader();
+
+  const [uploadImage] = useUploadImageMutation();
 
   const fileRejectionCallback = useCallback(
     (rejection: FileRejection) => {
@@ -60,16 +69,14 @@ const ImageUploader = (props: ImageUploaderProps) => {
 
   const fileAcceptedCallback = useCallback(
     async (file: File) => {
-      dispatch(
-        imageUploaded({
-          file,
-          image_category: 'user',
-          is_intermediate: false,
-          postUploadAction: { type: 'TOAST_UPLOADED' },
-        })
-      );
+      uploadImage({
+        file,
+        image_category: 'user',
+        is_intermediate: false,
+        postUploadAction,
+      });
     },
-    [dispatch]
+    [postUploadAction, uploadImage]
   );
 
   const onDrop = useCallback(
@@ -101,13 +108,12 @@ const ImageUploader = (props: ImageUploaderProps) => {
     isDragReject,
     isDragActive,
     inputRef,
-    open,
   } = useDropzone({
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
     noClick: true,
     onDrop,
     onDragOver: () => setIsHandlingUpload(true),
-    disabled: isUploaderDisabled,
+    disabled: isBusy,
     multiple: false,
   });
 
@@ -126,19 +132,13 @@ const ImageUploader = (props: ImageUploaderProps) => {
       }
     };
 
-    // Set the open function so we can open the uploader from anywhere
-    setOpenUploaderFunction(open);
-
     // Add the paste event listener
     document.addEventListener('paste', handlePaste);
 
     return () => {
       document.removeEventListener('paste', handlePaste);
-      setOpenUploaderFunction(() => {
-        return;
-      });
     };
-  }, [inputRef, open, setOpenUploaderFunction]);
+  }, [inputRef]);
 
   return (
     <Box
@@ -150,13 +150,30 @@ const ImageUploader = (props: ImageUploaderProps) => {
     >
       <input {...getInputProps()} />
       {children}
-      {isDragActive && isHandlingUpload && (
-        <ImageUploadOverlay
-          isDragAccept={isDragAccept}
-          isDragReject={isDragReject}
-          setIsHandlingUpload={setIsHandlingUpload}
-        />
-      )}
+      <AnimatePresence>
+        {isDragActive && isHandlingUpload && (
+          <motion.div
+            key="image-upload-overlay"
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+              transition: { duration: 0.1 },
+            }}
+            exit={{
+              opacity: 0,
+              transition: { duration: 0.1 },
+            }}
+          >
+            <ImageUploadOverlay
+              isDragAccept={isDragAccept}
+              isDragReject={isDragReject}
+              setIsHandlingUpload={setIsHandlingUpload}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Box>
   );
 };

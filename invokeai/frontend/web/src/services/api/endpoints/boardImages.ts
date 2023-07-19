@@ -1,6 +1,7 @@
-import { OffsetPaginatedResults_ImageDTO_ } from 'services/api/types';
+import { ImageDTO, OffsetPaginatedResults_ImageDTO_ } from 'services/api/types';
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
 import { paths } from '../schema';
+import { BoardId } from 'features/gallery/store/gallerySlice';
 
 type ListBoardImagesArg =
   paths['/api/v1/board_images/{board_id}']['get']['parameters']['path'] &
@@ -45,39 +46,7 @@ export const boardImagesApi = api.injectEndpoints({
         return tags;
       },
     }),
-
-    /**
-     * Board Images Mutations
-     */
-
-    addImageToBoard: build.mutation<void, AddImageToBoardArg>({
-      query: ({ board_id, image_name }) => ({
-        url: `board_images/`,
-        method: 'POST',
-        body: { board_id, image_name },
-      }),
-      invalidatesTags: (result, error, arg) => [
-        { type: 'BoardImage' },
-        { type: 'Board', id: arg.board_id },
-      ],
-    }),
-
-    removeImageFromBoard: build.mutation<void, RemoveImageFromBoardArg>({
-      query: ({ board_id, image_name }) => ({
-        url: `board_images/`,
-        method: 'DELETE',
-        body: { board_id, image_name },
-      }),
-      invalidatesTags: (result, error, arg) => [
-        { type: 'BoardImage' },
-        { type: 'Board', id: arg.board_id },
-      ],
-    }),
   }),
 });
 
-export const {
-  useAddImageToBoardMutation,
-  useRemoveImageFromBoardMutation,
-  useListBoardImagesQuery,
-} = boardImagesApi;
+export const { useListBoardImagesQuery } = boardImagesApi;

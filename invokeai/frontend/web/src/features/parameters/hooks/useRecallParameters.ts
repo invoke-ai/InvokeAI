@@ -244,22 +244,7 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Sets initial image with toast
-   */
-  const recallInitialImage = useCallback(
-    async (image: unknown) => {
-      if (!isImageField(image)) {
-        parameterNotSetToast();
-        return;
-      }
-      dispatch(initialImageSelected(image.image_name));
-      parameterSetToast();
-    },
-    [dispatch, parameterSetToast, parameterNotSetToast]
-  );
-
-  /**
+  /*
    * Sets image as initial image with toast
    */
   const sendToImageToImage = useCallback(
@@ -330,7 +315,6 @@ export const useRecallParameters = () => {
     recallPositivePrompt,
     recallNegativePrompt,
     recallSeed,
-    recallInitialImage,
     recallCfgScale,
     recallModel,
     recallScheduler,

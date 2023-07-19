@@ -68,6 +68,7 @@ export const IAINoContentFallback = (props: IAINoImageFallbackProps) => {
         flexDir: 'column',
         gap: 2,
         userSelect: 'none',
+        opacity: 0.7,
         color: 'base.700',
         _dark: {
           color: 'base.500',
