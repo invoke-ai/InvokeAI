@@ -518,8 +518,8 @@ class ImageScaleInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_scale"] = "img_scale"
 
     # Inputs
-    image:       Optional[ImageField] = Field(default=None, description="The image to scale")
-    scale_factor:                  float = Field(gt=0, description="The factor by which to scale the image")
+    image:          Optional[ImageField] = Field(default=None, description="The image to scale")
+    scale_factor:        Optional[float] = Field(default=2.0, gt=0, description="The factor by which to scale the image")
     resample_mode:  PIL_RESAMPLING_MODES = Field(default="bicubic", description="The resampling mode")
     # fmt: on
 

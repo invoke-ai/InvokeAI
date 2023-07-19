@@ -59,15 +59,8 @@ export const SCHEDULER_LABEL_MAP: Record<SchedulerParam, string> = {
 
 export type Scheduler = (typeof SCHEDULER_NAMES)[number];
 
-// Valid upscaling levels
-export const UPSCALING_LEVELS: Array<{ label: string; value: string }> = [
-  { label: '2x', value: '2' },
-  { label: '4x', value: '4' },
-];
 export const NUMPY_RAND_MIN = 0;
 
 export const NUMPY_RAND_MAX = 2147483647;
-
-export const FACETOOL_TYPES = ['gfpgan', 'codeformer'] as const;
 
 export const NODE_MIN_WIDTH = 250;

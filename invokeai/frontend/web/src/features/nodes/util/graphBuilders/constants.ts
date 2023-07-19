@@ -20,6 +20,9 @@ export const DYNAMIC_PROMPT = 'dynamic_prompt';
 export const IMAGE_COLLECTION = 'image_collection';
 export const IMAGE_COLLECTION_ITERATE = 'image_collection_iterate';
 export const METADATA_ACCUMULATOR = 'metadata_accumulator';
+export const REALESRGAN = 'esrgan';
+export const DIVIDE = 'divide';
+export const SCALE = 'scale_image';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';

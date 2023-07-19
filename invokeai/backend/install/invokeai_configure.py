@@ -222,7 +222,7 @@ def download_conversion_models():
 
 # ---------------------------------------------
 def download_realesrgan():
-    logger.info("Installing RealESRGAN models...")
+    logger.info("Installing ESRGAN Upscaling models...")
     URLs = [
         dict(
             url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
@@ -238,6 +238,11 @@ def download_realesrgan():
             url= "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
             dest= "core/upscaling/realesrgan/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
             description = "ESRGAN_SRx4_DF2KOST_official.pth",
+        ),
+        dict(
+            url= "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
+            dest= "core/upscaling/realesrgan/RealESRGAN_x2plus.pth",
+            description = "RealESRGAN_x2plus.pth",
         ),
     ]
     for model in URLs:
