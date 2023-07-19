@@ -174,7 +174,10 @@ export const boardsApi = api.injectEndpoints({
                   const newCount = imagesAdapter
                     .getSelectors()
                     .selectTotal(newState);
-                  draft.total = draft.total - (oldCount - newCount);
+                  draft.total = Math.max(
+                    draft.total - (oldCount - newCount),
+                    0
+                  );
                 }
               )
             );
@@ -238,7 +241,10 @@ export const boardsApi = api.injectEndpoints({
                   const newCount = imagesAdapter
                     .getSelectors()
                     .selectTotal(newState);
-                  draft.total = draft.total - (oldCount - newCount);
+                  draft.total = Math.max(
+                    draft.total - (oldCount - newCount),
+                    0
+                  );
                 }
               )
             );

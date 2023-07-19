@@ -198,7 +198,7 @@ export const imagesApi = api.injectEndpoints({
                 cacheKey,
                 (draft) => {
                   imagesAdapter.removeOne(draft, image_name);
-                  draft.total -= 1;
+                  draft.total = Math.max(draft.total - 1, 0);
                 }
               )
             )
@@ -460,7 +460,7 @@ export const imagesApi = api.injectEndpoints({
                   // sanity check
                   if (draft.ids.includes(image_name)) {
                     imagesAdapter.removeOne(draft, image_name);
-                    draft.total -= 1;
+                    draft.total = Math.max(draft.total - 1, 0);
                   }
                 }
               )
@@ -567,7 +567,7 @@ export const imagesApi = api.injectEndpoints({
                   // sanity check
                   if (draft.ids.includes(image_name)) {
                     imagesAdapter.removeOne(draft, image_name);
-                    draft.total -= 1;
+                    draft.total = Math.max(draft.total - 1, 0);
                   }
                 }
               )
