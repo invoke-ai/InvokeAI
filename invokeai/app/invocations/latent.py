@@ -38,6 +38,10 @@ from diffusers.models.attention_processor import (
     XFormersAttnProcessor,
 )
 
+def choose_torch_device() -> str:
+    # Your device selection logic here
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    return device
 
 class LatentsField(BaseModel):
     """A latents field used for passing latents between invocations"""
