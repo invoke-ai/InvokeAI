@@ -133,10 +133,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     removeFromBoard({ imageDTO });
   }, [imageDTO, removeFromBoard]);
 
-  const handleOpenInNewTab = useCallback(() => {
-    window.open(imageDTO.image_url, '_blank');
-  }, [imageDTO.image_url]);
-
   const handleAddToBatch = useCallback(() => {
     dispatch(imagesAddedToBatch([imageDTO.image_name]));
   }, [dispatch, imageDTO.image_name]);
@@ -148,10 +144,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   return (
     <>
       <Link href={imageDTO.image_url} target="_blank">
-        <MenuItem
-          icon={<FaExternalLinkAlt />}
-          onClickCapture={handleOpenInNewTab}
-        >
+        <MenuItem icon={<FaExternalLinkAlt />}>
           {t('common.openInNewTab')}
         </MenuItem>
       </Link>
