@@ -85,6 +85,7 @@ export interface SystemState {
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
   boardIdToAddTo?: string;
+  isNodesEnabled: boolean;
 }
 
 export const initialSystemState: SystemState = {
@@ -117,6 +118,7 @@ export const initialSystemState: SystemState = {
   isPersisted: false,
   language: 'en',
   isUploading: false,
+  isNodesEnabled: false,
 };
 
 export const systemSlice = createSlice({
@@ -191,6 +193,9 @@ export const systemSlice = createSlice({
     },
     progressImageSet(state, action: PayloadAction<ProgressImage | null>) {
       state.progressImage = action.payload;
+    },
+    setIsNodesEnabled(state, action: PayloadAction<boolean>) {
+      state.isNodesEnabled = action.payload;
     },
   },
   extraReducers(builder) {
@@ -400,6 +405,7 @@ export const {
   shouldAntialiasProgressImageChanged,
   languageChanged,
   progressImageSet,
+  setIsNodesEnabled,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
