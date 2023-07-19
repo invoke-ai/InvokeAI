@@ -18,6 +18,12 @@ const templatesSelector = createSelector(
   (nodes) => nodes.invocationTemplates
 );
 
+export const DRAG_HANDLE_CLASSNAME = 'node-drag-handle';
+
+export const SHARED_NODE_PROPERTIES: Partial<Node> = {
+  dragHandle: `.${DRAG_HANDLE_CLASSNAME}`,
+};
+
 export const useBuildInvocation = () => {
   const invocationTemplates = useAppSelector(templatesSelector);
 
@@ -32,6 +38,7 @@ export const useBuildInvocation = () => {
         });
 
         const node: Node = {
+          ...SHARED_NODE_PROPERTIES,
           id: 'progress_image',
           type: 'progress_image',
           position: { x: x, y: y },
@@ -91,6 +98,7 @@ export const useBuildInvocation = () => {
       });
 
       const invocation: Node<InvocationValue> = {
+        ...SHARED_NODE_PROPERTIES,
         id: nodeId,
         type: 'invocation',
         position: { x: x, y: y },

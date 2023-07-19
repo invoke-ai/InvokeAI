@@ -77,18 +77,14 @@ export type ImageDraggableData = BaseDragData & {
   payload: { imageDTO: ImageDTO };
 };
 
-export type GallerySelectionDraggableData = BaseDragData & {
-  payloadType: 'GALLERY_SELECTION';
-};
-
-export type BatchSelectionDraggableData = BaseDragData & {
-  payloadType: 'BATCH_SELECTION';
+export type ImageNamesDraggableData = BaseDragData & {
+  payloadType: 'IMAGE_NAMES';
+  payload: { image_names: string[] };
 };
 
 export type TypesafeDraggableData =
   | ImageDraggableData
-  | GallerySelectionDraggableData
-  | BatchSelectionDraggableData;
+  | ImageNamesDraggableData;
 
 interface UseDroppableTypesafeArguments
   extends Omit<UseDroppableArguments, 'data'> {
@@ -159,13 +155,11 @@ export const isValidDrop = (
     case 'SET_NODES_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_MULTI_NODES_IMAGE':
-      return payloadType === 'IMAGE_DTO' || 'GALLERY_SELECTION';
+      return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
     case 'ADD_TO_BATCH':
-      return payloadType === 'IMAGE_DTO' || 'GALLERY_SELECTION';
+      return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
     case 'MOVE_BOARD':
-      return (
-        payloadType === 'IMAGE_DTO' || 'GALLERY_SELECTION' || 'BATCH_SELECTION'
-      );
+      return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
     default:
       return false;
   }

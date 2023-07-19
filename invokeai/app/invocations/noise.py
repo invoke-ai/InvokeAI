@@ -48,7 +48,7 @@ def get_noise(
         dtype=torch_dtype(device),
         device=noise_device_type,
         generator=generator,
-    ).to(device)
+    ).to("cpu")
 
     return noise_tensor
 
@@ -112,6 +112,7 @@ class NoiseInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "Noise",
                 "tags": ["latents", "noise"],
             },
         }

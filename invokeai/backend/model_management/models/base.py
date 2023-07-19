@@ -30,6 +30,8 @@ class ModelNotFoundException(Exception):
 class BaseModelType(str, Enum):
     StableDiffusion1 = "sd-1"
     StableDiffusion2 = "sd-2"
+    StableDiffusionXL = "sdxl"
+    StableDiffusionXLRefiner = "sdxl-refiner"
     #Kandinsky2_1 = "kandinsky-2.1"
 
 class ModelType(str, Enum):
@@ -43,7 +45,9 @@ class ModelType(str, Enum):
 class SubModelType(str, Enum):
     UNet = "unet"
     TextEncoder = "text_encoder"
+    TextEncoder2 = "text_encoder_2"
     Tokenizer = "tokenizer"
+    Tokenizer2 = "tokenizer_2"
     Vae = "vae"
     VaeDecoder = "vae_decoder"
     VaeEncoder = "vae_encoder"
@@ -68,7 +72,6 @@ class ModelConfigBase(BaseModel):
     path: str # or Path
     description: Optional[str] = Field(None)
     model_format: Optional[str] = Field(None)
-    # do not save to config
     error: Optional[ModelError] = Field(None)
 
     class Config:

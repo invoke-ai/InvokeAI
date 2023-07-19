@@ -1,42 +1,76 @@
 import { Flex, Radio, RadioGroup, Text, Tooltip } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { makeToast } from 'app/components/Toaster';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
-import IAISelect from 'common/components/IAISelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAISlider from 'common/components/IAISlider';
+import { addToast } from 'features/system/store/systemSlice';
 import { pickBy } from 'lodash-es';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import {
+  useGetMainModelsQuery,
+  useMergeMainModelsMutation,
+} from 'services/api/endpoints/models';
+import { BaseModelType, MergeModelConfig } from 'services/api/types';
+
+const baseModelTypeSelectData = [
+  { label: 'Stable Diffusion 1', value: 'sd-1' },
+  { label: 'Stable Diffusion 2', value: 'sd-2' },
+];
+
+type MergeInterpolationMethods =
+  | 'weighted_sum'
+  | 'sigmoid'
+  | 'inv_sigmoid'
+  | 'add_difference';
 
 export default function MergeModelsPanel() {
   const { t } = useTranslation();
-
   const dispatch = useAppDispatch();
 
   const { data } = useGetMainModelsQuery();
 
-  const diffusersModels = pickBy(
+  const [mergeModels, { isLoading }] = useMergeMainModelsMutation();
+
+  const [baseModel, setBaseModel] = useState<BaseModelType>('sd-1');
+
+  const sd1DiffusersModels = pickBy(
     data?.entities,
-    (value, _) => value?.model_format === 'diffusers'
+    (value, _) =>
+      value?.model_format === 'diffusers' && value?.base_model === 'sd-1'
   );
 
-  const [modelOne, setModelOne] = useState<string>(
-    Object.keys(diffusersModels)[0]
+  const sd2DiffusersModels = pickBy(
+    data?.entities,
+    (value, _) =>
+      value?.model_format === 'diffusers' && value?.base_model === 'sd-2'
   );
-  const [modelTwo, setModelTwo] = useState<string>(
-    Object.keys(diffusersModels)[1]
+
+  const modelsMap = useMemo(() => {
+    return {
+      'sd-1': sd1DiffusersModels,
+      'sd-2': sd2DiffusersModels,
+    };
+  }, [sd1DiffusersModels, sd2DiffusersModels]);
+
+  const [modelOne, setModelOne] = useState<string | null>(
+    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])[0]
   );
-  const [modelThree, setModelThree] = useState<string>('none');
+  const [modelTwo, setModelTwo] = useState<string | null>(
+    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])[1]
+  );
+
+  const [modelThree, setModelThree] = useState<string | null>(null);
 
   const [mergedModelName, setMergedModelName] = useState<string>('');
   const [modelMergeAlpha, setModelMergeAlpha] = useState<number>(0.5);
 
-  const [modelMergeInterp, setModelMergeInterp] = useState<
-    'weighted_sum' | 'sigmoid' | 'inv_sigmoid' | 'add_difference'
-  >('weighted_sum');
+  const [modelMergeInterp, setModelMergeInterp] =
+    useState<MergeInterpolationMethods>('weighted_sum');
 
   const [modelMergeSaveLocType, setModelMergeSaveLocType] = useState<
     'root' | 'custom'
@@ -47,41 +81,73 @@ export default function MergeModelsPanel() {
 
   const [modelMergeForce, setModelMergeForce] = useState<boolean>(false);
 
-  const modelOneList = Object.keys(diffusersModels).filter(
-    (model) => model !== modelTwo && model !== modelThree
-  );
+  const modelOneList = Object.keys(
+    modelsMap[baseModel as keyof typeof modelsMap]
+  ).filter((model) => model !== modelTwo && model !== modelThree);
 
-  const modelTwoList = Object.keys(diffusersModels).filter(
-    (model) => model !== modelOne && model !== modelThree
-  );
+  const modelTwoList = Object.keys(
+    modelsMap[baseModel as keyof typeof modelsMap]
+  ).filter((model) => model !== modelOne && model !== modelThree);
 
-  const modelThreeList = [
-    { key: t('modelManager.none'), value: 'none' },
-    ...Object.keys(diffusersModels)
-      .filter((model) => model !== modelOne && model !== modelTwo)
-      .map((model) => ({ key: model, value: model })),
-  ];
+  const modelThreeList = Object.keys(
+    modelsMap[baseModel as keyof typeof modelsMap]
+  ).filter((model) => model !== modelOne && model !== modelTwo);
 
-  const isProcessing = useAppSelector(
-    (state: RootState) => state.system.isProcessing
-  );
+  const handleBaseModelChange = (v: string) => {
+    setBaseModel(v as BaseModelType);
+    setModelOne(null);
+    setModelTwo(null);
+  };
 
   const mergeModelsHandler = () => {
-    let modelsToMerge: string[] = [modelOne, modelTwo, modelThree];
-    modelsToMerge = modelsToMerge.filter((model) => model !== 'none');
+    const models_names: string[] = [];
 
-    const mergeModelsInfo: InvokeAI.InvokeModelMergingProps = {
-      models_to_merge: modelsToMerge,
+    let modelsToMerge: (string | null)[] = [modelOne, modelTwo, modelThree];
+    modelsToMerge = modelsToMerge.filter((model) => model !== null);
+    modelsToMerge.forEach((model) => {
+      if (model) {
+        models_names.push(model?.split('/')[2]);
+      }
+    });
+
+    const mergeModelsInfo: MergeModelConfig = {
+      model_names: models_names,
       merged_model_name:
-        mergedModelName !== '' ? mergedModelName : modelsToMerge.join('-'),
+        mergedModelName !== '' ? mergedModelName : models_names.join('-'),
       alpha: modelMergeAlpha,
       interp: modelMergeInterp,
-      model_merge_save_path:
-        modelMergeSaveLocType === 'root' ? null : modelMergeCustomSaveLoc,
       force: modelMergeForce,
+      merge_dest_directory:
+        modelMergeSaveLocType === 'root' ? undefined : modelMergeCustomSaveLoc,
     };
 
-    dispatch(mergeDiffusersModels(mergeModelsInfo));
+    mergeModels({
+      base_model: baseModel,
+      body: mergeModelsInfo,
+    })
+      .unwrap()
+      .then((_) => {
+        dispatch(
+          addToast(
+            makeToast({
+              title: t('modelManager.modelsMerged'),
+              status: 'success',
+            })
+          )
+        );
+      })
+      .catch((error) => {
+        if (error) {
+          dispatch(
+            addToast(
+              makeToast({
+                title: t('modelManager.modelsMergeFailed'),
+                status: 'error',
+              })
+            )
+          );
+        }
+      });
   };
 
   return (
@@ -90,7 +156,6 @@ export default function MergeModelsPanel() {
         sx={{
           flexDirection: 'column',
           rowGap: 1,
-          bg: 'base.900',
         }}
       >
         <Text>{t('modelManager.modelMergeHeaderHelp1')}</Text>
@@ -98,26 +163,43 @@ export default function MergeModelsPanel() {
           {t('modelManager.modelMergeHeaderHelp2')}
         </Text>
       </Flex>
+
       <Flex columnGap={4}>
-        <IAISelect
+        <IAIMantineSelect
+          label="Model Type"
+          w="100%"
+          data={baseModelTypeSelectData}
+          value={baseModel}
+          onChange={handleBaseModelChange}
+        />
+        <IAIMantineSearchableSelect
           label={t('modelManager.modelOne')}
-          validValues={modelOneList}
-          onChange={(e) => setModelOne(e.target.value)}
+          w="100%"
+          value={modelOne}
+          placeholder={t('modelManager.selectModel')}
+          data={modelOneList}
+          onChange={(v) => setModelOne(v)}
         />
-        <IAISelect
+        <IAIMantineSearchableSelect
           label={t('modelManager.modelTwo')}
-          validValues={modelTwoList}
-          onChange={(e) => setModelTwo(e.target.value)}
+          w="100%"
+          placeholder={t('modelManager.selectModel')}
+          value={modelTwo}
+          data={modelTwoList}
+          onChange={(v) => setModelTwo(v)}
         />
-        <IAISelect
+        <IAIMantineSearchableSelect
           label={t('modelManager.modelThree')}
-          validValues={modelThreeList}
-          onChange={(e) => {
-            if (e.target.value !== 'none') {
-              setModelThree(e.target.value);
+          data={modelThreeList}
+          w="100%"
+          placeholder={t('modelManager.selectModel')}
+          clearable
+          onChange={(v) => {
+            if (!v) {
+              setModelThree(null);
               setModelMergeInterp('add_difference');
             } else {
-              setModelThree('none');
+              setModelThree(v);
               setModelMergeInterp('weighted_sum');
             }
           }}
@@ -136,7 +218,10 @@ export default function MergeModelsPanel() {
           padding: 4,
           borderRadius: 'base',
           gap: 4,
-          bg: 'base.900',
+          bg: 'base.200',
+          _dark: {
+            bg: 'base.800',
+          },
         }}
       >
         <IAISlider
@@ -161,7 +246,10 @@ export default function MergeModelsPanel() {
           padding: 4,
           borderRadius: 'base',
           gap: 4,
-          bg: 'base.900',
+          bg: 'base.200',
+          _dark: {
+            bg: 'base.800',
+          },
         }}
       >
         <Text fontWeight={500} fontSize="sm" variant="subtext">
@@ -169,12 +257,10 @@ export default function MergeModelsPanel() {
         </Text>
         <RadioGroup
           value={modelMergeInterp}
-          onChange={(
-            v: 'weighted_sum' | 'sigmoid' | 'inv_sigmoid' | 'add_difference'
-          ) => setModelMergeInterp(v)}
+          onChange={(v: MergeInterpolationMethods) => setModelMergeInterp(v)}
         >
           <Flex columnGap={4}>
-            {modelThree === 'none' ? (
+            {modelThree === null ? (
               <>
                 <Radio value="weighted_sum">
                   <Text fontSize="sm">{t('modelManager.weightedSum')}</Text>
@@ -205,7 +291,10 @@ export default function MergeModelsPanel() {
           padding: 4,
           borderRadius: 'base',
           gap: 4,
-          bg: 'base.900',
+          bg: 'base.200',
+          _dark: {
+            bg: 'base.900',
+          },
         }}
       >
         <Flex columnGap={4}>
@@ -246,10 +335,8 @@ export default function MergeModelsPanel() {
 
       <IAIButton
         onClick={mergeModelsHandler}
-        isLoading={isProcessing}
-        isDisabled={
-          modelMergeSaveLocType === 'custom' && modelMergeCustomSaveLoc === ''
-        }
+        isLoading={isLoading}
+        isDisabled={modelOne === null || modelTwo === null}
       >
         {t('modelManager.merge')}
       </IAIButton>

@@ -5,7 +5,6 @@ import {
   LoraLoaderInvocation,
   MetadataAccumulatorInvocation,
 } from 'services/api/types';
-import { modelIdToLoRAModelField } from '../modelIdToLoRAName';
 import {
   CLIP_SKIP,
   LORA_LOADER,
@@ -61,23 +60,22 @@ export const addLoRAsToGraph = (
   let currentLoraIndex = 0;
 
   forEach(loras, (lora) => {
-    const { id, name, weight } = lora;
-    const loraField = modelIdToLoRAModelField(id);
-    const currentLoraNodeId = `${LORA_LOADER}_${loraField.model_name.replace(
-      '.',
-      '_'
-    )}`;
+    const { model_name, base_model, weight } = lora;
+    const currentLoraNodeId = `${LORA_LOADER}_${model_name.replace('.', '_')}`;
 
     const loraLoaderNode: LoraLoaderInvocation = {
       type: 'lora_loader',
       id: currentLoraNodeId,
-      lora: loraField,
+      lora: { model_name, base_model },
       weight,
     };
 
     // add the lora to the metadata accumulator
     if (metadataAccumulator) {
-      metadataAccumulator.loras.push({ lora: loraField, weight });
+      metadataAccumulator.loras.push({
+        lora: { model_name, base_model },
+        weight,
+      });
     }
 
     // add to graph

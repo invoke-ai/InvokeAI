@@ -28,11 +28,14 @@ export type OffsetPaginatedResults_ImageDTO_ =
 
 // Models
 export type ModelType = components['schemas']['ModelType'];
+export type SubModelType = components['schemas']['SubModelType'];
 export type BaseModelType = components['schemas']['BaseModelType'];
 export type MainModelField = components['schemas']['MainModelField'];
 export type OnnxModelField = components['schemas']['OnnxModelField'];
 export type VAEModelField = components['schemas']['VAEModelField'];
 export type LoRAModelField = components['schemas']['LoRAModelField'];
+export type ControlNetModelField =
+  components['schemas']['ControlNetModelField'];
 export type ModelsList = components['schemas']['ModelsList'];
 export type ControlField = components['schemas']['ControlField'];
 
@@ -43,18 +46,28 @@ export type ControlNetModelConfig =
   components['schemas']['ControlNetModelConfig'];
 export type TextualInversionModelConfig =
   components['schemas']['TextualInversionModelConfig'];
-export type MainModelConfig =
-  | components['schemas']['StableDiffusion1ModelCheckpointConfig']
+export type DiffusersModelConfig =
   | components['schemas']['StableDiffusion1ModelDiffusersConfig']
+  | components['schemas']['StableDiffusion2ModelDiffusersConfig']
+  | components['schemas']['StableDiffusionXLModelDiffusersConfig'];
+export type CheckpointModelConfig =
+  | components['schemas']['StableDiffusion1ModelCheckpointConfig']
   | components['schemas']['StableDiffusion2ModelCheckpointConfig']
   | components['schemas']['StableDiffusion2ModelDiffusersConfig'];
 export type OnnxModelConfig = components['schemas']['ONNXStableDiffusion1ModelConfig']
+  | components['schemas']['StableDiffusionXLModelCheckpointConfig'];
+export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig
   | VaeModelConfig
   | ControlNetModelConfig
   | TextualInversionModelConfig
-  | MainModelConfig;
+  | MainModelConfig
+  | OnnxModelConfig;
+
+export type MergeModelConfig = components['schemas']['Body_merge_models'];
+export type ConvertModelConfig = components['schemas']['Body_convert_model'];
+export type ImportModelConfig = components['schemas']['Body_import_model'];
 
 // Graphs
 export type Graph = components['schemas']['Graph'];
@@ -80,6 +93,9 @@ export type InpaintInvocation = TypeReq<
 >;
 export type ImageResizeInvocation = TypeReq<
   components['schemas']['ImageResizeInvocation']
+>;
+export type ImageScaleInvocation = TypeReq<
+  components['schemas']['ImageScaleInvocation']
 >;
 export type RandomIntInvocation = TypeReq<
   components['schemas']['RandomIntInvocation']
@@ -117,6 +133,12 @@ export type LoraLoaderInvocation = TypeReq<
 >;
 export type MetadataAccumulatorInvocation = TypeReq<
   components['schemas']['MetadataAccumulatorInvocation']
+>;
+export type ESRGANInvocation = TypeReq<
+  components['schemas']['ESRGANInvocation']
+>;
+export type DivideInvocation = TypeReq<
+  components['schemas']['DivideInvocation']
 >;
 
 // ControlNet Nodes

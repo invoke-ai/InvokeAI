@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from typing import List, Dict, Callable, Union, Set
 
 import requests
-from diffusers import StableDiffusionPipeline
+from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
 from huggingface_hub import hf_hub_url, HfFolder, HfApi
 from omegaconf import OmegaConf
@@ -71,8 +71,6 @@ class ModelInstallList:
 class InstallSelections():
     install_models: List[str]= field(default_factory=list)
     remove_models: List[str]=field(default_factory=list)
-#    scan_directory: Path = None
-#    autoscan_on_startup: bool=False
 
 @dataclass
 class ModelLoadInfo():
@@ -119,6 +117,7 @@ class ModelInstall(object):
 
         # supplement with entries in models.yaml
         installed_models = self.mgr.list_models()
+        
         for md in installed_models:
             base = md['base_model']
             model_type = md['model_type']
@@ -135,6 +134,12 @@ class ModelInstall(object):
                     installed = True,
                 )
         return {x : model_dict[x] for x in sorted(model_dict.keys(),key=lambda y: model_dict[y].name.lower())}
+
+    def list_models(self, model_type):
+        installed = self.mgr.list_models(model_type=model_type)
+        print(f'Installed models of type `{model_type}`:')
+        for i in installed:
+            print(f"{i['model_name']}\t{i['base_model']}\t{i['path']}")
 
     def starter_models(self)->Set[str]:
         models = set()
@@ -207,7 +212,7 @@ class ModelInstall(object):
                                     {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}
                                     ]
                                    ):
-            models_installed.update(self._install_path(path))
+            models_installed.update({str(model_path_id_or_url): self._install_path(path)})
 
         # recursive scan
         elif path.is_dir():
@@ -305,6 +310,8 @@ class ModelInstall(object):
         if key := self.reverse_paths.get(path_name):
             (name, base, mtype) = ModelManager.parse_key(key)
             return name
+        elif location.is_dir():
+            return location.name
         else:
             return location.stem
 
@@ -360,7 +367,7 @@ class ModelInstall(object):
         model = None
         for revision in revisions:
             try:
-                model = StableDiffusionPipeline.from_pretrained(repo_id,revision=revision,safety_checker=None)
+                model = DiffusionPipeline.from_pretrained(repo_id,revision=revision,safety_checker=None)
             except:  # most errors are due to fp16 not being present. Fix this to catch other errors
                 pass
             if model:

@@ -256,6 +256,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         widgets = dict()
         model_list = [x for x in self.all_models if self.all_models[x].model_type==model_type and not x in exclude]
         model_labels = [self.model_labels[x] for x in model_list]
+
+        show_recommended = len(self.installed_models)==0
         if len(model_list) > 0:
             max_width = max([len(x) for x in model_labels])
             columns = window_width // (max_width+8)  # 8 characters for "[x] " and padding
@@ -280,7 +282,8 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                     value=[
                         model_list.index(x)
                         for x in model_list
-                        if self.all_models[x].installed
+                        if (show_recommended and self.all_models[x].recommended) \
+                            or self.all_models[x].installed
                     ],
                     max_height=len(model_list)//columns + 1,
                     relx=4,
@@ -672,7 +675,9 @@ def select_and_download_models(opt: Namespace):
     # pass
     
     installer = ModelInstall(config, prediction_type_helper=helper)
-    if opt.add or opt.delete:
+    if opt.list_models:
+        installer.list_models(opt.list_models)
+    elif opt.add or opt.delete:
         selections = InstallSelections(
             install_models = opt.add or [],
             remove_models = opt.delete or []
@@ -696,7 +701,7 @@ def select_and_download_models(opt: Namespace):
 
         # the third argument is needed in the Windows 11 environment in
         # order to launch and resize a console window running this program
-        set_min_terminal_size(MIN_COLS, MIN_LINES,'invokeai-model-install')
+        set_min_terminal_size(MIN_COLS, MIN_LINES)
         installApp = AddModelApplication(opt)
         try:
             installApp.run()
@@ -745,7 +750,7 @@ def main():
     )
     parser.add_argument(
         "--list-models",
-        choices=["diffusers","loras","controlnets","tis"],
+        choices=[x.value for x in ModelType],
         help="list installed models",
     )
     parser.add_argument(
@@ -773,7 +778,7 @@ def main():
     config.parse_args(invoke_args)
     logger = InvokeAILogger().getLogger(config=config)
 
-    if not (config.conf_path / 'models.yaml').exists():
+    if not config.model_conf_path.exists():
         logger.info(
             "Your InvokeAI root directory is not set up. Calling invokeai-configure."
         )

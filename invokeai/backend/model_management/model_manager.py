@@ -106,16 +106,16 @@ providing information about a model defined in models.yaml. For example:
 
    >>> models = mgr.list_models()
    >>> json.dumps(models[0])
-  {"path": "/home/lstein/invokeai-main/models/sd-1/controlnet/canny", 
-    "model_format": "diffusers", 
-    "name": "canny", 
-    "base_model": "sd-1", 
+  {"path": "/home/lstein/invokeai-main/models/sd-1/controlnet/canny",
+    "model_format": "diffusers",
+    "name": "canny",
+    "base_model": "sd-1",
     "type": "controlnet"
    }
 
 You can filter by model type and base model as shown here:
 
-  
+
   controlnets = mgr.list_models(model_type=ModelType.ControlNet,
                                 base_model=BaseModelType.StableDiffusion1)
   for c in controlnets:
@@ -140,14 +140,14 @@ Layout of the `models` directory:
 
  models
  ├── sd-1
- │   ├── controlnet
- │   ├── lora
- │   ├── main
- │   └── embedding
+ │   ├── controlnet
+ │   ├── lora
+ │   ├── main
+ │   └── embedding
  ├── sd-2
- │   ├── controlnet
- │   ├── lora
- │   ├── main
+ │   ├── controlnet
+ │   ├── lora
+ │   ├── main
  │   └── embedding
  └── core
      ├── face_reconstruction
@@ -195,7 +195,7 @@ name, base model, type and a dict of model attributes. See
 `invokeai/backend/model_management/models` for the attributes required
 by each model type.
 
-A model can be deleted using `del_model()`, providing the same 
+A model can be deleted using `del_model()`, providing the same
 identifying information as `get_model()`
 
 The `heuristic_import()` method will take a set of strings
@@ -247,6 +247,7 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util import CUDA_DEVICE, Chdir
 from .model_cache import ModelCache, ModelLocker
+from .model_search import ModelSearch
 from .models import (
     BaseModelType, ModelType, SubModelType,
     ModelError, SchedulerPredictionType, MODEL_CLASSES,
@@ -303,7 +304,7 @@ class ModelManager(object):
         logger: types.ModuleType = logger,
     ):
         """
-        Initialize with the path to the models.yaml config file. 
+        Initialize with the path to the models.yaml config file.
         Optional parameters are the torch device type, precision, max_models,
         and sequential_offload boolean. Note that the default device
         type and precision are set up for a CUDA system running at half precision.
@@ -323,15 +324,6 @@ class ModelManager(object):
         # TODO: metadata not found
         # TODO: version check
 
-        self.models = dict()
-        for model_key, model_config in config.items():
-            model_name, base_model, model_type = self.parse_key(model_key)
-            model_class = MODEL_CLASSES[base_model][model_type]
-            # alias for config file
-            model_config["model_format"] = model_config.pop("format")
-            self.models[model_key] = model_class.create_config(**model_config)
-
-        # check config version number and update on disk/RAM if necessary
         self.app_config = InvokeAIAppConfig.get_config()
         self.logger = logger
         self.cache = ModelCache(
@@ -342,10 +334,40 @@ class ModelManager(object):
             sequential_offload = sequential_offload,
             logger = logger,
         )
+
+        self._read_models(config)
+
+    def _read_models(self, config: Optional[DictConfig] = None):
+        if not config:
+            if self.config_path:
+                config = OmegaConf.load(self.config_path)
+            else:
+                return
+
+        self.models = dict()
+        for model_key, model_config in config.items():
+            if model_key.startswith('_'):
+                continue
+            model_name, base_model, model_type = self.parse_key(model_key)
+            model_class = MODEL_CLASSES[base_model][model_type]
+            # alias for config file
+            model_config["model_format"] = model_config.pop("format")
+            self.models[model_key] = model_class.create_config(**model_config)
+
+        # check config version number and update on disk/RAM if necessary
         self.cache_keys = dict()
 
         # add controlnet, lora and textual_inversion models from disk
         self.scan_models_directory()
+
+    def sync_to_config(self):
+        """
+        Call this when `models.yaml` has been changed externally.
+        This will reinitialize internal data structures
+        """
+        # Reread models directory; note that this will reinitialize the cache,
+        # causing otherwise unreferenced models to be removed from memory
+        self._read_models()
 
     def model_exists(
         self,
@@ -409,7 +431,7 @@ class ModelManager(object):
         :param model_name: symbolic name of the model in models.yaml
         :param model_type: ModelType enum indicating the type of model to return
         :param base_model: BaseModelType enum indicating the base model used by this model
-        :param submode_typel: an ModelType enum indicating the portion of 
+        :param submode_typel: an ModelType enum indicating the portion of
                the model to retrieve (e.g. ModelType.Vae)
         """
         model_class = MODEL_CLASSES[base_model][model_type]
@@ -434,7 +456,7 @@ class ModelManager(object):
                 raise ModelNotFoundException(f"Model not found - {model_key}")
 
         # vae/movq override
-        # TODO: 
+        # TODO:
         if submodel_type is not None and hasattr(model_config, submodel_type):
             override_path = getattr(model_config, submodel_type)
             if override_path:
@@ -467,7 +489,7 @@ class ModelManager(object):
         self.cache_keys[model_key].add(model_context.key)
 
         model_hash = "<NO_HASH>" # TODO:
-            
+
         return ModelInfo(
             context = model_context,
             name = model_name,
@@ -496,7 +518,7 @@ class ModelManager(object):
 
     def model_names(self) -> List[Tuple[str, BaseModelType, ModelType]]:
         """
-        Return a list of (str, BaseModelType, ModelType) corresponding to all models 
+        Return a list of (str, BaseModelType, ModelType) corresponding to all models
         known to the configuration.
         """
         return [(self.parse_key(x)) for x in self.models.keys()]
@@ -527,7 +549,10 @@ class ModelManager(object):
         model_keys = [self.create_key(model_name, base_model, model_type)] if model_name else sorted(self.models, key=str.casefold)
         models = []
         for model_key in model_keys:
-            model_config = self.models[model_key]
+            model_config = self.models.get(model_key)
+            if not model_config:
+                self.logger.error(f'Unknown model {model_name}')
+                raise ModelNotFoundException(f'Unknown model {model_name}')
 
             cur_model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
             if base_model is not None and cur_base_model != base_model:
@@ -543,6 +568,9 @@ class ModelManager(object):
                 model_type=cur_model_type,
             )
 
+            # expose paths as absolute to help web UI
+            if path := model_dict.get('path'):
+                model_dict['path'] = str(self.app_config.root_path / path)
             models.append(model_dict)
 
         return models
@@ -571,7 +599,7 @@ class ModelManager(object):
         model_cfg = self.models.pop(model_key, None)
 
         if model_cfg is None:
-            raise KeyError(f"Unknown model {model_key}")
+            raise ModelNotFoundException(f"Unknown model {model_key}")
 
         # note: it not garantie to release memory(model can has other references)
         cache_ids = self.cache_keys.pop(model_key, [])
@@ -589,6 +617,7 @@ class ModelManager(object):
                 rmtree(str(model_path))
             else:
                 model_path.unlink()
+        self.commit()
 
     # LS: tested
     def add_model(
@@ -609,6 +638,10 @@ class ModelManager(object):
         The returned dict has the same format as the dict returned by
         model_info().
         """
+        # relativize paths as they go in - this makes it easier to move the root directory around
+        if path := model_attributes.get('path'):
+            if Path(path).is_relative_to(self.app_config.root_path):
+                model_attributes['path'] = str(Path(path).relative_to(self.app_config.root_path))
 
         model_class = MODEL_CLASSES[base_model][model_type]
         model_config = model_class.create_config(**model_attributes)
@@ -645,11 +678,61 @@ class ModelManager(object):
             config = model_config,
         )
 
+    def rename_model(
+            self,
+            model_name: str,
+            base_model: BaseModelType,
+            model_type: ModelType,
+            new_name: str = None,
+            new_base: BaseModelType = None,
+    ):
+        '''
+        Rename or rebase a model.
+        '''
+        if new_name is None and new_base is None:
+            self.logger.error("rename_model() called with neither a new_name nor a new_base. {model_name} unchanged.")
+            return
+
+        model_key = self.create_key(model_name, base_model, model_type)
+        model_cfg = self.models.get(model_key, None)
+        if not model_cfg:
+            raise ModelNotFoundException(f"Unknown model: {model_key}")
+
+        old_path = self.app_config.root_path / model_cfg.path
+        new_name = new_name or model_name
+        new_base = new_base or base_model
+        new_key = self.create_key(new_name, new_base, model_type)
+        if new_key in self.models:
+            raise ValueError(f'Attempt to overwrite existing model definition "{new_key}"')
+
+        # if this is a model file/directory that we manage ourselves, we need to move it
+        if old_path.is_relative_to(self.app_config.models_path):
+            new_path = self.app_config.root_path / 'models' / BaseModelType(new_base).value / ModelType(model_type).value / new_name
+            move(old_path, new_path)
+            model_cfg.path = str(new_path.relative_to(self.app_config.root_path))
+
+        # clean up caches
+        old_model_cache = self._get_model_cache_path(old_path)
+        if old_model_cache.exists():
+            if old_model_cache.is_dir():
+                rmtree(str(old_model_cache))
+            else:
+                old_model_cache.unlink()
+
+        cache_ids = self.cache_keys.pop(model_key, [])
+        for cache_id in cache_ids:
+            self.cache.uncache_model(cache_id)
+
+        self.models.pop(model_key, None) # delete
+        self.models[new_key] = model_cfg
+        self.commit()
+
     def convert_model (
             self,
             model_name: str,
             base_model: BaseModelType,
             model_type: Union[ModelType.Main,ModelType.Vae],
+            dest_directory: Optional[Path]=None,
     ) -> AddModelResult:
         '''
         Convert a checkpoint file into a diffusers folder, deleting the cached
@@ -676,14 +759,14 @@ class ModelManager(object):
                                )
         checkpoint_path = self.app_config.root_path / info["path"]
         old_diffusers_path = self.app_config.models_path / model.location
-        new_diffusers_path = self.app_config.models_path / base_model.value / model_type.value / model_name
+        new_diffusers_path = (dest_directory or self.app_config.models_path / base_model.value / model_type.value) / model_name
         if new_diffusers_path.exists():
             raise ValueError(f"A diffusers model already exists at {new_diffusers_path}")
 
         try:
             move(old_diffusers_path,new_diffusers_path)
             info["model_format"] = "diffusers"
-            info["path"] = str(new_diffusers_path.relative_to(self.app_config.root_path))
+            info["path"] = str(new_diffusers_path) if dest_directory else str(new_diffusers_path.relative_to(self.app_config.root_path))
             info.pop('config')
 
             result = self.add_model(model_name, base_model, model_type,
@@ -693,12 +776,12 @@ class ModelManager(object):
             # something went wrong, so don't leave dangling diffusers model in directory or it will cause a duplicate model error!
             rmtree(new_diffusers_path)
             raise
-        
+
         if checkpoint_path.exists() and checkpoint_path.is_relative_to(self.app_config.models_path):
             checkpoint_path.unlink()
-        
+
         return result
-    
+
     def search_models(self, search_folder):
         self.logger.info(f"Finding Models In: {search_folder}")
         models_folder_ckpt = Path(search_folder).glob("**/*.ckpt")
@@ -741,10 +824,14 @@ class ModelManager(object):
         assert config_file_path is not None,'no config file path to write to'
         config_file_path = self.app_config.root_path / config_file_path
         tmpfile = os.path.join(os.path.dirname(config_file_path), "new_config.tmp")
-        with open(tmpfile, "w", encoding="utf-8") as outfile:
-            outfile.write(self.preamble())
-            outfile.write(yaml_str)
-        os.replace(tmpfile, config_file_path)
+        try:
+            with open(tmpfile, "w", encoding="utf-8") as outfile:
+                outfile.write(self.preamble())
+                outfile.write(yaml_str)
+            os.replace(tmpfile, config_file_path)
+        except OSError as err:
+            self.logger.warning(f"Could not modify the config file at {config_file_path}")
+            self.logger.warning(err)
 
     def preamble(self) -> str:
         """
@@ -823,6 +910,7 @@ class ModelManager(object):
         if (new_models_found or imported_models) and self.config_path:
             self.commit()
 
+
     def autoimport(self)->Dict[str, AddModelResult]:
         '''
         Scan the autoimport directory (if defined) and import new models, delete defunct models.
@@ -830,63 +918,41 @@ class ModelManager(object):
         # avoid circular import
         from invokeai.backend.install.model_install_backend import ModelInstall
         from invokeai.frontend.install.model_install import ask_user_for_prediction_type
-        
+
+        class ScanAndImport(ModelSearch):
+            def __init__(self, directories, logger, ignore: Set[Path], installer: ModelInstall):
+                super().__init__(directories, logger)
+                self.installer = installer
+                self.ignore = ignore
+
+            def on_search_started(self):
+                self.new_models_found = dict()
+
+            def on_model_found(self, model: Path):
+                if model not in self.ignore:
+                    self.new_models_found.update(self.installer.heuristic_import(model))
+
+            def on_search_completed(self):
+                self.logger.info(f'Scanned {self._items_scanned} files and directories, imported {len(self.new_models_found)} models')
+
+            def models_found(self):
+                return self.new_models_found
+
+
         installer = ModelInstall(config = self.app_config,
                                  model_manager = self,
                                  prediction_type_helper = ask_user_for_prediction_type,
                                  )
-        
-        scanned_dirs = set()
-        
         config = self.app_config
-        known_paths = {(self.app_config.root_path / x['path']) for x in self.list_models()}
-
-        for autodir in [config.autoimport_dir,
-                        config.lora_dir,
-                        config.embedding_dir,
-                        config.controlnet_dir]:
-            if autodir is None:
-                continue
-
-            self.logger.info(f'Scanning {autodir} for models to import')
-            installed = dict()
-        
-            autodir = self.app_config.root_path / autodir
-            if not autodir.exists():
-                continue
-
-            items_scanned = 0
-            new_models_found = dict()
-            
-            for root, dirs, files in os.walk(autodir):
-                items_scanned += len(dirs) + len(files)
-                for d in dirs:
-                    path = Path(root) / d
-                    if path in known_paths or path.parent in scanned_dirs:
-                        scanned_dirs.add(path)
-                        continue
-                    if any([(path/x).exists() for x in {'config.json','model_index.json','learned_embeds.bin','pytorch_lora_weights.bin'}]):
-                        try:
-                            new_models_found.update(installer.heuristic_import(path))
-                            scanned_dirs.add(path)
-                        except ValueError as e:
-                            self.logger.warning(str(e))
-
-                for f in files:
-                    path = Path(root) / f
-                    if path in known_paths or path.parent in scanned_dirs:
-                        continue
-                    if path.suffix in {'.ckpt','.bin','.pth','.safetensors','.pt'}:
-                        try:
-                            import_result = installer.heuristic_import(path)
-                            new_models_found.update(import_result)
-                        except ValueError as e:
-                            self.logger.warning(str(e))
-
-            self.logger.info(f'Scanned {items_scanned} files and directories, imported {len(new_models_found)} models')
-            installed.update(new_models_found)
-
-        return installed
+        known_paths = {config.root_path / x['path'] for x in self.list_models()}
+        directories = {config.root_path / x for x in [config.autoimport_dir,
+                                                      config.lora_dir,
+                                                      config.embedding_dir,
+                                                      config.controlnet_dir]
+                       }
+        scanner = ScanAndImport(directories, self.logger, ignore=known_paths, installer=installer)
+        scanner.search()
+        return scanner.models_found()
 
     def heuristic_import(self,
                          items_to_import: Set[str],
@@ -909,18 +975,18 @@ class ModelManager(object):
         that model.
 
         May return the following exceptions:
-        - KeyError   - one or more of the items to import is not a valid path, repo_id or URL
+        - ModelNotFoundException   - one or more of the items to import is not a valid path, repo_id or URL
         - ValueError - a corresponding model already exists
         '''
         # avoid circular import here
         from invokeai.backend.install.model_install_backend import ModelInstall
         successfully_installed = dict()
-        
+
         installer = ModelInstall(config = self.app_config,
                                  prediction_type_helper = prediction_type_helper,
                                  model_manager = self)
         for thing in items_to_import:
             installed = installer.heuristic_import(thing)
             successfully_installed.update(installed)
-        self.commit()                
+        self.commit()
         return successfully_installed

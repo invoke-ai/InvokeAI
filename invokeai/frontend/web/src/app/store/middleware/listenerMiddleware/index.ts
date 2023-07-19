@@ -58,7 +58,6 @@ import {
   addReceivedPageOfImagesFulfilledListener,
   addReceivedPageOfImagesRejectedListener,
 } from './listeners/receivedPageOfImages';
-import { addSelectionAddedToBatchListener } from './listeners/selectionAddedToBatch';
 import {
   addSessionCanceledFulfilledListener,
   addSessionCanceledPendingListener,
@@ -89,6 +88,9 @@ import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
+import { addModelLoadStartedEventListener } from './listeners/socketio/socketModelLoadStarted';
+import { addModelLoadCompletedEventListener } from './listeners/socketio/socketModelLoadCompleted';
+import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -178,6 +180,8 @@ addSocketConnectedListener();
 addSocketDisconnectedListener();
 addSocketSubscribedListener();
 addSocketUnsubscribedListener();
+addModelLoadStartedEventListener();
+addModelLoadCompletedEventListener();
 
 // Session Created
 addSessionCreatedPendingListener();
@@ -215,9 +219,6 @@ addBoardIdSelectedListener();
 // Node schemas
 addReceivedOpenAPISchemaListener();
 
-// Batches
-addSelectionAddedToBatchListener();
-
 // DND
 addImageDroppedListener();
 
@@ -228,3 +229,5 @@ addModelSelectedListener();
 addAppStartedListener();
 addModelsLoadedListener();
 addAppConfigReceivedListener();
+
+addUpscaleRequestedListener();

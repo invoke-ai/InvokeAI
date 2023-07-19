@@ -17,8 +17,10 @@ import { FaPlay } from 'react-icons/fa';
 const IN_PROGRESS_STYLES: ChakraProps['sx'] = {
   _disabled: {
     bg: 'none',
+    color: 'base.600',
     cursor: 'not-allowed',
     _hover: {
+      color: 'base.600',
       bg: 'none',
     },
   },

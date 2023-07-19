@@ -13,6 +13,7 @@ import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
 import {
   CfgScaleParam,
   HeightParam,
+  MainModelParam,
   NegativePromptParam,
   PositivePromptParam,
   SchedulerParam,
@@ -22,7 +23,7 @@ import {
   VaeModelParam,
   WidthParam,
   zMainModel,
-} from './parameterZodSchemas';
+} from '../types/parameterSchemas';
 
 export interface GenerationState {
   cfgScale: CfgScaleParam;
@@ -228,19 +229,20 @@ export const generationSlice = createSlice({
     },
     modelChanged: (
       state,
-      action: PayloadAction<MainModelField | OnnxModelField | null>
+      action: PayloadAction<MainModelParam | OnnxModelField | null>
     ) => {
-      if (!action.payload) {
-        state.model = null;
-      }
+      state.model = action.payload;
 
-      state.model = zMainModel.parse(action.payload);
+      if (state.model === null) {
+        return;
+      }
 
       // Clamp ClipSkip Based On Selected Model
       const { maxClip } = clipSkipMap[state.model.base_model];
       state.clipSkip = clamp(state.clipSkip, 0, maxClip);
     },
     vaeSelected: (state, action: PayloadAction<VaeModelParam | null>) => {
+      // null is a valid VAE!
       state.vae = action.payload;
     },
     setClipSkip: (state, action: PayloadAction<number>) => {
@@ -256,12 +258,16 @@ export const generationSlice = createSlice({
 
       if (defaultModel && !state.model) {
         const [base_model, model_type, model_name] = defaultModel.split('/');
-        state.model = zMainModel.parse({
-          id: defaultModel,
-          name: model_name,
+
+        const result = zMainModel.safeParse({
+          model_name,
           base_model,
           model_type,
         });
+
+        if (result.success) {
+          state.model = result.data;
+        }
       }
     });
     builder.addCase(setShouldShowAdvancedOptions, (state, action) => {

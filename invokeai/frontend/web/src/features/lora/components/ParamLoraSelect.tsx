@@ -4,10 +4,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState, stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { loraAdded } from 'features/lora/store/loraSlice';
-import { MODEL_TYPE_MAP } from 'features/system/components/ModelSelect';
+import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { forEach } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
@@ -20,23 +20,23 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const ParamLoraSelect = () => {
+const ParamLoRASelect = () => {
   const dispatch = useAppDispatch();
   const { loras } = useAppSelector(selector);
-  const { data: lorasQueryData } = useGetLoRAModelsQuery();
+  const { data: loraModels } = useGetLoRAModelsQuery();
 
   const currentMainModel = useAppSelector(
     (state: RootState) => state.generation.model
   );
 
   const data = useMemo(() => {
-    if (!lorasQueryData) {
+    if (!loraModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(lorasQueryData.entities, (lora, id) => {
+    forEach(loraModels.entities, (lora, id) => {
       if (!lora || Boolean(id in loras)) {
         return;
       }
@@ -55,23 +55,25 @@ const ParamLoraSelect = () => {
     });
 
     return data.sort((a, b) => (a.disabled && !b.disabled ? 1 : -1));
-  }, [loras, lorasQueryData, currentMainModel?.base_model]);
+  }, [loras, loraModels, currentMainModel?.base_model]);
 
   const handleChange = useCallback(
     (v: string | null | undefined) => {
       if (!v) {
         return;
       }
-      const loraEntity = lorasQueryData?.entities[v];
+      const loraEntity = loraModels?.entities[v];
+
       if (!loraEntity) {
         return;
       }
+
       dispatch(loraAdded(loraEntity));
     },
-    [dispatch, lorasQueryData?.entities]
+    [dispatch, loraModels?.entities]
   );
 
-  if (lorasQueryData?.ids.length === 0) {
+  if (loraModels?.ids.length === 0) {
     return (
       <Flex sx={{ justifyContent: 'center', p: 2 }}>
         <Text sx={{ fontSize: 'sm', color: 'base.500', _dark: 'base.700' }}>
@@ -82,7 +84,7 @@ const ParamLoraSelect = () => {
   }
 
   return (
-    <IAIMantineSelect
+    <IAIMantineSearchableSelect
       placeholder={data.length === 0 ? 'All LoRAs added' : 'Add LoRA'}
       value={null}
       data={data}
@@ -98,4 +100,4 @@ const ParamLoraSelect = () => {
   );
 };
 
-export default ParamLoraSelect;
+export default ParamLoRASelect;

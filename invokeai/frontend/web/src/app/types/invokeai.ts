@@ -1,5 +1,5 @@
 import {
-  CONTROLNET_MODELS,
+  // CONTROLNET_MODELS,
   CONTROLNET_PROCESSORS,
 } from 'features/controlNet/store/constants';
 import { InvokeTabName } from 'features/ui/store/tabMap';
@@ -94,7 +94,8 @@ export type AppFeature =
   | 'bugLink'
   | 'localization'
   | 'consoleLogging'
-  | 'dynamicPrompting';
+  | 'dynamicPrompting'
+  | 'batches';
 
 /**
  * A disable-able Stable Diffusion feature
@@ -127,7 +128,7 @@ export type AppConfig = {
   canRestoreDeletedImagesFromBin: boolean;
   sd: {
     defaultModel?: string;
-    disabledControlNetModels: (keyof typeof CONTROLNET_MODELS)[];
+    disabledControlNetModels: string[];
     disabledControlNetProcessors: (keyof typeof CONTROLNET_PROCESSORS)[];
     iterations: {
       initial: number;

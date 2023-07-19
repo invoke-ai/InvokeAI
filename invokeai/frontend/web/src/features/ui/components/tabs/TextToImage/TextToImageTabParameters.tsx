@@ -4,7 +4,6 @@ import ParamAdvancedCollapse from 'features/parameters/components/Parameters/Adv
 import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
 import ParamNegativeConditioning from 'features/parameters/components/Parameters/Core/ParamNegativeConditioning';
 import ParamPositiveConditioning from 'features/parameters/components/Parameters/Core/ParamPositiveConditioning';
-import ParamHiresCollapse from 'features/parameters/components/Parameters/Hires/ParamHiresCollapse';
 import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/ParamNoiseCollapse';
 import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
@@ -20,13 +19,12 @@ const TextToImageTabParameters = () => {
       <ParamNegativeConditioning />
       <ProcessButtons />
       <TextToImageTabCoreParameters />
+      <ParamControlNetCollapse />
       <ParamLoraCollapse />
       <ParamDynamicPromptsCollapse />
-      <ParamControlNetCollapse />
       <ParamVariationCollapse />
       <ParamNoiseCollapse />
       <ParamSymmetryCollapse />
-      <ParamHiresCollapse />
       <ParamSeamlessCollapse />
       <ParamAdvancedCollapse />
     </>

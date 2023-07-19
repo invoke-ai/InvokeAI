@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { map } from 'lodash-es';
 import { forwardRef, useCallback } from 'react';
 import 'reactflow/dist/style.css';
@@ -77,7 +77,7 @@ const AddNodeMenu = () => {
 
   return (
     <Flex sx={{ gap: 2, alignItems: 'center' }}>
-      <IAIMantineSelect
+      <IAIMantineSearchableSelect
         selectOnBlur={false}
         placeholder="Add Node"
         value={null}
@@ -110,8 +110,11 @@ const SelectItem = forwardRef<HTMLDivElement, ItemProps>(
     return (
       <div ref={ref} {...others}>
         <div>
-          <Text>{label}</Text>
-          <Text size="xs" color="base.600">
+          <Text fontWeight={600}>{label}</Text>
+          <Text
+            size="xs"
+            sx={{ color: 'base.600', _dark: { color: 'base.500' } }}
+          >
             {description}
           </Text>
         </div>

@@ -256,7 +256,7 @@ manager, please follow these steps:
 
 10.  Render away!
 
-    Browse the [features](../features/CLI.md) section to learn about all the
+    Browse the [features](../features/index.md) section to learn about all the
     things you can do with InvokeAI.
 
 
@@ -270,7 +270,7 @@ manager, please follow these steps:
 
 12. Other scripts
 
-    The [Textual Inversion](../features/TEXTUAL_INVERSION.md) script can be launched with the command:
+    The [Textual Inversion](../features/TRAINING.md) script can be launched with the command:
 
     ```bash
     invokeai-ti --gui

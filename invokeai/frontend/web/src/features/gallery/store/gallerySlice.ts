@@ -1,19 +1,15 @@
 import type { PayloadAction, Update } from '@reduxjs/toolkit';
-import {
-  createEntityAdapter,
-  createSelector,
-  createSlice,
-} from '@reduxjs/toolkit';
+import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { dateComparator } from 'common/util/dateComparator';
-import { keyBy, uniq } from 'lodash-es';
+import { uniq } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import {
   imageUrlsReceived,
   receivedPageOfImages,
 } from 'services/api/thunks/image';
 import { ImageCategory, ImageDTO } from 'services/api/types';
+import { selectFilteredImagesLocal } from './gallerySelectors';
 
 export const imagesAdapter = createEntityAdapter<ImageDTO>({
   selectId: (image) => image.image_name,
@@ -27,9 +23,15 @@ export const ASSETS_CATEGORIES: ImageCategory[] = [
   'user',
   'other',
 ];
-
 export const INITIAL_IMAGE_LIMIT = 100;
 export const IMAGE_LIMIT = 20;
+
+export type GalleryView = 'images' | 'assets';
+export type BoardId =
+  | 'all'
+  | 'none'
+  | 'batch'
+  | (string & Record<never, never>);
 
 type AdditionaGalleryState = {
   offset: number;
@@ -37,13 +39,14 @@ type AdditionaGalleryState = {
   total: number;
   isLoading: boolean;
   isFetching: boolean;
-  categories: ImageCategory[];
-  selectedBoardId?: string;
   selection: string[];
   shouldAutoSwitch: boolean;
   galleryImageMinimumWidth: number;
-  galleryView: 'images' | 'assets';
+  galleryView: GalleryView;
+  selectedBoardId: BoardId;
   isInitialized: boolean;
+  batchImageNames: string[];
+  isBatchEnabled: boolean;
 };
 
 export const initialGalleryState =
@@ -53,12 +56,14 @@ export const initialGalleryState =
     total: 0,
     isLoading: true,
     isFetching: true,
-    categories: IMAGE_CATEGORIES,
     selection: [],
     shouldAutoSwitch: true,
     galleryImageMinimumWidth: 96,
     galleryView: 'images',
+    selectedBoardId: 'all',
     isInitialized: false,
+    batchImageNames: [],
+    isBatchEnabled: false,
   });
 
 export const gallerySlice = createSlice({
@@ -73,7 +78,7 @@ export const gallerySlice = createSlice({
       ) {
         state.selection = [action.payload.image_name];
         state.galleryView = 'images';
-        state.categories = IMAGE_CATEGORIES;
+        state.selectedBoardId = 'all';
       }
     },
     imageUpdatedOne: (state, action: PayloadAction<Update<ImageDTO>>) => {
@@ -81,12 +86,15 @@ export const gallerySlice = createSlice({
     },
     imageRemoved: (state, action: PayloadAction<string>) => {
       imagesAdapter.removeOne(state, action.payload);
+      state.batchImageNames = state.batchImageNames.filter(
+        (name) => name !== action.payload
+      );
     },
     imagesRemoved: (state, action: PayloadAction<string[]>) => {
       imagesAdapter.removeMany(state, action.payload);
-    },
-    imageCategoriesChanged: (state, action: PayloadAction<ImageCategory[]>) => {
-      state.categories = action.payload;
+      state.batchImageNames = state.batchImageNames.filter(
+        (name) => !action.payload.includes(name)
+      );
     },
     imageRangeEndSelected: (state, action: PayloadAction<string>) => {
       const rangeEndImageName = action.payload;
@@ -127,9 +135,7 @@ export const gallerySlice = createSlice({
       }
     },
     imageSelected: (state, action: PayloadAction<string | null>) => {
-      state.selection = action.payload
-        ? [action.payload]
-        : [String(state.ids[0])];
+      state.selection = action.payload ? [action.payload] : [];
     },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
@@ -137,14 +143,42 @@ export const gallerySlice = createSlice({
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
     },
-    setGalleryView: (state, action: PayloadAction<'images' | 'assets'>) => {
+    setGalleryView: (state, action: PayloadAction<GalleryView>) => {
       state.galleryView = action.payload;
     },
-    boardIdSelected: (state, action: PayloadAction<string | undefined>) => {
+    boardIdSelected: (state, action: PayloadAction<BoardId>) => {
       state.selectedBoardId = action.payload;
     },
     isLoadingChanged: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
+    },
+    isBatchEnabledChanged: (state, action: PayloadAction<boolean>) => {
+      state.isBatchEnabled = action.payload;
+    },
+    imagesAddedToBatch: (state, action: PayloadAction<string[]>) => {
+      state.batchImageNames = uniq(
+        state.batchImageNames.concat(action.payload)
+      );
+    },
+    imagesRemovedFromBatch: (state, action: PayloadAction<string[]>) => {
+      state.batchImageNames = state.batchImageNames.filter(
+        (imageName) => !action.payload.includes(imageName)
+      );
+
+      const newSelection = state.selection.filter(
+        (imageName) => !action.payload.includes(imageName)
+      );
+
+      if (newSelection.length) {
+        state.selection = newSelection;
+        return;
+      }
+
+      state.selection = [state.batchImageNames[0]] ?? [];
+    },
+    batchReset: (state) => {
+      state.batchImageNames = [];
+      state.selection = [];
     },
   },
   extraReducers: (builder) => {
@@ -188,7 +222,7 @@ export const gallerySlice = createSlice({
       boardsApi.endpoints.deleteBoard.matchFulfilled,
       (state, action) => {
         if (action.meta.arg.originalArgs === state.selectedBoardId) {
-          state.selectedBoardId = undefined;
+          state.selectedBoardId = 'all';
         }
       }
     );
@@ -208,7 +242,6 @@ export const {
   imageUpdatedOne,
   imageRemoved,
   imagesRemoved,
-  imageCategoriesChanged,
   imageRangeEndSelected,
   imageSelectionToggled,
   imageSelected,
@@ -217,48 +250,9 @@ export const {
   setGalleryView,
   boardIdSelected,
   isLoadingChanged,
+  isBatchEnabledChanged,
+  imagesAddedToBatch,
+  imagesRemovedFromBatch,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
-
-export const selectFilteredImagesLocal = createSelector(
-  (state: typeof initialGalleryState) => state,
-  (galleryState) => {
-    const allImages = imagesAdapter.getSelectors().selectAll(galleryState);
-    const { categories, selectedBoardId } = galleryState;
-
-    const filteredImages = allImages.filter((i) => {
-      const isInCategory = categories.includes(i.image_category);
-      const isInSelectedBoard = selectedBoardId
-        ? i.board_id === selectedBoardId
-        : true;
-      return isInCategory && isInSelectedBoard;
-    });
-
-    return filteredImages;
-  }
-);
-
-export const selectFilteredImages = createSelector(
-  (state: RootState) => state,
-  (state) => {
-    return selectFilteredImagesLocal(state.gallery);
-  },
-  defaultSelectorOptions
-);
-
-export const selectFilteredImagesAsObject = createSelector(
-  selectFilteredImages,
-  (filteredImages) => keyBy(filteredImages, 'image_name')
-);
-
-export const selectFilteredImagesIds = createSelector(
-  selectFilteredImages,
-  (filteredImages) => filteredImages.map((i) => i.image_name)
-);
-
-export const selectLastSelectedImage = createSelector(
-  (state: RootState) => state,
-  (state) => state.gallery.selection[state.gallery.selection.length - 1],
-  defaultSelectorOptions
-);

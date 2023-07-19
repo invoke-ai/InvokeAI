@@ -5,14 +5,11 @@ from pydantic import Field
 from pathlib import Path
 from typing import Literal, Optional, Union
 from .base import (
-    ModelBase,
     ModelConfigBase,
     BaseModelType,
     ModelType,
-    SubModelType,
     ModelVariantType,
     DiffusersModel,
-    SchedulerPredictionType,
     SilenceWarnings,
     read_checkpoint_meta,
     classproperty,
@@ -37,8 +34,7 @@ class StableDiffusion1Model(DiffusersModel):
         vae: Optional[str] = Field(None)
         config: str
         variant: ModelVariantType
-
-
+        
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion1
         assert model_type == ModelType.Main
@@ -249,6 +245,12 @@ def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
             ModelVariantType.Normal: "v2-inference-v.yaml", # best guess, as we can't differentiate with base(512)
             ModelVariantType.Inpaint: "v2-inpainting-inference.yaml",
             ModelVariantType.Depth: "v2-midas-inference.yaml",
+        },
+        # note that these .yaml files don't yet exist!
+        BaseModelType.StableDiffusionXL: {
+            ModelVariantType.Normal: "xl-inference-v.yaml",
+            ModelVariantType.Inpaint: "xl-inpainting-inference.yaml",
+            ModelVariantType.Depth: "xl-midas-inference.yaml",
         }
     }
 
@@ -264,6 +266,7 @@ def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
 
 
 # TODO: rework
+# Note that convert_ckpt_to_diffuses does not currently support conversion of SDXL models
 def _convert_ckpt_and_cache(
     version: BaseModelType,
     model_config: Union[StableDiffusion1Model.CheckpointConfig, StableDiffusion2Model.CheckpointConfig],

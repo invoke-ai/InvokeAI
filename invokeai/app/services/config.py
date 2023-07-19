@@ -200,7 +200,7 @@ class InvokeAISettings(BaseSettings):
         type = get_args(get_type_hints(cls)['type'])[0]
         field_dict = dict({type:dict()})
         for name,field in self.__fields__.items():
-            if name in cls._excluded():
+            if name in cls._excluded_from_yaml():
                 continue
             category = field.field_info.extra.get("category") or "Uncategorized"
             value = getattr(self,name)
@@ -271,8 +271,13 @@ class InvokeAISettings(BaseSettings):
 
     @classmethod
     def _excluded(self)->List[str]:
-        # combination of deprecated parameters and internal ones
-        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version']
+        # internal fields that shouldn't be exposed as command line options
+        return ['type','initconf']
+    
+    @classmethod
+    def _excluded_from_yaml(self)->List[str]:
+        # combination of deprecated parameters and internal ones that shouldn't be exposed as invokeai.yaml options
+        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model', 'restore']
 
     class Config:
         env_file_encoding = 'utf-8'
@@ -361,7 +366,7 @@ setting environment variables INVOKEAI_<setting>.
     log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", category='Features')
     nsfw_checker        : bool = Field(default=True, description="Enable/disable the NSFW checker", category='Features')
     patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
-    restore             : bool = Field(default=True, description="Enable/disable face restoration code", category='Features')
+    restore             : bool = Field(default=True, description="Enable/disable face restoration code (DEPRECATED)", category='DEPRECATED')
 
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
     free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')

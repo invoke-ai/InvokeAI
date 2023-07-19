@@ -1,6 +1,4 @@
-import { SchedulerParam } from 'features/parameters/store/parameterZodSchemas';
-
-export type AddNewModelType = 'ckpt' | 'diffusers' | null;
+import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
 
 export type Coordinates = {
   x: number;
@@ -22,7 +20,6 @@ export interface UIState {
   shouldUseCanvasBetaLayout: boolean;
   shouldShowExistingModelsInSearch: boolean;
   shouldUseSliders: boolean;
-  addNewModelUIOption: AddNewModelType;
   shouldHidePreview: boolean;
   shouldPinGallery: boolean;
   shouldShowGallery: boolean;

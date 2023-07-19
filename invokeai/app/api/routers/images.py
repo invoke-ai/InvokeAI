@@ -19,6 +19,9 @@ from ..dependencies import ApiDependencies
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
+# images are immutable; set a high max-age
+IMAGE_MAX_AGE = 31536000
+
 
 @images_router.post(
     "/",
@@ -155,12 +158,14 @@ async def get_image_full(
         if not ApiDependencies.invoker.services.images.validate_path(path):
             raise HTTPException(status_code=404)
 
-        return FileResponse(
+        response = FileResponse(
             path,
             media_type="image/png",
             filename=image_name,
             content_disposition_type="inline",
         )
+        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        return response
     except Exception as e:
         raise HTTPException(status_code=404)
 
@@ -189,9 +194,11 @@ async def get_image_thumbnail(
         if not ApiDependencies.invoker.services.images.validate_path(path):
             raise HTTPException(status_code=404)
 
-        return FileResponse(
+        response = FileResponse(
             path, media_type="image/webp", content_disposition_type="inline"
         )
+        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        return response
     except Exception as e:
         raise HTTPException(status_code=404)
 

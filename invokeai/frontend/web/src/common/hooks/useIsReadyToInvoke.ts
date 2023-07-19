@@ -3,36 +3,23 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { validateSeedWeights } from 'common/util/seedWeightPairs';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
-import { systemSelector } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import {
-  modelsApi,
-  useGetMainModelsQuery,
-} from '../../services/api/endpoints/models';
+import { modelsApi } from '../../services/api/endpoints/models';
+import { forEach } from 'lodash-es';
 
 const readinessSelector = createSelector(
   [stateSelector, activeTabNameSelector],
   (state, activeTabName) => {
-    const { generation, system, batch } = state;
+    const { generation, system } = state;
     const { shouldGenerateVariations, seedWeights, initialImage, seed } =
       generation;
 
     const { isProcessing, isConnected } = system;
-    const {
-      isEnabled: isBatchEnabled,
-      asInitialImage,
-      imageNames: batchImageNames,
-    } = batch;
 
     let isReady = true;
     const reasonsWhyNotReady: string[] = [];
 
-    if (
-      activeTabName === 'img2img' &&
-      !initialImage &&
-      !(asInitialImage && batchImageNames.length > 1)
-    ) {
+    if (activeTabName === 'img2img' && !initialImage) {
       isReady = false;
       reasonsWhyNotReady.push('No initial image selected');
     }
@@ -65,6 +52,13 @@ const readinessSelector = createSelector(
       isReady = false;
       reasonsWhyNotReady.push('Seed-Weights badly formatted.');
     }
+
+    forEach(state.controlNet.controlNets, (controlNet, id) => {
+      if (!controlNet.model) {
+        isReady = false;
+        reasonsWhyNotReady.push('ControlNet ${id} has no model selected.');
+      }
+    });
 
     // All good
     return { isReady, reasonsWhyNotReady };

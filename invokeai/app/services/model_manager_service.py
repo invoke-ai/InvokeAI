@@ -18,8 +18,9 @@ from invokeai.backend.model_management import (
     SchedulerPredictionType,
     ModelMerger,
     MergeInterpolationMethod,
+    ModelNotFoundException,
 )
-
+from invokeai.backend.model_management.model_search import FindModels
 
 import torch
 from invokeai.app.models.exceptions import CanceledException
@@ -145,7 +146,7 @@ class ModelManagerServiceBase(ABC):
     ) -> AddModelResult:
         """
         Update the named model with a dictionary of attributes. Will fail with a
-        KeyErrorException if the name does not already exist.
+        ModelNotFoundException if the name does not already exist.
 
         On a successful update, the config will be changed in memory. Will fail 
         with an assertion error if provided attributes are incorrect or 
@@ -164,6 +165,27 @@ class ModelManagerServiceBase(ABC):
         Delete the named model from configuration. If delete_files is true,
         then the underlying weight file or diffusers directory will be deleted
         as well. Call commit() to write to disk.
+        """
+        pass
+
+    @abstractmethod
+    def rename_model(self,
+                     model_name: str,
+                     base_model: BaseModelType,
+                     model_type: ModelType,
+                     new_name: str,
+                     ):
+        """
+        Rename the indicated model.
+        """
+        pass
+
+    @abstractmethod
+    def list_checkpoint_configs(
+        self
+    )->List[Path]:
+        """
+        List the checkpoint config paths from ROOT/configs/stable-diffusion.
         """
         pass
 
@@ -220,6 +242,7 @@ class ModelManagerServiceBase(ABC):
             alpha: Optional[float] = 0.5,
             interp: Optional[MergeInterpolationMethod] = None,
             force: Optional[bool] = False,
+            merge_dest_directory: Optional[Path] = None
     ) -> AddModelResult:
         """
         Merge two to three diffusrs pipeline models and save as a new model.
@@ -228,9 +251,26 @@ class ModelManagerServiceBase(ABC):
         :param merged_model_name: Name of destination merged model
         :param alpha: Alpha strength to apply to 2d and 3d model
         :param interp: Interpolation method. None (default) 
+        :param merge_dest_directory: Save the merged model to the designated directory (with 'merged_model_name' appended)
         """
         pass
-    
+
+    @abstractmethod
+    def search_for_models(self, directory: Path)->List[Path]:
+        """
+        Return list of all models found in the designated directory.
+        """
+        pass
+        
+    @abstractmethod
+    def sync_to_config(self):
+        """
+        Re-read models.yaml, rescan the models directory, and reimport models 
+        in the autoimport directories. Call after making changes outside the
+        model manager API.
+        """
+        pass
+        
     @abstractmethod
     def commit(self, conf_file: Optional[Path] = None) -> None:
         """
@@ -299,7 +339,6 @@ class ModelManagerService(ModelManagerServiceBase):
         base_model: BaseModelType,
         model_type: ModelType,
         submodel: Optional[SubModelType] = None,
-        node: Optional[BaseInvocation] = None,
         context: Optional[InvocationContext] = None,
     ) -> ModelInfo:
         """
@@ -307,11 +346,9 @@ class ModelManagerService(ModelManagerServiceBase):
         part (such as the vae) of a diffusers mode.
         """
 
-        # if we are called from within a node, then we get to emit
-        # load start and complete events
-        if node and context:
+        # we can emit model loading events if we are executing with access to the invocation context
+        if context:
             self._emit_load_event(
-                node=node,
                 context=context,
                 model_name=model_name,
                 base_model=base_model,
@@ -326,9 +363,8 @@ class ModelManagerService(ModelManagerServiceBase):
             submodel,
         )
 
-        if node and context:
+        if context:
             self._emit_load_event(
-                node=node,
                 context=context,
                 model_name=model_name,
                 base_model=base_model,
@@ -412,14 +448,14 @@ class ModelManagerService(ModelManagerServiceBase):
     ) -> AddModelResult:
         """
         Update the named model with a dictionary of attributes. Will fail with a
-        KeyError exception if the name does not already exist.
+        ModelNotFoundException exception if the name does not already exist.
         On a successful update, the config will be changed in memory. Will fail 
         with an assertion error if provided attributes are incorrect or 
         the model name is missing. Call commit() to write changes to disk.
         """
         self.logger.debug(f'update model {model_name}')
         if not self.model_exists(model_name, base_model, model_type):
-            raise KeyError(f"Unknown model {model_name}")
+            raise ModelNotFoundException(f"Unknown model {model_name}")
         return self.add_model(model_name, base_model, model_type, model_attributes, clobber=True)
     
     def del_model(
@@ -431,16 +467,18 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         Delete the named model from configuration. If delete_files is true,
         then the underlying weight file or diffusers directory will be deleted
-        as well. Call commit() to write to disk.
+        as well.
         """
         self.logger.debug(f'delete model {model_name}')
         self.mgr.del_model(model_name, base_model, model_type)
+        self.mgr.commit()
 
     def convert_model(
         self,
         model_name: str,
         base_model: BaseModelType,
         model_type: Union[ModelType.Main,ModelType.Vae],
+        convert_dest_directory: Optional[Path] = Field(default=None, description="Optional directory location for merged model"),        
     ) -> AddModelResult:
         """
         Convert a checkpoint file into a diffusers folder, deleting the cached
@@ -449,13 +487,14 @@ class ModelManagerService(ModelManagerServiceBase):
         :param model_name: Name of the model to convert
         :param base_model: Base model type
         :param model_type: Type of model ['vae' or 'main']
+        :param convert_dest_directory: Save the converted model to the designated directory (`models/etc/etc` by default)
 
         This will raise a ValueError unless the model is not a checkpoint. It will
         also raise a ValueError in the event that there is a similarly-named diffusers
         directory already in place.
         """
         self.logger.debug(f'convert model {model_name}')        
-        return self.mgr.convert_model(model_name, base_model, model_type)
+        return self.mgr.convert_model(model_name, base_model, model_type, convert_dest_directory)
 
     def commit(self, conf_file: Optional[Path]=None):
         """
@@ -467,23 +506,19 @@ class ModelManagerService(ModelManagerServiceBase):
 
     def _emit_load_event(
         self,
-        node,
         context,
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-        submodel: SubModelType,
+        submodel: Optional[SubModelType] = None,
         model_info: Optional[ModelInfo] = None,
     ):
         if context.services.queue.is_canceled(context.graph_execution_state_id):
             raise CanceledException()
-        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
-        source_node_id = graph_execution_state.prepared_source_mapping[node.id]
+
         if model_info:
             context.services.events.emit_model_load_completed(
                 graph_execution_state_id=context.graph_execution_state_id,
-                node=node.dict(),
-                source_node_id=source_node_id,
                 model_name=model_name,
                 base_model=base_model,
                 model_type=model_type,
@@ -493,8 +528,6 @@ class ModelManagerService(ModelManagerServiceBase):
         else:
             context.services.events.emit_model_load_started(
                 graph_execution_state_id=context.graph_execution_state_id,
-                node=node.dict(),
-                source_node_id=source_node_id,
                 model_name=model_name,
                 base_model=base_model,
                 model_type=model_type,
@@ -536,6 +569,7 @@ class ModelManagerService(ModelManagerServiceBase):
             alpha: Optional[float] = 0.5,
             interp: Optional[MergeInterpolationMethod] = None,
             force: Optional[bool] = False,
+            merge_dest_directory: Optional[Path] = Field(default=None, description="Optional directory location for merged model"),
     ) -> AddModelResult:
         """
         Merge two to three diffusrs pipeline models and save as a new model.
@@ -544,6 +578,7 @@ class ModelManagerService(ModelManagerServiceBase):
         :param merged_model_name: Name of destination merged model
         :param alpha: Alpha strength to apply to 2d and 3d model
         :param interp: Interpolation method. None (default) 
+        :param merge_dest_directory: Save the merged model to the designated directory (with 'merged_model_name' appended)
         """
         merger = ModelMerger(self.mgr)
         try:
@@ -554,7 +589,55 @@ class ModelManagerService(ModelManagerServiceBase):
                 alpha = alpha,
                 interp = interp,
                 force = force,
+                merge_dest_directory=merge_dest_directory,
             )
         except AssertionError as e:
             raise ValueError(e)
         return result
+
+    def search_for_models(self, directory: Path)->List[Path]:
+        """
+        Return list of all models found in the designated directory.
+        """
+        search = FindModels(directory,self.logger)
+        return search.list_models()
+
+    def sync_to_config(self):
+        """
+        Re-read models.yaml, rescan the models directory, and reimport models 
+        in the autoimport directories. Call after making changes outside the
+        model manager API.
+        """
+        return self.mgr.sync_to_config()
+
+    def list_checkpoint_configs(self)->List[Path]:
+        """
+        List the checkpoint config paths from ROOT/configs/stable-diffusion.
+        """
+        config = self.mgr.app_config
+        conf_path = config.legacy_conf_path
+        root_path = config.root_path
+        return [(conf_path / x).relative_to(root_path) for x in conf_path.glob('**/*.yaml')]
+
+    def rename_model(self,
+                     model_name: str,
+                     base_model: BaseModelType,
+                     model_type: ModelType,
+                     new_name: str = None,
+                     new_base: BaseModelType = None,
+                     ):
+        """
+        Rename the indicated model. Can provide a new name and/or a new base.
+        :param model_name: Current name of the model
+        :param base_model: Current base of the model
+        :param model_type: Model type (can't be changed)
+        :param new_name: New name for the model
+        :param new_base: New base for the model
+        """
+        self.mgr.rename_model(base_model = base_model,
+                              model_type = model_type,
+                              model_name = model_name,
+                              new_name = new_name,
+                              new_base = new_base,
+                              )
+        

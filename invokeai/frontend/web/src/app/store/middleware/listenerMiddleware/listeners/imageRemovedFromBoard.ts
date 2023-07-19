@@ -1,6 +1,5 @@
 import { log } from 'app/logging/useLogger';
 import { boardImagesApi } from 'services/api/endpoints/boardImages';
-import { imageDTOReceived } from 'services/api/thunks/image';
 import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'boards' });
@@ -14,12 +13,6 @@ export const addImageRemovedFromBoardFulfilledListener = () => {
       moduleLog.debug(
         { data: { board_id, image_name } },
         'Image added to board'
-      );
-
-      dispatch(
-        imageDTOReceived({
-          image_name,
-        })
       );
     },
   });

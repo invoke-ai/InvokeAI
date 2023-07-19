@@ -83,6 +83,10 @@ export const buildInputFieldValue = (
     if (template.type === 'lora_model') {
       fieldValue.value = undefined;
     }
+
+    if (template.type === 'controlnet_model') {
+      fieldValue.value = undefined;
+    }
   }
 
   return fieldValue;

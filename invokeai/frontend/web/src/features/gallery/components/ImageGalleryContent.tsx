@@ -19,7 +19,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { togglePinGalleryPanel } from 'features/ui/store/uiSlice';
 
-import { ChangeEvent, memo, useCallback, useRef } from 'react';
+import { ChangeEvent, memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { FaImage, FaServer, FaWrench } from 'react-icons/fa';
@@ -29,16 +29,12 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
-  imageCategoriesChanged,
-  shouldAutoSwitchChanged,
-} from 'features/gallery/store/gallerySlice';
+import { shouldAutoSwitchChanged } from 'features/gallery/store/gallerySlice';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { mode } from 'theme/util/mode';
-import BoardsList from './Boards/BoardsList';
-import ImageGalleryGrid from './ImageGalleryGrid';
+import BoardsList from './Boards/BoardsList/BoardsList';
+import BatchImageGrid from './ImageGrid/BatchImageGrid';
+import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 
 const selector = createSelector(
   [stateSelector],
@@ -66,6 +62,7 @@ const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
+  const galleryGridRef = useRef<HTMLDivElement>(null);
 
   const { colorMode } = useColorMode();
 
@@ -83,6 +80,16 @@ const ImageGalleryContent = () => {
     }),
   });
 
+  const boardTitle = useMemo(() => {
+    if (selectedBoardId === 'batch') {
+      return 'Batch';
+    }
+    if (selectedBoard) {
+      return selectedBoard.board_name;
+    }
+    return 'All Images';
+  }, [selectedBoard, selectedBoardId]);
+
   const { isOpen: isBoardListOpen, onToggle } = useDisclosure();
 
   const handleChangeGalleryImageMinimumWidth = (v: number) => {
@@ -95,12 +102,10 @@ const ImageGalleryContent = () => {
   };
 
   const handleClickImagesCategory = useCallback(() => {
-    dispatch(imageCategoriesChanged(IMAGE_CATEGORIES));
     dispatch(setGalleryView('images'));
   }, [dispatch]);
 
   const handleClickAssetsCategory = useCallback(() => {
-    dispatch(imageCategoriesChanged(ASSETS_CATEGORIES));
     dispatch(setGalleryView('assets'));
   }, [dispatch]);
 
@@ -163,7 +168,7 @@ const ImageGalleryContent = () => {
                 fontWeight: 600,
               }}
             >
-              {selectedBoard ? selectedBoard.board_name : 'All Images'}
+              {boardTitle}
             </Text>
             <ChevronUpIcon
               sx={{
@@ -216,8 +221,12 @@ const ImageGalleryContent = () => {
           <BoardsList isOpen={isBoardListOpen} />
         </Box>
       </Box>
-      <Flex direction="column" gap={2} h="full" w="full">
-        <ImageGalleryGrid />
+      <Flex ref={galleryGridRef} direction="column" gap={2} h="full" w="full">
+        {selectedBoardId === 'batch' ? (
+          <BatchImageGrid />
+        ) : (
+          <GalleryImageGrid />
+        )}
       </Flex>
     </VStack>
   );

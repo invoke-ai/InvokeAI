@@ -1,4 +1,5 @@
 import { Flex, Heading, Icon, Tooltip } from '@chakra-ui/react';
+import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/hooks/useBuildInvocation';
 import { memo } from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
 
@@ -12,14 +13,15 @@ const IAINodeHeader = (props: IAINodeHeaderProps) => {
   const { nodeId, title, description } = props;
   return (
     <Flex
+      className={DRAG_HANDLE_CLASSNAME}
       sx={{
         borderTopRadius: 'md',
         alignItems: 'center',
         justifyContent: 'space-between',
         px: 2,
         py: 1,
-        bg: 'base.300',
-        _dark: { bg: 'base.700' },
+        bg: 'base.100',
+        _dark: { bg: 'base.900' },
       }}
     >
       <Tooltip label={nodeId}>
@@ -28,7 +30,7 @@ const IAINodeHeader = (props: IAINodeHeaderProps) => {
           sx={{
             fontWeight: 600,
             color: 'base.900',
-            _dark: { color: 'base.100' },
+            _dark: { color: 'base.200' },
           }}
         >
           {title}

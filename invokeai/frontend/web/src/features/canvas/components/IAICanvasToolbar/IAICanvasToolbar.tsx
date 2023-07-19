@@ -24,7 +24,7 @@ import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash-es';
 
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import {
   canvasCopiedToClipboard,
   canvasDownloadedAsImage,
@@ -48,6 +48,7 @@ import IAICanvasRedoButton from './IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
+import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 
 export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
@@ -79,6 +80,7 @@ const IAICanvasToolbar = () => {
   const canvasBaseLayer = getCanvasBaseLayer();
 
   const { t } = useTranslation();
+  const { isClipboardAPIAvailable } = useCopyImageToClipboard();
 
   const { openUploader } = useImageUploader();
 
@@ -136,10 +138,10 @@ const IAICanvasToolbar = () => {
       handleCopyImageToClipboard();
     },
     {
-      enabled: () => !isStaging,
+      enabled: () => !isStaging && isClipboardAPIAvailable,
       preventDefault: true,
     },
-    [canvasBaseLayer, isProcessing]
+    [canvasBaseLayer, isProcessing, isClipboardAPIAvailable]
   );
 
   useHotkeys(
@@ -189,6 +191,9 @@ const IAICanvasToolbar = () => {
   };
 
   const handleCopyImageToClipboard = () => {
+    if (!isClipboardAPIAvailable) {
+      return;
+    }
     dispatch(canvasCopiedToClipboard());
   };
 
@@ -213,7 +218,7 @@ const IAICanvasToolbar = () => {
       }}
     >
       <Box w={24}>
-        <IAIMantineSelect
+        <IAIMantineSearchableSelect
           tooltip={`${t('unifiedCanvas.layer')} (Q)`}
           value={layer}
           data={LAYER_NAMES_DICT}
@@ -256,13 +261,15 @@ const IAICanvasToolbar = () => {
           onClick={handleSaveToGallery}
           isDisabled={isStaging}
         />
-        <IAIIconButton
-          aria-label={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
-          tooltip={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
-          icon={<FaCopy />}
-          onClick={handleCopyImageToClipboard}
-          isDisabled={isStaging}
-        />
+        {isClipboardAPIAvailable && (
+          <IAIIconButton
+            aria-label={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
+            tooltip={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
+            icon={<FaCopy />}
+            onClick={handleCopyImageToClipboard}
+            isDisabled={isStaging}
+          />
+        )}
         <IAIIconButton
           aria-label={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
           tooltip={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}

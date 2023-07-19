@@ -11,7 +11,7 @@ from enum import Enum
 from pathlib import Path
 from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
-from typing import List, Union
+from typing import List, Union, Optional
 
 import invokeai.backend.util.logging as logger
 
@@ -74,6 +74,7 @@ class ModelMerger(object):
             alpha: float = 0.5,
             interp: MergeInterpolationMethod = None,
             force: bool = False,
+            merge_dest_directory: Optional[Path] = None,
             **kwargs,
     ) -> AddModelResult:
         """
@@ -85,7 +86,7 @@ class ModelMerger(object):
         :param interp: The interpolation method to use for the merging. Supports "weighted_average", "sigmoid", "inv_sigmoid", "add_difference" and None.
                    Passing None uses the default interpolation which is weighted sum interpolation. For merging three checkpoints, only "add_difference" is supported. Add_difference is A+(B-C).
         :param force:  Whether to ignore mismatch in model_config.json for the current models. Defaults to False.
-
+        :param merge_dest_directory: Save the merged model to the designated directory (with 'merged_model_name' appended)
         **kwargs - the default DiffusionPipeline.get_config_dict kwargs:
              cache_dir, resume_download, force_download, proxies, local_files_only, use_auth_token, revision, torch_dtype, device_map
         """
@@ -111,7 +112,7 @@ class ModelMerger(object):
         merged_pipe = self.merge_diffusion_models(
            model_paths, alpha, merge_method, force, **kwargs
         )
-        dump_path = config.models_path / base_model.value / ModelType.Main.value
+        dump_path = Path(merge_dest_directory) if merge_dest_directory else config.models_path / base_model.value / ModelType.Main.value
         dump_path.mkdir(parents=True, exist_ok=True)
         dump_path = dump_path / merged_model_name
 

@@ -3,12 +3,12 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   imageSelected,
-  selectFilteredImages,
   selectImagesById,
 } from 'features/gallery/store/gallerySlice';
 import { clamp, isEqual } from 'lodash-es';
 import { useCallback } from 'react';
 import { receivedPageOfImages } from 'services/api/thunks/image';
+import { selectFilteredImages } from '../store/gallerySelectors';
 
 export const nextPrevImageButtonsSelector = createSelector(
   [stateSelector, selectFilteredImages],

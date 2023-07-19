@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Literal, get_origin
 from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings, ModelNotFoundException, InvalidModelException
 from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
+from .sdxl import StableDiffusionXLModel
 from .vae import VaeModel
 from .lora import LoRAModel
 from .controlnet import ControlNetModel # TODO:
@@ -24,6 +25,22 @@ MODEL_CLASSES = {
         ModelType.ONNX: ONNXStableDiffusion2Model,
         ModelType.Main: StableDiffusion2Model,
         ModelType.Vae: VaeModel,
+        ModelType.Lora: LoRAModel,
+        ModelType.ControlNet: ControlNetModel,
+        ModelType.TextualInversion: TextualInversionModel,
+    },
+    BaseModelType.StableDiffusionXL: {
+        ModelType.Main: StableDiffusionXLModel,
+        ModelType.Vae: VaeModel,
+        # will not work until support written
+        ModelType.Lora: LoRAModel,
+        ModelType.ControlNet: ControlNetModel,
+        ModelType.TextualInversion: TextualInversionModel,
+    },
+    BaseModelType.StableDiffusionXLRefiner: {
+        ModelType.Main: StableDiffusionXLModel,
+        ModelType.Vae: VaeModel,
+        # will not work until support written
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
@@ -52,7 +69,9 @@ for base_model, models in MODEL_CLASSES.items():
         model_configs.discard(None)
         MODEL_CONFIGS.extend(model_configs)
 
-        for cfg in model_configs:
+        # LS: sort to get the checkpoint configs first, which makes
+        # for a better template in the Swagger docs
+        for cfg in sorted(model_configs, key=lambda x: str(x)):
             model_name, cfg_name = cfg.__qualname__.split('.')[-2:]
             openapi_cfg_name = model_name + cfg_name
             if openapi_cfg_name in vars():

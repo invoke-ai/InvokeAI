@@ -1,5 +1,11 @@
 import { O } from 'ts-toolbelt';
-import { Graph, GraphExecutionState } from '../api/types';
+import {
+  BaseModelType,
+  Graph,
+  GraphExecutionState,
+  ModelType,
+  SubModelType,
+} from '../api/types';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -23,6 +29,25 @@ export type BaseNode = {
   id: string;
   type: string;
   [key: string]: AnyInvocation[keyof AnyInvocation];
+};
+
+export type ModelLoadStartedEvent = {
+  graph_execution_state_id: string;
+  model_name: string;
+  base_model: BaseModelType;
+  model_type: ModelType;
+  submodel: SubModelType;
+};
+
+export type ModelLoadCompletedEvent = {
+  graph_execution_state_id: string;
+  model_name: string;
+  base_model: BaseModelType;
+  model_type: ModelType;
+  submodel: SubModelType;
+  hash?: string;
+  location: string;
+  precision: string;
 };
 
 /**
@@ -101,6 +126,8 @@ export type ServerToClientEvents = {
   graph_execution_state_complete: (
     payload: GraphExecutionStateCompleteEvent
   ) => void;
+  model_load_started: (payload: ModelLoadStartedEvent) => void;
+  model_load_completed: (payload: ModelLoadCompletedEvent) => void;
 };
 
 export type ClientToServerEvents = {
