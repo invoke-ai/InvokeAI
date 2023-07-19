@@ -2864,7 +2864,7 @@ export type components = {
       clip?: components["schemas"]["ClipField"];
     };
     /**
-     * MainModelField 
+     * MainModelField
      * @description Main model field
      */
     MainModelField: {
@@ -2875,6 +2875,23 @@ export type components = {
       model_name: string;
       /** @description Base model */
       base_model: components["schemas"]["BaseModelType"];
+      /** @description Model Type */
+      model_type: components["schemas"]["ModelType"];
+    };
+    /**
+     * OnnxModelField 
+     * @description Onnx model field
+     */
+    OnnxModelField: {
+      /**
+       * Model Name
+       * @description Name of the model
+       */
+      model_name: string;
+      /** @description Base model */
+      base_model: components["schemas"]["BaseModelType"];
+      /** @description Model Type */
+      model_type: components["schemas"]["ModelType"];
     };
     /**
      * MainModelLoaderInvocation 
@@ -3308,7 +3325,7 @@ export type components = {
      * @description An enumeration. 
      * @enum {string}
      */
-    ModelType: "main" | "vae" | "lora" | "controlnet" | "embedding";
+    ModelType: "main" | "onnx" | "vae" | "lora" | "controlnet" | "embedding";
     /**
      * ModelVariantType 
      * @description An enumeration. 

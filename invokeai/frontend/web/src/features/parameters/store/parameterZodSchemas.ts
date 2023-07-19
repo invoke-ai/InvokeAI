@@ -127,6 +127,14 @@ export const isValidHeight = (val: unknown): val is HeightParam =>
   zHeight.safeParse(val).success;
 
 const zBaseModel = z.enum(['sd-1', 'sd-2']);
+const zModelType = z.enum([
+  'vae',
+  'lora',
+  'onnx',
+  'main',
+  'controlnet',
+  'embedding',
+]);
 
 export type BaseModelParam = z.infer<typeof zBaseModel>;
 
@@ -137,6 +145,7 @@ export type BaseModelParam = z.infer<typeof zBaseModel>;
 export const zMainModel = z.object({
   model_name: z.string(),
   base_model: zBaseModel,
+  model_type: zModelType,
 });
 
 /**

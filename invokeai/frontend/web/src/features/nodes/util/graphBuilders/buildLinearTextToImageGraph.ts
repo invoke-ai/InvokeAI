@@ -6,6 +6,8 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
+import { BaseModelType, OnnxModelField } from 'services/api/types';
+
 import {
   CLIP_SKIP,
   LATENTS_TO_IMAGE,

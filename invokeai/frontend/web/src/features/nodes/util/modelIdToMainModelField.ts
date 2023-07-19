@@ -1,4 +1,4 @@
-import { BaseModelType, MainModelField } from 'services/api/types';
+import { BaseModelType, MainModelField, ModelType } from 'services/api/types';
 
 /**
  * Crudely converts a model id to a main model field
@@ -9,6 +9,7 @@ export const modelIdToMainModelField = (modelId: string): MainModelField => {
 
   const field: MainModelField = {
     base_model: base_model as BaseModelType,
+    model_type: model_type as ModelType,
     model_name,
   };
 

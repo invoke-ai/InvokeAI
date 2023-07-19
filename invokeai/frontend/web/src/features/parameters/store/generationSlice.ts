@@ -260,6 +260,7 @@ export const generationSlice = createSlice({
           id: defaultModel,
           name: model_name,
           base_model,
+          model_type,
         });
       }
     });
