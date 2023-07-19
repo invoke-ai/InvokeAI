@@ -245,16 +245,16 @@ async def get_image_urls(
 )
 async def list_image_dtos(
     image_origin: Optional[ResourceOrigin] = Query(
-        default=None, description="The origin of images to list"
+        default=None, description="The origin of images to list."
     ),
     categories: Optional[list[ImageCategory]] = Query(
-        default=None, description="The categories of image to include"
+        default=None, description="The categories of image to include."
     ),
     is_intermediate: Optional[bool] = Query(
-        default=None, description="Whether to list intermediate images"
+        default=None, description="Whether to list intermediate images."
     ),
     board_id: Optional[str] = Query(
-        default=None, description="The board id to filter by"
+        default=None, description="The board id to filter by. Use 'none' to find images without a board."
     ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),

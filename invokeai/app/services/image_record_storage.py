@@ -10,7 +10,10 @@ from pydantic.generics import GenericModel
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.models.image_record import (
-    ImageRecord, ImageRecordChanges, deserialize_image_record)
+    ImageRecord,
+    ImageRecordChanges,
+    deserialize_image_record,
+)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -377,11 +380,15 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
                 query_params.append(is_intermediate)
 
-            if board_id is not None:
+            # board_id of "none" is reserved for images without a board
+            if board_id == "none":
+                query_conditions += """--sql
+                AND board_images.board_id IS NULL
+                """
+            elif board_id is not None:
                 query_conditions += """--sql
                 AND board_images.board_id = ?
                 """
-
                 query_params.append(board_id)
 
             query_pagination = """--sql
