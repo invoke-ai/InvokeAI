@@ -11,11 +11,9 @@ const ImageMetadataActions = (props: Props) => {
   const { metadata } = props;
 
   const {
-    recallBothPrompts,
     recallPositivePrompt,
     recallNegativePrompt,
     recallSeed,
-    recallInitialImage,
     recallCfgScale,
     recallModel,
     recallScheduler,
@@ -23,7 +21,6 @@ const ImageMetadataActions = (props: Props) => {
     recallWidth,
     recallHeight,
     recallStrength,
-    recallAllParameters,
   } = useRecallParameters();
 
   const handleRecallPositivePrompt = useCallback(() => {

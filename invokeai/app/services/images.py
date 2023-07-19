@@ -11,7 +11,6 @@ from invokeai.app.models.image import (ImageCategory,
                                        InvalidOriginException, ResourceOrigin)
 from invokeai.app.services.board_image_record_storage import \
     BoardImageRecordStorageBase
-from invokeai.app.services.graph import Graph
 from invokeai.app.services.image_file_storage import (
     ImageFileDeleteException, ImageFileNotFoundException,
     ImageFileSaveException, ImageFileStorageBase)
@@ -385,16 +384,14 @@ class ImageService(ImageServiceABC):
 
     def delete_images_on_board(self, board_id: str):
         try:
-            images = self._services.board_image_records.get_images_for_board(board_id)
-            image_name_list = list(
-                map(
-                    lambda r: r.image_name,
-                    images.items,
+            image_names = (
+                self._services.board_image_records.get_all_board_image_names_for_board(
+                    board_id
                 )
             )
-            for image_name in image_name_list:
+            for image_name in image_names:
                 self._services.image_files.delete(image_name)
-            self._services.image_records.delete_many(image_name_list)
+            self._services.image_records.delete_many(image_names)
         except ImageRecordDeleteException:
             self._services.logger.error(f"Failed to delete image records")
             raise

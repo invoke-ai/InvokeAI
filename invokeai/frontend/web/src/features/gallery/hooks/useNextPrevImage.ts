@@ -2,61 +2,76 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
+  IMAGE_LIMIT,
   imageSelected,
   selectImagesById,
 } from 'features/gallery/store/gallerySlice';
 import { clamp, isEqual } from 'lodash-es';
 import { useCallback } from 'react';
-import { receivedPageOfImages } from 'services/api/thunks/image';
-import { selectFilteredImages } from '../store/gallerySelectors';
+import {
+  ListImagesArgs,
+  imagesAdapter,
+  imagesApi,
+  useLazyListImagesQuery,
+} from 'services/api/endpoints/images';
+import { selectListImagesBaseQueryArgs } from '../store/gallerySelectors';
 
 export const nextPrevImageButtonsSelector = createSelector(
-  [stateSelector, selectFilteredImages],
-  (state, filteredImages) => {
-    const { total, isFetching } = state.gallery;
+  [stateSelector, selectListImagesBaseQueryArgs],
+  (state, baseQueryArgs) => {
+    const { data, status } =
+      imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
+
     const lastSelectedImage =
       state.gallery.selection[state.gallery.selection.length - 1];
 
-    if (!lastSelectedImage || filteredImages.length === 0) {
+    const isFetching = status === 'pending';
+
+    if (!data || !lastSelectedImage || data.total === 0) {
       return {
+        isFetching,
+        queryArgs: baseQueryArgs,
         isOnFirstImage: true,
         isOnLastImage: true,
       };
     }
 
-    const currentImageIndex = filteredImages.findIndex(
+    const queryArgs: ListImagesArgs = {
+      ...baseQueryArgs,
+      offset: data.ids.length,
+      limit: IMAGE_LIMIT,
+    };
+
+    const selectors = imagesAdapter.getSelectors();
+
+    const images = selectors.selectAll(data);
+
+    const currentImageIndex = images.findIndex(
       (i) => i.image_name === lastSelectedImage
     );
-    const nextImageIndex = clamp(
-      currentImageIndex + 1,
-      0,
-      filteredImages.length - 1
-    );
+    const nextImageIndex = clamp(currentImageIndex + 1, 0, images.length - 1);
 
-    const prevImageIndex = clamp(
-      currentImageIndex - 1,
-      0,
-      filteredImages.length - 1
-    );
+    const prevImageIndex = clamp(currentImageIndex - 1, 0, images.length - 1);
 
-    const nextImageId = filteredImages[nextImageIndex].image_name;
-    const prevImageId = filteredImages[prevImageIndex].image_name;
+    const nextImageId = images[nextImageIndex].image_name;
+    const prevImageId = images[prevImageIndex].image_name;
 
-    const nextImage = selectImagesById(state, nextImageId);
-    const prevImage = selectImagesById(state, prevImageId);
+    const nextImage = selectors.selectById(data, nextImageId);
+    const prevImage = selectors.selectById(data, prevImageId);
 
-    const imagesLength = filteredImages.length;
+    const imagesLength = images.length;
 
     return {
       isOnFirstImage: currentImageIndex === 0,
       isOnLastImage:
         !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
-      areMoreImagesAvailable: total > imagesLength,
-      isFetching,
+      areMoreImagesAvailable: data?.total ?? 0 > imagesLength,
+      isFetching: status === 'pending',
       nextImage,
       prevImage,
       nextImageId,
       prevImageId,
+      queryArgs,
     };
   },
   {
@@ -76,6 +91,7 @@ export const useNextPrevImage = () => {
     prevImageId,
     areMoreImagesAvailable,
     isFetching,
+    queryArgs,
   } = useAppSelector(nextPrevImageButtonsSelector);
 
   const handlePrevImage = useCallback(() => {
@@ -86,13 +102,11 @@ export const useNextPrevImage = () => {
     nextImageId && dispatch(imageSelected(nextImageId));
   }, [dispatch, nextImageId]);
 
+  const [listImages] = useLazyListImagesQuery();
+
   const handleLoadMoreImages = useCallback(() => {
-    dispatch(
-      receivedPageOfImages({
-        is_intermediate: false,
-      })
-    );
-  }, [dispatch]);
+    listImages(queryArgs);
+  }, [listImages, queryArgs]);
 
   return {
     handlePrevImage,

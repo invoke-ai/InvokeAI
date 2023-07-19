@@ -32,11 +32,11 @@ class BoardImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_images_for_board(
+    def get_all_board_image_names_for_board(
         self,
         board_id: str,
-    ) -> OffsetPaginatedResults[ImageRecord]:
-        """Gets images for a board."""
+    ) -> list[str]:
+        """Gets all board images for a board, as a list of the image names."""
         pass
 
     @abstractmethod
@@ -210,6 +210,26 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         return OffsetPaginatedResults(
             items=images, offset=offset, limit=limit, total=count
         )
+
+    def get_all_board_image_names_for_board(self, board_id: str) -> list[str]:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                SELECT image_name
+                FROM board_images
+                WHERE board_id = ?;
+                """,
+                (board_id,),
+            )
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            image_names = list(map(lambda r: r[0], result))
+            return image_names
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise e
+        finally:
+            self._lock.release()
 
     def get_board_for_image(
         self,
