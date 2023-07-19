@@ -1,7 +1,8 @@
 import { useDisclosure } from '@chakra-ui/react';
 import { PropsWithChildren, createContext, useCallback, useState } from 'react';
 import { ImageDTO } from 'services/api/types';
-import { useAddImageToBoardMutation } from 'services/api/endpoints/boardImages';
+import { imagesApi } from 'services/api/endpoints/images';
+import { useAppDispatch } from '../store/storeHooks';
 
 export type ImageUsage = {
   isInitialImage: boolean;
@@ -40,8 +41,7 @@ type Props = PropsWithChildren;
 export const AddImageToBoardContextProvider = (props: Props) => {
   const [imageToMove, setImageToMove] = useState<ImageDTO>();
   const { isOpen, onOpen, onClose } = useDisclosure();
-
-  const [addImageToBoard, result] = useAddImageToBoardMutation();
+  const dispatch = useAppDispatch();
 
   // Clean up after deleting or dismissing the modal
   const closeAndClearImageToDelete = useCallback(() => {
@@ -63,14 +63,16 @@ export const AddImageToBoardContextProvider = (props: Props) => {
   const handleAddToBoard = useCallback(
     (boardId: string) => {
       if (imageToMove) {
-        addImageToBoard({
-          board_id: boardId,
-          image_name: imageToMove.image_name,
-        });
+        dispatch(
+          imagesApi.endpoints.addImageToBoard.initiate({
+            imageDTO: imageToMove,
+            board_id: boardId,
+          })
+        );
         closeAndClearImageToDelete();
       }
     },
-    [addImageToBoard, closeAndClearImageToDelete, imageToMove]
+    [dispatch, closeAndClearImageToDelete, imageToMove]
   );
 
   return (

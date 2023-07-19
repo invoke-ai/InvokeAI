@@ -1,4 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
+import { ImageDTO } from 'services/api/types';
 
 export const canvasSavedToGallery = createAction('canvas/canvasSavedToGallery');
 
@@ -12,6 +13,6 @@ export const canvasDownloadedAsImage = createAction(
 
 export const canvasMerged = createAction('canvas/canvasMerged');
 
-export const stagingAreaImageSaved = createAction<{ imageName: string }>(
+export const stagingAreaImageSaved = createAction<{ imageDTO: ImageDTO }>(
   'canvas/stagingAreaImageSaved'
 );
