@@ -1,5 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-from pathlib import Path
+
 from typing import Literal, Optional
 
 import numpy
@@ -15,6 +15,7 @@ from .baseinvocation import (
     InvocationContext,
     InvocationConfig,
 )
+
 
 class PILInvocationConfig(BaseModel):
     """Helper class to provide all PIL invocations with additional config"""
@@ -665,27 +666,6 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-# dynamically populate from cv2/data/ instead of providing?
-CASCADE_FILES = Literal[
-    "haarcascade_eye.xml",
-    "haarcascade_eye_tree_eyeglasses.xml",
-    "haarcascade_frontalcatface.xml",
-    "haarcascade_frontalcatface_extended.xml",
-    "haarcascade_frontalface_alt.xml",
-    "haarcascade_frontalface_alt2.xml",
-    "haarcascade_frontalface_alt_tree.xml",
-    "haarcascade_frontalface_default.xml",
-    "haarcascade_fullbody.xml",
-    "haarcascade_lefteye_2splits.xml",
-    "haarcascade_license_plate_rus_16stages.xml",
-    "haarcascade_lowerbody.xml",
-    "haarcascade_profileface.xml",
-    "haarcascade_righteye_2splits.xml",
-    "haarcascade_russian_plate_number.xml",
-    "haarcascade_smile.xml",
-    "haarcascade_upperbody.xml",
-]
-
 class FaceMaskInvocation(BaseInvocation, PILInvocationConfig):
     """OpenCV cascade classifier detection to create transparencies in an image"""
 
@@ -697,29 +677,16 @@ class FaceMaskInvocation(BaseInvocation, PILInvocationConfig):
     x_offset: float = Field(default=0.0, description="Offset for the X-axis of the oval mask")
     y_offset: float = Field(default=0.0, description="Offset for the Y-axis of the oval mask")
     invert_mask: bool = Field(default=False, description="Toggle to invert the mask")
-    cascade_file: CASCADE_FILES = Field(
-        default="haarcascade_frontalface_default.xml",
-        description="The cascade file for detection"
-    )
+    cascade_file_path: Optional[str] = Field(default=None, description="Path to the cascade XML file for detection")
     # fmt: on
-
-    class Config(PILInvocationConfig):
-        schema_extra = {
-            "ui": {
-                "title": "Face Mask Detection",
-                "tags": ["image", "face mask", "opencv"],
-            },
-        }
 
     def invoke(self, context: InvocationContext) -> ImageMaskOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
-        root_path = context.services.configuration.root_path
-        cascade_files_path = Path(f".venv/lib/python3.10/site-packages/cv2/data/{self.cascade_file}")
-        cascade_file_path = str(root_path / cascade_files_path)
 
         # Perform face detection
         cv_image = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
-        face_cascade = cv2.CascadeClassifier(str(cascade_file_path))
+        cascade_file_path = self.cascade_file_path
+        face_cascade = cv2.CascadeClassifier(cascade_file_path)
         gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
