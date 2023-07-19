@@ -8,20 +8,64 @@ title: ControlNet
 
 ControlNet
 
-ControlNet is a powerful set of features developed by the open-source community (notably, Stanford researcher [**@ilyasviel**](https://github.com/lllyasviel)) that allows you to apply a secondary neural network model to your image generation process in Invoke.
+ControlNet is a powerful set of features developed by the open-source
+community (notably, Stanford researcher
+[**@ilyasviel**](https://github.com/lllyasviel)) that allows you to
+apply a secondary neural network model to your image generation
+process in Invoke.
 
-With ControlNet, you can get more control over the output of your image generation, providing you with a way to direct the network towards generating images that better fit your desired style or outcome.
+With ControlNet, you can get more control over the output of your
+image generation, providing you with a way to direct the network
+towards generating images that better fit your desired style or
+outcome.
 
 
 ### How it works
 
-ControlNet works by analyzing an input image, pre-processing that image to identify relevant information that can be interpreted by each specific ControlNet model, and then inserting that control information into the generation process. This can be used to adjust the style, composition, or other aspects of the image to better achieve a specific result.
+ControlNet works by analyzing an input image, pre-processing that
+image to identify relevant information that can be interpreted by each
+specific ControlNet model, and then inserting that control information
+into the generation process. This can be used to adjust the style,
+composition, or other aspects of the image to better achieve a
+specific result.
 
 
 ### Models
 
-As part of the model installation, ControlNet models can be selected including a variety of pre-trained models that have been added to achieve different effects or styles in your generated images. Further ControlNet models may require additional code functionality to also be incorporated into Invoke's Invocations folder. You should expect to follow any installation instructions for ControlNet models loaded  outside the default models provided by Invoke. The default models include:
+InvokeAI provides access to a series of ControlNet models that provide
+different effects or styles in your generated images.  Currently
+InvokeAI only supports "diffuser" style ControlNet models. These are
+folders that contain the files `config.json` and/or
+`diffusion_pytorch_model.safetensors` and
+`diffusion_pytorch_model.fp16.safetensors`. The name of the folder is
+the name of the model.
 
+***InvokeAI does not currently support checkpoint-format
+ControlNets. These come in the form of a single file with the
+extension `.safetensors`.***
+
+Diffuser-style ControlNet models are available at HuggingFace
+(http://huggingface.co) and accessed via their repo IDs (identifiers
+in the format "author/modelname"). The easiest way to install them is
+to use the InvokeAI model installer application. Use the
+`invoke.sh`/`invoke.bat` launcher to select item [5] and then navigate
+to the CONTROLNETS section. Select the models you wish to install and
+press "APPLY CHANGES". You may also enter additional HuggingFace
+repo_ids in the "Additional models" textbox:
+
+![Model Installer -
+Controlnetl](../assets/installing-models/model-installer-controlnet.png){:width="640px"}
+
+Command-line users can launch the model installer using the command
+`invokeai-model-install`.
+
+_Be aware that some ControlNet models require additional code
+functionality in order to work properly, so just installing a
+third-party ControlNet model may not have the desired effect._ Please
+read and follow the documentation for installing a third party model
+not currently included among InvokeAI's default list.
+
+The models currently supported include:
 
 **Canny**:
 

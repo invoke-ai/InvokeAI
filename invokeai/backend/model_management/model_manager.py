@@ -938,20 +938,29 @@ class ModelManager(object):
             def models_found(self):
                 return self.new_models_found
 
+        config = self.app_config
+
+        # LS: hacky
+        # Patch in the SD VAE from core so that it is available for use by the UI
+        try:
+            self.heuristic_import({config.root_path / 'models/core/convert/sd-vae-ft-mse'})
+        except:
+            pass
 
         installer = ModelInstall(config = self.app_config,
                                  model_manager = self,
                                  prediction_type_helper = ask_user_for_prediction_type,
                                  )
-        config = self.app_config
         known_paths = {config.root_path / x['path'] for x in self.list_models()}
         directories = {config.root_path / x for x in [config.autoimport_dir,
                                                       config.lora_dir,
                                                       config.embedding_dir,
-                                                      config.controlnet_dir]
+                                                      config.controlnet_dir,
+                                                      ]
                        }
         scanner = ScanAndImport(directories, self.logger, ignore=known_paths, installer=installer)
         scanner.search()
+        
         return scanner.models_found()
 
     def heuristic_import(self,
