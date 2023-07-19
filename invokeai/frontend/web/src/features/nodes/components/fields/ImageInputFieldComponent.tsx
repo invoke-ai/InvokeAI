@@ -15,8 +15,8 @@ import {
 } from 'app/components/ImageDnd/typesafeDnd';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { PostUploadAction } from 'services/api/thunks/image';
 import { FieldComponentProps } from './types';
+import { PostUploadAction } from 'services/api/types';
 
 const ImageInputFieldComponent = (
   props: FieldComponentProps<ImageInputFieldValue, ImageInputFieldTemplate>

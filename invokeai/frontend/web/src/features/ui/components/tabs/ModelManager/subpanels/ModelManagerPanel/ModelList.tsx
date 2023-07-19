@@ -17,14 +17,14 @@ type ModelListProps = {
   setSelectedModelId: (name: string | undefined) => void;
 };
 
-type ModelFormat = 'all' | 'checkpoint' | 'diffusers';
+type ModelFormat = 'images' | 'checkpoint' | 'diffusers';
 
 const ModelList = (props: ModelListProps) => {
   const { selectedModelId, setSelectedModelId } = props;
   const { t } = useTranslation();
   const [nameFilter, setNameFilter] = useState<string>('');
   const [modelFormatFilter, setModelFormatFilter] =
-    useState<ModelFormat>('all');
+    useState<ModelFormat>('images');
 
   const { filteredDiffusersModels } = useGetMainModelsQuery(undefined, {
     selectFromResult: ({ data }) => ({
@@ -47,8 +47,8 @@ const ModelList = (props: ModelListProps) => {
       <Flex flexDirection="column" gap={4} paddingInlineEnd={4}>
         <ButtonGroup isAttached>
           <IAIButton
-            onClick={() => setModelFormatFilter('all')}
-            isChecked={modelFormatFilter === 'all'}
+            onClick={() => setModelFormatFilter('images')}
+            isChecked={modelFormatFilter === 'images'}
             size="sm"
           >
             {t('modelManager.allModels')}
@@ -75,7 +75,7 @@ const ModelList = (props: ModelListProps) => {
           labelPos="side"
         />
 
-        {['all', 'diffusers'].includes(modelFormatFilter) &&
+        {['images', 'diffusers'].includes(modelFormatFilter) &&
           filteredDiffusersModels.length > 0 && (
             <StyledModelContainer>
               <Flex sx={{ gap: 2, flexDir: 'column' }}>
@@ -93,7 +93,7 @@ const ModelList = (props: ModelListProps) => {
               </Flex>
             </StyledModelContainer>
           )}
-        {['all', 'checkpoint'].includes(modelFormatFilter) &&
+        {['images', 'checkpoint'].includes(modelFormatFilter) &&
           filteredCheckpointModels.length > 0 && (
             <StyledModelContainer>
               <Flex sx={{ gap: 2, flexDir: 'column' }}>

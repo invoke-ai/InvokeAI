@@ -2,18 +2,34 @@ import { As, Badge, Flex } from '@chakra-ui/react';
 import { TypesafeDroppableData } from 'app/components/ImageDnd/typesafeDnd';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { ReactNode } from 'react';
 
 type GenericBoardProps = {
-  droppableData: TypesafeDroppableData;
+  droppableData?: TypesafeDroppableData;
   onClick: () => void;
   isSelected: boolean;
   icon: As;
   label: string;
+  dropLabel?: ReactNode;
   badgeCount?: number;
 };
 
+const formatBadgeCount = (count: number) =>
+  Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(count);
+
 const GenericBoard = (props: GenericBoardProps) => {
-  const { droppableData, onClick, isSelected, icon, label, badgeCount } = props;
+  const {
+    droppableData,
+    onClick,
+    isSelected,
+    icon,
+    label,
+    badgeCount,
+    dropLabel,
+  } = props;
 
   return (
     <Flex
@@ -59,10 +75,10 @@ const GenericBoard = (props: GenericBoardProps) => {
           }}
         >
           {badgeCount !== undefined && (
-            <Badge variant="solid">{badgeCount}</Badge>
+            <Badge variant="solid">{formatBadgeCount(badgeCount)}</Badge>
           )}
         </Flex>
-        <IAIDroppable data={droppableData} />
+        <IAIDroppable data={droppableData} dropLabel={dropLabel} />
       </Flex>
       <Flex
         sx={{

@@ -2,10 +2,10 @@ import { log } from 'app/logging/useLogger';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
+import { imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
-import { imageDTOReceived } from 'services/api/thunks/image';
 import { sessionCreated } from 'services/api/thunks/session';
-import { Graph } from 'services/api/types';
+import { Graph, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 import { startAppListening } from '..';
 
@@ -62,12 +62,13 @@ export const addControlNetImageProcessedListener = () => {
           invocationCompleteAction.payload.data.result.image;
 
         // Wait for the ImageDTO to be received
-        const [imageMetadataReceivedAction] = await take(
-          (action): action is ReturnType<typeof imageDTOReceived.fulfilled> =>
-            imageDTOReceived.fulfilled.match(action) &&
+        const [{ payload }] = await take(
+          (action) =>
+            imagesApi.endpoints.getImageDTO.matchFulfilled(action) &&
             action.payload.image_name === image_name
         );
-        const processedControlImage = imageMetadataReceivedAction.payload;
+
+        const processedControlImage = payload as ImageDTO;
 
         moduleLog.debug(
           { data: { arg: action.payload, processedControlImage } },

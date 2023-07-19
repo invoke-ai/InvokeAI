@@ -1,9 +1,9 @@
 import {
-  IMAGE_CATEGORIES,
+  ASSETS_CATEGORIES,
   INITIAL_IMAGE_LIMIT,
   boardIdSelected,
 } from 'features/gallery/store/gallerySlice';
-import { FaImages } from 'react-icons/fa';
+import { FaFileImage } from 'react-icons/fa';
 import { useDispatch } from 'react-redux';
 import {
   ListImagesArgs,
@@ -12,17 +12,17 @@ import {
 import GenericBoard from './GenericBoard';
 
 const baseQueryArg: ListImagesArgs = {
-  categories: IMAGE_CATEGORIES,
+  categories: ASSETS_CATEGORIES,
   offset: 0,
   limit: INITIAL_IMAGE_LIMIT,
   is_intermediate: false,
 };
 
-const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
+const AllAssetsBoard = ({ isSelected }: { isSelected: boolean }) => {
   const dispatch = useDispatch();
 
   const handleClick = () => {
-    dispatch(boardIdSelected('images'));
+    dispatch(boardIdSelected('assets'));
   };
 
   const { total } = useListImagesQuery(baseQueryArg, {
@@ -33,18 +33,18 @@ const AllImagesBoard = ({ isSelected }: { isSelected: boolean }) => {
   // const droppableData: MoveBoardDropData = {
   //   id: 'all-images-board',
   //   actionType: 'MOVE_BOARD',
-  //   context: { boardId: 'images' },
+  //   context: { boardId: 'assets' },
   // };
 
   return (
     <GenericBoard
       onClick={handleClick}
       isSelected={isSelected}
-      icon={FaImages}
-      label="All Images"
+      icon={FaFileImage}
+      label="All Assets"
       badgeCount={total}
     />
   );
 };
 
-export default AllImagesBoard;
+export default AllAssetsBoard;

@@ -1,31 +1,30 @@
 import { log } from 'app/logging/useLogger';
-import { boardImagesApi } from 'services/api/endpoints/boardImages';
+import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'boards' });
 
 export const addImageAddedToBoardFulfilledListener = () => {
   startAppListening({
-    matcher: boardImagesApi.endpoints.addImageToBoard.matchFulfilled,
+    matcher: imagesApi.endpoints.addImageToBoard.matchFulfilled,
     effect: (action, { getState, dispatch }) => {
-      const { board_id, image_name } = action.meta.arg.originalArgs;
+      const { board_id, imageDTO } = action.meta.arg.originalArgs;
 
-      moduleLog.debug(
-        { data: { board_id, image_name } },
-        'Image added to board'
-      );
+      // TODO: update listImages cache for this board
+
+      moduleLog.debug({ data: { board_id, imageDTO } }, 'Image added to board');
     },
   });
 };
 
 export const addImageAddedToBoardRejectedListener = () => {
   startAppListening({
-    matcher: boardImagesApi.endpoints.addImageToBoard.matchRejected,
+    matcher: imagesApi.endpoints.addImageToBoard.matchRejected,
     effect: (action, { getState, dispatch }) => {
-      const { board_id, image_name } = action.meta.arg.originalArgs;
+      const { board_id, imageDTO } = action.meta.arg.originalArgs;
 
       moduleLog.debug(
-        { data: { board_id, image_name } },
+        { data: { board_id, imageDTO } },
         'Problem adding image to board'
       );
     },

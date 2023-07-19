@@ -8,7 +8,14 @@ import {
 } from '@reduxjs/toolkit/query/react';
 import { $authToken, $baseUrl } from 'services/api/client';
 
-export const tagTypes = ['Board', 'Image', 'ImageMetadata', 'Model'];
+export const tagTypes = [
+  'Board',
+  'Image',
+  'ImageNameList',
+  'ImageList',
+  'ImageMetadata',
+  'Model',
+];
 export type ApiFullTagDescription = FullTagDescription<
   (typeof tagTypes)[number]
 >;

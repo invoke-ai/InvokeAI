@@ -17,6 +17,8 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import ImageMetadataViewer from '../ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from '../NextPrevImageButtons';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { FaImage } from 'react-icons/fa';
 
 export const imagesSelector = createSelector(
   [stateSelector, selectLastSelectedImage],
@@ -168,7 +170,11 @@ const CurrentImagePreview = () => {
           draggableData={draggableData}
           isUploadDisabled={true}
           fitContainer
+          useThumbailFallback
           dropLabel="Set as Current Image"
+          noContentFallback={
+            <IAINoContentFallback icon={FaImage} label="No image selected" />
+          }
         />
       )}
       {shouldShowImageDetails && imageDTO && (
