@@ -686,7 +686,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     tiled: bool = Field(
         default=False,
         description="Encode latents by overlaping tiles(less memory consumption)")
-    fp32: bool = Field(False, description="Decode in full precision")
+    fp32: bool = Field(default=choose_precision(choose_torch_device())=='float32', description="Decode in full precision")
 
 
     # Schema customisation
