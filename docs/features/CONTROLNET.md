@@ -35,26 +35,29 @@ specific result.
 InvokeAI provides access to a series of ControlNet models that provide
 different effects or styles in your generated images.  Currently
 InvokeAI only supports "diffuser" style ControlNet models. These are
-directories that contain the files `config.json` and either
-`diffusion_pytorch_model.safetensors` or
-`diffusion_pytorch_model.fp16.safetensors`. The name of the directory
-is the same as the name of the model. ***We do not support
-checkpoint-format ControlNets, which come in a single file with the
+folders that contain the files `config.json` and/or
+`diffusion_pytorch_model.safetensors` and
+`diffusion_pytorch_model.fp16.safetensors`. The name of the folder is
+the name of the model.
+
+***InvokeAI does not currently support checkpoint-format
+ControlNets. These come in the form of a single file with the
 extension `.safetensors`.***
 
 Diffuser-style ControlNet models are available at HuggingFace
 (http://huggingface.co) and accessed via their repo IDs (identifiers
 in the format "author/modelname"). The easiest way to install them is
-to use the InvokeAI model installer application. If you use the
-`invoke.sh`/`invoke.bat` launcher, select item [5] and navigate to the
-CONTROLNETS section. From the command line, the model installer can be
-started with `invokeai-model-install`.
+to use the InvokeAI model installer application. Use the
+`invoke.sh`/`invoke.bat` launcher to select item [5] and then navigate
+to the CONTROLNETS section. Select the models you wish to install and
+press "APPLY CHANGES". You may also enter additional HuggingFace
+repo_ids in the "Additional models" textbox:
 
-You can select as many ControlNet models from the checkbox list as you
-like, or enter additional HuggingFace repo_ids in the "Additional
-models" textbox:
+![Model Installer -
+Controlnetl](../assets/installing-models/model-installer-controlnet.png){:width="640px"}
 
-![Model Installer - Controlnetl](../assets/installing-models/model-installer-controlnet.png){:width="640px"}
+Command-line users can launch the model installer using the command
+`invokeai-model-install`.
 
 _Be aware that some ControlNet models require additional code
 functionality in order to work properly, so just installing a
