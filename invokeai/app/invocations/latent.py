@@ -38,6 +38,10 @@ from diffusers.models.attention_processor import (
     XFormersAttnProcessor,
 )
 
+
+DEFAULT_PRECISION = choose_precision(choose_torch_device())
+
+
 class LatentsField(BaseModel):
     """A latents field used for passing latents between invocations"""
 
@@ -492,7 +496,7 @@ class LatentsToImageInvocation(BaseInvocation):
     tiled: bool = Field(
         default=False,
         description="Decode latents by overlaping tiles(less memory consumption)")
-    fp32: bool = Field(default=choose_precision(choose_torch_device())=='float32', description="Decode in full precision")
+    fp32: bool = Field(DEFAULT_PRECISION=='float32', description="Decode in full precision")
     metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")
 
     # Schema customisation
@@ -686,7 +690,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     tiled: bool = Field(
         default=False,
         description="Encode latents by overlaping tiles(less memory consumption)")
-    fp32: bool = Field(default=choose_precision(choose_torch_device())=='float32', description="Decode in full precision")
+    fp32: bool = Field(DEFAULT_PRECISION=='float32', description="Decode in full precision")
 
 
     # Schema customisation
