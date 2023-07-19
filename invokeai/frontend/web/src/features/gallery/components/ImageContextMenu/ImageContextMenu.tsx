@@ -32,7 +32,7 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
 
   const { selectionCount } = useAppSelector(selector);
 
-  const handleContextMenu = useCallback((e: MouseEvent<HTMLDivElement>) => {
+  const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
   }, []);
 
@@ -48,7 +48,7 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
           <MenuList
             sx={{ visibility: 'visible !important' }}
             motionProps={menuListMotionProps}
-            onContextMenu={handleContextMenu}
+            onContextMenu={skipEvent}
           >
             {selectionCount === 0 && <></>}
             {selectionCount === 1 && (

@@ -67,6 +67,10 @@ export const imagesApi = api.injectEndpoints({
         url: getListImagesUrl(queryArgs),
         method: 'GET',
       }),
+      providesTags: (result, error, { board_id, categories }) => [
+        // Make the tags the same as the cache key
+        { type: 'ImageList', id: getListImagesUrl({ board_id, categories }) },
+      ],
       serializeQueryArgs: ({ queryArgs }) => {
         // Create cache & key based on board_id and categories - skip the other args.
         // Offset is the size of the cache, and limit is always the same. Both are provided by

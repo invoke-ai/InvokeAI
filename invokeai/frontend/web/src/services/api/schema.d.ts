@@ -228,6 +228,13 @@ export type paths = {
      */
     patch: operations["update_board"];
   };
+  "/api/v1/boards/{board_id}/image_names": {
+    /**
+     * List All Board Image Names 
+     * @description Gets a list of images for a board
+     */
+    get: operations["list_all_board_image_names"];
+  };
   "/api/v1/board_images/": {
     /**
      * Create Board Image 
@@ -239,13 +246,6 @@ export type paths = {
      * @description Deletes a board_image
      */
     delete: operations["remove_board_image"];
-  };
-  "/api/v1/board_images/{board_id}": {
-    /**
-     * List Board Images 
-     * @description Gets a list of images for a board
-     */
-    get: operations["list_board_images"];
   };
   "/api/v1/app/version": {
     /** Get Version */
@@ -1036,6 +1036,24 @@ export type components = {
        * @description The mask to use when inpainting
        */
       mask?: components["schemas"]["ImageField"];
+    };
+    /** DeleteBoardResult */
+    DeleteBoardResult: {
+      /**
+       * Board Id 
+       * @description The id of the board that was deleted.
+       */
+      board_id: string;
+      /**
+       * Deleted Board Images 
+       * @description The image names of the board-images relationships that were deleted.
+       */
+      deleted_board_images: (string)[];
+      /**
+       * Deleted Images 
+       * @description The names of the images that were deleted.
+       */
+      deleted_images: (string)[];
     };
     /**
      * DivideInvocation 
@@ -5306,23 +5324,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionXLModelFormat 
      * @description An enumeration. 
@@ -6334,7 +6346,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          "application/json": components["schemas"]["DeleteBoardResult"];
         };
       };
       /** @description Validation Error */
@@ -6366,6 +6378,32 @@ export type operations = {
       201: {
         content: {
           "application/json": components["schemas"]["BoardDTO"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * List All Board Image Names 
+   * @description Gets a list of images for a board
+   */
+  list_all_board_image_names: {
+    parameters: {
+      path: {
+        /** @description The id of the board */
+        board_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": (string)[];
         };
       };
       /** @description Validation Error */
@@ -6416,38 +6454,6 @@ export type operations = {
       201: {
         content: {
           "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * List Board Images 
-   * @description Gets a list of images for a board
-   */
-  list_board_images: {
-    parameters: {
-      query?: {
-        /** @description The page offset */
-        offset?: number;
-        /** @description The number of boards per page */
-        limit?: number;
-      };
-      path: {
-        /** @description The id of the board */
-        board_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
         };
       };
       /** @description Validation Error */

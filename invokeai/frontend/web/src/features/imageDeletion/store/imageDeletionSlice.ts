@@ -51,10 +51,42 @@ export type ImageUsage = {
   isControlNetImage: boolean;
 };
 
+export const getImageUsage = (state: RootState, image_name: string) => {
+  const { generation, canvas, nodes, controlNet } = state;
+  const isInitialImage = generation.initialImage?.imageName === image_name;
+
+  const isCanvasImage = canvas.layerState.objects.some(
+    (obj) => obj.kind === 'image' && obj.imageName === image_name
+  );
+
+  const isNodesImage = nodes.nodes.some((node) => {
+    return some(
+      node.data.inputs,
+      (input) =>
+        input.type === 'image' && input.value?.image_name === image_name
+    );
+  });
+
+  const isControlNetImage = some(
+    controlNet.controlNets,
+    (c) =>
+      c.controlImage === image_name || c.processedControlImage === image_name
+  );
+
+  const imageUsage: ImageUsage = {
+    isInitialImage,
+    isCanvasImage,
+    isNodesImage,
+    isControlNetImage,
+  };
+
+  return imageUsage;
+};
+
 export const selectImageUsage = createSelector(
   [(state: RootState) => state],
-  ({ imageDeletion, generation, canvas, nodes, controlNet }) => {
-    const { imageToDelete } = imageDeletion;
+  (state) => {
+    const { imageToDelete } = state.imageDeletion;
 
     if (!imageToDelete) {
       return;
@@ -62,32 +94,7 @@ export const selectImageUsage = createSelector(
 
     const { image_name } = imageToDelete;
 
-    const isInitialImage = generation.initialImage?.imageName === image_name;
-
-    const isCanvasImage = canvas.layerState.objects.some(
-      (obj) => obj.kind === 'image' && obj.imageName === image_name
-    );
-
-    const isNodesImage = nodes.nodes.some((node) => {
-      return some(
-        node.data.inputs,
-        (input) =>
-          input.type === 'image' && input.value?.image_name === image_name
-      );
-    });
-
-    const isControlNetImage = some(
-      controlNet.controlNets,
-      (c) =>
-        c.controlImage === image_name || c.processedControlImage === image_name
-    );
-
-    const imageUsage: ImageUsage = {
-      isInitialImage,
-      isCanvasImage,
-      isNodesImage,
-      isControlNetImage,
-    };
+    const imageUsage = getImageUsage(state, image_name);
 
     return imageUsage;
   },

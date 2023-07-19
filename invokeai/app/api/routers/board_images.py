@@ -24,11 +24,14 @@ async def create_board_image(
 ):
     """Creates a board_image"""
     try:
-        result = ApiDependencies.invoker.services.board_images.add_image_to_board(board_id=board_id, image_name=image_name)
+        result = ApiDependencies.invoker.services.board_images.add_image_to_board(
+            board_id=board_id, image_name=image_name
+        )
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to add to board")
-    
+
+
 @board_images_router.delete(
     "/",
     operation_id="remove_board_image",
@@ -43,27 +46,10 @@ async def remove_board_image(
 ):
     """Deletes a board_image"""
     try:
-        result = ApiDependencies.invoker.services.board_images.remove_image_from_board(board_id=board_id, image_name=image_name)
+        result = ApiDependencies.invoker.services.board_images.remove_image_from_board(
+            board_id=board_id, image_name=image_name
+        )
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to update board")
-
-
-
-@board_images_router.get(
-    "/{board_id}",
-    operation_id="list_board_images",
-    response_model=OffsetPaginatedResults[ImageDTO],
-)
-async def list_board_images(
-    board_id: str = Path(description="The id of the board"),
-    offset: int = Query(default=0, description="The page offset"),
-    limit: int = Query(default=10, description="The number of boards per page"),
-) -> OffsetPaginatedResults[ImageDTO]:
-    """Gets a list of images for a board"""
-
-    results = ApiDependencies.invoker.services.board_images.get_images_for_board(
-        board_id,
-    )
-    return results
 

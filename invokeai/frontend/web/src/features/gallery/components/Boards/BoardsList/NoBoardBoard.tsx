@@ -44,7 +44,7 @@ const NoBoardBoard = ({ isSelected }: { isSelected: boolean }) => {
       onClick={handleClick}
       isSelected={isSelected}
       icon={FaFolder}
-      label="No Board"
+      label="Unfiled"
       badgeCount={total}
     />
   );

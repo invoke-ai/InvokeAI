@@ -18,7 +18,6 @@ import { Middleware } from '@reduxjs/toolkit';
 import ImageDndContext from './ImageDnd/ImageDndContext';
 import { AddImageToBoardContextProvider } from '../contexts/AddImageToBoardContext';
 import { $authToken, $baseUrl } from 'services/api/client';
-import { DeleteBoardImagesContextProvider } from '../contexts/DeleteBoardImagesContext';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -78,9 +77,7 @@ const InvokeAIUI = ({
           <ThemeLocaleProvider>
             <ImageDndContext>
               <AddImageToBoardContextProvider>
-                <DeleteBoardImagesContextProvider>
-                  <App config={config} headerComponent={headerComponent} />
-                </DeleteBoardImagesContextProvider>
+                <App config={config} headerComponent={headerComponent} />
               </AddImageToBoardContextProvider>
             </ImageDndContext>
           </ThemeLocaleProvider>

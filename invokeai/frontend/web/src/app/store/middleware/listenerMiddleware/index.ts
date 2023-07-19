@@ -11,7 +11,7 @@ import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingA
 import { addAppConfigReceivedListener } from './listeners/appConfigReceived';
 import { addAppStartedListener } from './listeners/appStarted';
 import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
-import { addRequestedBoardImageDeletionListener } from './listeners/boardImagesDeleted';
+import { addDeleteBoardAndImagesFulfilledListener } from './listeners/boardAndImagesDeleted';
 import { addCanvasCopiedToClipboardListener } from './listeners/canvasCopiedToClipboard';
 import { addCanvasDownloadedAsImageListener } from './listeners/canvasDownloadedAsImage';
 import { addCanvasMergedListener } from './listeners/canvasMerged';
@@ -121,7 +121,7 @@ addRequestedImageDeletionListener();
 addImageDeletedPendingListener();
 addImageDeletedFulfilledListener();
 addImageDeletedRejectedListener();
-addRequestedBoardImageDeletionListener();
+addDeleteBoardAndImagesFulfilledListener();
 addImageToDeleteSelectedListener();
 
 // User Invoked
