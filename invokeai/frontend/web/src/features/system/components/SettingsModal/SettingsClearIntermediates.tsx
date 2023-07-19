@@ -1,7 +1,5 @@
-import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { StyledFlex } from './SettingsModal';
 import { Heading, Text } from '@chakra-ui/react';
 import IAIButton from '../../../../common/components/IAIButton';
@@ -12,29 +10,27 @@ export default function SettingsClearIntermediates() {
   const dispatch = useAppDispatch();
   const [isDisabled, setIsDisabled] = useState(false);
 
-  const [clearIntermediates, { isLoading: isLoadingClearIntermediates, data }] =
+  const [clearIntermediates, { isLoading: isLoadingClearIntermediates }] =
     useClearIntermediatesMutation();
 
   const handleClickClearIntermediates = useCallback(() => {
-    clearIntermediates({});
-  }, [clearIntermediates]);
-
-  useEffect(() => {
-    if (data >= 0) {
-      dispatch(
-        addToast({
-          title:
-            data === 0
-              ? `No intermediates to clear`
-              : `Successfully cleared ${data} intermediates`,
-          status: 'info',
-        })
-      );
-      if (data < 100) {
-        setIsDisabled(true);
-      }
-    }
-  }, [data, dispatch]);
+    clearIntermediates({})
+      .unwrap()
+      .then((response) => {
+        dispatch(
+          addToast({
+            title:
+              response === 0
+                ? `No intermediates to clear`
+                : `Successfully cleared ${response} intermediates`,
+            status: 'info',
+          })
+        );
+        if (response < 100) {
+          setIsDisabled(true);
+        }
+      });
+  }, [clearIntermediates, dispatch]);
 
   return (
     <StyledFlex>
@@ -45,11 +41,16 @@ export default function SettingsClearIntermediates() {
         isLoading={isLoadingClearIntermediates}
         isDisabled={isDisabled}
       >
-        {isDisabled ? 'No more intermedates to clear' : 'Clear Intermediates'}
+        {isDisabled ? 'Intermediates Cleared' : 'Clear 100 Intermediates'}
       </IAIButton>
       <Text>
         Will permanently delete first 100 intermediates found on disk and in
         database
+      </Text>
+      <Text>
+        Intermediate images are byproducts of generation, different from the
+        result images in the gallery. Purging intermediates will free disk
+        space. Your gallery images will not be deleted.
       </Text>
     </StyledFlex>
   );
