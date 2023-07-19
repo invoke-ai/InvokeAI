@@ -50,10 +50,8 @@ export const buildCanvasTextToImageGraph = (
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
-  console.log(model);
-  const model_loader = model.model_name.includes('onnx')
-    ? ONNX_MODEL_LOADER
-    : MAIN_MODEL_LOADER;
+  const onnx_model_type = model.model_type.includes('onnx');
+  const model_loader = onnx_model_type ? ONNX_MODEL_LOADER : MAIN_MODEL_LOADER;
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -69,12 +67,12 @@ export const buildCanvasTextToImageGraph = (
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
       [POSITIVE_CONDITIONING]: {
-        type: 'compel',
+        type: onnx_model_type ? 'prompt_onnx' : 'compel',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: 'compel',
+        type: onnx_model_type ? 'prompt_onnx' : 'compel',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
       },
@@ -86,7 +84,7 @@ export const buildCanvasTextToImageGraph = (
         use_cpu,
       },
       [TEXT_TO_LATENTS]: {
-        type: 't2l',
+        type: onnx_model_type ? 't2l_onnx' : 't2l',
         id: TEXT_TO_LATENTS,
         cfg_scale,
         scheduler,
@@ -103,7 +101,7 @@ export const buildCanvasTextToImageGraph = (
         skipped_layers: clipSkip,
       },
       [LATENTS_TO_IMAGE]: {
-        type: 'l2i',
+        type: onnx_model_type ? 'l2i_onnx' : 'l2i',
         id: LATENTS_TO_IMAGE,
       },
     },
@@ -224,10 +222,10 @@ export const buildCanvasTextToImageGraph = (
   });
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS);
+  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS, model_loader);
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph);
+  addVAEToGraph(state, graph, model_loader);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

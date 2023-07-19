@@ -83,10 +83,8 @@ export const buildLinearImageToImageGraph = (
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
 
-  console.log(model);
-  const model_loader = model.model_name.includes('onnx')
-    ? ONNX_MODEL_LOADER
-    : MAIN_MODEL_LOADER;
+  const onnx_model_type = model.model_type.includes('onnx');
+  const model_loader = onnx_model_type ? ONNX_MODEL_LOADER : MAIN_MODEL_LOADER;
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   // TODO: Actually create the graph correctly for ONNX
@@ -104,12 +102,12 @@ export const buildLinearImageToImageGraph = (
         skipped_layers: clipSkip,
       },
       [POSITIVE_CONDITIONING]: {
-        type: 'compel',
+        type: onnx_model_type ? 'prompt_onnx' : 'compel',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: 'compel',
+        type: onnx_model_type ? 'prompt_onnx' : 'compel',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
       },
@@ -119,11 +117,11 @@ export const buildLinearImageToImageGraph = (
         use_cpu,
       },
       [LATENTS_TO_IMAGE]: {
-        type: 'l2i',
+        type: onnx_model_type ? 'l2i_onnx' : 'l2i',
         id: LATENTS_TO_IMAGE,
       },
       [LATENTS_TO_LATENTS]: {
-        type: 'l2l',
+        type: onnx_model_type ? 'l2l_onnx' : 'l2l',
         id: LATENTS_TO_LATENTS,
         cfg_scale,
         scheduler,
@@ -131,7 +129,7 @@ export const buildLinearImageToImageGraph = (
         strength,
       },
       [IMAGE_TO_LATENTS]: {
-        type: 'i2l',
+        type: onnx_model_type ? 'i2l_onnx' : 'i2l',
         id: IMAGE_TO_LATENTS,
         // must be set manually later, bc `fit` parameter may require a resize node inserted
         // image: {
@@ -373,10 +371,10 @@ export const buildLinearImageToImageGraph = (
   });
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
+  addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS, model_loader);
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph);
+  addVAEToGraph(state, graph, model_loader);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

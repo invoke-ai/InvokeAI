@@ -64,8 +64,7 @@ export const buildCanvasInpaintGraph = (
   // We may need to set the inpaint width and height to scale the image
   const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
 
-  console.log(model);
-  const model_loader = model.model_name.includes('onnx')
+  const model_loader = model.model_type.includes('onnx')
     ? ONNX_MODEL_LOADER
     : MAIN_MODEL_LOADER;
 

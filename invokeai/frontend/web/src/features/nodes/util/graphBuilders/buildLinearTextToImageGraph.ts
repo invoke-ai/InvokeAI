@@ -49,8 +49,7 @@ export const buildLinearTextToImageGraph = (
     throw new Error('No model found in state');
   }
 
-  console.log(model);
-  const onnx_model_type = model.model_name.includes('onnx');
+  const onnx_model_type = model.model_type.includes('onnx');
   const model_loader = onnx_model_type ? ONNX_MODEL_LOADER : MAIN_MODEL_LOADER;
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
