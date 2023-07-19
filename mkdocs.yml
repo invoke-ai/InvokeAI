@@ -143,6 +143,7 @@ nav:
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Translation: 'contributing/contribution_guides/translation.md'
       - Tutorials: 'contributing/contribution_guides/tutorials.md'
+      - Local Development: contributing/LOCAL_DEVELOPMENT.md
     - Changelog: 'CHANGELOG.md'
     - Deprecated:
       - Command Line Interface: 'deprecated/CLI.md'

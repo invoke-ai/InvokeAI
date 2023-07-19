@@ -12,10 +12,10 @@ To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the 
 ### Areas of contribution: 
 
 #### Development
-If you’d like to help with development, please see our [development guide](docs/contributing/.contribution_guides/development.md). If you’re unfamiliar with contributing to open source projects, there is a tutorial contained within the development guide.
+If you’d like to help with development, please see our [development guide](contribution_guides/development.md). If you’re unfamiliar with contributing to open source projects, there is a tutorial contained within the development guide.
 
 #### Documentation
-If you’d like to help with documentation, please see our [documentation guide](docs/contributing/.contribution_guides/documenation.md).
+If you’d like to help with documentation, please see our [documentation guide](contribution_guides/documenation.md).
 
 #### Translation
 If you'd like to help with translation, please see our [translation guide](docs/contributing/.contribution_guides/translation.md).
@@ -32,7 +32,7 @@ This project is a combined effort of dedicated people from across the world. [C
 
 ### Code of Conduct
 
-The InvokeAI community is a welcoming place, and we want your help in maintaining that. Please review our Code of Conduct **<link to code of conduct>** to learn more. 
+The InvokeAI community is a welcoming place, and we want your help in maintaining that. Please review our [Code of Conduct](../../CODE_OF_CONDUCT.md) to learn more. 
 
 ### Support
 
