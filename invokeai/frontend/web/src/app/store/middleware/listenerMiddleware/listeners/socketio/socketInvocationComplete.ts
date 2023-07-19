@@ -54,20 +54,6 @@ export const addInvocationCompleteEventListener = () => {
           dispatch(addImageToStagingArea(imageDTO));
         }
 
-        // If auto-save canvas is enabled, add to the gallery
-        if (
-          graph_execution_state_id ===
-            canvas.layerState.stagingArea.sessionId &&
-          canvas.shouldAutoSave
-        ) {
-          dispatch(
-            imagesApi.endpoints.updateImage.initiate({
-              imageDTO: imageDTO,
-              changes: { is_intermediate: imageDTO.is_intermediate },
-            })
-          );
-        }
-
         if (!imageDTO.is_intermediate) {
           // add image to the board
           if (
