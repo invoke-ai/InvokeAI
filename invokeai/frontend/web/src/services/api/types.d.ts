@@ -90,6 +90,9 @@ export type InpaintInvocation = TypeReq<
 export type ImageResizeInvocation = TypeReq<
   components['schemas']['ImageResizeInvocation']
 >;
+export type ImageScaleInvocation = TypeReq<
+  components['schemas']['ImageScaleInvocation']
+>;
 export type RandomIntInvocation = TypeReq<
   components['schemas']['RandomIntInvocation']
 >;
@@ -123,6 +126,12 @@ export type LoraLoaderInvocation = TypeReq<
 >;
 export type MetadataAccumulatorInvocation = TypeReq<
   components['schemas']['MetadataAccumulatorInvocation']
+>;
+export type ESRGANInvocation = TypeReq<
+  components['schemas']['ESRGANInvocation']
+>;
+export type DivideInvocation = TypeReq<
+  components['schemas']['DivideInvocation']
 >;
 
 // ControlNet Nodes

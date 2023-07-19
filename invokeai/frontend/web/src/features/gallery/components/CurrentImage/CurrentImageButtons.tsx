@@ -5,34 +5,26 @@ import {
   ButtonGroup,
   Flex,
   FlexProps,
-  Link,
   Menu,
   MenuButton,
-  MenuItem,
   MenuList,
 } from '@chakra-ui/react';
 // import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
-import IAIPopover from 'common/components/IAIPopover';
 
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
+import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { stateSelector } from 'app/store/store';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { DeleteImageButton } from 'features/imageDeletion/components/DeleteImageButton';
 import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
-import FaceRestoreSettings from 'features/parameters/components/Parameters/FaceRestore/FaceRestoreSettings';
-import UpscaleSettings from 'features/parameters/components/Parameters/Upscale/UpscaleSettings';
+import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
-  setActiveTab,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
@@ -42,38 +34,25 @@ import { useTranslation } from 'react-i18next';
 import {
   FaAsterisk,
   FaCode,
-  FaCopy,
-  FaDownload,
-  FaExpandArrowsAlt,
-  FaGrinStars,
   FaHourglassHalf,
   FaQuoteRight,
   FaSeedling,
-  FaShare,
   FaShareAlt,
 } from 'react-icons/fa';
 import {
   useGetImageDTOQuery,
   useGetImageMetadataQuery,
 } from 'services/api/endpoints/images';
-import { useDebounce } from 'use-debounce';
-import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
 import { menuListMotionProps } from 'theme/components/menu';
+import { useDebounce } from 'use-debounce';
+import { sentImageToImg2Img } from '../../store/actions';
 import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
-  ({ gallery, system, postprocessing, ui }, activeTabName) => {
-    const {
-      isProcessing,
-      isConnected,
-      isGFPGANAvailable,
-      isESRGANAvailable,
-      shouldConfirmOnDelete,
-      progressImage,
-    } = system;
-
-    const { upscalingLevel, facetoolStrength } = postprocessing;
+  ({ gallery, system, ui }, activeTabName) => {
+    const { isProcessing, isConnected, shouldConfirmOnDelete, progressImage } =
+      system;
 
     const {
       shouldShowImageDetails,
@@ -88,10 +67,6 @@ const currentImageButtonsSelector = createSelector(
       shouldConfirmOnDelete,
       isProcessing,
       isConnected,
-      isGFPGANAvailable,
-      isESRGANAvailable,
-      upscalingLevel,
-      facetoolStrength,
       shouldDisableToolbarButtons: Boolean(progressImage) || !lastSelectedImage,
       shouldShowImageDetails,
       activeTabName,
@@ -114,26 +89,16 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const {
     isProcessing,
     isConnected,
-    isGFPGANAvailable,
-    isESRGANAvailable,
-    upscalingLevel,
-    facetoolStrength,
     shouldDisableToolbarButtons,
     shouldShowImageDetails,
-    activeTabName,
     lastSelectedImage,
     shouldShowProgressInViewer,
   } = useAppSelector(currentImageButtonsSelector);
 
-  const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
-  const isFaceRestoreEnabled = useFeatureStatus('faceRestore').isFeatureEnabled;
 
   const toaster = useAppToaster();
   const { t } = useTranslation();
-
-  const { isClipboardAPIAvailable, copyImageToClipboard } =
-    useCopyImageToClipboard();
 
   const { recallBothPrompts, recallSeed, recallAllParameters } =
     useRecallParameters();
@@ -154,42 +119,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   );
 
   const metadata = metadataData?.metadata;
-
-  const handleCopyImageLink = useCallback(() => {
-    const getImageUrl = () => {
-      if (!imageDTO) {
-        return;
-      }
-
-      if (imageDTO.image_url.startsWith('http')) {
-        return imageDTO.image_url;
-      }
-
-      return window.location.toString() + imageDTO.image_url;
-    };
-
-    const url = getImageUrl();
-
-    if (!url) {
-      toaster({
-        title: t('toast.problemCopyingImageLink'),
-        status: 'error',
-        duration: 2500,
-        isClosable: true,
-      });
-
-      return;
-    }
-
-    navigator.clipboard.writeText(url).then(() => {
-      toaster({
-        title: t('toast.imageLinkCopied'),
-        status: 'success',
-        duration: 2500,
-        isClosable: true,
-      });
-    });
-  }, [toaster, t, imageDTO]);
 
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);
@@ -223,8 +152,11 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys('shift+i', handleSendToImageToImage, [imageDTO]);
 
   const handleClickUpscale = useCallback(() => {
-    // selectedImage && dispatch(runESRGAN(selectedImage));
-  }, []);
+    if (!imageDTO) {
+      return;
+    }
+    dispatch(upscaleRequested({ image_name: imageDTO.image_name }));
+  }, [dispatch, imageDTO]);
 
   const handleDelete = useCallback(() => {
     if (!imageDTO) {
@@ -242,53 +174,17 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       enabled: () =>
         Boolean(
           isUpscalingEnabled &&
-            isESRGANAvailable &&
             !shouldDisableToolbarButtons &&
             isConnected &&
-            !isProcessing &&
-            upscalingLevel
+            !isProcessing
         ),
     },
     [
       isUpscalingEnabled,
       imageDTO,
-      isESRGANAvailable,
       shouldDisableToolbarButtons,
       isConnected,
       isProcessing,
-      upscalingLevel,
-    ]
-  );
-
-  const handleClickFixFaces = useCallback(() => {
-    // selectedImage && dispatch(runFacetool(selectedImage));
-  }, []);
-
-  useHotkeys(
-    'Shift+R',
-    () => {
-      handleClickFixFaces();
-    },
-    {
-      enabled: () =>
-        Boolean(
-          isFaceRestoreEnabled &&
-            isGFPGANAvailable &&
-            !shouldDisableToolbarButtons &&
-            isConnected &&
-            !isProcessing &&
-            facetoolStrength
-        ),
-    },
-
-    [
-      isFaceRestoreEnabled,
-      imageDTO,
-      isGFPGANAvailable,
-      shouldDisableToolbarButtons,
-      isConnected,
-      isProcessing,
-      facetoolStrength,
     ]
   );
 
@@ -296,25 +192,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     () => dispatch(setShouldShowImageDetails(!shouldShowImageDetails)),
     [dispatch, shouldShowImageDetails]
   );
-
-  const handleSendToCanvas = useCallback(() => {
-    if (!imageDTO) return;
-    dispatch(sentImageToCanvas());
-
-    dispatch(setInitialCanvasImage(imageDTO));
-    dispatch(requestCanvasRescale());
-
-    if (activeTabName !== 'unifiedCanvas') {
-      dispatch(setActiveTab('unifiedCanvas'));
-    }
-
-    toaster({
-      title: t('toast.sentToUnifiedCanvas'),
-      status: 'success',
-      duration: 2500,
-      isClosable: true,
-    });
-  }, [imageDTO, dispatch, activeTabName, toaster, t]);
 
   useHotkeys(
     'i',
@@ -336,13 +213,6 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const handleClickProgressImagesToggle = useCallback(() => {
     dispatch(setShouldShowProgressInViewer(!shouldShowProgressInViewer));
   }, [dispatch, shouldShowProgressInViewer]);
-
-  const handleCopyImage = useCallback(() => {
-    if (!imageDTO) {
-      return;
-    }
-    copyImageToClipboard(imageDTO.image_url);
-  }, [copyImageToClipboard, imageDTO]);
 
   return (
     <>
@@ -396,72 +266,12 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
           />
         </ButtonGroup>
 
-        {(isUpscalingEnabled || isFaceRestoreEnabled) && (
+        {isUpscalingEnabled && (
           <ButtonGroup
             isAttached={true}
             isDisabled={shouldDisableToolbarButtons}
           >
-            {isFaceRestoreEnabled && (
-              <IAIPopover
-                triggerComponent={
-                  <IAIIconButton
-                    icon={<FaGrinStars />}
-                    aria-label={t('parameters.restoreFaces')}
-                  />
-                }
-              >
-                <Flex
-                  sx={{
-                    flexDirection: 'column',
-                    rowGap: 4,
-                  }}
-                >
-                  <FaceRestoreSettings />
-                  <IAIButton
-                    isDisabled={
-                      !isGFPGANAvailable ||
-                      !imageDTO ||
-                      !(isConnected && !isProcessing) ||
-                      !facetoolStrength
-                    }
-                    onClick={handleClickFixFaces}
-                  >
-                    {t('parameters.restoreFaces')}
-                  </IAIButton>
-                </Flex>
-              </IAIPopover>
-            )}
-
-            {isUpscalingEnabled && (
-              <IAIPopover
-                triggerComponent={
-                  <IAIIconButton
-                    icon={<FaExpandArrowsAlt />}
-                    aria-label={t('parameters.upscale')}
-                  />
-                }
-              >
-                <Flex
-                  sx={{
-                    flexDirection: 'column',
-                    gap: 4,
-                  }}
-                >
-                  <UpscaleSettings />
-                  <IAIButton
-                    isDisabled={
-                      !isESRGANAvailable ||
-                      !imageDTO ||
-                      !(isConnected && !isProcessing) ||
-                      !upscalingLevel
-                    }
-                    onClick={handleClickUpscale}
-                  >
-                    {t('parameters.upscaleImage')}
-                  </IAIButton>
-                </Flex>
-              </IAIPopover>
-            )}
+            {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
           </ButtonGroup>
         )}
 

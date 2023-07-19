@@ -90,6 +90,7 @@ import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
 import { addModelLoadStartedEventListener } from './listeners/socketio/socketModelLoadStarted';
 import { addModelLoadCompletedEventListener } from './listeners/socketio/socketModelLoadCompleted';
+import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -228,3 +229,5 @@ addModelSelectedListener();
 addAppStartedListener();
 addModelsLoadedListener();
 addAppConfigReceivedListener();
+
+addUpscaleRequestedListener();
