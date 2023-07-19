@@ -1,5 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
+from pathlib import Path
 from typing import Literal, Optional
 
 import numpy
@@ -15,7 +15,6 @@ from .baseinvocation import (
     InvocationContext,
     InvocationConfig,
 )
-
 
 class PILInvocationConfig(BaseModel):
     """Helper class to provide all PIL invocations with additional config"""
@@ -61,15 +60,14 @@ class MaskOutput(BaseInvocationOutput):
         }
 
 class ImageMaskOutput(BaseInvocationOutput):
-    """Base class for invocations that output an image"""
+    """Base class for invocations that output an image and a mask"""
 
     # fmt: off
-    type: Literal["image_output"] = "image_output"
+    type: Literal["image_mask_output"] = "image_mask_output"
     image:      ImageField = Field(default=None, description="The output image")
     width:             int = Field(description="The width of the image in pixels")
     height:            int = Field(description="The height of the image in pixels")
-    type: Literal["mask"] = "mask"
-    mask:      ImageField = Field(default=None, description="The output mask")
+    mask:       ImageField = Field(default=None, description="The output mask")
     # fmt: on
 
     class Config:
@@ -533,8 +531,8 @@ class ImageScaleInvocation(BaseInvocation, PILInvocationConfig):
     type: Literal["img_scale"] = "img_scale"
 
     # Inputs
-    image:       Optional[ImageField] = Field(default=None, description="The image to scale")
-    scale_factor:                  float = Field(gt=0, description="The factor by which to scale the image")
+    image:          Optional[ImageField] = Field(default=None, description="The image to scale")
+    scale_factor:        Optional[float] = Field(default=2.0, gt=0, description="The factor by which to scale the image")
     resample_mode:  PIL_RESAMPLING_MODES = Field(default="bicubic", description="The resampling mode")
     # fmt: on
 
@@ -667,27 +665,61 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
+# dynamically populate from cv2/data/ instead of providing?
+CASCADE_FILES = Literal[
+    "haarcascade_eye.xml",
+    "haarcascade_eye_tree_eyeglasses.xml",
+    "haarcascade_frontalcatface.xml",
+    "haarcascade_frontalcatface_extended.xml",
+    "haarcascade_frontalface_alt.xml",
+    "haarcascade_frontalface_alt2.xml",
+    "haarcascade_frontalface_alt_tree.xml",
+    "haarcascade_frontalface_default.xml",
+    "haarcascade_fullbody.xml",
+    "haarcascade_lefteye_2splits.xml",
+    "haarcascade_license_plate_rus_16stages.xml",
+    "haarcascade_lowerbody.xml",
+    "haarcascade_profileface.xml",
+    "haarcascade_righteye_2splits.xml",
+    "haarcascade_russian_plate_number.xml",
+    "haarcascade_smile.xml",
+    "haarcascade_upperbody.xml",
+]
+
 class FaceMaskInvocation(BaseInvocation, PILInvocationConfig):
     """OpenCV cascade classifier detection to create transparencies in an image"""
 
     # fmt: off
-    type: Literal["image_mask"] = "image_mask"
+    type: Literal["img_detect_mask"] = "img_detect_mask"
 
     # Inputs
     image: Optional[ImageField]  = Field(default=None, description="Image to apply transparency to")
     x_offset: float = Field(default=0.0, description="Offset for the X-axis of the oval mask")
     y_offset: float = Field(default=0.0, description="Offset for the Y-axis of the oval mask")
     invert_mask: bool = Field(default=False, description="Toggle to invert the mask")
-    cascade_file_path: Optional[str] = Field(default=None, description="Path to the cascade XML file for detection")
+    cascade_file: CASCADE_FILES = Field(
+        default="haarcascade_frontalface_default.xml",
+        description="The cascade file for detection"
+    )
     # fmt: on
+
+    class Config(PILInvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Face Mask Detection",
+                "tags": ["image", "face mask", "opencv"],
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> ImageMaskOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
+        root_path = context.services.configuration.root_path
+        cascade_files_path = Path(f".venv/lib/python3.10/site-packages/cv2/data/{self.cascade_file}")
+        cascade_file_path = str(root_path / cascade_files_path)
 
         # Perform face detection
         cv_image = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
-        cascade_file_path = self.cascade_file_path
-        face_cascade = cv2.CascadeClassifier(cascade_file_path)
+        face_cascade = cv2.CascadeClassifier(str(cascade_file_path))
         gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
@@ -696,7 +728,7 @@ class FaceMaskInvocation(BaseInvocation, PILInvocationConfig):
         for (x, y, w, h) in faces:
             mask = Image.new("L", (w, h), 0)
             draw = ImageDraw.Draw(mask)
-            # Adjust the shape of the oval based on the scale factors
+            # Adjust the shape of the oval based on the offsets
             x_elongation_factor = 0.8 + (1.2 - 0.8) * self.x_offset
             y_elongation_factor = 1 + (1.2 - 0.8) * self.y_offset
             draw.ellipse((0, 0, w, h), fill=255, outline=255)
