@@ -762,3 +762,29 @@ class ImageToLatentsInvocation(BaseInvocation):
         latents = latents.to("cpu")
         context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents)
+
+class LatentsAlphaBlendingInvocation(BaseInvocation):
+    """Blends two Latents objects using an alpha/mask"""
+
+    # fmt: off
+    type: Literal["latents_alpha_blending"] = "latents_alpha_blending"
+
+    # Inputs
+    latents1: Optional[LatentsField] = Field(description="The first Latents object to blend")
+    latents2: Optional[LatentsField] = Field(description="The second Latents object to blend")
+    alphaLatents: Optional[LatentsField] = Field(description="The alpha/mask to use for blending in latents form")
+    # fmt: on
+
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        latents1 = context.services.latents.get(self.latents1.latents_name)
+        latents2 = context.services.latents.get(self.latents2.latents_name)
+        alpha = context.services.latents.get(self.alpha.latents_name)
+        # Perform the alpha-blending
+        blended_latents = alpha * latents1 + (1 - alpha) * latents2
+
+        # Save the blended Latents object
+        name = f"{context.graph_execution_state_id}__{self.id}"
+        context.services.latents.save(name, blended_latents)
+
+        return build_latents_output(latents_name=name, latents=blended_latents)
+
