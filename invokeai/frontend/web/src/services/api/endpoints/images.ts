@@ -127,6 +127,13 @@ export const imagesApi = api.injectEndpoints({
       // 24 hours - reducing this to a few minutes would reduce memory usage.
       keepUnusedDataFor: 86400,
     }),
+    getIntermediatesCount: build.query<number, void>({
+      query: () => ({ url: getListImagesUrl({ is_intermediate: true }) }),
+      providesTags: ['IntermediatesCount'],
+      transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
+        return response.total;
+      },
+    }),
     getImageDTO: build.query<ImageDTO, string>({
       query: (image_name) => ({ url: `images/${image_name}` }),
       providesTags: (result, error, arg) => {
@@ -148,8 +155,9 @@ export const imagesApi = api.injectEndpoints({
       },
       keepUnusedDataFor: 86400, // 24 hours
     }),
-    clearIntermediates: build.mutation({
+    clearIntermediates: build.mutation<number, void>({
       query: () => ({ url: `images/clear-intermediates`, method: 'POST' }),
+      invalidatesTags: ['IntermediatesCount'],
     }),
     deleteImage: build.mutation<void, ImageDTO>({
       query: ({ image_name }) => ({
@@ -617,6 +625,7 @@ export const imagesApi = api.injectEndpoints({
 });
 
 export const {
+  useGetIntermediatesCountQuery,
   useListImagesQuery,
   useLazyListImagesQuery,
   useGetImageDTOQuery,
