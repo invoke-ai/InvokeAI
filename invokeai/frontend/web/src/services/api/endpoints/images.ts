@@ -182,7 +182,7 @@ export const imagesApi = api.injectEndpoints({
 
         // Board specific
         if (board_id) {
-          removeFromCacheKeys.push({ board_id, categories });
+          removeFromCacheKeys.push({ board_id });
         } else {
           // TODO: No Board
         }
@@ -270,12 +270,12 @@ export const imagesApi = api.injectEndpoints({
           )
         );
 
-        // Update the "All Image" board
+        // Update the "All Image" or "All Assets" board
         const queryArgsToUpdate: ListImagesArgs[] = [{ categories }];
 
         if (board_id) {
           // We also need to update the user board
-          queryArgsToUpdate.push({ categories, board_id });
+          queryArgsToUpdate.push({ board_id });
         }
 
         queryArgsToUpdate.forEach((queryArg) => {
@@ -363,12 +363,11 @@ export const imagesApi = api.injectEndpoints({
             return;
           }
 
-          // Add the image to the All Images board
+          // Add the image to the "All Images" / "All Assets" board
           const queryArg = {
-            categories:
-              image_category === 'general'
-                ? IMAGE_CATEGORIES
-                : ASSETS_CATEGORIES,
+            categories: IMAGE_CATEGORIES.includes(image_category)
+              ? IMAGE_CATEGORIES
+              : ASSETS_CATEGORIES,
           };
 
           dispatch(
