@@ -5,6 +5,7 @@
 - [ ] Bug Fix
 - [ ] Optimization
 - [ ] Documentation Update
+- [ ] Community Node Submission
 
 
 ## Have you discussed this change with the InvokeAI team?
@@ -12,6 +13,11 @@
 - [ ] No, because:
 
       
+## Have you updated relevant documentation?
+- [ ] Yes
+- [ ] No
+
+
 ## Description
 
 
