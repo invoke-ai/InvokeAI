@@ -156,7 +156,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
     precision: PRECISION_VALUES = Field(default = "tensor(float16)", description="The precision to use when generating latents")
     unet: UNetField = Field(default=None, description="UNet submodel")
-    #control: Union[ControlField, list[ControlField]] = Field(default=None, description="The control to use")
+    control: Union[ControlField, list[ControlField]] = Field(default=None, description="The control to use")
     #seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
     #seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
@@ -180,6 +180,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
                 "tags": ["latents"],
                 "type_hints": {
                   "model": "model",
+                  "control": "control",
                   # "cfg_scale": "float",
                   "cfg_scale": "number"
                 }
