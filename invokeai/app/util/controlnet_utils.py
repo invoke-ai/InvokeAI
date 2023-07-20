@@ -94,12 +94,66 @@ def nake_nms(x):
     return y
 
 
+################################################################################
+# copied from Mikubill/sd-webui-controlnet external_code.py and modified for InvokeAI
+################################################################################
+# FIXME: not using yet, if used in the future will most likely require modification of preprocessors
+def pixel_perfect_resolution(
+        image: np.ndarray,
+        target_H: int,
+        target_W: int,
+        resize_mode: str,
+) -> int:
+    """
+    Calculate the estimated resolution for resizing an image while preserving aspect ratio.
+
+    The function first calculates scaling factors for height and width of the image based on the target
+    height and width. Then, based on the chosen resize mode, it either takes the smaller or the larger
+    scaling factor to estimate the new resolution.
+
+    If the resize mode is OUTER_FIT, the function uses the smaller scaling factor, ensuring the whole image
+    fits within the target dimensions, potentially leaving some empty space.
+
+    If the resize mode is not OUTER_FIT, the function uses the larger scaling factor, ensuring the target
+    dimensions are fully filled, potentially cropping the image.
+
+    After calculating the estimated resolution, the function prints some debugging information.
+
+    Args:
+        image (np.ndarray): A 3D numpy array representing an image. The dimensions represent [height, width, channels].
+        target_H (int): The target height for the image.
+        target_W (int): The target width for the image.
+        resize_mode (ResizeMode): The mode for resizing.
+
+    Returns:
+        int: The estimated resolution after resizing.
+    """
+    raw_H, raw_W, _ = image.shape
+
+    k0 = float(target_H) / float(raw_H)
+    k1 = float(target_W) / float(raw_W)
+
+    if resize_mode == "fill_resize":
+        estimation = min(k0, k1) * float(min(raw_H, raw_W))
+    else: # "crop_resize" or "just_resize" (or possibly "just_resize_simple"?)
+        estimation = max(k0, k1) * float(min(raw_H, raw_W))
+
+    # print(f"Pixel Perfect Computation:")
+    # print(f"resize_mode = {resize_mode}")
+    # print(f"raw_H = {raw_H}")
+    # print(f"raw_W = {raw_W}")
+    # print(f"target_H = {target_H}")
+    # print(f"target_W = {target_W}")
+    # print(f"estimation = {estimation}")
+
+    return int(np.round(estimation))
+
+
 ###########################################################################
 # Copied from detectmap_proc method in scripts/detectmap_proc.py in Mikubill/sd-webui-controlnet
 #    modified for InvokeAI
 ###########################################################################
 # def detectmap_proc(detected_map, module, resize_mode, h, w):
-@staticmethod
 def np_img_resize(
     np_img: np.ndarray,
     resize_mode: str,
