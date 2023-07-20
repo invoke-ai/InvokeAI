@@ -258,7 +258,12 @@ export const imagesApi = api.injectEndpoints({
          */
 
         const patches: PatchCollection[] = [];
-        const { image_name, board_id, image_category } = oldImageDTO;
+        const { image_name, board_id, image_category, is_intermediate } = oldImageDTO;
+
+        const isChangingFromIntermediate = changes.is_intermediate === false;
+        // do not add intermediates to gallery cache
+        if (is_intermediate && !isChangingFromIntermediate) return;
+
         const categories = IMAGE_CATEGORIES.includes(image_category)
           ? IMAGE_CATEGORIES
           : ASSETS_CATEGORIES;
