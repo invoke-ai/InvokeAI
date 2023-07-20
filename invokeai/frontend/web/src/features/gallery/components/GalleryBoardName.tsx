@@ -58,7 +58,9 @@ const GalleryBoardName = (props: Props) => {
             },
           }}
         >
-          {boardName}
+          {boardName.length > 20
+            ? `${boardName.substring(0, 20)}...`
+            : boardName}
         </Text>
       </Box>
       <Spacer />
