@@ -85,8 +85,8 @@ CONTROLNET_DEFAULT_MODELS = [
 CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
 CONTROLNET_MODE_VALUES = Literal[tuple(
     ["balanced", "more_prompt", "more_control", "unbalanced"])]
-# crop and fill options not ready yet
-# CONTROLNET_RESIZE_VALUES = Literal[tuple(["just_resize", "crop_resize", "fill_resize"])]
+CONTROLNET_RESIZE_VALUES = Literal[tuple(
+    ["just_resize", "crop_resize", "fill_resize", "just_resize_simple",])]
 
 
 class ControlNetModelField(BaseModel):
@@ -111,7 +111,8 @@ class ControlField(BaseModel):
         description="When the ControlNet is last applied (% of total steps)")
     control_mode: CONTROLNET_MODE_VALUES = Field(
         default="balanced", description="The control mode to use")
-    # resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode to use")
+    resize_mode: CONTROLNET_RESIZE_VALUES = Field(
+        default="just_resize", description="The resize mode to use")
 
     @validator("control_weight")
     def validate_control_weight(cls, v):
@@ -161,6 +162,7 @@ class ControlNetInvocation(BaseInvocation):
     end_step_percent: float = Field(default=1, ge=0, le=1,
                                     description="When the ControlNet is last applied (% of total steps)")
     control_mode: CONTROLNET_MODE_VALUES = Field(default="balanced", description="The control mode used")
+    resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode used")
     # fmt: on
 
     class Config(InvocationConfig):
@@ -187,6 +189,7 @@ class ControlNetInvocation(BaseInvocation):
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
                 control_mode=self.control_mode,
+                resize_mode=self.resize_mode,
             ),
         )
 
