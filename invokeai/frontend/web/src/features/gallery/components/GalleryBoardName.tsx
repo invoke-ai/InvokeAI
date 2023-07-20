@@ -6,6 +6,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { memo, useMemo } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
+import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 
 const selector = createSelector(
   [stateSelector],
@@ -26,12 +27,17 @@ const GalleryBoardName = (props: Props) => {
   const { isOpen, onToggle } = props;
   const { selectedBoardId } = useAppSelector(selector);
   const boardName = useBoardName(selectedBoardId);
+  const numOfBoardImages = useBoardTotal(selectedBoardId);
+
   const formattedBoardName = useMemo(() => {
-    if (boardName.length > 20) {
-      return `${boardName.substring(0, 20)}...`;
+    if (!boardName || !numOfBoardImages) {
+      return '';
     }
-    return boardName;
-  }, [boardName]);
+    if (boardName.length > 20) {
+      return `${boardName.substring(0, 20)}... (${numOfBoardImages})`;
+    }
+    return `${boardName} (${numOfBoardImages})`;
+  }, [boardName, numOfBoardImages]);
 
   return (
     <Flex
