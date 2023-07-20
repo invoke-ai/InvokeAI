@@ -75,42 +75,49 @@ const ModelList = (props: ModelListProps) => {
           labelPos="side"
         />
 
-        {['images', 'diffusers'].includes(modelFormatFilter) &&
-          filteredDiffusersModels.length > 0 && (
-            <StyledModelContainer>
-              <Flex sx={{ gap: 2, flexDir: 'column' }}>
-                <Text variant="subtext" fontSize="sm">
-                  Diffusers
-                </Text>
-                {filteredDiffusersModels.map((model) => (
-                  <ModelListItem
-                    key={model.id}
-                    model={model}
-                    isSelected={selectedModelId === model.id}
-                    setSelectedModelId={setSelectedModelId}
-                  />
-                ))}
-              </Flex>
-            </StyledModelContainer>
-          )}
-        {['images', 'checkpoint'].includes(modelFormatFilter) &&
-          filteredCheckpointModels.length > 0 && (
-            <StyledModelContainer>
-              <Flex sx={{ gap: 2, flexDir: 'column' }}>
-                <Text variant="subtext" fontSize="sm">
-                  Checkpoint
-                </Text>
-                {filteredCheckpointModels.map((model) => (
-                  <ModelListItem
-                    key={model.id}
-                    model={model}
-                    isSelected={selectedModelId === model.id}
-                    setSelectedModelId={setSelectedModelId}
-                  />
-                ))}
-              </Flex>
-            </StyledModelContainer>
-          )}
+        <Flex
+          flexDirection="column"
+          gap={4}
+          maxHeight={window.innerHeight - 280}
+          overflow="scroll"
+        >
+          {['images', 'diffusers'].includes(modelFormatFilter) &&
+            filteredDiffusersModels.length > 0 && (
+              <StyledModelContainer>
+                <Flex sx={{ gap: 2, flexDir: 'column' }}>
+                  <Text variant="subtext" fontSize="sm">
+                    Diffusers
+                  </Text>
+                  {filteredDiffusersModels.map((model) => (
+                    <ModelListItem
+                      key={model.id}
+                      model={model}
+                      isSelected={selectedModelId === model.id}
+                      setSelectedModelId={setSelectedModelId}
+                    />
+                  ))}
+                </Flex>
+              </StyledModelContainer>
+            )}
+          {['images', 'checkpoint'].includes(modelFormatFilter) &&
+            filteredCheckpointModels.length > 0 && (
+              <StyledModelContainer>
+                <Flex sx={{ gap: 2, flexDir: 'column' }}>
+                  <Text variant="subtext" fontSize="sm">
+                    Checkpoints
+                  </Text>
+                  {filteredCheckpointModels.map((model) => (
+                    <ModelListItem
+                      key={model.id}
+                      model={model}
+                      isSelected={selectedModelId === model.id}
+                      setSelectedModelId={setSelectedModelId}
+                    />
+                  ))}
+                </Flex>
+              </StyledModelContainer>
+            )}
+        </Flex>
       </Flex>
     </Flex>
   );
@@ -146,8 +153,6 @@ const StyledModelContainer = (props: PropsWithChildren) => {
   return (
     <Flex
       flexDirection="column"
-      maxHeight={window.innerHeight - 280}
-      overflow="scroll"
       gap={4}
       borderRadius={4}
       p={4}
