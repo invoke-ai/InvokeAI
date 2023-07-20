@@ -262,7 +262,9 @@ export const imagesApi = api.injectEndpoints({
 
         const isChangingFromIntermediate = changes.is_intermediate === false;
         // do not add intermediates to gallery cache
-        if (is_intermediate && !isChangingFromIntermediate) return;
+        if (is_intermediate && !isChangingFromIntermediate) {
+          return;
+        }
 
         const categories = IMAGE_CATEGORIES.includes(image_category)
           ? IMAGE_CATEGORIES
