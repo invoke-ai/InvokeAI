@@ -5,18 +5,19 @@ import {
   useDroppable,
 } from 'app/components/ImageDnd/typesafeDnd';
 import { AnimatePresence } from 'framer-motion';
-import { memo, useRef } from 'react';
+import { ReactNode, memo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import IAIDropOverlay from './IAIDropOverlay';
 
 type IAIDroppableProps = {
-  dropLabel?: string;
+  dropLabel?: ReactNode;
   disabled?: boolean;
   data?: TypesafeDroppableData;
+  hoverRef?: React.Ref<HTMLDivElement>;
 };
 
 const IAIDroppable = (props: IAIDroppableProps) => {
-  const { dropLabel, data, disabled } = props;
+  const { dropLabel, data, disabled, hoverRef } = props;
   const dndId = useRef(uuidv4());
 
   const { isOver, setNodeRef, active } = useDroppable({

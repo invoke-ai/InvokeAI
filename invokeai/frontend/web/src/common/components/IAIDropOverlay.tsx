@@ -1,12 +1,12 @@
 import { Flex, Text, useColorMode } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
-import { memo, useRef } from 'react';
+import { ReactNode, memo, useRef } from 'react';
 import { mode } from 'theme/util/mode';
 import { v4 as uuidv4 } from 'uuid';
 
 type Props = {
   isOver: boolean;
-  label?: string;
+  label?: ReactNode;
 };
 
 export const IAIDropOverlay = (props: Props) => {
@@ -57,16 +57,16 @@ export const IAIDropOverlay = (props: Props) => {
         <Flex
           sx={{
             position: 'absolute',
-            top: 0,
-            insetInlineStart: 0,
-            w: 'full',
-            h: 'full',
+            top: 0.5,
+            insetInlineStart: 0.5,
+            insetInlineEnd: 0.5,
+            bottom: 0.5,
             opacity: 1,
-            borderWidth: 3,
+            borderWidth: 2,
             borderColor: isOver
-              ? mode('base.50', 'base.200')(colorMode)
-              : mode('base.100', 'base.500')(colorMode),
-            borderRadius: 'base',
+              ? mode('base.50', 'base.50')(colorMode)
+              : mode('base.200', 'base.300')(colorMode),
+            borderRadius: 'lg',
             borderStyle: 'dashed',
             transitionProperty: 'common',
             transitionDuration: '0.1s',
@@ -78,10 +78,10 @@ export const IAIDropOverlay = (props: Props) => {
             sx={{
               fontSize: '2xl',
               fontWeight: 600,
-              transform: isOver ? 'scale(1.02)' : 'scale(1)',
+              transform: isOver ? 'scale(1.1)' : 'scale(1)',
               color: isOver
                 ? mode('base.50', 'base.50')(colorMode)
-                : mode('base.100', 'base.200')(colorMode),
+                : mode('base.200', 'base.300')(colorMode),
               transitionProperty: 'common',
               transitionDuration: '0.1s',
             }}

@@ -1,19 +1,17 @@
 import { log } from 'app/logging/useLogger';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
-import { selectNextImageToSelect } from 'features/gallery/store/gallerySelectors';
-import {
-  imageRemoved,
-  imageSelected,
-} from 'features/gallery/store/gallerySlice';
+import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import {
   imageDeletionConfirmed,
   isModalOpenChanged,
 } from 'features/imageDeletion/store/imageDeletionSlice';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import { clamp } from 'lodash-es';
 import { api } from 'services/api';
-import { imageDeleted } from 'services/api/thunks/image';
+import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'image' });
@@ -36,10 +34,28 @@ export const addRequestedImageDeletionListener = () => {
         state.gallery.selection[state.gallery.selection.length - 1];
 
       if (lastSelectedImage === image_name) {
-        const newSelectedImageId = selectNextImageToSelect(state, image_name);
+        const baseQueryArgs = selectListImagesBaseQueryArgs(state);
+        const { data } =
+          imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
+
+        const ids = data?.ids ?? [];
+
+        const deletedImageIndex = ids.findIndex(
+          (result) => result.toString() === image_name
+        );
+
+        const filteredIds = ids.filter((id) => id.toString() !== image_name);
+
+        const newSelectedImageIndex = clamp(
+          deletedImageIndex,
+          0,
+          filteredIds.length - 1
+        );
+
+        const newSelectedImageId = filteredIds[newSelectedImageIndex];
 
         if (newSelectedImageId) {
-          dispatch(imageSelected(newSelectedImageId));
+          dispatch(imageSelected(newSelectedImageId as string));
         } else {
           dispatch(imageSelected(null));
         }
@@ -63,16 +79,15 @@ export const addRequestedImageDeletionListener = () => {
         dispatch(nodeEditorReset());
       }
 
-      // Preemptively remove from gallery
-      dispatch(imageRemoved(image_name));
-
       // Delete from server
-      const { requestId } = dispatch(imageDeleted({ image_name }));
+      const { requestId } = dispatch(
+        imagesApi.endpoints.deleteImage.initiate(imageDTO)
+      );
 
       // Wait for successful deletion, then trigger boards to re-fetch
       const wasImageDeleted = await condition(
-        (action): action is ReturnType<typeof imageDeleted.fulfilled> =>
-          imageDeleted.fulfilled.match(action) &&
+        (action) =>
+          imagesApi.endpoints.deleteImage.matchFulfilled(action) &&
           action.meta.requestId === requestId,
         30000
       );
@@ -91,7 +106,7 @@ export const addRequestedImageDeletionListener = () => {
  */
 export const addImageDeletedPendingListener = () => {
   startAppListening({
-    actionCreator: imageDeleted.pending,
+    matcher: imagesApi.endpoints.deleteImage.matchPending,
     effect: (action, { dispatch, getState }) => {
       //
     },
@@ -103,9 +118,12 @@ export const addImageDeletedPendingListener = () => {
  */
 export const addImageDeletedFulfilledListener = () => {
   startAppListening({
-    actionCreator: imageDeleted.fulfilled,
+    matcher: imagesApi.endpoints.deleteImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
-      moduleLog.debug({ data: { image: action.meta.arg } }, 'Image deleted');
+      moduleLog.debug(
+        { data: { image: action.meta.arg.originalArgs } },
+        'Image deleted'
+      );
     },
   });
 };
@@ -115,10 +133,10 @@ export const addImageDeletedFulfilledListener = () => {
  */
 export const addImageDeletedRejectedListener = () => {
   startAppListening({
-    actionCreator: imageDeleted.rejected,
+    matcher: imagesApi.endpoints.deleteImage.matchRejected,
     effect: (action, { dispatch, getState }) => {
       moduleLog.debug(
-        { data: { image: action.meta.arg } },
+        { data: { image: action.meta.arg.originalArgs } },
         'Unable to delete image'
       );
     },

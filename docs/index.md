@@ -145,8 +145,8 @@ This method is recommended for those familiar with running Docker containers
 ### Model Management
 - [Installing](installation/050_INSTALLING_MODELS.md)
 - [Model Merging](features/MODEL_MERGING.md)
+- [ControlNet Models](features/CONTROLNET.md)
 - [Style/Subject Concepts and Embeddings](features/CONCEPTS.md)
-- [Textual Inversion](features/TEXTUAL_INVERSION.md)
 - [Not Safe for Work (NSFW) Checker](features/NSFW.md)
 <!-- seperator -->
 ### Prompt Engineering
@@ -222,14 +222,10 @@ get solutions for common installation problems and other issues.
 
 Anyone who wishes to contribute to this project, whether documentation,
 features, bug fixes, code cleanup, testing, or code reviews, is very much
-encouraged to do so. If you are unfamiliar with how to contribute to GitHub
-projects, here is a
-[Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github).
+encouraged to do so. 
 
-A full set of contribution guidelines, along with templates, are in progress,
-but for now the most important thing is to **make your pull request against the
-"development" branch**, and not against "main". This will help keep public
-breakage to a minimum and will allow you to propose more radical changes.
+[Please take a look at our Contribution documentation to learn more about contributing to InvokeAI. 
+](contributing/CONTRIBUTING.md)
 
 ## :octicons-person-24: Contributors
 

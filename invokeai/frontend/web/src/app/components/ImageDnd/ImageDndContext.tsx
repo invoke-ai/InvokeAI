@@ -28,6 +28,7 @@ const ImageDndContext = (props: ImageDndContextProps) => {
   const dispatch = useAppDispatch();
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    console.log('dragStart', event.active.data.current);
     const activeData = event.active.data.current;
     if (!activeData) {
       return;
@@ -37,15 +38,16 @@ const ImageDndContext = (props: ImageDndContextProps) => {
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      console.log('dragEnd', event.active.data.current);
       const activeData = event.active.data.current;
       const overData = event.over?.data.current;
-      if (!activeData || !overData) {
+      if (!activeDragData || !overData) {
         return;
       }
-      dispatch(dndDropped({ overData, activeData }));
+      dispatch(dndDropped({ overData, activeData: activeDragData }));
       setActiveDragData(null);
     },
-    [dispatch]
+    [activeDragData, dispatch]
   );
 
   const mouseSensor = useSensor(MouseSensor, {

@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) & the InvokeAI Team
-from pathlib import Path, PosixPath
-from typing import Literal, Union, cast
+from pathlib import Path
+from typing import Literal, Union
 
 import cv2 as cv
 import numpy as np
@@ -16,19 +16,20 @@ from .image import ImageOutput
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?
-REALESRGAN_MODELS = Literal[
+ESRGAN_MODELS = Literal[
     "RealESRGAN_x4plus.pth",
     "RealESRGAN_x4plus_anime_6B.pth",
     "ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+    "RealESRGAN_x2plus.pth",
 ]
 
 
-class RealESRGANInvocation(BaseInvocation):
+class ESRGANInvocation(BaseInvocation):
     """Upscales an image using RealESRGAN."""
 
-    type: Literal["realesrgan"] = "realesrgan"
+    type: Literal["esrgan"] = "esrgan"
     image: Union[ImageField, None] = Field(default=None, description="The input image")
-    model_name: REALESRGAN_MODELS = Field(
+    model_name: ESRGAN_MODELS = Field(
         default="RealESRGAN_x4plus.pth", description="The Real-ESRGAN model to use"
     )
 
@@ -73,19 +74,17 @@ class RealESRGANInvocation(BaseInvocation):
                 scale=4,
             )
             netscale = 4
-        # TODO: add x2 models handling?
-        # elif self.model_name in ["RealESRGAN_x2plus"]:
-        #     # x2 RRDBNet model
-        #     model = RRDBNet(
-        #         num_in_ch=3,
-        #         num_out_ch=3,
-        #         num_feat=64,
-        #         num_block=23,
-        #         num_grow_ch=32,
-        #         scale=2,
-        #     )
-        #     model_path = Path()
-        #     netscale = 2
+        elif self.model_name in ["RealESRGAN_x2plus.pth"]:
+            # x2 RRDBNet model
+            rrdbnet_model = RRDBNet(
+                num_in_ch=3,
+                num_out_ch=3,
+                num_feat=64,
+                num_block=23,
+                num_grow_ch=32,
+                scale=2,
+            )
+            netscale = 2
         else:
             msg = f"Invalid RealESRGAN model: {self.model_name}"
             context.services.logger.error(msg)

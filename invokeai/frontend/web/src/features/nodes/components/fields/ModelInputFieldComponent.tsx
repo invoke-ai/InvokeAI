@@ -5,10 +5,12 @@ import {
   ModelInputFieldTemplate,
 } from 'features/nodes/types/types';
 
+import { Box, Flex } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
+import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -88,18 +90,23 @@ const ModelInputFieldComponent = (
       data={[]}
     />
   ) : (
-    <IAIMantineSearchableSelect
-      tooltip={selectedModel?.description}
-      label={
-        selectedModel?.base_model && MODEL_TYPE_MAP[selectedModel?.base_model]
-      }
-      value={selectedModel?.id}
-      placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
-      data={data}
-      error={data.length === 0}
-      disabled={data.length === 0}
-      onChange={handleChangeModel}
-    />
+    <Flex w="100%" alignItems="center" gap={2}>
+      <IAIMantineSearchableSelect
+        tooltip={selectedModel?.description}
+        label={
+          selectedModel?.base_model && MODEL_TYPE_MAP[selectedModel?.base_model]
+        }
+        value={selectedModel?.id}
+        placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
+        data={data}
+        error={data.length === 0}
+        disabled={data.length === 0}
+        onChange={handleChangeModel}
+      />
+      <Box mt={7}>
+        <SyncModelsButton iconMode />
+      </Box>
+    </Flex>
   );
 };
 
