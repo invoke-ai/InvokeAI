@@ -20,6 +20,7 @@ import { tabsTheme } from './components/tabs';
 import { textTheme } from './components/text';
 import { textareaTheme } from './components/textarea';
 import { tooltipTheme } from './components/tooltip';
+import { editableTheme } from './components/editable';
 
 export const theme: ThemeOverride = {
   config: {
@@ -74,12 +75,23 @@ export const theme: ThemeOverride = {
         '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
       dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
     },
+    hoverSelected: {
+      light:
+        '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 4px var(--invokeai-colors-accent-500)',
+      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-300)',
+    },
+    hoverUnselected: {
+      light:
+        '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 4px var(--invokeai-colors-accent-200)',
+      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-600)',
+    },
     nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-accent-450)`,
   },
   colors: InvokeAIColors,
   components: {
     Button: buttonTheme, // Button and IconButton
     Input: inputTheme,
+    Editable: editableTheme,
     Textarea: textareaTheme,
     Tabs: tabsTheme,
     Progress: progressTheme,
