@@ -24,6 +24,7 @@ import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ParamControlNetControlMode from './parameters/ParamControlNetControlMode';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
+import ParamControlNetResizeMode from './parameters/ParamControlNetResizeMode';
 
 type ControlNetProps = {
   controlNetId: string;
@@ -151,7 +152,7 @@ const ControlNet = (props: ControlNetProps) => {
           />
         )}
       </Flex>
-      <Flex sx={{ w: 'full', flexDirection: 'column' }}>
+      <Flex sx={{ w: 'full', flexDirection: 'column', gap: 2 }}>
         <Flex sx={{ gap: 4, w: 'full', alignItems: 'center' }}>
           <Flex
             sx={{
@@ -183,9 +184,8 @@ const ControlNet = (props: ControlNetProps) => {
             </Flex>
           )}
         </Flex>
-        <Box mt={2}>
-          <ParamControlNetControlMode controlNetId={controlNetId} />
-        </Box>
+        <ParamControlNetControlMode controlNetId={controlNetId} />
+        <ParamControlNetResizeMode controlNetId={controlNetId} />
         <ParamControlNetProcessorSelect controlNetId={controlNetId} />
       </Flex>
 
