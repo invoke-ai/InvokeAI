@@ -305,8 +305,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                 </IAIButton>
                 {shouldShowResetWebUiText && (
                   <>
-                    <Text>{t('settings.resetWebUIDesc1')}</Text>
-                    <Text>{t('settings.resetWebUIDesc2')}</Text>
+                    <Text variant="subtext">
+                      {t('settings.resetWebUIDesc1')}
+                    </Text>
+                    <Text variant="subtext">
+                      {t('settings.resetWebUIDesc2')}
+                    </Text>
                   </>
                 )}
               </StyledFlex>
