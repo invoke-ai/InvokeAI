@@ -40,6 +40,12 @@ export default function SettingsClearIntermediates() {
     updateIntermediatesCount();
   }, [updateIntermediatesCount]);
 
+  const buttonText = intermediatesCount
+    ? `Clear ${intermediatesCount} Intermediate${
+        intermediatesCount > 1 ? 's' : ''
+      }`
+    : 'No Intermediates to Clear';
+
   return (
     <StyledFlex>
       <Heading size="sm">Clear Intermediates</Heading>
@@ -49,25 +55,17 @@ export default function SettingsClearIntermediates() {
         isLoading={isLoadingClearIntermediates}
         isDisabled={!intermediatesCount}
       >
-        {intermediatesCount
-          ? `Clear ${
-              intermediatesCount >= 100 ? 100 : intermediatesCount
-            } Intermediates`
-          : 'Intermediates Cleared'}
+        {buttonText}
       </IAIButton>
-      <Text>
-        Permanently delete the first 100 intermediates found on disk and in
-        database. There are currently {intermediatesCount ?? 0} stored
-        intermediates.
-      </Text>
       <Text fontWeight="bold">
         Clearing intermediates will reset your Canvas and ControlNet state.
       </Text>
-      <Text sx={{ fontSize: 'sm' }} variant="subtext">
+      <Text variant="subtext">
         Intermediate images are byproducts of generation, different from the
         result images in the gallery. Clearing intermediates will free disk
-        space. Your gallery images will not be deleted.
+        space.
       </Text>
+      <Text variant="subtext">Your gallery images will not be deleted.</Text>
     </StyledFlex>
   );
 }
