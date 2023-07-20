@@ -23,6 +23,7 @@ from urllib import request
 
 import npyscreen
 import transformers
+import omegaconf
 from diffusers import AutoencoderKL
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
@@ -568,7 +569,14 @@ def default_startup_options(init_file: Path) -> Namespace:
     return opts
 
 def default_user_selections(program_opts: Namespace) -> InstallSelections:
-    installer = ModelInstall(config)
+    
+    try:
+        installer = ModelInstall(config)
+    except omegaconf.errors.ConfigKeyError:
+        logger.warning('Your models.yaml file is corrupt or out of date. Reinitializing')
+        initialize_rootdir(config.root_path, True)
+        installer = ModelInstall(config)
+        
     models = installer.all_models()
     return InstallSelections(
         install_models=[models[installer.default_model()].path or models[installer.default_model()].repo_id]

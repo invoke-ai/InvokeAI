@@ -958,7 +958,6 @@ class ModelManager(object):
                                                       config.controlnet_dir,
                                                       ] if x
                        }
-        print(directories)
         scanner = ScanAndImport(directories, self.logger, ignore=known_paths, installer=installer)
         scanner.search()
         
