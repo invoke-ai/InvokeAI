@@ -25,6 +25,7 @@ export type BoardId =
 type GalleryState = {
   selection: string[];
   shouldAutoSwitch: boolean;
+  autoAddBoardId: string | null;
   galleryImageMinimumWidth: number;
   selectedBoardId: BoardId;
   batchImageNames: string[];
@@ -34,6 +35,7 @@ type GalleryState = {
 export const initialGalleryState: GalleryState = {
   selection: [],
   shouldAutoSwitch: true,
+  autoAddBoardId: null,
   galleryImageMinimumWidth: 96,
   selectedBoardId: 'images',
   batchImageNames: [],
@@ -123,13 +125,33 @@ export const gallerySlice = createSlice({
       state.batchImageNames = [];
       state.selection = [];
     },
+    autoAddBoardIdChanged: (state, action: PayloadAction<string | null>) => {
+      state.autoAddBoardId = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(
       boardsApi.endpoints.deleteBoard.matchFulfilled,
       (state, action) => {
-        if (action.meta.arg.originalArgs === state.selectedBoardId) {
+        const deletedBoardId = action.meta.arg.originalArgs;
+        if (deletedBoardId === state.selectedBoardId) {
           state.selectedBoardId = 'images';
+        }
+        if (deletedBoardId === state.autoAddBoardId) {
+          state.autoAddBoardId = null;
+        }
+      }
+    );
+    builder.addMatcher(
+      boardsApi.endpoints.listAllBoards.matchFulfilled,
+      (state, action) => {
+        const boards = action.payload;
+        if (!state.autoAddBoardId) {
+          return;
+        }
+
+        if (!boards.map((b) => b.board_id).includes(state.autoAddBoardId)) {
+          state.autoAddBoardId = null;
         }
       }
     );
@@ -147,6 +169,7 @@ export const {
   isBatchEnabledChanged,
   imagesAddedToBatch,
   imagesRemovedFromBatch,
+  autoAddBoardIdChanged,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

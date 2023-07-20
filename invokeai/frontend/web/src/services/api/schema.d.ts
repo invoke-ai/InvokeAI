@@ -126,7 +126,7 @@ export type paths = {
      * @description Call after making changes to models.yaml, autoimport directories or models directory to synchronize
      * in-memory data structures with disk data structures.
      */
-    get: operations["sync_to_config"];
+    post: operations["sync_to_config"];
   };
   "/api/v1/models/merge/{base_model}": {
     /**
@@ -167,7 +167,7 @@ export type paths = {
   "/api/v1/images/clear-intermediates": {
     /**
      * Clear Intermediates 
-     * @description Clears first 100 intermediates
+     * @description Clears all intermediates
      */
     post: operations["clear_intermediates"];
   };
@@ -228,6 +228,13 @@ export type paths = {
      */
     patch: operations["update_board"];
   };
+  "/api/v1/boards/{board_id}/image_names": {
+    /**
+     * List All Board Image Names 
+     * @description Gets a list of images for a board
+     */
+    get: operations["list_all_board_image_names"];
+  };
   "/api/v1/board_images/": {
     /**
      * Create Board Image 
@@ -240,13 +247,6 @@ export type paths = {
      */
     delete: operations["remove_board_image"];
   };
-  "/api/v1/board_images/{board_id}": {
-    /**
-     * List Board Images 
-     * @description Gets a list of images for a board
-     */
-    get: operations["list_board_images"];
-  };
   "/api/v1/app/version": {
     /** Get Version */
     get: operations["app_version"];
@@ -254,6 +254,18 @@ export type paths = {
   "/api/v1/app/config": {
     /** Get Config */
     get: operations["get_config"];
+  };
+  "/api/v1/app/logging": {
+    /**
+     * Get Log Level 
+     * @description Returns the log level
+     */
+    get: operations["get_log_level"];
+    /**
+     * Set Log Level 
+     * @description Sets the log verbosity level
+     */
+    post: operations["set_log_level"];
   };
 };
 
@@ -800,6 +812,13 @@ export type components = {
        * @enum {string}
        */
       control_mode?: "balanced" | "more_prompt" | "more_control" | "unbalanced";
+      /**
+       * Resize Mode 
+       * @description The resize mode to use 
+       * @default just_resize 
+       * @enum {string}
+       */
+      resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
     };
     /**
      * ControlNetInvocation 
@@ -859,6 +878,13 @@ export type components = {
        * @enum {string}
        */
       control_mode?: "balanced" | "more_prompt" | "more_control" | "unbalanced";
+      /**
+       * Resize Mode 
+       * @description The resize mode used 
+       * @default just_resize 
+       * @enum {string}
+       */
+      resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
     };
     /** ControlNetModelConfig */
     ControlNetModelConfig: {
@@ -1036,6 +1062,24 @@ export type components = {
        * @description The mask to use when inpainting
        */
       mask?: components["schemas"]["ImageField"];
+    };
+    /** DeleteBoardResult */
+    DeleteBoardResult: {
+      /**
+       * Board Id 
+       * @description The id of the board that was deleted.
+       */
+      board_id: string;
+      /**
+       * Deleted Board Images 
+       * @description The image names of the board-images relationships that were deleted.
+       */
+      deleted_board_images: (string)[];
+      /**
+       * Deleted Images 
+       * @description The names of the images that were deleted.
+       */
+      deleted_images: (string)[];
     };
     /**
      * DivideInvocation 
@@ -2878,6 +2922,12 @@ export type components = {
        */
       image?: components["schemas"]["ImageField"];
     };
+    /**
+     * LogLevel 
+     * @description An enumeration. 
+     * @enum {integer}
+     */
+    LogLevel: 0 | 10 | 20 | 30 | 40 | 50;
     /** LoraInfo */
     LoraInfo: {
       /**
@@ -5306,17 +5356,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion1ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionXLModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion1ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion2ModelFormat 
      * @description An enumeration. 
@@ -5909,7 +5959,7 @@ export type operations = {
       /** @description synchronization successful */
       201: {
         content: {
-          "application/json": unknown;
+          "application/json": boolean;
         };
       };
     };
@@ -5956,13 +6006,13 @@ export type operations = {
   list_image_dtos: {
     parameters: {
       query?: {
-        /** @description The origin of images to list */
+        /** @description The origin of images to list. */
         image_origin?: components["schemas"]["ResourceOrigin"];
-        /** @description The categories of image to include */
+        /** @description The categories of image to include. */
         categories?: (components["schemas"]["ImageCategory"])[];
-        /** @description Whether to list intermediate images */
+        /** @description Whether to list intermediate images. */
         is_intermediate?: boolean;
-        /** @description The board id to filter by */
+        /** @description The board id to filter by. Use 'none' to find images without a board. */
         board_id?: string;
         /** @description The page offset */
         offset?: number;
@@ -6107,7 +6157,7 @@ export type operations = {
   };
   /**
    * Clear Intermediates 
-   * @description Clears first 100 intermediates
+   * @description Clears all intermediates
    */
   clear_intermediates: {
     responses: {
@@ -6328,7 +6378,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          "application/json": components["schemas"]["DeleteBoardResult"];
         };
       };
       /** @description Validation Error */
@@ -6360,6 +6410,32 @@ export type operations = {
       201: {
         content: {
           "application/json": components["schemas"]["BoardDTO"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * List All Board Image Names 
+   * @description Gets a list of images for a board
+   */
+  list_all_board_image_names: {
+    parameters: {
+      path: {
+        /** @description The id of the board */
+        board_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": (string)[];
         };
       };
       /** @description Validation Error */
@@ -6420,38 +6496,6 @@ export type operations = {
       };
     };
   };
-  /**
-   * List Board Images 
-   * @description Gets a list of images for a board
-   */
-  list_board_images: {
-    parameters: {
-      query?: {
-        /** @description The page offset */
-        offset?: number;
-        /** @description The number of boards per page */
-        limit?: number;
-      };
-      path: {
-        /** @description The id of the board */
-        board_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /** Get Version */
   app_version: {
     responses: {
@@ -6470,6 +6514,45 @@ export type operations = {
       200: {
         content: {
           "application/json": components["schemas"]["AppConfig"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Log Level 
+   * @description Returns the log level
+   */
+  get_log_level: {
+    responses: {
+      /** @description The operation was successful */
+      200: {
+        content: {
+          "application/json": components["schemas"]["LogLevel"];
+        };
+      };
+    };
+  };
+  /**
+   * Set Log Level 
+   * @description Sets the log verbosity level
+   */
+  set_log_level: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LogLevel"];
+      };
+    };
+    responses: {
+      /** @description The operation was successful */
+      200: {
+        content: {
+          "application/json": components["schemas"]["LogLevel"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

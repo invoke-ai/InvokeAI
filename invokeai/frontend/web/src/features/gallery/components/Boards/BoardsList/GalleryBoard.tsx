@@ -1,31 +1,39 @@
 import {
   Badge,
   Box,
+  ChakraProps,
   Editable,
   EditableInput,
   EditablePreview,
   Flex,
+  Icon,
   Image,
-  MenuItem,
-  MenuList,
   Text,
-  useColorMode,
 } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { ContextMenu } from 'chakra-ui-contextmenu';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
-import { memo, useCallback, useMemo } from 'react';
-import { FaTrash, FaUser } from 'react-icons/fa';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { FaFolder } from 'react-icons/fa';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
-import { menuListMotionProps } from 'theme/components/menu';
-import { mode } from 'theme/util/mode';
+import BoardContextMenu from '../BoardContextMenu';
 
+const AUTO_ADD_BADGE_STYLES: ChakraProps['sx'] = {
+  bg: 'accent.200',
+  color: 'blackAlpha.900',
+};
+
+const BASE_BADGE_STYLES: ChakraProps['sx'] = {
+  bg: 'base.500',
+  color: 'whiteAlpha.900',
+};
 interface GalleryBoardProps {
   board: BoardDTO;
   isSelected: boolean;
@@ -35,27 +43,36 @@ interface GalleryBoardProps {
 const GalleryBoard = memo(
   ({ board, isSelected, setBoardToDelete }: GalleryBoardProps) => {
     const dispatch = useAppDispatch();
+    const selector = useMemo(
+      () =>
+        createSelector(
+          stateSelector,
+          ({ gallery }) => {
+            const isSelectedForAutoAdd =
+              board.board_id === gallery.autoAddBoardId;
+
+            return { isSelectedForAutoAdd };
+          },
+          defaultSelectorOptions
+        ),
+      [board.board_id]
+    );
+
+    const { isSelectedForAutoAdd } = useAppSelector(selector);
 
     const { currentData: coverImage } = useGetImageDTOQuery(
       board.cover_image_name ?? skipToken
     );
 
-    const { colorMode } = useColorMode();
     const { board_name, board_id } = board;
+    const [localBoardName, setLocalBoardName] = useState(board_name);
+
     const handleSelectBoard = useCallback(() => {
       dispatch(boardIdSelected(board_id));
     }, [board_id, dispatch]);
 
     const [updateBoard, { isLoading: isUpdateBoardLoading }] =
       useUpdateBoardMutation();
-
-    const handleUpdateBoardName = (newBoardName: string) => {
-      updateBoard({ board_id, changes: { board_name: newBoardName } });
-    };
-
-    const handleDeleteBoard = useCallback(() => {
-      setBoardToDelete(board);
-    }, [board, setBoardToDelete]);
 
     const droppableData: MoveBoardDropData = useMemo(
       () => ({
@@ -66,86 +83,116 @@ const GalleryBoard = memo(
       [board_id]
     );
 
+    const handleSubmit = useCallback(
+      (newBoardName: string) => {
+        if (!newBoardName) {
+          // empty strings are not allowed
+          setLocalBoardName(board_name);
+          return;
+        }
+        if (newBoardName === board_name) {
+          // don't updated the board name if it hasn't changed
+          return;
+        }
+        updateBoard({ board_id, changes: { board_name: newBoardName } })
+          .unwrap()
+          .then((response) => {
+            // update local state
+            setLocalBoardName(response.board_name);
+          })
+          .catch(() => {
+            // revert on error
+            setLocalBoardName(board_name);
+          });
+      },
+      [board_id, board_name, updateBoard]
+    );
+
+    const handleChange = useCallback((newBoardName: string) => {
+      setLocalBoardName(newBoardName);
+    }, []);
+
     return (
-      <Box sx={{ touchAction: 'none', height: 'full' }}>
-        <ContextMenu<HTMLDivElement>
-          menuProps={{ size: 'sm', isLazy: true }}
-          menuButtonProps={{
-            bg: 'transparent',
-            _hover: { bg: 'transparent' },
+      <Box
+        sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}
+      >
+        <Flex
+          sx={{
+            position: 'relative',
+            justifyContent: 'center',
+            alignItems: 'center',
+            aspectRatio: '1/1',
+            w: 'full',
+            h: 'full',
           }}
-          renderMenu={() => (
-            <MenuList
-              sx={{ visibility: 'visible !important' }}
-              motionProps={menuListMotionProps}
-            >
-              {board.image_count > 0 && (
-                <>
-                  {/* <MenuItem
-                    isDisabled={!board.image_count}
-                    icon={<FaImages />}
-                    onClickCapture={handleAddBoardToBatch}
-                  >
-                    Add Board to Batch
-                  </MenuItem> */}
-                </>
-              )}
-              <MenuItem
-                sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
-                icon={<FaTrash />}
-                onClickCapture={handleDeleteBoard}
-              >
-                Delete Board
-              </MenuItem>
-            </MenuList>
-          )}
         >
-          {(ref) => (
-            <Flex
-              key={board_id}
-              userSelect="none"
-              ref={ref}
-              sx={{
-                flexDir: 'column',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                cursor: 'pointer',
-                w: 'full',
-                h: 'full',
-              }}
-            >
+          <BoardContextMenu
+            board={board}
+            board_id={board_id}
+            setBoardToDelete={setBoardToDelete}
+          >
+            {(ref) => (
               <Flex
+                ref={ref}
                 onClick={handleSelectBoard}
                 sx={{
+                  w: 'full',
+                  h: 'full',
                   position: 'relative',
                   justifyContent: 'center',
                   alignItems: 'center',
                   borderRadius: 'base',
-                  w: 'full',
-                  aspectRatio: '1/1',
-                  overflow: 'hidden',
-                  shadow: isSelected ? 'selected.light' : undefined,
-                  _dark: { shadow: isSelected ? 'selected.dark' : undefined },
-                  flexShrink: 0,
+                  cursor: 'pointer',
                 }}
               >
-                {board.cover_image_name && coverImage?.thumbnail_url && (
-                  <Image src={coverImage?.thumbnail_url} draggable={false} />
-                )}
-                {!(board.cover_image_name && coverImage?.thumbnail_url) && (
-                  <IAINoContentFallback
-                    boxSize={8}
-                    icon={FaUser}
-                    sx={{
-                      borderWidth: '2px',
-                      borderStyle: 'solid',
-                      borderColor: 'base.200',
-                      _dark: {
-                        borderColor: 'base.800',
-                      },
-                    }}
-                  />
-                )}
+                <Flex
+                  sx={{
+                    w: 'full',
+                    h: 'full',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    borderRadius: 'base',
+                    bg: 'base.200',
+                    _dark: {
+                      bg: 'base.800',
+                    },
+                  }}
+                >
+                  {coverImage?.thumbnail_url ? (
+                    <Image
+                      src={coverImage?.thumbnail_url}
+                      draggable={false}
+                      sx={{
+                        maxW: 'full',
+                        maxH: 'full',
+                        borderRadius: 'base',
+                        borderBottomRadius: 'lg',
+                      }}
+                    />
+                  ) : (
+                    <Flex
+                      sx={{
+                        w: 'full',
+                        h: 'full',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Icon
+                        boxSize={12}
+                        as={FaFolder}
+                        sx={{
+                          mt: -3,
+                          opacity: 0.7,
+                          color: 'base.500',
+                          _dark: {
+                            color: 'base.500',
+                          },
+                        }}
+                      />
+                    </Flex>
+                  )}
+                </Flex>
                 <Flex
                   sx={{
                     position: 'absolute',
@@ -154,58 +201,97 @@ const GalleryBoard = memo(
                     p: 1,
                   }}
                 >
-                  <Badge variant="solid">{board.image_count}</Badge>
+                  <Badge
+                    variant="solid"
+                    sx={
+                      isSelectedForAutoAdd
+                        ? AUTO_ADD_BADGE_STYLES
+                        : BASE_BADGE_STYLES
+                    }
+                  >
+                    {board.image_count}
+                  </Badge>
                 </Flex>
+                <Box
+                  className="selection-box"
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    insetInlineEnd: 0,
+                    bottom: 0,
+                    insetInlineStart: 0,
+                    borderRadius: 'base',
+                    transitionProperty: 'common',
+                    transitionDuration: 'common',
+                    shadow: isSelected ? 'selected.light' : undefined,
+                    _dark: {
+                      shadow: isSelected ? 'selected.dark' : undefined,
+                    },
+                  }}
+                />
+                <Flex
+                  sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    p: 1,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    w: 'full',
+                    maxW: 'full',
+                    borderBottomRadius: 'base',
+                    bg: isSelected ? 'accent.400' : 'base.500',
+                    color: isSelected ? 'base.50' : 'base.100',
+                    _dark: {
+                      bg: isSelected ? 'accent.500' : 'base.600',
+                      color: isSelected ? 'base.50' : 'base.100',
+                    },
+                    lineHeight: 'short',
+                    fontSize: 'xs',
+                  }}
+                >
+                  <Editable
+                    value={localBoardName}
+                    isDisabled={isUpdateBoardLoading}
+                    submitOnBlur={true}
+                    onChange={handleChange}
+                    onSubmit={handleSubmit}
+                    sx={{
+                      w: 'full',
+                    }}
+                  >
+                    <EditablePreview
+                      sx={{
+                        p: 0,
+                        fontWeight: isSelected ? 700 : 500,
+                        textAlign: 'center',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      noOfLines={1}
+                    />
+                    <EditableInput
+                      sx={{
+                        p: 0,
+                        _focusVisible: {
+                          p: 0,
+                          textAlign: 'center',
+                          // get rid of the edit border
+                          boxShadow: 'none',
+                        },
+                      }}
+                    />
+                  </Editable>
+                </Flex>
+
                 <IAIDroppable
                   data={droppableData}
                   dropLabel={<Text fontSize="md">Move</Text>}
                 />
               </Flex>
-
-              <Flex
-                sx={{
-                  width: 'full',
-                  height: 'full',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <Editable
-                  defaultValue={board_name}
-                  submitOnBlur={false}
-                  onSubmit={(nextValue) => {
-                    handleUpdateBoardName(nextValue);
-                  }}
-                  sx={{ maxW: 'full' }}
-                >
-                  <EditablePreview
-                    sx={{
-                      color: isSelected
-                        ? mode('base.900', 'base.50')(colorMode)
-                        : mode('base.700', 'base.200')(colorMode),
-                      fontWeight: isSelected ? 600 : undefined,
-                      fontSize: 'xs',
-                      textAlign: 'center',
-                      p: 0,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                    noOfLines={1}
-                  />
-                  <EditableInput
-                    sx={{
-                      color: mode('base.900', 'base.50')(colorMode),
-                      fontSize: 'xs',
-                      borderColor: mode('base.500', 'base.500')(colorMode),
-                      p: 0,
-                      outline: 0,
-                    }}
-                  />
-                </Editable>
-              </Flex>
-            </Flex>
-          )}
-        </ContextMenu>
+            )}
+          </BoardContextMenu>
+        </Flex>
       </Box>
     );
   }

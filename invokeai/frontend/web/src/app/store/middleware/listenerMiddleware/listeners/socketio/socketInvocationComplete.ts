@@ -6,11 +6,7 @@ import {
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
 import { progressImageSet } from 'features/system/store/systemSlice';
-import {
-  SYSTEM_BOARDS,
-  imagesAdapter,
-  imagesApi,
-} from 'services/api/endpoints/images';
+import { imagesAdapter, imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
 import { sessionCanceled } from 'services/api/thunks/session';
 import {
@@ -32,8 +28,7 @@ export const addInvocationCompleteEventListener = () => {
       );
       const session_id = action.payload.data.graph_execution_state_id;
 
-      const { cancelType, isCancelScheduled, boardIdToAddTo } =
-        getState().system;
+      const { cancelType, isCancelScheduled } = getState().system;
 
       // Handle scheduled cancelation
       if (cancelType === 'scheduled' && isCancelScheduled) {
@@ -88,26 +83,28 @@ export const addInvocationCompleteEventListener = () => {
             )
           );
 
-          // add image to the board if we had one selected
-          if (boardIdToAddTo && !SYSTEM_BOARDS.includes(boardIdToAddTo)) {
+          const { autoAddBoardId } = gallery;
+
+          // add image to the board if auto-add is enabled
+          if (autoAddBoardId) {
             dispatch(
               imagesApi.endpoints.addImageToBoard.initiate({
-                board_id: boardIdToAddTo,
+                board_id: autoAddBoardId,
                 imageDTO,
               })
             );
           }
 
-          const { selectedBoardId } = gallery;
-
-          if (boardIdToAddTo && boardIdToAddTo !== selectedBoardId) {
-            dispatch(boardIdSelected(boardIdToAddTo));
-          } else if (!boardIdToAddTo) {
-            dispatch(boardIdSelected('all'));
-          }
+          const { selectedBoardId, shouldAutoSwitch } = gallery;
 
           // If auto-switch is enabled, select the new image
-          if (getState().gallery.shouldAutoSwitch) {
+          if (shouldAutoSwitch) {
+            // if auto-add is enabled, switch the board as the image comes in
+            if (autoAddBoardId && autoAddBoardId !== selectedBoardId) {
+              dispatch(boardIdSelected(autoAddBoardId));
+            } else if (!autoAddBoardId) {
+              dispatch(boardIdSelected('images'));
+            }
             dispatch(imageSelected(imageDTO.image_name));
           }
         }

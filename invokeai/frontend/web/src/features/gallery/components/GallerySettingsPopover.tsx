@@ -1,19 +1,20 @@
 import { Flex } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAISlider from 'common/components/IAISlider';
-import { setGalleryImageMinimumWidth } from 'features/gallery/store/gallerySlice';
-
+import {
+  setGalleryImageMinimumWidth,
+  shouldAutoSwitchChanged,
+} from 'features/gallery/store/gallerySlice';
 import { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
-
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { shouldAutoSwitchChanged } from 'features/gallery/store/gallerySlice';
+import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
 
 const selector = createSelector(
   [stateSelector],
@@ -50,7 +51,7 @@ const GallerySettingsPopover = () => {
         />
       }
     >
-      <Flex direction="column" gap={2}>
+      <Flex direction="column" gap={4}>
         <IAISlider
           value={galleryImageMinimumWidth}
           onChange={handleChangeGalleryImageMinimumWidth}
@@ -68,6 +69,7 @@ const GallerySettingsPopover = () => {
             dispatch(shouldAutoSwitchChanged(e.target.checked))
           }
         />
+        <BoardAutoAddSelect />
       </Flex>
     </IAIPopover>
   );

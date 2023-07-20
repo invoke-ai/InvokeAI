@@ -1,8 +1,7 @@
 import io
 from typing import Optional
 
-from fastapi import (Body, HTTPException, Path, Query, Request, Response,
-                     UploadFile)
+from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
@@ -11,9 +10,11 @@ from invokeai.app.invocations.metadata import ImageMetadata
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.item_storage import PaginatedResults
-from invokeai.app.services.models.image_record import (ImageDTO,
-                                                       ImageRecordChanges,
-                                                       ImageUrlsDTO)
+from invokeai.app.services.models.image_record import (
+    ImageDTO,
+    ImageRecordChanges,
+    ImageUrlsDTO,
+)
 
 from ..dependencies import ApiDependencies
 
@@ -84,15 +85,16 @@ async def delete_image(
         # TODO: Does this need any exception handling at all?
         pass
 
+
 @images_router.post("/clear-intermediates", operation_id="clear_intermediates")
 async def clear_intermediates() -> int:
-    """Clears first 100 intermediates"""
+    """Clears all intermediates"""
 
     try:
-        count_deleted = ApiDependencies.invoker.services.images.delete_many(is_intermediate=True)
+        count_deleted = ApiDependencies.invoker.services.images.delete_intermediates()
         return count_deleted
     except Exception as e:
-        # TODO: Does this need any exception handling at all?
+        raise HTTPException(status_code=500, detail="Failed to clear intermediates")
         pass
 
 
@@ -129,6 +131,7 @@ async def get_image_dto(
         return ApiDependencies.invoker.services.images.get_dto(image_name)
     except Exception as e:
         raise HTTPException(status_code=404)
+
 
 @images_router.get(
     "/{image_name}/metadata",
@@ -254,7 +257,8 @@ async def list_image_dtos(
         default=None, description="Whether to list intermediate images."
     ),
     board_id: Optional[str] = Query(
-        default=None, description="The board id to filter by. Use 'none' to find images without a board."
+        default=None,
+        description="The board id to filter by. Use 'none' to find images without a board.",
     ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),

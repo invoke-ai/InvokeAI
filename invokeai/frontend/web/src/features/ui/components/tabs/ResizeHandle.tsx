@@ -3,7 +3,7 @@ import { memo } from 'react';
 import { PanelResizeHandle } from 'react-resizable-panels';
 import { mode } from 'theme/util/mode';
 
-type ResizeHandleProps = FlexProps & {
+type ResizeHandleProps = Omit<FlexProps, 'direction'> & {
   direction?: 'horizontal' | 'vertical';
 };
 
