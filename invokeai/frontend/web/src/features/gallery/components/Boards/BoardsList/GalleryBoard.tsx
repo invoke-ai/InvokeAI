@@ -241,7 +241,7 @@ const GalleryBoard = memo(
                     borderBottomRadius: 'base',
                     bg: 'accent.400',
                     color: isSelected ? 'base.50' : 'base.100',
-                    _dark: { color: 'base.800', bg: 'accent.200' },
+                    _dark: { color: 'base.200', bg: 'accent.500' },
                     lineHeight: 'short',
                     fontSize: 'xs',
                   }}

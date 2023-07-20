@@ -4,6 +4,7 @@ import { InvokeAIColors } from './colors/colors';
 import { accordionTheme } from './components/accordion';
 import { buttonTheme } from './components/button';
 import { checkboxTheme } from './components/checkbox';
+import { editableTheme } from './components/editable';
 import { formLabelTheme } from './components/formLabel';
 import { inputTheme } from './components/input';
 import { menuTheme } from './components/menu';
@@ -20,7 +21,6 @@ import { tabsTheme } from './components/tabs';
 import { textTheme } from './components/text';
 import { textareaTheme } from './components/textarea';
 import { tooltipTheme } from './components/tooltip';
-import { editableTheme } from './components/editable';
 
 export const theme: ThemeOverride = {
   config: {
@@ -73,7 +73,7 @@ export const theme: ThemeOverride = {
     selected: {
       light:
         '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
-      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
+      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-500)',
     },
     hoverSelected: {
       light:
