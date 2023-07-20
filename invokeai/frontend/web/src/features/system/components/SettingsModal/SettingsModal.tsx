@@ -24,7 +24,6 @@ import {
   setEnableImageDebugging,
   setIsNodesEnabled,
   setShouldConfirmOnDelete,
-  setShouldDisplayGuides,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
 } from 'features/system/store/systemSlice';
@@ -56,7 +55,6 @@ const selector = createSelector(
   (system: SystemState, ui: UIState) => {
     const {
       shouldConfirmOnDelete,
-      shouldDisplayGuides,
       enableImageDebugging,
       consoleLogLevel,
       shouldLogToConsole,
@@ -73,7 +71,6 @@ const selector = createSelector(
 
     return {
       shouldConfirmOnDelete,
-      shouldDisplayGuides,
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
@@ -139,7 +136,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
   const {
     shouldConfirmOnDelete,
-    shouldDisplayGuides,
     enableImageDebugging,
     shouldUseCanvasBetaLayout,
     shouldUseSliders,
@@ -195,7 +191,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
       <Modal
         isOpen={isSettingsModalOpen}
         onClose={onSettingsModalClose}
-        size="xl"
+        size="2xl"
         isCentered
       >
         <ModalOverlay />
@@ -231,14 +227,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
               <StyledFlex>
                 <Heading size="sm">{t('settings.ui')}</Heading>
-                <SettingSwitch
-                  label={t('settings.displayHelpIcons')}
-                  isChecked={shouldDisplayGuides}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldDisplayGuides(e.target.checked))
-                  }
-                />
-
                 <SettingSwitch
                   label={t('settings.useSlidersForAll')}
                   isChecked={shouldUseSliders}
@@ -317,8 +305,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                 </IAIButton>
                 {shouldShowResetWebUiText && (
                   <>
-                    <Text>{t('settings.resetWebUIDesc1')}</Text>
-                    <Text>{t('settings.resetWebUIDesc2')}</Text>
+                    <Text variant="subtext">
+                      {t('settings.resetWebUIDesc1')}
+                    </Text>
+                    <Text variant="subtext">
+                      {t('settings.resetWebUIDesc2')}
+                    </Text>
                   </>
                 )}
               </StyledFlex>

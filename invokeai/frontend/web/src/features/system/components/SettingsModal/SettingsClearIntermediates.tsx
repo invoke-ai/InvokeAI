@@ -1,60 +1,71 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useCallback, useEffect, useState } from 'react';
-import { StyledFlex } from './SettingsModal';
 import { Heading, Text } from '@chakra-ui/react';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useCallback, useEffect } from 'react';
 import IAIButton from '../../../../common/components/IAIButton';
-import { useClearIntermediatesMutation } from '../../../../services/api/endpoints/images';
-import { addToast } from '../../store/systemSlice';
+import {
+  useClearIntermediatesMutation,
+  useGetIntermediatesCountQuery,
+} from '../../../../services/api/endpoints/images';
 import { resetCanvas } from '../../../canvas/store/canvasSlice';
+import { addToast } from '../../store/systemSlice';
+import { StyledFlex } from './SettingsModal';
+import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 
 export default function SettingsClearIntermediates() {
   const dispatch = useAppDispatch();
-  const [isDisabled, setIsDisabled] = useState(false);
+
+  const { data: intermediatesCount, refetch: updateIntermediatesCount } =
+    useGetIntermediatesCountQuery();
 
   const [clearIntermediates, { isLoading: isLoadingClearIntermediates }] =
     useClearIntermediatesMutation();
 
   const handleClickClearIntermediates = useCallback(() => {
-    clearIntermediates({})
+    clearIntermediates()
       .unwrap()
       .then((response) => {
+        dispatch(controlNetReset());
         dispatch(resetCanvas());
         dispatch(
           addToast({
-            title:
-              response === 0
-                ? `No intermediates to clear`
-                : `Successfully cleared ${response} intermediates`,
+            title: `Cleared ${response} intermediates`,
             status: 'info',
           })
         );
-        if (response < 100) {
-          setIsDisabled(true);
-        }
       });
   }, [clearIntermediates, dispatch]);
+
+  useEffect(() => {
+    // update the count on mount
+    updateIntermediatesCount();
+  }, [updateIntermediatesCount]);
+
+  const buttonText = intermediatesCount
+    ? `Clear ${intermediatesCount} Intermediate${
+        intermediatesCount > 1 ? 's' : ''
+      }`
+    : 'No Intermediates to Clear';
 
   return (
     <StyledFlex>
       <Heading size="sm">Clear Intermediates</Heading>
       <IAIButton
-        colorScheme="error"
+        colorScheme="warning"
         onClick={handleClickClearIntermediates}
         isLoading={isLoadingClearIntermediates}
-        isDisabled={isDisabled}
+        isDisabled={!intermediatesCount}
       >
-        {isDisabled ? 'Intermediates Cleared' : 'Clear 100 Intermediates'}
+        {buttonText}
       </IAIButton>
-      <Text>
-        Will permanently delete first 100 intermediates found on disk and in
-        database
+      <Text fontWeight="bold">
+        Clearing intermediates will reset your Canvas and ControlNet state.
       </Text>
-      <Text fontWeight="bold">This will also clear your canvas state.</Text>
-      <Text>
+      <Text variant="subtext">
         Intermediate images are byproducts of generation, different from the
-        result images in the gallery. Purging intermediates will free disk
-        space. Your gallery images will not be deleted.
+        result images in the gallery. Clearing intermediates will free disk
+        space.
       </Text>
+      <Text variant="subtext">Your gallery images will not be deleted.</Text>
     </StyledFlex>
   );
 }

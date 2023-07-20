@@ -38,6 +38,7 @@ const AllAssetsBoard = ({ isSelected }: { isSelected: boolean }) => {
 
   return (
     <GenericBoard
+      board_id="assets"
       onClick={handleClick}
       isSelected={isSelected}
       icon={FaFileImage}

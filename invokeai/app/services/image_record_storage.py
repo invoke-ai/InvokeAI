@@ -123,6 +123,11 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def delete_intermediates(self) -> list[str]:
+        """Deletes all intermediate image records, returning a list of deleted image names."""
+        pass
+
+    @abstractmethod
     def save(
         self,
         image_name: str,
@@ -455,6 +460,32 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._cursor.execute(query, image_names)
 
             self._conn.commit()
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise ImageRecordDeleteException from e
+        finally:
+            self._lock.release()
+
+
+    def delete_intermediates(self) -> list[str]:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                SELECT image_name FROM images
+                WHERE is_intermediate = TRUE;
+                """
+            )
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            image_names = list(map(lambda r: r[0], result))
+            self._cursor.execute(
+                """--sql
+                DELETE FROM images
+                WHERE is_intermediate = TRUE;
+                """
+            )
+            self._conn.commit()
+            return image_names
         except sqlite3.Error as e:
             self._conn.rollback()
             raise ImageRecordDeleteException from e

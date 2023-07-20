@@ -39,6 +39,7 @@ const NoBoardBoard = ({ isSelected }: { isSelected: boolean }) => {
 
   return (
     <GenericBoard
+      board_id="no_board"
       droppableData={droppableData}
       dropLabel={<Text fontSize="md">Move</Text>}
       onClick={handleClick}
