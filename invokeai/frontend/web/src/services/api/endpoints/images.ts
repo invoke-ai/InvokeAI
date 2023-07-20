@@ -169,10 +169,11 @@ export const imagesApi = api.injectEndpoints({
       ],
       async onQueryStarted(imageDTO, { dispatch, queryFulfilled }) {
         /**
-         * Cache changes for deleteImage:
-         * - Remove from "All Images"
-         * - Remove from image's `board_id` if it has one, or "No Board" if not
-         * - Remove from "Batch"
+         * Cache changes for `deleteImage`:
+         * - *remove* from "All Images" / "All Assets"
+         * - IF it has a board:
+         *   - THEN *remove* from it's own board
+         *   - ELSE *remove* from "No Board"
          */
 
         const { image_name, board_id, image_category } = imageDTO;
@@ -181,21 +182,22 @@ export const imagesApi = api.injectEndpoints({
         // That means constructing the possible query args that are serialized into the cache key...
 
         const removeFromCacheKeys: ListImagesArgs[] = [];
+
+        // determine `categories`, i.e. do we update "All Images" or "All Assets"
         const categories = IMAGE_CATEGORIES.includes(image_category)
           ? IMAGE_CATEGORIES
           : ASSETS_CATEGORIES;
 
-        // All Images board (e.g. no board)
+        // remove from "All Images"
         removeFromCacheKeys.push({ categories });
 
-        // Board specific
         if (board_id) {
+          // remove from it's own board
           removeFromCacheKeys.push({ board_id });
         } else {
-          // TODO: No Board
+          // remove from "No Board"
+          removeFromCacheKeys.push({ board_id: 'none' });
         }
-
-        // TODO: Batch
 
         const patches: PatchCollection[] = [];
         removeFromCacheKeys.forEach((cacheKey) => {
@@ -240,25 +242,24 @@ export const imagesApi = api.injectEndpoints({
         { imageDTO: oldImageDTO, changes: _changes },
         { dispatch, queryFulfilled, getState }
       ) {
-        // TODO: Should we handle changes to boards via this mutation? Seems reasonable...
-
         // let's be extra-sure we do not accidentally change categories
         const changes = omit(_changes, 'image_category');
 
         /**
-         * Cache changes for `updateImage`:
-         * - Update the ImageDTO
-         * - Update the image in "All Images" board:
-         *   - IF it is in the date range represented by the cache:
-         *     - add the image IF it is not already in the cache & update the total
-         *     - ELSE update the image IF it is already in the cache
+         * Cache changes for "updateImage":
+         * - *update* "getImageDTO" cache
+         * - for "All Images" || "All Assets":
+         *     - IF it is not already in the cache
+         *        - THEN *add* it to "All Images" / "All Assets" and update the total
+         *     - ELSE *update* it
          * - IF the image has a board:
-         *   - Update the image in it's own board
-         *   - ELSE Update the image in the "No Board" board (TODO)
+         *   - THEN *update* it's own board
+         *   - ELSE *update* the "No Board" board
          */
 
         const patches: PatchCollection[] = [];
-        const { image_name, board_id, image_category, is_intermediate } = oldImageDTO;
+        const { image_name, board_id, image_category, is_intermediate } =
+          oldImageDTO;
 
         const isChangingFromIntermediate = changes.is_intermediate === false;
         // do not add intermediates to gallery cache
@@ -266,13 +267,12 @@ export const imagesApi = api.injectEndpoints({
           return;
         }
 
+        // determine `categories`, i.e. do we update "All Images" or "All Assets"
         const categories = IMAGE_CATEGORIES.includes(image_category)
           ? IMAGE_CATEGORIES
           : ASSETS_CATEGORIES;
 
-        // TODO: No Board
-
-        // Update `getImageDTO` cache
+        // update `getImageDTO` cache
         patches.push(
           dispatch(
             imagesApi.util.updateQueryData(
@@ -288,9 +288,13 @@ export const imagesApi = api.injectEndpoints({
         // Update the "All Image" or "All Assets" board
         const queryArgsToUpdate: ListImagesArgs[] = [{ categories }];
 
+        // IF the image has a board:
         if (board_id) {
-          // We also need to update the user board
+          // THEN update it's own board
           queryArgsToUpdate.push({ board_id });
+        } else {
+          // ELSE update the "No Board" board
+          queryArgsToUpdate.push({ board_id: 'none' });
         }
 
         queryArgsToUpdate.forEach((queryArg) => {
@@ -378,12 +382,12 @@ export const imagesApi = api.injectEndpoints({
             return;
           }
 
-          // Add the image to the "All Images" / "All Assets" board
-          const queryArg = {
-            categories: IMAGE_CATEGORIES.includes(image_category)
-              ? IMAGE_CATEGORIES
-              : ASSETS_CATEGORIES,
-          };
+          // determine `categories`, i.e. do we update "All Images" or "All Assets"
+          const categories = IMAGE_CATEGORIES.includes(image_category)
+            ? IMAGE_CATEGORIES
+            : ASSETS_CATEGORIES;
+
+          const queryArg = { categories };
 
           dispatch(
             imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
@@ -417,16 +421,14 @@ export const imagesApi = api.injectEndpoints({
         { dispatch, queryFulfilled, getState }
       ) {
         /**
-         * Cache changes for addImageToBoard:
-         * - Remove from "No Board"
-         * - Remove from `old_board_id` if it has one
-         * - Add to new `board_id`
-         *    - IF the image's `created_at` is within the range of the board's cached images
+         * Cache changes for `addImageToBoard`:
+         * - *update* the `getImageDTO` cache
+         * - *remove* from "No Board"
+         * - IF the image has an old `board_id`:
+         *    - THEN *remove* from it's old `board_id`
+         * - IF the image's `created_at` is within the range of the board's cached images
          *    - OR the board cache has length of 0 or 1
-         * - Update the `total` for each board whose cache is updated
-         * - Update the ImageDTO
-         *
-         * TODO: maybe total should just be updated in the boards endpoints?
+         *    - THEN *add* it to new `board_id`
          */
 
         const { image_name, board_id: old_board_id } = oldImageDTO;
@@ -434,13 +436,10 @@ export const imagesApi = api.injectEndpoints({
         // Figure out the `listImages` caches that we need to update
         const removeFromQueryArgs: ListImagesArgs[] = [];
 
-        // TODO: No Board
-        // TODO: Batch
-
-        // Remove from No Board
+        // remove from "No Board"
         removeFromQueryArgs.push({ board_id: 'none' });
 
-        // Remove from old board
+        // remove from old board
         if (old_board_id) {
           removeFromQueryArgs.push({ board_id: old_board_id });
         }
@@ -541,16 +540,14 @@ export const imagesApi = api.injectEndpoints({
         { dispatch, queryFulfilled, getState }
       ) {
         /**
-         * Cache changes for removeImageFromBoard:
-         * - Add to "No Board"
-         *    - IF the image's `created_at` is within the range of the board's cached images
-         * - Remove from `old_board_id`
-         * - Update the ImageDTO
+         * Cache changes for `removeImageFromBoard`:
+         * - *update* `getImageDTO`
+         * - IF the image's `created_at` is within the range of the board's cached images
+         *    - THEN *add* to "No Board"
+         * - *remove* from `old_board_id`
          */
 
         const { image_name, board_id: old_board_id } = imageDTO;
-
-        // TODO: Batch
 
         const patches: PatchCollection[] = [];
 
