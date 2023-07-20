@@ -956,8 +956,9 @@ class ModelManager(object):
                                                       config.lora_dir,
                                                       config.embedding_dir,
                                                       config.controlnet_dir,
-                                                      ]
+                                                      ] if x
                        }
+        print(directories)
         scanner = ScanAndImport(directories, self.logger, ignore=known_paths, installer=installer)
         scanner.search()
         
