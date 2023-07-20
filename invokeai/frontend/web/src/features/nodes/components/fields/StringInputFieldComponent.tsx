@@ -9,9 +9,14 @@ import { ChangeEvent, memo } from 'react';
 import { FieldComponentProps } from './types';
 
 const StringInputFieldComponent = (
-  props: FieldComponentProps<StringInputFieldValue, StringInputFieldTemplate>
+  props: FieldComponentProps<
+    StringInputFieldValue,
+    StringInputFieldTemplate
+  > & {
+    nodeWidth: number;
+  }
 ) => {
-  const { nodeId, field } = props;
+  const { nodeId, field, nodeWidth } = props;
   const dispatch = useAppDispatch();
 
   const handleValueChanged = (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -24,11 +29,13 @@ const StringInputFieldComponent = (
     );
   };
 
+  const textareaWidth = nodeWidth - 20;
+
   return (
     <Textarea
       style={{
-        height: '200px',
-        width: '350px',
+        height: '150px',
+        width: `${textareaWidth}px`,
         resize: 'none',
         overflowY: 'auto',
       }}
