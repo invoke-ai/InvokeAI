@@ -455,7 +455,12 @@
         "addDifference": "Add Difference",
         "pickModelType": "Pick Model Type",
         "selectModel": "Select Model",
-        "importModels": "Import Models"
+        "importModels": "Import Models",
+        "settings": "Settings",
+        "syncModels": "Sync Models",
+        "syncModelsDesc": "If your models are out of sync with the backend, you can refresh them up using this option. This is generally handy in cases where you manually update your models.yaml file or add models to the InvokeAI root folder after the application has booted.",
+        "modelsSynced": "Models Synced",
+        "modelSyncFailed": "Model Sync Failed"
     },
     "parameters": {
         "general": "General",

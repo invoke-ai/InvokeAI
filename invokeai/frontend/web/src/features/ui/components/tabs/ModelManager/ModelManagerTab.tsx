@@ -4,8 +4,13 @@ import { ReactNode, memo } from 'react';
 import ImportModelsPanel from './subpanels/ImportModelsPanel';
 import MergeModelsPanel from './subpanels/MergeModelsPanel';
 import ModelManagerPanel from './subpanels/ModelManagerPanel';
+import ModelManagerSettingsPanel from './subpanels/ModelManagerSettingsPanel';
 
-type ModelManagerTabName = 'modelManager' | 'importModels' | 'mergeModels';
+type ModelManagerTabName =
+  | 'modelManager'
+  | 'importModels'
+  | 'mergeModels'
+  | 'settings';
 
 type ModelManagerTabInfo = {
   id: ModelManagerTabName;
@@ -28,6 +33,11 @@ const tabs: ModelManagerTabInfo[] = [
     id: 'mergeModels',
     label: i18n.t('modelManager.mergeModels'),
     content: <MergeModelsPanel />,
+  },
+  {
+    id: 'settings',
+    label: i18n.t('modelManager.settings'),
+    content: <ModelManagerSettingsPanel />,
   },
 ];
 
