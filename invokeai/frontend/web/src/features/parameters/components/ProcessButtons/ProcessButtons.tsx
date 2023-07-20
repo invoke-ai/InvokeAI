@@ -9,7 +9,6 @@ const ProcessButtons = () => {
   return (
     <Flex gap={2}>
       <InvokeButton />
-      {/* {activeTabName === 'img2img' && <LoopbackButton />} */}
       <CancelButton />
     </Flex>
   );

@@ -83,7 +83,6 @@ export interface SystemState {
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
-  boardIdToAddTo?: string;
   isNodesEnabled: boolean;
 }
 
@@ -199,7 +198,6 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
-      state.boardIdToAddTo = action.payload.boardId;
       state.canceledSession = '';
     });
 
@@ -208,7 +206,6 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketUnsubscribed, (state) => {
       state.sessionId = null;
-      state.boardIdToAddTo = undefined;
     });
 
     /**

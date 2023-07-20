@@ -1,20 +1,18 @@
 import { ChevronUpIcon } from '@chakra-ui/icons';
-import { Button, Flex, Text } from '@chakra-ui/react';
+import { Box, Button, Flex, Spacer, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { memo } from 'react';
-import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
+import { useBoardName } from 'services/api/hooks/useBoardName';
 
 const selector = createSelector(
   [stateSelector],
   (state) => {
     const { selectedBoardId } = state.gallery;
 
-    return {
-      selectedBoardId,
-    };
+    return { selectedBoardId };
   },
   defaultSelectorOptions
 );
@@ -27,25 +25,7 @@ type Props = {
 const GalleryBoardName = (props: Props) => {
   const { isOpen, onToggle } = props;
   const { selectedBoardId } = useAppSelector(selector);
-  const { selectedBoardName } = useListAllBoardsQuery(undefined, {
-    selectFromResult: ({ data }) => {
-      let selectedBoardName = '';
-      if (selectedBoardId === 'images') {
-        selectedBoardName = 'All Images';
-      } else if (selectedBoardId === 'assets') {
-        selectedBoardName = 'All Assets';
-      } else if (selectedBoardId === 'no_board') {
-        selectedBoardName = 'No Board';
-      } else if (selectedBoardId === 'batch') {
-        selectedBoardName = 'Batch';
-      } else {
-        const selectedBoard = data?.find((b) => b.board_id === selectedBoardId);
-        selectedBoardName = selectedBoard?.board_name || 'Unknown Board';
-      }
-
-      return { selectedBoardName };
-    },
-  });
+  const boardName = useBoardName(selectedBoardId);
 
   return (
     <Flex
@@ -54,6 +34,8 @@ const GalleryBoardName = (props: Props) => {
       size="sm"
       variant="ghost"
       sx={{
+        position: 'relative',
+        gap: 2,
         w: 'full',
         justifyContent: 'center',
         alignItems: 'center',
@@ -64,19 +46,22 @@ const GalleryBoardName = (props: Props) => {
         },
       }}
     >
-      <Text
-        noOfLines={1}
-        sx={{
-          w: 'full',
-          fontWeight: 600,
-          color: 'base.800',
-          _dark: {
-            color: 'base.200',
-          },
-        }}
-      >
-        {selectedBoardName}
-      </Text>
+      <Spacer />
+      <Box position="relative">
+        <Text
+          noOfLines={1}
+          sx={{
+            fontWeight: 600,
+            color: 'base.800',
+            _dark: {
+              color: 'base.200',
+            },
+          }}
+        >
+          {boardName}
+        </Text>
+      </Box>
+      <Spacer />
       <ChevronUpIcon
         sx={{
           transform: isOpen ? 'rotate(0deg)' : 'rotate(180deg)',
