@@ -118,11 +118,16 @@ const ControlNet = (props: ControlNetProps) => {
           tooltip={isExpanded ? 'Hide Advanced' : 'Show Advanced'}
           aria-label={isExpanded ? 'Hide Advanced' : 'Show Advanced'}
           onClick={toggleIsExpanded}
-          variant="link"
+          variant="ghost"
+          sx={{
+            _hover: {
+              bg: 'none',
+            },
+          }}
           icon={
             <ChevronUpIcon
               sx={{
-                boxSize: 6,
+                boxSize: 4,
                 color: 'base.700',
                 transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
                 transitionProperty: 'common',
