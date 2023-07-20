@@ -663,7 +663,7 @@ def write_opts(opts: Namespace, init_file: Path):
     with open(init_file,'w', encoding='utf-8') as file:
         file.write(new_config.to_yaml())
 
-    if opts.hf_token:
+    if hasattr(opts,'hf_token'):
         HfLogin(opts.hf_token)
 
 # -------------------------------------
