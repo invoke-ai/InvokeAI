@@ -30,6 +30,7 @@ from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
 from .image import ImageOutput
 from .model import ModelInfo, UNetField, VaeField
+from invokeai.app.util.controlnet_utils import prepare_control_image
 
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,
@@ -288,7 +289,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 #        and add in batch_size, num_images_per_prompt?
                 #        and do real check for classifier_free_guidance?
                 # prepare_control_image should return torch.Tensor of shape(batch_size, 3, height, width)
-                control_image = model.prepare_control_image(
+                control_image = prepare_control_image(
                     image=input_image,
                     do_classifier_free_guidance=do_classifier_free_guidance,
                     width=control_width_resize,
@@ -298,13 +299,18 @@ class TextToLatentsInvocation(BaseInvocation):
                     device=control_model.device,
                     dtype=control_model.dtype,
                     control_mode=control_info.control_mode,
+                    resize_mode=control_info.resize_mode,
                 )
                 control_item = ControlNetData(
-                    model=control_model, image_tensor=control_image,
+                    model=control_model,
+                    image_tensor=control_image,
                     weight=control_info.control_weight,
                     begin_step_percent=control_info.begin_step_percent,
                     end_step_percent=control_info.end_step_percent,
                     control_mode=control_info.control_mode,
+                    # any resizing needed should currently be happening in prepare_control_image(),
+                    #    but adding resize_mode to ControlNetData in case needed in the future
+                    resize_mode=control_info.resize_mode,
                 )
                 control_data.append(control_item)
                 # MultiControlNetModel has been refactored out, just need list[ControlNetData]
@@ -601,7 +607,7 @@ class ResizeLatentsInvocation(BaseInvocation):
     antialias: bool = Field(
         default=False,
         description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
-    
+
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
@@ -647,7 +653,7 @@ class ScaleLatentsInvocation(BaseInvocation):
     antialias: bool = Field(
         default=False,
         description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
-    
+
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
