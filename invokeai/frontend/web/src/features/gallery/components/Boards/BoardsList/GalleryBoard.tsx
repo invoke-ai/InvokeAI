@@ -272,6 +272,7 @@ const GalleryBoard = memo(
                         p: 0,
                         _focusVisible: {
                           p: 0,
+                          textAlign: 'center',
                           // get rid of the edit border
                           boxShadow: 'none',
                         },
