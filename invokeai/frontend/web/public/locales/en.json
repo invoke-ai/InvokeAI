@@ -547,7 +547,8 @@
         "saveSteps": "Save images every n steps",
         "confirmOnDelete": "Confirm On Delete",
         "displayHelpIcons": "Display Help Icons",
-        "useCanvasBeta": "Use Canvas Beta Layout",
+        "alternateCanvasLayout": "Alternate Canvas Layout",
+        "enableNodesEditor": "Enable Nodes Editor",
         "enableImageDebugging": "Enable Image Debugging",
         "useSlidersForAll": "Use Sliders For All Options",
         "showProgressInViewer": "Show Progress Images in Viewer",
@@ -564,7 +565,9 @@
         "ui": "User Interface",
         "favoriteSchedulers": "Favorite Schedulers",
         "favoriteSchedulersPlaceholder": "No schedulers favorited",
-        "showAdvancedOptions": "Show Advanced Options"
+        "showAdvancedOptions": "Show Advanced Options",
+        "experimental": "Experimental",
+        "beta": "Beta"
     },
     "toast": {
         "serverError": "Server Error",
