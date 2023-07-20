@@ -69,7 +69,7 @@ const ControlNet = (props: ControlNetProps) => {
     <Flex
       sx={{
         flexDir: 'column',
-        gap: 2,
+        gap: 3,
         p: 3,
         borderRadius: 'base',
         position: 'relative',
@@ -152,7 +152,7 @@ const ControlNet = (props: ControlNetProps) => {
           />
         )}
       </Flex>
-      <Flex sx={{ w: 'full', flexDirection: 'column', gap: 3, mt: 2 }}>
+      <Flex sx={{ w: 'full', flexDirection: 'column', gap: 3 }}>
         <Flex sx={{ gap: 4, w: 'full', alignItems: 'center' }}>
           <Flex
             sx={{
