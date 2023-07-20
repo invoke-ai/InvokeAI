@@ -37,4 +37,7 @@ export const getInputOutlineStyles = (props: StyleFunctionProps) => ({
   _placeholder: {
     color: mode('base.700', 'base.400')(props),
   },
+  '::selection': {
+    bg: mode('accent.200', 'accent.400')(props),
+  },
 });

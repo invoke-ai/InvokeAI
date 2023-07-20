@@ -17,7 +17,7 @@ type GenericBoardProps = {
   badgeCount?: number;
 };
 
-const formatBadgeCount = (count: number) =>
+export const formatBadgeCount = (count: number) =>
   Intl.NumberFormat('en-US', {
     notation: 'compact',
     maximumFractionDigits: 1,
@@ -92,7 +92,7 @@ const GenericBoard = (props: GenericBoardProps) => {
               h: 'full',
               alignItems: 'center',
               fontWeight: isSelected ? 600 : undefined,
-              fontSize: 'xs',
+              fontSize: 'sm',
               color: isSelected ? 'base.900' : 'base.700',
               _dark: { color: isSelected ? 'base.50' : 'base.200' },
             }}

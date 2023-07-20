@@ -10,7 +10,14 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { setBoardSearchText } from 'features/gallery/store/boardSlice';
-import { memo } from 'react';
+import {
+  ChangeEvent,
+  KeyboardEvent,
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+} from 'react';
 
 const selector = createSelector(
   [stateSelector],
@@ -22,31 +29,60 @@ const selector = createSelector(
 );
 
 type Props = {
-  setSearchMode: (searchMode: boolean) => void;
+  setIsSearching: (isSearching: boolean) => void;
 };
 
 const BoardsSearch = (props: Props) => {
-  const { setSearchMode } = props;
+  const { setIsSearching } = props;
   const dispatch = useAppDispatch();
   const { searchText } = useAppSelector(selector);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleBoardSearch = (searchTerm: string) => {
-    setSearchMode(searchTerm.length > 0);
-    dispatch(setBoardSearchText(searchTerm));
-  };
-  const clearBoardSearch = () => {
-    setSearchMode(false);
+  const handleBoardSearch = useCallback(
+    (searchTerm: string) => {
+      dispatch(setBoardSearchText(searchTerm));
+    },
+    [dispatch]
+  );
+
+  const clearBoardSearch = useCallback(() => {
     dispatch(setBoardSearchText(''));
-  };
+    setIsSearching(false);
+  }, [dispatch, setIsSearching]);
+
+  const handleKeydown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      // exit search mode on escape
+      if (e.key === 'Escape') {
+        clearBoardSearch();
+      }
+    },
+    [clearBoardSearch]
+  );
+
+  const handleChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      handleBoardSearch(e.target.value);
+    },
+    [handleBoardSearch]
+  );
+
+  useEffect(() => {
+    // focus the search box on mount
+    if (!inputRef.current) {
+      return;
+    }
+    inputRef.current.focus();
+  }, []);
 
   return (
     <InputGroup>
       <Input
+        ref={inputRef}
         placeholder="Search Boards..."
         value={searchText}
-        onChange={(e) => {
-          handleBoardSearch(e.target.value);
-        }}
+        onKeyDown={handleKeydown}
+        onChange={handleChange}
       />
       {searchText && searchText.length && (
         <InputRightElement>
@@ -55,7 +91,8 @@ const BoardsSearch = (props: Props) => {
             size="xs"
             variant="ghost"
             aria-label="Clear Search"
-            icon={<CloseIcon boxSize={3} />}
+            opacity={0.5}
+            icon={<CloseIcon boxSize={2} />}
           />
         </InputRightElement>
       )}
