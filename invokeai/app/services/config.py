@@ -277,7 +277,7 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def _excluded_from_yaml(self)->List[str]:
         # combination of deprecated parameters and internal ones that shouldn't be exposed as invokeai.yaml options
-        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model', 'restore']
+        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model', 'restore', 'root']
 
     class Config:
         env_file_encoding = 'utf-8'
@@ -446,7 +446,7 @@ setting environment variables INVOKEAI_<setting>.
         Path to the runtime root directory
         '''
         if self.root:
-            return Path(self.root).expanduser()
+            return Path(self.root).expanduser().absolute()
         else:
             return self.find_root()
 
