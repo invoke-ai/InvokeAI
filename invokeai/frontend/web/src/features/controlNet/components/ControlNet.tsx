@@ -152,7 +152,7 @@ const ControlNet = (props: ControlNetProps) => {
           />
         )}
       </Flex>
-      <Flex sx={{ w: 'full', flexDirection: 'column', gap: 2 }}>
+      <Flex sx={{ w: 'full', flexDirection: 'column', gap: 3, mt: 2 }}>
         <Flex sx={{ gap: 4, w: 'full', alignItems: 'center' }}>
           <Flex
             sx={{
@@ -177,7 +177,6 @@ const ControlNet = (props: ControlNetProps) => {
                 h: 28,
                 w: 28,
                 aspectRatio: '1/1',
-                mt: 3,
               }}
             >
               <ControlNetImagePreview controlNetId={controlNetId} height={28} />
