@@ -51,6 +51,7 @@ A noise scheduler (eg. DPM++ 2M Karras) schedules the subtraction of noise from 
 | CvInpaint                          | Simple inpaint using opencv |
 | Divide                             | Divides two numbers |
 | DynamicPrompt                      | Parses a prompt using adieyal/dynamic prompt's random or combinatorial generator |
+| FaceMask                           | OpenCV cascade classifier detection to create transparencies in an image |
 | FloatLinearRange                   | Creates a range |
 | HedImageProcessor                  | Applies HED edge detection to image |
 | ImageBlur                          | Blurs an image |
