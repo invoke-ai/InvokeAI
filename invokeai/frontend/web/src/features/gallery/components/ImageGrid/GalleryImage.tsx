@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { TypesafeDraggableData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
@@ -86,38 +86,31 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   return (
     <Box sx={{ w: 'full', h: 'full', touchAction: 'none' }}>
-      <ImageContextMenu imageDTO={imageDTO}>
-        {(ref) => (
-          <Box
-            position="relative"
-            key={imageName}
-            userSelect="none"
-            ref={ref}
-            sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              aspectRatio: '1/1',
-            }}
-          >
-            <IAIDndImage
-              onClick={handleClick}
-              imageDTO={imageDTO}
-              draggableData={draggableData}
-              isSelected={isSelected}
-              minSize={0}
-              onClickReset={handleDelete}
-              imageSx={{ w: 'full', h: 'full' }}
-              isDropDisabled={true}
-              isUploadDisabled={true}
-              thumbnail={true}
-              // resetIcon={<FaTrash />}
-              // resetTooltip="Delete image"
-              // withResetIcon // removed bc it's too easy to accidentally delete images
-            />
-          </Box>
-        )}
-      </ImageContextMenu>
+      <Flex
+        userSelect="none"
+        sx={{
+          position: 'relative',
+          justifyContent: 'center',
+          alignItems: 'center',
+          aspectRatio: '1/1',
+        }}
+      >
+        <IAIDndImage
+          onClick={handleClick}
+          imageDTO={imageDTO}
+          draggableData={draggableData}
+          isSelected={isSelected}
+          minSize={0}
+          onClickReset={handleDelete}
+          imageSx={{ w: 'full', h: 'full' }}
+          isDropDisabled={true}
+          isUploadDisabled={true}
+          thumbnail={true}
+          // resetIcon={<FaTrash />}
+          // resetTooltip="Delete image"
+          // withResetIcon // removed bc it's too easy to accidentally delete images
+        />
+      </Flex>
     </Box>
   );
 };
