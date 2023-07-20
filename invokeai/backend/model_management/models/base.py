@@ -20,7 +20,7 @@ from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callab
 import onnx
 from onnx import numpy_helper
 from onnx.external_data_helper import set_external_data
-from onnxruntime import InferenceSession, OrtValue, SessionOptions, ExecutionMode, GraphOptimizationLevel
+from onnxruntime import InferenceSession, OrtValue, SessionOptions, ExecutionMode, GraphOptimizationLevel, get_available_providers
 class InvalidModelException(Exception):
     pass
 
@@ -514,7 +514,7 @@ class IAIOnnxRuntimeModel:
     def __init__(self, model_path: str, provider: Optional[str]):
         self.path = model_path
         self.session = None
-        self.provider = provider or "CPUExecutionProvider"
+        self.provider = provider
         """
         self.data_path = self.path + "_data"
         if not os.path.exists(self.data_path):
@@ -567,15 +567,19 @@ class IAIOnnxRuntimeModel:
             # sess.enable_mem_pattern = True
             # sess.add_session_config_entry("session.intra_op.use_xnnpack_threadpool", "1") ########### It's the key code
 
-
-            sess.add_free_dimension_override_by_name("unet_sample_batch", 2)
-            sess.add_free_dimension_override_by_name("unet_sample_channels", 4)
-            sess.add_free_dimension_override_by_name("unet_hidden_batch", 2)
-            sess.add_free_dimension_override_by_name("unet_hidden_sequence", 77)
-            sess.add_free_dimension_override_by_name("unet_sample_height", 64)
-            sess.add_free_dimension_override_by_name("unet_sample_width", 64)
-            sess.add_free_dimension_override_by_name("unet_time_batch", 1)
-            self.session = InferenceSession(self.proto.SerializeToString(), providers=['CUDAExecutionProvider', 'CPUExecutionProvider'], sess_options=sess)
+            # sess.add_free_dimension_override_by_name("unet_sample_batch", 2)
+            # sess.add_free_dimension_override_by_name("unet_sample_channels", 4)
+            # sess.add_free_dimension_override_by_name("unet_hidden_batch", 2)
+            # sess.add_free_dimension_override_by_name("unet_hidden_sequence", 77)
+            # sess.add_free_dimension_override_by_name("unet_sample_height", 64)
+            # sess.add_free_dimension_override_by_name("unet_sample_width", 64)
+            # sess.add_free_dimension_override_by_name("unet_time_batch", 1)
+            providers = []
+            if self.provider:
+                providers.append(self.provider)
+            else:
+                providers = get_available_providers()
+            self.session = InferenceSession(self.proto.SerializeToString(), providers=providers, sess_options=sess)
             #self.session = InferenceSession("tmp.onnx", providers=[self.provider], sess_options=self.sess_options)
             # self.io_binding = self.session.io_binding()
 

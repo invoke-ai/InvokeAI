@@ -49,6 +49,9 @@ ORT_TO_NP_TYPE = {
     "tensor(double)": np.float64,
 }
 
+PRECISION_VALUES = Literal[
+    tuple(list(ORT_TO_NP_TYPE.keys()))
+]
 
 class ONNXPromptInvocation(BaseInvocation):
     type: Literal["prompt_onnx"] = "prompt_onnx"
@@ -151,6 +154,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
     cfg_scale: Union[float, List[float]] = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
     scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
+    precision: PRECISION_VALUES = Field(default = "tensor(float16)", description="The precision to use when generating latents")
     unet: UNetField = Field(default=None, description="UNet submodel")
     #control: Union[ControlField, list[ControlField]] = Field(default=None, description="The control to use")
     #seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
@@ -202,7 +206,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
             latents = latents.cpu().numpy()
 
         # TODO: better execution device handling
-        latents = latents.astype(np.float16)
+        latents = latents.astype(ORT_TO_NP_TYPE[self.precision])
 
         # get the initial random noise unless the user supplied it
         do_classifier_free_guidance = True
@@ -486,7 +490,6 @@ class OnnxModelLoaderInvocation(BaseInvocation):
     type: Literal["onnx_model_loader"] = "onnx_model_loader"
 
     model: OnnxModelField = Field(description="The model to load")
-    # TODO: precision?
 
     # Schema customisation
     class Config(InvocationConfig):
