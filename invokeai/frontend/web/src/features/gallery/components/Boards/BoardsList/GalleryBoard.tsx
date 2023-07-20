@@ -240,9 +240,12 @@ const GalleryBoard = memo(
                     w: 'full',
                     maxW: 'full',
                     borderBottomRadius: 'base',
-                    bg: 'accent.400',
+                    bg: isSelected ? 'accent.400' : 'base.600',
                     color: isSelected ? 'base.50' : 'base.100',
-                    _dark: { color: 'base.200', bg: 'accent.500' },
+                    _dark: {
+                      bg: isSelected ? 'accent.500' : 'base.600',
+                      color: isSelected ? 'base.50' : 'base.100',
+                    },
                     lineHeight: 'short',
                     fontSize: 'xs',
                   }}
