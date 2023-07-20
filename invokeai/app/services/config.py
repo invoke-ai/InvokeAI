@@ -446,7 +446,7 @@ setting environment variables INVOKEAI_<setting>.
         Path to the runtime root directory
         '''
         if self.root:
-            return Path(self.root).expanduser()
+            return Path(self.root).expanduser().absolute()
         else:
             return self.find_root()
 
