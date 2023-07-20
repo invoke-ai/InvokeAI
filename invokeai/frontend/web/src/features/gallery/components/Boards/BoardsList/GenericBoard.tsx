@@ -17,7 +17,7 @@ type GenericBoardProps = {
   badgeCount?: number;
 };
 
-const formatBadgeCount = (count: number) =>
+export const formatBadgeCount = (count: number) =>
   Intl.NumberFormat('en-US', {
     notation: 'compact',
     maximumFractionDigits: 1,
