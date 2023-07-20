@@ -1,31 +1,41 @@
 import {
   Badge,
   Box,
+  ChakraProps,
   Editable,
   EditableInput,
   EditablePreview,
   Flex,
   Image,
-  MenuItem,
-  MenuList,
   Text,
   useColorMode,
 } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { ContextMenu } from 'chakra-ui-contextmenu';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
-import { FaTrash, FaUser } from 'react-icons/fa';
+import { FaUser } from 'react-icons/fa';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
-import { menuListMotionProps } from 'theme/components/menu';
 import { mode } from 'theme/util/mode';
+import BoardContextMenu from '../BoardContextMenu';
 
+const AUTO_ADD_BADGE_STYLES: ChakraProps['sx'] = {
+  bg: 'accent.200',
+  color: 'blackAlpha.900',
+};
+
+const BASE_BADGE_STYLES: ChakraProps['sx'] = {
+  bg: 'base.500',
+  color: 'whiteAlpha.900',
+};
 interface GalleryBoardProps {
   board: BoardDTO;
   isSelected: boolean;
@@ -35,6 +45,22 @@ interface GalleryBoardProps {
 const GalleryBoard = memo(
   ({ board, isSelected, setBoardToDelete }: GalleryBoardProps) => {
     const dispatch = useAppDispatch();
+    const selector = useMemo(
+      () =>
+        createSelector(
+          stateSelector,
+          ({ gallery }) => {
+            const isSelectedForAutoAdd =
+              board.board_id === gallery.autoAddBoardId;
+
+            return { isSelectedForAutoAdd };
+          },
+          defaultSelectorOptions
+        ),
+      [board.board_id]
+    );
+
+    const { isSelectedForAutoAdd } = useAppSelector(selector);
 
     const { currentData: coverImage } = useGetImageDTOQuery(
       board.cover_image_name ?? skipToken
@@ -53,10 +79,6 @@ const GalleryBoard = memo(
       updateBoard({ board_id, changes: { board_name: newBoardName } });
     };
 
-    const handleDeleteBoard = useCallback(() => {
-      setBoardToDelete(board);
-    }, [board, setBoardToDelete]);
-
     const droppableData: MoveBoardDropData = useMemo(
       () => ({
         id: board_id,
@@ -68,37 +90,10 @@ const GalleryBoard = memo(
 
     return (
       <Box sx={{ touchAction: 'none', height: 'full' }}>
-        <ContextMenu<HTMLDivElement>
-          menuProps={{ size: 'sm', isLazy: true }}
-          menuButtonProps={{
-            bg: 'transparent',
-            _hover: { bg: 'transparent' },
-          }}
-          renderMenu={() => (
-            <MenuList
-              sx={{ visibility: 'visible !important' }}
-              motionProps={menuListMotionProps}
-            >
-              {board.image_count > 0 && (
-                <>
-                  {/* <MenuItem
-                    isDisabled={!board.image_count}
-                    icon={<FaImages />}
-                    onClickCapture={handleAddBoardToBatch}
-                  >
-                    Add Board to Batch
-                  </MenuItem> */}
-                </>
-              )}
-              <MenuItem
-                sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
-                icon={<FaTrash />}
-                onClickCapture={handleDeleteBoard}
-              >
-                Delete Board
-              </MenuItem>
-            </MenuList>
-          )}
+        <BoardContextMenu
+          board={board}
+          board_id={board_id}
+          setBoardToDelete={setBoardToDelete}
         >
           {(ref) => (
             <Flex
@@ -154,7 +149,16 @@ const GalleryBoard = memo(
                     p: 1,
                   }}
                 >
-                  <Badge variant="solid">{board.image_count}</Badge>
+                  <Badge
+                    variant="solid"
+                    sx={
+                      isSelectedForAutoAdd
+                        ? AUTO_ADD_BADGE_STYLES
+                        : BASE_BADGE_STYLES
+                    }
+                  >
+                    {board.image_count}
+                  </Badge>
                 </Flex>
                 <IAIDroppable
                   data={droppableData}
@@ -172,7 +176,7 @@ const GalleryBoard = memo(
               >
                 <Editable
                   defaultValue={board_name}
-                  submitOnBlur={false}
+                  submitOnBlur={true}
                   onSubmit={(nextValue) => {
                     handleUpdateBoardName(nextValue);
                   }}
@@ -205,7 +209,7 @@ const GalleryBoard = memo(
               </Flex>
             </Flex>
           )}
-        </ContextMenu>
+        </BoardContextMenu>
       </Box>
     );
   }

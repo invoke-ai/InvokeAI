@@ -9,7 +9,7 @@ import {
 } from '@chakra-ui/react';
 import { memo } from 'react';
 
-interface Props extends SwitchProps {
+export interface IAISwitchProps extends SwitchProps {
   label?: string;
   width?: string | number;
   formControlProps?: FormControlProps;
@@ -20,7 +20,7 @@ interface Props extends SwitchProps {
 /**
  * Customized Chakra FormControl + Switch multi-part component.
  */
-const IAISwitch = (props: Props) => {
+const IAISwitch = (props: IAISwitchProps) => {
   const {
     label,
     isDisabled = false,

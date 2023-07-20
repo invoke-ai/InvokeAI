@@ -1,42 +1,38 @@
+# How to Contribute
+
 ## Welcome to Invoke AI
-
-We're thrilled to have you here and we're excited for you to contribute. 
-
 Invoke AI originated as a project built by the community, and that vision carries forward today as we aim to build the best pro-grade tools available. We work together to incorporate the latest in AI/ML research, making these tools available in over 20 languages to artists and creatives around the world as part of our fully permissive OSS project designed for individual users to self-host and use.
 
-Here are some guidelines to help you get started:
 
-### Technical Prerequisites
+## Contributing to Invoke AI
+Anyone who wishes to contribute to InvokeAI, whether features, bug fixes, code cleanup, testing, code reviews, documentation or translation is very much encouraged to do so.
 
-Front-end: You'll need a working knowledge of React and TypeScript.
+To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the GitHub discussion board.
 
-Back-end: Depending on the scope of your contribution, you may need to know SQLite, FastAPI, Python, and Socketio. Also, a good majority of the backend logic involved in processing images is built in a modular way using a concept called "Nodes", which are isolated functions that carry out individual, discrete operations. This design allows for easy contributions of novel pipelines and capabilities.
+### Areas of contribution: 
 
-### How to Submit Contributions
+#### Development
+If you’d like to help with development, please see our [development guide](contribution_guides/development.md). If you’re unfamiliar with contributing to open source projects, there is a tutorial contained within the development guide.
 
-To start contributing, please follow these steps:
+#### Documentation
+If you’d like to help with documentation, please see our [documentation guide](contribution_guides/documenation.md).
 
-1. Familiarize yourself with our roadmap and open projects to see where your skills and interests align. These documents can serve as a source of inspiration.
-2. Open a Pull Request (PR) with a clear description of the feature you're adding or the problem you're solving. Make sure your contribution aligns with the project's vision.
-3. Adhere to general best practices. This includes assuming interoperability with other nodes, keeping the scope of your functions as small as possible, and organizing your code according to our architecture documents.
+#### Translation
+If you'd like to help with translation, please see our [translation guide](docs/contributing/.contribution_guides/translation.md).
 
-### Types of Contributions We're Looking For
+#### Tutorials 
+Please reach out to @imic or @hipsterusername on [Discord](https://discord.gg/ZmtBAhwWhy) to help create tutorials for InvokeAI.
 
-We welcome all contributions that improve the project. Right now, we're especially looking for:
+We hope you enjoy using our software as much as we enjoy creating it, and we hope that some of those of you who are reading this will elect to become part of our contributor community.
 
-1. Quality of life (QOL) enhancements on the front-end.
-2. New backend capabilities added through nodes.
-3. Incorporating additional optimizations from the broader open-source software community.
 
-### Communication and Decision-making Process
+### Contributors
 
-Project maintainers and code owners review PRs to ensure they align with the project's goals. They may provide design or architectural guidance, suggestions on user experience, or provide more significant feedback on the contribution itself. Expect to receive feedback on your submissions, and don't hesitate to ask questions or propose changes.
+This project is a combined effort of dedicated people from across the world. [Check out the list of all these amazing people](https://invoke-ai.github.io/InvokeAI/other/CONTRIBUTORS/). We thank them for their time, hard work and effort.
 
-For more robust discussions, or if you're planning to add capabilities not currently listed on our roadmap, please reach out to us on our Discord server. That way, we can ensure your proposed contribution aligns with the project's direction before you start writing code.
+### Code of Conduct
 
-### Code of Conduct and Contribution Expectations
-
-We want everyone in our community to have a positive experience. To facilitate this, we've established a code of conduct and a statement of values that we expect all contributors to adhere to. Please take a moment to review these documents—they're essential to maintaining a respectful and inclusive environment.
+The InvokeAI community is a welcoming place, and we want your help in maintaining that. Please review our [Code of Conduct](https://github.com/invoke-ai/InvokeAI/blob/main/CODE_OF_CONDUCT.md) to learn more - it's essential to maintaining a respectful and inclusive environment.
 
 By making a contribution to this project, you certify that:
 
@@ -48,6 +44,12 @@ By making a contribution to this project, you certify that:
 This disclaimer is not a license and does not grant any rights or permissions. You must obtain necessary permissions and licenses, including from third parties, before contributing to this project.
 
 This disclaimer is provided "as is" without warranty of any kind, whether expressed or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, or non-infringement. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the contribution or the use or other dealings in the contribution.
+
+### Support
+
+For support, please use this repository's [GitHub Issues](https://github.com/invoke-ai/InvokeAI/issues), or join the [Discord](https://discord.gg/ZmtBAhwWhy).
+
+Original portions of the software are Copyright (c) 2023 by respective contributors.
 
 ---
 

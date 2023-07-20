@@ -38,7 +38,6 @@ export interface SystemState {
   currentIteration: number;
   totalIterations: number;
   currentStatusHasSteps: boolean;
-  shouldDisplayGuides: boolean;
   isCancelable: boolean;
   enableImageDebugging: boolean;
   toastQueue: UseToastOptions[];
@@ -84,14 +83,12 @@ export interface SystemState {
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
-  boardIdToAddTo?: string;
   isNodesEnabled: boolean;
 }
 
 export const initialSystemState: SystemState = {
   isConnected: false,
   isProcessing: false,
-  shouldDisplayGuides: true,
   isGFPGANAvailable: true,
   isESRGANAvailable: true,
   shouldConfirmOnDelete: true,
@@ -133,9 +130,6 @@ export const systemSlice = createSlice({
     },
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
-    },
-    setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
-      state.shouldDisplayGuides = action.payload;
     },
     setIsCancelable: (state, action: PayloadAction<boolean>) => {
       state.isCancelable = action.payload;
@@ -204,7 +198,6 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
-      state.boardIdToAddTo = action.payload.boardId;
       state.canceledSession = '';
     });
 
@@ -213,7 +206,6 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketUnsubscribed, (state) => {
       state.sessionId = null;
-      state.boardIdToAddTo = undefined;
     });
 
     /**
@@ -390,7 +382,6 @@ export const {
   setIsProcessing,
   setShouldConfirmOnDelete,
   setCurrentStatus,
-  setShouldDisplayGuides,
   setIsCancelable,
   setEnableImageDebugging,
   addToast,
