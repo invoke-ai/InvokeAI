@@ -4,7 +4,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 const selector = createSelector(
@@ -26,6 +26,12 @@ const GalleryBoardName = (props: Props) => {
   const { isOpen, onToggle } = props;
   const { selectedBoardId } = useAppSelector(selector);
   const boardName = useBoardName(selectedBoardId);
+  const formattedBoardName = useMemo(() => {
+    if (boardName.length > 20) {
+      return `${boardName.substring(0, 20)}...`;
+    }
+    return boardName;
+  }, [boardName]);
 
   return (
     <Flex
@@ -58,9 +64,7 @@ const GalleryBoardName = (props: Props) => {
             },
           }}
         >
-          {boardName.length > 20
-            ? `${boardName.substring(0, 20)}...`
-            : boardName}
+          {formattedBoardName}
         </Text>
       </Box>
       <Spacer />
