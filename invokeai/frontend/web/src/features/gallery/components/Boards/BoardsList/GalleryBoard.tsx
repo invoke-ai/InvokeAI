@@ -176,7 +176,7 @@ const GalleryBoard = memo(
               >
                 <Editable
                   defaultValue={board_name}
-                  submitOnBlur={false}
+                  submitOnBlur={true}
                   onSubmit={(nextValue) => {
                     handleUpdateBoardName(nextValue);
                   }}
