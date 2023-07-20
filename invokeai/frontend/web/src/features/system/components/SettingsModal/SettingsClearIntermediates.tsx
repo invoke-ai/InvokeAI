@@ -9,6 +9,7 @@ import {
 import { resetCanvas } from '../../../canvas/store/canvasSlice';
 import { addToast } from '../../store/systemSlice';
 import { StyledFlex } from './SettingsModal';
+import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 
 export default function SettingsClearIntermediates() {
   const dispatch = useAppDispatch();
@@ -23,6 +24,7 @@ export default function SettingsClearIntermediates() {
     clearIntermediates()
       .unwrap()
       .then((response) => {
+        dispatch(controlNetReset());
         dispatch(resetCanvas());
         dispatch(
           addToast({
@@ -58,10 +60,12 @@ export default function SettingsClearIntermediates() {
         database. There are currently {intermediatesCount ?? 0} stored
         intermediates.
       </Text>
-      <Text fontWeight="bold">This will also clear your canvas state.</Text>
+      <Text fontWeight="bold">
+        Clearing intermediates will reset your Canvas and ControlNet state.
+      </Text>
       <Text sx={{ fontSize: 'sm' }} variant="subtext">
         Intermediate images are byproducts of generation, different from the
-        result images in the gallery. Purging intermediates will free disk
+        result images in the gallery. Clearing intermediates will free disk
         space. Your gallery images will not be deleted.
       </Text>
     </StyledFlex>

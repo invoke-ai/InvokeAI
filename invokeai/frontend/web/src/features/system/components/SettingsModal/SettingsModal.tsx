@@ -191,7 +191,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
       <Modal
         isOpen={isSettingsModalOpen}
         onClose={onSettingsModalClose}
-        size="xl"
+        size="2xl"
         isCentered
       >
         <ModalOverlay />
