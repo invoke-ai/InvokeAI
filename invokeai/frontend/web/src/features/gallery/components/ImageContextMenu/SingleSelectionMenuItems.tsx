@@ -8,7 +8,10 @@ import {
   resizeAndScaleCanvas,
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
-import { imagesAddedToBatch } from 'features/gallery/store/gallerySlice';
+import {
+  IMAGE_CATEGORIES,
+  imagesAddedToBatch,
+} from 'features/gallery/store/gallerySlice';
 import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
@@ -208,11 +211,17 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           Add to Batch
         </MenuItem>
       )}
-      <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
-        {imageDTO.board_id ? 'Change Board' : 'Add to Board'}
-      </MenuItem>
-      {imageDTO.board_id && (
-        <MenuItem icon={<FaFolder />} onClickCapture={handleRemoveFromBoard}>
+      {IMAGE_CATEGORIES.includes(imageDTO.image_category) && (
+        <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
+          {imageDTO.board_id ? 'Change Board' : 'Add to Board'}
+        </MenuItem>
+      )}
+      {IMAGE_CATEGORIES.includes(imageDTO.image_category) && (
+        <MenuItem
+          icon={<FaFolder />}
+          isDisabled={!imageDTO.board_id}
+          onClickCapture={handleRemoveFromBoard}
+        >
           Remove from Board
         </MenuItem>
       )}

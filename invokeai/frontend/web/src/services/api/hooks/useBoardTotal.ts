@@ -26,6 +26,7 @@ const assetsQueryArg: ListImagesArgs = {
 
 const noBoardQueryArg: ListImagesArgs = {
   board_id: 'none',
+  categories: IMAGE_CATEGORIES,
   ...baseQueryArg,
 };
 

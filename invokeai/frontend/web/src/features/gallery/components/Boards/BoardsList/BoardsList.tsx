@@ -3,11 +3,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { AnimatePresence, motion } from 'framer-motion';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useState } from 'react';
-import { FaSearch } from 'react-icons/fa';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { BoardDTO } from 'services/api/types';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
@@ -16,6 +13,7 @@ import AddBoardButton from './AddBoardButton';
 import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';
 import SystemBoardButton from './SystemBoardButton';
+import NoBoardBoard from './NoBoardBoard';
 
 const selector = createSelector(
   [stateSelector],
@@ -42,13 +40,9 @@ const BoardsList = (props: Props) => {
       )
     : boards;
   const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
-  const [isSearching, setIsSearching] = useState(false);
-  const handleClickSearchIcon = useCallback(() => {
-    setIsSearching((v) => !v);
-  }, []);
 
   const showBoardList = useCallback(() => {
-    return selectedBoardId !== 'no_board' && selectedBoardId !== 'assets';
+    return selectedBoardId !== 'assets';
   }, [selectedBoardId]);
 
   return (
@@ -68,13 +62,12 @@ const BoardsList = (props: Props) => {
             <ButtonGroup sx={{ w: 'full', ps: 1.5 }} isAttached>
               <SystemBoardButton board_id="images" />
               <SystemBoardButton board_id="assets" />
-              <SystemBoardButton board_id="no_board" />
             </ButtonGroup>
           </Flex>
           {showBoardList() && (
             <>
               <Flex sx={{ gap: 2, alignItems: 'center' }}>
-                <BoardsSearch setIsSearching={setIsSearching} />
+                <BoardsSearch />
 
                 <AddBoardButton />
               </Flex>
@@ -97,6 +90,9 @@ const BoardsList = (props: Props) => {
                     maxH: 346,
                   }}
                 >
+                  <GridItem key="no_board" sx={{ p: 1.5 }}>
+                    <NoBoardBoard isSelected={selectedBoardId === 'no_board'} />
+                  </GridItem>
                   {filteredBoards &&
                     filteredBoards.map((board) => (
                       <GridItem key={board.board_id} sx={{ p: 1.5 }}>

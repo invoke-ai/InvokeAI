@@ -30,7 +30,7 @@ const AUTO_ADD_BADGE_STYLES: ChakraProps['sx'] = {
   color: 'blackAlpha.900',
 };
 
-const BASE_BADGE_STYLES: ChakraProps['sx'] = {
+export const BASE_BADGE_STYLES: ChakraProps['sx'] = {
   bg: 'base.500',
   color: 'whiteAlpha.900',
 };

@@ -157,7 +157,7 @@ export const boardsApi = api.injectEndpoints({
           const updates: Update<ImageDTO>[] = deleted_board_images.map(
             (image_name) => ({
               id: image_name,
-              changes: { board_id: undefined },
+              changes: { board_id: 'none' },
             })
           );
 

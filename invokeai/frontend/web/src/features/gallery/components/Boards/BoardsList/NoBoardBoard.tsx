@@ -1,6 +1,7 @@
 import { Text } from '@chakra-ui/react';
 import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
 import {
+  IMAGE_CATEGORIES,
   INITIAL_IMAGE_LIMIT,
   boardIdSelected,
 } from 'features/gallery/store/gallerySlice';
@@ -14,6 +15,7 @@ import GenericBoard from './GenericBoard';
 
 const baseQueryArg: ListImagesArgs = {
   board_id: 'none',
+  categories: IMAGE_CATEGORIES,
   offset: 0,
   limit: INITIAL_IMAGE_LIMIT,
   is_intermediate: false,

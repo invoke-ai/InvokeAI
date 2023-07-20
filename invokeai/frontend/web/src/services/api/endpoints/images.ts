@@ -51,7 +51,7 @@ export const imagesSelectors = imagesAdapter.getSelectors();
 export const getListImagesUrl = (queryArgs: ListImagesArgs) =>
   `images/?${queryString.stringify(queryArgs, { arrayFormat: 'none' })}`;
 
-export const SYSTEM_BOARDS = ['images', 'assets', 'no_board', 'batch'];
+export const SYSTEM_BOARDS = ['images', 'assets', 'batch'];
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -437,11 +437,11 @@ export const imagesApi = api.injectEndpoints({
         const removeFromQueryArgs: ListImagesArgs[] = [];
 
         // remove from "No Board"
-        removeFromQueryArgs.push({ board_id: 'none' });
+        removeFromQueryArgs.push({ board_id: 'none', categories: IMAGE_CATEGORIES });
 
         // remove from old board
         if (old_board_id) {
-          removeFromQueryArgs.push({ board_id: old_board_id });
+          removeFromQueryArgs.push({ board_id: old_board_id, categories: IMAGE_CATEGORIES });
         }
 
         // Store all patch results in case we need to roll back
@@ -484,7 +484,7 @@ export const imagesApi = api.injectEndpoints({
 
         // We only need to add to the cache if the board is not a system board
         if (!SYSTEM_BOARDS.includes(board_id)) {
-          const queryArgs = { board_id };
+          const queryArgs = { board_id, categories: IMAGE_CATEGORIES };
           const { data } = imagesApi.endpoints.listImages.select(queryArgs)(
             getState()
           );
@@ -569,7 +569,7 @@ export const imagesApi = api.injectEndpoints({
 
         // Remove from old board
         if (old_board_id) {
-          const oldBoardQueryArgs = { board_id: old_board_id };
+          const oldBoardQueryArgs = { board_id: old_board_id, categories: IMAGE_CATEGORIES };
           patches.push(
             dispatch(
               imagesApi.util.updateQueryData(
@@ -588,7 +588,7 @@ export const imagesApi = api.injectEndpoints({
         }
 
         // Add to "No Board"
-        const noBoardQueryArgs = { board_id: 'none' };
+        const noBoardQueryArgs = { board_id: 'none', categories: IMAGE_CATEGORIES };
         const { data } = imagesApi.endpoints.listImages.select(
           noBoardQueryArgs
         )(getState());

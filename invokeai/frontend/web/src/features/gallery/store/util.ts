@@ -10,12 +10,7 @@ export const getCategoriesQueryParamForBoard = (
     return ASSETS_CATEGORIES;
   }
 
-  if (board_id === 'images') {
-    return IMAGE_CATEGORIES;
-  }
-
-  // 'no_board' board, 'batch' board, user boards
-  return undefined;
+  return IMAGE_CATEGORIES;
 };
 
 export const getBoardIdQueryParamForBoard = (

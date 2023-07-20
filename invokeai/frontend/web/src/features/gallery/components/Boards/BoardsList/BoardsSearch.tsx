@@ -29,7 +29,7 @@ const selector = createSelector(
 );
 
 type Props = {
-  setIsSearching: (isSearching: boolean) => void;
+  setIsSearching?: (isSearching: boolean) => void;
 };
 
 const BoardsSearch = (props: Props) => {
@@ -47,7 +47,7 @@ const BoardsSearch = (props: Props) => {
 
   const clearBoardSearch = useCallback(() => {
     dispatch(setBoardSearchText(''));
-    setIsSearching(false);
+    setIsSearching && setIsSearching(false);
   }, [dispatch, setIsSearching]);
 
   const handleKeydown = useCallback(

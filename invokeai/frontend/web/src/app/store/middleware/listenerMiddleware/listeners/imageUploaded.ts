@@ -44,33 +44,8 @@ export const addImageUploadedFulfilledListener = () => {
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {
         const { toastOptions } = postUploadAction;
-        if (SYSTEM_BOARDS.includes(selectedBoardId)) {
-          dispatch(addToast({ ...DEFAULT_UPLOADED_TOAST, ...toastOptions }));
-        } else {
-          // Add this image to the board
-          dispatch(
-            imagesApi.endpoints.addImageToBoard.initiate({
-              board_id: selectedBoardId,
-              imageDTO,
-            })
-          );
+        dispatch(addToast({ ...DEFAULT_UPLOADED_TOAST, ...toastOptions }));
 
-          // Attempt to get the board's name for the toast
-          const { data } = boardsApi.endpoints.listAllBoards.select()(state);
-
-          // Fall back to just the board id if we can't find the board for some reason
-          const board = data?.find((b) => b.board_id === selectedBoardId);
-          const description = board
-            ? `Added to board ${board.board_name}`
-            : `Added to board ${selectedBoardId}`;
-
-          dispatch(
-            addToast({
-              ...DEFAULT_UPLOADED_TOAST,
-              description,
-            })
-          );
-        }
         return;
       }
 
