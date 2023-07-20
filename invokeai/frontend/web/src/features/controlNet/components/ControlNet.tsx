@@ -184,8 +184,10 @@ const ControlNet = (props: ControlNetProps) => {
             </Flex>
           )}
         </Flex>
-        <ParamControlNetControlMode controlNetId={controlNetId} />
-        <ParamControlNetResizeMode controlNetId={controlNetId} />
+        <Flex sx={{ gap: 2 }}>
+          <ParamControlNetControlMode controlNetId={controlNetId} />
+          <ParamControlNetResizeMode controlNetId={controlNetId} />
+        </Flex>
         <ParamControlNetProcessorSelect controlNetId={controlNetId} />
       </Flex>
 
