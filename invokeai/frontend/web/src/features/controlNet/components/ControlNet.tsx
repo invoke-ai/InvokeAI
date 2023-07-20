@@ -122,7 +122,7 @@ const ControlNet = (props: ControlNetProps) => {
           icon={
             <ChevronUpIcon
               sx={{
-                boxSize: 4,
+                boxSize: 6,
                 color: 'base.700',
                 transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)',
                 transitionProperty: 'common',
