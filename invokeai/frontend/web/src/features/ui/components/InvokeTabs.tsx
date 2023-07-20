@@ -105,7 +105,7 @@ const enabledTabsSelector = createSelector(
   }
 );
 
-const MIN_GALLERY_WIDTH = 300;
+const MIN_GALLERY_WIDTH = 350;
 const DEFAULT_GALLERY_PCT = 20;
 export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager'];
 

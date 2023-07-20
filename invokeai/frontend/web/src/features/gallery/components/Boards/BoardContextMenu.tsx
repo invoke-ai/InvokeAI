@@ -23,34 +23,32 @@ const BoardContextMenu = memo(
       dispatch(boardIdSelected(board?.board_id ?? board_id));
     }, [board?.board_id, board_id, dispatch]);
     return (
-      <Box sx={{ touchAction: 'none', height: 'full' }}>
-        <ContextMenu<HTMLDivElement>
-          menuProps={{ size: 'sm', isLazy: true }}
-          menuButtonProps={{
-            bg: 'transparent',
-            _hover: { bg: 'transparent' },
-          }}
-          renderMenu={() => (
-            <MenuList
-              sx={{ visibility: 'visible !important' }}
-              motionProps={menuListMotionProps}
-            >
-              <MenuItem icon={<FaFolder />} onClickCapture={handleSelectBoard}>
-                Select Board
-              </MenuItem>
-              {!board && <SystemBoardContextMenuItems board_id={board_id} />}
-              {board && (
-                <GalleryBoardContextMenuItems
-                  board={board}
-                  setBoardToDelete={setBoardToDelete}
-                />
-              )}
-            </MenuList>
-          )}
-        >
-          {children}
-        </ContextMenu>
-      </Box>
+      <ContextMenu<HTMLDivElement>
+        menuProps={{ size: 'sm', isLazy: true }}
+        menuButtonProps={{
+          bg: 'transparent',
+          _hover: { bg: 'transparent' },
+        }}
+        renderMenu={() => (
+          <MenuList
+            sx={{ visibility: 'visible !important' }}
+            motionProps={menuListMotionProps}
+          >
+            <MenuItem icon={<FaFolder />} onClickCapture={handleSelectBoard}>
+              Select Board
+            </MenuItem>
+            {!board && <SystemBoardContextMenuItems board_id={board_id} />}
+            {board && (
+              <GalleryBoardContextMenuItems
+                board={board}
+                setBoardToDelete={setBoardToDelete}
+              />
+            )}
+          </MenuList>
+        )}
+      >
+        {children}
+      </ContextMenu>
     );
   }
 );
