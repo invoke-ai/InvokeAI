@@ -17,13 +17,13 @@ import {
 } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { MouseEvent, ReactElement, SyntheticEvent, memo } from 'react';
 import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
 import { ImageDTO, PostUploadAction } from 'services/api/types';
 import { mode } from 'theme/util/mode';
 import IAIDraggable from './IAIDraggable';
 import IAIDroppable from './IAIDroppable';
-import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 
 type IAIDndImageProps = {
   imageDTO: ImageDTO | undefined;
@@ -148,7 +148,9 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                   maxH: 'full',
                   borderRadius: 'base',
                   shadow: isSelected ? 'selected.light' : undefined,
-                  _dark: { shadow: isSelected ? 'selected.dark' : undefined },
+                  _dark: {
+                    shadow: isSelected ? 'selected.dark' : undefined,
+                  },
                   ...imageSx,
                 }}
               />
@@ -183,18 +185,18 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             </>
           )}
           {!imageDTO && isUploadDisabled && noContentFallback}
-          {!isDropDisabled && (
-            <IAIDroppable
-              data={droppableData}
-              disabled={isDropDisabled}
-              dropLabel={dropLabel}
-            />
-          )}
           {imageDTO && !isDragDisabled && (
             <IAIDraggable
               data={draggableData}
               disabled={isDragDisabled || !imageDTO}
               onClick={onClick}
+            />
+          )}
+          {!isDropDisabled && (
+            <IAIDroppable
+              data={droppableData}
+              disabled={isDropDisabled}
+              dropLabel={dropLabel}
             />
           )}
           {onClickReset && withResetIcon && imageDTO && (

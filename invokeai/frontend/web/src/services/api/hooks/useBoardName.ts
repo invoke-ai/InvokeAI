@@ -6,9 +6,9 @@ export const useBoardName = (board_id: BoardId | null | undefined) => {
     selectFromResult: ({ data }) => {
       let boardName = '';
       if (board_id === 'images') {
-        boardName = 'All Images';
+        boardName = 'Images';
       } else if (board_id === 'assets') {
-        boardName = 'All Assets';
+        boardName = 'Assets';
       } else if (board_id === 'no_board') {
         boardName = 'No Board';
       } else if (board_id === 'batch') {

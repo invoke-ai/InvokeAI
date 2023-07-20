@@ -13,10 +13,11 @@ type IAIDroppableProps = {
   dropLabel?: ReactNode;
   disabled?: boolean;
   data?: TypesafeDroppableData;
+  hoverRef?: React.Ref<HTMLDivElement>;
 };
 
 const IAIDroppable = (props: IAIDroppableProps) => {
-  const { dropLabel, data, disabled } = props;
+  const { dropLabel, data, disabled, hoverRef } = props;
   const dndId = useRef(uuidv4());
 
   const { isOver, setNodeRef, active } = useDroppable({
