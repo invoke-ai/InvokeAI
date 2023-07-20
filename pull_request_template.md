@@ -5,7 +5,7 @@
 - [ ] Bug Fix
 - [ ] Optimization
 - [ ] Documentation Update
-- [ ] Community Node 
+- [ ] Community Node Submission
 
 
 ## Have you discussed this change with the InvokeAI team?

@@ -10,7 +10,7 @@
 
 The UI is a fairly straightforward Typescript React app, with the Unified Canvas being more complex.
 
-Code is located in `invokeai/frontend/web/src` for review.
+Code is located in `invokeai/frontend/web/` for review.
 
 ## Stack
 
@@ -24,7 +24,7 @@ The API client and associated types are generated from the OpenAPI schema. See A
 
 Communication with server is a mix of HTTP and [socket.io](https://github.com/socketio/socket.io-client) (with a simple socket.io redux middleware to help).
 
-[Chakra-UI](https://github.com/chakra-ui/chakra-ui) & Mantine for components and styling.
+[Chakra-UI](https://github.com/chakra-ui/chakra-ui) & [Mantine](https://github.com/mantinedev/mantine) for components and styling.
 
 [Konva](https://github.com/konvajs/react-konva) for the canvas, but we are pushing the limits of what is feasible with it (and HTML canvas in general). We plan to rebuild it with [PixiJS](https://github.com/pixijs/pixijs) to take advantage of WebGL's improved raster handling.
 
@@ -40,7 +40,17 @@ We encourage you to ping @psychedelicious and @blessedcoolant on [Discord](http
 
 ### Dev Environment
 
-Install [node](https://nodejs.org/en/download/) and [yarn classic](https://classic.yarnpkg.com/lang/en/).
+**Setup** 
+
+1. Install [node](https://nodejs.org/en/download/). You can confirm node is installed with:
+```bash
+node --version
+```
+2. Install [yarn classic](https://classic.yarnpkg.com/lang/en/) and confirm it is installed by running this:
+```bash
+npm install --global yarn
+yarn --version
+```
 
 From `invokeai/frontend/web/` run `yarn install` to get everything set up.
 
