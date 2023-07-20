@@ -233,6 +233,7 @@ const GalleryBoard = memo(
                   sx={{
                     position: 'absolute',
                     bottom: 0,
+                    left: 0,
                     p: 1,
                     justifyContent: 'center',
                     alignItems: 'center',
