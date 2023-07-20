@@ -325,7 +325,7 @@ async def list_ckpt_configs(
     response_model = bool
 )
 async def sync_to_config(
-)->None:
+)->bool:
     """Call after making changes to models.yaml, autoimport directories or models directory to synchronize
     in-memory data structures with disk data structures."""
     ApiDependencies.invoker.services.model_manager.sync_to_config()
