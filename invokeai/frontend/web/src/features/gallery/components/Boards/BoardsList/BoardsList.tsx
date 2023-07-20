@@ -47,6 +47,10 @@ const BoardsList = (props: Props) => {
     setIsSearching((v) => !v);
   }, []);
 
+  const showBoardList = useCallback(() => {
+    return selectedBoardId !== 'no_board' && selectedBoardId !== 'assets';
+  }, [selectedBoardId]);
+
   return (
     <>
       <Collapse in={isOpen} animateOpacity>
@@ -61,87 +65,52 @@ const BoardsList = (props: Props) => {
           }}
         >
           <Flex sx={{ gap: 2, alignItems: 'center' }}>
-            <AnimatePresence mode="popLayout">
-              {isSearching ? (
-                <motion.div
-                  key="boards-search"
-                  initial={{
-                    opacity: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    transition: { duration: 0.1 },
-                  }}
-                  style={{ width: '100%' }}
-                >
-                  <BoardsSearch setIsSearching={setIsSearching} />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="system-boards-select"
-                  initial={{
-                    opacity: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    transition: { duration: 0.1 },
-                  }}
-                  style={{ width: '100%' }}
-                >
-                  <ButtonGroup sx={{ w: 'full', ps: 1.5 }} isAttached>
-                    <SystemBoardButton board_id="images" />
-                    <SystemBoardButton board_id="assets" />
-                    <SystemBoardButton board_id="no_board" />
-                  </ButtonGroup>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <IAIIconButton
-              aria-label="Search Boards"
-              size="sm"
-              isChecked={isSearching}
-              onClick={handleClickSearchIcon}
-              icon={<FaSearch />}
-            />
-            <AddBoardButton />
+            <ButtonGroup sx={{ w: 'full', ps: 1.5 }} isAttached>
+              <SystemBoardButton board_id="images" />
+              <SystemBoardButton board_id="assets" />
+              <SystemBoardButton board_id="no_board" />
+            </ButtonGroup>
           </Flex>
-          <OverlayScrollbarsComponent
-            defer
-            style={{ height: '100%', width: '100%' }}
-            options={{
-              scrollbars: {
-                visibility: 'auto',
-                autoHide: 'move',
-                autoHideDelay: 1300,
-                theme: 'os-theme-dark',
-              },
-            }}
-          >
-            <Grid
-              className="list-container"
-              sx={{
-                gridTemplateColumns: `repeat(auto-fill, minmax(96px, 1fr));`,
-                maxH: 346,
-              }}
-            >
-              {filteredBoards &&
-                filteredBoards.map((board) => (
-                  <GridItem key={board.board_id} sx={{ p: 1.5 }}>
-                    <GalleryBoard
-                      board={board}
-                      isSelected={selectedBoardId === board.board_id}
-                      setBoardToDelete={setBoardToDelete}
-                    />
-                  </GridItem>
-                ))}
-            </Grid>
-          </OverlayScrollbarsComponent>
+          {showBoardList() && (
+            <>
+              <Flex sx={{ gap: 2, alignItems: 'center' }}>
+                <BoardsSearch setIsSearching={setIsSearching} />
+
+                <AddBoardButton />
+              </Flex>
+              <OverlayScrollbarsComponent
+                defer
+                style={{ height: '100%', width: '100%' }}
+                options={{
+                  scrollbars: {
+                    visibility: 'auto',
+                    autoHide: 'move',
+                    autoHideDelay: 1300,
+                    theme: 'os-theme-dark',
+                  },
+                }}
+              >
+                <Grid
+                  className="list-container"
+                  sx={{
+                    gridTemplateColumns: `repeat(auto-fill, minmax(96px, 1fr));`,
+                    maxH: 346,
+                  }}
+                >
+                  {filteredBoards &&
+                    filteredBoards.map((board) => (
+                      <GridItem key={board.board_id} sx={{ p: 1.5 }}>
+                        <GalleryBoard
+                          board={board}
+                          isSelected={selectedBoardId === board.board_id}
+                          setBoardToDelete={setBoardToDelete}
+                        />
+                      </GridItem>
+                    ))}
+                </Grid>
+              </OverlayScrollbarsComponent>
+            </>
+          )}
         </Flex>
       </Collapse>
       <DeleteBoardModal
