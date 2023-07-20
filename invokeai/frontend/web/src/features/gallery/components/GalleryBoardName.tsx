@@ -30,9 +30,8 @@ const GalleryBoardName = (props: Props) => {
   const numOfBoardImages = useBoardTotal(selectedBoardId);
 
   const formattedBoardName = useMemo(() => {
-    if (!boardName || !numOfBoardImages) {
-      return '';
-    }
+    if (!boardName) return '';
+    if (boardName && !numOfBoardImages) return boardName;
     if (boardName.length > 20) {
       return `${boardName.substring(0, 20)}... (${numOfBoardImages})`;
     }

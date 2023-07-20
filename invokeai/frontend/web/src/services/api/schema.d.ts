@@ -167,7 +167,7 @@ export type paths = {
   "/api/v1/images/clear-intermediates": {
     /**
      * Clear Intermediates 
-     * @description Clears first 100 intermediates
+     * @description Clears all intermediates
      */
     post: operations["clear_intermediates"];
   };
@@ -800,6 +800,13 @@ export type components = {
        * @enum {string}
        */
       control_mode?: "balanced" | "more_prompt" | "more_control" | "unbalanced";
+      /**
+       * Resize Mode 
+       * @description The resize mode to use 
+       * @default just_resize 
+       * @enum {string}
+       */
+      resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
     };
     /**
      * ControlNetInvocation 
@@ -859,6 +866,13 @@ export type components = {
        * @enum {string}
        */
       control_mode?: "balanced" | "more_prompt" | "more_control" | "unbalanced";
+      /**
+       * Resize Mode 
+       * @description The resize mode used 
+       * @default just_resize 
+       * @enum {string}
+       */
+      resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
     };
     /** ControlNetModelConfig */
     ControlNetModelConfig: {
@@ -5324,11 +5338,11 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion2ModelFormat 
+     * StableDiffusion1ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionXLModelFormat 
      * @description An enumeration. 
@@ -5336,11 +5350,11 @@ export type components = {
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusion1ModelFormat 
+     * StableDiffusion2ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -6125,7 +6139,7 @@ export type operations = {
   };
   /**
    * Clear Intermediates 
-   * @description Clears first 100 intermediates
+   * @description Clears all intermediates
    */
   clear_intermediates: {
     responses: {
