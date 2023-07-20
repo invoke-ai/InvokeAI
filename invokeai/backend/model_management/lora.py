@@ -767,6 +767,7 @@ class ONNXModelPatcher:
                     if not layer_key.startswith(prefix):
                         continue
 
+                    layer.to(dtype=torch.float32)
                     layer_key = layer_key.replace(prefix, "")
                     layer_weight = layer.get_weight().detach().cpu().numpy() * lora_weight
                     if layer_key is blended_loras:
