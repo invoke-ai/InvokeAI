@@ -43,6 +43,7 @@ A noise scheduler (eg. DPM++ 2M Karras) schedules the subtraction of noise from 
 | ---------------------------------- | --------------------------------------------------------------------------------------|
 | Add                                | Adds two numbers |
 | CannyImageProcessor                | Canny edge detection for ControlNet |
+| CenterPadCrop                      | Pad or crop an image's sides from the center by specified pixels. Positive values are outside of the image. |
 | ClipSkip                           | Skip layers in clip text_encoder model |
 | Collect                            | Collects values into a collection |
 | Prompt (Compel)                    | Parse prompt using compel package to conditioning |
