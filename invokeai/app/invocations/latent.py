@@ -764,7 +764,7 @@ class ImageToLatentsInvocation(BaseInvocation):
                     dtype=vae.dtype
                 )  # FIXME: uses torch.randn. make reproducible!
 
-            latents = 0.18215 * latents
+            latents = vae.config.scaling_factor * latents
             latents = latents.to(dtype=orig_dtype)
 
         name = f"{context.graph_execution_state_id}__{self.id}"
