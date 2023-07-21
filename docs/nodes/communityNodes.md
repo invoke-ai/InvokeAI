@@ -42,6 +42,11 @@ The nodes linked below have been developed and contributed by members of the Inv
 
 ![Invoke AI](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png)
 
+### Ideal Size
+
+**Description:** This node calculates an ideal image size for a first pass of a multi-pass upscaling. The aim is to avoid duplication that results from choosing a size larger than the model is capable of.
+
+**Node Link:** https://github.com/JPPhoto/ideal-size-node
 
 ## Help
 If you run into any issues with a node, please post in the [InvokeAI Discord](https://discord.gg/ZmtBAhwWhy). 
