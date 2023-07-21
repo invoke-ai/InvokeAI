@@ -15,6 +15,9 @@ from contextlib import suppress
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
 
+class DuplicateModelException(Exception):
+    pass
+
 class InvalidModelException(Exception):
     pass
 
