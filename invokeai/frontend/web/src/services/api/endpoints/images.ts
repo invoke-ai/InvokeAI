@@ -225,7 +225,7 @@ export const imagesApi = api.injectEndpoints({
           dispatch(
             imagesApi.util.updateQueryData(
               'listImages',
-              { board_id, categories },
+              { board_id: board_id ?? 'none', categories },
               (draft) => {
                 const oldTotal = draft.total;
                 const newState = imagesAdapter.removeOne(draft, image_name);
@@ -300,7 +300,7 @@ export const imagesApi = api.injectEndpoints({
             dispatch(
               imagesApi.util.updateQueryData(
                 'listImages',
-                { board_id: imageDTO.board_id, categories },
+                { board_id: imageDTO.board_id ?? 'none', categories },
                 (draft) => {
                   const oldTotal = draft.total;
                   const newState = imagesAdapter.removeOne(
@@ -315,7 +315,10 @@ export const imagesApi = api.injectEndpoints({
           );
         } else {
           // ELSE (it is being changed to a non-intermediate):
-          const queryArgs = { board_id: imageDTO.board_id, categories };
+          const queryArgs = {
+            board_id: imageDTO.board_id ?? 'none',
+            categories,
+          };
 
           const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(
             getState()
@@ -539,48 +542,30 @@ export const imagesApi = api.injectEndpoints({
           )
         );
 
-        if (imageDTO.board_id) {
-          // *remove* from old board_id/[images|assets]
-          patches.push(
-            dispatch(
-              imagesApi.util.updateQueryData(
-                'listImages',
-                {
-                  board_id: imageDTO.board_id,
-                  categories,
-                },
-                (draft) => {
-                  const oldTotal = draft.total;
-                  const newState = imagesAdapter.removeOne(
-                    draft,
-                    imageDTO.image_name
-                  );
-                  const delta = newState.total - oldTotal;
-                  draft.total = draft.total + delta;
-                }
-              )
+        // *remove* from [no_board|board_id]/[images|assets]
+        patches.push(
+          dispatch(
+            imagesApi.util.updateQueryData(
+              'listImages',
+              {
+                board_id: imageDTO.board_id ?? 'none',
+                categories,
+              },
+              (draft) => {
+                const oldTotal = draft.total;
+                const newState = imagesAdapter.removeOne(
+                  draft,
+                  imageDTO.image_name
+                );
+                const delta = newState.total - oldTotal;
+                draft.total = draft.total + delta;
+              }
             )
-          );
-        } else {
-          // *remove* from no_board/[images|assets]
-          patches.push(
-            dispatch(
-              imagesApi.util.updateQueryData(
-                'listImages',
-                {
-                  board_id: 'none',
-                  categories,
-                },
-                (draft) => {
-                  imagesAdapter.removeOne(draft, imageDTO.image_name);
-                }
-              )
-            )
-          );
-        }
+          )
+        );
 
         // $cache = board_id/[images|assets]
-        const queryArgs = { board_id, categories };
+        const queryArgs = { board_id: board_id ?? 'none', categories };
         const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(
           getState()
         );
@@ -676,7 +661,7 @@ export const imagesApi = api.injectEndpoints({
             imagesApi.util.updateQueryData(
               'listImages',
               {
-                board_id: imageDTO.board_id,
+                board_id: imageDTO.board_id ?? 'none',
                 categories,
               },
               (draft) => {
