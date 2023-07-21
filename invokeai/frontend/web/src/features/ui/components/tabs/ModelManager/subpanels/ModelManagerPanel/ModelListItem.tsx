@@ -98,16 +98,7 @@ export default function ModelListItem(props: ModelListItemProps) {
         onClick={handleSelectModel}
       >
         <Flex gap={4} alignItems="center">
-          <Badge
-            minWidth={14}
-            p={1}
-            fontSize="sm"
-            sx={{
-              bg: 'base.350',
-              color: 'base.900',
-              _dark: { bg: 'base.500' },
-            }}
-          >
+          <Badge minWidth={14} p={0.5} fontSize="sm" variant="solid">
             {
               modelBaseTypeMap[
                 model.base_model as keyof typeof modelBaseTypeMap

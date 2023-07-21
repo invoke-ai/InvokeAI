@@ -11,6 +11,7 @@ import {
   useDraggable as useOriginalDraggable,
   useDroppable as useOriginalDroppable,
 } from '@dnd-kit/core';
+import { BoardId } from 'features/gallery/store/gallerySlice';
 import { ImageDTO } from 'services/api/types';
 
 type BaseDropData = {
@@ -55,7 +56,7 @@ export type AddToBatchDropData = BaseDropData & {
 
 export type MoveBoardDropData = BaseDropData & {
   actionType: 'MOVE_BOARD';
-  context: { boardId: string | null };
+  context: { boardId: BoardId };
 };
 
 export type TypesafeDroppableData =
@@ -158,8 +159,36 @@ export const isValidDrop = (
       return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
     case 'ADD_TO_BATCH':
       return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
-    case 'MOVE_BOARD':
-      return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
+    case 'MOVE_BOARD': {
+      // If the board is the same, don't allow the drop
+
+      // Check the payload types
+      const isPayloadValid = payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
+      if (!isPayloadValid) {
+        return false;
+      }
+
+      // Check if the image's board is the board we are dragging onto
+      if (payloadType === 'IMAGE_DTO') {
+        const { imageDTO } = active.data.current.payload;
+        const currentBoard = imageDTO.board_id;
+        const destinationBoard = overData.context.boardId;
+
+        const isSameBoard = currentBoard === destinationBoard;
+        const isDestinationValid = !currentBoard
+          ? destinationBoard !== 'no_board'
+          : true;
+
+        return !isSameBoard && isDestinationValid;
+      }
+
+      if (payloadType === 'IMAGE_NAMES') {
+        // TODO (multi-select)
+        return false;
+      }
+
+      return true;
+    }
     default:
       return false;
   }

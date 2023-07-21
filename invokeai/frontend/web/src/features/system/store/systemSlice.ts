@@ -6,7 +6,6 @@ import { userInvoked } from 'app/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { t } from 'i18next';
 import { LogLevelName } from 'roarr';
-import { imageUploaded } from 'services/api/thunks/image';
 import {
   isAnySessionRejected,
   sessionCanceled,
@@ -39,7 +38,6 @@ export interface SystemState {
   currentIteration: number;
   totalIterations: number;
   currentStatusHasSteps: boolean;
-  shouldDisplayGuides: boolean;
   isCancelable: boolean;
   enableImageDebugging: boolean;
   toastQueue: UseToastOptions[];
@@ -85,13 +83,12 @@ export interface SystemState {
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
-  boardIdToAddTo?: string;
+  isNodesEnabled: boolean;
 }
 
 export const initialSystemState: SystemState = {
   isConnected: false,
   isProcessing: false,
-  shouldDisplayGuides: true,
   isGFPGANAvailable: true,
   isESRGANAvailable: true,
   shouldConfirmOnDelete: true,
@@ -118,6 +115,7 @@ export const initialSystemState: SystemState = {
   isPersisted: false,
   language: 'en',
   isUploading: false,
+  isNodesEnabled: false,
 };
 
 export const systemSlice = createSlice({
@@ -132,9 +130,6 @@ export const systemSlice = createSlice({
     },
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
-    },
-    setShouldDisplayGuides: (state, action: PayloadAction<boolean>) => {
-      state.shouldDisplayGuides = action.payload;
     },
     setIsCancelable: (state, action: PayloadAction<boolean>) => {
       state.isCancelable = action.payload;
@@ -193,6 +188,9 @@ export const systemSlice = createSlice({
     progressImageSet(state, action: PayloadAction<ProgressImage | null>) {
       state.progressImage = action.payload;
     },
+    setIsNodesEnabled(state, action: PayloadAction<boolean>) {
+      state.isNodesEnabled = action.payload;
+    },
   },
   extraReducers(builder) {
     /**
@@ -200,7 +198,6 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketSubscribed, (state, action) => {
       state.sessionId = action.payload.sessionId;
-      state.boardIdToAddTo = action.payload.boardId;
       state.canceledSession = '';
     });
 
@@ -209,7 +206,6 @@ export const systemSlice = createSlice({
      */
     builder.addCase(appSocketUnsubscribed, (state) => {
       state.sessionId = null;
-      state.boardIdToAddTo = undefined;
     });
 
     /**
@@ -360,27 +356,6 @@ export const systemSlice = createSlice({
       state.wasSchemaParsed = true;
     });
 
-    /**
-     * Image Uploading Started
-     */
-    builder.addCase(imageUploaded.pending, (state) => {
-      state.isUploading = true;
-    });
-
-    /**
-     * Image Uploading Complete
-     */
-    builder.addCase(imageUploaded.rejected, (state) => {
-      state.isUploading = false;
-    });
-
-    /**
-     * Image Uploading Complete
-     */
-    builder.addCase(imageUploaded.fulfilled, (state) => {
-      state.isUploading = false;
-    });
-
     // *** Matchers - must be after all cases ***
 
     /**
@@ -407,7 +382,6 @@ export const {
   setIsProcessing,
   setShouldConfirmOnDelete,
   setCurrentStatus,
-  setShouldDisplayGuides,
   setIsCancelable,
   setEnableImageDebugging,
   addToast,
@@ -422,6 +396,7 @@ export const {
   shouldAntialiasProgressImageChanged,
   languageChanged,
   progressImageSet,
+  setIsNodesEnabled,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

@@ -1,17 +1,13 @@
 import { log } from 'app/logging/useLogger';
-import { selectFilteredImages } from 'features/gallery/store/gallerySelectors';
 import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
   boardIdSelected,
   imageSelected,
-  selectImagesAll,
 } from 'features/gallery/store/gallerySlice';
-import { boardsApi } from 'services/api/endpoints/boards';
 import {
-  IMAGES_PER_PAGE,
-  receivedPageOfImages,
-} from 'services/api/thunks/image';
+  getBoardIdQueryParamForBoard,
+  getCategoriesQueryParamForBoard,
+} from 'features/gallery/store/util';
+import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'boards' });
@@ -19,54 +15,44 @@ const moduleLog = log.child({ namespace: 'boards' });
 export const addBoardIdSelectedListener = () => {
   startAppListening({
     actionCreator: boardIdSelected,
-    effect: (action, { getState, dispatch }) => {
-      const board_id = action.payload;
+    effect: async (
+      action,
+      { getState, dispatch, condition, cancelActiveListeners }
+    ) => {
+      // Cancel any in-progress instances of this listener, we don't want to select an image from a previous board
+      cancelActiveListeners();
 
-      // we need to check if we need to fetch more images
+      const _board_id = action.payload;
+      // when a board is selected, we need to wait until the board has loaded *some* images, then select the first one
 
-      const state = getState();
-      const allImages = selectImagesAll(state);
+      const categories = getCategoriesQueryParamForBoard(_board_id);
+      const board_id = getBoardIdQueryParamForBoard(_board_id);
+      const queryArgs = { board_id, categories };
 
-      if (board_id === 'all') {
-        // Selected all images
-        dispatch(imageSelected(allImages[0]?.image_name ?? null));
-        return;
-      }
+      // wait until the board has some images - maybe it already has some from a previous fetch
+      // must use getState() to ensure we do not have stale state
+      const isSuccess = await condition(
+        () =>
+          imagesApi.endpoints.listImages.select(queryArgs)(getState())
+            .isSuccess,
+        1000
+      );
 
-      if (board_id === 'batch') {
-        // Selected the batch
-        dispatch(imageSelected(state.gallery.batchImageNames[0] ?? null));
-        return;
-      }
+      if (isSuccess) {
+        // the board was just changed - we can select the first image
+        const { data: boardImagesData } = imagesApi.endpoints.listImages.select(
+          queryArgs
+        )(getState());
 
-      const filteredImages = selectFilteredImages(state);
-
-      const categories =
-        state.gallery.galleryView === 'images'
-          ? IMAGE_CATEGORIES
-          : ASSETS_CATEGORIES;
-
-      // get the board from the cache
-      const { data: boards } =
-        boardsApi.endpoints.listAllBoards.select()(state);
-      const board = boards?.find((b) => b.board_id === board_id);
-
-      if (!board) {
-        // can't find the board in cache...
-        dispatch(boardIdSelected('all'));
-        return;
-      }
-
-      dispatch(imageSelected(board.cover_image_name ?? null));
-
-      // if we haven't loaded one full page of images from this board, load more
-      if (
-        filteredImages.length < board.image_count &&
-        filteredImages.length < IMAGES_PER_PAGE
-      ) {
-        dispatch(
-          receivedPageOfImages({ categories, board_id, is_intermediate: false })
-        );
+        if (boardImagesData?.ids.length) {
+          dispatch(imageSelected((boardImagesData.ids[0] as string) ?? null));
+        } else {
+          // board has no images - deselect
+          dispatch(imageSelected(null));
+        }
+      } else {
+        // fallback - deselect
+        dispatch(imageSelected(null));
       }
     },
   });

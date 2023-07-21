@@ -2,7 +2,8 @@ import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { ControlNetModelParam } from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, forEach } from 'lodash-es';
-import { imageDeleted } from 'services/api/thunks/image';
+import { imagesApi } from 'services/api/endpoints/images';
+import { components } from 'services/api/schema';
 import { isAnySessionRejected } from 'services/api/thunks/session';
 import { appSocketInvocationError } from 'services/events/actions';
 import { controlNetImageProcessed } from './actions';
@@ -16,11 +17,13 @@ import {
   RequiredControlNetProcessorNode,
 } from './types';
 
-export type ControlModes =
-  | 'balanced'
-  | 'more_prompt'
-  | 'more_control'
-  | 'unbalanced';
+export type ControlModes = NonNullable<
+  components['schemas']['ControlNetInvocation']['control_mode']
+>;
+
+export type ResizeModes = NonNullable<
+  components['schemas']['ControlNetInvocation']['resize_mode']
+>;
 
 export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   isEnabled: true,
@@ -29,6 +32,7 @@ export const initialControlNet: Omit<ControlNetConfig, 'controlNetId'> = {
   beginStepPct: 0,
   endStepPct: 1,
   controlMode: 'balanced',
+  resizeMode: 'just_resize',
   controlImage: null,
   processedControlImage: null,
   processorType: 'canny_image_processor',
@@ -45,6 +49,7 @@ export type ControlNetConfig = {
   beginStepPct: number;
   endStepPct: number;
   controlMode: ControlModes;
+  resizeMode: ResizeModes;
   controlImage: string | null;
   processedControlImage: string | null;
   processorType: ControlNetProcessorType;
@@ -215,6 +220,16 @@ export const controlNetSlice = createSlice({
       const { controlNetId, controlMode } = action.payload;
       state.controlNets[controlNetId].controlMode = controlMode;
     },
+    controlNetResizeModeChanged: (
+      state,
+      action: PayloadAction<{
+        controlNetId: string;
+        resizeMode: ResizeModes;
+      }>
+    ) => {
+      const { controlNetId, resizeMode } = action.payload;
+      state.controlNets[controlNetId].resizeMode = resizeMode;
+    },
     controlNetProcessorParamsChanged: (
       state,
       action: PayloadAction<{
@@ -300,21 +315,6 @@ export const controlNetSlice = createSlice({
       }
     });
 
-    builder.addCase(imageDeleted.pending, (state, action) => {
-      // Preemptively remove the image from all controlnets
-      // TODO: doesn't the imageusage stuff do this for us?
-      const { image_name } = action.meta.arg;
-      forEach(state.controlNets, (c) => {
-        if (c.controlImage === image_name) {
-          c.controlImage = null;
-          c.processedControlImage = null;
-        }
-        if (c.processedControlImage === image_name) {
-          c.processedControlImage = null;
-        }
-      });
-    });
-
     builder.addCase(appSocketInvocationError, (state, action) => {
       state.pendingControlImages = [];
     });
@@ -322,6 +322,24 @@ export const controlNetSlice = createSlice({
     builder.addMatcher(isAnySessionRejected, (state, action) => {
       state.pendingControlImages = [];
     });
+
+    builder.addMatcher(
+      imagesApi.endpoints.deleteImage.matchFulfilled,
+      (state, action) => {
+        // Preemptively remove the image from all controlnets
+        // TODO: doesn't the imageusage stuff do this for us?
+        const { image_name } = action.meta.arg.originalArgs;
+        forEach(state.controlNets, (c) => {
+          if (c.controlImage === image_name) {
+            c.controlImage = null;
+            c.processedControlImage = null;
+          }
+          if (c.processedControlImage === image_name) {
+            c.processedControlImage = null;
+          }
+        });
+      }
+    );
   },
 });
 
@@ -339,6 +357,7 @@ export const {
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
   controlNetControlModeChanged,
+  controlNetResizeModeChanged,
   controlNetProcessorParamsChanged,
   controlNetProcessorTypeChanged,
   controlNetReset,

@@ -36,15 +36,6 @@
 
 </div>
 
-_**Note: This is an alpha release. Bugs are expected and not all
-features are fully implemented. Please use the GitHub [Issues
-pages](https://github.com/invoke-ai/InvokeAI/issues?q=is%3Aissue+is%3Aopen)
-to report unexpected problems. Also note that InvokeAI root directory
-which contains models, outputs and configuration files, has changed
-between the 2.x and 3.x release. If you wish to use your v2.3 root
-directory with v3.0, please follow the directions in [Migrating a 2.3
-root directory to 3.0](#migrating-to-3).**_
-
 InvokeAI is a leading creative engine built to empower professionals
 and enthusiasts alike. Generate and create stunning visual media using
 the latest AI-driven technologies. InvokeAI offers an industry leading
@@ -264,19 +255,24 @@ old models directory (which contains the models selected at install
 time) will be renamed `models.orig` and can be deleted once you have
 confirmed that the migration was successful.
 
+ If you wish, you can pass the 2.3 root directory to both `--from` and
+`--to` in order to update in place. Warning: this directory will no
+longer be usable with InvokeAI 2.3.
+
 #### Migrating in place
 
 For the adventurous, you may do an in-place upgrade from 2.3 to 3.0
-without touching the command line. The recipe is as follows>
+without touching the command line. ***This recipe does not work on
+Windows platforms due to a bug in the Windows version of the 2.3
+upgrade script.** See the next section for a Windows recipe.
+
+##### For Mac and Linux Users:
 
 1. Launch the InvokeAI launcher script in your current v2.3 root directory.
 
 2. Select option [9] "Update InvokeAI" to bring up the updater dialog.
 
-3a. During the alpha release phase, select option [3] and manually
-enter the tag name `v3.0.0+a2`.
-
-3b. Once 3.0 is released, select option [1] to upgrade to the latest release.
+3. Select option [1] to upgrade to the latest release.
 
 4. Once the upgrade is finished you will be returned to the launcher
 menu. Select option [7] "Re-run the configure script to fix a broken
@@ -295,14 +291,33 @@ worked, you can safely remove these files. Alternatively you can
 restore a working v2.3 directory by removing the new files and
 restoring the ".orig" files' original names.
 
+##### For Windows Users:
+
+Windows Users can upgrade with the
+
+1. Enter the 2.3 root directory you wish to upgrade
+2. Launch `invoke.sh` or `invoke.bat`
+3. Select the "Developer's console" option [8]
+4. Type the following commands
+
+```
+pip install "invokeai @ https://github.com/invoke-ai/InvokeAI/archive/refs/tags/v3.0.0" --use-pep517 --upgrade
+invokeai-configure --root .
+```
+(Replace `v3.0.0` with the current release number if this document is out of date).
+
+The first command will install and upgrade new software to run
+InvokeAI. The second will prepare the 2.3 directory for use with 3.0.
+You may now launch the WebUI in the usual way, by selecting option [1]
+from the launcher script
+
 #### Migration Caveats
 
 The migration script will migrate your invokeai settings and models,
 including textual inversion models, LoRAs and merges that you may have
 installed previously. However it does **not** migrate the generated
-images stored in your 2.3-format outputs directory. The released
-version of 3.0 is expected to have an interface for importing an
-entire directory of image files as a batch.
+images stored in your 2.3-format outputs directory. You will need to
+manually import selected images into the 3.0 gallery via drag-and-drop.
 
 ## Hardware Requirements
 
@@ -314,9 +329,12 @@ AMD card (using the ROCm driver).
 
 You will need one of the following:
 
-- An NVIDIA-based graphics card with 4 GB or more VRAM memory.
+- An NVIDIA-based graphics card with 4 GB or more VRAM memory. 6-8 GB
+  of VRAM is highly recommended for rendering using the Stable
+  Diffusion XL models
 - An Apple computer with an M1 chip.
-- An AMD-based graphics card with 4GB or more VRAM memory. (Linux only)
+- An AMD-based graphics card with 4GB or more VRAM memory (Linux
+  only), 6-8 GB for XL rendering.
 
 We do not recommend the GTX 1650 or 1660 series video cards. They are
 unable to run in half-precision mode and do not have sufficient VRAM
@@ -349,13 +367,12 @@ Invoke AI provides an organized gallery system for easily storing, accessing, an
 ### Other features
 
 - *Support for both ckpt and diffusers models*
-- *SD 2.0, 2.1 support*
+- *SD 2.0, 2.1, XL support*
 - *Upscaling Tools*
 - *Embedding Manager & Support*
 - *Model Manager & Support*
 - *Node-Based Architecture*
 - *Node-Based Plug-&-Play UI (Beta)*
-- *SDXL Support* (Coming soon)
 
 ### Latest Changes
 

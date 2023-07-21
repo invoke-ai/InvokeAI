@@ -315,20 +315,21 @@ async def list_ckpt_configs(
     return ApiDependencies.invoker.services.model_manager.list_checkpoint_configs()
     
         
-@models_router.get(
+@models_router.post(
     "/sync",
     operation_id="sync_to_config",
     responses={
         201: { "description": "synchronization successful" },
     },
     status_code = 201,
-    response_model = None
+    response_model = bool
 )
 async def sync_to_config(
-)->None:
+)->bool:
     """Call after making changes to models.yaml, autoimport directories or models directory to synchronize
     in-memory data structures with disk data structures."""
-    return ApiDependencies.invoker.services.model_manager.sync_to_config()
+    ApiDependencies.invoker.services.model_manager.sync_to_config()
+    return True
         
 @models_router.put(
     "/merge/{base_model}",
@@ -373,50 +374,3 @@ async def merge_models(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return response
-
-# The rename operation is now supported by update_model and no longer needs to be
-# a standalone route.
-# @models_router.post(
-#     "/rename/{base_model}/{model_type}/{model_name}",
-#     operation_id="rename_model",
-#     responses= {
-#         201: {"description" : "The model was renamed successfully"},
-#         404: {"description" : "The model could not be found"},
-#         409: {"description" : "There is already a model corresponding to the new name"},
-#     },
-#     status_code=201,
-#     response_model=ImportModelResponse
-# )
-# async def rename_model(
-#         base_model: BaseModelType = Path(description="Base model"),
-#         model_type: ModelType = Path(description="The type of model"),
-#         model_name: str = Path(description="current model name"),
-#         new_name: Optional[str] = Query(description="new model name", default=None),
-#         new_base: Optional[BaseModelType] = Query(description="new model base", default=None),
-# ) -> ImportModelResponse:
-#     """ Rename a model"""
-    
-#     logger = ApiDependencies.invoker.services.logger
-
-#     try:
-#         result = ApiDependencies.invoker.services.model_manager.rename_model(
-#             base_model = base_model,
-#             model_type = model_type,
-#             model_name = model_name,
-#             new_name = new_name,
-#             new_base = new_base,
-#         )
-#         logger.debug(result)
-#         logger.info(f'Successfully renamed {model_name}=>{new_name}')
-#         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
-#             model_name=new_name or model_name,
-#             base_model=new_base or base_model,
-#             model_type=model_type
-#         )
-#         return parse_obj_as(ImportModelResponse, model_raw)
-#     except ModelNotFoundException as e:
-#         logger.error(str(e))
-#         raise HTTPException(status_code=404, detail=str(e))
-#     except ValueError as e:
-#         logger.error(str(e))
-#         raise HTTPException(status_code=409, detail=str(e))

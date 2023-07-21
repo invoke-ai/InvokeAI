@@ -1,7 +1,7 @@
-import { useAppDispatch } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { PostUploadAction, imageUploaded } from 'services/api/thunks/image';
+import { useUploadImageMutation } from 'services/api/endpoints/images';
+import { PostUploadAction } from 'services/api/types';
 
 type UseImageUploadButtonArgs = {
   postUploadAction?: PostUploadAction;
@@ -12,13 +12,16 @@ type UseImageUploadButtonArgs = {
  * Provides image uploader functionality to any component.
  *
  * @example
- * const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
+ * const { getUploadButtonProps, getUploadInputProps, openUploader } = useImageUploadButton({
  *   postUploadAction: {
  *     type: 'SET_CONTROLNET_IMAGE',
  *     controlNetId: '12345',
  *   },
  *   isDisabled: getIsUploadDisabled(),
  * });
+ *
+ * // open the uploaded directly
+ * const handleSomething = () => { openUploader() }
  *
  * // in the render function
  * <Button {...getUploadButtonProps()} /> // will open the file dialog on click
@@ -28,24 +31,23 @@ export const useImageUploadButton = ({
   postUploadAction,
   isDisabled,
 }: UseImageUploadButtonArgs) => {
-  const dispatch = useAppDispatch();
+  const [uploadImage] = useUploadImageMutation();
   const onDropAccepted = useCallback(
     (files: File[]) => {
       const file = files[0];
+
       if (!file) {
         return;
       }
 
-      dispatch(
-        imageUploaded({
-          file,
-          image_category: 'user',
-          is_intermediate: false,
-          postUploadAction,
-        })
-      );
+      uploadImage({
+        file,
+        image_category: 'user',
+        is_intermediate: false,
+        postUploadAction: postUploadAction ?? { type: 'TOAST' },
+      });
     },
-    [dispatch, postUploadAction]
+    [postUploadAction, uploadImage]
   );
 
   const {

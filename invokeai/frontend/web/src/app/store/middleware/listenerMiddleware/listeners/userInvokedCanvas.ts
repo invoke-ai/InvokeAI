@@ -1,20 +1,20 @@
-import { startAppListening } from '..';
-import { sessionCreated } from 'services/api/thunks/session';
-import { buildCanvasGraph } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
 import { log } from 'app/logging/useLogger';
-import { canvasGraphBuilt } from 'features/nodes/store/actions';
-import { imageUpdated, imageUploaded } from 'services/api/thunks/image';
-import { ImageDTO } from 'services/api/types';
+import { userInvoked } from 'app/store/actions';
+import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import {
   canvasSessionIdChanged,
   stagingAreaInitialized,
 } from 'features/canvas/store/canvasSlice';
-import { userInvoked } from 'app/store/actions';
+import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
-import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
-import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
+import { canvasGraphBuilt } from 'features/nodes/store/actions';
+import { buildCanvasGraph } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
+import { imagesApi } from 'services/api/endpoints/images';
+import { sessionCreated } from 'services/api/thunks/session';
+import { ImageDTO } from 'services/api/types';
+import { startAppListening } from '..';
 
 const moduleLog = log.child({ namespace: 'invoke' });
 
@@ -74,7 +74,7 @@ export const addUserInvokedCanvasListener = () => {
       if (['img2img', 'inpaint', 'outpaint'].includes(generationMode)) {
         // upload the image, saving the request id
         const { requestId: initImageUploadedRequestId } = dispatch(
-          imageUploaded({
+          imagesApi.endpoints.uploadImage.initiate({
             file: new File([baseBlob], 'canvasInitImage.png', {
               type: 'image/png',
             }),
@@ -85,19 +85,20 @@ export const addUserInvokedCanvasListener = () => {
 
         // Wait for the image to be uploaded, matching by request id
         const [{ payload }] = await take(
-          (action): action is ReturnType<typeof imageUploaded.fulfilled> =>
-            imageUploaded.fulfilled.match(action) &&
+          // TODO: figure out how to narrow this action's type
+          (action) =>
+            imagesApi.endpoints.uploadImage.matchFulfilled(action) &&
             action.meta.requestId === initImageUploadedRequestId
         );
 
-        canvasInitImage = payload;
+        canvasInitImage = payload as ImageDTO;
       }
 
       // For inpaint/outpaint, we also need to upload the mask layer
       if (['inpaint', 'outpaint'].includes(generationMode)) {
         // upload the image, saving the request id
         const { requestId: maskImageUploadedRequestId } = dispatch(
-          imageUploaded({
+          imagesApi.endpoints.uploadImage.initiate({
             file: new File([maskBlob], 'canvasMaskImage.png', {
               type: 'image/png',
             }),
@@ -108,12 +109,13 @@ export const addUserInvokedCanvasListener = () => {
 
         // Wait for the image to be uploaded, matching by request id
         const [{ payload }] = await take(
-          (action): action is ReturnType<typeof imageUploaded.fulfilled> =>
-            imageUploaded.fulfilled.match(action) &&
+          // TODO: figure out how to narrow this action's type
+          (action) =>
+            imagesApi.endpoints.uploadImage.matchFulfilled(action) &&
             action.meta.requestId === maskImageUploadedRequestId
         );
 
-        canvasMaskImage = payload;
+        canvasMaskImage = payload as ImageDTO;
       }
 
       const graph = buildCanvasGraph(
@@ -144,9 +146,9 @@ export const addUserInvokedCanvasListener = () => {
       // Associate the init image with the session, now that we have the session ID
       if (['img2img', 'inpaint'].includes(generationMode) && canvasInitImage) {
         dispatch(
-          imageUpdated({
-            image_name: canvasInitImage.image_name,
-            session_id: sessionId,
+          imagesApi.endpoints.updateImage.initiate({
+            imageDTO: canvasInitImage,
+            changes: { session_id: sessionId },
           })
         );
       }
@@ -154,9 +156,9 @@ export const addUserInvokedCanvasListener = () => {
       // Associate the mask image with the session, now that we have the session ID
       if (['inpaint'].includes(generationMode) && canvasMaskImage) {
         dispatch(
-          imageUpdated({
-            image_name: canvasMaskImage.image_name,
-            session_id: sessionId,
+          imagesApi.endpoints.updateImage.initiate({
+            imageDTO: canvasMaskImage,
+            changes: { session_id: sessionId },
           })
         );
       }

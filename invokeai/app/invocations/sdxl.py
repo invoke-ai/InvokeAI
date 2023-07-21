@@ -6,6 +6,7 @@ from typing import List, Literal, Optional, Union
 from pydantic import Field, validator
 
 from ...backend.model_management import ModelType, SubModelType
+from invokeai.app.util.step_callback import stable_diffusion_xl_step_callback
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
 
@@ -243,10 +244,31 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
             },
         }
 
+    def dispatch_progress(
+        self,
+        context: InvocationContext,
+        source_node_id: str,
+        sample,
+        step,
+        total_steps,
+    ) -> None:
+        stable_diffusion_xl_step_callback(
+            context=context,
+            node=self.dict(),
+            source_node_id=source_node_id,
+            sample=sample,
+            step=step,
+            total_steps=total_steps,
+        )
+
     # based on
     # https://github.com/huggingface/diffusers/blob/3ebbaf7c96801271f9e6c21400033b6aa5ffcf29/src/diffusers/pipelines/stable_diffusion/pipeline_onnx_stable_diffusion.py#L375
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
+        graph_execution_state = context.services.graph_execution_manager.get(
+            context.graph_execution_state_id
+        )
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
         latents = context.services.latents.get(self.noise.latents_name)
 
         positive_cond_data = context.services.latents.get(self.positive_conditioning.conditioning_name)
@@ -341,6 +363,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
                         # call the callback, if provided
                         if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % scheduler.order == 0):
                             progress_bar.update()
+                            self.dispatch_progress(context, source_node_id, latents, i, num_inference_steps)
                             #if callback is not None and i % callback_steps == 0:
                             #    callback(i, t, latents)
             else:
@@ -409,6 +432,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
                         # call the callback, if provided
                         if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % scheduler.order == 0):
                             progress_bar.update()
+                            self.dispatch_progress(context, source_node_id, latents, i, num_inference_steps)
                             #if callback is not None and i % callback_steps == 0:
                             #    callback(i, t, latents)
 
@@ -473,10 +497,31 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
             },
         }
 
+    def dispatch_progress(
+        self,
+        context: InvocationContext,
+        source_node_id: str,
+        sample,
+        step,
+        total_steps,
+    ) -> None:
+        stable_diffusion_xl_step_callback(
+            context=context,
+            node=self.dict(),
+            source_node_id=source_node_id,
+            sample=sample,
+            step=step,
+            total_steps=total_steps,
+        )
+
     # based on
     # https://github.com/huggingface/diffusers/blob/3ebbaf7c96801271f9e6c21400033b6aa5ffcf29/src/diffusers/pipelines/stable_diffusion/pipeline_onnx_stable_diffusion.py#L375
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
+        graph_execution_state = context.services.graph_execution_manager.get(
+            context.graph_execution_state_id
+        )
+        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
         latents = context.services.latents.get(self.latents.latents_name)
 
         positive_cond_data = context.services.latents.get(self.positive_conditioning.conditioning_name)
@@ -579,6 +624,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
                         # call the callback, if provided
                         if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % scheduler.order == 0):
                             progress_bar.update()
+                            self.dispatch_progress(context, source_node_id, latents, i, num_inference_steps)
                             #if callback is not None and i % callback_steps == 0:
                             #    callback(i, t, latents)
             else:
@@ -647,6 +693,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
                         # call the callback, if provided
                         if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % scheduler.order == 0):
                             progress_bar.update()
+                            self.dispatch_progress(context, source_node_id, latents, i, num_inference_steps)
                             #if callback is not None and i % callback_steps == 0:
                             #    callback(i, t, latents)
 

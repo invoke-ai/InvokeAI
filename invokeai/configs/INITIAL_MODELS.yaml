@@ -1,10 +1,4 @@
 # This file predefines a few models that the user may want to install.
-sd-1/main/stable-diffusion-xdl-base:
-   description: Stable Diffusion XL base model - NOT YET RELEASED!! (70 GB)
-   repo_id: stabilityai/stable-diffusion-xl-base
-sd-1/main/stable-diffusion-xdl-refiner:
-   description: Stable Diffusion XL refiner model - NOT YET RELEASED!! (60 GB)
-   repo_id: stabilityai/stable-diffusion-xl-refiner
 sd-1/main/stable-diffusion-v1-5:
    description: Stable Diffusion version 1.5 diffusers model (4.27 GB)
    repo_id: runwayml/stable-diffusion-v1-5
@@ -21,6 +15,14 @@ sd-2/main/stable-diffusion-2-1:
 sd-2/main/stable-diffusion-2-inpainting:
    description: Stable Diffusion version 2.0 inpainting model (5.21 GB)
    repo_id: stabilityai/stable-diffusion-2-inpainting
+   recommended: False
+sdxl/main/stable-diffusion-xl-base-0-9:
+   description: Stable Diffusion XL base model (12 GB; access token required)
+   repo_id: stabilityai/stable-diffusion-xl-base-0.9
+   recommended: False
+sdxl-refiner/main/stable-diffusion-xl-refiner-0-9:
+   description: Stable Diffusion XL refiner model (12 GB; access token required)
+   repo_id: stabilityai/stable-diffusion-xl-refiner-0.9
    recommended: False
 sd-1/main/Analog-Diffusion:
    description: An SD-1.5 model trained on diverse analog photographs (2.13 GB)

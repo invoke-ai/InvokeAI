@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 
+import { Box, Flex } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
@@ -11,6 +12,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { modelSelected } from 'features/parameters/store/actions';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
+import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { forEach } from 'lodash-es';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
@@ -84,16 +86,22 @@ const ParamMainModelSelect = () => {
       data={[]}
     />
   ) : (
-    <IAIMantineSearchableSelect
-      tooltip={selectedModel?.description}
-      label={t('modelManager.model')}
-      value={selectedModel?.id}
-      placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
-      data={data}
-      error={data.length === 0}
-      disabled={data.length === 0}
-      onChange={handleChangeModel}
-    />
+    <Flex w="100%" alignItems="center" gap={2}>
+      <IAIMantineSearchableSelect
+        tooltip={selectedModel?.description}
+        label={t('modelManager.model')}
+        value={selectedModel?.id}
+        placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
+        data={data}
+        error={data.length === 0}
+        disabled={data.length === 0}
+        onChange={handleChangeModel}
+        w="100%"
+      />
+      <Box mt={7}>
+        <SyncModelsButton iconMode />
+      </Box>
+    </Flex>
   );
 };
 

@@ -43,6 +43,7 @@ export const addDynamicPromptsToGraph = (
     const dynamicPromptNode: DynamicPromptInvocation = {
       id: DYNAMIC_PROMPT,
       type: 'dynamic_prompt',
+      is_intermediate: true,
       max_prompts: combinatorial ? maxPrompts : iterations,
       combinatorial,
       prompt: positivePrompt,
@@ -51,6 +52,7 @@ export const addDynamicPromptsToGraph = (
     const iterateNode: IterateInvocation = {
       id: ITERATE,
       type: 'iterate',
+      is_intermediate: true,
     };
 
     graph.nodes[DYNAMIC_PROMPT] = dynamicPromptNode;
@@ -99,6 +101,7 @@ export const addDynamicPromptsToGraph = (
       const randomIntNode: RandomIntInvocation = {
         id: RANDOM_INT,
         type: 'rand_int',
+        is_intermediate: true,
       };
 
       graph.nodes[RANDOM_INT] = randomIntNode;
@@ -133,6 +136,7 @@ export const addDynamicPromptsToGraph = (
     const rangeOfSizeNode: RangeOfSizeInvocation = {
       id: RANGE_OF_SIZE,
       type: 'range_of_size',
+      is_intermediate: true,
       size: iterations,
       step: 1,
     };
@@ -140,6 +144,7 @@ export const addDynamicPromptsToGraph = (
     const iterateNode: IterateInvocation = {
       id: ITERATE,
       type: 'iterate',
+      is_intermediate: true,
     };
 
     graph.nodes[ITERATE] = iterateNode;
@@ -186,6 +191,7 @@ export const addDynamicPromptsToGraph = (
       const randomIntNode: RandomIntInvocation = {
         id: RANDOM_INT,
         type: 'rand_int',
+        is_intermediate: true,
       };
 
       graph.nodes[RANDOM_INT] = randomIntNode;

@@ -39,6 +39,7 @@ class ModelProbe(object):
 
     CLASS2TYPE = {
         'StableDiffusionPipeline' : ModelType.Main,
+        'StableDiffusionInpaintPipeline' : ModelType.Main,
         'StableDiffusionXLPipeline' : ModelType.Main,
         'StableDiffusionXLImg2ImgPipeline' : ModelType.Main,
         'AutoencoderKL' : ModelType.Vae,
@@ -401,7 +402,7 @@ class PipelineFolderProbe(FolderProbeBase):
                 
             in_channels = conf['in_channels']
             if in_channels == 9:
-                return ModelVariantType.Inpainting
+                return ModelVariantType.Inpaint
             elif in_channels == 5:
                 return ModelVariantType.Depth
             elif in_channels == 4:

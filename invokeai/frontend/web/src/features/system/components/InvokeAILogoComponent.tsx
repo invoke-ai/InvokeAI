@@ -5,7 +5,11 @@ import { useRef } from 'react';
 import { useHoverDirty } from 'react-use';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
-const InvokeAILogoComponent = () => {
+interface Props {
+  showVersion?: boolean;
+}
+
+const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
   const { data: appVersion } = useGetAppVersionQuery();
   const ref = useRef(null);
   const isHovered = useHoverDirty(ref);
@@ -28,7 +32,7 @@ const InvokeAILogoComponent = () => {
           invoke <strong>ai</strong>
         </Text>
         <AnimatePresence>
-          {isHovered && appVersion && (
+          {showVersion && isHovered && appVersion && (
             <motion.div
               key="statusText"
               initial={{

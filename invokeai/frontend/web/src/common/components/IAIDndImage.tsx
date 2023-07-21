@@ -11,17 +11,19 @@ import {
   TypesafeDroppableData,
 } from 'app/components/ImageDnd/typesafeDnd';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import {
+  IAILoadingImageFallback,
+  IAINoContentFallback,
+} from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { MouseEvent, ReactElement, SyntheticEvent, memo } from 'react';
 import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
-import { PostUploadAction } from 'services/api/thunks/image';
-import { ImageDTO } from 'services/api/types';
+import { ImageDTO, PostUploadAction } from 'services/api/types';
 import { mode } from 'theme/util/mode';
 import IAIDraggable from './IAIDraggable';
 import IAIDroppable from './IAIDroppable';
-import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 
 type IAIDndImageProps = {
   imageDTO: ImageDTO | undefined;
@@ -46,6 +48,7 @@ type IAIDndImageProps = {
   isSelected?: boolean;
   thumbnail?: boolean;
   noContentFallback?: ReactElement;
+  useThumbailFallback?: boolean;
 };
 
 const IAIDndImage = (props: IAIDndImageProps) => {
@@ -71,6 +74,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     resetTooltip = 'Reset',
     resetIcon = <FaUndo />,
     noContentFallback = <IAINoContentFallback icon={FaImage} />,
+    useThumbailFallback,
   } = props;
 
   const { colorMode } = useColorMode();
@@ -126,9 +130,14 @@ const IAIDndImage = (props: IAIDndImageProps) => {
               <Image
                 src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
                 fallbackStrategy="beforeLoadOrError"
-                // If we fall back to thumbnail, it feels much snappier than the skeleton...
-                fallbackSrc={imageDTO.thumbnail_url}
-                // fallback={<IAILoadingImageFallback image={imageDTO} />}
+                fallbackSrc={
+                  useThumbailFallback ? imageDTO.thumbnail_url : undefined
+                }
+                fallback={
+                  useThumbailFallback ? undefined : (
+                    <IAILoadingImageFallback image={imageDTO} />
+                  )
+                }
                 width={imageDTO.width}
                 height={imageDTO.height}
                 onError={onError}
@@ -139,7 +148,9 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                   maxH: 'full',
                   borderRadius: 'base',
                   shadow: isSelected ? 'selected.light' : undefined,
-                  _dark: { shadow: isSelected ? 'selected.dark' : undefined },
+                  _dark: {
+                    shadow: isSelected ? 'selected.dark' : undefined,
+                  },
                   ...imageSx,
                 }}
               />
@@ -174,18 +185,18 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             </>
           )}
           {!imageDTO && isUploadDisabled && noContentFallback}
-          {!isDropDisabled && (
-            <IAIDroppable
-              data={droppableData}
-              disabled={isDropDisabled}
-              dropLabel={dropLabel}
-            />
-          )}
           {imageDTO && !isDragDisabled && (
             <IAIDraggable
               data={draggableData}
               disabled={isDragDisabled || !imageDTO}
               onClick={onClick}
+            />
+          )}
+          {!isDropDisabled && (
+            <IAIDroppable
+              data={droppableData}
+              disabled={isDropDisabled}
+              dropLabel={dropLabel}
             />
           )}
           {onClickReset && withResetIcon && imageDTO && (

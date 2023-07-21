@@ -93,6 +93,9 @@ type AddMainModelArg = {
 type AddMainModelResponse =
   paths['/api/v1/models/add']['post']['responses']['201']['content']['application/json'];
 
+type SyncModelsResponse =
+  paths['/api/v1/models/sync']['post']['responses']['201']['content']['application/json'];
+
 export type SearchFolderResponse =
   paths['/api/v1/models/search']['get']['responses']['200']['content']['application/json'];
 
@@ -240,6 +243,15 @@ export const modelsApi = api.injectEndpoints({
           url: `models/merge/${base_model}`,
           method: 'PUT',
           body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+    }),
+    syncModels: build.mutation<SyncModelsResponse, void>({
+      query: () => {
+        return {
+          url: `models/sync`,
+          method: 'POST',
         };
       },
       invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
@@ -423,6 +435,7 @@ export const {
   useAddMainModelsMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
+  useSyncModelsMutation,
   useGetModelsInFolderQuery,
   useGetCheckpointConfigsQuery,
 } = modelsApi;

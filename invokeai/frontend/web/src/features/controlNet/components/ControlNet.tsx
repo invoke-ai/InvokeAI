@@ -24,6 +24,7 @@ import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ParamControlNetControlMode from './parameters/ParamControlNetControlMode';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
+import ParamControlNetResizeMode from './parameters/ParamControlNetResizeMode';
 
 type ControlNetProps = {
   controlNetId: string;
@@ -68,7 +69,7 @@ const ControlNet = (props: ControlNetProps) => {
     <Flex
       sx={{
         flexDir: 'column',
-        gap: 2,
+        gap: 3,
         p: 3,
         borderRadius: 'base',
         position: 'relative',
@@ -117,7 +118,12 @@ const ControlNet = (props: ControlNetProps) => {
           tooltip={isExpanded ? 'Hide Advanced' : 'Show Advanced'}
           aria-label={isExpanded ? 'Hide Advanced' : 'Show Advanced'}
           onClick={toggleIsExpanded}
-          variant="link"
+          variant="ghost"
+          sx={{
+            _hover: {
+              bg: 'none',
+            },
+          }}
           icon={
             <ChevronUpIcon
               sx={{
@@ -151,7 +157,7 @@ const ControlNet = (props: ControlNetProps) => {
           />
         )}
       </Flex>
-      <Flex sx={{ w: 'full', flexDirection: 'column' }}>
+      <Flex sx={{ w: 'full', flexDirection: 'column', gap: 3 }}>
         <Flex sx={{ gap: 4, w: 'full', alignItems: 'center' }}>
           <Flex
             sx={{
@@ -176,16 +182,16 @@ const ControlNet = (props: ControlNetProps) => {
                 h: 28,
                 w: 28,
                 aspectRatio: '1/1',
-                mt: 3,
               }}
             >
               <ControlNetImagePreview controlNetId={controlNetId} height={28} />
             </Flex>
           )}
         </Flex>
-        <Box mt={2}>
+        <Flex sx={{ gap: 2 }}>
           <ParamControlNetControlMode controlNetId={controlNetId} />
-        </Box>
+          <ParamControlNetResizeMode controlNetId={controlNetId} />
+        </Flex>
         <ParamControlNetProcessorSelect controlNetId={controlNetId} />
       </Flex>
 

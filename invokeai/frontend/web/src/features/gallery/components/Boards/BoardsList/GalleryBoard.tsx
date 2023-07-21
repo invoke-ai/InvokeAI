@@ -1,224 +1,301 @@
 import {
   Badge,
   Box,
+  ChakraProps,
   Editable,
   EditableInput,
   EditablePreview,
   Flex,
+  Icon,
   Image,
-  MenuItem,
-  MenuList,
-  useColorMode,
+  Text,
 } from '@chakra-ui/react';
-
-import { useAppDispatch } from 'app/store/storeHooks';
-import { ContextMenu } from 'chakra-ui-contextmenu';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { boardIdSelected } from 'features/gallery/store/gallerySlice';
-import { memo, useCallback, useContext, useMemo } from 'react';
-import { FaFolder, FaImages, FaTrash } from 'react-icons/fa';
-import {
-  useDeleteBoardMutation,
-  useUpdateBoardMutation,
-} from 'services/api/endpoints/boards';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { BoardDTO } from 'services/api/types';
-
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
-// import { boardAddedToBatch } from 'app/store/middleware/listenerMiddleware/listeners/addBoardToBatch';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
-import { mode } from 'theme/util/mode';
-import { DeleteBoardImagesContext } from '../../../../../app/contexts/DeleteBoardImagesContext';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { FaFolder } from 'react-icons/fa';
+import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { BoardDTO } from 'services/api/types';
+import BoardContextMenu from '../BoardContextMenu';
 
+const AUTO_ADD_BADGE_STYLES: ChakraProps['sx'] = {
+  bg: 'accent.200',
+  color: 'blackAlpha.900',
+};
+
+const BASE_BADGE_STYLES: ChakraProps['sx'] = {
+  bg: 'base.500',
+  color: 'whiteAlpha.900',
+};
 interface GalleryBoardProps {
   board: BoardDTO;
   isSelected: boolean;
+  setBoardToDelete: (board?: BoardDTO) => void;
 }
 
-const GalleryBoard = memo(({ board, isSelected }: GalleryBoardProps) => {
-  const dispatch = useAppDispatch();
+const GalleryBoard = memo(
+  ({ board, isSelected, setBoardToDelete }: GalleryBoardProps) => {
+    const dispatch = useAppDispatch();
+    const selector = useMemo(
+      () =>
+        createSelector(
+          stateSelector,
+          ({ gallery }) => {
+            const isSelectedForAutoAdd =
+              board.board_id === gallery.autoAddBoardId;
 
-  const { currentData: coverImage } = useGetImageDTOQuery(
-    board.cover_image_name ?? skipToken
-  );
+            return { isSelectedForAutoAdd };
+          },
+          defaultSelectorOptions
+        ),
+      [board.board_id]
+    );
 
-  const { colorMode } = useColorMode();
+    const { isSelectedForAutoAdd } = useAppSelector(selector);
 
-  const { board_name, board_id } = board;
+    const { currentData: coverImage } = useGetImageDTOQuery(
+      board.cover_image_name ?? skipToken
+    );
 
-  const { onClickDeleteBoardImages } = useContext(DeleteBoardImagesContext);
+    const { board_name, board_id } = board;
+    const [localBoardName, setLocalBoardName] = useState(board_name);
 
-  const handleSelectBoard = useCallback(() => {
-    dispatch(boardIdSelected(board_id));
-  }, [board_id, dispatch]);
+    const handleSelectBoard = useCallback(() => {
+      dispatch(boardIdSelected(board_id));
+    }, [board_id, dispatch]);
 
-  const [updateBoard, { isLoading: isUpdateBoardLoading }] =
-    useUpdateBoardMutation();
+    const [updateBoard, { isLoading: isUpdateBoardLoading }] =
+      useUpdateBoardMutation();
 
-  const [deleteBoard, { isLoading: isDeleteBoardLoading }] =
-    useDeleteBoardMutation();
+    const droppableData: MoveBoardDropData = useMemo(
+      () => ({
+        id: board_id,
+        actionType: 'MOVE_BOARD',
+        context: { boardId: board_id },
+      }),
+      [board_id]
+    );
 
-  const handleUpdateBoardName = (newBoardName: string) => {
-    updateBoard({ board_id, changes: { board_name: newBoardName } });
-  };
+    const handleSubmit = useCallback(
+      (newBoardName: string) => {
+        if (!newBoardName) {
+          // empty strings are not allowed
+          setLocalBoardName(board_name);
+          return;
+        }
+        if (newBoardName === board_name) {
+          // don't updated the board name if it hasn't changed
+          return;
+        }
+        updateBoard({ board_id, changes: { board_name: newBoardName } })
+          .unwrap()
+          .then((response) => {
+            // update local state
+            setLocalBoardName(response.board_name);
+          })
+          .catch(() => {
+            // revert on error
+            setLocalBoardName(board_name);
+          });
+      },
+      [board_id, board_name, updateBoard]
+    );
 
-  const handleDeleteBoard = useCallback(() => {
-    deleteBoard(board_id);
-  }, [board_id, deleteBoard]);
+    const handleChange = useCallback((newBoardName: string) => {
+      setLocalBoardName(newBoardName);
+    }, []);
 
-  const handleAddBoardToBatch = useCallback(() => {
-    // dispatch(boardAddedToBatch({ board_id }));
-  }, []);
-
-  const handleDeleteBoardAndImages = useCallback(() => {
-    onClickDeleteBoardImages(board);
-  }, [board, onClickDeleteBoardImages]);
-
-  const droppableData: MoveBoardDropData = useMemo(
-    () => ({
-      id: board_id,
-      actionType: 'MOVE_BOARD',
-      context: { boardId: board_id },
-    }),
-    [board_id]
-  );
-
-  return (
-    <Box sx={{ touchAction: 'none', height: 'full' }}>
-      <ContextMenu<HTMLDivElement>
-        menuProps={{ size: 'sm', isLazy: true }}
-        renderMenu={() => (
-          <MenuList sx={{ visibility: 'visible !important' }}>
-            {board.image_count > 0 && (
-              <>
-                <MenuItem
-                  isDisabled={!board.image_count}
-                  icon={<FaImages />}
-                  onClickCapture={handleAddBoardToBatch}
-                >
-                  Add Board to Batch
-                </MenuItem>
-                <MenuItem
-                  sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
-                  icon={<FaTrash />}
-                  onClickCapture={handleDeleteBoardAndImages}
-                >
-                  Delete Board and Images
-                </MenuItem>
-              </>
-            )}
-            <MenuItem
-              sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
-              icon={<FaTrash />}
-              onClickCapture={handleDeleteBoard}
-            >
-              Delete Board
-            </MenuItem>
-          </MenuList>
-        )}
+    return (
+      <Box
+        sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}
       >
-        {(ref) => (
-          <Flex
-            key={board_id}
-            userSelect="none"
-            ref={ref}
-            sx={{
-              flexDir: 'column',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              cursor: 'pointer',
-              w: 'full',
-              h: 'full',
-            }}
+        <Flex
+          sx={{
+            position: 'relative',
+            justifyContent: 'center',
+            alignItems: 'center',
+            aspectRatio: '1/1',
+            w: 'full',
+            h: 'full',
+          }}
+        >
+          <BoardContextMenu
+            board={board}
+            board_id={board_id}
+            setBoardToDelete={setBoardToDelete}
           >
-            <Flex
-              onClick={handleSelectBoard}
-              sx={{
-                position: 'relative',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: 'base',
-                w: 'full',
-                aspectRatio: '1/1',
-                overflow: 'hidden',
-                shadow: isSelected ? 'selected.light' : undefined,
-                _dark: { shadow: isSelected ? 'selected.dark' : undefined },
-                flexShrink: 0,
-              }}
-            >
-              {board.cover_image_name && coverImage?.image_url && (
-                <Image src={coverImage?.image_url} draggable={false} />
-              )}
-              {!(board.cover_image_name && coverImage?.image_url) && (
-                <IAINoContentFallback
-                  boxSize={8}
-                  icon={FaFolder}
+            {(ref) => (
+              <Flex
+                ref={ref}
+                onClick={handleSelectBoard}
+                sx={{
+                  w: 'full',
+                  h: 'full',
+                  position: 'relative',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderRadius: 'base',
+                  cursor: 'pointer',
+                }}
+              >
+                <Flex
                   sx={{
-                    border: '2px solid var(--invokeai-colors-base-200)',
+                    w: 'full',
+                    h: 'full',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    borderRadius: 'base',
+                    bg: 'base.200',
                     _dark: {
-                      border: '2px solid var(--invokeai-colors-base-800)',
+                      bg: 'base.800',
+                    },
+                  }}
+                >
+                  {coverImage?.thumbnail_url ? (
+                    <Image
+                      src={coverImage?.thumbnail_url}
+                      draggable={false}
+                      sx={{
+                        maxW: 'full',
+                        maxH: 'full',
+                        borderRadius: 'base',
+                        borderBottomRadius: 'lg',
+                      }}
+                    />
+                  ) : (
+                    <Flex
+                      sx={{
+                        w: 'full',
+                        h: 'full',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Icon
+                        boxSize={12}
+                        as={FaFolder}
+                        sx={{
+                          mt: -3,
+                          opacity: 0.7,
+                          color: 'base.500',
+                          _dark: {
+                            color: 'base.500',
+                          },
+                        }}
+                      />
+                    </Flex>
+                  )}
+                </Flex>
+                <Flex
+                  sx={{
+                    position: 'absolute',
+                    insetInlineEnd: 0,
+                    top: 0,
+                    p: 1,
+                  }}
+                >
+                  <Badge
+                    variant="solid"
+                    sx={
+                      isSelectedForAutoAdd
+                        ? AUTO_ADD_BADGE_STYLES
+                        : BASE_BADGE_STYLES
+                    }
+                  >
+                    {board.image_count}
+                  </Badge>
+                </Flex>
+                <Box
+                  className="selection-box"
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    insetInlineEnd: 0,
+                    bottom: 0,
+                    insetInlineStart: 0,
+                    borderRadius: 'base',
+                    transitionProperty: 'common',
+                    transitionDuration: 'common',
+                    shadow: isSelected ? 'selected.light' : undefined,
+                    _dark: {
+                      shadow: isSelected ? 'selected.dark' : undefined,
                     },
                   }}
                 />
-              )}
-              <Flex
-                sx={{
-                  position: 'absolute',
-                  insetInlineEnd: 0,
-                  top: 0,
-                  p: 1,
-                }}
-              >
-                <Badge variant="solid">{board.image_count}</Badge>
-              </Flex>
-              <IAIDroppable data={droppableData} />
-            </Flex>
+                <Flex
+                  sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    p: 1,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    w: 'full',
+                    maxW: 'full',
+                    borderBottomRadius: 'base',
+                    bg: isSelected ? 'accent.400' : 'base.500',
+                    color: isSelected ? 'base.50' : 'base.100',
+                    _dark: {
+                      bg: isSelected ? 'accent.500' : 'base.600',
+                      color: isSelected ? 'base.50' : 'base.100',
+                    },
+                    lineHeight: 'short',
+                    fontSize: 'xs',
+                  }}
+                >
+                  <Editable
+                    value={localBoardName}
+                    isDisabled={isUpdateBoardLoading}
+                    submitOnBlur={true}
+                    onChange={handleChange}
+                    onSubmit={handleSubmit}
+                    sx={{
+                      w: 'full',
+                    }}
+                  >
+                    <EditablePreview
+                      sx={{
+                        p: 0,
+                        fontWeight: isSelected ? 700 : 500,
+                        textAlign: 'center',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      noOfLines={1}
+                    />
+                    <EditableInput
+                      sx={{
+                        p: 0,
+                        _focusVisible: {
+                          p: 0,
+                          textAlign: 'center',
+                          // get rid of the edit border
+                          boxShadow: 'none',
+                        },
+                      }}
+                    />
+                  </Editable>
+                </Flex>
 
-            <Flex
-              sx={{
-                width: 'full',
-                height: 'full',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <Editable
-                defaultValue={board_name}
-                submitOnBlur={false}
-                onSubmit={(nextValue) => {
-                  handleUpdateBoardName(nextValue);
-                }}
-              >
-                <EditablePreview
-                  sx={{
-                    color: isSelected
-                      ? mode('base.900', 'base.50')(colorMode)
-                      : mode('base.700', 'base.200')(colorMode),
-                    fontWeight: isSelected ? 600 : undefined,
-                    fontSize: 'xs',
-                    textAlign: 'center',
-                    p: 0,
-                  }}
-                  noOfLines={1}
+                <IAIDroppable
+                  data={droppableData}
+                  dropLabel={<Text fontSize="md">Move</Text>}
                 />
-                <EditableInput
-                  sx={{
-                    color: mode('base.900', 'base.50')(colorMode),
-                    fontSize: 'xs',
-                    borderColor: mode('base.500', 'base.500')(colorMode),
-                    p: 0,
-                    outline: 0,
-                  }}
-                />
-              </Editable>
-            </Flex>
-          </Flex>
-        )}
-      </ContextMenu>
-    </Box>
-  );
-});
+              </Flex>
+            )}
+          </BoardContextMenu>
+        </Flex>
+      </Box>
+    );
+  }
+);
 
 GalleryBoard.displayName = 'HoverableBoard';
 

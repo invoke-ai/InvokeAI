@@ -1,3 +1,4 @@
+import { UseToastOptions } from '@chakra-ui/react';
 import { O } from 'ts-toolbelt';
 import { components } from './schema';
 
@@ -90,6 +91,9 @@ export type InpaintInvocation = TypeReq<
 export type ImageResizeInvocation = TypeReq<
   components['schemas']['ImageResizeInvocation']
 >;
+export type ImageScaleInvocation = TypeReq<
+  components['schemas']['ImageScaleInvocation']
+>;
 export type RandomIntInvocation = TypeReq<
   components['schemas']['RandomIntInvocation']
 >;
@@ -123,6 +127,12 @@ export type LoraLoaderInvocation = TypeReq<
 >;
 export type MetadataAccumulatorInvocation = TypeReq<
   components['schemas']['MetadataAccumulatorInvocation']
+>;
+export type ESRGANInvocation = TypeReq<
+  components['schemas']['ESRGANInvocation']
+>;
+export type DivideInvocation = TypeReq<
+  components['schemas']['DivideInvocation']
 >;
 
 // ControlNet Nodes
@@ -177,3 +187,41 @@ export type CollectInvocationOutput =
 export type LatentsOutput = components['schemas']['LatentsOutput'];
 export type GraphInvocationOutput =
   components['schemas']['GraphInvocationOutput'];
+
+// Post-image upload actions, controls workflows when images are uploaded
+
+export type ControlNetAction = {
+  type: 'SET_CONTROLNET_IMAGE';
+  controlNetId: string;
+};
+
+export type InitialImageAction = {
+  type: 'SET_INITIAL_IMAGE';
+};
+
+export type NodesAction = {
+  type: 'SET_NODES_IMAGE';
+  nodeId: string;
+  fieldName: string;
+};
+
+export type CanvasInitialImageAction = {
+  type: 'SET_CANVAS_INITIAL_IMAGE';
+};
+
+export type ToastAction = {
+  type: 'TOAST';
+  toastOptions?: UseToastOptions;
+};
+
+export type AddToBatchAction = {
+  type: 'ADD_TO_BATCH';
+};
+
+export type PostUploadAction =
+  | ControlNetAction
+  | InitialImageAction
+  | NodesAction
+  | CanvasInitialImageAction
+  | ToastAction
+  | AddToBatchAction;
