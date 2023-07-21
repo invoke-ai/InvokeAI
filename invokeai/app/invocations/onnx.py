@@ -257,7 +257,8 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
             with ONNXModelPatcher.apply_lora_unet(unet, loras):
                 # TODO: 
-                unet.create_session()
+                _, _, h, w = latents.shape
+                unet.create_session(h, w)
 
                 timestep_dtype = next(
                     (input.type for input in unet.session.get_inputs() if input.name == "timestep"), "tensor(float16)"
