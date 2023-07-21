@@ -7,7 +7,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
-import { FaFolder, FaPlus } from 'react-icons/fa';
+import { FaFolder } from 'react-icons/fa';
 import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
@@ -72,9 +72,9 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 alignItems: 'center',
                 borderRadius: 'base',
                 cursor: 'pointer',
-                bg: 'base.200',
+                bg: 'base.300',
                 _dark: {
-                  bg: 'base.800',
+                  bg: 'base.900',
                 },
               }}
             >
