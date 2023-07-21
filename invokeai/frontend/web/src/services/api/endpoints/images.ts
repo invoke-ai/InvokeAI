@@ -421,6 +421,7 @@ export const imagesApi = api.injectEndpoints({
         postUploadAction?: PostUploadAction;
         session_id?: string;
         board_id?: string;
+        crop_visible?: boolean;
       }
     >({
       query: ({
@@ -429,6 +430,7 @@ export const imagesApi = api.injectEndpoints({
         is_intermediate,
         session_id,
         board_id,
+        crop_visible,
       }) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -441,6 +443,7 @@ export const imagesApi = api.injectEndpoints({
             is_intermediate,
             session_id,
             board_id,
+            crop_visible,
           },
         };
       },

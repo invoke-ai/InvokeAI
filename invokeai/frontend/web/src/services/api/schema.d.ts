@@ -5356,17 +5356,17 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusionXLModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion2ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionXLModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
@@ -6050,6 +6050,8 @@ export type operations = {
         board_id?: string;
         /** @description The session ID associated with this upload, if any */
         session_id?: string;
+        /** @description Whether to crop the image */
+        crop_visible?: boolean;
       };
     };
     requestBody: {
