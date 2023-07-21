@@ -51,7 +51,6 @@ class MemoryInvocationQueue(InvocationQueueABC):
         )
 
     async def delete_on_error(self, event: Event):
-        print(event)
         event_name = event[1]["event"]
         if event_name == "invocation_error":
             session_id = event[1]["data"]["graph_execution_state_id"]
@@ -70,7 +69,6 @@ class MemoryInvocationQueue(InvocationQueueABC):
             if self.__cancellations[graph_execution_state_id] < item.timestamp:
                 del self.__cancellations[graph_execution_state_id]
 
-        print(self.__queue.qsize())
         return item
 
     def put(self, item: Optional[InvocationQueueItem]) -> None:
