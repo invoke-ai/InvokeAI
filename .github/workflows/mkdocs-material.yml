@@ -2,7 +2,7 @@ name: mkdocs-material
 on:
   push:
     branches:
-      - 'refs/heads/v2.3'
+      - 'refs/heads/main'
 
 permissions:
     contents: write
