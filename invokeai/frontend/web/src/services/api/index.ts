@@ -10,6 +10,8 @@ import { $authToken, $baseUrl } from 'services/api/client';
 
 export const tagTypes = [
   'Board',
+  'BoardImagesTotal',
+  'BoardAssetsTotal',
   'Image',
   'ImageNameList',
   'ImageList',

@@ -25,27 +25,27 @@ export const getIsImageInDateRange = (
   return false;
 };
 
-/**
- * Determines the action we should take when an image may need to be added or updated in a cache.
- */
-export const getCacheAction = (
-  data: ImageCache | undefined,
-  imageDTO: ImageDTO
-): 'add' | 'update' | 'none' => {
-  const isInDateRange = getIsImageInDateRange(data, imageDTO);
-  const isCacheFullyPopulated = data && data.total === data.ids.length;
-  const shouldUpdateCache =
-    Boolean(isInDateRange) || Boolean(isCacheFullyPopulated);
+// /**
+//  * Determines the action we should take when an image may need to be added or updated in a cache.
+//  */
+// export const getCacheAction = (
+//   data: ImageCache | undefined,
+//   imageDTO: ImageDTO
+// ): 'add' | 'update' | 'none' => {
+//   const isInDateRange = getIsImageInDateRange(data, imageDTO);
+//   const isCacheFullyPopulated = data && data.total === data.ids.length;
+//   const shouldUpdateCache =
+//     Boolean(isInDateRange) || Boolean(isCacheFullyPopulated);
 
-  const isImageInCache = data && data.ids.includes(imageDTO.image_name);
+//   const isImageInCache = data && data.ids.includes(imageDTO.image_name);
 
-  if (shouldUpdateCache && isImageInCache) {
-    return 'update';
-  }
+//   if (shouldUpdateCache && isImageInCache) {
+//     return 'update';
+//   }
 
-  if (shouldUpdateCache && !isImageInCache) {
-    return 'add';
-  }
+//   if (shouldUpdateCache && !isImageInCache) {
+//     return 'add';
+//   }
 
-  return 'none';
-};
+//   return 'none';
+// };

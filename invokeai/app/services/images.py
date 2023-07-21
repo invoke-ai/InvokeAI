@@ -52,6 +52,7 @@ class ImageServiceABC(ABC):
         image_category: ImageCategory,
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
+        board_id: Optional[str] = None,
         is_intermediate: bool = False,
         metadata: Optional[dict] = None,
     ) -> ImageDTO:
@@ -174,6 +175,7 @@ class ImageService(ImageServiceABC):
         image_category: ImageCategory,
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
+        board_id: Optional[str] = None,
         is_intermediate: bool = False,
         metadata: Optional[dict] = None,
     ) -> ImageDTO:
@@ -214,6 +216,11 @@ class ImageService(ImageServiceABC):
                 metadata=metadata,
                 session_id=session_id,
             )
+
+            if board_id is not None:
+                self._services.board_image_records.add_image_to_board(
+                    board_id=board_id, image_name=image_name
+                )
 
             self._services.image_files.save(
                 image_name=image_name, image=image, metadata=metadata, graph=graph

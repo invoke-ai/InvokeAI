@@ -45,7 +45,7 @@ export const addCanvasMergedListener = () => {
         relativeTo: canvasBaseLayer.getParent(),
       });
 
-      const imageUploadedRequest = dispatch(
+      const imageDTO = await dispatch(
         imagesApi.endpoints.uploadImage.initiate({
           file: new File([blob], 'mergedCanvas.png', {
             type: 'image/png',
@@ -57,17 +57,10 @@ export const addCanvasMergedListener = () => {
             toastOptions: { title: 'Canvas Merged' },
           },
         })
-      );
-
-      const [{ payload }] = await take(
-        (uploadedImageAction) =>
-          imagesApi.endpoints.uploadImage.matchFulfilled(uploadedImageAction) &&
-          uploadedImageAction.meta.requestId === imageUploadedRequest.requestId
-      );
+      ).unwrap();
 
       // TODO: I can't figure out how to do the type narrowing in the `take()` so just brute forcing it here
-      const { image_name } =
-        payload as typeof imagesApi.endpoints.uploadImage.Types.ResultType;
+      const { image_name } = imageDTO;
 
       dispatch(
         setMergedCanvas({

@@ -156,14 +156,13 @@ export const addImageDroppedListener = () => {
       if (
         overData.actionType === 'MOVE_BOARD' &&
         activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO &&
-        overData.context.boardId
+        activeData.payload.imageDTO
       ) {
         const { imageDTO } = activeData.payload;
         const { boardId } = overData.context;
 
-        // if the board is "No Board", this is a remove action
-        if (boardId === 'no_board') {
+        // image was droppe on the "NoBoardBoard"
+        if (!boardId) {
           dispatch(
             imagesApi.endpoints.removeImageFromBoard.initiate({
               imageDTO,
@@ -172,12 +171,7 @@ export const addImageDroppedListener = () => {
           return;
         }
 
-        // Handle adding image to batch
-        if (boardId === 'batch') {
-          // TODO
-        }
-
-        // Otherwise, add the image to the board
+        // image was dropped on a user board
         dispatch(
           imagesApi.endpoints.addImageToBoard.initiate({
             imageDTO,

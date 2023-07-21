@@ -15,7 +15,7 @@ See the [troubleshooting
 section](010_INSTALL_AUTOMATED.md#troubleshooting) of the automated
 install guide for frequently-encountered installation issues.
 
-## Main Application
+## Installation options
 
 1. [Automated Installer](010_INSTALL_AUTOMATED.md)
 
@@ -23,6 +23,9 @@ install guide for frequently-encountered installation issues.
     third party libraries and InvokeAI itself. It includes access to a
     "developer console" which will help us debug problems with you and
     give you to access experimental features.
+
+
+    ✅ This is the recommended option for first time users. 
 
 2. [Manual Installation](020_INSTALL_MANUAL.md)
 
