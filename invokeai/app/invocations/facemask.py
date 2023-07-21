@@ -43,7 +43,7 @@ class ImageMaskOutputFaceMask(BaseInvocationOutput):
 
 
 class FaceMaskInvocation(BaseInvocation, PILInvocationConfig):
-    """OpenCV cascade classifier detection to create transparencies in an image"""
+    """MediaPipe face detection to create transparencies in an image"""
 
     # fmt: off
     type: Literal["img_detect_mask"] = "img_detect_mask"
