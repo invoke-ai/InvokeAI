@@ -1,5 +1,5 @@
 import { ChevronUpIcon } from '@chakra-ui/icons';
-import { Box, Button, Flex, Spacer, Text } from '@chakra-ui/react';
+import { Button, Flex, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -56,7 +56,7 @@ const GalleryBoardName = (props: Props) => {
         position: 'relative',
         gap: 2,
         w: 'full',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         alignItems: 'center',
         px: 2,
         // bg: 'base.100',
@@ -67,22 +67,20 @@ const GalleryBoardName = (props: Props) => {
         // },
       }}
     >
-      <Spacer />
-      <Box position="relative">
-        <Text
-          noOfLines={1}
-          sx={{
-            fontWeight: 600,
-            color: 'base.800',
-            _dark: {
-              color: 'base.200',
-            },
-          }}
-        >
-          {formattedBoardName}
-        </Text>
-      </Box>
-      <Spacer />
+      <Text
+        noOfLines={1}
+        sx={{
+          fontWeight: 600,
+          w: '100%',
+          textAlign: 'center',
+          color: 'base.800',
+          _dark: {
+            color: 'base.200',
+          },
+        }}
+      >
+        {formattedBoardName}
+      </Text>
       <ChevronUpIcon
         sx={{
           transform: isOpen ? 'rotate(0deg)' : 'rotate(180deg)',
