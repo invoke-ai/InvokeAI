@@ -52,8 +52,8 @@ export const nextPrevImageButtonsSelector = createSelector(
 
     const prevImageIndex = clamp(currentImageIndex - 1, 0, images.length - 1);
 
-    const nextImageId = images[nextImageIndex].image_name;
-    const prevImageId = images[prevImageIndex].image_name;
+    const nextImageId = images[nextImageIndex]?.image_name;
+    const prevImageId = images[prevImageIndex]?.image_name;
 
     const nextImage = selectors.selectById(data, nextImageId);
     const prevImage = selectors.selectById(data, prevImageId);
