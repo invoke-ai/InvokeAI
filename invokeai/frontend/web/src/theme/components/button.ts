@@ -64,9 +64,23 @@ const invokeAI = defineStyle((props) => {
   };
 });
 
+const invokeAIOutline = defineStyle((props) => {
+  const { colorScheme: c } = props;
+  const borderColor = mode(`gray.200`, `whiteAlpha.300`)(props);
+  return {
+    border: '1px solid',
+    borderColor: c === 'gray' ? borderColor : 'currentColor',
+    '.chakra-button__group[data-attached][data-orientation=horizontal] > &:not(:last-of-type)':
+      { marginEnd: '-1px' },
+    '.chakra-button__group[data-attached][data-orientation=vertical] > &:not(:last-of-type)':
+      { marginBottom: '-1px' },
+  };
+});
+
 export const buttonTheme = defineStyleConfig({
   variants: {
     invokeAI,
+    invokeAIOutline,
   },
   defaultProps: {
     variant: 'invokeAI',

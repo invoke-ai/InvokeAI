@@ -3,6 +3,7 @@ import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
   IMAGE_CATEGORIES,
   boardIdSelected,
+  galleryViewChanged,
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
 import { progressImageSet } from 'features/system/store/systemSlice';
@@ -55,37 +56,16 @@ export const addInvocationCompleteEventListener = () => {
         }
 
         if (!imageDTO.is_intermediate) {
-          // update the cache for 'All Images'
-          dispatch(
-            imagesApi.util.updateQueryData(
-              'listImages',
-              {
-                categories: IMAGE_CATEGORIES,
-              },
-              (draft) => {
-                imagesAdapter.addOne(draft, imageDTO);
-                draft.total = draft.total + 1;
-              }
-            )
-          );
-
-          // update the cache for 'No Board'
-          dispatch(
-            imagesApi.util.updateQueryData(
-              'listImages',
-              {
-                board_id: 'none',
-              },
-              (draft) => {
-                imagesAdapter.addOne(draft, imageDTO);
-                draft.total = draft.total + 1;
-              }
-            )
-          );
+          /**
+           * Cache updates for when an image result is received
+           * - *add* to getImageDTO
+           * - IF `autoAddBoardId` is set:
+           *    - THEN add it to the board_id/images
+           * - ELSE (`autoAddBoardId` is not set):
+           *    - THEN add it to the no_board/images
+           */
 
           const { autoAddBoardId } = gallery;
-
-          // add image to the board if auto-add is enabled
           if (autoAddBoardId) {
             dispatch(
               imagesApi.endpoints.addImageToBoard.initiate({
@@ -93,7 +73,30 @@ export const addInvocationCompleteEventListener = () => {
                 imageDTO,
               })
             );
+          } else {
+            dispatch(
+              imagesApi.util.updateQueryData(
+                'listImages',
+                {
+                  board_id: 'none',
+                  categories: IMAGE_CATEGORIES,
+                },
+                (draft) => {
+                  const oldTotal = draft.total;
+                  const newState = imagesAdapter.addOne(draft, imageDTO);
+                  const delta = newState.total - oldTotal;
+                  draft.total = draft.total + delta;
+                }
+              )
+            );
           }
+
+          dispatch(
+            imagesApi.util.invalidateTags([
+              { type: 'BoardImagesTotal', id: autoAddBoardId ?? 'none' },
+              { type: 'BoardAssetsTotal', id: autoAddBoardId ?? 'none' },
+            ])
+          );
 
           const { selectedBoardId, shouldAutoSwitch } = gallery;
 
@@ -102,8 +105,9 @@ export const addInvocationCompleteEventListener = () => {
             // if auto-add is enabled, switch the board as the image comes in
             if (autoAddBoardId && autoAddBoardId !== selectedBoardId) {
               dispatch(boardIdSelected(autoAddBoardId));
+              dispatch(galleryViewChanged('images'));
             } else if (!autoAddBoardId) {
-              dispatch(boardIdSelected('images'));
+              dispatch(galleryViewChanged('images'));
             }
             dispatch(imageSelected(imageDTO.image_name));
           }

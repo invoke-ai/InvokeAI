@@ -1,8 +1,9 @@
-import { Box, Spinner } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { IMAGE_LIMIT } from 'features/gallery//store/gallerySlice';
+import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   UseOverlayScrollbarsParams,
   useOverlayScrollbars,
@@ -15,10 +16,10 @@ import {
   useLazyListImagesQuery,
   useListImagesQuery,
 } from 'services/api/endpoints/images';
+import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
-import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 
 const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   defer: true,
@@ -40,7 +41,10 @@ const GalleryImageGrid = () => {
   const [initialize, osInstance] = useOverlayScrollbars(
     overlayScrollbarsConfig
   );
-
+  const selectedBoardId = useAppSelector(
+    (state) => state.gallery.selectedBoardId
+  );
+  const { currentViewTotal } = useBoardTotal(selectedBoardId);
   const queryArgs = useAppSelector(selectListImagesBaseQueryArgs);
 
   const { currentData, isFetching, isSuccess, isError } =
@@ -49,19 +53,23 @@ const GalleryImageGrid = () => {
   const [listImages] = useLazyListImagesQuery();
 
   const areMoreAvailable = useMemo(() => {
-    if (!currentData) {
+    if (!currentData || !currentViewTotal) {
       return false;
     }
-    return currentData.ids.length < currentData.total;
-  }, [currentData]);
+    return currentData.ids.length < currentViewTotal;
+  }, [currentData, currentViewTotal]);
 
   const handleLoadMoreImages = useCallback(() => {
+    if (!areMoreAvailable) {
+      return;
+    }
+
     listImages({
       ...queryArgs,
       offset: currentData?.ids.length ?? 0,
       limit: IMAGE_LIMIT,
     });
-  }, [listImages, queryArgs, currentData?.ids.length]);
+  }, [areMoreAvailable, listImages, queryArgs, currentData?.ids.length]);
 
   useEffect(() => {
     // Initialize the gallery's custom scrollbar
@@ -79,20 +87,34 @@ const GalleryImageGrid = () => {
 
   if (!currentData) {
     return (
-      <Box sx={{ w: 'full', h: 'full' }}>
-        <Spinner size="2xl" opacity={0.5} />
-      </Box>
+      <Flex
+        sx={{
+          w: 'full',
+          h: 'full',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <IAINoContentFallback label="Loading..." icon={FaImage} />
+      </Flex>
     );
   }
 
   if (isSuccess && currentData?.ids.length === 0) {
     return (
-      <Box sx={{ w: 'full', h: 'full' }}>
+      <Flex
+        sx={{
+          w: 'full',
+          h: 'full',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <IAINoContentFallback
           label={t('gallery.noImagesInGallery')}
           icon={FaImage}
         />
-      </Box>
+      </Flex>
     );
   }
 
@@ -121,9 +143,7 @@ const GalleryImageGrid = () => {
           loadingText="Loading"
           flexShrink={0}
         >
-          {areMoreAvailable
-            ? t('gallery.loadMore')
-            : t('gallery.allImagesLoaded')}
+          {`Load More (${currentData.ids.length} of ${currentViewTotal})`}
         </IAIButton>
       </>
     );

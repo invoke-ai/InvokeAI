@@ -1,3 +1,4 @@
+import { useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
@@ -31,6 +32,9 @@ export const useImageUploadButton = ({
   postUploadAction,
   isDisabled,
 }: UseImageUploadButtonArgs) => {
+  const autoAddBoardId = useAppSelector(
+    (state) => state.gallery.autoAddBoardId
+  );
   const [uploadImage] = useUploadImageMutation();
   const onDropAccepted = useCallback(
     (files: File[]) => {
@@ -45,9 +49,10 @@ export const useImageUploadButton = ({
         image_category: 'user',
         is_intermediate: false,
         postUploadAction: postUploadAction ?? { type: 'TOAST' },
+        board_id: autoAddBoardId,
       });
     },
-    [postUploadAction, uploadImage]
+    [autoAddBoardId, postUploadAction, uploadImage]
   );
 
   const {
