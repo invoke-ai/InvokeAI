@@ -1,5 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { uniq } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { ImageCategory } from 'services/api/types';
@@ -44,14 +44,8 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState: initialGalleryState,
   reducers: {
-    imagesRemoved: (state, action: PayloadAction<string[]>) => {
-      // TODO: port all instances of this to use RTK Query cache
-      // imagesAdapter.removeMany(state, action.payload);
-      // state.batchImageNames = state.batchImageNames.filter(
-      //   (name) => !action.payload.includes(name)
-      // );
-    },
     imageRangeEndSelected: (state, action: PayloadAction<string>) => {
+      // MULTI SELECT LOGIC
       // const rangeEndImageName = action.payload;
       // const lastSelectedImage = state.selection[state.selection.length - 1];
       // const filteredImages = selectFilteredImagesLocal(state);
@@ -72,6 +66,7 @@ export const gallerySlice = createSlice({
       // }
     },
     imageSelectionToggled: (state, action: PayloadAction<string>) => {
+      // MULTI SELECT LOGIC
       // if (
       //   state.selection.includes(action.payload) &&
       //   state.selection.length > 1
@@ -135,19 +130,16 @@ export const gallerySlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addMatcher(
-      boardsApi.endpoints.deleteBoard.matchFulfilled,
-      (state, action) => {
-        const deletedBoardId = action.meta.arg.originalArgs;
-        if (deletedBoardId === state.selectedBoardId) {
-          state.selectedBoardId = undefined;
-          state.galleryView = 'images';
-        }
-        if (deletedBoardId === state.autoAddBoardId) {
-          state.autoAddBoardId = undefined;
-        }
+    builder.addMatcher(isAnyBoardDeleted, (state, action) => {
+      const deletedBoardId = action.meta.arg.originalArgs;
+      if (deletedBoardId === state.selectedBoardId) {
+        state.selectedBoardId = undefined;
+        state.galleryView = 'images';
       }
-    );
+      if (deletedBoardId === state.autoAddBoardId) {
+        state.autoAddBoardId = undefined;
+      }
+    });
     builder.addMatcher(
       boardsApi.endpoints.listAllBoards.matchFulfilled,
       (state, action) => {
@@ -180,3 +172,8 @@ export const {
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
+
+const isAnyBoardDeleted = isAnyOf(
+  boardsApi.endpoints.deleteBoard.matchFulfilled,
+  boardsApi.endpoints.deleteBoardAndImages.matchFulfilled
+);
