@@ -40,7 +40,6 @@ const StringInputFieldComponent = (
           style={{
             height: '150px',
             width: `${textareaWidth}px`,
-            resize: 'none',
             overflowY: 'auto',
           }}
           onChange={handleValueChanged}
