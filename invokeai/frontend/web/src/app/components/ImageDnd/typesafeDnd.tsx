@@ -175,9 +175,7 @@ export const isValidDrop = (
         const destinationBoard = overData.context.boardId;
 
         const isSameBoard = currentBoard === destinationBoard;
-        const isDestinationValid = !currentBoard
-          ? destinationBoard !== 'no_board'
-          : true;
+        const isDestinationValid = !currentBoard ? destinationBoard : true;
 
         return !isSameBoard && isDestinationValid;
       }

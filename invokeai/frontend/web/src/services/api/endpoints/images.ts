@@ -6,6 +6,7 @@ import {
   BoardId,
   IMAGE_CATEGORIES,
 } from 'features/gallery/store/gallerySlice';
+import { getCategories } from 'features/gallery/store/util';
 import queryString from 'query-string';
 import { ApiFullTagDescription, api } from '..';
 import { components, paths } from '../schema';
@@ -15,8 +16,7 @@ import {
   OffsetPaginatedResults_ImageDTO_,
   PostUploadAction,
 } from '../types';
-import { getCacheAction, getIsImageInDateRange } from './util';
-import { getCategories } from 'features/gallery/store/util';
+import { getIsImageInDateRange } from './util';
 
 export type ListImagesArgs = NonNullable<
   paths['/api/v1/images/']['get']['parameters']['query']
@@ -502,7 +502,6 @@ export const imagesApi = api.injectEndpoints({
         };
       },
       invalidatesTags: (result, error, { board_id, imageDTO }) => [
-        { type: 'BoardImage' },
         { type: 'Board', id: board_id },
         { type: 'BoardImagesTotal', id: board_id },
         { type: 'BoardImagesTotal', id: imageDTO.board_id ?? 'none' },
@@ -636,7 +635,6 @@ export const imagesApi = api.injectEndpoints({
         };
       },
       invalidatesTags: (result, error, { imageDTO }) => [
-        { type: 'BoardImage' },
         { type: 'Board', id: imageDTO.board_id },
         { type: 'BoardImagesTotal', id: imageDTO.board_id },
         { type: 'BoardImagesTotal', id: 'none' },

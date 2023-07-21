@@ -59,9 +59,11 @@ const GalleryBoardName = (props: Props) => {
         justifyContent: 'center',
         alignItems: 'center',
         px: 2,
+        bg: 'base.100',
+        _dark: { bg: 'base.800' },
         _hover: {
-          bg: 'base.100',
-          _dark: { bg: 'base.800' },
+          bg: 'base.200',
+          _dark: { bg: 'base.700' },
         },
       }}
     >

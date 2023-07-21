@@ -109,10 +109,25 @@ export const boardsApi = api.injectEndpoints({
 
     deleteBoard: build.mutation<DeleteBoardResult, string>({
       query: (board_id) => ({ url: `boards/${board_id}`, method: 'DELETE' }),
-      invalidatesTags: (result, error, arg) => [
-        { type: 'Board', id: arg },
+      invalidatesTags: (result, error, board_id) => [
+        { type: 'Board', id: LIST_TAG },
         // invalidate the 'No Board' cache
-        { type: 'ImageList', id: getListImagesUrl({ board_id: 'none' }) },
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: 'none',
+            categories: IMAGE_CATEGORIES,
+          }),
+        },
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: 'none',
+            categories: ASSETS_CATEGORIES,
+          }),
+        },
+        { type: 'BoardImagesTotal', id: 'none' },
+        { type: 'BoardAssetsTotal', id: 'none' },
       ],
       async onQueryStarted(board_id, { dispatch, queryFulfilled, getState }) {
         /**
@@ -167,17 +182,10 @@ export const boardsApi = api.injectEndpoints({
                 'listImages',
                 queryArgs,
                 (draft) => {
-                  const oldCount = imagesAdapter
-                    .getSelectors()
-                    .selectTotal(draft);
+                  const oldTotal = draft.total;
                   const newState = imagesAdapter.updateMany(draft, updates);
-                  const newCount = imagesAdapter
-                    .getSelectors()
-                    .selectTotal(newState);
-                  draft.total = Math.max(
-                    draft.total - (oldCount - newCount),
-                    0
-                  );
+                  const delta = newState.total - oldTotal;
+                  draft.total = draft.total + delta;
                 }
               )
             );
@@ -197,9 +205,24 @@ export const boardsApi = api.injectEndpoints({
         method: 'DELETE',
         params: { include_images: true },
       }),
-      invalidatesTags: (result, error, arg) => [
-        { type: 'Board', id: arg },
-        { type: 'ImageList', id: getListImagesUrl({ board_id: 'none' }) },
+      invalidatesTags: (result, error, board_id) => [
+        { type: 'Board', id: LIST_TAG },
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: 'none',
+            categories: IMAGE_CATEGORIES,
+          }),
+        },
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: 'none',
+            categories: ASSETS_CATEGORIES,
+          }),
+        },
+        { type: 'BoardImagesTotal', id: 'none' },
+        { type: 'BoardAssetsTotal', id: 'none' },
       ],
       async onQueryStarted(board_id, { dispatch, queryFulfilled, getState }) {
         /**
@@ -231,20 +254,13 @@ export const boardsApi = api.injectEndpoints({
                 'listImages',
                 queryArgs,
                 (draft) => {
-                  const oldCount = imagesAdapter
-                    .getSelectors()
-                    .selectTotal(draft);
+                  const oldTotal = draft.total;
                   const newState = imagesAdapter.removeMany(
                     draft,
                     deleted_images
                   );
-                  const newCount = imagesAdapter
-                    .getSelectors()
-                    .selectTotal(newState);
-                  draft.total = Math.max(
-                    draft.total - (oldCount - newCount),
-                    0
-                  );
+                  const delta = newState.total - oldTotal;
+                  draft.total = draft.total + delta;
                 }
               )
             );

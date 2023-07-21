@@ -19,12 +19,12 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FaFolder } from 'react-icons/fa';
+import { FaUser } from 'react-icons/fa';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import { BoardDTO } from 'services/api/types';
 import BoardContextMenu from '../BoardContextMenu';
-import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 
 const AUTO_ADD_BADGE_STYLES: ChakraProps['sx'] = {
   bg: 'accent.200',
@@ -176,7 +176,7 @@ const GalleryBoard = memo(
                   >
                     <Icon
                       boxSize={12}
-                      as={FaFolder}
+                      as={FaUser}
                       sx={{
                         mt: -3,
                         opacity: 0.7,
