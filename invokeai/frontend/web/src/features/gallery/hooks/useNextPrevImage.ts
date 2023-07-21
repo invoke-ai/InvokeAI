@@ -64,7 +64,7 @@ export const nextPrevImageButtonsSelector = createSelector(
       isOnFirstImage: currentImageIndex === 0,
       isOnLastImage:
         !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
-      areMoreImagesAvailable: data?.total ?? 0 > imagesLength,
+      areMoreImagesAvailable: (data?.total ?? 0) > imagesLength,
       isFetching: status === 'pending',
       nextImage,
       prevImage,

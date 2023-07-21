@@ -19,6 +19,7 @@ import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 
 const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   defer: true,
@@ -40,7 +41,10 @@ const GalleryImageGrid = () => {
   const [initialize, osInstance] = useOverlayScrollbars(
     overlayScrollbarsConfig
   );
-
+  const selectedBoardId = useAppSelector(
+    (state) => state.gallery.selectedBoardId
+  );
+  const { currentViewTotal } = useBoardTotal(selectedBoardId);
   const queryArgs = useAppSelector(selectListImagesBaseQueryArgs);
 
   const { currentData, isFetching, isSuccess, isError } =
@@ -49,19 +53,23 @@ const GalleryImageGrid = () => {
   const [listImages] = useLazyListImagesQuery();
 
   const areMoreAvailable = useMemo(() => {
-    if (!currentData) {
+    if (!currentData || !currentViewTotal) {
       return false;
     }
-    return currentData.ids.length < currentData.total;
-  }, [currentData]);
+    return currentData.ids.length < currentViewTotal;
+  }, [currentData, currentViewTotal]);
 
   const handleLoadMoreImages = useCallback(() => {
+    if (!areMoreAvailable) {
+      return;
+    }
+
     listImages({
       ...queryArgs,
       offset: currentData?.ids.length ?? 0,
       limit: IMAGE_LIMIT,
     });
-  }, [listImages, queryArgs, currentData?.ids.length]);
+  }, [areMoreAvailable, listImages, queryArgs, currentData?.ids.length]);
 
   useEffect(() => {
     // Initialize the gallery's custom scrollbar
