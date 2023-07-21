@@ -44,7 +44,7 @@ export const addBoardIdSelectedListener = () => {
         () =>
           imagesApi.endpoints.listImages.select(queryArgs)(getState())
             .isSuccess,
-        1000
+        5000
       );
 
       if (isSuccess) {

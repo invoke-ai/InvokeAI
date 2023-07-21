@@ -6,7 +6,6 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { memo, useMemo } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 
 const selector = createSelector(
   [stateSelector],
@@ -27,24 +26,28 @@ const GalleryBoardName = (props: Props) => {
   const { isOpen, onToggle } = props;
   const { selectedBoardId } = useAppSelector(selector);
   const boardName = useBoardName(selectedBoardId);
-  const { totalImages, totalAssets } = useBoardTotal(selectedBoardId);
+  // const { totalImages, totalAssets } = useBoardTotal(selectedBoardId);
 
   const formattedBoardName = useMemo(() => {
-    if (!boardName) {
-      return '';
-    }
-
-    if (boardName && (totalImages === undefined || totalAssets === undefined)) {
-      return boardName;
-    }
-
-    const count = `${totalImages}/${totalAssets}`;
-
     if (boardName.length > 20) {
-      return `${boardName.substring(0, 20)}... (${count})`;
+      return `${boardName.substring(0, 20)}...`;
     }
-    return `${boardName} (${count})`;
-  }, [boardName, totalAssets, totalImages]);
+    return boardName;
+    // if (!boardName) {
+    //   return '';
+    // }
+
+    // if (boardName && (totalImages === undefined || totalAssets === undefined)) {
+    //   return boardName;
+    // }
+
+    // const count = `${totalImages}/${totalAssets}`;
+
+    // if (boardName.length > 20) {
+    //   return `${boardName.substring(0, 20)}... (${count})`;
+    // }
+    // return `${boardName} (${count})`;
+  }, [boardName]);
 
   return (
     <Flex

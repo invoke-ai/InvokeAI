@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   ButtonGroup,
   Flex,
   Spacer,
@@ -92,23 +93,42 @@ const ImageGalleryContent = () => {
         >
           <Tabs
             index={galleryView === 'images' ? 0 : 1}
-            variant="line"
+            variant="unstyled"
             size="sm"
             sx={{ w: 'full' }}
           >
             <TabList>
-              <Tab
-                onClick={handleClickImages}
-                sx={{ borderTopRadius: 'base', w: 'full' }}
+              <ButtonGroup
+                isAttached
+                sx={{
+                  w: 'full',
+                }}
               >
-                Images
-              </Tab>
-              <Tab
-                onClick={handleClickAssets}
-                sx={{ borderTopRadius: 'base', w: 'full' }}
-              >
-                Assets
-              </Tab>
+                <Tab
+                  as={IAIButton}
+                  size="sm"
+                  isChecked={galleryView === 'images'}
+                  onClick={handleClickImages}
+                  sx={{
+                    w: 'full',
+                  }}
+                  leftIcon={<FaImages />}
+                >
+                  Images
+                </Tab>
+                <Tab
+                  as={IAIButton}
+                  size="sm"
+                  isChecked={galleryView === 'assets'}
+                  onClick={handleClickAssets}
+                  sx={{
+                    w: 'full',
+                  }}
+                  leftIcon={<FaServer />}
+                >
+                  Assets
+                </Tab>
+              </ButtonGroup>
             </TabList>
           </Tabs>
         </Flex>

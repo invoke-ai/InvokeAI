@@ -26,6 +26,7 @@ import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import { BoardDTO } from 'services/api/types';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
+import SelectionOverlay from 'common/components/SelectionOverlay';
 
 const BASE_BADGE_STYLES: ChakraProps['sx'] = {
   bg: 'base.500',
@@ -56,7 +57,13 @@ const GalleryBoard = memo(
     );
 
     const { isSelectedForAutoAdd } = useAppSelector(selector);
-
+    const [isHovered, setIsHovered] = useState(false);
+    const handleMouseOver = useCallback(() => {
+      setIsHovered(true);
+    }, []);
+    const handleMouseOut = useCallback(() => {
+      setIsHovered(false);
+    }, []);
     const { currentData: coverImage } = useGetImageDTOQuery(
       board.cover_image_name ?? skipToken
     );
@@ -83,26 +90,30 @@ const GalleryBoard = memo(
     );
 
     const handleSubmit = useCallback(
-      (newBoardName: string) => {
-        if (!newBoardName) {
-          // empty strings are not allowed
+      async (newBoardName: string) => {
+        // empty strings are not allowed
+        if (!newBoardName.trim()) {
           setLocalBoardName(board_name);
           return;
         }
+
+        // don't updated the board name if it hasn't changed
         if (newBoardName === board_name) {
-          // don't updated the board name if it hasn't changed
           return;
         }
-        updateBoard({ board_id, changes: { board_name: newBoardName } })
-          .unwrap()
-          .then((response) => {
-            // update local state
-            setLocalBoardName(response.board_name);
-          })
-          .catch(() => {
-            // revert on error
-            setLocalBoardName(board_name);
-          });
+
+        try {
+          const { board_name } = await updateBoard({
+            board_id,
+            changes: { board_name: newBoardName },
+          }).unwrap();
+
+          // update local state
+          setLocalBoardName(board_name);
+        } catch {
+          // revert on error
+          setLocalBoardName(board_name);
+        }
       },
       [board_id, board_name, updateBoard]
     );
@@ -116,6 +127,8 @@ const GalleryBoard = memo(
         sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}
       >
         <Flex
+          onMouseOver={handleMouseOver}
+          onMouseOut={handleMouseOut}
           sx={{
             position: 'relative',
             justifyContent: 'center',
@@ -174,7 +187,7 @@ const GalleryBoard = memo(
                       boxSize={12}
                       as={FaUser}
                       sx={{
-                        mt: -3,
+                        mt: -6,
                         opacity: 0.7,
                         color: 'base.500',
                         _dark: {
@@ -184,7 +197,7 @@ const GalleryBoard = memo(
                     />
                   </Flex>
                 )}
-                <Flex
+                {/* <Flex
                   sx={{
                     position: 'absolute',
                     insetInlineEnd: 0,
@@ -195,24 +208,11 @@ const GalleryBoard = memo(
                   <Badge variant="solid" sx={BASE_BADGE_STYLES}>
                     {totalImages}/{totalAssets}
                   </Badge>
-                </Flex>
+                </Flex> */}
                 {isSelectedForAutoAdd && <AutoAddIcon />}
-                <Box
-                  className="selection-box"
-                  sx={{
-                    position: 'absolute',
-                    top: 0,
-                    insetInlineEnd: 0,
-                    bottom: 0,
-                    insetInlineStart: 0,
-                    borderRadius: 'base',
-                    transitionProperty: 'common',
-                    transitionDuration: 'common',
-                    shadow: isSelected ? 'selected.light' : undefined,
-                    _dark: {
-                      shadow: isSelected ? 'selected.dark' : undefined,
-                    },
-                  }}
+                <SelectionOverlay
+                  isSelected={isSelected}
+                  isHovered={isHovered}
                 />
                 <Flex
                   sx={{

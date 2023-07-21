@@ -5,7 +5,7 @@ const AutoAddIcon = () => {
     <Flex
       sx={{
         position: 'absolute',
-        insetInlineStart: 0,
+        insetInlineEnd: 0,
         top: 0,
         p: 1,
       }}

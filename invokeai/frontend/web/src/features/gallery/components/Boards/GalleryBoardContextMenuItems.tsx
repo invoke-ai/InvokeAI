@@ -59,11 +59,11 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
                   </MenuItem> */}
         </>
       )}
-      {!isSelectedForAutoAdd && (
+      {/* {!isSelectedForAutoAdd && (
         <MenuItem icon={<FaPlus />} onClick={handleToggleAutoAdd}>
           Auto-add to this Board
         </MenuItem>
-      )}
+      )} */}
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
         icon={<FaTrash />}
