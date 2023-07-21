@@ -24,12 +24,8 @@ import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import { BoardDTO } from 'services/api/types';
+import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
-
-const AUTO_ADD_BADGE_STYLES: ChakraProps['sx'] = {
-  bg: 'accent.200',
-  color: 'blackAlpha.900',
-};
 
 const BASE_BADGE_STYLES: ChakraProps['sx'] = {
   bg: 'base.500',
@@ -200,6 +196,7 @@ const GalleryBoard = memo(
                     {totalImages}/{totalAssets}
                   </Badge>
                 </Flex>
+                {isSelectedForAutoAdd && <AutoAddIcon />}
                 <Box
                   className="selection-box"
                   sx={{

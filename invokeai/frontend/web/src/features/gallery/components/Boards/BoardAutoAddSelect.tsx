@@ -52,7 +52,7 @@ const BoardAutoAddSelect = () => {
         return;
       }
 
-      dispatch(autoAddBoardIdChanged(v === 'none' ? null : v));
+      dispatch(autoAddBoardIdChanged(v === 'none' ? undefined : v));
     },
     [dispatch]
   );

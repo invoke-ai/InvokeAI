@@ -51,7 +51,7 @@ const GalleryBoardName = (props: Props) => {
       as={Button}
       onClick={onToggle}
       size="sm"
-      variant="ghost"
+      // variant="ghost"
       sx={{
         position: 'relative',
         gap: 2,
@@ -59,12 +59,12 @@ const GalleryBoardName = (props: Props) => {
         justifyContent: 'center',
         alignItems: 'center',
         px: 2,
-        bg: 'base.100',
-        _dark: { bg: 'base.800' },
-        _hover: {
-          bg: 'base.200',
-          _dark: { bg: 'base.700' },
-        },
+        // bg: 'base.100',
+        // _dark: { bg: 'base.800' },
+        // _hover: {
+        //   bg: 'base.200',
+        //   _dark: { bg: 'base.700' },
+        // },
       }}
     >
       <Spacer />

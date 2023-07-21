@@ -190,9 +190,6 @@ export const boardsApi = api.injectEndpoints({
               )
             );
           });
-
-          // after deleting a board, select the 'All Images' board
-          dispatch(boardIdSelected('images'));
         } catch {
           //no-op
         }
@@ -265,9 +262,6 @@ export const boardsApi = api.injectEndpoints({
               )
             );
           });
-
-          // after deleting a board, select the 'All Images' board
-          dispatch(boardIdSelected('images'));
         } catch {
           //no-op
         }

@@ -3,6 +3,9 @@ import {
   ButtonGroup,
   Flex,
   Spacer,
+  Tab,
+  TabList,
+  Tabs,
   VStack,
   useDisclosure,
 } from '@chakra-ui/react';
@@ -87,30 +90,22 @@ const ImageGalleryContent = () => {
             gap: 2,
           }}
         >
-          <ButtonGroup isAttached sx={{ w: 'full' }}>
-            <IAIButton
-              leftIcon={<FaImages />}
-              size="sm"
-              isChecked={galleryView === 'images'}
-              onClick={handleClickImages}
-              sx={{
-                w: 'full',
-              }}
-            >
-              Images
-            </IAIButton>
-            <IAIButton
-              leftIcon={<FaServer />}
-              size="sm"
-              isChecked={galleryView === 'assets'}
-              onClick={handleClickAssets}
-              sx={{
-                w: 'full',
-              }}
-            >
-              Assets
-            </IAIButton>
-          </ButtonGroup>
+          <Tabs variant="line" size="sm" sx={{ w: 'full' }}>
+            <TabList>
+              <Tab
+                onClick={handleClickImages}
+                sx={{ borderTopRadius: 'base', w: 'full' }}
+              >
+                Images
+              </Tab>
+              <Tab
+                onClick={handleClickAssets}
+                sx={{ borderTopRadius: 'base', w: 'full' }}
+              >
+                Assets
+              </Tab>
+            </TabList>
+          </Tabs>
         </Flex>
 
         {selectedBoardId === 'batch' ? (

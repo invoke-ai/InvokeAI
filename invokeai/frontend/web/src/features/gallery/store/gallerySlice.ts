@@ -21,7 +21,7 @@ export type BoardId = string | undefined;
 type GalleryState = {
   selection: string[];
   shouldAutoSwitch: boolean;
-  autoAddBoardId: string | null;
+  autoAddBoardId: string | undefined;
   galleryImageMinimumWidth: number;
   selectedBoardId: BoardId;
   galleryView: GalleryView;
@@ -32,7 +32,7 @@ type GalleryState = {
 export const initialGalleryState: GalleryState = {
   selection: [],
   shouldAutoSwitch: true,
-  autoAddBoardId: null,
+  autoAddBoardId: undefined,
   galleryImageMinimumWidth: 96,
   selectedBoardId: undefined,
   galleryView: 'images',
@@ -124,7 +124,10 @@ export const gallerySlice = createSlice({
       state.batchImageNames = [];
       state.selection = [];
     },
-    autoAddBoardIdChanged: (state, action: PayloadAction<string | null>) => {
+    autoAddBoardIdChanged: (
+      state,
+      action: PayloadAction<string | undefined>
+    ) => {
       state.autoAddBoardId = action.payload;
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
@@ -137,10 +140,11 @@ export const gallerySlice = createSlice({
       (state, action) => {
         const deletedBoardId = action.meta.arg.originalArgs;
         if (deletedBoardId === state.selectedBoardId) {
-          state.selectedBoardId = 'images';
+          state.selectedBoardId = undefined;
+          state.galleryView = 'images';
         }
         if (deletedBoardId === state.autoAddBoardId) {
-          state.autoAddBoardId = null;
+          state.autoAddBoardId = undefined;
         }
       }
     );
@@ -153,7 +157,7 @@ export const gallerySlice = createSlice({
         }
 
         if (!boards.map((b) => b.board_id).includes(state.autoAddBoardId)) {
-          state.autoAddBoardId = null;
+          state.autoAddBoardId = undefined;
         }
       }
     );

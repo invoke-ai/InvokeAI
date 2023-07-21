@@ -84,6 +84,13 @@ export const addInvocationCompleteEventListener = () => {
             );
           }
 
+          dispatch(
+            imagesApi.util.invalidateTags([
+              { type: 'BoardImagesTotal', id: autoAddBoardId ?? 'none' },
+              { type: 'BoardAssetsTotal', id: autoAddBoardId ?? 'none' },
+            ])
+          );
+
           const { selectedBoardId, shouldAutoSwitch } = gallery;
 
           // If auto-switch is enabled, select the new image
