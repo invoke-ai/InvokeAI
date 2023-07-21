@@ -6,6 +6,7 @@ import os
 import platform
 import psutil
 import requests
+import pkg_resources
 from rich import box, print
 from rich.console import Console, group
 from rich.panel import Panel
@@ -72,10 +73,20 @@ def welcome(versions: dict):
     )
     console.line()
 
+def get_extras():
+    extras = ''
+    try:
+        dist = pkg_resources.get_distribution('xformers')
+        extras = '[xformers]'
+    except pkg_resources.DistributionNotFound:
+        pass
+    return extras
+
 def main():
     versions = get_versions()
     if invokeai_is_running():
         print(f':exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]')
+        input('Press any key to continue...')
         return
 
     welcome(versions)
@@ -94,13 +105,15 @@ def main():
     elif choice=='4':
         branch = Prompt.ask('Enter an InvokeAI branch name')
 
+    extras = get_extras()
+
     print(f':crossed_fingers: Upgrading to [yellow]{tag if tag else release}[/yellow]')
     if release:
-        cmd = f'pip install {INVOKE_AI_SRC}/{release}.zip --use-pep517 --upgrade'
+        cmd = f"pip install 'invokeai{extras} @ {INVOKE_AI_SRC}/{release}.zip' --use-pep517 --upgrade"
     elif tag:
-        cmd = f'pip install {INVOKE_AI_TAG}/{tag}.zip --use-pep517 --upgrade'
+        cmd = f"pip install 'invokeai{extras} @ {INVOKE_AI_TAG}/{tag}.zip' --use-pep517 --upgrade"
     else:
-        cmd = f'pip install {INVOKE_AI_BRANCH}/{branch}.zip --use-pep517 --upgrade'
+        cmd = f"pip install 'invokeai{extras} @ {INVOKE_AI_BRANCH}/{branch}.zip' --use-pep517 --upgrade"
     print('')
     print('')
     if os.system(cmd)==0:

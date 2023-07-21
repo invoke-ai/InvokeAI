@@ -9,7 +9,6 @@ from __future__ import annotations
 import contextlib
 import gc
 import hashlib
-import io
 import os
 import re
 import sys
@@ -31,11 +30,10 @@ from huggingface_hub import scan_cache_dir
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 from picklescan.scanner import scan_file_path
-
 from ldm.invoke.devices import CPU_DEVICE
 from ldm.invoke.generator.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ldm.invoke.globals import Globals, global_cache_dir
-from ldm.util import ask_user, download_with_resume, instantiate_from_config, url_attachment_name
+from ldm.util import ask_user, download_with_resume, url_attachment_name
 
 
 class SDLegacyType(Enum):
@@ -370,8 +368,9 @@ class ModelManager(object):
         print(
             f">> Converting legacy checkpoint {model_name} into a diffusers model..."
         )
-        from ldm.invoke.ckpt_to_diffuser import load_pipeline_from_original_stable_diffusion_ckpt
-
+        from .ckpt_to_diffuser import (
+            load_pipeline_from_original_stable_diffusion_ckpt,
+        )
         if self._has_cuda():
             torch.cuda.empty_cache()
         pipeline = load_pipeline_from_original_stable_diffusion_ckpt(
@@ -433,7 +432,7 @@ class ModelManager(object):
                     **fp_args,
                 )
             except OSError as e:
-                if str(e).startswith("fp16 is not a valid"):
+                if 'Revision Not Found' in str(e):
                     pass
                 else:
                     print(
@@ -1230,6 +1229,17 @@ class ModelManager(object):
         return vae_path
                                
     def _load_vae(self, vae_config) -> AutoencoderKL:
+        using_fp16 = self.precision == "float16"
+        dtype = torch.float16 if using_fp16 else torch.float32
+        
+        # Handle the common case of a user shoving a VAE .ckpt into
+        # the vae field for a diffusers. We convert it into diffusers
+        # format and use it.
+        if isinstance(vae_config,(str,Path)):
+            return self.convert_vae(vae_config).to(dtype=dtype)
+        elif isinstance(vae_config,DictConfig) and (vae_path := vae_config.get('path')):
+            return self.convert_vae(vae_path).to(dtype=dtype)
+            
         vae_args = {}
         try:
             name_or_path = self.model_name_or_path(vae_config)
@@ -1237,7 +1247,6 @@ class ModelManager(object):
             return None
         if name_or_path is None:
             return None
-        using_fp16 = self.precision == "float16"
 
         vae_args.update(
             cache_dir=global_cache_dir("hub"),
@@ -1275,6 +1284,32 @@ class ModelManager(object):
         if not vae and deferred_error:
             print(f"** Could not load VAE {name_or_path}: {str(deferred_error)}")
 
+        return vae
+
+    @staticmethod
+    def convert_vae(vae_path: Union[Path,str])->AutoencoderKL:
+        print("   | A checkpoint VAE was detected. Converting to diffusers format.")
+        vae_path = Path(Globals.root,vae_path).resolve()
+        
+        from .ckpt_to_diffuser import (
+            create_vae_diffusers_config,
+            convert_ldm_vae_state_dict,
+        )
+
+        vae_path = Path(vae_path)
+        if vae_path.suffix in ['.pt','.ckpt']:
+            vae_state_dict = torch.load(vae_path, map_location="cpu")
+        else:
+            vae_state_dict = safetensors.torch.load_file(vae_path)
+        if 'state_dict' in vae_state_dict:
+            vae_state_dict = vae_state_dict['state_dict']
+        # TODO: see if this works with 1.x inpaint models and 2.x models
+        config_file_path = Path(Globals.root,"configs/stable-diffusion/v1-inference.yaml")
+        original_conf = OmegaConf.load(config_file_path)
+        vae_config = create_vae_diffusers_config(original_conf, image_size=512) # TODO: fix
+        diffusers_vae = convert_ldm_vae_state_dict(vae_state_dict,vae_config)
+        vae = AutoencoderKL(**vae_config)
+        vae.load_state_dict(diffusers_vae)
         return vae
 
     @staticmethod
