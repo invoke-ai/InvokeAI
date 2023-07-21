@@ -98,7 +98,7 @@ dependencies = [
 "dev" = [
   "pudb",
 ]
-"test" = ["pytest>6.0.0", "pytest-cov"]
+"test" = ["pytest>6.0.0", "pytest-cov", "black"]
 "xformers" = [
 	   "xformers~=0.0.19; sys_platform!='darwin'",
 	   "triton; sys_platform=='linux'",
@@ -176,5 +176,8 @@ directory = "coverage/html"
 output = "coverage/index.xml"
 #=== End: PyTest and Coverage
 
-[flake8]
-max-line-length = 120
+[tool.flake8]
+max-line-length = 100
+
+[tool.black]
+line-length = 100
