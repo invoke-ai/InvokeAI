@@ -46,6 +46,9 @@ async def upload_image(
     session_id: Optional[str] = Query(
         default=None, description="The session ID associated with this upload, if any"
     ),
+    crop_visible: Optional[bool] = Query(
+        default=False, description="Whether to crop the image"
+    ),
 ) -> ImageDTO:
     """Uploads an image"""
     if not file.content_type.startswith("image"):
@@ -55,6 +58,9 @@ async def upload_image(
 
     try:
         pil_image = Image.open(io.BytesIO(contents))
+        if crop_visible:
+            bbox = pil_image.getbbox()
+            pil_image = pil_image.crop(bbox)
     except:
         # Error opening the image
         raise HTTPException(status_code=415, detail="Failed to read image")
