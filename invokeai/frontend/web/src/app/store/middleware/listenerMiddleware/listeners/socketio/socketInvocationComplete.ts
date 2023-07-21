@@ -3,6 +3,7 @@ import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
   IMAGE_CATEGORIES,
   boardIdSelected,
+  galleryViewChanged,
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
 import { progressImageSet } from 'features/system/store/systemSlice';
@@ -55,34 +56,6 @@ export const addInvocationCompleteEventListener = () => {
         }
 
         if (!imageDTO.is_intermediate) {
-          // update the cache for 'All Images'
-          dispatch(
-            imagesApi.util.updateQueryData(
-              'listImages',
-              {
-                categories: IMAGE_CATEGORIES,
-              },
-              (draft) => {
-                imagesAdapter.addOne(draft, imageDTO);
-                draft.total = draft.total + 1;
-              }
-            )
-          );
-
-          // update the cache for 'No Board'
-          dispatch(
-            imagesApi.util.updateQueryData(
-              'listImages',
-              {
-                board_id: 'none',
-              },
-              (draft) => {
-                imagesAdapter.addOne(draft, imageDTO);
-                draft.total = draft.total + 1;
-              }
-            )
-          );
-
           const { autoAddBoardId } = gallery;
 
           // add image to the board if auto-add is enabled
@@ -93,6 +66,22 @@ export const addInvocationCompleteEventListener = () => {
                 imageDTO,
               })
             );
+          } else {
+            // add to no board board
+            // update the cache for 'No Board'
+            dispatch(
+              imagesApi.util.updateQueryData(
+                'listImages',
+                {
+                  board_id: 'none',
+                  categories: IMAGE_CATEGORIES,
+                },
+                (draft) => {
+                  imagesAdapter.addOne(draft, imageDTO);
+                  draft.total = draft.total + 1;
+                }
+              )
+            );
           }
 
           const { selectedBoardId, shouldAutoSwitch } = gallery;
@@ -102,8 +91,9 @@ export const addInvocationCompleteEventListener = () => {
             // if auto-add is enabled, switch the board as the image comes in
             if (autoAddBoardId && autoAddBoardId !== selectedBoardId) {
               dispatch(boardIdSelected(autoAddBoardId));
+              dispatch(galleryViewChanged('images'));
             } else if (!autoAddBoardId) {
-              dispatch(boardIdSelected('images'));
+              dispatch(galleryViewChanged('images'));
             }
             dispatch(imageSelected(imageDTO.image_name));
           }
