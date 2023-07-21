@@ -24,7 +24,7 @@ title: Home
 
 [![CI checks on main badge]][ci checks on main link]
 [![CI checks on dev badge]][ci checks on dev link]
-[![latest commit to dev badge]][latest commit to dev link]
+<!-- [![latest commit to dev badge]][latest commit to dev link] -->
 
 [![github open issues badge]][github open issues link]
 [![github open prs badge]][github open prs link]
@@ -54,10 +54,10 @@ title: Home
 [github stars badge]:
   https://flat.badgen.net/github/stars/invoke-ai/InvokeAI?icon=github
 [github stars link]: https://github.com/invoke-ai/InvokeAI/stargazers
-[latest commit to dev badge]:
+<!-- [latest commit to dev badge]:
   https://flat.badgen.net/github/last-commit/invoke-ai/InvokeAI/development?icon=github&color=yellow&label=last%20dev%20commit&cache=900
 [latest commit to dev link]:
-  https://github.com/invoke-ai/InvokeAI/commits/development
+  https://github.com/invoke-ai/InvokeAI/commits/main -->
 [latest release badge]:
   https://flat.badgen.net/github/release/invoke-ai/InvokeAI/development?icon=github
 [latest release link]: https://github.com/invoke-ai/InvokeAI/releases
@@ -81,6 +81,25 @@ Q&A</a>]
 !!! note
 
     This fork is rapidly evolving. Please use the [Issues tab](https://github.com/invoke-ai/InvokeAI/issues) to report bugs and make feature requests. Be sure to use the provided templates. They will help aid diagnose issues faster.
+
+## :octicons-package-dependencies-24: Installation
+
+This fork is supported across Linux, Windows and Macintosh. Linux users can use
+either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
+driver).
+
+### [Installation Getting Started Guide](installation)
+#### **[Automated Installer](installation/010_INSTALL_AUTOMATED.md)**
+✅ This is the recommended installation method for first-time users. 
+#### [Manual Installation](installation/020_INSTALL_MANUAL.md)
+This method is recommended for experienced users and developers
+#### [Docker Installation](installation/040_INSTALL_DOCKER.md)
+This method is recommended for those familiar with running Docker containers
+### Other Installation Guides
+  - [PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md)
+  - [XFormers](installation/070_INSTALL_XFORMERS.md)
+  - [CUDA and ROCm Drivers](installation/030_INSTALL_CUDA_AND_ROCM.md)
+  - [Installing New Models](installation/050_INSTALLING_MODELS.md)
 
 ## :fontawesome-solid-computer: Hardware Requirements
 
@@ -107,24 +126,6 @@ images in full-precision mode:
 - At least 18 GB of free disk space for the machine learning model, Python, and
   all its dependencies.
 
-## :octicons-package-dependencies-24: Installation
-
-This fork is supported across Linux, Windows and Macintosh. Linux users can use
-either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
-driver).
-
-### [Installation Getting Started Guide](installation)
-#### [Automated Installer](installation/010_INSTALL_AUTOMATED.md)
-This method is recommended for 1st time users
-#### [Manual Installation](installation/020_INSTALL_MANUAL.md)
-This method is recommended for experienced users and developers
-#### [Docker Installation](installation/040_INSTALL_DOCKER.md)
-This method is recommended for those familiar with running Docker containers
-### Other Installation Guides
-  - [PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md)
-  - [XFormers](installation/070_INSTALL_XFORMERS.md)
-  - [CUDA and ROCm Drivers](installation/030_INSTALL_CUDA_AND_ROCM.md)
-  - [Installing New Models](installation/050_INSTALLING_MODELS.md)
 
 ## :octicons-gift-24: InvokeAI Features
 
