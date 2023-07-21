@@ -40,6 +40,9 @@ async def upload_image(
     response: Response,
     image_category: ImageCategory = Query(description="The category of the image"),
     is_intermediate: bool = Query(description="Whether this is an intermediate image"),
+    board_id: Optional[str] = Query(
+        default=None, description="The board to add this image to, if any"
+    ),
     session_id: Optional[str] = Query(
         default=None, description="The session ID associated with this upload, if any"
     ),
@@ -62,6 +65,7 @@ async def upload_image(
             image_origin=ResourceOrigin.EXTERNAL,
             image_category=image_category,
             session_id=session_id,
+            board_id=board_id,
             is_intermediate=is_intermediate,
         )
 
