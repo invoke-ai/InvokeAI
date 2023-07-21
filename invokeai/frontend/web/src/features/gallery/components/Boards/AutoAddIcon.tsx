@@ -12,7 +12,7 @@ const AutoAddIcon = () => {
     >
       <Badge
         variant="solid"
-        sx={{ fontSize: 10, bg: 'accent.400', _dark: { bg: 'accent.500' } }}
+        sx={{ bg: 'accent.400', _dark: { bg: 'accent.500' } }}
       >
         auto
       </Badge>

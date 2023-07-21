@@ -1,12 +1,6 @@
-import { ListImagesArgs, SYSTEM_BOARDS } from 'services/api/endpoints/images';
-import {
-  ASSETS_CATEGORIES,
-  BoardId,
-  GalleryView,
-  IMAGE_CATEGORIES,
-} from './gallerySlice';
-import { ImageCategory, ImageDTO } from 'services/api/types';
 import { isEqual } from 'lodash-es';
+import { ImageCategory, ImageDTO } from 'services/api/types';
+import { ASSETS_CATEGORIES, BoardId, IMAGE_CATEGORIES } from './gallerySlice';
 
 export const getCategoriesQueryParamForBoard = (
   board_id: BoardId

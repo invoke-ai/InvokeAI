@@ -56,9 +56,16 @@ export const addInvocationCompleteEventListener = () => {
         }
 
         if (!imageDTO.is_intermediate) {
-          const { autoAddBoardId } = gallery;
+          /**
+           * Cache updates for when an image result is received
+           * - *add* to getImageDTO
+           * - IF `autoAddBoardId` is set:
+           *    - THEN add it to the board_id/images
+           * - ELSE (`autoAddBoardId` is not set):
+           *    - THEN add it to the no_board/images
+           */
 
-          // add image to the board if auto-add is enabled
+          const { autoAddBoardId } = gallery;
           if (autoAddBoardId) {
             dispatch(
               imagesApi.endpoints.addImageToBoard.initiate({
@@ -67,8 +74,6 @@ export const addInvocationCompleteEventListener = () => {
               })
             );
           } else {
-            // add to no board board
-            // update the cache for 'No Board'
             dispatch(
               imagesApi.util.updateQueryData(
                 'listImages',
@@ -77,8 +82,10 @@ export const addInvocationCompleteEventListener = () => {
                   categories: IMAGE_CATEGORIES,
                 },
                 (draft) => {
-                  imagesAdapter.addOne(draft, imageDTO);
-                  draft.total = draft.total + 1;
+                  const oldTotal = draft.total;
+                  const newState = imagesAdapter.addOne(draft, imageDTO);
+                  const delta = newState.total - oldTotal;
+                  draft.total = draft.total + delta;
                 }
               )
             );

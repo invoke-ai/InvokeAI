@@ -8,10 +8,7 @@ import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
-import {
-  SYSTEM_BOARDS,
-  imagesApi,
-} from '../../../../../services/api/endpoints/images';
+import { imagesApi } from '../../../../../services/api/endpoints/images';
 
 const moduleLog = log.child({ namespace: 'image' });
 
@@ -26,7 +23,7 @@ export const addImageUploadedFulfilledListener = () => {
     effect: (action, { dispatch, getState }) => {
       const imageDTO = action.payload;
       const state = getState();
-      const { selectedBoardId } = state.gallery;
+      const { selectedBoardId, autoAddBoardId } = state.gallery;
 
       moduleLog.debug({ arg: '<Blob>', imageDTO }, 'Image uploaded');
 
@@ -44,13 +41,13 @@ export const addImageUploadedFulfilledListener = () => {
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {
         const { toastOptions } = postUploadAction;
-        if (SYSTEM_BOARDS.includes(selectedBoardId)) {
+        if (!autoAddBoardId) {
           dispatch(addToast({ ...DEFAULT_UPLOADED_TOAST, ...toastOptions }));
         } else {
           // Add this image to the board
           dispatch(
             imagesApi.endpoints.addImageToBoard.initiate({
-              board_id: selectedBoardId,
+              board_id: autoAddBoardId,
               imageDTO,
             })
           );
@@ -59,10 +56,10 @@ export const addImageUploadedFulfilledListener = () => {
           const { data } = boardsApi.endpoints.listAllBoards.select()(state);
 
           // Fall back to just the board id if we can't find the board for some reason
-          const board = data?.find((b) => b.board_id === selectedBoardId);
+          const board = data?.find((b) => b.board_id === autoAddBoardId);
           const description = board
             ? `Added to board ${board.board_name}`
-            : `Added to board ${selectedBoardId}`;
+            : `Added to board ${autoAddBoardId}`;
 
           dispatch(
             addToast({
