@@ -98,12 +98,16 @@ const ParamEmbeddingPopover = (props: Props) => {
           sx={{ p: 0, w: `calc(${PARAMETERS_PANEL_WIDTH} - 2rem )` }}
         >
           {data.length === 0 ? (
-            <Flex sx={{ justifyContent: 'center', p: 2 }}>
-              <Text
-                sx={{ fontSize: 'sm', color: 'base.500', _dark: 'base.700' }}
-              >
-                No Embeddings Loaded
-              </Text>
+            <Flex
+              sx={{
+                justifyContent: 'center',
+                p: 2,
+                fontSize: 'sm',
+                color: 'base.500',
+                _dark: { color: 'base.700' },
+              }}
+            >
+              <Text>No Embeddings Loaded</Text>
             </Flex>
           ) : (
             <IAIMantineSearchableSelect
