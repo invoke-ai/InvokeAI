@@ -19,10 +19,11 @@ import { useUploadImageMutation } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 import ImageUploadOverlay from './ImageUploadOverlay';
 import { AnimatePresence, motion } from 'framer-motion';
+import { stateSelector } from 'app/store/store';
 
 const selector = createSelector(
-  [activeTabNameSelector],
-  (activeTabName) => {
+  [stateSelector, activeTabNameSelector],
+  ({ gallery }, activeTabName) => {
     let postUploadAction: PostUploadAction = { type: 'TOAST' };
 
     if (activeTabName === 'unifiedCanvas') {
@@ -33,7 +34,10 @@ const selector = createSelector(
       postUploadAction = { type: 'SET_INITIAL_IMAGE' };
     }
 
+    const { autoAddBoardId } = gallery;
+
     return {
+      autoAddBoardId,
       postUploadAction,
     };
   },
@@ -46,7 +50,7 @@ type ImageUploaderProps = {
 
 const ImageUploader = (props: ImageUploaderProps) => {
   const { children } = props;
-  const { postUploadAction } = useAppSelector(selector);
+  const { autoAddBoardId, postUploadAction } = useAppSelector(selector);
   const isBusy = useAppSelector(selectIsBusy);
   const toaster = useAppToaster();
   const { t } = useTranslation();
@@ -74,9 +78,10 @@ const ImageUploader = (props: ImageUploaderProps) => {
         image_category: 'user',
         is_intermediate: false,
         postUploadAction,
+        board_id: autoAddBoardId,
       });
     },
-    [postUploadAction, uploadImage]
+    [autoAddBoardId, postUploadAction, uploadImage]
   );
 
   const onDrop = useCallback(

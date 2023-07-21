@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
-import { FaMinus, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaTrash } from 'react-icons/fa';
 import { BoardDTO } from 'services/api/types';
 
 type Props = {
@@ -42,7 +42,7 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
 
   const handleToggleAutoAdd = useCallback(() => {
     dispatch(
-      autoAddBoardIdChanged(isSelectedForAutoAdd ? null : board.board_id)
+      autoAddBoardIdChanged(isSelectedForAutoAdd ? undefined : board.board_id)
     );
   }, [board.board_id, dispatch, isSelectedForAutoAdd]);
 
@@ -59,16 +59,15 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
                   </MenuItem> */}
         </>
       )}
-      <MenuItem
-        icon={isSelectedForAutoAdd ? <FaMinus /> : <FaPlus />}
-        onClickCapture={handleToggleAutoAdd}
-      >
-        {isSelectedForAutoAdd ? 'Disable Auto-Add' : 'Auto-Add to this Board'}
-      </MenuItem>
+      {/* {!isSelectedForAutoAdd && (
+        <MenuItem icon={<FaPlus />} onClick={handleToggleAutoAdd}>
+          Auto-add to this Board
+        </MenuItem>
+      )} */}
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
         icon={<FaTrash />}
-        onClickCapture={handleDelete}
+        onClick={handleDelete}
       >
         Delete Board
       </MenuItem>
