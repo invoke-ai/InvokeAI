@@ -7,6 +7,10 @@ from queue import Queue
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from fastapi_events.handlers.local import local_handler
+from fastapi_events.typing import Event
+from invokeai.app.services.events import EventServiceBase
+
 class InvocationQueueItem(BaseModel):
     graph_execution_state_id: str = Field(description="The ID of the graph execution state")
     invocation_id: str = Field(description="The ID of the node being invoked")
@@ -35,12 +39,23 @@ class InvocationQueueABC(ABC):
 
 
 class MemoryInvocationQueue(InvocationQueueABC):
+
     __queue: Queue
     __cancellations: dict[str, float]
 
     def __init__(self):
         self.__queue = Queue()
         self.__cancellations = dict()
+        local_handler.register(
+            event_name=EventServiceBase.session_event, _func=self.delete_on_error
+        )
+
+    async def delete_on_error(self, event: Event):
+        print(event)
+        event_name = event[1]["event"]
+        if event_name == "invocation_error":
+            session_id = event[1]["data"]["graph_execution_state_id"]
+            self.cancel(session_id)
 
     def get(self) -> InvocationQueueItem:
         item = self.__queue.get()
@@ -55,6 +70,7 @@ class MemoryInvocationQueue(InvocationQueueABC):
             if self.__cancellations[graph_execution_state_id] < item.timestamp:
                 del self.__cancellations[graph_execution_state_id]
 
+        print(self.__queue.qsize())
         return item
 
     def put(self, item: Optional[InvocationQueueItem]) -> None:
