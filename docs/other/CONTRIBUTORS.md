@@ -17,18 +17,19 @@ We thank them for all of their time and hard work.
 
 * @lstein (Lincoln Stein) - Co-maintainer
 * @blessedcoolant - Co-maintainer
-* @hipsterusername (Kent Keirsey) - Product Manager
-* @psychedelicious - Web Team Leader
-* @keturn (Kevin Turner) - Diffusers
+* @hipsterusername (Kent Keirsey) - Co-maintainer, CEO, Positive Vibes
+* @psychedelicious (Spencer Mabrito) - Web Team Leader
 * @Kyle0654 (Kyle Schouviller) - Node Architect and General Backend Wizard
-* @damian0815 - Attention Systems and Gameplay Engineer
+* @damian0815 - Attention Systems and Compel Maintainer
 * @ebr (Eugene Brodsky) - Cloud/DevOps/Sofware engineer; your friendly neighbourhood cluster-autoscaler
 * @genomancer (Gregg Helt) - Controlnet support
 * @StAlKeR7779 (Sergey Borisov) - Torch stack, ONNX, model management, optimization
-* @cheerio (Mary Hip) - Web development
-* @brandon (Brandon Rising) - OSS/commercial interactions
-* @spencer - Web development
-* @millu (Millun Atluri) - Documentation, GitHub integration
+* @cheerio (Mary Rogers) - Lead Engineer & Web App Development
+* @brandon (Brandon Rising) - Platform, Infrastructure, Backend Systems
+* @ryanjdick (Ryan Dick) - Machine Learning & Training
+* @millu (Millun Atluri) - Community Manager, Documentation, Node-wrangler
+* @chainchompa (Jennifer Player) - Web Development & Chain-Chomping
+* @keturn (Kevin Turner) - Diffusers
 * @gogurt enjoyer - Discord moderator and end user support
 * @whosawhatsis - Discord moderator and end user support
 * @dwinrger - Discord moderator and end user support
