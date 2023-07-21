@@ -34,6 +34,7 @@ export const addCanvasSavedToGalleryListener = () => {
           }),
           image_category: 'general',
           is_intermediate: false,
+          board_id: state.gallery.autoAddBoardId,
           postUploadAction: {
             type: 'TOAST',
             toastOptions: { title: 'Canvas Saved to Gallery' },

@@ -72,9 +72,9 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 alignItems: 'center',
                 borderRadius: 'base',
                 cursor: 'pointer',
-                bg: 'base.300',
+                bg: 'base.200',
                 _dark: {
-                  bg: 'base.900',
+                  bg: 'base.800',
                 },
               }}
             >
