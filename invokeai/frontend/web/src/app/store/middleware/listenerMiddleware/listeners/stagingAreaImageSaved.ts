@@ -12,25 +12,35 @@ export const addStagingAreaImageSavedListener = () => {
     effect: async (action, { dispatch, getState, take }) => {
       const { imageDTO } = action.payload;
 
-      dispatch(
-        imagesApi.endpoints.updateImage.initiate({
-          imageDTO,
-          changes: { is_intermediate: false },
-        })
-      )
-        .unwrap()
-        .then((image) => {
-          dispatch(addToast({ title: 'Image Saved', status: 'success' }));
-        })
-        .catch((error) => {
-          dispatch(
-            addToast({
-              title: 'Image Saving Failed',
-              description: error.message,
-              status: 'error',
+      try {
+        const newImageDTO = await dispatch(
+          imagesApi.endpoints.changeImageIsIntermediate.initiate({
+            imageDTO,
+            is_intermediate: false,
+          })
+        ).unwrap();
+
+        // we may need to add it to the autoadd board
+        const { autoAddBoardId } = getState().gallery;
+
+        if (autoAddBoardId) {
+          await dispatch(
+            imagesApi.endpoints.addImageToBoard.initiate({
+              imageDTO: newImageDTO,
+              board_id: autoAddBoardId,
             })
           );
-        });
+        }
+        dispatch(addToast({ title: 'Image Saved', status: 'success' }));
+      } catch (error) {
+        dispatch(
+          addToast({
+            title: 'Image Saving Failed',
+            description: (error as Error)?.message,
+            status: 'error',
+          })
+        );
+      }
     },
   });
 };

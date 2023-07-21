@@ -251,7 +251,9 @@ from .model_search import ModelSearch
 from .models import (
     BaseModelType, ModelType, SubModelType,
     ModelError, SchedulerPredictionType, MODEL_CLASSES,
-    ModelConfigBase, ModelNotFoundException, InvalidModelException,
+    ModelConfigBase,
+    ModelNotFoundException, InvalidModelException,
+    DuplicateModelException,
 )
 
 # We are only starting to number the config file with release 3.
@@ -858,7 +860,7 @@ class ModelManager(object):
         loaded_files = set()
         new_models_found = False
 
-        self.logger.info(f'scanning {self.app_config.models_path} for new models')
+        self.logger.info(f'Scanning {self.app_config.models_path} for new models')
         with Chdir(self.app_config.root_path):
             for model_key, model_config in list(self.models.items()):
                 model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
@@ -891,15 +893,18 @@ class ModelManager(object):
                             model_name = model_path.name if model_path.is_dir() else model_path.stem
                             model_key = self.create_key(model_name, cur_base_model, cur_model_type)
 
-                            if model_key in self.models:
-                                raise Exception(f"Model with key {model_key} added twice")
-
-                            if model_path.is_relative_to(self.app_config.root_path):
-                                model_path = model_path.relative_to(self.app_config.root_path)
                             try:
+                                if model_key in self.models:
+                                    raise DuplicateModelException(f"Model with key {model_key} added twice")
+
+                                if model_path.is_relative_to(self.app_config.root_path):
+                                    model_path = model_path.relative_to(self.app_config.root_path)
+                                    
                                 model_config: ModelConfigBase = model_class.probe_config(str(model_path))
                                 self.models[model_key] = model_config
                                 new_models_found = True
+                            except DuplicateModelException as e:
+                                self.logger.warning(e)
                             except InvalidModelException:
                                 self.logger.warning(f"Not a valid model: {model_path}")
                             except NotImplementedError as e:
@@ -956,7 +961,7 @@ class ModelManager(object):
                                                       config.lora_dir,
                                                       config.embedding_dir,
                                                       config.controlnet_dir,
-                                                      ]
+                                                      ] if x
                        }
         scanner = ScanAndImport(directories, self.logger, ignore=known_paths, installer=installer)
         scanner.search()

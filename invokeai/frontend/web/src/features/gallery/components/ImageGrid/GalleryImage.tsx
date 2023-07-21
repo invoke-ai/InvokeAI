@@ -106,6 +106,7 @@ const GalleryImage = (props: HoverableImageProps) => {
           isDropDisabled={true}
           isUploadDisabled={true}
           thumbnail={true}
+          withHoverOverlay
           // resetIcon={<FaTrash />}
           // resetTooltip="Delete image"
           // withResetIcon // removed bc it's too easy to accidentally delete images

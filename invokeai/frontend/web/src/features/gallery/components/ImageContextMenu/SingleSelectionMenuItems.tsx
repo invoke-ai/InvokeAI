@@ -35,6 +35,8 @@ import {
 import { ImageDTO } from 'services/api/types';
 import { AddImageToBoardContext } from '../../../../app/contexts/AddImageToBoardContext';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import { useDebounce } from 'use-debounce';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -70,7 +72,16 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   const { onClickAddToBoard } = useContext(AddImageToBoardContext);
 
-  const { currentData } = useGetImageMetadataQuery(imageDTO.image_name);
+  const [debouncedMetadataQueryArg, debounceState] = useDebounce(
+    imageDTO.image_name,
+    500
+  );
+
+  const { currentData } = useGetImageMetadataQuery(
+    debounceState.isPending()
+      ? skipToken
+      : debouncedMetadataQueryArg ?? skipToken
+  );
 
   const { isClipboardAPIAvailable, copyImageToClipboard } =
     useCopyImageToClipboard();

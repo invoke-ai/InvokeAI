@@ -19,10 +19,10 @@ export const addFirstListImagesListener = () => {
       action,
       { getState, dispatch, unsubscribe, cancelActiveListeners }
     ) => {
-      // Only run this listener on the first listImages request for `images` categories
+      // Only run this listener on the first listImages request for no-board images
       if (
         action.meta.arg.queryCacheKey !==
-        getListImagesUrl({ categories: IMAGE_CATEGORIES })
+        getListImagesUrl({ board_id: 'none', categories: IMAGE_CATEGORIES })
       ) {
         return;
       }

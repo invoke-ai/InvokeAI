@@ -78,12 +78,12 @@ export const theme: ThemeOverride = {
     hoverSelected: {
       light:
         '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 4px var(--invokeai-colors-accent-500)',
-      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-300)',
+      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-400)',
     },
     hoverUnselected: {
       light:
-        '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 4px var(--invokeai-colors-accent-200)',
-      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 4px var(--invokeai-colors-accent-600)',
+        '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 3px var(--invokeai-colors-accent-500)',
+      dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 3px var(--invokeai-colors-accent-400)',
     },
     nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-accent-450)`,
   },
