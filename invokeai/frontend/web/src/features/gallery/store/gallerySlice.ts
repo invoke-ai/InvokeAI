@@ -14,13 +14,9 @@ export const ASSETS_CATEGORIES: ImageCategory[] = [
 export const INITIAL_IMAGE_LIMIT = 100;
 export const IMAGE_LIMIT = 20;
 
-// export type GalleryView = 'images' | 'assets';
-export type BoardId =
-  | 'images'
-  | 'assets'
-  | 'no_board'
-  | 'batch'
-  | (string & Record<never, never>);
+export type GalleryView = 'images' | 'assets';
+// export type BoardId = 'no_board' | (string & Record<never, never>);
+export type BoardId = string | undefined;
 
 type GalleryState = {
   selection: string[];
@@ -28,6 +24,7 @@ type GalleryState = {
   autoAddBoardId: string | null;
   galleryImageMinimumWidth: number;
   selectedBoardId: BoardId;
+  galleryView: GalleryView;
   batchImageNames: string[];
   isBatchEnabled: boolean;
 };
@@ -37,7 +34,8 @@ export const initialGalleryState: GalleryState = {
   shouldAutoSwitch: true,
   autoAddBoardId: null,
   galleryImageMinimumWidth: 96,
-  selectedBoardId: 'images',
+  selectedBoardId: undefined,
+  galleryView: 'images',
   batchImageNames: [],
   isBatchEnabled: false,
 };
@@ -96,6 +94,7 @@ export const gallerySlice = createSlice({
     },
     boardIdSelected: (state, action: PayloadAction<BoardId>) => {
       state.selectedBoardId = action.payload;
+      state.galleryView = 'images';
     },
     isBatchEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isBatchEnabled = action.payload;
@@ -127,6 +126,9 @@ export const gallerySlice = createSlice({
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<string | null>) => {
       state.autoAddBoardId = action.payload;
+    },
+    galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
+      state.galleryView = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -170,6 +172,7 @@ export const {
   imagesAddedToBatch,
   imagesRemovedFromBatch,
   autoAddBoardIdChanged,
+  galleryViewChanged,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

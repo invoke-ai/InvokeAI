@@ -27,16 +27,24 @@ const GalleryBoardName = (props: Props) => {
   const { isOpen, onToggle } = props;
   const { selectedBoardId } = useAppSelector(selector);
   const boardName = useBoardName(selectedBoardId);
-  const numOfBoardImages = useBoardTotal(selectedBoardId);
+  const { totalImages, totalAssets } = useBoardTotal(selectedBoardId);
 
   const formattedBoardName = useMemo(() => {
-    if (!boardName) return '';
-    if (boardName && !numOfBoardImages) return boardName;
-    if (boardName.length > 20) {
-      return `${boardName.substring(0, 20)}... (${numOfBoardImages})`;
+    if (!boardName) {
+      return '';
     }
-    return `${boardName} (${numOfBoardImages})`;
-  }, [boardName, numOfBoardImages]);
+
+    if (boardName && (totalImages === undefined || totalAssets === undefined)) {
+      return boardName;
+    }
+
+    const count = `${totalImages}/${totalAssets}`;
+
+    if (boardName.length > 20) {
+      return `${boardName.substring(0, 20)}... (${count})`;
+    }
+    return `${boardName} (${count})`;
+  }, [boardName, totalAssets, totalImages]);
 
   return (
     <Flex

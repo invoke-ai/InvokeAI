@@ -4,7 +4,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   IMAGE_LIMIT,
   imageSelected,
-  selectImagesById,
 } from 'features/gallery/store/gallerySlice';
 import { clamp, isEqual } from 'lodash-es';
 import { useCallback } from 'react';

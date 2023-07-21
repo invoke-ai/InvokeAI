@@ -1,53 +1,45 @@
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
-  ASSETS_CATEGORIES,
   BoardId,
-  IMAGE_CATEGORIES,
   INITIAL_IMAGE_LIMIT,
 } from 'features/gallery/store/gallerySlice';
-import { useMemo } from 'react';
-import { ListImagesArgs, useListImagesQuery } from '../endpoints/images';
+import {
+  ListImagesArgs,
+  useGetBoardAssetsTotalQuery,
+  useGetBoardImagesTotalQuery,
+} from '../endpoints/images';
 
-const baseQueryArg: ListImagesArgs = {
+const baseQueryArgs: ListImagesArgs = {
   offset: 0,
   limit: INITIAL_IMAGE_LIMIT,
   is_intermediate: false,
 };
 
-const imagesQueryArg: ListImagesArgs = {
-  categories: IMAGE_CATEGORIES,
-  ...baseQueryArg,
-};
+export const useBoardTotal = (board_id: BoardId) => {
+  const { data: totalImages } = useGetBoardImagesTotalQuery(board_id);
+  const { data: totalAssets } = useGetBoardAssetsTotalQuery(board_id);
+  // const imagesQueryArg = useMemo(() => {
+  //   const categories = IMAGE_CATEGORIES;
+  //   return { board_id, categories, ...baseQueryArgs };
+  // }, [board_id]);
 
-const assetsQueryArg: ListImagesArgs = {
-  categories: ASSETS_CATEGORIES,
-  ...baseQueryArg,
-};
+  // const assetsQueryArg = useMemo(() => {
+  //   const categories = ASSETS_CATEGORIES;
+  //   return { board_id, categories, ...baseQueryArgs };
+  // }, [board_id]);
 
-const noBoardQueryArg: ListImagesArgs = {
-  board_id: 'none',
-  ...baseQueryArg,
-};
+  // const { total: totalImages } = useListImagesQuery(
+  //   imagesQueryArg ?? skipToken,
+  //   {
+  //     selectFromResult: ({ currentData }) => ({ total: currentData?.total }),
+  //   }
+  // );
 
-export const useBoardTotal = (board_id: BoardId | null | undefined) => {
-  const queryArg = useMemo(() => {
-    if (!board_id) {
-      return;
-    }
-    if (board_id === 'images') {
-      return imagesQueryArg;
-    } else if (board_id === 'assets') {
-      return assetsQueryArg;
-    } else if (board_id === 'no_board') {
-      return noBoardQueryArg;
-    } else {
-      return { board_id, ...baseQueryArg };
-    }
-  }, [board_id]);
+  // const { total: totalAssets } = useListImagesQuery(
+  //   assetsQueryArg ?? skipToken,
+  //   {
+  //     selectFromResult: ({ currentData }) => ({ total: currentData?.total }),
+  //   }
+  // );
 
-  const { total } = useListImagesQuery(queryArg ?? skipToken, {
-    selectFromResult: ({ currentData }) => ({ total: currentData?.total }),
-  });
-
-  return total;
+  return { totalImages, totalAssets };
 };

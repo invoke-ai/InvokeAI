@@ -1,54 +1,123 @@
-import { Text } from '@chakra-ui/react';
+import { Badge, Box, ChakraProps, Flex, Icon, Text } from '@chakra-ui/react';
 import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
-import {
-  INITIAL_IMAGE_LIMIT,
-  boardIdSelected,
-} from 'features/gallery/store/gallerySlice';
-import { FaFolderOpen } from 'react-icons/fa';
-import { useDispatch } from 'react-redux';
-import {
-  ListImagesArgs,
-  useListImagesQuery,
-} from 'services/api/endpoints/images';
-import GenericBoard from './GenericBoard';
+import { useAppDispatch } from 'app/store/storeHooks';
+import IAIDroppable from 'common/components/IAIDroppable';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { memo, useCallback, useMemo } from 'react';
+import { FaFolder } from 'react-icons/fa';
+import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 
-const baseQueryArg: ListImagesArgs = {
-  board_id: 'none',
-  offset: 0,
-  limit: INITIAL_IMAGE_LIMIT,
-  is_intermediate: false,
+const BASE_BADGE_STYLES: ChakraProps['sx'] = {
+  bg: 'base.500',
+  color: 'whiteAlpha.900',
 };
+interface Props {
+  isSelected: boolean;
+}
 
-const NoBoardBoard = ({ isSelected }: { isSelected: boolean }) => {
-  const dispatch = useDispatch();
+const NoBoardBoard = memo(({ isSelected }: Props) => {
+  const dispatch = useAppDispatch();
+  const { totalImages, totalAssets } = useBoardTotal(undefined);
+  const handleSelectBoard = useCallback(() => {
+    dispatch(boardIdSelected(undefined));
+  }, [dispatch]);
 
-  const handleClick = () => {
-    dispatch(boardIdSelected('no_board'));
-  };
-
-  const { total } = useListImagesQuery(baseQueryArg, {
-    selectFromResult: ({ data }) => ({ total: data?.total ?? 0 }),
-  });
-
-  // TODO: Do we support making 'images' 'assets? if yes, we need to handle this
-  const droppableData: MoveBoardDropData = {
-    id: 'all-images-board',
-    actionType: 'MOVE_BOARD',
-    context: { boardId: 'no_board' },
-  };
+  const droppableData: MoveBoardDropData = useMemo(
+    () => ({
+      id: 'no_board',
+      actionType: 'MOVE_BOARD',
+      context: { boardId: undefined },
+    }),
+    []
+  );
 
   return (
-    <GenericBoard
-      board_id="no_board"
-      droppableData={droppableData}
-      dropLabel={<Text fontSize="md">Move</Text>}
-      onClick={handleClick}
-      isSelected={isSelected}
-      icon={FaFolderOpen}
-      label="No Board"
-      badgeCount={total}
-    />
+    <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
+      <Flex
+        onClick={handleSelectBoard}
+        sx={{
+          position: 'relative',
+          justifyContent: 'center',
+          alignItems: 'center',
+          aspectRatio: '1/1',
+          borderRadius: 'base',
+          cursor: 'pointer',
+          w: 'full',
+          h: 'full',
+        }}
+      >
+        <Flex
+          sx={{
+            w: 'full',
+            h: 'full',
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderRadius: 'base',
+            bg: 'base.200',
+            _dark: {
+              bg: 'base.800',
+            },
+          }}
+        >
+          <Flex
+            sx={{
+              w: 'full',
+              h: 'full',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Icon
+              boxSize={12}
+              as={FaFolder}
+              sx={{
+                opacity: 0.7,
+                color: 'base.500',
+                _dark: {
+                  color: 'base.500',
+                },
+              }}
+            />
+          </Flex>
+        </Flex>
+        <Flex
+          sx={{
+            position: 'absolute',
+            insetInlineEnd: 0,
+            top: 0,
+            p: 1,
+          }}
+        >
+          <Badge variant="solid" sx={BASE_BADGE_STYLES}>
+            {totalImages}/{totalAssets}
+          </Badge>
+        </Flex>
+        <Box
+          className="selection-box"
+          sx={{
+            position: 'absolute',
+            top: 0,
+            insetInlineEnd: 0,
+            bottom: 0,
+            insetInlineStart: 0,
+            borderRadius: 'base',
+            transitionProperty: 'common',
+            transitionDuration: 'common',
+            shadow: isSelected ? 'selected.light' : undefined,
+            _dark: {
+              shadow: isSelected ? 'selected.dark' : undefined,
+            },
+          }}
+        />
+        <IAIDroppable
+          data={droppableData}
+          dropLabel={<Text fontSize="md">Move</Text>}
+        />
+      </Flex>
+    </Box>
   );
-};
+});
+
+NoBoardBoard.displayName = 'HoverableBoard';
 
 export default NoBoardBoard;

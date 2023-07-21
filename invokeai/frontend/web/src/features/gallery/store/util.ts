@@ -1,6 +1,11 @@
-import { SYSTEM_BOARDS } from 'services/api/endpoints/images';
-import { ASSETS_CATEGORIES, BoardId, IMAGE_CATEGORIES } from './gallerySlice';
-import { ImageCategory } from 'services/api/types';
+import { ListImagesArgs, SYSTEM_BOARDS } from 'services/api/endpoints/images';
+import {
+  ASSETS_CATEGORIES,
+  BoardId,
+  GalleryView,
+  IMAGE_CATEGORIES,
+} from './gallerySlice';
+import { ImageCategory, ImageDTO } from 'services/api/types';
 import { isEqual } from 'lodash-es';
 
 export const getCategoriesQueryParamForBoard = (
@@ -20,14 +25,9 @@ export const getCategoriesQueryParamForBoard = (
 
 export const getBoardIdQueryParamForBoard = (
   board_id: BoardId
-): string | undefined => {
-  if (board_id === 'no_board') {
+): string | null => {
+  if (board_id === undefined) {
     return 'none';
-  }
-
-  // system boards besides 'no_board'
-  if (SYSTEM_BOARDS.includes(board_id)) {
-    return undefined;
   }
 
   // user boards
@@ -51,4 +51,11 @@ export const getBoardIdFromBoardAndCategoriesQueryParam = (
   }
 
   return board_id ?? 'UNKNOWN_BOARD';
+};
+
+export const getCategories = (imageDTO: ImageDTO) => {
+  if (IMAGE_CATEGORIES.includes(imageDTO.image_category)) {
+    return IMAGE_CATEGORIES;
+  }
+  return ASSETS_CATEGORIES;
 };
