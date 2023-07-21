@@ -76,7 +76,7 @@ export default function FoundModelsList() {
             dispatch(
               addToast(
                 makeToast({
-                  title: 'Faile To Add Model',
+                  title: 'Failed To Add Model',
                   status: 'error',
                 })
               )
