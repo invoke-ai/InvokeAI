@@ -1,4 +1,4 @@
-import { Flex, Icon } from '@chakra-ui/react';
+import { Badge, Flex, Icon } from '@chakra-ui/react';
 import { FaPlus } from 'react-icons/fa';
 
 const AutoAddIcon = () => {
@@ -11,7 +11,12 @@ const AutoAddIcon = () => {
         p: 1,
       }}
     >
-      <Icon as={FaPlus} sx={{ fill: 'accent.500' }} />
+      <Badge
+        variant="solid"
+        sx={{ bg: 'accent.400', _dark: { bg: 'accent.500' } }}
+      >
+        auto
+      </Badge>
     </Flex>
   );
 };
