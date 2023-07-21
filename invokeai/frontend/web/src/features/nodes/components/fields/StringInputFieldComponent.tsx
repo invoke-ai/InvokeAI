@@ -35,7 +35,8 @@ const StringInputFieldComponent = (
 
   return (
     <>
-      {field.name.toLowerCase() === 'prompt' ? (
+      {field.name.toLowerCase() === 'prompt' ||
+      field.name.toLowerCase() === 'text' ? (
         <Textarea
           style={{
             height: '150px',
