@@ -858,7 +858,7 @@ class ModelManager(object):
         loaded_files = set()
         new_models_found = False
 
-        self.logger.info(f'scanning {self.app_config.models_path} for new models')
+        self.logger.info(f'Scanning {self.app_config.models_path} for new models')
         with Chdir(self.app_config.root_path):
             for model_key, model_config in list(self.models.items()):
                 model_name, cur_base_model, cur_model_type = self.parse_key(model_key)

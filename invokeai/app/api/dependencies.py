@@ -58,7 +58,8 @@ class ApiDependencies:
 
     @staticmethod
     def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger):
-        logger.debug(f"InvokeAI version {__version__}")
+        logger.info(f"InvokeAI version {__version__}")
+        logger.info(f"Root directory = {str(config.root_path)}")
         logger.debug(f"Internet connectivity is {config.internet_available}")
 
         events = FastAPIEventService(event_handler_id)
