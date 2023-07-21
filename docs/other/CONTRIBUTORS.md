@@ -17,67 +17,267 @@ We thank them for all of their time and hard work.
 
 * @lstein (Lincoln Stein) - Co-maintainer
 * @blessedcoolant - Co-maintainer
-* @hipsterusername (Kent Keirsey) - Product Manager
-* @psychedelicious - Web Team Leader
+* @hipsterusername (Kent Keirsey) - Co-maintainer, CEO, Positive Vibes
+* @psychedelicious (Spencer Mabrito) - Web Team Leader
 * @Kyle0654 (Kyle Schouviller) - Node Architect and General Backend Wizard
-* @damian0815 - Attention Systems and Gameplay Engineer
-* @mauwii (Matthias Wild) - Continuous integration and product maintenance engineer
-* @Netsvetaev (Artur Netsvetaev) - UI/UX Developer
-* @tildebyte - General gadfly and resident (self-appointed) know-it-all
-* @keturn - Lead for Diffusers port
+* @damian0815 - Attention Systems and Compel Maintainer
 * @ebr (Eugene Brodsky) - Cloud/DevOps/Sofware engineer; your friendly neighbourhood cluster-autoscaler
-* @jpphoto (Jonathan Pollack) - Inference and rendering engine optimization
-* @genomancer (Gregg Helt) - Model training and merging
+* @genomancer (Gregg Helt) - Controlnet support
+* @StAlKeR7779 (Sergey Borisov) - Torch stack, ONNX, model management, optimization
+* @cheerio (Mary Rogers) - Lead Engineer & Web App Development
+* @brandon (Brandon Rising) - Platform, Infrastructure, Backend Systems
+* @ryanjdick (Ryan Dick) - Machine Learning & Training
+* @millu (Millun Atluri) - Community Manager, Documentation, Node-wrangler
+* @chainchompa (Jennifer Player) - Web Development & Chain-Chomping
+* @keturn (Kevin Turner) - Diffusers
+* @gogurt enjoyer - Discord moderator and end user support
+* @whosawhatsis - Discord moderator and end user support
+* @dwinrger - Discord moderator and end user support
+* @526christian - Discord moderator and end user support
 
-## **Contributions by**
+## **Full List of Contributors by Commit Name**
 
-- [Sean McLellan](https://github.com/Oceanswave)
-- [Kevin Gibbons](https://github.com/bakkot)
-- [Tesseract Cat](https://github.com/TesseractCat)
-- [blessedcoolant](https://github.com/blessedcoolant)
-- [David Ford](https://github.com/david-ford)
-- [yunsaki](https://github.com/yunsaki)
-- [James Reynolds](https://github.com/magnusviri)
-- [David Wager](https://github.com/maddavid123)
-- [Jason Toffaletti](https://github.com/toffaletti)
-- [tildebyte](https://github.com/tildebyte)
-- [Cragin Godley](https://github.com/cgodley)
-- [BlueAmulet](https://github.com/BlueAmulet)
-- [Benjamin Warner](https://github.com/warner-benjamin)
-- [Cora Johnson-Roberson](https://github.com/corajr)
-- [veprogames](https://github.com/veprogames)
-- [JigenD](https://github.com/JigenD)
-- [Niek van der Maas](https://github.com/Niek)
-- [Henry van Megen](https://github.com/hvanmegen)
-- [Håvard Gulldahl](https://github.com/havardgulldahl)
-- [greentext2](https://github.com/greentext2)
-- [Simon Vans-Colina](https://github.com/simonvc)
-- [Gabriel Rotbart](https://github.com/gabrielrotbart)
-- [Eric Khun](https://github.com/erickhun)
-- [Brent Ozar](https://github.com/BrentOzar)
-- [nderscore](https://github.com/nderscore)
-- [Mikhail Tishin](https://github.com/tishin)
-- [Tom Elovi Spruce](https://github.com/ilovecomputers)
-- [spezialspezial](https://github.com/spezialspezial)
-- [Yosuke Shinya](https://github.com/shinya7y)
-- [Andy Pilate](https://github.com/Cubox)
-- [Muhammad Usama](https://github.com/SMUsamaShah)
-- [Arturo Mendivil](https://github.com/artmen1516)
-- [Paul Sajna](https://github.com/sajattack)
-- [Samuel Husso](https://github.com/shusso)
-- [nicolai256](https://github.com/nicolai256)
-- [Mihai](https://github.com/mh-dm)
-- [Any Winter](https://github.com/any-winter-4079)
-- [Doggettx](https://github.com/doggettx)
-- [Matthias Wild](https://github.com/mauwii)
-- [Kyle Schouviller](https://github.com/kyle0654)
-- [rabidcopy](https://github.com/rabidcopy)
-- [Dominic Letz](https://github.com/dominicletz)
-- [Dmitry T.](https://github.com/ArDiouscuros)
-- [Kent Keirsey](https://github.com/hipsterusername)
-- [psychedelicious](https://github.com/psychedelicious)
-- [damian0815](https://github.com/damian0815)
-- [Eugene Brodsky](https://github.com/ebr)
+- AbdBarho
+- ablattmann
+- AdamOStark
+- Adam Rice
+- Airton Silva
+- Alexander Eichhorn
+- Alexandre D. Roberge
+- Andreas Rozek
+- Andre LaBranche
+- Andy Bearman
+- Andy Luhrs
+- Andy Pilate
+- Any-Winter-4079
+- apolinario
+- ArDiouscuros
+- Armando C. Santisbon
+- Arthur Holstvoogd
+- artmen1516
+- Artur
+- Arturo Mendivil
+- Ben Alkov
+- Benjamin Warner
+- Bernard Maltais
+- blessedcoolant
+- blhook
+- BlueAmulet
+- Bouncyknighter
+- Brandon Rising
+- Brent Ozar
+- Brian Racer
+- bsilvereagle
+- c67e708d
+- CapableWeb
+- Carson Katri
+- Chloe
+- Chris Dawson
+- Chris Hayes
+- Chris Jones
+- chromaticist
+- Claus F. Strasburger
+- cmdr2
+- cody
+- Conor Reid
+- Cora Johnson-Roberson
+- coreco
+- cosmii02
+- cpacker
+- Cragin Godley
+- creachec
+- Damian Stewart
+- Daniel Manzke
+- Danny Beer
+- Dan Sully
+- David Burnett
+- David Ford
+- David Regla
+- David Wager
+- Daya Adianto
+- db3000
+- Denis Olshin
+- Dennis
+- Dominic Letz
+- DrGunnarMallon
+- Edward Johan
+- elliotsayes
+- Elrik
+- ElrikUnderlake
+- Eric Khun
+- Eric Wolf
+- Eugene Brodsky
+- ExperimentalCyborg
+- Fabian Bahl
+- Fabio 'MrWHO' Torchetti
+- fattire
+- Felipe Nogueira
+- Félix Sanz
+- figgefigge
+- Gabriel Mackievicz Telles
+- gabrielrotbart
+- gallegonovato
+- Gérald LONLAS
+- GitHub Actions Bot
+- gogurtenjoyer
+- greentext2
+- Gregg Helt
+- H4rk
+- Håvard Gulldahl
+- henry
+- Henry van Megen
+- hipsterusername
+- hj
+- Hosted Weblate
+- Iman Karim
+- ismail ihsan bülbül
+- Ivan Efimov
+- jakehl
+- Jakub Kolčář
+- JamDon2
+- James Reynolds
+- Jan Skurovec
+- Jari Vetoniemi
+- Jason Toffaletti
+- Jaulustus
+- Jeff Mahoney
+- jeremy
+- Jeremy Clark
+- JigenD
+- Jim Hays
+- Johan Roxendal
+- Johnathon Selstad
+- Jonathan
+- Joseph Dries III
+- JPPhoto
+- jspraul
+- Justin Wong
+- Juuso V
+- Kaspar Emanuel
+- Katsuyuki-Karasawa
+- Kent Keirsey
+- Kevin Coakley
+- Kevin Gibbons
+- Kevin Schaul
+- Kevin Turner
+- krummrey
+- Kyle Lacy
+- Kyle Schouviller
+- Lawrence Norton
+- LemonDouble
+- Leo Pasanen
+- Lincoln Stein
+- LoganPederson
+- Lynne Whitehorn
+- majick
+- Marco Labarile
+- Martin Kristiansen
+- Mary Hipp Rogers
+- mastercaster9000
+- Matthias Wild
+- michaelk71
+- mickr777
+- Mihai
+- Mihail Dumitrescu
+- Mikhail Tishin
+- Millun Atluri
+- Minjune Song
+- mitien
+- mofuzz
+- Muhammad Usama
+- Name
+- _nderscore
+- Netzer R
+- Nicholas Koh
+- Nicholas Körfer
+- nicolai256
+- Niek van der Maas
+- noodlebox
+- Nuno Coração
+- ofirkris
+- Olivier Louvignes
+- owenvincent
+- Patrick Esser
+- Patrick Tien
+- Patrick von Platen
+- Paul Sajna
+- pejotr
+- Peter Baylies
+- Peter Lin
+- plucked
+- prixt
+- psychedelicious
+- Rainer Bernhardt
+- Riccardo Giovanetti
+- Rich Jones
+- rmagur1203
+- Rob Baines
+- Robert Bolender
+- Robin Rombach
+- Rohan Barar
+- rpagliuca
+- rromb
+- Rupesh Sreeraman
+- Ryan Cao
+- Saifeddine
+- Saifeddine ALOUI
+- SammCheese
+- Sammy
+- sammyf
+- Samuel Husso
+- Scott Lahteine
+- Sean McLellan
+- Sebastian Aigner
+- Sergey Borisov
+- Sergey Krashevich
+- Shapor Naghibzadeh
+- Shawn Zhong
+- Simon Vans-Colina
+- skunkworxdark
+- slashtechno
+- spezialspezial
+- ssantos
+- StAlKeR7779
+- Stephan Koglin-Fischer
+- SteveCaruso
+- Steve Martinelli
+- Steven Frank
+- System X - Files
+- Taylor Kems
+- techicode
+- techybrain-dev
+- tesseractcat
+- thealanle
+- Thomas
+- tildebyte
+- Tim Cabbage
+- Tom
+- Tom Elovi Spruce
+- Tom Gouville
+- tomosuto
+- Travco
+- Travis Palmer
+- tyler
+- unknown
+- user1
+- Vedant Madane
+- veprogames
+- wa.code
+- wfng92
+- whosawhatsis
+- Will
+- William Becher
+- William Chong
+- xra
+- Yeung Yiu Hung
+- ymgenesis
+- Yorzaren
+- Yosuke Shinya
+- yun saki
+- Zadagu
+- zeptofine
+- 冯不游
+- 唐澤 克幸
 
 ## **Original CompVis Authors**
 
