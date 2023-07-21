@@ -90,7 +90,12 @@ const ImageGalleryContent = () => {
             gap: 2,
           }}
         >
-          <Tabs variant="line" size="sm" sx={{ w: 'full' }}>
+          <Tabs
+            index={galleryView === 'images' ? 0 : 1}
+            variant="line"
+            size="sm"
+            sx={{ w: 'full' }}
+          >
             <TabList>
               <Tab
                 onClick={handleClickImages}
