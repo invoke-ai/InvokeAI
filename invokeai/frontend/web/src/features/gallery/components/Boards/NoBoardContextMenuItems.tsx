@@ -17,8 +17,8 @@ const NoBoardContextMenuItems = () => {
   return (
     <>
       {autoAddBoardId && (
-        <MenuItem icon={<FaPlus />} onClickCapture={handleDisableAutoAdd}>
-          Disable Auto-Add
+        <MenuItem icon={<FaPlus />} onClick={handleDisableAutoAdd}>
+          Auto-add to this Board
         </MenuItem>
       )}
     </>
