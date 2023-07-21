@@ -16,11 +16,11 @@ const NoBoardContextMenuItems = () => {
 
   return (
     <>
-      {autoAddBoardId && (
+      {/* {autoAddBoardId && (
         <MenuItem icon={<FaPlus />} onClick={handleDisableAutoAdd}>
           Auto-add to this Board
         </MenuItem>
-      )}
+      )} */}
     </>
   );
 };

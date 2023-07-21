@@ -76,7 +76,7 @@ const BoardsList = (props: Props) => {
             <Grid
               className="list-container"
               sx={{
-                gridTemplateColumns: `repeat(auto-fill, minmax(96px, 1fr));`,
+                gridTemplateColumns: `repeat(auto-fill, minmax(108px, 1fr));`,
                 maxH: 346,
               }}
             >
