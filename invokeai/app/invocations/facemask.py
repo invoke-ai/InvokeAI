@@ -1,6 +1,7 @@
 from typing import Literal, Optional
 
-import numpy
+import numpy as np
+import mediapipe as mp
 from PIL import Image, ImageFilter, ImageOps, ImageChops, ImageDraw
 from pydantic import BaseModel, Field
 from typing import Union
@@ -52,7 +53,6 @@ class FaceMaskInvocation(BaseInvocation, PILInvocationConfig):
     x_offset: float = Field(default=0.0, description="Offset for the X-axis of the oval mask")
     y_offset: float = Field(default=0.0, description="Offset for the Y-axis of the oval mask")
     invert_mask: bool = Field(default=False, description="Toggle to invert the mask")
-    cascade_file_path: Optional[str] = Field(default=None, description="Path to the cascade XML file for detection")
     # fmt: on
 
     class Config(InvocationConfig):
@@ -63,41 +63,59 @@ class FaceMaskInvocation(BaseInvocation, PILInvocationConfig):
             },
         }
 
+    def generate_face_mask(self, pil_image):
+        # Convert the PIL image to a NumPy array.
+        np_image = np.array(pil_image, dtype=np.uint8)
+
+        # Check if the input image has four channels (RGBA).
+        if np_image.shape[2] == 4:
+            # Convert RGBA to RGB by removing the alpha channel.
+            np_image = np_image[:, :, :3]
+
+        # Create a FaceMesh object for face landmark detection and mesh generation.
+        face_mesh = mp.solutions.face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+
+        # Detect the face landmarks and mesh in the input image.
+        results = face_mesh.process(np_image)
+
+        # Generate a binary face mask using the face mesh.
+        mask_image = np.zeros_like(np_image[:, :, 0])
+        if results.multi_face_landmarks:
+            for face_landmarks in results.multi_face_landmarks:
+                face_landmark_points = np.array(
+                    [[landmark.x * np_image.shape[1], landmark.y * np_image.shape[0]] for landmark in face_landmarks.landmark]
+                )
+
+                # Apply the scaling offsets to the face landmark points.
+                x_center = np.mean(face_landmark_points[:, 0])
+                y_center = np.mean(face_landmark_points[:, 1])
+                x_scaled = face_landmark_points[:, 0] + self.x_offset * (face_landmark_points[:, 0] - x_center)
+                y_scaled = face_landmark_points[:, 1] + self.y_offset * (face_landmark_points[:, 1] - y_center)
+
+                convex_hull = cv2.convexHull(np.column_stack((x_scaled, y_scaled)).astype(np.int32))
+                cv2.fillConvexPoly(mask_image, convex_hull, 255)
+
+        # Convert the binary mask image to a PIL Image.
+        mask_pil = Image.fromarray(mask_image, mode='L')
+
+        return mask_pil
+
     def invoke(self, context: InvocationContext) -> ImageMaskOutputFaceMask:
         image = context.services.images.get_pil_image(self.image.image_name)
 
-        # Perform face detection
-        cv_image = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
-        cascade_file_path = self.cascade_file_path
-        face_cascade = cv2.CascadeClassifier(cascade_file_path)
-        gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
-        # Create an elongated oval-shaped transparent mask for the face region
-        transparent_mask = Image.new("L", image.size, color=0)
-        for (x, y, w, h) in faces:
-            mask = Image.new("L", (w, h), 0)
-            draw = ImageDraw.Draw(mask)
-            # Adjust the shape of the oval based on the offsets
-            x_elongation_factor = 0.8 + (1.2 - 0.8) * self.x_offset
-            y_elongation_factor = 1 + (1.2 - 0.8) * self.y_offset
-            draw.ellipse((0, 0, w, h), fill=255, outline=255)
-            mask = mask.resize((int(w * x_elongation_factor), int(h * y_elongation_factor)), resample=Image.LANCZOS)
-            # Calculate the Y-axis offset to ensure symmetry from the middle
-            y_offset = int((h - h * y_elongation_factor) / 2)
-            transparent_mask.paste(mask, (x + int((w - w * x_elongation_factor) / 2), y + y_offset))
+        # Generate the face mesh mask.
+        mask_pil = self.generate_face_mask(image)
 
         # Create an RGBA image with transparency
         rgba_image = image.convert("RGBA")
 
         if self.invert_mask:
-            # Apply the transparent mask to the image
-            composite_image = Image.composite(rgba_image, Image.new("RGBA", image.size, (0, 0, 0, 0)), transparent_mask)
+            # Apply the mask to make the face transparent.
+            composite_image = Image.composite(rgba_image, Image.new("RGBA", image.size, (0, 0, 0, 0)), mask_pil)
 
         else:
-            # Invert the transparent mask to mask the rest of the image
-            inverted_mask = ImageOps.invert(transparent_mask)
-            # Apply the inverted mask to the image
+            # Invert the mask to make everything outside the face transparent.
+            inverted_mask = ImageOps.invert(mask_pil)
             composite_image = Image.composite(rgba_image, Image.new("RGBA", image.size, (0, 0, 0, 0)), inverted_mask)
 
         # Create white mask with dimensions as transparency image for use with outpainting
