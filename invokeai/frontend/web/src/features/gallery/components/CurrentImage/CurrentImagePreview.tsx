@@ -54,44 +54,44 @@ const CurrentImagePreview = () => {
     shouldAntialiasProgressImage,
   } = useAppSelector(imagesSelector);
 
-  // const {
-  //   handlePrevImage,
-  //   handleNextImage,
-  //   prevImageId,
-  //   nextImageId,
-  //   isOnLastImage,
-  //   handleLoadMoreImages,
-  //   areMoreImagesAvailable,
-  //   isFetching,
-  // } = useNextPrevImage();
+  const {
+    handlePrevImage,
+    handleNextImage,
+    prevImageId,
+    nextImageId,
+    isOnLastImage,
+    handleLoadMoreImages,
+    areMoreImagesAvailable,
+    isFetching,
+  } = useNextPrevImage();
 
-  // useHotkeys(
-  //   'left',
-  //   () => {
-  //     handlePrevImage();
-  //   },
-  //   [prevImageId]
-  // );
+  useHotkeys(
+    'left',
+    () => {
+      handlePrevImage();
+    },
+    [prevImageId]
+  );
 
-  // useHotkeys(
-  //   'right',
-  //   () => {
-  //     if (isOnLastImage && areMoreImagesAvailable && !isFetching) {
-  //       handleLoadMoreImages();
-  //       return;
-  //     }
-  //     if (!isOnLastImage) {
-  //       handleNextImage();
-  //     }
-  //   },
-  //   [
-  //     nextImageId,
-  //     isOnLastImage,
-  //     areMoreImagesAvailable,
-  //     handleLoadMoreImages,
-  //     isFetching,
-  //   ]
-  // );
+  useHotkeys(
+    'right',
+    () => {
+      if (isOnLastImage && areMoreImagesAvailable && !isFetching) {
+        handleLoadMoreImages();
+        return;
+      }
+      if (!isOnLastImage) {
+        handleNextImage();
+      }
+    },
+    [
+      nextImageId,
+      isOnLastImage,
+      areMoreImagesAvailable,
+      handleLoadMoreImages,
+      isFetching,
+    ]
+  );
 
   const {
     currentData: imageDTO,
@@ -213,7 +213,7 @@ const CurrentImagePreview = () => {
               pointerEvents: 'none',
             }}
           >
-            {/* <NextPrevImageButtons /> */}
+            <NextPrevImageButtons />
           </motion.div>
         )}
       </AnimatePresence>
