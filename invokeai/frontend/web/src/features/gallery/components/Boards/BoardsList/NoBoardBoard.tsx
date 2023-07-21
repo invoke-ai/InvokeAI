@@ -1,54 +1,145 @@
-import { Text } from '@chakra-ui/react';
+import { Badge, Box, ChakraProps, Flex, Icon, Text } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
-import {
-  INITIAL_IMAGE_LIMIT,
-  boardIdSelected,
-} from 'features/gallery/store/gallerySlice';
-import { FaFolderOpen } from 'react-icons/fa';
-import { useDispatch } from 'react-redux';
-import {
-  ListImagesArgs,
-  useListImagesQuery,
-} from 'services/api/endpoints/images';
-import GenericBoard from './GenericBoard';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIDroppable from 'common/components/IAIDroppable';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { memo, useCallback, useMemo } from 'react';
+import { FaFolder } from 'react-icons/fa';
+import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
+import AutoAddIcon from '../AutoAddIcon';
+import BoardContextMenu from '../BoardContextMenu';
 
-const baseQueryArg: ListImagesArgs = {
-  board_id: 'none',
-  offset: 0,
-  limit: INITIAL_IMAGE_LIMIT,
-  is_intermediate: false,
+const BASE_BADGE_STYLES: ChakraProps['sx'] = {
+  bg: 'base.500',
+  color: 'whiteAlpha.900',
 };
+interface Props {
+  isSelected: boolean;
+}
 
-const NoBoardBoard = ({ isSelected }: { isSelected: boolean }) => {
-  const dispatch = useDispatch();
+const selector = createSelector(
+  stateSelector,
+  ({ gallery }) => {
+    const { autoAddBoardId } = gallery;
+    return { autoAddBoardId };
+  },
+  defaultSelectorOptions
+);
 
-  const handleClick = () => {
-    dispatch(boardIdSelected('no_board'));
-  };
+const NoBoardBoard = memo(({ isSelected }: Props) => {
+  const dispatch = useAppDispatch();
+  const { totalImages, totalAssets } = useBoardTotal(undefined);
+  const { autoAddBoardId } = useAppSelector(selector);
+  const handleSelectBoard = useCallback(() => {
+    dispatch(boardIdSelected(undefined));
+  }, [dispatch]);
 
-  const { total } = useListImagesQuery(baseQueryArg, {
-    selectFromResult: ({ data }) => ({ total: data?.total ?? 0 }),
-  });
-
-  // TODO: Do we support making 'images' 'assets? if yes, we need to handle this
-  const droppableData: MoveBoardDropData = {
-    id: 'all-images-board',
-    actionType: 'MOVE_BOARD',
-    context: { boardId: 'no_board' },
-  };
+  const droppableData: MoveBoardDropData = useMemo(
+    () => ({
+      id: 'no_board',
+      actionType: 'MOVE_BOARD',
+      context: { boardId: undefined },
+    }),
+    []
+  );
 
   return (
-    <GenericBoard
-      board_id="no_board"
-      droppableData={droppableData}
-      dropLabel={<Text fontSize="md">Move</Text>}
-      onClick={handleClick}
-      isSelected={isSelected}
-      icon={FaFolderOpen}
-      label="No Board"
-      badgeCount={total}
-    />
+    <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
+      <Flex
+        sx={{
+          position: 'relative',
+          justifyContent: 'center',
+          alignItems: 'center',
+          aspectRatio: '1/1',
+          borderRadius: 'base',
+          w: 'full',
+          h: 'full',
+        }}
+      >
+        <BoardContextMenu>
+          {(ref) => (
+            <Flex
+              ref={ref}
+              onClick={handleSelectBoard}
+              sx={{
+                w: 'full',
+                h: 'full',
+                position: 'relative',
+                justifyContent: 'center',
+                alignItems: 'center',
+                borderRadius: 'base',
+                cursor: 'pointer',
+                bg: 'base.300',
+                _dark: {
+                  bg: 'base.900',
+                },
+              }}
+            >
+              <Flex
+                sx={{
+                  w: 'full',
+                  h: 'full',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Icon
+                  boxSize={12}
+                  as={FaFolder}
+                  sx={{
+                    opacity: 0.7,
+                    color: 'base.500',
+                    _dark: {
+                      color: 'base.500',
+                    },
+                  }}
+                />
+              </Flex>
+              <Flex
+                sx={{
+                  position: 'absolute',
+                  insetInlineEnd: 0,
+                  top: 0,
+                  p: 1,
+                }}
+              >
+                <Badge variant="solid" sx={BASE_BADGE_STYLES}>
+                  {totalImages}/{totalAssets}
+                </Badge>
+              </Flex>
+              {!autoAddBoardId && <AutoAddIcon />}
+              <Box
+                className="selection-box"
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  insetInlineEnd: 0,
+                  bottom: 0,
+                  insetInlineStart: 0,
+                  borderRadius: 'base',
+                  transitionProperty: 'common',
+                  transitionDuration: 'common',
+                  shadow: isSelected ? 'selected.light' : undefined,
+                  _dark: {
+                    shadow: isSelected ? 'selected.dark' : undefined,
+                  },
+                }}
+              />
+              <IAIDroppable
+                data={droppableData}
+                dropLabel={<Text fontSize="md">Move</Text>}
+              />
+            </Flex>
+          )}
+        </BoardContextMenu>
+      </Flex>
+    </Box>
   );
-};
+});
+
+NoBoardBoard.displayName = 'HoverableBoard';
 
 export default NoBoardBoard;

@@ -1,4 +1,4 @@
-import { Box, MenuItem, MenuList } from '@chakra-ui/react';
+import { MenuItem, MenuList } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
@@ -7,11 +7,11 @@ import { FaFolder } from 'react-icons/fa';
 import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
-import SystemBoardContextMenuItems from './SystemBoardContextMenuItems';
+import NoBoardContextMenuItems from './NoBoardContextMenuItems';
 
 type Props = {
   board?: BoardDTO;
-  board_id: string;
+  board_id?: string;
   children: ContextMenuProps<HTMLDivElement>['children'];
   setBoardToDelete?: (board?: BoardDTO) => void;
 };
@@ -19,9 +19,11 @@ type Props = {
 const BoardContextMenu = memo(
   ({ board, board_id, setBoardToDelete, children }: Props) => {
     const dispatch = useAppDispatch();
+
     const handleSelectBoard = useCallback(() => {
       dispatch(boardIdSelected(board?.board_id ?? board_id));
     }, [board?.board_id, board_id, dispatch]);
+
     return (
       <ContextMenu<HTMLDivElement>
         menuProps={{ size: 'sm', isLazy: true }}
@@ -37,7 +39,7 @@ const BoardContextMenu = memo(
             <MenuItem icon={<FaFolder />} onClickCapture={handleSelectBoard}>
               Select Board
             </MenuItem>
-            {!board && <SystemBoardContextMenuItems board_id={board_id} />}
+            {!board && <NoBoardContextMenuItems />}
             {board && (
               <GalleryBoardContextMenuItems
                 board={board}

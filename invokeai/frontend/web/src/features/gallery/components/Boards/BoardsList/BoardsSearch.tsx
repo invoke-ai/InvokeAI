@@ -28,12 +28,7 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-type Props = {
-  setIsSearching: (isSearching: boolean) => void;
-};
-
-const BoardsSearch = (props: Props) => {
-  const { setIsSearching } = props;
+const BoardsSearch = () => {
   const dispatch = useAppDispatch();
   const { searchText } = useAppSelector(selector);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,8 +42,7 @@ const BoardsSearch = (props: Props) => {
 
   const clearBoardSearch = useCallback(() => {
     dispatch(setBoardSearchText(''));
-    setIsSearching(false);
-  }, [dispatch, setIsSearching]);
+  }, [dispatch]);
 
   const handleKeydown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {

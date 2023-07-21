@@ -14,20 +14,17 @@ export const ASSETS_CATEGORIES: ImageCategory[] = [
 export const INITIAL_IMAGE_LIMIT = 100;
 export const IMAGE_LIMIT = 20;
 
-// export type GalleryView = 'images' | 'assets';
-export type BoardId =
-  | 'images'
-  | 'assets'
-  | 'no_board'
-  | 'batch'
-  | (string & Record<never, never>);
+export type GalleryView = 'images' | 'assets';
+// export type BoardId = 'no_board' | (string & Record<never, never>);
+export type BoardId = string | undefined;
 
 type GalleryState = {
   selection: string[];
   shouldAutoSwitch: boolean;
-  autoAddBoardId: string | null;
+  autoAddBoardId: string | undefined;
   galleryImageMinimumWidth: number;
   selectedBoardId: BoardId;
+  galleryView: GalleryView;
   batchImageNames: string[];
   isBatchEnabled: boolean;
 };
@@ -35,9 +32,10 @@ type GalleryState = {
 export const initialGalleryState: GalleryState = {
   selection: [],
   shouldAutoSwitch: true,
-  autoAddBoardId: null,
+  autoAddBoardId: undefined,
   galleryImageMinimumWidth: 96,
-  selectedBoardId: 'images',
+  selectedBoardId: undefined,
+  galleryView: 'images',
   batchImageNames: [],
   isBatchEnabled: false,
 };
@@ -96,6 +94,7 @@ export const gallerySlice = createSlice({
     },
     boardIdSelected: (state, action: PayloadAction<BoardId>) => {
       state.selectedBoardId = action.payload;
+      state.galleryView = 'images';
     },
     isBatchEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isBatchEnabled = action.payload;
@@ -125,8 +124,14 @@ export const gallerySlice = createSlice({
       state.batchImageNames = [];
       state.selection = [];
     },
-    autoAddBoardIdChanged: (state, action: PayloadAction<string | null>) => {
+    autoAddBoardIdChanged: (
+      state,
+      action: PayloadAction<string | undefined>
+    ) => {
       state.autoAddBoardId = action.payload;
+    },
+    galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
+      state.galleryView = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -135,10 +140,11 @@ export const gallerySlice = createSlice({
       (state, action) => {
         const deletedBoardId = action.meta.arg.originalArgs;
         if (deletedBoardId === state.selectedBoardId) {
-          state.selectedBoardId = 'images';
+          state.selectedBoardId = undefined;
+          state.galleryView = 'images';
         }
         if (deletedBoardId === state.autoAddBoardId) {
-          state.autoAddBoardId = null;
+          state.autoAddBoardId = undefined;
         }
       }
     );
@@ -151,7 +157,7 @@ export const gallerySlice = createSlice({
         }
 
         if (!boards.map((b) => b.board_id).includes(state.autoAddBoardId)) {
-          state.autoAddBoardId = null;
+          state.autoAddBoardId = undefined;
         }
       }
     );
@@ -170,6 +176,7 @@ export const {
   imagesAddedToBatch,
   imagesRemovedFromBatch,
   autoAddBoardIdChanged,
+  galleryViewChanged,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

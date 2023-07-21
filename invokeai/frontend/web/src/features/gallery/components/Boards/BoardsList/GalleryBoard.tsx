@@ -19,16 +19,13 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FaFolder } from 'react-icons/fa';
+import { FaUser } from 'react-icons/fa';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import { BoardDTO } from 'services/api/types';
+import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
-
-const AUTO_ADD_BADGE_STYLES: ChakraProps['sx'] = {
-  bg: 'accent.200',
-  color: 'blackAlpha.900',
-};
 
 const BASE_BADGE_STYLES: ChakraProps['sx'] = {
   bg: 'base.500',
@@ -63,6 +60,8 @@ const GalleryBoard = memo(
     const { currentData: coverImage } = useGetImageDTOQuery(
       board.cover_image_name ?? skipToken
     );
+
+    const { totalImages, totalAssets } = useBoardTotal(board.board_id);
 
     const { board_name, board_id } = board;
     const [localBoardName, setLocalBoardName] = useState(board_name);
@@ -143,56 +142,48 @@ const GalleryBoard = memo(
                   alignItems: 'center',
                   borderRadius: 'base',
                   cursor: 'pointer',
+                  bg: 'base.200',
+                  _dark: {
+                    bg: 'base.800',
+                  },
                 }}
               >
-                <Flex
-                  sx={{
-                    w: 'full',
-                    h: 'full',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderRadius: 'base',
-                    bg: 'base.200',
-                    _dark: {
-                      bg: 'base.800',
-                    },
-                  }}
-                >
-                  {coverImage?.thumbnail_url ? (
-                    <Image
-                      src={coverImage?.thumbnail_url}
-                      draggable={false}
+                {coverImage?.thumbnail_url ? (
+                  <Image
+                    src={coverImage?.thumbnail_url}
+                    draggable={false}
+                    sx={{
+                      objectFit: 'cover',
+                      w: 'full',
+                      h: 'full',
+                      maxH: 'full',
+                      borderRadius: 'base',
+                      borderBottomRadius: 'lg',
+                    }}
+                  />
+                ) : (
+                  <Flex
+                    sx={{
+                      w: 'full',
+                      h: 'full',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Icon
+                      boxSize={12}
+                      as={FaUser}
                       sx={{
-                        maxW: 'full',
-                        maxH: 'full',
-                        borderRadius: 'base',
-                        borderBottomRadius: 'lg',
+                        mt: -3,
+                        opacity: 0.7,
+                        color: 'base.500',
+                        _dark: {
+                          color: 'base.500',
+                        },
                       }}
                     />
-                  ) : (
-                    <Flex
-                      sx={{
-                        w: 'full',
-                        h: 'full',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Icon
-                        boxSize={12}
-                        as={FaFolder}
-                        sx={{
-                          mt: -3,
-                          opacity: 0.7,
-                          color: 'base.500',
-                          _dark: {
-                            color: 'base.500',
-                          },
-                        }}
-                      />
-                    </Flex>
-                  )}
-                </Flex>
+                  </Flex>
+                )}
                 <Flex
                   sx={{
                     position: 'absolute',
@@ -201,17 +192,11 @@ const GalleryBoard = memo(
                     p: 1,
                   }}
                 >
-                  <Badge
-                    variant="solid"
-                    sx={
-                      isSelectedForAutoAdd
-                        ? AUTO_ADD_BADGE_STYLES
-                        : BASE_BADGE_STYLES
-                    }
-                  >
-                    {board.image_count}
+                  <Badge variant="solid" sx={BASE_BADGE_STYLES}>
+                    {totalImages}/{totalAssets}
                   </Badge>
                 </Flex>
+                {isSelectedForAutoAdd && <AutoAddIcon />}
                 <Box
                   className="selection-box"
                   sx={{
