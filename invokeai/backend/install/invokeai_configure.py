@@ -46,6 +46,7 @@ from invokeai.frontend.install.model_install import addModelsForm, process_and_e
 from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
     FileBox,
+    PasswordBox,
     IntTitleSlider,
     set_min_terminal_size,
     CyclingForm,
@@ -76,6 +77,7 @@ Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
 
 PRECISION_CHOICES = ['auto','float16','float32']
+LOG_LEVEL_CHOICES = ['debug','info','warning','error','critical']
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -289,33 +291,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
 
         self.nextrely += 1
         self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name="== BASIC OPTIONS ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
-            scroll_exit=True,
-        )
-        self.nextrely -= 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Select an output directory for images:",
-            editable=False,
-            color="CONTROL",
-        )
-        self.outdir = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name="(<tab> autocompletes, ctrl-N advances):",
-            value=str(default_output_dir()),
-            select_dir=True,
-            must_exist=False,
-            use_two_lines=False,
-            labelColor="GOOD",
-            begin_entry_at=40,
-            scroll_exit=True,
-        )
-        self.nextrely += 1
-        self.add_widget_intelligent(
             npyscreen.FixedText,
             value="Activate the NSFW checker to blur images showing potential sexual imagery:",
             editable=False,
@@ -328,34 +303,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             relx=5,
             scroll_exit=True,
         )
-        self.nextrely += 1
-        label = """HuggingFace access token (OPTIONAL) for automatic model downloads. See https://huggingface.co/settings/tokens."""
-        for line in textwrap.wrap(label,width=window_width-6):
-            self.add_widget_intelligent(
-                npyscreen.FixedText,
-                value=line,
-                editable=False,
-                color="CONTROL",
-            )
-
-        self.hf_token = self.add_widget_intelligent(
-            npyscreen.TitlePassword,
-            name="Access Token (ctrl-shift-V pastes):",
-            value=access_token,
-            begin_entry_at=42,
-            use_two_lines=False,
-            scroll_exit=True,
-        )
-        self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name="== ADVANCED OPTIONS ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
-            scroll_exit=True,
-        )
-        self.nextrely -= 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
             name="GPU Management",
@@ -391,12 +338,20 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.precision = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
-            columns = 2,
             name="Precision",
             values=PRECISION_CHOICES,
             value=PRECISION_CHOICES.index(precision),
             begin_entry_at=3,
             max_height=len(PRECISION_CHOICES) + 1,
+            scroll_exit=True,
+        )
+        self.log_level = self.add_widget_intelligent(
+            npyscreen.TitleSelectOne,
+            name="Logging Level",
+            values=LOG_LEVEL_CHOICES,
+            value=LOG_LEVEL_CHOICES.index(old_opts.log_level),
+            begin_entry_at=3,
+            max_height=len(LOG_LEVEL_CHOICES) + 1,
             scroll_exit=True,
         )
         self.max_cache_size = self.add_widget_intelligent(
@@ -409,35 +364,32 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             scroll_exit=True,
         )
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models (<tab> autocompletes, ctrl-N advances):",
-            editable=False,
-            color="CONTROL",
-        )
-        self.autoimport_dirs = {}
-        self.autoimport_dirs['autoimport_dir'] = self.add_widget_intelligent(
-                FileBox,
-                name=f'Autoimport Folder',
-                value=str(config.root_path / config.autoimport_dir),
-                select_dir=True,
-                must_exist=False,
-                use_two_lines=False,
-                labelColor="GOOD",
-                begin_entry_at=32,
-                max_height = 3,
-                scroll_exit=True
-            )
-        self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name="== LICENSE ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
+        self.hf_token = self.add_widget_intelligent(
+            PasswordBox,
+            name="Optional HuggingFace Access Token for Restricted Model Downloads (ctrl-shift-V pastes):",
+            value=access_token,
+            use_two_lines=False,
+            max_height=3,
+            max_width=100,
             scroll_exit=True,
         )
-        self.nextrely -= 1
+        self.nextrely += 1
+        self.autoimport_dirs = {}
+        for description, config_name, path in import_paths(old_opts):
+            self.autoimport_dirs[config_name] = self.add_widget_intelligent(
+                    FileBox,
+                    name=description+':',
+                    value=str(path),
+                    select_dir=True,
+                    must_exist=False,
+                    use_two_lines=False,
+                    labelColor="GOOD",
+                    begin_entry_at=32,
+                    max_width = 100,
+                    max_height = 3,
+                    scroll_exit=True
+                )
+        self.nextrely += 1
         label = """BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ
 AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT
 https://huggingface.co/spaces/CompVis/stable-diffusion-license
@@ -505,7 +457,6 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
         new_opts = Namespace()
 
         for attr in [
-                "outdir",
                 "nsfw_checker",
                 "free_gpu_mem",
                 "max_cache_size",
@@ -515,6 +466,7 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
             setattr(new_opts, attr, getattr(self, attr).value)
 
         for attr in self.autoimport_dirs:
+            print(attr)
             directory = Path(self.autoimport_dirs[attr].value)
             if directory.is_relative_to(config.root_path):
                 directory = directory.relative_to(config.root_path)
@@ -553,9 +505,8 @@ class EditOptApplication(npyscreen.NPSAppManaged):
                 cycle_widgets=True,
             )
 
-    def new_opts(self):
-        return self.options.marshall_arguments()
-
+def new_opts(self):
+    return self.options.marshall_arguments()
 
 def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Namespace:
     editApp = EditOptApplication(program_opts, invokeai_opts)
@@ -587,11 +538,20 @@ def default_user_selections(program_opts: Namespace) -> InstallSelections:
     )
 
 # -------------------------------------
+def import_paths(config: InvokeAIAppConfig):
+    return [
+        ('Folder for generated and uploaded images (tab autocompletes, return advances)',     'outdir',   config.root_path / config.outdir),
+        ('Folder to scan for new checkpoints, Controlnets, LoRAs and TI models', 'autoimport_dir',        config.root_path / config.autoimport_dir),
+        ('Folder containing nodes to import',                                    'nodes_dir',             config.root_path / config.nodes_dir),
+    ]
+
+# -------------------------------------
 def initialize_rootdir(root: Path, yes_to_all: bool = False):
     logger.info("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
     for name in (
             "models",
             "databases",
+            "nodes",
             "text-inversion-output",
             "text-inversion-training-data",
             "configs"

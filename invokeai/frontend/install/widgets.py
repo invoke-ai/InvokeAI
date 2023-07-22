@@ -364,6 +364,9 @@ class ConfirmCancelPopup(fmPopup.ActionPopup):
     def on_cancel(self):
         self.value = False
         
+class PasswordBox(npyscreen.BoxTitle):
+    _contained_widget = npyscreen.PasswordEntry
+    
 class FileBox(npyscreen.BoxTitle):
     _contained_widget = npyscreen.Filename
     
