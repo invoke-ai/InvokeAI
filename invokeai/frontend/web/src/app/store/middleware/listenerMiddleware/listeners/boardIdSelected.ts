@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { isAnyOf } from '@reduxjs/toolkit';
 import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
@@ -8,9 +8,6 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
-import { isAnyOf } from '@reduxjs/toolkit';
-
-const moduleLog = log.child({ namespace: 'boards' });
 
 export const addBoardIdSelectedListener = () => {
   startAppListening({

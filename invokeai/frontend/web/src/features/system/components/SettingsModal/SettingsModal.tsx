@@ -12,7 +12,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
+import { VALID_LOG_LEVELS } from 'app/logging/logger';
 import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';

@@ -1,13 +1,10 @@
-import { startAppListening } from '..';
-import { log } from 'app/logging/useLogger';
 import {
   imageDeletionConfirmed,
   imageToDeleteSelected,
   isModalOpenChanged,
   selectImageUsage,
 } from 'features/imageDeletion/store/imageDeletionSlice';
-
-const moduleLog = log.child({ namespace: 'image' });
+import { startAppListening } from '..';
 
 export const addImageToDeleteSelectedListener = () => {
   startAppListening({

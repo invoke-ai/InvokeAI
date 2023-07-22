@@ -1,5 +1,5 @@
 import { makeToast } from 'app/components/Toaster';
-import { log } from 'app/logging/useLogger';
+import { $logger, logger } from 'app/logging/logger';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
@@ -12,17 +12,17 @@ import { forEach } from 'lodash-es';
 import { startAppListening } from '..';
 import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
 
-const moduleLog = log.child({ module: 'models' });
-
 export const addModelSelectedListener = () => {
   startAppListening({
     actionCreator: modelSelected,
     effect: (action, { getState, dispatch }) => {
+      const log = logger('models');
+
       const state = getState();
       const result = zMainModel.safeParse(action.payload);
 
       if (!result.success) {
-        moduleLog.error(
+        log.error(
           { error: result.error.format() },
           'Failed to parse main model'
         );

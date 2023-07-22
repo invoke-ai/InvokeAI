@@ -1,4 +1,5 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
   IMAGE_CATEGORIES,
@@ -16,15 +17,16 @@ import {
 } from 'services/events/actions';
 import { startAppListening } from '../..';
 
-const moduleLog = log.child({ namespace: 'socketio' });
 const nodeDenylist = ['dataURL_image'];
 
 export const addInvocationCompleteEventListener = () => {
   startAppListening({
     actionCreator: socketInvocationComplete,
     effect: async (action, { dispatch, getState, take }) => {
-      moduleLog.debug(
-        { data: action.payload },
+      const log = logger('socketio');
+      const { data } = action.payload;
+      log.debug(
+        { data: parseify(data) },
         `Invocation complete (${action.payload.data.node.type})`
       );
       const session_id = action.payload.data.graph_execution_state_id;
@@ -36,7 +38,6 @@ export const addInvocationCompleteEventListener = () => {
         dispatch(sessionCanceled({ session_id }));
       }
 
-      const { data } = action.payload;
       const { result, node, graph_execution_state_id } = data;
 
       // This complete event has an associated image output

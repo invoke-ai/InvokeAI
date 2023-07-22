@@ -1,14 +1,14 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import { serializeError } from 'serialize-error';
 import { sessionCreated } from 'services/api/thunks/session';
 import { startAppListening } from '..';
-
-const moduleLog = log.child({ namespace: 'session' });
 
 export const addSessionCreatedPendingListener = () => {
   startAppListening({
     actionCreator: sessionCreated.pending,
     effect: (action, { getState, dispatch }) => {
+      const log = logger('session');
       //
     },
   });
@@ -18,8 +18,12 @@ export const addSessionCreatedFulfilledListener = () => {
   startAppListening({
     actionCreator: sessionCreated.fulfilled,
     effect: (action, { getState, dispatch }) => {
+      const log = logger('session');
       const session = action.payload;
-      moduleLog.debug({ data: { session } }, `Session created (${session.id})`);
+      log.debug(
+        { session: parseify(session) },
+        `Session created (${session.id})`
+      );
     },
   });
 };
@@ -28,16 +32,13 @@ export const addSessionCreatedRejectedListener = () => {
   startAppListening({
     actionCreator: sessionCreated.rejected,
     effect: (action, { getState, dispatch }) => {
+      const log = logger('session');
       if (action.payload) {
         const { arg, error } = action.payload;
+        const graph = parseify(action.meta.arg);
         const stringifiedError = JSON.stringify(error);
-        moduleLog.error(
-          {
-            data: {
-              arg,
-              error: serializeError(error),
-            },
-          },
+        log.error(
+          { graph, error: serializeError(error) },
           `Problem creating session: ${stringifiedError}`
         );
       }

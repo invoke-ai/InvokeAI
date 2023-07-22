@@ -1,12 +1,9 @@
-import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { log } from 'app/logging/useLogger';
-import { isObject } from 'lodash-es';
 import { isAnyOf } from '@reduxjs/toolkit';
-import { paths } from 'services/api/schema';
+import { createAppAsyncThunk } from 'app/store/storeUtils';
+import { isObject } from 'lodash-es';
 import { $client } from 'services/api/client';
+import { paths } from 'services/api/schema';
 import { O } from 'ts-toolbelt';
-
-const sessionLog = log.child({ namespace: 'session' });
 
 type CreateSessionArg = {
   graph: NonNullable<

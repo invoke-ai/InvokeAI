@@ -1,7 +1,7 @@
 import { UseToastOptions } from '@chakra-ui/react';
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 
-import { InvokeLogLevel } from 'app/logging/useLogger';
+import { InvokeLogLevel } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { t } from 'i18next';

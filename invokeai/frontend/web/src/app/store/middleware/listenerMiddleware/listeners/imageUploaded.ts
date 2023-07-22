@@ -1,5 +1,5 @@
 import { UseToastOptions } from '@chakra-ui/react';
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
 import { imagesAddedToBatch } from 'features/gallery/store/gallerySlice';
@@ -10,8 +10,6 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
 import { imagesApi } from '../../../../../services/api/endpoints/images';
 
-const moduleLog = log.child({ namespace: 'image' });
-
 const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
   title: 'Image Uploaded',
   status: 'success',
@@ -21,11 +19,12 @@ export const addImageUploadedFulfilledListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
+      const log = logger('images');
       const imageDTO = action.payload;
       const state = getState();
       const { selectedBoardId, autoAddBoardId } = state.gallery;
 
-      moduleLog.debug({ arg: '<Blob>', imageDTO }, 'Image uploaded');
+      log.debug({ imageDTO }, 'Image uploaded');
 
       const { postUploadAction } = action.meta.arg.originalArgs;
 
@@ -140,9 +139,10 @@ export const addImageUploadedRejectedListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchRejected,
     effect: (action, { dispatch }) => {
+      const log = logger('images');
       const { file, postUploadAction, ...rest } = action.meta.arg.originalArgs;
       const sanitizedData = { arg: { ...rest, file: '<Blob>' } };
-      moduleLog.error({ data: sanitizedData }, 'Image upload failed');
+      log.error({ ...sanitizedData }, 'Image upload failed');
       dispatch(
         addToast({
           title: 'Image Upload Failed',

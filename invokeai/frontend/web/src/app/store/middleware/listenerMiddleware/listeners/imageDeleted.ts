@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -14,8 +14,6 @@ import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
 
-const moduleLog = log.child({ namespace: 'image' });
-
 /**
  * Called when the user requests an image deletion
  */
@@ -23,6 +21,7 @@ export const addRequestedImageDeletionListener = () => {
   startAppListening({
     actionCreator: imageDeletionConfirmed,
     effect: async (action, { dispatch, getState, condition }) => {
+      const log = logger('images');
       const { imageDTO, imageUsage } = action.payload;
 
       dispatch(isModalOpenChanged(false));
@@ -108,6 +107,7 @@ export const addImageDeletedPendingListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchPending,
     effect: (action, { dispatch, getState }) => {
+      const log = logger('images');
       //
     },
   });
@@ -120,10 +120,8 @@ export const addImageDeletedFulfilledListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
-      moduleLog.debug(
-        { data: { image: action.meta.arg.originalArgs } },
-        'Image deleted'
-      );
+      const log = logger('images');
+      log.debug({ imageDTO: action.meta.arg.originalArgs }, 'Image deleted');
     },
   });
 };
@@ -135,8 +133,9 @@ export const addImageDeletedRejectedListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchRejected,
     effect: (action, { dispatch, getState }) => {
-      moduleLog.debug(
-        { data: { image: action.meta.arg.originalArgs } },
+      const log = logger('images');
+      log.debug(
+        { imageDTO: action.meta.arg.originalArgs },
         'Unable to delete image'
       );
     },
