@@ -62,6 +62,10 @@ type DeleteMainModelArg = {
 
 type DeleteMainModelResponse = void;
 
+type DeleteLoRAModelArg = DeleteMainModelArg;
+
+type DeleteLoRAModelResponse = void;
+
 type ConvertMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
@@ -320,6 +324,18 @@ export const modelsApi = api.injectEndpoints({
         );
       },
     }),
+    deleteLoRAModels: build.mutation<
+      DeleteLoRAModelResponse,
+      DeleteLoRAModelArg
+    >({
+      query: ({ base_model, model_name }) => {
+        return {
+          url: `models/${base_model}/lora/${model_name}`,
+          method: 'DELETE',
+        };
+      },
+      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
+    }),
     getControlNetModels: build.query<
       EntityState<ControlNetModelConfigEntity>,
       void
@@ -467,6 +483,7 @@ export const {
   useAddMainModelsMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
+  useDeleteLoRAModelsMutation,
   useSyncModelsMutation,
   useGetModelsInFolderQuery,
   useGetCheckpointConfigsQuery,
