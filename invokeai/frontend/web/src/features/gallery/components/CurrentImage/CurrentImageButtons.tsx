@@ -210,6 +210,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     [imageDTO, shouldShowImageDetails, toaster]
   );
 
+  useHotkeys(
+    'delete',
+    () => {
+      handleDelete();
+    },
+    [dispatch, imageDTO]
+  );
+
   const handleClickProgressImagesToggle = useCallback(() => {
     dispatch(setShouldShowProgressInViewer(!shouldShowProgressInViewer));
   }, [dispatch, shouldShowProgressInViewer]);
