@@ -3,10 +3,8 @@ import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import {
-  imageDeletionConfirmed,
-  isModalOpenChanged,
-} from 'features/imageDeletion/store/imageDeletionSlice';
+import { imageDeletionConfirmed } from 'features/imageDeletion/store/actions';
+import { isModalOpenChanged } from 'features/imageDeletion/store/imageDeletionSlice';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { clamp } from 'lodash-es';

@@ -1,4 +1,4 @@
-import { NODE_MIN_WIDTH } from 'app/constants';
+import { NODE_MIN_WIDTH } from 'features/nodes/types/constants';
 import { memo } from 'react';
 import { NodeResizeControl, NodeResizerProps } from 'reactflow';
 

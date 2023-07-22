@@ -6,7 +6,7 @@ import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
   INITIAL_IMAGE_LIMIT,
-} from './gallerySlice';
+} from './types';
 
 export const gallerySelector = (state: RootState) => state.gallery;
 

@@ -1,8 +1,8 @@
+import { imageDeletionConfirmed } from 'features/imageDeletion/store/actions';
+import { selectImageUsage } from 'features/imageDeletion/store/imageDeletionSelectors';
 import {
-  imageDeletionConfirmed,
   imageToDeleteSelected,
   isModalOpenChanged,
-  selectImageUsage,
 } from 'features/imageDeletion/store/imageDeletionSlice';
 import { startAppListening } from '..';
 

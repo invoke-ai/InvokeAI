@@ -20,7 +20,7 @@ const selector = createSelector(
 export default function ParamAdvancedCollapse() {
   const { activeLabel } = useAppSelector(selector);
   const shouldShowAdvancedOptions = useAppSelector(
-    (state: RootState) => state.ui.shouldShowAdvancedOptions
+    (state: RootState) => state.generation.shouldShowAdvancedOptions
   );
 
   if (!shouldShowAdvancedOptions) {

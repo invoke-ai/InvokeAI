@@ -1,5 +1,5 @@
 import { FileButton } from '@mantine/core';
-import { makeToast } from 'app/components/Toaster';
+import { makeToast } from 'features/system/util/makeToast';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { loadFileEdges, loadFileNodes } from 'features/nodes/store/nodesSlice';

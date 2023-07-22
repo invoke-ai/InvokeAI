@@ -1,8 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
-import {
-  IMAGE_CATEGORIES,
-  imageSelected,
-} from 'features/gallery/store/gallerySlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import {
   ImageCache,
   getListImagesUrl,

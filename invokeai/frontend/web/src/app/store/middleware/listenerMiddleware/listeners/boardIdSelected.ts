@@ -1,11 +1,13 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
   boardIdSelected,
   galleryViewChanged,
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
+import {
+  ASSETS_CATEGORIES,
+  IMAGE_CATEGORIES,
+} from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
 

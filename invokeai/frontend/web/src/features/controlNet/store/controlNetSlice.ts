@@ -1,5 +1,4 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
 import { ControlNetModelParam } from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, forEach } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -365,5 +364,3 @@ export const {
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;
-
-export const controlNetSelector = (state: RootState) => state.controlNet;

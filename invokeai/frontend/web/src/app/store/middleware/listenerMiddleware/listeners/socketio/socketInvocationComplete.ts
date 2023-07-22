@@ -2,11 +2,11 @@ import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
-  IMAGE_CATEGORIES,
   boardIdSelected,
   galleryViewChanged,
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
+import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { progressImageSet } from 'features/system/store/systemSlice';
 import { imagesAdapter, imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';

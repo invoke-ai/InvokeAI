@@ -1,6 +1,6 @@
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
-import { getImageUsage } from 'features/imageDeletion/store/imageDeletionSlice';
+import { getImageUsage } from 'features/imageDeletion/store/imageDeletionSelectors';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { startAppListening } from '..';

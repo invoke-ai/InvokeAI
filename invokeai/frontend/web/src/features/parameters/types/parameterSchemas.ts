@@ -1,4 +1,4 @@
-import { NUMPY_RAND_MAX, SCHEDULER_NAMES_AS_CONST } from 'app/constants';
+import { NUMPY_RAND_MAX } from 'app/constants';
 import { z } from 'zod';
 
 /**
@@ -73,7 +73,30 @@ export const isValidCfgScale = (val: unknown): val is CfgScaleParam =>
 /**
  * Zod schema for scheduler parameter
  */
-export const zScheduler = z.enum(SCHEDULER_NAMES_AS_CONST);
+export const zScheduler = z.enum([
+  'euler',
+  'deis',
+  'ddim',
+  'ddpm',
+  'dpmpp_2s',
+  'dpmpp_2m',
+  'dpmpp_2m_sde',
+  'dpmpp_sde',
+  'heun',
+  'kdpm_2',
+  'lms',
+  'pndm',
+  'unipc',
+  'euler_k',
+  'dpmpp_2s_k',
+  'dpmpp_2m_k',
+  'dpmpp_2m_sde_k',
+  'dpmpp_sde_k',
+  'heun_k',
+  'lms_k',
+  'euler_a',
+  'kdpm_2_a',
+]);
 /**
  * Type alias for scheduler parameter, inferred from its zod schema
  */
@@ -83,6 +106,31 @@ export type SchedulerParam = z.infer<typeof zScheduler>;
  */
 export const isValidScheduler = (val: unknown): val is SchedulerParam =>
   zScheduler.safeParse(val).success;
+
+export const SCHEDULER_LABEL_MAP: Record<SchedulerParam, string> = {
+  euler: 'Euler',
+  deis: 'DEIS',
+  ddim: 'DDIM',
+  ddpm: 'DDPM',
+  dpmpp_sde: 'DPM++ SDE',
+  dpmpp_2s: 'DPM++ 2S',
+  dpmpp_2m: 'DPM++ 2M',
+  dpmpp_2m_sde: 'DPM++ 2M SDE',
+  heun: 'Heun',
+  kdpm_2: 'KDPM 2',
+  lms: 'LMS',
+  pndm: 'PNDM',
+  unipc: 'UniPC',
+  euler_k: 'Euler Karras',
+  dpmpp_sde_k: 'DPM++ SDE Karras',
+  dpmpp_2s_k: 'DPM++ 2S Karras',
+  dpmpp_2m_k: 'DPM++ 2M Karras',
+  dpmpp_2m_sde_k: 'DPM++ 2M SDE Karras',
+  heun_k: 'Heun Karras',
+  lms_k: 'LMS Karras',
+  euler_a: 'Euler Ancestral',
+  kdpm_2_a: 'KDPM 2 Ancestral',
+};
 
 /**
  * Zod schema for seed parameter

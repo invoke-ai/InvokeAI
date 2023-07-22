@@ -1,6 +1,5 @@
 import { UseToastOptions } from '@chakra-ui/react';
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-
 import { InvokeLogLevel } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
@@ -22,8 +21,8 @@ import {
   appSocketUnsubscribed,
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
-import { makeToast } from '../../../app/components/Toaster';
-import { LANGUAGES } from '../components/LanguagePicker';
+import { makeToast } from '../util/makeToast';
+import { LANGUAGES } from './constants';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 

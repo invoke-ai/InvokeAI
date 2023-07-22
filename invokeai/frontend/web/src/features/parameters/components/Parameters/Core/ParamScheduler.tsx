@@ -1,12 +1,15 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { SCHEDULER_LABEL_MAP, SCHEDULER_NAMES } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setScheduler } from 'features/parameters/store/generationSlice';
-import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
+import {
+  SCHEDULER_LABEL_MAP,
+  SchedulerParam,
+} from 'features/parameters/types/parameterSchemas';
 import { uiSelector } from 'features/ui/store/uiSelectors';
+import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,10 +19,10 @@ const selector = createSelector(
     const { scheduler } = generation;
     const { favoriteSchedulers: enabledSchedulers } = ui;
 
-    const data = SCHEDULER_NAMES.map((schedulerName) => ({
-      value: schedulerName,
-      label: SCHEDULER_LABEL_MAP[schedulerName as SchedulerParam],
-      group: enabledSchedulers.includes(schedulerName)
+    const data = map(SCHEDULER_LABEL_MAP, (label, name) => ({
+      value: name,
+      label: label,
+      group: enabledSchedulers.includes(name as SchedulerParam)
         ? 'Favorites'
         : undefined,
     })).sort((a, b) => a.label.localeCompare(b.label));

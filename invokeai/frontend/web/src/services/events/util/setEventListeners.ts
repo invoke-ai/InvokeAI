@@ -1,9 +1,9 @@
 import { MiddlewareAPI } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { AppDispatch, RootState } from 'app/store/store';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { Socket } from 'socket.io-client';
-import { makeToast } from '../../../app/components/Toaster';
-import { addToast } from '../../../features/system/store/systemSlice';
 import {
   socketConnected,
   socketDisconnected,

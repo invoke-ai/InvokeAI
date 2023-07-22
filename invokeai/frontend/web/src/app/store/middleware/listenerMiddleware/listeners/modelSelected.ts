@@ -1,5 +1,5 @@
-import { makeToast } from 'app/components/Toaster';
-import { $logger, logger } from 'app/logging/logger';
+import { logger } from 'app/logging/logger';
+import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
@@ -8,9 +8,9 @@ import {
 } from 'features/parameters/store/generationSlice';
 import { zMainModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { forEach } from 'lodash-es';
 import { startAppListening } from '..';
-import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
 
 export const addModelSelectedListener = () => {
   startAppListening({
