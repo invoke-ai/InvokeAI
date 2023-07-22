@@ -388,6 +388,7 @@ setting environment variables INVOKEAI_<setting>.
     models_dir          : Path = Field(default='models', description='Path to the models directory', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
     db_dir              : Path = Field(default='databases', description='Path to InvokeAI databases directory', category='Paths')
+    nodes_dir           : Path = Field(default='nodes', description='Path to InvokeAI nodes extension directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
@@ -501,6 +502,13 @@ setting environment variables INVOKEAI_<setting>.
         Path to the models directory
         '''
         return self._resolve(self.models_dir)
+
+    @property
+    def nodes_path(self)->Path:
+        '''
+        Path to the nodes extension mechanism directory
+        '''
+        return self._resolve(self.nodes_dir)
 
     @property
     def autoconvert_path(self)->Path:

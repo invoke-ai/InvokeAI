@@ -9,7 +9,7 @@ class InvokeAIExtensionManager():
     def __init__(self) -> None:
         self.logger = getLogger('Extension Manager')
         self.config = get_invokeai_config()
-        self.community_nodes_dir = pathlib.Path(self.config.root / 'nodes')
+        self.community_nodes_dir = self.config.nodes_path
         assert self.community_nodes_dir.is_dir()
 
     def load_extensions(self) -> List:
