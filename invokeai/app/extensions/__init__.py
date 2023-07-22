@@ -1,0 +1,1 @@
+from .extension_manager import InvokeAIExtensionManager
