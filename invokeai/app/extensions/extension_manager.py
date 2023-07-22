@@ -15,20 +15,19 @@ class InvokeAIExtensionManager():
     def load_extensions(self) -> List:
         loaded_extensions = []
         for extension in self.community_nodes_dir.iterdir():
-            if extension.is_dir() and extension.name != '__pycache__':
+            if extension.is_dir() and not extension.name.startswith('__'):
                 # Search for py files that are not named __init__.py in extensions root directory
                 py_files = list(extension.glob('*.py'))
                 py_files = [
-                    file for file in py_files
-                    if not file.name.endswith("__init__.py")]
+                    file for file in py_files if not file.name == "__init__.py"]
 
-                # If no py files are found, extensions is not loaded.
+                # If no py files are found, extension is not loaded.
                 if len(py_files) == 0:
                     self.logger.warn(
                         f'Extension: "{extension.name}" failed to load. No nodes found.')
                     continue
 
-                # Every py file in the root directory of the extension is loaded as a node
+                # Every py file in the root directory of the extension is loaded as an invocation
                 # This will allow people to pack multiple nodes in different files in the same extension
                 # All subfolders are ignored. These can be used for secondary operations needed for the node.
                 for file in extension.iterdir():
