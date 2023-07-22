@@ -5,7 +5,7 @@ import { startAppListening } from '../..';
 export const addSocketSubscribedEventListener = () => {
   startAppListening({
     actionCreator: socketSubscribed,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { dispatch }) => {
       const log = logger('socketio');
       log.debug(action.payload, 'Subscribed');
       dispatch(appSocketSubscribed(action.payload));

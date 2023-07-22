@@ -48,6 +48,8 @@ export const useLogger = () => {
 
   // Update the module-scoped logger context as needed
   useEffect(() => {
+    // TODO: type this properly
+    //eslint-disable-next-line @typescript-eslint/no-explicit-any
     const newContext: Record<string, any> = {
       ...BASE_CONTEXT,
     };

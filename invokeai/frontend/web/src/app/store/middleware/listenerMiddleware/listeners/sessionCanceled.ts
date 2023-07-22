@@ -6,8 +6,7 @@ import { startAppListening } from '..';
 export const addSessionCanceledPendingListener = () => {
   startAppListening({
     actionCreator: sessionCanceled.pending,
-    effect: (action, { getState, dispatch }) => {
-      const log = logger('session');
+    effect: () => {
       //
     },
   });
@@ -16,7 +15,7 @@ export const addSessionCanceledPendingListener = () => {
 export const addSessionCanceledFulfilledListener = () => {
   startAppListening({
     actionCreator: sessionCanceled.fulfilled,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action) => {
       const log = logger('session');
       const { session_id } = action.meta.arg;
       log.debug({ session_id }, `Session canceled (${session_id})`);
@@ -27,7 +26,7 @@ export const addSessionCanceledFulfilledListener = () => {
 export const addSessionCanceledRejectedListener = () => {
   startAppListening({
     actionCreator: sessionCanceled.rejected,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action) => {
       const log = logger('session');
       const { session_id } = action.meta.arg;
       if (action.payload) {

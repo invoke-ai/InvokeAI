@@ -22,7 +22,7 @@ const nodeDenylist = ['dataURL_image'];
 export const addInvocationCompleteEventListener = () => {
   startAppListening({
     actionCreator: socketInvocationComplete,
-    effect: async (action, { dispatch, getState, take }) => {
+    effect: async (action, { dispatch, getState }) => {
       const log = logger('socketio');
       const { data } = action.payload;
       log.debug(

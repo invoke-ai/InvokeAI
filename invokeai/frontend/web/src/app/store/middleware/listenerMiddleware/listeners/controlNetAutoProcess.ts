@@ -62,10 +62,7 @@ const predicate: AnyListenerPredicate<RootState> = (
 export const addControlNetAutoProcessListener = () => {
   startAppListening({
     predicate,
-    effect: async (
-      action,
-      { dispatch, getState, cancelActiveListeners, delay }
-    ) => {
+    effect: async (action, { dispatch, cancelActiveListeners, delay }) => {
       const log = logger('session');
       const { controlNetId } = action.payload;
 

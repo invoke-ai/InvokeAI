@@ -4,7 +4,6 @@ import {
   autoBatchEnhancer,
   combineReducers,
   configureStore,
-  createAsyncThunk,
 } from '@reduxjs/toolkit';
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import controlNetReducer from 'features/controlNet/store/controlNetSlice';
@@ -118,6 +117,7 @@ export const store = configureStore({
 
 export type AppGetState = typeof store.getState;
 export type RootState = ReturnType<typeof store.getState>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
 export type AppDispatch = typeof store.dispatch;
 export const stateSelector = (state: RootState) => state;

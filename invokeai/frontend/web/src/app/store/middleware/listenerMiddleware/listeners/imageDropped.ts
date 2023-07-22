@@ -23,7 +23,7 @@ export const dndDropped = createAction<{
 export const addImageDroppedListener = () => {
   startAppListening({
     actionCreator: dndDropped,
-    effect: async (action, { dispatch, getState, take }) => {
+    effect: async (action, { dispatch }) => {
       const log = logger('images');
       const { activeData, overData } = action.payload;
 

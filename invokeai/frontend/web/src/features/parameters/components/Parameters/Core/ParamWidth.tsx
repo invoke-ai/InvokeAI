@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
-  ({ generation, hotkeys, config, ui }) => {
+  ({ generation, hotkeys, config }) => {
     const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
       config.sd.width;
     const { width, aspectRatio } = generation;

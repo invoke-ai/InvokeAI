@@ -9,8 +9,8 @@ import { boardsApi } from '../../../../../services/api/endpoints/boards';
 export const addDeleteBoardAndImagesFulfilledListener = () => {
   startAppListening({
     matcher: boardsApi.endpoints.deleteBoardAndImages.matchFulfilled,
-    effect: async (action, { dispatch, getState, condition }) => {
-      const { board_id, deleted_board_images, deleted_images } = action.payload;
+    effect: async (action, { dispatch, getState }) => {
+      const { deleted_images } = action.payload;
 
       // Remove all deleted images from the UI
 

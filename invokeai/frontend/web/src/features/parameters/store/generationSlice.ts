@@ -266,7 +266,7 @@ export const generationSlice = createSlice({
       const defaultModel = action.payload.sd?.defaultModel;
 
       if (defaultModel && !state.model) {
-        const [base_model, model_type, model_name] = defaultModel.split('/');
+        const [base_model, _model_type, model_name] = defaultModel.split('/');
 
         const result = zMainModel.safeParse({
           model_name,

@@ -1,6 +1,7 @@
 import { Box, chakra, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import {
   canvasSelector,
   isStagingSelector,
@@ -8,8 +9,6 @@ import {
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
-import { isEqual } from 'lodash-es';
-
 import { useCallback, useRef } from 'react';
 import { Layer, Stage } from 'react-konva';
 import useCanvasDragMove from '../hooks/useCanvasDragMove';
@@ -34,7 +33,6 @@ import IAICanvasStagingAreaToolbar from './IAICanvasStagingAreaToolbar';
 import IAICanvasStatusText from './IAICanvasStatusText';
 import IAICanvasBoundingBox from './IAICanvasToolbar/IAICanvasBoundingBox';
 import IAICanvasToolPreview from './IAICanvasToolPreview';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 const selector = createSelector(
   [canvasSelector, isStagingSelector],

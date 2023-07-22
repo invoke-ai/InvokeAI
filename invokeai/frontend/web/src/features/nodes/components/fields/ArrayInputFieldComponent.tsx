@@ -7,10 +7,8 @@ import { FaList } from 'react-icons/fa';
 import { FieldComponentProps } from './types';
 
 const ArrayInputFieldComponent = (
-  props: FieldComponentProps<ArrayInputFieldValue, ArrayInputFieldTemplate>
+  _props: FieldComponentProps<ArrayInputFieldValue, ArrayInputFieldTemplate>
 ) => {
-  const { nodeId, field } = props;
-
   return <FaList />;
 };
 

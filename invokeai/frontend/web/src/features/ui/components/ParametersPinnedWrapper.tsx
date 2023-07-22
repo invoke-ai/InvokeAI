@@ -5,7 +5,6 @@ import { PropsWithChildren, memo } from 'react';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 import { uiSelector } from '../store/uiSelectors';
 import PinParametersPanelButton from './PinParametersPanelButton';
-import OverlayScrollable from './common/OverlayScrollable';
 
 const selector = createSelector(uiSelector, (ui) => {
   const { shouldPinParametersPanel, shouldShowParametersPanel } = ui;

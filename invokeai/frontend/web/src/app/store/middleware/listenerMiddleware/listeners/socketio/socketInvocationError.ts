@@ -8,7 +8,7 @@ import { startAppListening } from '../..';
 export const addInvocationErrorEventListener = () => {
   startAppListening({
     actionCreator: socketInvocationError,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { dispatch }) => {
       const log = logger('socketio');
       log.error(
         action.payload,

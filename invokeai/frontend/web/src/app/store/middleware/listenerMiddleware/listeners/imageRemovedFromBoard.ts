@@ -5,7 +5,7 @@ import { startAppListening } from '..';
 export const addImageRemovedFromBoardFulfilledListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.removeImageFromBoard.matchFulfilled,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action) => {
       const log = logger('images');
       const imageDTO = action.meta.arg.originalArgs;
 
@@ -17,7 +17,7 @@ export const addImageRemovedFromBoardFulfilledListener = () => {
 export const addImageRemovedFromBoardRejectedListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.removeImageFromBoard.matchRejected,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action) => {
       const log = logger('images');
       const imageDTO = action.meta.arg.originalArgs;
 

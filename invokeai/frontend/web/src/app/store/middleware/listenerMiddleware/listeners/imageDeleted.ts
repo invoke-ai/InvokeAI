@@ -19,7 +19,6 @@ export const addRequestedImageDeletionListener = () => {
   startAppListening({
     actionCreator: imageDeletionConfirmed,
     effect: async (action, { dispatch, getState, condition }) => {
-      const log = logger('images');
       const { imageDTO, imageUsage } = action.payload;
 
       dispatch(isModalOpenChanged(false));
@@ -104,8 +103,7 @@ export const addRequestedImageDeletionListener = () => {
 export const addImageDeletedPendingListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchPending,
-    effect: (action, { dispatch, getState }) => {
-      const log = logger('images');
+    effect: () => {
       //
     },
   });
@@ -117,7 +115,7 @@ export const addImageDeletedPendingListener = () => {
 export const addImageDeletedFulfilledListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchFulfilled,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action) => {
       const log = logger('images');
       log.debug({ imageDTO: action.meta.arg.originalArgs }, 'Image deleted');
     },
@@ -130,7 +128,7 @@ export const addImageDeletedFulfilledListener = () => {
 export const addImageDeletedRejectedListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchRejected,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action) => {
       const log = logger('images');
       log.debug(
         { imageDTO: action.meta.arg.originalArgs },

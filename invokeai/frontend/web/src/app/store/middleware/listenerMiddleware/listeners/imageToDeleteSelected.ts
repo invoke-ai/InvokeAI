@@ -9,7 +9,7 @@ import { startAppListening } from '..';
 export const addImageToDeleteSelectedListener = () => {
   startAppListening({
     actionCreator: imageToDeleteSelected,
-    effect: async (action, { dispatch, getState, condition }) => {
+    effect: async (action, { dispatch, getState }) => {
       const imageDTO = action.payload;
       const state = getState();
       const { shouldConfirmOnDelete } = state.system;

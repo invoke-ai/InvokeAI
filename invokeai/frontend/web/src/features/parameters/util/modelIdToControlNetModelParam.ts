@@ -6,7 +6,7 @@ export const modelIdToControlNetModelParam = (
   controlNetModelId: string
 ): ControlNetModelField | undefined => {
   const log = logger('models');
-  const [base_model, model_type, model_name] = controlNetModelId.split('/');
+  const [base_model, _model_type, model_name] = controlNetModelId.split('/');
 
   const result = zControlNetModel.safeParse({
     base_model,

@@ -8,7 +8,7 @@ import { startAppListening } from '..';
 export const addCanvasSavedToGalleryListener = () => {
   startAppListening({
     actionCreator: canvasSavedToGallery,
-    effect: async (action, { dispatch, getState, take }) => {
+    effect: async (action, { dispatch, getState }) => {
       const log = logger('canvas');
       const state = getState();
 

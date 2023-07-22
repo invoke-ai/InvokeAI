@@ -1,15 +1,15 @@
 import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { parseSchema } from 'features/nodes/util/parseSchema';
 import { size } from 'lodash-es';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { startAppListening } from '..';
-import { parseify } from 'common/util/serialize';
 
 export const addReceivedOpenAPISchemaListener = () => {
   startAppListening({
     actionCreator: receivedOpenAPISchema.fulfilled,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { dispatch }) => {
       const log = logger('system');
       const schemaJSON = action.payload;
 
@@ -28,7 +28,7 @@ export const addReceivedOpenAPISchemaListener = () => {
 
   startAppListening({
     actionCreator: receivedOpenAPISchema.rejected,
-    effect: (action, { dispatch, getState }) => {
+    effect: () => {
       const log = logger('system');
       log.error('Problem dereferencing OpenAPI Schema');
     },

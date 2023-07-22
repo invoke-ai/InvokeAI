@@ -50,7 +50,9 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
 
   socket.on('connect_error', (error) => {
     if (error && error.message) {
-      const data: string | undefined = (error as any).data;
+      const data: string | undefined = (
+        error as unknown as { data: string | undefined }
+      ).data;
       if (data === 'ERR_UNAUTHENTICATED') {
         dispatch(
           addToast(

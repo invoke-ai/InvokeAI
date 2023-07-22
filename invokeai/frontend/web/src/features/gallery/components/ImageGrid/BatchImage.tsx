@@ -8,13 +8,8 @@ import IAIDndImage from 'common/components/IAIDndImage';
 import IAIErrorLoadingImageFallback from 'common/components/IAIErrorLoadingImageFallback';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
 import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
-import {
-  imageRangeEndSelected,
-  imageSelected,
-  imageSelectionToggled,
-  imagesRemovedFromBatch,
-} from 'features/gallery/store/gallerySlice';
-import { MouseEvent, memo, useCallback, useMemo } from 'react';
+import { imagesRemovedFromBatch } from 'features/gallery/store/gallerySlice';
+import { memo, useCallback, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const makeSelector = (image_name: string) =>
@@ -39,7 +34,6 @@ const BatchImage = (props: BatchImageProps) => {
     currentData: imageDTO,
     isLoading,
     isError,
-    isSuccess,
   } = useGetImageDTOQuery(imageName);
   const selector = useMemo(() => makeSelector(imageName), [imageName]);
 
@@ -49,18 +43,18 @@ const BatchImage = (props: BatchImageProps) => {
     dispatch(imagesRemovedFromBatch([imageName]));
   }, [dispatch, imageName]);
 
-  const handleClick = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      if (e.shiftKey) {
-        dispatch(imageRangeEndSelected(imageName));
-      } else if (e.ctrlKey || e.metaKey) {
-        dispatch(imageSelectionToggled(imageName));
-      } else {
-        dispatch(imageSelected(imageName));
-      }
-    },
-    [dispatch, imageName]
-  );
+  // const handleClick = useCallback(
+  //   (e: MouseEvent<HTMLDivElement>) => {
+  //     if (e.shiftKey) {
+  //       dispatch(imageRangeEndSelected(imageName));
+  //     } else if (e.ctrlKey || e.metaKey) {
+  //       dispatch(imageSelectionToggled(imageName));
+  //     } else {
+  //       dispatch(imageSelected(imageName));
+  //     }
+  //   },
+  //   [dispatch, imageName]
+  // );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
     if (selectionCount > 1) {
@@ -105,7 +99,7 @@ const BatchImage = (props: BatchImageProps) => {
             }}
           >
             <IAIDndImage
-              onClick={handleClick}
+              // onClick={handleClick}
               imageDTO={imageDTO}
               draggableData={draggableData}
               isSelected={isSelected}

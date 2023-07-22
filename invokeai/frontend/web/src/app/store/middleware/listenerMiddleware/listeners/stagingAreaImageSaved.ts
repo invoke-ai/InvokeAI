@@ -1,4 +1,3 @@
-import { logger } from 'app/logging/logger';
 import { stagingAreaImageSaved } from 'features/canvas/store/actions';
 import { addToast } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -7,8 +6,7 @@ import { startAppListening } from '..';
 export const addStagingAreaImageSavedListener = () => {
   startAppListening({
     actionCreator: stagingAreaImageSaved,
-    effect: async (action, { dispatch, getState, take }) => {
-      const log = logger('canvas');
+    effect: async (action, { dispatch, getState }) => {
       const { imageDTO } = action.payload;
 
       try {

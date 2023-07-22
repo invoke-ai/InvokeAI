@@ -314,11 +314,11 @@ export const controlNetSlice = createSlice({
       }
     });
 
-    builder.addCase(appSocketInvocationError, (state, action) => {
+    builder.addCase(appSocketInvocationError, (state) => {
       state.pendingControlImages = [];
     });
 
-    builder.addMatcher(isAnySessionRejected, (state, action) => {
+    builder.addMatcher(isAnySessionRejected, (state) => {
       state.pendingControlImages = [];
     });
 

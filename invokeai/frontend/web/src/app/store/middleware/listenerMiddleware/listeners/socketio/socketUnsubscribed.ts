@@ -8,7 +8,7 @@ import { startAppListening } from '../..';
 export const addSocketUnsubscribedEventListener = () => {
   startAppListening({
     actionCreator: socketUnsubscribed,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { dispatch }) => {
       const log = logger('socketio');
       log.debug(action.payload, 'Unsubscribed');
       dispatch(appSocketUnsubscribed(action.payload));

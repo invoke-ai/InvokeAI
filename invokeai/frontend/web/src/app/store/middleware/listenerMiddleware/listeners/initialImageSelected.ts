@@ -8,7 +8,7 @@ import { startAppListening } from '..';
 export const addInitialImageSelectedListener = () => {
   startAppListening({
     actionCreator: initialImageSelected,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action, { dispatch }) => {
       if (!action.payload) {
         dispatch(
           addToast(

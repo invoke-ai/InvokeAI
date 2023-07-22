@@ -8,7 +8,7 @@ import { startAppListening } from '../..';
 export const addGraphExecutionStateCompleteEventListener = () => {
   startAppListening({
     actionCreator: socketGraphExecutionStateComplete,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { dispatch }) => {
       const log = logger('socketio');
       log.debug(action.payload, 'Session complete');
       // pass along the socket event as an application action

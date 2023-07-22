@@ -6,7 +6,7 @@ export const modelIdToLoRAModelParam = (
 ): LoRAModelParam | undefined => {
   const log = logger('models');
 
-  const [base_model, model_type, model_name] = loraModelId.split('/');
+  const [base_model, _model_type, model_name] = loraModelId.split('/');
 
   const result = zLoRAModel.safeParse({
     base_model,

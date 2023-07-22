@@ -15,7 +15,7 @@ export const addFirstListImagesListener = () => {
     matcher: imagesApi.endpoints.listImages.matchFulfilled,
     effect: async (
       action,
-      { getState, dispatch, unsubscribe, cancelActiveListeners }
+      { dispatch, unsubscribe, cancelActiveListeners }
     ) => {
       // Only run this listener on the first listImages request for no-board images
       if (

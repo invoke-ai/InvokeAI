@@ -7,8 +7,7 @@ import { startAppListening } from '..';
 export const addSessionCreatedPendingListener = () => {
   startAppListening({
     actionCreator: sessionCreated.pending,
-    effect: (action, { getState, dispatch }) => {
-      const log = logger('session');
+    effect: () => {
       //
     },
   });
@@ -17,7 +16,7 @@ export const addSessionCreatedPendingListener = () => {
 export const addSessionCreatedFulfilledListener = () => {
   startAppListening({
     actionCreator: sessionCreated.fulfilled,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action) => {
       const log = logger('session');
       const session = action.payload;
       log.debug(
@@ -31,10 +30,10 @@ export const addSessionCreatedFulfilledListener = () => {
 export const addSessionCreatedRejectedListener = () => {
   startAppListening({
     actionCreator: sessionCreated.rejected,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action) => {
       const log = logger('session');
       if (action.payload) {
-        const { arg, error } = action.payload;
+        const { error } = action.payload;
         const graph = parseify(action.meta.arg);
         const stringifiedError = JSON.stringify(error);
         log.error(

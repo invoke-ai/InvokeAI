@@ -1,4 +1,5 @@
-import { $logger, logger } from 'app/logging/logger';
+import { logger } from 'app/logging/logger';
+import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import {
   modelChanged,
@@ -11,7 +12,6 @@ import {
 import { forEach, some } from 'lodash-es';
 import { modelsApi } from 'services/api/endpoints/models';
 import { startAppListening } from '..';
-import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
 
 export const addModelsLoadedListener = () => {
   startAppListening({
@@ -167,7 +167,7 @@ export const addModelsLoadedListener = () => {
   });
   startAppListening({
     matcher: modelsApi.endpoints.getTextualInversionModels.matchFulfilled,
-    effect: async (action, { getState, dispatch }) => {
+    effect: async (action) => {
       const log = logger('models');
       log.info(
         { models: action.payload.entities },

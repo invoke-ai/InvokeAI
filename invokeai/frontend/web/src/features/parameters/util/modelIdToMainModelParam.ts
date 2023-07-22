@@ -8,7 +8,7 @@ export const modelIdToMainModelParam = (
   mainModelId: string
 ): MainModelParam | undefined => {
   const log = logger('models');
-  const [base_model, model_type, model_name] = mainModelId.split('/');
+  const [base_model, _model_type, model_name] = mainModelId.split('/');
 
   const result = zMainModel.safeParse({
     base_model,

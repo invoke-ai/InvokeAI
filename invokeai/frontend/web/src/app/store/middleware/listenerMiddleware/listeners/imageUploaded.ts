@@ -9,6 +9,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
 import { imagesApi } from '../../../../../services/api/endpoints/images';
+import { omit } from 'lodash-es';
 
 const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
   title: 'Image Uploaded',
@@ -22,7 +23,7 @@ export const addImageUploadedFulfilledListener = () => {
       const log = logger('images');
       const imageDTO = action.payload;
       const state = getState();
-      const { selectedBoardId, autoAddBoardId } = state.gallery;
+      const { autoAddBoardId } = state.gallery;
 
       log.debug({ imageDTO }, 'Image uploaded');
 
@@ -140,8 +141,12 @@ export const addImageUploadedRejectedListener = () => {
     matcher: imagesApi.endpoints.uploadImage.matchRejected,
     effect: (action, { dispatch }) => {
       const log = logger('images');
-      const { file, postUploadAction, ...rest } = action.meta.arg.originalArgs;
-      const sanitizedData = { arg: { ...rest, file: '<Blob>' } };
+      const sanitizedData = {
+        arg: {
+          ...omit(action.meta.arg.originalArgs, ['file', 'postUploadAction']),
+          file: '<Blob>',
+        },
+      };
       log.error({ ...sanitizedData }, 'Image upload failed');
       dispatch(
         addToast({

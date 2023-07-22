@@ -11,10 +11,7 @@ export const upscaleRequested = createAction<{ image_name: string }>(
 export const addUpscaleRequestedListener = () => {
   startAppListening({
     actionCreator: upscaleRequested,
-    effect: async (
-      action,
-      { dispatch, getState, take, unsubscribe, subscribe }
-    ) => {
+    effect: async (action, { dispatch, getState, take }) => {
       const { image_name } = action.payload;
       const { esrganModelName } = getState().postprocessing;
 

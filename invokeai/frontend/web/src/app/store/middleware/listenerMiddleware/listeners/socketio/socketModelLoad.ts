@@ -1,5 +1,4 @@
 import { logger } from 'app/logging/logger';
-import { ModelType } from 'services/api/types';
 import {
   appSocketModelLoadCompleted,
   appSocketModelLoadStarted,
@@ -8,18 +7,10 @@ import {
 } from 'services/events/actions';
 import { startAppListening } from '../..';
 
-const MODEL_TYPES: Record<ModelType, string> = {
-  main: 'main',
-  vae: 'VAE',
-  lora: 'LoRA',
-  controlnet: 'ControlNet',
-  embedding: 'embedding',
-};
-
 export const addModelLoadEventListener = () => {
   startAppListening({
     actionCreator: socketModelLoadStarted,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { dispatch }) => {
       const log = logger('socketio');
       const { base_model, model_name, model_type, submodel } =
         action.payload.data;
@@ -39,7 +30,7 @@ export const addModelLoadEventListener = () => {
 
   startAppListening({
     actionCreator: socketModelLoadCompleted,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { dispatch }) => {
       const log = logger('socketio');
       const { base_model, model_name, model_type, submodel } =
         action.payload.data;

@@ -19,40 +19,44 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState: initialGalleryState,
   reducers: {
-    imageRangeEndSelected: (state, action: PayloadAction<string>) => {
-      // TODO: multiselect
-      // const rangeEndImageName = action.payload;
-      // const lastSelectedImage = state.selection[state.selection.length - 1];
-      // const filteredImages = selectFilteredImagesLocal(state);
-      // const lastClickedIndex = filteredImages.findIndex(
-      //   (n) => n.image_name === lastSelectedImage
-      // );
-      // const currentClickedIndex = filteredImages.findIndex(
-      //   (n) => n.image_name === rangeEndImageName
-      // );
-      // if (lastClickedIndex > -1 && currentClickedIndex > -1) {
-      //   // We have a valid range!
-      //   const start = Math.min(lastClickedIndex, currentClickedIndex);
-      //   const end = Math.max(lastClickedIndex, currentClickedIndex);
-      //   const imagesToSelect = filteredImages
-      //     .slice(start, end + 1)
-      //     .map((i) => i.image_name);
-      //   state.selection = uniq(state.selection.concat(imagesToSelect));
-      // }
+    imageRangeEndSelected: () => {
+      // TODO
     },
-    imageSelectionToggled: (state, action: PayloadAction<string>) => {
-      // TODO: multiselect
-      // if (
-      //   state.selection.includes(action.payload) &&
-      //   state.selection.length > 1
-      // ) {
-      //   state.selection = state.selection.filter(
-      //     (imageName) => imageName !== action.payload
-      //   );
-      // } else {
-      //   state.selection = uniq(state.selection.concat(action.payload));
-      // }
+    // imageRangeEndSelected: (state, action: PayloadAction<string>) => {
+    // const rangeEndImageName = action.payload;
+    // const lastSelectedImage = state.selection[state.selection.length - 1];
+    // const filteredImages = selectFilteredImagesLocal(state);
+    // const lastClickedIndex = filteredImages.findIndex(
+    //   (n) => n.image_name === lastSelectedImage
+    // );
+    // const currentClickedIndex = filteredImages.findIndex(
+    //   (n) => n.image_name === rangeEndImageName
+    // );
+    // if (lastClickedIndex > -1 && currentClickedIndex > -1) {
+    //   // We have a valid range!
+    //   const start = Math.min(lastClickedIndex, currentClickedIndex);
+    //   const end = Math.max(lastClickedIndex, currentClickedIndex);
+    //   const imagesToSelect = filteredImages
+    //     .slice(start, end + 1)
+    //     .map((i) => i.image_name);
+    //   state.selection = uniq(state.selection.concat(imagesToSelect));
+    // }
+    // },
+    imageSelectionToggled: () => {
+      // TODO
     },
+    // imageSelectionToggled: (state, action: PayloadAction<string>) => {
+    // TODO: multiselect
+    // if (
+    //   state.selection.includes(action.payload) &&
+    //   state.selection.length > 1
+    // ) {
+    //   state.selection = state.selection.filter(
+    //     (imageName) => imageName !== action.payload
+    //   );
+    // } else {
+    //   state.selection = uniq(state.selection.concat(action.payload));
+    // }
     imageSelected: (state, action: PayloadAction<string | null>) => {
       state.selection = action.payload ? [action.payload] : [];
     },

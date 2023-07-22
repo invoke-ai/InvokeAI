@@ -15,7 +15,6 @@ import { getValidControlNets } from 'features/controlNet/util/getValidControlNet
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { map } from 'lodash-es';
 import { Fragment, memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { FaPlus } from 'react-icons/fa';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 import { v4 as uuidv4 } from 'uuid';
@@ -38,7 +37,6 @@ const selector = createSelector(
 );
 
 const ParamControlNetCollapse = () => {
-  const { t } = useTranslation();
   const { controlNetsArray, activeLabel } = useAppSelector(selector);
   const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
   const dispatch = useAppDispatch();

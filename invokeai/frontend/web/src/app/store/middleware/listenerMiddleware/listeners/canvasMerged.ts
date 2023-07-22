@@ -10,7 +10,7 @@ import { startAppListening } from '..';
 export const addCanvasMergedListener = () => {
   startAppListening({
     actionCreator: canvasMerged,
-    effect: async (action, { dispatch, getState, take }) => {
+    effect: async (action, { dispatch }) => {
       const moduleLog = $logger
         .get()
         .child({ namespace: 'canvasCopiedToClipboardListener' });

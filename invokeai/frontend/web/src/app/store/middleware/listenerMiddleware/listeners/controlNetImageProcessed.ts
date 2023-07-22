@@ -1,4 +1,4 @@
-import { $logger, logger } from 'app/logging/logger';
+import { logger } from 'app/logging/logger';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
@@ -12,10 +12,7 @@ import { startAppListening } from '..';
 export const addControlNetImageProcessedListener = () => {
   startAppListening({
     actionCreator: controlNetImageProcessed,
-    effect: async (
-      action,
-      { dispatch, getState, take, unsubscribe, subscribe }
-    ) => {
+    effect: async (action, { dispatch, getState, take }) => {
       const log = logger('session');
       const { controlNetId } = action.payload;
       const controlNet = getState().controlNet.controlNets[controlNetId];
