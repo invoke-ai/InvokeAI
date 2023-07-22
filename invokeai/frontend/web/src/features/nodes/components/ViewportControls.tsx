@@ -59,13 +59,25 @@ const ViewportControls = () => {
   return (
     <ButtonGroup isAttached orientation="vertical">
       <Tooltip label={t('nodes.zoomInNodes')}>
-        <IAIIconButton onClick={handleClickedZoomIn} icon={<FaPlus />} />
+        <IAIIconButton
+          aria-label="Zoom in "
+          onClick={handleClickedZoomIn}
+          icon={<FaPlus />}
+        />
       </Tooltip>
       <Tooltip label={t('nodes.zoomOutNodes')}>
-        <IAIIconButton onClick={handleClickedZoomOut} icon={<FaMinus />} />
+        <IAIIconButton
+          aria-label="Zoom out"
+          onClick={handleClickedZoomOut}
+          icon={<FaMinus />}
+        />
       </Tooltip>
       <Tooltip label={t('nodes.fitViewportNodes')}>
-        <IAIIconButton onClick={handleClickedFitView} icon={<FaExpand />} />
+        <IAIIconButton
+          aria-label="Fit viewport"
+          onClick={handleClickedFitView}
+          icon={<FaExpand />}
+        />
       </Tooltip>
       <Tooltip
         label={
@@ -75,6 +87,7 @@ const ViewportControls = () => {
         }
       >
         <IAIIconButton
+          aria-label="Toggle nodes graph overlay"
           isChecked={shouldShowGraphOverlay}
           onClick={handleClickedToggleGraphOverlay}
           icon={<FaCode />}
@@ -88,6 +101,7 @@ const ViewportControls = () => {
         }
       >
         <IAIIconButton
+          aria-label="Toggle field type legend"
           isChecked={shouldShowFieldTypeLegend}
           onClick={handleClickedToggleFieldTypeLegend}
           icon={<FaInfo />}
@@ -101,6 +115,7 @@ const ViewportControls = () => {
         }
       >
         <IAIIconButton
+          aria-label="Toggle minimap"
           isChecked={shouldShowMinimapPanel}
           onClick={handleClickedToggleMiniMapPanel}
           icon={<FaMapMarkerAlt />}

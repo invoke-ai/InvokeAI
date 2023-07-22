@@ -22,13 +22,16 @@ export default function ParamAdvancedCollapse() {
   const shouldShowAdvancedOptions = useAppSelector(
     (state: RootState) => state.ui.shouldShowAdvancedOptions
   );
+
+  if (!shouldShowAdvancedOptions) {
+    return null;
+  }
+
   return (
-    shouldShowAdvancedOptions && (
-      <IAICollapse label={'Advanced'} activeLabel={activeLabel}>
-        <Flex sx={{ flexDir: 'column', gap: 2 }}>
-          <ParamClipSkip />
-        </Flex>
-      </IAICollapse>
-    )
+    <IAICollapse label={'Advanced'} activeLabel={activeLabel}>
+      <Flex sx={{ flexDir: 'column', gap: 2 }}>
+        <ParamClipSkip />
+      </Flex>
+    </IAICollapse>
   );
 }

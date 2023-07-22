@@ -159,6 +159,8 @@ const GalleryImageGrid = () => {
       </Box>
     );
   }
+
+  return null;
 };
 
 export default memo(GalleryImageGrid);

@@ -45,7 +45,7 @@ export const gallerySlice = createSlice({
   initialState: initialGalleryState,
   reducers: {
     imageRangeEndSelected: (state, action: PayloadAction<string>) => {
-      // MULTI SELECT LOGIC
+      // TODO: multiselect
       // const rangeEndImageName = action.payload;
       // const lastSelectedImage = state.selection[state.selection.length - 1];
       // const filteredImages = selectFilteredImagesLocal(state);
@@ -66,7 +66,7 @@ export const gallerySlice = createSlice({
       // }
     },
     imageSelectionToggled: (state, action: PayloadAction<string>) => {
-      // MULTI SELECT LOGIC
+      // TODO: multiselect
       // if (
       //   state.selection.includes(action.payload) &&
       //   state.selection.length > 1
@@ -157,7 +157,6 @@ export const gallerySlice = createSlice({
 });
 
 export const {
-  imagesRemoved,
   imageRangeEndSelected,
   imageSelectionToggled,
   imageSelected,

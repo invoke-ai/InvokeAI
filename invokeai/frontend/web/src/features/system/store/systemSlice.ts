@@ -74,7 +74,8 @@ export interface SystemState {
    */
   consoleLogLevel: InvokeLogLevel;
   shouldLogToConsole: boolean;
-  statusTranslationKey: any;
+  // TODO: probably better to not store keys here, should just be a string that maps to the translation key
+  statusTranslationKey: string;
   /**
    * When a session is canceled, its ID is stored here until a new session is created.
    */
@@ -125,7 +126,7 @@ export const systemSlice = createSlice({
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
     },
-    setCurrentStatus: (state, action: any) => {
+    setCurrentStatus: (state, action: PayloadAction<string>) => {
       state.statusTranslationKey = action.payload;
     },
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
@@ -362,7 +363,7 @@ export const systemSlice = createSlice({
      * Session Invoked - REJECTED
      * Session Created - REJECTED
      */
-    builder.addMatcher(isAnySessionRejected, (state, action) => {
+    builder.addMatcher(isAnySessionRejected, (state) => {
       state.isProcessing = false;
       state.isCancelable = false;
       state.isCancelScheduled = false;

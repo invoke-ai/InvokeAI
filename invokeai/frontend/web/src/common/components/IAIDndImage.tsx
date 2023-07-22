@@ -169,7 +169,9 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                   ...imageSx,
                 }}
               />
-              {withMetadataOverlay && <ImageMetadataOverlay image={imageDTO} />}
+              {withMetadataOverlay && (
+                <ImageMetadataOverlay imageDTO={imageDTO} />
+              )}
               <SelectionOverlay
                 isSelected={isSelected}
                 isHovered={withHoverOverlay ? isHovered : false}

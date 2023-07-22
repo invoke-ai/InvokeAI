@@ -4,7 +4,7 @@ import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName } from './tabMap';
-import { AddNewModelType, UIState } from './uiTypes';
+import { UIState } from './uiTypes';
 
 export const initialUIState: UIState = {
   activeTab: 0,
@@ -14,7 +14,6 @@ export const initialUIState: UIState = {
   shouldUseCanvasBetaLayout: false,
   shouldShowExistingModelsInSearch: false,
   shouldUseSliders: false,
-  addNewModelUIOption: null,
   shouldPinGallery: true,
   shouldShowGallery: true,
   shouldHidePreview: false,
@@ -56,9 +55,6 @@ export const uiSlice = createSlice({
     },
     setShouldUseSliders: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSliders = action.payload;
-    },
-    setAddNewModelUIOption: (state, action: PayloadAction<AddNewModelType>) => {
-      state.addNewModelUIOption = action.payload;
     },
     setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGallery = action.payload;
@@ -124,7 +120,6 @@ export const {
   setShouldUseCanvasBetaLayout,
   setShouldShowExistingModelsInSearch,
   setShouldUseSliders,
-  setAddNewModelUIOption,
   setShouldHidePreview,
   setShouldShowGallery,
   togglePanels,
