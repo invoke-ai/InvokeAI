@@ -1121,7 +1121,7 @@ def download_from_original_stable_diffusion_ckpt(
     prediction_type: str = None,
     model_type: str = None,
     extract_ema: bool = False,
-    precision: torch.dtype = torch.float16,
+    precision: torch.dtype = torch.float32,
     scheduler_type: str = "pndm",
     num_in_channels: Optional[int] = None,
     upcast_attention: Optional[bool] = None,
@@ -1250,7 +1250,7 @@ def download_from_original_stable_diffusion_ckpt(
     while "state_dict" in checkpoint:
         checkpoint = checkpoint["state_dict"]
         
-    print(f'DEBUG: model_type = {model_type}; original_config_file = {original_config_file}')
+    logger.debug(f'model_type = {model_type}; original_config_file = {original_config_file}')
 
     if original_config_file is None:
         key_name_v2_1 = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
@@ -1624,7 +1624,7 @@ def download_controlnet_from_original_ckpt(
     original_config_file: str,
     image_size: int = 512,
     extract_ema: bool = False,
-    precision: torch.dtype = torch.float16,
+    precision: torch.dtype = torch.float32,
     num_in_channels: Optional[int] = None,
     upcast_attention: Optional[bool] = None,
     device: str = None,
@@ -1702,7 +1702,7 @@ def convert_ldm_vae_to_diffusers(checkpoint, vae_config: DictConfig, image_size:
 def convert_ckpt_to_diffusers(
         checkpoint_path: Union[str, Path],
         dump_path: Union[str, Path],
-        no_safetensors: bool = False,
+        use_safetensors: bool=True,
         **kwargs,
 ):
     """
@@ -1714,7 +1714,7 @@ def convert_ckpt_to_diffusers(
 
     pipe.save_pretrained(
         dump_path,
-        safe_serialization=is_safetensors_available() and not no_safetensors,
+        safe_serialization=use_safetensors and is_safetensors_available(),
     )
 
 def convert_controlnet_to_diffusers(

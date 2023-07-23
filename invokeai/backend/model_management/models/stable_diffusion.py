@@ -16,8 +16,10 @@ from .base import (
     InvalidModelException,
 )
 from .sdxl import StableDiffusionXLModel
+import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from omegaconf import OmegaConf
+
 
 class StableDiffusion1ModelFormat(str, Enum):
     Checkpoint = "checkpoint"
@@ -265,6 +267,9 @@ def _convert_ckpt_and_cache(
 
     # to avoid circular import errors
     from ..convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
+    from ...util.devices import choose_torch_device, torch_dtype
+    
+    logger.info(f'Converting {weights} to diffusers format')
     with SilenceWarnings():        
         convert_ckpt_to_diffusers(
             weights,
@@ -275,6 +280,7 @@ def _convert_ckpt_and_cache(
             extract_ema=True,
             scan_needed=True,
             from_safetensors = weights.suffix == ".safetensors",
+            precision = torch_dtype(choose_torch_device()),
             **kwargs,
         )
     return output_path
