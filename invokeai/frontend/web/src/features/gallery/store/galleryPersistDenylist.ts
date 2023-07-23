@@ -5,13 +5,6 @@ import { initialGalleryState } from './gallerySlice';
  */
 export const galleryPersistDenylist: (keyof typeof initialGalleryState)[] = [
   'selection',
-  'entities',
-  'ids',
-  'isLoading',
-  'limit',
-  'offset',
   'selectedBoardId',
   'galleryView',
-  'total',
-  'isInitialized',
 ];

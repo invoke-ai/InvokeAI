@@ -1,14 +1,12 @@
-import { log } from 'app/logging/useLogger';
-import { startAppListening } from '..';
-import { sessionCanceled } from 'services/api/thunks/session';
+import { logger } from 'app/logging/logger';
 import { serializeError } from 'serialize-error';
-
-const moduleLog = log.child({ namespace: 'session' });
+import { sessionCanceled } from 'services/api/thunks/session';
+import { startAppListening } from '..';
 
 export const addSessionCanceledPendingListener = () => {
   startAppListening({
     actionCreator: sessionCanceled.pending,
-    effect: (action, { getState, dispatch }) => {
+    effect: () => {
       //
     },
   });
@@ -17,12 +15,10 @@ export const addSessionCanceledPendingListener = () => {
 export const addSessionCanceledFulfilledListener = () => {
   startAppListening({
     actionCreator: sessionCanceled.fulfilled,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action) => {
+      const log = logger('session');
       const { session_id } = action.meta.arg;
-      moduleLog.debug(
-        { data: { session_id } },
-        `Session canceled (${session_id})`
-      );
+      log.debug({ session_id }, `Session canceled (${session_id})`);
     },
   });
 };
@@ -30,15 +26,15 @@ export const addSessionCanceledFulfilledListener = () => {
 export const addSessionCanceledRejectedListener = () => {
   startAppListening({
     actionCreator: sessionCanceled.rejected,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action) => {
+      const log = logger('session');
+      const { session_id } = action.meta.arg;
       if (action.payload) {
-        const { arg, error } = action.payload;
-        moduleLog.error(
+        const { error } = action.payload;
+        log.error(
           {
-            data: {
-              arg,
-              error: serializeError(error),
-            },
+            session_id,
+            error: serializeError(error),
           },
           `Problem canceling session`
         );

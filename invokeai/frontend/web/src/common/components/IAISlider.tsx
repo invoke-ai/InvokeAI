@@ -1,5 +1,4 @@
 import {
-  ChakraProps,
   FormControl,
   FormControlProps,
   FormLabel,
@@ -24,16 +23,15 @@ import {
   Tooltip,
   TooltipProps,
 } from '@chakra-ui/react';
-import { clamp } from 'lodash-es';
-
 import { useAppDispatch } from 'app/store/storeHooks';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
+import { clamp } from 'lodash-es';
 import {
   FocusEvent,
   KeyboardEvent,
-  memo,
   MouseEvent,
+  memo,
   useCallback,
   useEffect,
   useMemo,

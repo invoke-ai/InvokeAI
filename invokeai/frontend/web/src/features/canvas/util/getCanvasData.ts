@@ -1,22 +1,22 @@
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
-import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { isCanvasMaskLine } from '../store/canvasTypes';
-import { log } from 'app/logging/useLogger';
 import createMaskStage from './createMaskStage';
-import { konvaNodeToImageData } from './konvaNodeToImageData';
+import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { konvaNodeToBlob } from './konvaNodeToBlob';
-
-const moduleLog = log.child({ namespace: 'getCanvasDataURLs' });
+import { konvaNodeToImageData } from './konvaNodeToImageData';
 
 /**
  * Gets Blob and ImageData objects for the base and mask layers
  */
 export const getCanvasData = async (state: RootState) => {
+  const log = logger('canvas');
+
   const canvasBaseLayer = getCanvasBaseLayer();
   const canvasStage = getCanvasStage();
 
   if (!canvasBaseLayer || !canvasStage) {
-    moduleLog.error('Unable to find canvas / stage');
+    log.error('Unable to find canvas / stage');
     return;
   }
 

@@ -1,21 +1,11 @@
 import { Badge, Flex } from '@chakra-ui/react';
-import { isString } from 'lodash-es';
-import { useMemo } from 'react';
 import { ImageDTO } from 'services/api/types';
 
 type ImageMetadataOverlayProps = {
-  image: ImageDTO;
+  imageDTO: ImageDTO;
 };
 
-const ImageMetadataOverlay = ({ image }: ImageMetadataOverlayProps) => {
-  const model = useMemo(() => {
-    if (!isString(image.metadata?.model)) {
-      return;
-    }
-
-    return image.metadata?.model;
-  }, [image.metadata]);
-
+const ImageMetadataOverlay = ({ imageDTO }: ImageMetadataOverlayProps) => {
   return (
     <Flex
       sx={{
@@ -30,13 +20,8 @@ const ImageMetadataOverlay = ({ image }: ImageMetadataOverlayProps) => {
       }}
     >
       <Badge variant="solid" colorScheme="base">
-        {image.width} × {image.height}
+        {imageDTO.width} × {imageDTO.height}
       </Badge>
-      {model && (
-        <Badge variant="solid" colorScheme="base">
-          {model}
-        </Badge>
-      )}
     </Flex>
   );
 };

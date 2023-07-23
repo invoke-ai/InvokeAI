@@ -14,14 +14,14 @@ const invokeAIOverlay = defineStyle((props) => ({
 
 const invokeAIDialogContainer = defineStyle({});
 
-const invokeAIDialog = defineStyle((props) => {
+const invokeAIDialog = defineStyle(() => {
   return {
     layerStyle: 'first',
     maxH: '80vh',
   };
 });
 
-const invokeAIHeader = defineStyle((props) => {
+const invokeAIHeader = defineStyle(() => {
   return {
     fontWeight: '600',
     fontSize: 'lg',
@@ -42,8 +42,8 @@ const invokeAIFooter = defineStyle({});
 export const invokeAI = definePartsStyle((props) => ({
   overlay: invokeAIOverlay(props),
   dialogContainer: invokeAIDialogContainer,
-  dialog: invokeAIDialog(props),
-  header: invokeAIHeader(props),
+  dialog: invokeAIDialog(),
+  header: invokeAIHeader(),
   closeButton: invokeAICloseButton,
   body: invokeAIBody,
   footer: invokeAIFooter,

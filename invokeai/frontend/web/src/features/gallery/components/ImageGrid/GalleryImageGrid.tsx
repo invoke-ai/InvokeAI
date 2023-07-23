@@ -2,8 +2,8 @@ import { Box, Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { IMAGE_LIMIT } from 'features/gallery//store/gallerySlice';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { IMAGE_LIMIT } from 'features/gallery/store/types';
 import {
   UseOverlayScrollbarsParams,
   useOverlayScrollbars,
@@ -159,6 +159,8 @@ const GalleryImageGrid = () => {
       </Box>
     );
   }
+
+  return null;
 };
 
 export default memo(GalleryImageGrid);

@@ -1,4 +1,4 @@
-import { BoardId } from 'features/gallery/store/gallerySlice';
+import { BoardId } from 'features/gallery/store/types';
 import { useListAllBoardsQuery } from '../endpoints/boards';
 
 export const useBoardName = (board_id: BoardId | null | undefined) => {

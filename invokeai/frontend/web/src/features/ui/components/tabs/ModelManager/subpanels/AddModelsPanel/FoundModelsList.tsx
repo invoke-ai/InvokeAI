@@ -1,5 +1,5 @@
 import { Flex, Text } from '@chakra-ui/react';
-import { makeToast } from 'app/components/Toaster';
+import { makeToast } from 'features/system/util/makeToast';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -168,7 +168,9 @@ export default function FoundModelsList() {
   };
 
   const renderFoundModels = () => {
-    if (!searchFolder) return;
+    if (!searchFolder) {
+      return null;
+    }
 
     if (!foundModels || foundModels.length === 0) {
       return (
@@ -242,7 +244,7 @@ const foundModelsFilter = (
   const filteredModels: SearchFolderResponse = [];
   forEach(data, (model) => {
     if (!model) {
-      return;
+      return null;
     }
 
     if (model.includes(nameFilter)) {

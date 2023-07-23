@@ -1,10 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   roundDownToMultiple,
   roundToMultiple,
 } from 'common/util/roundDownToMultiple';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import {
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
@@ -13,7 +13,6 @@ import {
   setIsTransformingBoundingBox,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import { uiSelector } from 'features/ui/store/uiSelectors';
 import Konva from 'konva';
 import { GroupConfig } from 'konva/lib/Group';
 import { KonvaEventObject } from 'konva/lib/Node';
@@ -25,8 +24,8 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { Group, Rect, Transformer } from 'react-konva';
 
 const boundingBoxPreviewSelector = createSelector(
-  [canvasSelector, uiSelector],
-  (canvas, ui) => {
+  [stateSelector],
+  ({ canvas, generation }) => {
     const {
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -38,7 +37,7 @@ const boundingBoxPreviewSelector = createSelector(
       shouldSnapToGrid,
     } = canvas;
 
-    const { aspectRatio } = ui;
+    const { aspectRatio } = generation;
 
     return {
       boundingBoxCoordinates,

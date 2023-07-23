@@ -1,7 +1,7 @@
+import { ListItem, Text, UnorderedList } from '@chakra-ui/react';
 import { some } from 'lodash-es';
 import { memo } from 'react';
-import { ImageUsage } from '../store/imageDeletionSlice';
-import { ListItem, Text, UnorderedList } from '@chakra-ui/react';
+import { ImageUsage } from '../store/types';
 type Props = {
   imageUsage?: ImageUsage;
   topMessage?: string;

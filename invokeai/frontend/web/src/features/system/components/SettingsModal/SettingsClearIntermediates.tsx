@@ -1,5 +1,6 @@
 import { Heading, Text } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 import { useCallback, useEffect } from 'react';
 import IAIButton from '../../../../common/components/IAIButton';
 import {
@@ -8,8 +9,7 @@ import {
 } from '../../../../services/api/endpoints/images';
 import { resetCanvas } from '../../../canvas/store/canvasSlice';
 import { addToast } from '../../store/systemSlice';
-import { StyledFlex } from './SettingsModal';
-import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
+import StyledFlex from './StyledFlex';
 
 export default function SettingsClearIntermediates() {
   const dispatch = useAppDispatch();

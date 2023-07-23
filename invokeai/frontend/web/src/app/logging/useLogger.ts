@@ -1,48 +1,19 @@
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { createLogWriter } from '@roarr/browser-log-writer';
 import { useAppSelector } from 'app/store/storeHooks';
 import { systemSelector } from 'features/system/store/systemSelectors';
 import { isEqual } from 'lodash-es';
 import { useEffect } from 'react';
-import { LogLevelName, ROARR, Roarr } from 'roarr';
-import { createLogWriter } from '@roarr/browser-log-writer';
-
-// Base logging context includes only the package name
-const baseContext = { package: '@invoke-ai/invoke-ai-ui' };
-
-// Create browser log writer
-ROARR.write = createLogWriter();
-
-// Module-scoped logger - can be imported and used anywhere
-export let log = Roarr.child(baseContext);
-
-// Translate human-readable log levels to numbers, used for log filtering
-export const LOG_LEVEL_MAP: Record<LogLevelName, number> = {
-  trace: 10,
-  debug: 20,
-  info: 30,
-  warn: 40,
-  error: 50,
-  fatal: 60,
-};
-
-export const VALID_LOG_LEVELS = [
-  'trace',
-  'debug',
-  'info',
-  'warn',
-  'error',
-  'fatal',
-] as const;
-
-export type InvokeLogLevel = (typeof VALID_LOG_LEVELS)[number];
+import { ROARR, Roarr } from 'roarr';
+import { $logger, BASE_CONTEXT, LOG_LEVEL_MAP } from './logger';
 
 const selector = createSelector(
   systemSelector,
   (system) => {
-    const { app_version, consoleLogLevel, shouldLogToConsole } = system;
+    const { consoleLogLevel, shouldLogToConsole } = system;
 
     return {
-      version: app_version,
       consoleLogLevel,
       shouldLogToConsole,
     };
@@ -55,8 +26,7 @@ const selector = createSelector(
 );
 
 export const useLogger = () => {
-  const { version, consoleLogLevel, shouldLogToConsole } =
-    useAppSelector(selector);
+  const { consoleLogLevel, shouldLogToConsole } = useAppSelector(selector);
 
   // The provided Roarr browser log writer uses localStorage to config logging to console
   useEffect(() => {
@@ -78,17 +48,16 @@ export const useLogger = () => {
 
   // Update the module-scoped logger context as needed
   useEffect(() => {
+    // TODO: type this properly
+    //eslint-disable-next-line @typescript-eslint/no-explicit-any
     const newContext: Record<string, any> = {
-      ...baseContext,
+      ...BASE_CONTEXT,
     };
 
-    if (version) {
-      newContext.version = version;
-    }
+    $logger.set(Roarr.child(newContext));
+  }, []);
 
-    log = Roarr.child(newContext);
-  }, [version]);
+  const logger = useStore($logger);
 
-  // Use the logger within components - no different than just importing it directly
-  return log;
+  return logger;
 };

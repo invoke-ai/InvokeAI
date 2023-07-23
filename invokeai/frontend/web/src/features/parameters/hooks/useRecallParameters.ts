@@ -3,7 +3,6 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UnsafeImageMetadata } from 'services/api/endpoints/images';
-import { isImageField } from 'services/api/guards';
 import { ImageDTO } from 'services/api/types';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {

@@ -108,7 +108,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     500
   );
 
-  const { currentData: imageDTO, isFetching } = useGetImageDTOQuery(
+  const { currentData: imageDTO } = useGetImageDTOQuery(
     lastSelectedImage ?? skipToken
   );
 

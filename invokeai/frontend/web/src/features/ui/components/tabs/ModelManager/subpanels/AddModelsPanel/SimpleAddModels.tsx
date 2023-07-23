@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { SelectItem } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { makeToast } from 'app/components/Toaster';
+import { makeToast } from 'features/system/util/makeToast';
 import { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
