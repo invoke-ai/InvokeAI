@@ -5,7 +5,11 @@ from typing import Literal, Optional
 import numpy
 from PIL import Image, ImageFilter, ImageOps, ImageChops
 from pydantic import BaseModel, Field
+from pathlib import Path
 from typing import Union
+
+from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+from transformers import AutoFeatureExtractor
 
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (
@@ -14,7 +18,8 @@ from .baseinvocation import (
     InvocationContext,
     InvocationConfig,
 )
-
+from invokeai.backend.util.devices import choose_torch_device
+from invokeai.backend import SilenceWarnings
 
 class PILInvocationConfig(BaseModel):
     """Helper class to provide all PIL invocations with additional config"""
@@ -397,7 +402,6 @@ class ImageConvertInvocation(BaseInvocation, PILInvocationConfig):
             height=image_dto.height,
         )
 
-
 class ImageBlurInvocation(BaseInvocation, PILInvocationConfig):
     """Blurs an image"""
 
@@ -602,7 +606,6 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
             height=image_dto.height,
         )
 
-
 class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
     """Inverse linear interpolation of all pixels of an image"""
 
@@ -650,3 +653,130 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
             width=image_dto.width,
             height=image_dto.height,
         )
+
+class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
+    """Add blur to NSFW-flagged images"""
+
+    # fmt: off
+    type: Literal["img_nsfw"] = "img_nsfw"
+
+    # Inputs
+    image: Optional[ImageField]  = Field(default=None, description="The image to check")
+    active: bool = Field(default=True, description="Whether the NSFW checker is active")
+    # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Blur NSFW Images",
+                "tags": ["image", "nsfw", "checker"]
+            },
+        }
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get_pil_image(self.image.image_name)
+        
+        if not self.active:
+            return ImageOutput(
+                image=ImageField(image_name=self.image.image_name),
+                width=image.width,
+                height=image.height,
+            )
+
+        config = context.services.configuration
+        logger = context.services.logger
+        device = choose_torch_device()
+        
+        logger.info("Running NSFW checker")
+        safety_checker = StableDiffusionSafetyChecker.from_pretrained(config.models_path / 'core/convert/stable-diffusion-safety-checker')
+        feature_extractor = AutoFeatureExtractor.from_pretrained(config.models_path / 'core/convert/stable-diffusion-safety-checker')
+        
+        features = feature_extractor([image], return_tensors="pt")
+        features.to(device)
+        safety_checker.to(device)
+
+        x_image = numpy.array(image).astype(numpy.float32) / 255.0
+        x_image = x_image[None].transpose(0, 3, 1, 2)
+        with SilenceWarnings():
+            checked_image, has_nsfw_concept = safety_checker(images=x_image, clip_input=features.pixel_values)
+
+        logger.info(f"NSFW scan result: {has_nsfw_concept[0]}")
+        if has_nsfw_concept[0]:
+            blurry_image = image.filter(filter=ImageFilter.GaussianBlur(radius=32))
+            caution = self._get_caution_img()
+            blurry_image.paste(caution,(0,0),caution)
+
+            image_dto = context.services.images.create(
+                image=blurry_image,
+                image_origin=ResourceOrigin.INTERNAL,
+                image_category=ImageCategory.GENERAL,
+                node_id=self.id,
+                session_id=context.graph_execution_state_id,
+                is_intermediate=self.is_intermediate,
+            )
+            return ImageOutput(
+                image=ImageField(image_name=image_dto.image_name),
+                width=image_dto.width,
+                height=image_dto.height,
+            )
+        else:
+            return ImageOutput(
+                image=ImageField(image_name=self.image.image_name),
+                width=image.width,
+                height=image.height,
+            )
+    
+    def _get_caution_img(self)->Image:
+        import invokeai.assets.web as web_assets
+        caution = Image.open(Path(web_assets.__path__[0]) / 'caution.png')
+        return caution.resize((caution.width // 2, caution.height //2))
+
+class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
+    """ Add an invisible watermark to an image """
+    # fmt: off
+    type: Literal["img_watermark"] = "img_watermark"
+
+    # Inputs
+    image: Optional[ImageField]  = Field(default=None, description="The image to check")
+    text: str = Field(default='InvokeAI', description="Watermark text")
+    # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Add Invisible Watermark",
+                "tags": ["image", "watermark", "invisible"]
+            },
+        }
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        import cv2
+        from imwatermark import WatermarkEncoder
+        
+        image = context.services.images.get_pil_image(self.image.image_name)
+        bgr = cv2.cvtColor(numpy.array(image.convert("RGB")), cv2.COLOR_RGB2BGR)
+        wm = self.text
+        encoder = WatermarkEncoder()
+        encoder.set_watermark('bytes', wm.encode('utf-8'))
+        bgr_encoded = encoder.encode(bgr, 'dwtDct')
+        new_image = Image.fromarray(
+            cv2.cvtColor(bgr_encoded, cv2.COLOR_BGR2RGB)
+        ).convert("RGBA")
+        
+        image_dto = context.services.images.create(
+            image=new_image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+
