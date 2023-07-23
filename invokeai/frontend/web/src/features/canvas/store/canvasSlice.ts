@@ -30,6 +30,7 @@ import {
   CanvasState,
   CanvasTool,
   Dimensions,
+  GenerationMode,
   isCanvasAnyLine,
   isCanvasBaseImage,
   isCanvasMaskLine,
@@ -858,6 +859,9 @@ export const canvasSlice = createSlice({
       state.isMovingBoundingBox = false;
       state.isTransformingBoundingBox = false;
     },
+    generationModeChanged: (state, action: PayloadAction<GenerationMode>) => {
+      state.generationMode = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(sessionCanceled.pending, (state) => {
@@ -955,6 +959,7 @@ export const {
   stagingAreaInitialized,
   canvasSessionIdChanged,
   setShouldAntialias,
+  generationModeChanged,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

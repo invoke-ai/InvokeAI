@@ -40,7 +40,7 @@ export const addUserInvokedCanvasListener = () => {
       const state = getState();
 
       // Build canvas blobs
-      const canvasBlobsAndImageData = await getCanvasData(state);
+      const canvasBlobsAndImageData = await getCanvasData(state.canvas);
 
       if (!canvasBlobsAndImageData) {
         log.error('Unable to create canvas data');

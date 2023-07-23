@@ -1,6 +1,5 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import { isCanvasMaskLine } from '../store/canvasTypes';
+import { CanvasState, isCanvasMaskLine } from '../store/canvasTypes';
 import createMaskStage from './createMaskStage';
 import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { konvaNodeToBlob } from './konvaNodeToBlob';
@@ -9,7 +8,7 @@ import { konvaNodeToImageData } from './konvaNodeToImageData';
 /**
  * Gets Blob and ImageData objects for the base and mask layers
  */
-export const getCanvasData = async (state: RootState) => {
+export const getCanvasData = async (canvasState: CanvasState) => {
   const log = logger('canvas');
 
   const canvasBaseLayer = getCanvasBaseLayer();
@@ -26,7 +25,7 @@ export const getCanvasData = async (state: RootState) => {
     boundingBoxDimensions,
     isMaskEnabled,
     shouldPreserveMaskedArea,
-  } = state.canvas;
+  } = canvasState;
 
   const boundingBox = {
     ...boundingBoxCoordinates,
