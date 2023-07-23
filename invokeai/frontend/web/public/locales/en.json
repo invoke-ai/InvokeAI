@@ -615,6 +615,8 @@
         "initialImageNotSetDesc": "Could not load initial image",
         "nodesSaved": "Nodes Saved",
         "nodesLoaded": "Nodes Loaded",
+        "nodesNotValidGraph": "Not a valid InvokeAI Node Graph",
+        "nodesNotValidJSON": "Not a valid JSON",
         "nodesLoadedFailed": "Failed To Load Nodes",
         "nodesCleared": "Nodes Cleared"
     },

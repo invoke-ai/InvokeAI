@@ -1,13 +1,27 @@
 import { FileButton } from '@mantine/core';
-import { makeToast } from 'features/system/util/makeToast';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { loadFileEdges, loadFileNodes } from 'features/nodes/store/nodesSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaUpload } from 'react-icons/fa';
 import { useReactFlow } from 'reactflow';
+
+interface JsonFile {
+  [key: string]: unknown;
+}
+
+function validateInvokeAIGraph(jsonFile: JsonFile): boolean {
+  const keys = ['nodes', 'edges', 'viewport'];
+  for (const key of keys) {
+    if (!(key in jsonFile)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 const LoadNodesButton = () => {
   const { t } = useTranslation();
@@ -22,33 +36,45 @@ const LoadNodesButton = () => {
       const reader = new FileReader();
       reader.onload = async () => {
         const json = reader.result;
-        const retrievedNodeTree = await JSON.parse(String(json));
 
-        if (!retrievedNodeTree) {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.nodesLoadedFailed'),
-                status: 'error',
-              })
-            )
-          );
+        try {
+          const retrievedNodeTree = await JSON.parse(String(json));
+          const isValidNodeTree = validateInvokeAIGraph(retrievedNodeTree);
+
+          if (isValidNodeTree) {
+            dispatch(loadFileNodes(retrievedNodeTree.nodes));
+            dispatch(loadFileEdges(retrievedNodeTree.edges));
+            fitView();
+
+            dispatch(
+              addToast(
+                makeToast({ title: t('toast.nodesLoaded'), status: 'success' })
+              )
+            );
+          } else {
+            dispatch(
+              addToast(
+                makeToast({
+                  title: t('toast.nodesNotValidGraph'),
+                  status: 'error',
+                })
+              )
+            );
+          }
+          // Cleanup
+          reader.abort();
+        } catch (error) {
+          if (error) {
+            dispatch(
+              addToast(
+                makeToast({
+                  title: t('toast.nodesNotValidJSON'),
+                  status: 'error',
+                })
+              )
+            );
+          }
         }
-
-        if (retrievedNodeTree) {
-          dispatch(loadFileNodes(retrievedNodeTree.nodes));
-          dispatch(loadFileEdges(retrievedNodeTree.edges));
-          fitView();
-
-          dispatch(
-            addToast(
-              makeToast({ title: t('toast.nodesLoaded'), status: 'success' })
-            )
-          );
-        }
-
-        // Cleanup
-        reader.abort();
       };
 
       reader.readAsText(v);
