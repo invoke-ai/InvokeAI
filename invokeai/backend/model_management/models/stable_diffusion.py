@@ -237,6 +237,7 @@ class StableDiffusion2Model(DiffusersModel):
             return model_path
 
 # TODO: rework
+# pass precision - currently defaulting to fp16
 def _convert_ckpt_and_cache(
         version: BaseModelType,
         model_config: Union[StableDiffusion1Model.CheckpointConfig,
