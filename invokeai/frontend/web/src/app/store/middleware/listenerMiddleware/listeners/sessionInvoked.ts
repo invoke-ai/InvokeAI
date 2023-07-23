@@ -31,13 +31,12 @@ export const addSessionInvokedRejectedListener = () => {
       const { session_id } = action.meta.arg;
       if (action.payload) {
         const { error } = action.payload;
-        const stringifiedError = JSON.stringify(error);
         log.error(
           {
             session_id,
             error: serializeError(error),
           },
-          `Problem invoking session: ${stringifiedError}`
+          `Problem invoking session`
         );
       }
     },
