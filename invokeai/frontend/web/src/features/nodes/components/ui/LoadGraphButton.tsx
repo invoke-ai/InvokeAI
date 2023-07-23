@@ -13,17 +13,28 @@ interface JsonFile {
   [key: string]: unknown;
 }
 
-function validateInvokeAIGraph(jsonFile: JsonFile): boolean {
+function sanityCheckInvokeAIGraph(jsonFile: JsonFile): boolean {
   const keys = ['nodes', 'edges', 'viewport'];
   for (const key of keys) {
     if (!(key in jsonFile)) {
       return false;
     }
   }
+
+  if (!Array.isArray(jsonFile.nodes) || !Array.isArray(jsonFile.edges)) {
+    return false;
+  }
+
+  for (const node of jsonFile.nodes) {
+    if (!('data' in node)) {
+      return false;
+    }
+  }
+
   return true;
 }
 
-const LoadNodesButton = () => {
+const LoadGraphButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { fitView } = useReactFlow();
@@ -39,9 +50,9 @@ const LoadNodesButton = () => {
 
         try {
           const retrievedNodeTree = await JSON.parse(String(json));
-          const isValidNodeTree = validateInvokeAIGraph(retrievedNodeTree);
+          const isSaneNodeTree = sanityCheckInvokeAIGraph(retrievedNodeTree);
 
-          if (isValidNodeTree) {
+          if (isSaneNodeTree) {
             dispatch(loadFileNodes(retrievedNodeTree.nodes));
             dispatch(loadFileEdges(retrievedNodeTree.edges));
             fitView();
@@ -93,8 +104,8 @@ const LoadNodesButton = () => {
       {(props) => (
         <IAIIconButton
           icon={<FaUpload />}
-          tooltip={t('nodes.loadNodes')}
-          aria-label={t('nodes.loadNodes')}
+          tooltip={t('nodes.loadGraph')}
+          aria-label={t('nodes.loadGraph')}
           {...props}
         />
       )}
@@ -102,4 +113,4 @@ const LoadNodesButton = () => {
   );
 };
 
-export default memo(LoadNodesButton);
+export default memo(LoadGraphButton);

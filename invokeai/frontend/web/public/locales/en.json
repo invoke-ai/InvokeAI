@@ -702,9 +702,9 @@
     },
     "nodes": {
         "reloadSchema": "Reload Schema",
-        "saveNodes": "Save Nodes",
-        "loadNodes": "Load Nodes",
-        "clearNodes": "Clear Nodes",
+        "saveGraph": "Save Graph",
+        "loadGraph": "Load Graph (saved from Node Editor) (Do not copy-paste metadata)",
+        "clearGraph": "Clear Graph",
         "zoomInNodes": "Zoom In",
         "zoomOutNodes": "Zoom Out",
         "fitViewportNodes": "Fit View",
