@@ -48,7 +48,7 @@ class StableDiffusionXLModel(DiffusersModel):
         if model_format == StableDiffusionXLModelFormat.Checkpoint:
             if ckpt_config_path:
                 ckpt_config = OmegaConf.load(ckpt_config_path)
-                ckpt_config["model"]["params"]["unet_config"]["params"]["in_channels"]
+                in_channels = ckpt_config["model"]["params"]["unet_config"]["params"]["in_channels"]
 
             else:
                 checkpoint = read_checkpoint_meta(path)
@@ -109,6 +109,13 @@ class StableDiffusionXLModel(DiffusersModel):
         base_model: BaseModelType,
     ) -> str:
         if isinstance(config, cls.CheckpointConfig):
-            raise NotImplementedError('conversion of SDXL checkpoint models to diffusers format is not yet supported')
+            from invokeai.backend.model_management.models.stable_diffusion import _convert_ckpt_and_cache
+            return _convert_ckpt_and_cache(
+                version=base_model,
+                model_config=config,
+                output_path=output_path,
+                model_type='SDXL',
+                no_safetensors=True, # giving errors for some reason
+            )
         else:
             return model_path

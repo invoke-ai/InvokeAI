@@ -253,7 +253,8 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
             return BaseModelType.StableDiffusion1
         if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
             return BaseModelType.StableDiffusion2
-        # TODO: Verify that this is correct! Need an XL checkpoint file for this.
+        # TODO: This is just a guess based on N=1
+        key_name = 'model.diffusion_model.input_blocks.4.1.transformer_blocks.0.attn2.to_k.weight'
         if key_name in state_dict and state_dict[key_name].shape[-1] == 2048:
             return BaseModelType.StableDiffusionXL
         raise InvalidModelException("Cannot determine base type")

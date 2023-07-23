@@ -55,6 +55,7 @@ from invokeai.frontend.install.widgets import (
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
     hf_download_from_pretrained,
+    hf_download_with_resume,
     InstallSelections,
     ModelInstall,
 )
@@ -203,6 +204,13 @@ def download_conversion_models():
 
         pipeline = CLIPTextModel.from_pretrained(repo_id, subfolder="text_encoder", **kwargs)
         pipeline.save_pretrained(target_dir / 'stable-diffusion-2-clip' / 'text_encoder', safe_serialization=True)
+
+        repo_id = "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
+        _, model_name = repo_id.split('/')
+        tokenizer_2 = CLIPTokenizer.from_pretrained(repo_id, **kwargs)
+        tokenizer_2.save_pretrained(target_dir / model_name, safe_serialization=True)
+        # for some reason config.json never downloads
+        hf_download_with_resume(repo_id, target_dir / model_name, "config.json")
 
         # VAE
         logger.info('Downloading stable diffusion VAE')
