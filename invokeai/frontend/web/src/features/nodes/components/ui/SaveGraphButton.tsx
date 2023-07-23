@@ -6,7 +6,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaSave } from 'react-icons/fa';
 
-const SaveNodesButton = () => {
+const SaveGraphButton = () => {
   const { t } = useTranslation();
   const editorInstance = useAppSelector(
     (state: RootState) => state.nodes.editorInstance
@@ -37,12 +37,12 @@ const SaveNodesButton = () => {
     <IAIIconButton
       icon={<FaSave />}
       fontSize={18}
-      tooltip={t('nodes.saveNodes')}
-      aria-label={t('nodes.saveNodes')}
+      tooltip={t('nodes.saveGraph')}
+      aria-label={t('nodes.saveGraph')}
       onClick={saveEditorToJSON}
       isDisabled={nodes.length === 0}
     />
   );
 };
 
-export default memo(SaveNodesButton);
+export default memo(SaveGraphButton);
