@@ -32,6 +32,7 @@ from omegaconf import OmegaConf
 from tqdm import tqdm
 from transformers import (
     CLIPTextModel,
+    CLIPTextConfig,
     CLIPTokenizer,
     AutoFeatureExtractor,
     BertTokenizerFast,
@@ -205,13 +206,15 @@ def download_conversion_models():
         pipeline = CLIPTextModel.from_pretrained(repo_id, subfolder="text_encoder", **kwargs)
         pipeline.save_pretrained(target_dir / 'stable-diffusion-2-clip' / 'text_encoder', safe_serialization=True)
 
+        # sd-xl - tokenizer_2
         repo_id = "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
         _, model_name = repo_id.split('/')
-        tokenizer_2 = CLIPTokenizer.from_pretrained(repo_id, **kwargs)
-        tokenizer_2.save_pretrained(target_dir / model_name, safe_serialization=True)
-        # for some reason config.json never downloads
-        hf_download_with_resume(repo_id, target_dir / model_name, "config.json")
-
+        pipeline = CLIPTokenizer.from_pretrained(repo_id, **kwargs)
+        pipeline.save_pretrained(target_dir / model_name, safe_serialization=True)
+        
+        pipeline = CLIPTextConfig.from_pretrained(repo_id, **kwargs)
+        pipeline.save_pretrained(target_dir / model_name, safe_serialization=True)
+        
         # VAE
         logger.info('Downloading stable diffusion VAE')
         vae = AutoencoderKL.from_pretrained('stabilityai/sd-vae-ft-mse', **kwargs)

@@ -1711,7 +1711,7 @@ def convert_ckpt_to_diffusers(
 
     pipe.save_pretrained(
         dump_path,
-        safe_serialization=is_safetensors_available(),
+        safe_serialization=is_safetensors_available() and not no_safetensors,
     )
 
 def convert_controlnet_to_diffusers(
