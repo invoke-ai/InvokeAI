@@ -7,10 +7,8 @@ import { FaAddressCard } from 'react-icons/fa';
 import { FieldComponentProps } from './types';
 
 const ItemInputFieldComponent = (
-  props: FieldComponentProps<ItemInputFieldValue, ItemInputFieldTemplate>
+  _props: FieldComponentProps<ItemInputFieldValue, ItemInputFieldTemplate>
 ) => {
-  const { nodeId, field } = props;
-
   return <FaAddressCard />;
 };
 

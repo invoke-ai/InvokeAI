@@ -1,7 +1,6 @@
 import { UseToastOptions } from '@chakra-ui/react';
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-
-import { InvokeLogLevel } from 'app/logging/useLogger';
+import { InvokeLogLevel } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { t } from 'i18next';
@@ -22,8 +21,8 @@ import {
   appSocketUnsubscribed,
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
-import { makeToast } from '../../../app/components/Toaster';
-import { LANGUAGES } from '../components/LanguagePicker';
+import { makeToast } from '../util/makeToast';
+import { LANGUAGES } from './constants';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -74,7 +73,8 @@ export interface SystemState {
    */
   consoleLogLevel: InvokeLogLevel;
   shouldLogToConsole: boolean;
-  statusTranslationKey: any;
+  // TODO: probably better to not store keys here, should just be a string that maps to the translation key
+  statusTranslationKey: string;
   /**
    * When a session is canceled, its ID is stored here until a new session is created.
    */
@@ -125,7 +125,7 @@ export const systemSlice = createSlice({
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
     },
-    setCurrentStatus: (state, action: any) => {
+    setCurrentStatus: (state, action: PayloadAction<string>) => {
       state.statusTranslationKey = action.payload;
     },
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
@@ -362,7 +362,7 @@ export const systemSlice = createSlice({
      * Session Invoked - REJECTED
      * Session Created - REJECTED
      */
-    builder.addMatcher(isAnySessionRejected, (state, action) => {
+    builder.addMatcher(isAnySessionRejected, (state) => {
       state.isProcessing = false;
       state.isCancelable = false;
       state.isCancelScheduled = false;

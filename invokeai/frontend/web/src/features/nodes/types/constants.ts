@@ -157,3 +157,5 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: 'A RGBA color.',
   },
 };
+
+export const NODE_MIN_WIDTH = 250;

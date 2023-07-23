@@ -69,6 +69,7 @@
     "@mantine/core": "^6.0.14",
     "@mantine/form": "^6.0.15",
     "@mantine/hooks": "^6.0.14",
+    "@nanostores/react": "^0.7.1",
     "@reduxjs/toolkit": "^1.9.5",
     "@roarr/browser-log-writer": "^1.1.5",
     "chakra-ui-contextmenu": "^1.0.5",

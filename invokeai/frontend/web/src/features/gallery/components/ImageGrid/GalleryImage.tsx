@@ -6,7 +6,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
-import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
@@ -36,20 +35,17 @@ const GalleryImage = (props: HoverableImageProps) => {
   const { isSelected, selectionCount, selection } =
     useAppSelector(localSelector);
 
-  const handleClick = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      // disable multiselect for now
-      // if (e.shiftKey) {
-      //   dispatch(imageRangeEndSelected(imageName));
-      // } else if (e.ctrlKey || e.metaKey) {
-      //   dispatch(imageSelectionToggled(imageName));
-      // } else {
-      //   dispatch(imageSelected(imageName));
-      // }
-      dispatch(imageSelected(imageName));
-    },
-    [dispatch, imageName]
-  );
+  const handleClick = useCallback(() => {
+    // disable multiselect for now
+    // if (e.shiftKey) {
+    //   dispatch(imageRangeEndSelected(imageName));
+    // } else if (e.ctrlKey || e.metaKey) {
+    //   dispatch(imageSelectionToggled(imageName));
+    // } else {
+    //   dispatch(imageSelected(imageName));
+    // }
+    dispatch(imageSelected(imageName));
+  }, [dispatch, imageName]);
 
   const handleDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {

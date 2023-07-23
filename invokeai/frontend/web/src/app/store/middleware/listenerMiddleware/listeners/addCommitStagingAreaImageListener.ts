@@ -1,14 +1,13 @@
-import { startAppListening } from '..';
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { commitStagingAreaImage } from 'features/canvas/store/canvasSlice';
 import { sessionCanceled } from 'services/api/thunks/session';
-
-const moduleLog = log.child({ namespace: 'canvas' });
+import { startAppListening } from '..';
 
 export const addCommitStagingAreaImageListener = () => {
   startAppListening({
     actionCreator: commitStagingAreaImage,
     effect: async (action, { dispatch, getState }) => {
+      const log = logger('canvas');
       const state = getState();
       const { sessionId: session_id, isProcessing } = state.system;
       const canvasSessionId = action.payload;
@@ -19,17 +18,15 @@ export const addCommitStagingAreaImageListener = () => {
       }
 
       if (!canvasSessionId) {
-        moduleLog.debug('No canvas session, skipping cancel');
+        log.debug('No canvas session, skipping cancel');
         return;
       }
 
       if (canvasSessionId !== session_id) {
-        moduleLog.debug(
+        log.debug(
           {
-            data: {
-              canvasSessionId,
-              session_id,
-            },
+            canvasSessionId,
+            session_id,
           },
           'Canvas session does not match global session, skipping cancel'
         );

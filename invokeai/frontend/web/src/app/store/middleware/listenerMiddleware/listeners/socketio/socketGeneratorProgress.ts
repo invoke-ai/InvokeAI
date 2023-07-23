@@ -1,28 +1,27 @@
-import { startAppListening } from '../..';
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import {
   appSocketGeneratorProgress,
   socketGeneratorProgress,
 } from 'services/events/actions';
-
-const moduleLog = log.child({ namespace: 'socketio' });
+import { startAppListening } from '../..';
 
 export const addGeneratorProgressEventListener = () => {
   startAppListening({
     actionCreator: socketGeneratorProgress,
     effect: (action, { dispatch, getState }) => {
+      const log = logger('socketio');
       if (
         getState().system.canceledSession ===
         action.payload.data.graph_execution_state_id
       ) {
-        moduleLog.trace(
+        log.trace(
           action.payload,
           'Ignored generator progress for canceled session'
         );
         return;
       }
 
-      moduleLog.trace(
+      log.trace(
         action.payload,
         `Generator progress (${action.payload.data.node.type})`
       );

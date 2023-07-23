@@ -5,8 +5,7 @@ import {
   ASSETS_CATEGORIES,
   BoardId,
   IMAGE_CATEGORIES,
-} from 'features/gallery/store/gallerySlice';
-import { getCategories } from 'features/gallery/store/util';
+} from 'features/gallery/store/types';
 import queryString from 'query-string';
 import { ApiFullTagDescription, api } from '..';
 import { components, paths } from '../schema';
@@ -16,7 +15,37 @@ import {
   OffsetPaginatedResults_ImageDTO_,
   PostUploadAction,
 } from '../types';
-import { getIsImageInDateRange } from './util';
+
+const getIsImageInDateRange = (
+  data: ImageCache | undefined,
+  imageDTO: ImageDTO
+) => {
+  if (!data) {
+    return false;
+  }
+  const cacheImageDTOS = imagesSelectors.selectAll(data);
+
+  if (cacheImageDTOS.length > 1) {
+    // Images are sorted by `created_at` DESC
+    // check if the image is newer than the oldest image in the cache
+    const createdDate = new Date(imageDTO.created_at);
+    const oldestDate = new Date(
+      cacheImageDTOS[cacheImageDTOS.length - 1].created_at
+    );
+    return createdDate >= oldestDate;
+  } else if ([0, 1].includes(cacheImageDTOS.length)) {
+    // if there are only 1 or 0 images in the cache, we consider the image to be in the date range
+    return true;
+  }
+  return false;
+};
+
+const getCategories = (imageDTO: ImageDTO) => {
+  if (IMAGE_CATEGORIES.includes(imageDTO.image_category)) {
+    return IMAGE_CATEGORIES;
+  }
+  return ASSETS_CATEGORIES;
+};
 
 export type ListImagesArgs = NonNullable<
   paths['/api/v1/images/']['get']['parameters']['query']

@@ -1,23 +1,20 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
-import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
-  [canvasSelector, isStagingSelector, uiSelector],
-  (canvas, isStaging, ui) => {
+  [stateSelector, isStagingSelector],
+  ({ canvas, generation }, isStaging) => {
     const { boundingBoxDimensions } = canvas;
-    const { aspectRatio } = ui;
+    const { aspectRatio } = generation;
     return {
       boundingBoxDimensions,
       isStaging,

@@ -8,7 +8,6 @@ import {
   controlNetResizeModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
 import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 
 type ParamControlNetResizeModeProps = {
   controlNetId: string;
@@ -40,8 +39,6 @@ export default function ParamControlNetResizeMode(
   );
 
   const { resizeMode, isEnabled } = useAppSelector(selector);
-
-  const { t } = useTranslation();
 
   const handleResizeModeChange = useCallback(
     (resizeMode: ResizeModes) => {

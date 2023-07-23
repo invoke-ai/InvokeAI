@@ -1,20 +1,16 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlNetReset } from 'features/controlNet/store/controlNetSlice';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import {
-  imageDeletionConfirmed,
-  isModalOpenChanged,
-} from 'features/imageDeletion/store/imageDeletionSlice';
+import { imageDeletionConfirmed } from 'features/imageDeletion/store/actions';
+import { isModalOpenChanged } from 'features/imageDeletion/store/imageDeletionSlice';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { clamp } from 'lodash-es';
 import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
-
-const moduleLog = log.child({ namespace: 'image' });
 
 /**
  * Called when the user requests an image deletion
@@ -107,7 +103,7 @@ export const addRequestedImageDeletionListener = () => {
 export const addImageDeletedPendingListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchPending,
-    effect: (action, { dispatch, getState }) => {
+    effect: () => {
       //
     },
   });
@@ -119,11 +115,9 @@ export const addImageDeletedPendingListener = () => {
 export const addImageDeletedFulfilledListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchFulfilled,
-    effect: (action, { dispatch, getState }) => {
-      moduleLog.debug(
-        { data: { image: action.meta.arg.originalArgs } },
-        'Image deleted'
-      );
+    effect: (action) => {
+      const log = logger('images');
+      log.debug({ imageDTO: action.meta.arg.originalArgs }, 'Image deleted');
     },
   });
 };
@@ -134,9 +128,10 @@ export const addImageDeletedFulfilledListener = () => {
 export const addImageDeletedRejectedListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchRejected,
-    effect: (action, { dispatch, getState }) => {
-      moduleLog.debug(
-        { data: { image: action.meta.arg.originalArgs } },
+    effect: (action) => {
+      const log = logger('images');
+      log.debug(
+        { imageDTO: action.meta.arg.originalArgs },
         'Unable to delete image'
       );
     },

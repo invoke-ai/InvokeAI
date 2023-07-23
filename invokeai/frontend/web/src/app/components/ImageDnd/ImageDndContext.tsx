@@ -39,7 +39,6 @@ const ImageDndContext = (props: ImageDndContextProps) => {
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       console.log('dragEnd', event.active.data.current);
-      const activeData = event.active.data.current;
       const overData = event.over?.data.current;
       if (!activeDragData || !overData) {
         return;

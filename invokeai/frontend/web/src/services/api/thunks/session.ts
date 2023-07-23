@@ -1,12 +1,8 @@
-import { createAppAsyncThunk } from 'app/store/storeUtils';
-import { log } from 'app/logging/useLogger';
+import { createAsyncThunk, isAnyOf } from '@reduxjs/toolkit';
 import { isObject } from 'lodash-es';
-import { isAnyOf } from '@reduxjs/toolkit';
-import { paths } from 'services/api/schema';
 import { $client } from 'services/api/client';
+import { paths } from 'services/api/schema';
 import { O } from 'ts-toolbelt';
-
-const sessionLog = log.child({ namespace: 'session' });
 
 type CreateSessionArg = {
   graph: NonNullable<
@@ -28,7 +24,7 @@ type CreateSessionThunkConfig = {
 /**
  * `SessionsService.createSession()` thunk
  */
-export const sessionCreated = createAppAsyncThunk<
+export const sessionCreated = createAsyncThunk<
   CreateSessionResponse,
   CreateSessionArg,
   CreateSessionThunkConfig
@@ -66,7 +62,7 @@ const isErrorWithStatus = (error: unknown): error is { status: number } =>
 /**
  * `SessionsService.invokeSession()` thunk
  */
-export const sessionInvoked = createAppAsyncThunk<
+export const sessionInvoked = createAsyncThunk<
   InvokedSessionResponse,
   InvokedSessionArg,
   InvokedSessionThunkConfig
@@ -104,7 +100,7 @@ type CancelSessionThunkConfig = {
 /**
  * `SessionsService.cancelSession()` thunk
  */
-export const sessionCanceled = createAppAsyncThunk<
+export const sessionCanceled = createAsyncThunk<
   CancelSessionResponse,
   CancelSessionArg,
   CancelSessionThunkConfig
@@ -144,7 +140,7 @@ type ListSessionsThunkConfig = {
 /**
  * `SessionsService.listSessions()` thunk
  */
-export const listedSessions = createAppAsyncThunk<
+export const listedSessions = createAsyncThunk<
   ListSessionsResponse,
   ListSessionsArg,
   ListSessionsThunkConfig

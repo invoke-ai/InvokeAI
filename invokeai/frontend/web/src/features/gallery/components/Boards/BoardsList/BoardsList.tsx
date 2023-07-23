@@ -1,21 +1,16 @@
-import { ButtonGroup, Collapse, Flex, Grid, GridItem } from '@chakra-ui/react';
+import { Collapse, Flex, Grid, GridItem } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { AnimatePresence, motion } from 'framer-motion';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import { memo, useCallback, useState } from 'react';
-import { FaSearch } from 'react-icons/fa';
+import { memo, useState } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { BoardDTO } from 'services/api/types';
-import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 import DeleteBoardModal from '../DeleteBoardModal';
 import AddBoardButton from './AddBoardButton';
 import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';
-import SystemBoardButton from './SystemBoardButton';
 import NoBoardBoard from './NoBoardBoard';
 
 const selector = createSelector(
@@ -36,7 +31,6 @@ const BoardsList = (props: Props) => {
   const { isOpen } = props;
   const { selectedBoardId, searchText } = useAppSelector(selector);
   const { data: boards } = useListAllBoardsQuery();
-  const isBatchEnabled = useFeatureStatus('batches').isFeatureEnabled;
   const filteredBoards = searchText
     ? boards?.filter((board) =>
         board.board_name.toLowerCase().includes(searchText.toLowerCase())

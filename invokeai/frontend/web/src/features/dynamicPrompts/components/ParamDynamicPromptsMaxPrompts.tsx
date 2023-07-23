@@ -4,7 +4,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
 import { useCallback } from 'react';
-import { maxPromptsChanged, maxPromptsReset } from '../store/slice';
+import {
+  maxPromptsChanged,
+  maxPromptsReset,
+} from '../store/dynamicPromptsSlice';
 
 const selector = createSelector(
   stateSelector,
