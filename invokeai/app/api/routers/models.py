@@ -298,7 +298,7 @@ async def search_for_models(
 )->List[pathlib.Path]:
     if not search_path.is_dir():
         raise HTTPException(status_code=404, detail=f"The search path '{search_path}' does not exist or is not directory")
-    return ApiDependencies.invoker.services.model_manager.search_for_models([search_path])
+    return ApiDependencies.invoker.services.model_manager.search_for_models(search_path)
 
 @models_router.get(
     "/ckpt_confs",
