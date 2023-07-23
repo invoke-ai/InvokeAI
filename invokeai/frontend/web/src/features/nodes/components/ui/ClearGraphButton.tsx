@@ -66,7 +66,7 @@ const ClearGraphButton = () => {
           </AlertDialogHeader>
 
           <AlertDialogBody>
-            <Text>{t('common.clearGraph')}</Text>
+            <Text>{t('nodes.clearGraphDesc')}</Text>
           </AlertDialogBody>
 
           <AlertDialogFooter>

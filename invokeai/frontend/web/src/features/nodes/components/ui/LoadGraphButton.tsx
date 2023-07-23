@@ -4,6 +4,7 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { loadFileEdges, loadFileNodes } from 'features/nodes/store/nodesSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import i18n from 'i18n';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaUpload } from 'react-icons/fa';
@@ -13,25 +14,70 @@ interface JsonFile {
   [key: string]: unknown;
 }
 
-function sanityCheckInvokeAIGraph(jsonFile: JsonFile): boolean {
+function sanityCheckInvokeAIGraph(jsonFile: JsonFile): {
+  isValid: boolean;
+  message: string;
+} {
+  // Check if primary keys exist
   const keys = ['nodes', 'edges', 'viewport'];
   for (const key of keys) {
     if (!(key in jsonFile)) {
-      return false;
+      return {
+        isValid: false,
+        message: i18n.t('toast.nodesNotValidGraph'),
+      };
     }
   }
 
+  // Check if nodes and edges are arrays
   if (!Array.isArray(jsonFile.nodes) || !Array.isArray(jsonFile.edges)) {
-    return false;
+    return {
+      isValid: false,
+      message: i18n.t('toast.nodesNotValidGraph'),
+    };
   }
 
-  for (const node of jsonFile.nodes) {
-    if (!('data' in node)) {
-      return false;
+  // Check if data is present in nodes
+  const nodeKeys = ['data', 'type'];
+  const nodeTypes = ['invocation', 'progress_image'];
+  if (jsonFile.nodes.length > 0) {
+    for (const node of jsonFile.nodes) {
+      for (const nodeKey of nodeKeys) {
+        if (!(nodeKey in node)) {
+          return {
+            isValid: false,
+            message: i18n.t('toast.nodesNotValidGraph'),
+          };
+        }
+        if (nodeKey === 'type' && !nodeTypes.includes(node[nodeKey])) {
+          return {
+            isValid: false,
+            message: i18n.t('toast.nodesUnrecognizedTypes'),
+          };
+        }
+      }
     }
   }
 
-  return true;
+  // Check Edge Object
+  const edgeKeys = ['source', 'sourceHandle', 'target', 'targetHandle'];
+  if (jsonFile.edges.length > 0) {
+    for (const edge of jsonFile.edges) {
+      for (const edgeKey of edgeKeys) {
+        if (!(edgeKey in edge)) {
+          return {
+            isValid: false,
+            message: i18n.t('toast.nodesBrokenConnections'),
+          };
+        }
+      }
+    }
+  }
+
+  return {
+    isValid: true,
+    message: i18n.t('toast.nodesLoaded'),
+  };
 }
 
 const LoadGraphButton = () => {
@@ -50,23 +96,22 @@ const LoadGraphButton = () => {
 
         try {
           const retrievedNodeTree = await JSON.parse(String(json));
-          const isSaneNodeTree = sanityCheckInvokeAIGraph(retrievedNodeTree);
+          const { isValid, message } =
+            sanityCheckInvokeAIGraph(retrievedNodeTree);
 
-          if (isSaneNodeTree) {
+          if (isValid) {
             dispatch(loadFileNodes(retrievedNodeTree.nodes));
             dispatch(loadFileEdges(retrievedNodeTree.edges));
             fitView();
 
             dispatch(
-              addToast(
-                makeToast({ title: t('toast.nodesLoaded'), status: 'success' })
-              )
+              addToast(makeToast({ title: message, status: 'success' }))
             );
           } else {
             dispatch(
               addToast(
                 makeToast({
-                  title: t('toast.nodesNotValidGraph'),
+                  title: message,
                   status: 'error',
                 })
               )
