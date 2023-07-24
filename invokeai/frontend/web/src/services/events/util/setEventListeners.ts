@@ -11,9 +11,11 @@ import {
   socketGraphExecutionStateComplete,
   socketInvocationComplete,
   socketInvocationError,
+  socketInvocationRetrievalError,
   socketInvocationStarted,
   socketModelLoadCompleted,
   socketModelLoadStarted,
+  socketSessionRetrievalError,
   socketSubscribed,
 } from '../actions';
 import { ClientToServerEvents, ServerToClientEvents } from '../types';
@@ -134,6 +136,28 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
   socket.on('model_load_completed', (data) => {
     dispatch(
       socketModelLoadCompleted({
+        data,
+      })
+    );
+  });
+
+  /**
+   * Session retrieval error
+   */
+  socket.on('session_retrieval_error', (data) => {
+    dispatch(
+      socketSessionRetrievalError({
+        data,
+      })
+    );
+  });
+
+  /**
+   * Invocation retrieval error
+   */
+  socket.on('invocation_retrieval_error', (data) => {
+    dispatch(
+      socketInvocationRetrievalError({
         data,
       })
     );
