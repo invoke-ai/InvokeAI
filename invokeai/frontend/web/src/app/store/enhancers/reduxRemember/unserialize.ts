@@ -12,7 +12,7 @@ import { defaultsDeep } from 'lodash-es';
 import { UnserializeFunction } from 'redux-remember';
 
 const initialStates: {
-  [key: string]: any;
+  [key: string]: object; // TODO: type this properly
 } = {
   canvas: initialCanvasState,
   gallery: initialGalleryState,

@@ -1,16 +1,17 @@
 import { canvasDownloadedAsImage } from 'features/canvas/store/actions';
 import { startAppListening } from '..';
-import { log } from 'app/logging/useLogger';
+import { $logger } from 'app/logging/logger';
 import { downloadBlob } from 'features/canvas/util/downloadBlob';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
-
-const moduleLog = log.child({ namespace: 'canvasSavedToGalleryListener' });
 
 export const addCanvasDownloadedAsImageListener = () => {
   startAppListening({
     actionCreator: canvasDownloadedAsImage,
     effect: async (action, { dispatch, getState }) => {
+      const moduleLog = $logger
+        .get()
+        .child({ namespace: 'canvasSavedToGalleryListener' });
       const state = getState();
 
       const blob = await getBaseLayerBlob(state);

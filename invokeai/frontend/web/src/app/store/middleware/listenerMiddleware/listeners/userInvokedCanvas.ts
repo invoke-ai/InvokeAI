@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import {
@@ -15,8 +15,7 @@ import { imagesApi } from 'services/api/endpoints/images';
 import { sessionCreated } from 'services/api/thunks/session';
 import { ImageDTO } from 'services/api/types';
 import { startAppListening } from '..';
-
-const moduleLog = log.child({ namespace: 'invoke' });
+import { parseify } from 'common/util/serialize';
 
 /**
  * This listener is responsible invoking the canvas. This involves a number of steps:
@@ -36,13 +35,29 @@ export const addUserInvokedCanvasListener = () => {
     predicate: (action): action is ReturnType<typeof userInvoked> =>
       userInvoked.match(action) && action.payload === 'unifiedCanvas',
     effect: async (action, { getState, dispatch, take }) => {
+      const log = logger('session');
+
       const state = getState();
 
+      const {
+        layerState,
+        boundingBoxCoordinates,
+        boundingBoxDimensions,
+        isMaskEnabled,
+        shouldPreserveMaskedArea,
+      } = state.canvas;
+
       // Build canvas blobs
-      const canvasBlobsAndImageData = await getCanvasData(state);
+      const canvasBlobsAndImageData = await getCanvasData(
+        layerState,
+        boundingBoxCoordinates,
+        boundingBoxDimensions,
+        isMaskEnabled,
+        shouldPreserveMaskedArea
+      );
 
       if (!canvasBlobsAndImageData) {
-        moduleLog.error('Unable to create canvas data');
+        log.error('Unable to create canvas data');
         return;
       }
 
@@ -64,7 +79,7 @@ export const addUserInvokedCanvasListener = () => {
         ]);
       }
 
-      moduleLog.debug(`Generation mode: ${generationMode}`);
+      log.debug(`Generation mode: ${generationMode}`);
 
       // Temp placeholders for the init and mask images
       let canvasInitImage: ImageDTO | undefined;
@@ -105,7 +120,7 @@ export const addUserInvokedCanvasListener = () => {
         canvasMaskImage
       );
 
-      moduleLog.debug({ graph }, `Canvas graph built`);
+      log.debug({ graph: parseify(graph) }, `Canvas graph built`);
 
       // currently this action is just listened to for logging
       dispatch(canvasGraphBuilt(graph));

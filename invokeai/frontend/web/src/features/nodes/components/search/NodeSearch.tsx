@@ -1,26 +1,25 @@
 import { Box, Flex } from '@chakra-ui/layout';
+import { Tooltip } from '@chakra-ui/tooltip';
+import { useAppToaster } from 'app/components/Toaster';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInput from 'common/components/IAIInput';
+import { useBuildInvocation } from 'features/nodes/hooks/useBuildInvocation';
+import { InvocationTemplate } from 'features/nodes/types/types';
+import Fuse from 'fuse.js';
 import { map } from 'lodash-es';
 import {
   ChangeEvent,
   FocusEvent,
   KeyboardEvent,
-  memo,
   ReactNode,
+  memo,
   useCallback,
   useRef,
   useState,
 } from 'react';
-import { Tooltip } from '@chakra-ui/tooltip';
 import { AnyInvocationType } from 'services/events/types';
-import { useBuildInvocation } from 'features/nodes/hooks/useBuildInvocation';
-import { addToast } from 'features/system/store/systemSlice';
 import { nodeAdded } from '../../store/nodesSlice';
-import Fuse from 'fuse.js';
-import { InvocationTemplate } from 'features/nodes/types/types';
-import { useAppToaster } from 'app/components/Toaster';
 
 interface NodeListItemProps {
   title: string;

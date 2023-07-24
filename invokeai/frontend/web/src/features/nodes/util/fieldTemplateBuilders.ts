@@ -417,14 +417,17 @@ export const getFieldType = (
     // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
     if (schemaObject.allOf) {
       rawFieldType = refObjectToFieldType(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         schemaObject.allOf![0] as OpenAPIV3.ReferenceObject
       );
     } else if (schemaObject.anyOf) {
       rawFieldType = refObjectToFieldType(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         schemaObject.anyOf![0] as OpenAPIV3.ReferenceObject
       );
     } else if (schemaObject.oneOf) {
       rawFieldType = refObjectToFieldType(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         schemaObject.oneOf![0] as OpenAPIV3.ReferenceObject
       );
     }
@@ -547,6 +550,7 @@ export const buildOutputFieldTemplates = (
   const outputSchemaName = refObject.$ref.split('/').slice(-1)[0];
 
   // get the output schema itself
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const outputSchema = openAPI.components!.schemas![outputSchemaName];
 
   if (isSchemaObject(outputSchema)) {

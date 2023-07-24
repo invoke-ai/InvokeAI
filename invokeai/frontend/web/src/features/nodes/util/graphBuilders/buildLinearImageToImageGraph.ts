@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
@@ -24,14 +24,13 @@ import {
   RESIZE,
 } from './constants';
 
-const moduleLog = log.child({ namespace: 'nodes' });
-
 /**
  * Builds the Image to Image tab graph.
  */
 export const buildLinearImageToImageGraph = (
   state: RootState
 ): NonNullableGraph => {
+  const log = logger('nodes');
   const {
     positivePrompt,
     negativePrompt,
@@ -69,12 +68,12 @@ export const buildLinearImageToImageGraph = (
    */
 
   if (!initialImage) {
-    moduleLog.error('No initial image found in state');
+    log.error('No initial image found in state');
     throw new Error('No initial image found in state');
   }
 
   if (!model) {
-    moduleLog.error('No model found in state');
+    log.error('No model found in state');
     throw new Error('No model found in state');
   }
 

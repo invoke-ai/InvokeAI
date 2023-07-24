@@ -1,16 +1,18 @@
-import { SCHEDULER_LABEL_MAP, SCHEDULER_NAMES } from 'app/constants';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIMantineMultiSelect from 'common/components/IAIMantineMultiSelect';
-import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
+import {
+  SCHEDULER_LABEL_MAP,
+  SchedulerParam,
+} from 'features/parameters/types/parameterSchemas';
 import { favoriteSchedulersChanged } from 'features/ui/store/uiSlice';
 import { map } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const data = map(SCHEDULER_NAMES, (s) => ({
-  value: s,
-  label: SCHEDULER_LABEL_MAP[s],
+const data = map(SCHEDULER_LABEL_MAP, (value, label) => ({
+  value,
+  label,
 })).sort((a, b) => a.label.localeCompare(b.label));
 
 export default function SettingsSchedulers() {

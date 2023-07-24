@@ -1,19 +1,16 @@
 import { MenuGroup, MenuItem, MenuList } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
-import {
-  autoAddBoardIdChanged,
-  boardIdSelected,
-} from 'features/gallery/store/gallerySlice';
+import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
-import { FaFolder, FaPlus } from 'react-icons/fa';
+import { FaPlus } from 'react-icons/fa';
+import { useBoardName } from 'services/api/hooks/useBoardName';
 import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
-import { useBoardName } from 'services/api/hooks/useBoardName';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 
 type Props = {
   board?: BoardDTO;
@@ -29,19 +26,14 @@ const BoardContextMenu = memo(
     const selector = useMemo(
       () =>
         createSelector(stateSelector, ({ gallery }) => {
-          const isSelected = gallery.selectedBoardId === board_id;
           const isAutoAdd = gallery.autoAddBoardId === board_id;
-          return { isSelected, isAutoAdd };
+          return { isAutoAdd };
         }),
       [board_id]
     );
 
-    const { isSelected, isAutoAdd } = useAppSelector(selector);
+    const { isAutoAdd } = useAppSelector(selector);
     const boardName = useBoardName(board_id);
-
-    const handleSelectBoard = useCallback(() => {
-      dispatch(boardIdSelected(board_id));
-    }, [board_id, dispatch]);
 
     const handleSetAutoAdd = useCallback(() => {
       dispatch(autoAddBoardIdChanged(board_id));

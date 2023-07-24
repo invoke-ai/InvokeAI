@@ -98,6 +98,6 @@ class FindModels(ModelSearch):
 
     def list_models(self) -> List[Path]:
         self.search()
-        return self.models_found
+        return list(self.models_found)
 
     

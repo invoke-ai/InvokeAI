@@ -1,9 +1,8 @@
 import { Box, useToken } from '@chakra-ui/react';
-import { NODE_MIN_WIDTH } from 'app/constants';
-
 import { useAppSelector } from 'app/store/storeHooks';
 import { PropsWithChildren } from 'react';
 import { DRAG_HANDLE_CLASSNAME } from '../hooks/useBuildInvocation';
+import { NODE_MIN_WIDTH } from '../types/constants';
 
 type NodeWrapperProps = PropsWithChildren & {
   selected: boolean;

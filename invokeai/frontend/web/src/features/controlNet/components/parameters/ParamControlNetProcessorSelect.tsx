@@ -13,7 +13,6 @@ import { memo, useCallback, useMemo } from 'react';
 import { CONTROLNET_PROCESSORS } from '../../store/constants';
 import { controlNetProcessorTypeChanged } from '../../store/controlNetSlice';
 import { ControlNetProcessorType } from '../../store/types';
-import { FormControl, FormLabel } from '@chakra-ui/react';
 
 type ParamControlNetProcessorSelectProps = {
   controlNetId: string;

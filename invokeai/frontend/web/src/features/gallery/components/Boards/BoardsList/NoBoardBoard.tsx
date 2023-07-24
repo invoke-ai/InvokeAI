@@ -1,4 +1,4 @@
-import { Box, ChakraProps, Flex, Image, Text } from '@chakra-ui/react';
+import { Box, Flex, Image, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
@@ -10,14 +10,8 @@ import SelectionOverlay from 'common/components/SelectionOverlay';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
-
-const BASE_BADGE_STYLES: ChakraProps['sx'] = {
-  bg: 'base.500',
-  color: 'whiteAlpha.900',
-};
 interface Props {
   isSelected: boolean;
 }
@@ -33,7 +27,6 @@ const selector = createSelector(
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const { totalImages, totalAssets } = useBoardTotal(undefined);
   const { autoAddBoardId } = useAppSelector(selector);
   const boardName = useBoardName(undefined);
   const handleSelectBoard = useCallback(() => {

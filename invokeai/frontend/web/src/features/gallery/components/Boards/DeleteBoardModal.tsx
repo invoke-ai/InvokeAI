@@ -11,14 +11,12 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { ImageUsage } from 'app/contexts/AddImageToBoardContext';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import ImageUsageMessage from 'features/imageDeletion/components/ImageUsageMessage';
-import {
-  ImageUsage,
-  getImageUsage,
-} from 'features/imageDeletion/store/imageDeletionSlice';
+import { getImageUsage } from 'features/imageDeletion/store/imageDeletionSelectors';
 import { some } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';

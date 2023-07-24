@@ -1,5 +1,4 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
 
 type BoardsState = {
   searchText: string;
@@ -26,7 +25,5 @@ const boardsSlice = createSlice({
 
 export const { setBoardSearchText, setUpdateBoardModalOpen } =
   boardsSlice.actions;
-
-export const boardsSelector = (state: RootState) => state.boards;
 
 export default boardsSlice.reducer;

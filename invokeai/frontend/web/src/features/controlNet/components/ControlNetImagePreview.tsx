@@ -11,8 +11,8 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { controlNetImageChanged } from '../store/controlNetSlice';
 import { PostUploadAction } from 'services/api/types';
+import { controlNetImageChanged } from '../store/controlNetSlice';
 
 type Props = {
   controlNetId: string;
@@ -59,19 +59,13 @@ const ControlNetImagePreview = (props: Props) => {
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
-  const {
-    currentData: controlImage,
-    isLoading: isLoadingControlImage,
-    isError: isErrorControlImage,
-    isSuccess: isSuccessControlImage,
-  } = useGetImageDTOQuery(controlImageName ?? skipToken);
+  const { currentData: controlImage } = useGetImageDTOQuery(
+    controlImageName ?? skipToken
+  );
 
-  const {
-    currentData: processedControlImage,
-    isLoading: isLoadingProcessedControlImage,
-    isError: isErrorProcessedControlImage,
-    isSuccess: isSuccessProcessedControlImage,
-  } = useGetImageDTOQuery(processedControlImageName ?? skipToken);
+  const { currentData: processedControlImage } = useGetImageDTOQuery(
+    processedControlImageName ?? skipToken
+  );
 
   const handleResetControlImage = useCallback(() => {
     dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));

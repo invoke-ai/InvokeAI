@@ -1,7 +1,5 @@
 import {
-  Badge,
   Box,
-  ChakraProps,
   Editable,
   EditableInput,
   EditablePreview,
@@ -17,21 +15,16 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
+import SelectionOverlay from 'common/components/SelectionOverlay';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { FaUser } from 'react-icons/fa';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import { BoardDTO } from 'services/api/types';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
-import SelectionOverlay from 'common/components/SelectionOverlay';
 
-const BASE_BADGE_STYLES: ChakraProps['sx'] = {
-  bg: 'base.500',
-  color: 'whiteAlpha.900',
-};
 interface GalleryBoardProps {
   board: BoardDTO;
   isSelected: boolean;
@@ -67,8 +60,6 @@ const GalleryBoard = memo(
     const { currentData: coverImage } = useGetImageDTOQuery(
       board.cover_image_name ?? skipToken
     );
-
-    const { totalImages, totalAssets } = useBoardTotal(board.board_id);
 
     const { board_name, board_id } = board;
     const [localBoardName, setLocalBoardName] = useState(board_name);

@@ -27,7 +27,7 @@ const STYLES: ChakraProps['sx'] = {
 
 const DragPreview = (props: OverlayDragImageProps) => {
   if (!props.dragData) {
-    return;
+    return null;
   }
 
   if (props.dragData.payloadType === 'IMAGE_DTO') {

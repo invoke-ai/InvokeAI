@@ -71,9 +71,13 @@ const invokeAIOutline = defineStyle((props) => {
     border: '1px solid',
     borderColor: c === 'gray' ? borderColor : 'currentColor',
     '.chakra-button__group[data-attached][data-orientation=horizontal] > &:not(:last-of-type)':
-      { marginEnd: '-1px' },
+      {
+        marginEnd: '-1px',
+      },
     '.chakra-button__group[data-attached][data-orientation=vertical] > &:not(:last-of-type)':
-      { marginBottom: '-1px' },
+      {
+        marginBottom: '-1px',
+      },
   };
 });
 

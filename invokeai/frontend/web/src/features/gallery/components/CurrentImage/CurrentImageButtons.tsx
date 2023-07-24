@@ -108,7 +108,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     500
   );
 
-  const { currentData: imageDTO, isFetching } = useGetImageDTOQuery(
+  const { currentData: imageDTO } = useGetImageDTOQuery(
     lastSelectedImage ?? skipToken
   );
 
@@ -208,6 +208,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       }
     },
     [imageDTO, shouldShowImageDetails, toaster]
+  );
+
+  useHotkeys(
+    'delete',
+    () => {
+      handleDelete();
+    },
+    [dispatch, imageDTO]
   );
 
   const handleClickProgressImagesToggle = useCallback(() => {
