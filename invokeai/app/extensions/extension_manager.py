@@ -58,10 +58,12 @@ class InvokeAIExtensionManager():
         Returns `None` if no Invocations are found.
         """
         extension_name = extension.name
+        extension_version = 'n/a'
         
         extension_config = self.get_extension_config(extension)
         if extension_config:
             extension_name = extension_config.name or extension_name
+            extension_version = extension_config.version or extension_version
 
         # Search for py files that are not named __init__.py in extensions root directory
         py_files = list(extension.path.glob('*.py'))
@@ -96,10 +98,19 @@ class InvokeAIExtensionManager():
 
         if len(loaded_nodes) > 0:
             self.logger.info(
-                f'Extension: {extension_name}, Nodes: {nodes_found} - LOADED!')
+                f'\
+                    \n \
+                    \nExtension: {extension_name} \
+                    \n- Version: {extension_version} \
+                    \n- Nodes: {nodes_found} - LOADED! \
+                    \n')
         if len(nodes_not_found) > 0:
             self.logger.warn(
-                f'Extension: {extension_name}, No Nodes Found In: {nodes_not_found} - NOT LOADED!')
+                f'\
+                    \n \
+                    \nExtension: {extension_name} \
+                    \n- No Nodes Found In: {nodes_not_found} - NOT LOADED!\
+                    \n')
 
         return unique_list(loaded_nodes) if len(loaded_nodes) > 0 else None
 

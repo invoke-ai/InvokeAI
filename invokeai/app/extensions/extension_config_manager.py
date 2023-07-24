@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class ExtensionConfigSchema(BaseModel):
     repo_id: Optional[str]
     name: Optional[str]
+    version: Optional[float]
     last_updated: Optional[int]
 
 

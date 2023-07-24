@@ -1,2 +1,3 @@
 repo_id: link to your github repo <string><optional>
 name: name of your addon <string><optional>
+version: version of your addon <float><optional>
