@@ -145,8 +145,7 @@ class ModelInstall(object):
         models = set()
         for key, value in self.datasets.items():
             name,base,model_type = ModelManager.parse_key(key)
-            if model_type==ModelType.Main:
-                models.add(key)
+            models.add(key)
         return models
 
     def recommended_models(self)->Set[str]:
