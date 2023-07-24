@@ -474,7 +474,7 @@ class ModelPatcher:
 
     @staticmethod
     def _lora_forward_hook(
-        applied_loras: List[Tuple[LoraModel, float]],
+        applied_loras: List[Tuple[LoRAModel, float]],
         layer_name: str,
     ):
 
@@ -519,7 +519,7 @@ class ModelPatcher:
     def apply_lora(
         cls,
         model: torch.nn.Module,
-        loras: List[Tuple[LoraModel, float]],
+        loras: List[Tuple[LoRAModel, float]],
         prefix: str,
     ):
         original_weights = dict()
