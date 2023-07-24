@@ -101,7 +101,7 @@ class PromptsFromFileInvocation(BaseInvocation):
 class PromptsToFileInvocationOutput(BaseInvocationOutput):
     """Base class for invocation that writes to a file and returns nothing of use"""
     #fmt: off
-    type: Literal["prompts_to_file_output"] = "prompts_to_file_output"
+    type: Literal["prompt_to_file_output"] = "prompt_to_file_output"
     #fmt: on
 
     class Config:
