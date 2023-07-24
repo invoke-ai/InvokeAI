@@ -4,9 +4,11 @@ import {
   GraphExecutionStateCompleteEvent,
   InvocationCompleteEvent,
   InvocationErrorEvent,
+  InvocationRetrievalErrorEvent,
   InvocationStartedEvent,
   ModelLoadCompletedEvent,
   ModelLoadStartedEvent,
+  SessionRetrievalErrorEvent,
 } from 'services/events/types';
 
 // Create actions for each socket
@@ -181,3 +183,35 @@ export const socketModelLoadCompleted = createAction<{
 export const appSocketModelLoadCompleted = createAction<{
   data: ModelLoadCompletedEvent;
 }>('socket/appSocketModelLoadCompleted');
+
+/**
+ * Socket.IO Session Retrieval Error
+ *
+ * Do not use. Only for use in middleware.
+ */
+export const socketSessionRetrievalError = createAction<{
+  data: SessionRetrievalErrorEvent;
+}>('socket/socketSessionRetrievalError');
+
+/**
+ * App-level Session Retrieval Error
+ */
+export const appSocketSessionRetrievalError = createAction<{
+  data: SessionRetrievalErrorEvent;
+}>('socket/appSocketSessionRetrievalError');
+
+/**
+ * Socket.IO Invocation Retrieval Error
+ *
+ * Do not use. Only for use in middleware.
+ */
+export const socketInvocationRetrievalError = createAction<{
+  data: InvocationRetrievalErrorEvent;
+}>('socket/socketInvocationRetrievalError');
+
+/**
+ * App-level Invocation Retrieval Error
+ */
+export const appSocketInvocationRetrievalError = createAction<{
+  data: InvocationRetrievalErrorEvent;
+}>('socket/appSocketInvocationRetrievalError');

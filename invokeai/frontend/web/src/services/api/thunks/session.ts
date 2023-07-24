@@ -18,7 +18,7 @@ type CreateSessionResponse = O.Required<
 >;
 
 type CreateSessionThunkConfig = {
-  rejectValue: { arg: CreateSessionArg; error: unknown };
+  rejectValue: { arg: CreateSessionArg; status: number; error: unknown };
 };
 
 /**
@@ -36,7 +36,7 @@ export const sessionCreated = createAsyncThunk<
   });
 
   if (error) {
-    return rejectWithValue({ arg, error });
+    return rejectWithValue({ arg, status: response.status, error });
   }
 
   return data;
@@ -53,6 +53,7 @@ type InvokedSessionThunkConfig = {
   rejectValue: {
     arg: InvokedSessionArg;
     error: unknown;
+    status: number;
   };
 };
 
@@ -78,9 +79,13 @@ export const sessionInvoked = createAsyncThunk<
 
   if (error) {
     if (isErrorWithStatus(error) && error.status === 403) {
-      return rejectWithValue({ arg, error: (error as any).body.detail });
+      return rejectWithValue({
+        arg,
+        status: response.status,
+        error: (error as any).body.detail,
+      });
     }
-    return rejectWithValue({ arg, error });
+    return rejectWithValue({ arg, status: response.status, error });
   }
 });
 
