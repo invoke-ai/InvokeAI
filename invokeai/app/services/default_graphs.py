@@ -1,4 +1,5 @@
 from ..invocations.latent import LatentsToImageInvocation, TextToLatentsInvocation
+from ..invocations.image import ImageNSFWBlurInvocation
 from ..invocations.noise import NoiseInvocation
 from ..invocations.compel import CompelInvocation
 from ..invocations.params import ParamIntInvocation
@@ -24,6 +25,7 @@ def create_text_to_image() -> LibraryGraph:
                 '5': CompelInvocation(id='5'),
                 '6': TextToLatentsInvocation(id='6'),
                 '7': LatentsToImageInvocation(id='7'),
+                '8': ImageNSFWBlurInvocation(id='8'),
             },
             edges=[
                 Edge(source=EdgeConnection(node_id='width', field='a'), destination=EdgeConnection(node_id='3', field='width')),
@@ -33,6 +35,7 @@ def create_text_to_image() -> LibraryGraph:
                 Edge(source=EdgeConnection(node_id='6', field='latents'), destination=EdgeConnection(node_id='7', field='latents')),
                 Edge(source=EdgeConnection(node_id='4', field='conditioning'), destination=EdgeConnection(node_id='6', field='positive_conditioning')),
                 Edge(source=EdgeConnection(node_id='5', field='conditioning'), destination=EdgeConnection(node_id='6', field='negative_conditioning')),
+                Edge(source=EdgeConnection(node_id='7', field='image'), destination=EdgeConnection(node_id='8', field='image')),
             ]
         ),
         exposed_inputs=[
@@ -43,7 +46,7 @@ def create_text_to_image() -> LibraryGraph:
             ExposedNodeInput(node_path='seed', field='a', alias='seed'),
         ],
         exposed_outputs=[
-            ExposedNodeOutput(node_path='7', field='image', alias='image')
+            ExposedNodeOutput(node_path='8', field='image', alias='image')
         ])
 
 

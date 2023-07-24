@@ -22,6 +22,8 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  NSFW_CHECKER,
+  WATERMARKER,
 } from './constants';
 
 /**
@@ -113,6 +115,7 @@ export const buildLinearImageToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
+        is_intermediate: true,
       },
       [LATENTS_TO_LATENTS]: {
         type: 'l2l',
@@ -128,7 +131,15 @@ export const buildLinearImageToImageGraph = (
         // must be set manually later, bc `fit` parameter may require a resize node inserted
         // image: {
         //   image_name: initialImage.image_name,
-        // },
+      },
+      [NSFW_CHECKER]: {
+        type: 'img_nsfw',
+        id: NSFW_CHECKER,
+        is_intermediate: true,
+      },
+      [WATERMARKER]: {
+        type: 'img_watermark',
+        id: WATERMARKER,
       },
     },
     edges: [
@@ -180,6 +191,26 @@ export const buildLinearImageToImageGraph = (
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'latents',
+        },
+      },
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: NSFW_CHECKER,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: NSFW_CHECKER,
+          field: 'image',
+        },
+        destination: {
+          node_id: WATERMARKER,
+          field: 'image',
         },
       },
       {
@@ -359,7 +390,7 @@ export const buildLinearImageToImageGraph = (
       field: 'metadata',
     },
     destination: {
-      node_id: LATENTS_TO_IMAGE,
+      node_id: WATERMARKER,
       field: 'metadata',
     },
   });

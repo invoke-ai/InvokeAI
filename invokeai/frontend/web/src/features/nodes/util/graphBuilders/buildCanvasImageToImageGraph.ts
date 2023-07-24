@@ -23,6 +23,8 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  NSFW_CHECKER,
+  WATERMARKER,
 } from './constants';
 
 /**
@@ -104,9 +106,9 @@ export const buildCanvasImageToImageGraph = (
         skipped_layers: clipSkip,
       },
       [LATENTS_TO_IMAGE]: {
-        is_intermediate: !shouldAutoSave,
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
+        is_intermediate: true,
       },
       [LATENTS_TO_LATENTS]: {
         type: 'l2l',
@@ -125,6 +127,16 @@ export const buildCanvasImageToImageGraph = (
         // image: {
         //   image_name: initialImage.image_name,
         // },
+      },
+      [NSFW_CHECKER]: {
+        type: 'img_nsfw',
+        id: NSFW_CHECKER,
+        is_intermediate: true,
+      },
+      [WATERMARKER]: {
+        is_intermediate: !shouldAutoSave,
+        type: 'img_watermark',
+        id: WATERMARKER,
       },
     },
     edges: [
@@ -166,6 +178,26 @@ export const buildCanvasImageToImageGraph = (
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'latents',
+        },
+      },
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: NSFW_CHECKER,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: NSFW_CHECKER,
+          field: 'image',
+        },
+        destination: {
+          node_id: WATERMARKER,
+          field: 'image',
         },
       },
       {
@@ -316,7 +348,7 @@ export const buildCanvasImageToImageGraph = (
       field: 'metadata',
     },
     destination: {
-      node_id: LATENTS_TO_IMAGE,
+      node_id: WATERMARKER,
       field: 'metadata',
     },
   });

@@ -9,7 +9,6 @@ from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.model import (LoRAModelField, MainModelField,
                                             VAEModelField)
 
-
 class LoRAMetadataField(BaseModel):
     """LoRA metadata for an image generated in InvokeAI."""
     lora: LoRAModelField = Field(description="The LoRA model")
