@@ -9,17 +9,17 @@ import {
   Text,
   useDisclosure,
 } from '@chakra-ui/react';
-import { makeToast } from 'features/system/util/makeToast';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { addToast } from 'features/system/store/systemSlice';
-import { memo, useRef, useCallback } from 'react';
+import { makeToast } from 'features/system/util/makeToast';
+import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 
-const ClearNodesButton = () => {
+const ClearGraphButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -46,8 +46,8 @@ const ClearNodesButton = () => {
     <>
       <IAIIconButton
         icon={<FaTrash />}
-        tooltip={t('nodes.clearNodes')}
-        aria-label={t('nodes.clearNodes')}
+        tooltip={t('nodes.clearGraph')}
+        aria-label={t('nodes.clearGraph')}
         onClick={onOpen}
         isDisabled={nodes.length === 0}
       />
@@ -62,11 +62,11 @@ const ClearNodesButton = () => {
 
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            {t('nodes.clearNodes')}
+            {t('nodes.clearGraph')}
           </AlertDialogHeader>
 
           <AlertDialogBody>
-            <Text>{t('common.clearNodes')}</Text>
+            <Text>{t('nodes.clearGraphDesc')}</Text>
           </AlertDialogBody>
 
           <AlertDialogFooter>
@@ -83,4 +83,4 @@ const ClearNodesButton = () => {
   );
 };
 
-export default memo(ClearNodesButton);
+export default memo(ClearGraphButton);

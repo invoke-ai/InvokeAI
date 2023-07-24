@@ -10,6 +10,7 @@ from .base import (
     SubModelType,
     classproperty,
     InvalidModelException,
+    ModelNotFoundException,
 )
 # TODO: naming
 from ..lora import LoRAModel as LoRAModelRaw
