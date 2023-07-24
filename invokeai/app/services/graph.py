@@ -882,7 +882,7 @@ class GraphExecutionState(BaseModel):
                 if self.batch_indices[index] > 0:
                     self.executed.clear()
                     self.batch_indices[index] -= 1
-                    return next(self)
+                    return self.next(self)
 
         # If next is still none, there's no next node, return None
         return next_node
