@@ -600,7 +600,7 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         Return list of all models found in the designated directory.
         """
-        search = FindModels(directory,self.logger)
+        search = FindModels([directory], self.logger)
         return search.list_models()
 
     def sync_to_config(self):
