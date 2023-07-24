@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
@@ -18,11 +18,10 @@ import {
   TEXT_TO_LATENTS,
 } from './constants';
 
-const moduleLog = log.child({ namespace: 'nodes' });
-
 export const buildLinearTextToImageGraph = (
   state: RootState
 ): NonNullableGraph => {
+  const log = logger('nodes');
   const {
     positivePrompt,
     negativePrompt,
@@ -42,7 +41,7 @@ export const buildLinearTextToImageGraph = (
     : initialGenerationState.shouldUseCpuNoise;
 
   if (!model) {
-    moduleLog.error('No model found in state');
+    log.error('No model found in state');
     throw new Error('No model found in state');
   }
 

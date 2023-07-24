@@ -15,10 +15,7 @@ const STYLES: ChakraProps['sx'] = {
   maxH: BOX_SIZE,
   shadow: 'dark-lg',
   borderRadius: 'lg',
-  borderWidth: 2,
-  borderStyle: 'dashed',
-  borderColor: 'base.100',
-  opacity: 0.5,
+  opacity: 0.3,
   bg: 'base.800',
   color: 'base.50',
   _dark: {
@@ -30,7 +27,7 @@ const STYLES: ChakraProps['sx'] = {
 
 const DragPreview = (props: OverlayDragImageProps) => {
   if (!props.dragData) {
-    return;
+    return null;
   }
 
   if (props.dragData.payloadType === 'IMAGE_DTO') {

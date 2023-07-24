@@ -124,9 +124,9 @@ experimental versions later.
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest),
     and look for a file named:
 
-    - InvokeAI-installer-v2.X.X.zip
+    - InvokeAI-installer-v3.X.X.zip
 
-    where "2.X.X" is the latest released version. The file is located
+    where "3.X.X" is the latest released version. The file is located
     at the very bottom of the release page, under **Assets**.
 
 4.  **Unpack the installer**: Unpack the zip file into a convenient directory. This will create a new
@@ -354,8 +354,8 @@ experimental versions later.
 
 12. **InvokeAI Options**: You can launch InvokeAI with several different command-line arguments that
     customize its behavior. For example, you can change the location of the
-    image output directory, or select your favorite sampler. See the
-    [Command-Line Interface](../features/CLI.md) for a full list of the options.
+    image output directory or balance memory usage vs performance. See
+    [Configuration](../features/CONFIGURATION.md) for a full list of the options.
 
     - To set defaults that will take effect every time you launch InvokeAI,
       use a text editor (e.g. Notepad) to exit the file

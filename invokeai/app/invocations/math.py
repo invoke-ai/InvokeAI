@@ -52,6 +52,14 @@ class AddInvocation(BaseInvocation, MathInvocationConfig):
     b: int = Field(default=0, description="The second number")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Add",
+                "tags": ["math", "add"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> IntOutput:
         return IntOutput(a=self.a + self.b)
 
@@ -64,6 +72,14 @@ class SubtractInvocation(BaseInvocation, MathInvocationConfig):
     a: int = Field(default=0, description="The first number")
     b: int = Field(default=0, description="The second number")
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Subtract",
+                "tags": ["math", "subtract"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> IntOutput:
         return IntOutput(a=self.a - self.b)
@@ -78,6 +94,14 @@ class MultiplyInvocation(BaseInvocation, MathInvocationConfig):
     b: int = Field(default=0, description="The second number")
     # fmt: on
 
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Multiply",
+                "tags": ["math", "multiply"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> IntOutput:
         return IntOutput(a=self.a * self.b)
 
@@ -90,6 +114,14 @@ class DivideInvocation(BaseInvocation, MathInvocationConfig):
     a: int = Field(default=0, description="The first number")
     b: int = Field(default=0, description="The second number")
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Divide",
+                "tags": ["math", "divide"]
+            },
+        }
 
     def invoke(self, context: InvocationContext) -> IntOutput:
         return IntOutput(a=int(self.a / self.b))
@@ -105,5 +137,14 @@ class RandomIntInvocation(BaseInvocation):
         default=np.iinfo(np.int32).max, description="The exclusive high value"
     )
     # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "Random Integer",
+                "tags": ["math", "random", "integer"]
+            },
+        }
+
     def invoke(self, context: InvocationContext) -> IntOutput:
         return IntOutput(a=np.random.randint(self.low, self.high))

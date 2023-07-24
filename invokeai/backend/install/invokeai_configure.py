@@ -23,6 +23,7 @@ from urllib import request
 
 import npyscreen
 import transformers
+import omegaconf
 from diffusers import AutoencoderKL
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
@@ -44,6 +45,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
+    FileBox,
     IntTitleSlider,
     set_min_terminal_size,
     CyclingForm,
@@ -222,7 +224,7 @@ def download_conversion_models():
 
 # ---------------------------------------------
 def download_realesrgan():
-    logger.info("Installing RealESRGAN models...")
+    logger.info("Installing ESRGAN Upscaling models...")
     URLs = [
         dict(
             url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
@@ -238,6 +240,11 @@ def download_realesrgan():
             url= "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
             dest= "core/upscaling/realesrgan/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
             description = "ESRGAN_SRx4_DF2KOST_official.pth",
+        ),
+        dict(
+            url= "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
+            dest= "core/upscaling/realesrgan/RealESRGAN_x2plus.pth",
+            description = "RealESRGAN_x2plus.pth",
         ),
     ]
     for model in URLs:
@@ -404,21 +411,21 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value="Directories containing textual inversion, controlnet and LoRA models (<tab> autocompletes, ctrl-N advances):",
+            value="Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models (<tab> autocompletes, ctrl-N advances):",
             editable=False,
             color="CONTROL",
         )
         self.autoimport_dirs = {}
-        for description, config_name, path in autoimport_paths(old_opts):
-            self.autoimport_dirs[config_name] = self.add_widget_intelligent(
-                npyscreen.TitleFilename,
-                name=description+':',
-                value=str(path),
+        self.autoimport_dirs['autoimport_dir'] = self.add_widget_intelligent(
+                FileBox,
+                name=f'Autoimport Folder',
+                value=str(config.root_path / config.autoimport_dir),
                 select_dir=True,
                 must_exist=False,
                 use_two_lines=False,
                 labelColor="GOOD",
                 begin_entry_at=32,
+                max_height = 3,
                 scroll_exit=True
             )
         self.nextrely += 1
@@ -555,7 +562,6 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
     editApp.run()
     return editApp.new_opts()
 
-
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
     if not init_file.exists():
@@ -563,7 +569,14 @@ def default_startup_options(init_file: Path) -> Namespace:
     return opts
 
 def default_user_selections(program_opts: Namespace) -> InstallSelections:
-    installer = ModelInstall(config)
+    
+    try:
+        installer = ModelInstall(config)
+    except omegaconf.errors.ConfigKeyError:
+        logger.warning('Your models.yaml file is corrupt or out of date. Reinitializing')
+        initialize_rootdir(config.root_path, True)
+        installer = ModelInstall(config)
+        
     models = installer.all_models()
     return InstallSelections(
         install_models=[models[installer.default_model()].path or models[installer.default_model()].repo_id]
@@ -571,19 +584,8 @@ def default_user_selections(program_opts: Namespace) -> InstallSelections:
         else [models[x].path or models[x].repo_id for x in installer.recommended_models()]
         if program_opts.yes_to_all
         else list(),
-#        scan_directory=None,
-#        autoscan_on_startup=None,
     )
 
-# -------------------------------------
-def autoimport_paths(config: InvokeAIAppConfig):
-    return [
-        ('Checkpoints & diffusers models', 'autoimport_dir', config.root_path / config.autoimport_dir),
-        ('LoRA/LyCORIS models',            'lora_dir',       config.root_path / config.lora_dir),
-        ('Controlnet models',              'controlnet_dir', config.root_path / config.controlnet_dir),
-        ('Textual Inversion Embeddings',   'embedding_dir',  config.root_path / config.embedding_dir),
-    ]
-    
 # -------------------------------------
 def initialize_rootdir(root: Path, yes_to_all: bool = False):
     logger.info("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
@@ -658,6 +660,9 @@ def write_opts(opts: Namespace, init_file: Path):
 
     with open(init_file,'w', encoding='utf-8') as file:
         file.write(new_config.to_yaml())
+
+    if hasattr(opts,'hf_token') and opts.hf_token:
+        HfLogin(opts.hf_token)
 
 # -------------------------------------
 def default_output_dir() -> Path:

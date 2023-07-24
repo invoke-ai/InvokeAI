@@ -28,11 +28,15 @@ import {
   FaShare,
   FaTrash,
 } from 'react-icons/fa';
-import { useRemoveImageFromBoardMutation } from 'services/api/endpoints/boardImages';
-import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
+import {
+  useGetImageMetadataQuery,
+  useRemoveImageFromBoardMutation,
+} from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { AddImageToBoardContext } from '../../../../app/contexts/AddImageToBoardContext';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import { useDebounce } from 'use-debounce';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -68,7 +72,16 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   const { onClickAddToBoard } = useContext(AddImageToBoardContext);
 
-  const { currentData } = useGetImageMetadataQuery(imageDTO.image_name);
+  const [debouncedMetadataQueryArg, debounceState] = useDebounce(
+    imageDTO.image_name,
+    500
+  );
+
+  const { currentData } = useGetImageMetadataQuery(
+    debounceState.isPending()
+      ? skipToken
+      : debouncedMetadataQueryArg ?? skipToken
+  );
 
   const { isClipboardAPIAvailable, copyImageToClipboard } =
     useCopyImageToClipboard();
@@ -128,15 +141,8 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     if (!imageDTO.board_id) {
       return;
     }
-    removeFromBoard({
-      board_id: imageDTO.board_id,
-      image_name: imageDTO.image_name,
-    });
-  }, [imageDTO.board_id, imageDTO.image_name, removeFromBoard]);
-
-  const handleOpenInNewTab = useCallback(() => {
-    window.open(imageDTO.image_url, '_blank');
-  }, [imageDTO.image_url]);
+    removeFromBoard({ imageDTO });
+  }, [imageDTO, removeFromBoard]);
 
   const handleAddToBatch = useCallback(() => {
     dispatch(imagesAddedToBatch([imageDTO.image_name]));
@@ -149,10 +155,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   return (
     <>
       <Link href={imageDTO.image_url} target="_blank">
-        <MenuItem
-          icon={<FaExternalLinkAlt />}
-          onClickCapture={handleOpenInNewTab}
-        >
+        <MenuItem icon={<FaExternalLinkAlt />}>
           {t('common.openInNewTab')}
         </MenuItem>
       </Link>
@@ -161,6 +164,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           {t('parameters.copyImage')}
         </MenuItem>
       )}
+      <Link download={true} href={imageDTO.image_url} target="_blank">
+        <MenuItem icon={<FaDownload />} w="100%">
+          {t('parameters.downloadImage')}
+        </MenuItem>
+      </Link>
       <MenuItem
         icon={<FaQuoteRight />}
         onClickCapture={handleRecallPrompt}
@@ -219,11 +227,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           Remove from Board
         </MenuItem>
       )}
-      <Link download={true} href={imageDTO.image_url} target="_blank">
-        <MenuItem icon={<FaDownload />} w="100%">
-          {t('parameters.downloadImage')}
-        </MenuItem>
-      </Link>
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
         icon={<FaTrash />}

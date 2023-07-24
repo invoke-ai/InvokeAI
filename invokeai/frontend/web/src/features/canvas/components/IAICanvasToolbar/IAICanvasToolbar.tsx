@@ -2,8 +2,15 @@ import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import useImageUploader from 'common/hooks/useImageUploader';
+import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
+import {
+  canvasCopiedToClipboard,
+  canvasDownloadedAsImage,
+  canvasMerged,
+  canvasSavedToGallery,
+} from 'features/canvas/store/actions';
 import {
   canvasSelector,
   isStagingSelector,
@@ -22,15 +29,8 @@ import {
 } from 'features/canvas/store/canvasTypes';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { systemSelector } from 'features/system/store/systemSelectors';
+import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 import { isEqual } from 'lodash-es';
-
-import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
-import {
-  canvasCopiedToClipboard,
-  canvasDownloadedAsImage,
-  canvasMerged,
-  canvasSavedToGallery,
-} from 'features/canvas/store/actions';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -48,7 +48,6 @@ import IAICanvasRedoButton from './IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
-import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 
 export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
@@ -82,7 +81,9 @@ const IAICanvasToolbar = () => {
   const { t } = useTranslation();
   const { isClipboardAPIAvailable } = useCopyImageToClipboard();
 
-  const { openUploader } = useImageUploader();
+  const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
+    postUploadAction: { type: 'SET_CANVAS_INITIAL_IMAGE' },
+  });
 
   useHotkeys(
     ['v'],
@@ -218,7 +219,7 @@ const IAICanvasToolbar = () => {
       }}
     >
       <Box w={24}>
-        <IAIMantineSearchableSelect
+        <IAIMantineSelect
           tooltip={`${t('unifiedCanvas.layer')} (Q)`}
           value={layer}
           data={LAYER_NAMES_DICT}
@@ -288,9 +289,10 @@ const IAICanvasToolbar = () => {
           aria-label={`${t('common.upload')}`}
           tooltip={`${t('common.upload')}`}
           icon={<FaUpload />}
-          onClick={openUploader}
           isDisabled={isStaging}
+          {...getUploadButtonProps()}
         />
+        <input {...getUploadInputProps()} />
         <IAIIconButton
           aria-label={`${t('unifiedCanvas.clearCanvas')}`}
           tooltip={`${t('unifiedCanvas.clearCanvas')}`}

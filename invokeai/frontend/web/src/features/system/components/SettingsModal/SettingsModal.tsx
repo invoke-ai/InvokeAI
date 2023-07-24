@@ -12,34 +12,29 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
+import { VALID_LOG_LEVELS } from 'app/logging/logger';
 import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import IAISwitch from 'common/components/IAISwitch';
-import { systemSelector } from 'features/system/store/systemSelectors';
+import { setShouldShowAdvancedOptions } from 'features/parameters/store/generationSlice';
 import {
-  SystemState,
   consoleLogLevelChanged,
   setEnableImageDebugging,
+  setIsNodesEnabled,
   setShouldConfirmOnDelete,
-  setShouldDisplayGuides,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
 } from 'features/system/store/systemSlice';
-import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
-  setShouldShowAdvancedOptions,
   setShouldShowProgressInViewer,
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
-import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash-es';
 import {
   ChangeEvent,
-  PropsWithChildren,
   ReactElement,
   cloneElement,
   useCallback,
@@ -47,30 +42,33 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
+import SettingSwitch from './SettingSwitch';
+import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
+import StyledFlex from './StyledFlex';
 
 const selector = createSelector(
-  [systemSelector, uiSelector],
-  (system: SystemState, ui: UIState) => {
+  [stateSelector],
+  ({ system, ui, generation }) => {
     const {
       shouldConfirmOnDelete,
-      shouldDisplayGuides,
       enableImageDebugging,
       consoleLogLevel,
       shouldLogToConsole,
       shouldAntialiasProgressImage,
+      isNodesEnabled,
     } = system;
 
     const {
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
       shouldShowProgressInViewer,
-      shouldShowAdvancedOptions,
     } = ui;
+
+    const { shouldShowAdvancedOptions } = generation;
 
     return {
       shouldConfirmOnDelete,
-      shouldDisplayGuides,
       enableImageDebugging,
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
@@ -79,6 +77,7 @@ const selector = createSelector(
       shouldLogToConsole,
       shouldAntialiasProgressImage,
       shouldShowAdvancedOptions,
+      isNodesEnabled,
     };
   },
   {
@@ -91,6 +90,8 @@ type ConfigOptions = {
   shouldShowResetWebUiText: boolean;
   shouldShowBetaLayout: boolean;
   shouldShowAdvancedOptionsSettings: boolean;
+  shouldShowClearIntermediates: boolean;
+  shouldShowNodesToggle: boolean;
 };
 
 type SettingsModalProps = {
@@ -109,6 +110,9 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
   const shouldShowAdvancedOptionsSettings =
     config?.shouldShowAdvancedOptionsSettings ?? true;
+  const shouldShowClearIntermediates =
+    config?.shouldShowClearIntermediates ?? true;
+  const shouldShowNodesToggle = config?.shouldShowNodesToggle ?? true;
 
   useEffect(() => {
     if (!shouldShowDeveloperSettings) {
@@ -130,7 +134,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
   const {
     shouldConfirmOnDelete,
-    shouldDisplayGuides,
     enableImageDebugging,
     shouldUseCanvasBetaLayout,
     shouldUseSliders,
@@ -139,6 +142,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     shouldLogToConsole,
     shouldAntialiasProgressImage,
     shouldShowAdvancedOptions,
+    isNodesEnabled,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -169,6 +173,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     [dispatch]
   );
 
+  const handleToggleNodes = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setIsNodesEnabled(e.target.checked));
+    },
+    [dispatch]
+  );
+
   return (
     <>
       {cloneElement(children, {
@@ -178,7 +189,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
       <Modal
         isOpen={isSettingsModalOpen}
         onClose={onSettingsModalClose}
-        size="xl"
+        size="2xl"
         isCentered
       >
         <ModalOverlay />
@@ -189,7 +200,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
             <Flex sx={{ gap: 4, flexDirection: 'column' }}>
               <StyledFlex>
                 <Heading size="sm">{t('settings.general')}</Heading>
-                <IAISwitch
+                <SettingSwitch
                   label={t('settings.confirmOnDelete')}
                   isChecked={shouldConfirmOnDelete}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -197,7 +208,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                   }
                 />
                 {shouldShowAdvancedOptionsSettings && (
-                  <IAISwitch
+                  <SettingSwitch
                     label={t('settings.showAdvancedOptions')}
                     isChecked={shouldShowAdvancedOptions}
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -214,37 +225,21 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
               <StyledFlex>
                 <Heading size="sm">{t('settings.ui')}</Heading>
-                <IAISwitch
-                  label={t('settings.displayHelpIcons')}
-                  isChecked={shouldDisplayGuides}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    dispatch(setShouldDisplayGuides(e.target.checked))
-                  }
-                />
-                {shouldShowBetaLayout && (
-                  <IAISwitch
-                    label={t('settings.useCanvasBeta')}
-                    isChecked={shouldUseCanvasBetaLayout}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
-                    }
-                  />
-                )}
-                <IAISwitch
+                <SettingSwitch
                   label={t('settings.useSlidersForAll')}
                   isChecked={shouldUseSliders}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     dispatch(setShouldUseSliders(e.target.checked))
                   }
                 />
-                <IAISwitch
+                <SettingSwitch
                   label={t('settings.showProgressInViewer')}
                   isChecked={shouldShowProgressInViewer}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     dispatch(setShouldShowProgressInViewer(e.target.checked))
                   }
                 />
-                <IAISwitch
+                <SettingSwitch
                   label={t('settings.antialiasProgressImages')}
                   isChecked={shouldAntialiasProgressImage}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -253,12 +248,31 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     )
                   }
                 />
+                {shouldShowBetaLayout && (
+                  <SettingSwitch
+                    label={t('settings.alternateCanvasLayout')}
+                    useBadge
+                    badgeLabel={t('settings.beta')}
+                    isChecked={shouldUseCanvasBetaLayout}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
+                    }
+                  />
+                )}
+                {shouldShowNodesToggle && (
+                  <SettingSwitch
+                    label={t('settings.enableNodesEditor')}
+                    useBadge
+                    isChecked={isNodesEnabled}
+                    onChange={handleToggleNodes}
+                  />
+                )}
               </StyledFlex>
 
               {shouldShowDeveloperSettings && (
                 <StyledFlex>
                   <Heading size="sm">{t('settings.developer')}</Heading>
-                  <IAISwitch
+                  <SettingSwitch
                     label={t('settings.shouldLogToConsole')}
                     isChecked={shouldLogToConsole}
                     onChange={handleLogToConsoleChanged}
@@ -270,7 +284,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     value={consoleLogLevel}
                     data={VALID_LOG_LEVELS.concat()}
                   />
-                  <IAISwitch
+                  <SettingSwitch
                     label={t('settings.enableImageDebugging')}
                     isChecked={enableImageDebugging}
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -280,6 +294,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                 </StyledFlex>
               )}
 
+              {shouldShowClearIntermediates && <SettingsClearIntermediates />}
+
               <StyledFlex>
                 <Heading size="sm">{t('settings.resetWebUI')}</Heading>
                 <IAIButton colorScheme="error" onClick={handleClickResetWebUI}>
@@ -287,8 +303,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                 </IAIButton>
                 {shouldShowResetWebUiText && (
                   <>
-                    <Text>{t('settings.resetWebUIDesc1')}</Text>
-                    <Text>{t('settings.resetWebUIDesc2')}</Text>
+                    <Text variant="subtext">
+                      {t('settings.resetWebUIDesc1')}
+                    </Text>
+                    <Text variant="subtext">
+                      {t('settings.resetWebUIDesc2')}
+                    </Text>
                   </>
                 )}
               </StyledFlex>
@@ -327,22 +347,3 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 };
 
 export default SettingsModal;
-
-const StyledFlex = (props: PropsWithChildren) => {
-  return (
-    <Flex
-      sx={{
-        flexDirection: 'column',
-        gap: 2,
-        p: 4,
-        borderRadius: 'base',
-        bg: 'base.100',
-        _dark: {
-          bg: 'base.900',
-        },
-      }}
-    >
-      {props.children}
-    </Flex>
-  );
-};

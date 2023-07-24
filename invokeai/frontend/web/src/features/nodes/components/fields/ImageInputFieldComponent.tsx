@@ -1,21 +1,19 @@
-import { useAppDispatch } from 'app/store/storeHooks';
-
-import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
-import {
-  ImageInputFieldTemplate,
-  ImageInputFieldValue,
-} from 'features/nodes/types/types';
-import { memo, useCallback, useMemo } from 'react';
-
 import { Flex } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'app/components/ImageDnd/typesafeDnd';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
+import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
+import {
+  ImageInputFieldTemplate,
+  ImageInputFieldValue,
+} from 'features/nodes/types/types';
+import { memo, useCallback, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { PostUploadAction } from 'services/api/thunks/image';
+import { PostUploadAction } from 'services/api/types';
 import { FieldComponentProps } from './types';
 
 const ImageInputFieldComponent = (
@@ -25,12 +23,9 @@ const ImageInputFieldComponent = (
 
   const dispatch = useAppDispatch();
 
-  const {
-    currentData: imageDTO,
-    isLoading,
-    isError,
-    isSuccess,
-  } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
+  const { currentData: imageDTO } = useGetImageDTOQuery(
+    field.value?.image_name ?? skipToken
+  );
 
   const handleReset = useCallback(() => {
     dispatch(

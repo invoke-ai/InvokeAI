@@ -29,6 +29,7 @@ const BatchBoard = ({ isSelected }: { isSelected: boolean }) => {
 
   return (
     <GenericBoard
+      board_id="batch"
       droppableData={droppableData}
       onClick={handleBatchBoardClick}
       isSelected={isSelected}

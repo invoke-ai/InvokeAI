@@ -8,12 +8,14 @@ import {
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { AnimatePresence, motion } from 'framer-motion';
 import { isEqual } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import ImageMetadataViewer from '../ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from '../NextPrevImageButtons';
@@ -91,12 +93,7 @@ const CurrentImagePreview = () => {
     ]
   );
 
-  const {
-    currentData: imageDTO,
-    isLoading,
-    isError,
-    isSuccess,
-  } = useGetImageDTOQuery(imageName ?? skipToken);
+  const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
     if (imageDTO) {
@@ -168,7 +165,11 @@ const CurrentImagePreview = () => {
           draggableData={draggableData}
           isUploadDisabled={true}
           fitContainer
+          useThumbailFallback
           dropLabel="Set as Current Image"
+          noContentFallback={
+            <IAINoContentFallback icon={FaImage} label="No image selected" />
+          }
         />
       )}
       {shouldShowImageDetails && imageDTO && (

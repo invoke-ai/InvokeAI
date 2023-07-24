@@ -6,10 +6,8 @@ import { memo } from 'react';
 import { FieldComponentProps } from './types';
 
 const ClipInputFieldComponent = (
-  props: FieldComponentProps<ClipInputFieldValue, ClipInputFieldTemplate>
+  _props: FieldComponentProps<ClipInputFieldValue, ClipInputFieldTemplate>
 ) => {
-  const { nodeId, field } = props;
-
   return null;
 };
 

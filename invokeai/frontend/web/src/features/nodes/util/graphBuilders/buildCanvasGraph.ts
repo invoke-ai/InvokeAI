@@ -1,13 +1,9 @@
 import { RootState } from 'app/store/store';
-import { ImageDTO } from 'services/api/types';
-import { log } from 'app/logging/useLogger';
-import { forEach } from 'lodash-es';
-import { buildCanvasInpaintGraph } from './buildCanvasInpaintGraph';
 import { NonNullableGraph } from 'features/nodes/types/types';
+import { ImageDTO } from 'services/api/types';
 import { buildCanvasImageToImageGraph } from './buildCanvasImageToImageGraph';
+import { buildCanvasInpaintGraph } from './buildCanvasInpaintGraph';
 import { buildCanvasTextToImageGraph } from './buildCanvasTextToImageGraph';
-
-const moduleLog = log.child({ namespace: 'nodes' });
 
 export const buildCanvasGraph = (
   state: RootState,
@@ -30,10 +26,6 @@ export const buildCanvasGraph = (
     }
     graph = buildCanvasInpaintGraph(state, canvasInitImage, canvasMaskImage);
   }
-
-  forEach(graph.nodes, (node) => {
-    graph.nodes[node.id].is_intermediate = true;
-  });
 
   return graph;
 };

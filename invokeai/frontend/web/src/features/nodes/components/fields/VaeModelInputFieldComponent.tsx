@@ -11,7 +11,6 @@ import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToVAEModelParam } from 'features/parameters/util/modelIdToVAEModelParam';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 
@@ -24,7 +23,6 @@ const VaeModelInputFieldComponent = (
   const { nodeId, field } = props;
   const vae = field.value;
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
   const { data: vaeModels } = useGetVaeModelsQuery();
 
   const data = useMemo(() => {

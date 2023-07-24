@@ -112,14 +112,15 @@ class NoiseInvocation(BaseInvocation):
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
+                "title": "Noise",
                 "tags": ["latents", "noise"],
             },
         }
 
     @validator("seed", pre=True)
     def modulo_seed(cls, v):
-        """Returns the seed modulo SEED_MAX to ensure it is within the valid range."""
-        return v % SEED_MAX
+        """Returns the seed modulo (SEED_MAX + 1) to ensure it is within the valid range."""
+        return v % (SEED_MAX + 1)
 
     def invoke(self, context: InvocationContext) -> NoiseOutput:
         noise = get_noise(

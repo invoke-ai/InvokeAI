@@ -2,8 +2,8 @@ import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import GenerationModeStatusText from 'features/parameters/components/Parameters/Canvas/GenerationModeStatusText';
 import { isEqual } from 'lodash-es';
-
 import { useTranslation } from 'react-i18next';
 import roundToHundreth from '../util/roundToHundreth';
 import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
@@ -110,6 +110,7 @@ const IAICanvasStatusText = () => {
         },
       }}
     >
+      <GenerationModeStatusText />
       <Box
         style={{
           color: activeLayerColor,

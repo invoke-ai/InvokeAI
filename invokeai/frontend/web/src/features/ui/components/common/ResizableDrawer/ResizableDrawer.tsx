@@ -164,7 +164,7 @@ const ResizableDrawer = ({
           sx={{
             borderColor: mode('base.200', 'base.800')(colorMode),
             p: 4,
-            bg: mode('base.100', 'base.900')(colorMode),
+            bg: mode('base.50', 'base.900')(colorMode),
             height: 'full',
             shadow: isOpen ? 'dark-lg' : undefined,
             ...containerStyles,

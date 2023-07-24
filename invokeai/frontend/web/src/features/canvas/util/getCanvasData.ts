@@ -1,32 +1,34 @@
-import { RootState } from 'app/store/store';
-import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
-import { isCanvasMaskLine } from '../store/canvasTypes';
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
+import { Vector2d } from 'konva/lib/types';
+import {
+  CanvasLayerState,
+  Dimensions,
+  isCanvasMaskLine,
+} from '../store/canvasTypes';
 import createMaskStage from './createMaskStage';
-import { konvaNodeToImageData } from './konvaNodeToImageData';
+import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { konvaNodeToBlob } from './konvaNodeToBlob';
-
-const moduleLog = log.child({ namespace: 'getCanvasDataURLs' });
+import { konvaNodeToImageData } from './konvaNodeToImageData';
 
 /**
  * Gets Blob and ImageData objects for the base and mask layers
  */
-export const getCanvasData = async (state: RootState) => {
+export const getCanvasData = async (
+  layerState: CanvasLayerState,
+  boundingBoxCoordinates: Vector2d,
+  boundingBoxDimensions: Dimensions,
+  isMaskEnabled: boolean,
+  shouldPreserveMaskedArea: boolean
+) => {
+  const log = logger('canvas');
+
   const canvasBaseLayer = getCanvasBaseLayer();
   const canvasStage = getCanvasStage();
 
   if (!canvasBaseLayer || !canvasStage) {
-    moduleLog.error('Unable to find canvas / stage');
+    log.error('Unable to find canvas / stage');
     return;
   }
-
-  const {
-    layerState: { objects },
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    isMaskEnabled,
-    shouldPreserveMaskedArea,
-  } = state.canvas;
 
   const boundingBox = {
     ...boundingBoxCoordinates,
@@ -58,7 +60,7 @@ export const getCanvasData = async (state: RootState) => {
 
   // For the mask layer, use the normal boundingBox
   const maskStage = await createMaskStage(
-    isMaskEnabled ? objects.filter(isCanvasMaskLine) : [], // only include mask lines, and only if mask is enabled
+    isMaskEnabled ? layerState.objects.filter(isCanvasMaskLine) : [], // only include mask lines, and only if mask is enabled
     boundingBox,
     shouldPreserveMaskedArea
   );

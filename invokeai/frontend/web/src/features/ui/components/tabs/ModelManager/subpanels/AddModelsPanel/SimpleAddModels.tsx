@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { SelectItem } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { makeToast } from 'app/components/Toaster';
+import { makeToast } from 'features/system/util/makeToast';
 import { RootState } from 'app/store/store';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
@@ -85,7 +85,7 @@ export default function SimpleAddModels() {
       <Flex flexDirection="column" width="100%" gap={4}>
         <IAIMantineTextInput
           label="Model Location"
-          placeholder="Provide a path to a local Diffusers model, local checkpoint / safetensors model or a HuggingFace Repo ID"
+          placeholder="Provide a path to a local Diffusers model, local checkpoint / safetensors model a HuggingFace Repo ID, or a checkpoint/diffusers model URL."
           w="100%"
           {...addModelForm.getInputProps('location')}
         />

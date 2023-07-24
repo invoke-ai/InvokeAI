@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
@@ -18,14 +18,13 @@ import {
   TEXT_TO_LATENTS,
 } from './constants';
 
-const moduleLog = log.child({ namespace: 'nodes' });
-
 /**
  * Builds the Canvas tab's Text to Image graph.
  */
 export const buildCanvasTextToImageGraph = (
   state: RootState
 ): NonNullableGraph => {
+  const log = logger('nodes');
   const {
     positivePrompt,
     negativePrompt,
@@ -41,8 +40,10 @@ export const buildCanvasTextToImageGraph = (
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
+  const { shouldAutoSave } = state.canvas;
+
   if (!model) {
-    moduleLog.error('No model found in state');
+    log.error('No model found in state');
     throw new Error('No model found in state');
   }
 
@@ -66,16 +67,19 @@ export const buildCanvasTextToImageGraph = (
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
+        is_intermediate: true,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'compel',
         id: NEGATIVE_CONDITIONING,
+        is_intermediate: true,
         prompt: negativePrompt,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
+        is_intermediate: true,
         width,
         height,
         use_cpu,
@@ -83,6 +87,7 @@ export const buildCanvasTextToImageGraph = (
       [TEXT_TO_LATENTS]: {
         type: 't2l',
         id: TEXT_TO_LATENTS,
+        is_intermediate: true,
         cfg_scale,
         scheduler,
         steps,
@@ -90,16 +95,19 @@ export const buildCanvasTextToImageGraph = (
       [MAIN_MODEL_LOADER]: {
         type: 'main_model_loader',
         id: MAIN_MODEL_LOADER,
+        is_intermediate: true,
         model,
       },
       [CLIP_SKIP]: {
         type: 'clip_skip',
         id: CLIP_SKIP,
+        is_intermediate: true,
         skipped_layers: clipSkip,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
+        is_intermediate: !shouldAutoSave,
       },
     },
     edges: [

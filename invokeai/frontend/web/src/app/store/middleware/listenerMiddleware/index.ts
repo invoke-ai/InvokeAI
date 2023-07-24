@@ -8,10 +8,11 @@ import {
 
 import type { AppDispatch, RootState } from '../../store';
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
+import { addFirstListImagesListener } from './listeners/addFirstListImagesListener.ts';
 import { addAppConfigReceivedListener } from './listeners/appConfigReceived';
 import { addAppStartedListener } from './listeners/appStarted';
+import { addDeleteBoardAndImagesFulfilledListener } from './listeners/boardAndImagesDeleted';
 import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
-import { addRequestedBoardImageDeletionListener } from './listeners/boardImagesDeleted';
 import { addCanvasCopiedToClipboardListener } from './listeners/canvasCopiedToClipboard';
 import { addCanvasDownloadedAsImageListener } from './listeners/canvasDownloadedAsImage';
 import { addCanvasMergedListener } from './listeners/canvasMerged';
@@ -30,34 +31,18 @@ import {
 } from './listeners/imageDeleted';
 import { addImageDroppedListener } from './listeners/imageDropped';
 import {
-  addImageMetadataReceivedFulfilledListener,
-  addImageMetadataReceivedRejectedListener,
-} from './listeners/imageMetadataReceived';
-import {
   addImageRemovedFromBoardFulfilledListener,
   addImageRemovedFromBoardRejectedListener,
 } from './listeners/imageRemovedFromBoard';
 import { addImageToDeleteSelectedListener } from './listeners/imageToDeleteSelected';
 import {
-  addImageUpdatedFulfilledListener,
-  addImageUpdatedRejectedListener,
-} from './listeners/imageUpdated';
-import {
   addImageUploadedFulfilledListener,
   addImageUploadedRejectedListener,
 } from './listeners/imageUploaded';
-import {
-  addImageUrlsReceivedFulfilledListener,
-  addImageUrlsReceivedRejectedListener,
-} from './listeners/imageUrlsReceived';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
 import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
-import {
-  addReceivedPageOfImagesFulfilledListener,
-  addReceivedPageOfImagesRejectedListener,
-} from './listeners/receivedPageOfImages';
 import {
   addSessionCanceledFulfilledListener,
   addSessionCanceledPendingListener,
@@ -81,15 +66,17 @@ import { addGraphExecutionStateCompleteEventListener as addGraphExecutionStateCo
 import { addInvocationCompleteEventListener as addInvocationCompleteListener } from './listeners/socketio/socketInvocationComplete';
 import { addInvocationErrorEventListener as addInvocationErrorListener } from './listeners/socketio/socketInvocationError';
 import { addInvocationStartedEventListener as addInvocationStartedListener } from './listeners/socketio/socketInvocationStarted';
+import { addModelLoadEventListener } from './listeners/socketio/socketModelLoad';
 import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
+import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
 import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
-import { addModelLoadStartedEventListener } from './listeners/socketio/socketModelLoadStarted';
-import { addModelLoadCompletedEventListener } from './listeners/socketio/socketModelLoadCompleted';
+import { addSessionRetrievalErrorEventListener } from './listeners/socketio/socketSessionRetrievalError';
+import { addInvocationRetrievalErrorEventListener } from './listeners/socketio/socketInvocationRetrievalError';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -119,10 +106,6 @@ export type AppListenerEffect = ListenerEffect<
 addImageUploadedFulfilledListener();
 addImageUploadedRejectedListener();
 
-// Image updated
-addImageUpdatedFulfilledListener();
-addImageUpdatedRejectedListener();
-
 // Image selected
 addInitialImageSelectedListener();
 
@@ -131,16 +114,8 @@ addRequestedImageDeletionListener();
 addImageDeletedPendingListener();
 addImageDeletedFulfilledListener();
 addImageDeletedRejectedListener();
-addRequestedBoardImageDeletionListener();
+addDeleteBoardAndImagesFulfilledListener();
 addImageToDeleteSelectedListener();
-
-// Image metadata
-addImageMetadataReceivedFulfilledListener();
-addImageMetadataReceivedRejectedListener();
-
-// Image URLs
-addImageUrlsReceivedFulfilledListener();
-addImageUrlsReceivedRejectedListener();
 
 // User Invoked
 addUserInvokedCanvasListener();
@@ -179,8 +154,9 @@ addSocketConnectedListener();
 addSocketDisconnectedListener();
 addSocketSubscribedListener();
 addSocketUnsubscribedListener();
-addModelLoadStartedEventListener();
-addModelLoadCompletedEventListener();
+addModelLoadEventListener();
+addSessionRetrievalErrorEventListener();
+addInvocationRetrievalErrorEventListener();
 
 // Session Created
 addSessionCreatedPendingListener();
@@ -197,16 +173,9 @@ addSessionCanceledPendingListener();
 addSessionCanceledFulfilledListener();
 addSessionCanceledRejectedListener();
 
-// Fetching images
-addReceivedPageOfImagesFulfilledListener();
-addReceivedPageOfImagesRejectedListener();
-
 // ControlNet
 addControlNetImageProcessedListener();
 addControlNetAutoProcessListener();
-
-// Update image URLs on connect
-// addUpdateImageUrlsOnConnectListener();
 
 // Boards
 addImageAddedToBoardFulfilledListener();
@@ -228,3 +197,7 @@ addModelSelectedListener();
 addAppStartedListener();
 addModelsLoadedListener();
 addAppConfigReceivedListener();
+addFirstListImagesListener();
+
+// Ad-hoc upscale workflwo
+addUpscaleRequestedListener();

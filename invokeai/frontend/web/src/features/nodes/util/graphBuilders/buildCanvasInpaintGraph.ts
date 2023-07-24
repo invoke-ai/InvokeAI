@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
@@ -21,8 +21,6 @@ import {
   RANGE_OF_SIZE,
 } from './constants';
 
-const moduleLog = log.child({ namespace: 'nodes' });
-
 /**
  * Builds the Canvas tab's Inpaint graph.
  */
@@ -31,6 +29,7 @@ export const buildCanvasInpaintGraph = (
   canvasInitImage: ImageDTO,
   canvasMaskImage: ImageDTO
 ): NonNullableGraph => {
+  const log = logger('nodes');
   const {
     positivePrompt,
     negativePrompt,
@@ -53,7 +52,7 @@ export const buildCanvasInpaintGraph = (
   } = state.generation;
 
   if (!model) {
-    moduleLog.error('No model found in state');
+    log.error('No model found in state');
     throw new Error('No model found in state');
   }
 
@@ -61,12 +60,17 @@ export const buildCanvasInpaintGraph = (
   const { width, height } = state.canvas.boundingBoxDimensions;
 
   // We may need to set the inpaint width and height to scale the image
-  const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
+  const {
+    scaledBoundingBoxDimensions,
+    boundingBoxScaleMethod,
+    shouldAutoSave,
+  } = state.canvas;
 
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
     nodes: {
       [INPAINT]: {
+        is_intermediate: !shouldAutoSave,
         type: 'inpaint',
         id: INPAINT,
         steps,
@@ -100,26 +104,31 @@ export const buildCanvasInpaintGraph = (
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
+        is_intermediate: true,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'compel',
         id: NEGATIVE_CONDITIONING,
+        is_intermediate: true,
         prompt: negativePrompt,
       },
       [MAIN_MODEL_LOADER]: {
         type: 'main_model_loader',
         id: MAIN_MODEL_LOADER,
+        is_intermediate: true,
         model,
       },
       [CLIP_SKIP]: {
         type: 'clip_skip',
         id: CLIP_SKIP,
+        is_intermediate: true,
         skipped_layers: clipSkip,
       },
       [RANGE_OF_SIZE]: {
         type: 'range_of_size',
         id: RANGE_OF_SIZE,
+        is_intermediate: true,
         // seed - must be connected manually
         // start: 0,
         size: iterations,
@@ -128,6 +137,7 @@ export const buildCanvasInpaintGraph = (
       [ITERATE]: {
         type: 'iterate',
         id: ITERATE,
+        is_intermediate: true,
       },
     },
     edges: [

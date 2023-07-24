@@ -87,6 +87,7 @@ export type InvocationErrorEvent = {
   graph_execution_state_id: string;
   node: BaseNode;
   source_node_id: string;
+  error_type: string;
   error: string;
 };
 
@@ -110,6 +111,29 @@ export type GraphExecutionStateCompleteEvent = {
   graph_execution_state_id: string;
 };
 
+/**
+ * A `session_retrieval_error` socket.io event.
+ *
+ * @example socket.on('session_retrieval_error', (data: SessionRetrievalErrorEvent) => { ... }
+ */
+export type SessionRetrievalErrorEvent = {
+  graph_execution_state_id: string;
+  error_type: string;
+  error: string;
+};
+
+/**
+ * A `invocation_retrieval_error` socket.io event.
+ *
+ * @example socket.on('invocation_retrieval_error', (data: InvocationRetrievalErrorEvent) => { ... }
+ */
+export type InvocationRetrievalErrorEvent = {
+  graph_execution_state_id: string;
+  node_id: string;
+  error_type: string;
+  error: string;
+};
+
 export type ClientEmitSubscribe = {
   session: string;
 };
@@ -128,6 +152,8 @@ export type ServerToClientEvents = {
   ) => void;
   model_load_started: (payload: ModelLoadStartedEvent) => void;
   model_load_completed: (payload: ModelLoadCompletedEvent) => void;
+  session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
+  invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
 };
 
 export type ClientToServerEvents = {

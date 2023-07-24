@@ -1,15 +1,14 @@
+import { logger } from 'app/logging/logger';
 import {
   MainModelParam,
   zMainModel,
 } from 'features/parameters/types/parameterSchemas';
-import { log } from 'app/logging/useLogger';
-
-const moduleLog = log.child({ module: 'models' });
 
 export const modelIdToMainModelParam = (
   mainModelId: string
 ): MainModelParam | undefined => {
-  const [base_model, model_type, model_name] = mainModelId.split('/');
+  const log = logger('models');
+  const [base_model, _model_type, model_name] = mainModelId.split('/');
 
   const result = zMainModel.safeParse({
     base_model,
@@ -17,7 +16,7 @@ export const modelIdToMainModelParam = (
   });
 
   if (!result.success) {
-    moduleLog.error(
+    log.error(
       {
         mainModelId,
         errors: result.error.format(),

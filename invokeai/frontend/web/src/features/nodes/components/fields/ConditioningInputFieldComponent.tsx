@@ -6,13 +6,11 @@ import { memo } from 'react';
 import { FieldComponentProps } from './types';
 
 const ConditioningInputFieldComponent = (
-  props: FieldComponentProps<
+  _props: FieldComponentProps<
     ConditioningInputFieldValue,
     ConditioningInputFieldTemplate
   >
 ) => {
-  const { nodeId, field } = props;
-
   return null;
 };
 

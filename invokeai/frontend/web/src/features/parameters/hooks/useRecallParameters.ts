@@ -3,7 +3,6 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UnsafeImageMetadata } from 'services/api/endpoints/images';
-import { isImageField } from 'services/api/guards';
 import { ImageDTO } from 'services/api/types';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
@@ -244,22 +243,7 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Sets initial image with toast
-   */
-  const recallInitialImage = useCallback(
-    async (image: unknown) => {
-      if (!isImageField(image)) {
-        parameterNotSetToast();
-        return;
-      }
-      dispatch(initialImageSelected(image.image_name));
-      parameterSetToast();
-    },
-    [dispatch, parameterSetToast, parameterNotSetToast]
-  );
-
-  /**
+  /*
    * Sets image as initial image with toast
    */
   const sendToImageToImage = useCallback(
@@ -330,7 +314,6 @@ export const useRecallParameters = () => {
     recallPositivePrompt,
     recallNegativePrompt,
     recallSeed,
-    recallInitialImage,
     recallCfgScale,
     recallModel,
     recallScheduler,

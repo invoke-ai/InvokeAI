@@ -109,7 +109,7 @@ const GalleryDrawer = () => {
       isResizable={true}
       isOpen={shouldShowGallery}
       onClose={handleCloseGallery}
-      minWidth={337}
+      minWidth={400}
     >
       <ImageGalleryContent />
     </ResizableDrawer>

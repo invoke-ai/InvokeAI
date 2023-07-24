@@ -1,18 +1,19 @@
+import { $logger } from 'app/logging/logger';
 import { canvasMerged } from 'features/canvas/store/actions';
-import { startAppListening } from '..';
-import { log } from 'app/logging/useLogger';
-import { addToast } from 'features/system/store/systemSlice';
-import { imageUploaded } from 'services/api/thunks/image';
 import { setMergedCanvas } from 'features/canvas/store/canvasSlice';
-import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { getFullBaseLayerBlob } from 'features/canvas/util/getFullBaseLayerBlob';
-
-const moduleLog = log.child({ namespace: 'canvasCopiedToClipboardListener' });
+import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
+import { addToast } from 'features/system/store/systemSlice';
+import { imagesApi } from 'services/api/endpoints/images';
+import { startAppListening } from '..';
 
 export const addCanvasMergedListener = () => {
   startAppListening({
     actionCreator: canvasMerged,
-    effect: async (action, { dispatch, getState, take }) => {
+    effect: async (action, { dispatch }) => {
+      const moduleLog = $logger
+        .get()
+        .child({ namespace: 'canvasCopiedToClipboardListener' });
       const blob = await getFullBaseLayerBlob();
 
       if (!blob) {
@@ -45,28 +46,22 @@ export const addCanvasMergedListener = () => {
         relativeTo: canvasBaseLayer.getParent(),
       });
 
-      const imageUploadedRequest = dispatch(
-        imageUploaded({
+      const imageDTO = await dispatch(
+        imagesApi.endpoints.uploadImage.initiate({
           file: new File([blob], 'mergedCanvas.png', {
             type: 'image/png',
           }),
           image_category: 'general',
           is_intermediate: true,
           postUploadAction: {
-            type: 'TOAST_CANVAS_MERGED',
+            type: 'TOAST',
+            toastOptions: { title: 'Canvas Merged' },
           },
         })
-      );
+      ).unwrap();
 
-      const [{ payload }] = await take(
-        (
-          uploadedImageAction
-        ): uploadedImageAction is ReturnType<typeof imageUploaded.fulfilled> =>
-          imageUploaded.fulfilled.match(uploadedImageAction) &&
-          uploadedImageAction.meta.requestId === imageUploadedRequest.requestId
-      );
-
-      const { image_name } = payload;
+      // TODO: I can't figure out how to do the type narrowing in the `take()` so just brute forcing it here
+      const { image_name } = imageDTO;
 
       dispatch(
         setMergedCanvas({
@@ -74,13 +69,6 @@ export const addCanvasMergedListener = () => {
           layer: 'base',
           imageName: image_name,
           ...baseLayerRect,
-        })
-      );
-
-      dispatch(
-        addToast({
-          title: 'Canvas Merged',
-          status: 'success',
         })
       );
     },

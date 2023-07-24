@@ -2,7 +2,7 @@ name: mkdocs-material
 on:
   push:
     branches:
-      - 'refs/heads/v2.3'
+      - 'refs/heads/main'
 
 permissions:
     contents: write
@@ -43,7 +43,7 @@ jobs:
             --verbose
 
       - name: deploy to gh-pages
-        if: ${{ github.ref == 'refs/heads/v2.3' }}
+        if: ${{ github.ref == 'refs/heads/main' }}
         run: |
           python -m \
             mkdocs gh-deploy \

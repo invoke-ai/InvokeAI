@@ -4,6 +4,7 @@ import sys
 from inspect import signature
 
 import uvicorn
+import socket
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -193,9 +194,22 @@ app.mount("/",
          )
 
 def invoke_api():
+    def find_port(port: int):
+        """Find a port not in use starting at given port"""
+        # Taken from https://waylonwalker.com/python-find-available-port/, thanks Waylon!
+        # https://github.com/WaylonWalker
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(("localhost", port)) == 0:
+                return find_port(port=port + 1)
+            else:
+                return port
+
+    port = find_port(app_config.port)
+    if port != app_config.port:
+        logger.warn(f"Port {app_config.port} in use, using port {port}")
     # Start our own event loop for eventing usage
     loop = asyncio.new_event_loop()
-    config = uvicorn.Config(app=app, host=app_config.host, port=app_config.port, loop=loop)
+    config = uvicorn.Config(app=app, host=app_config.host, port=port, loop=loop)
     # Use access_log to turn off logging
     server = uvicorn.Server(config)
     loop.run_until_complete(server.serve())

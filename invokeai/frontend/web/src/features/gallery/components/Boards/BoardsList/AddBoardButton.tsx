@@ -1,5 +1,6 @@
-import IAIButton from 'common/components/IAIButton';
+import IAIIconButton from 'common/components/IAIIconButton';
 import { useCallback } from 'react';
+import { FaPlus } from 'react-icons/fa';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
 
 const DEFAULT_BOARD_NAME = 'My Board';
@@ -12,15 +13,14 @@ const AddBoardButton = () => {
   }, [createBoard]);
 
   return (
-    <IAIButton
+    <IAIIconButton
+      icon={<FaPlus />}
       isLoading={isLoading}
+      tooltip="Add Board"
       aria-label="Add Board"
       onClick={handleCreateBoard}
       size="sm"
-      sx={{ px: 4 }}
-    >
-      Add Board
-    </IAIButton>
+    />
   );
 };
 

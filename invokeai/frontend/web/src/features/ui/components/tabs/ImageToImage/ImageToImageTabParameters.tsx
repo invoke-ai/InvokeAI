@@ -7,9 +7,8 @@ import ParamPositiveConditioning from 'features/parameters/components/Parameters
 import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/ParamNoiseCollapse';
 import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
-import ParamVariationCollapse from 'features/parameters/components/Parameters/Variations/ParamVariationCollapse';
+// import ParamVariationCollapse from 'features/parameters/components/Parameters/Variations/ParamVariationCollapse';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
-import { memo } from 'react';
 import ImageToImageTabCoreParameters from './ImageToImageTabCoreParameters';
 
 const ImageToImageTabParameters = () => {
@@ -22,7 +21,7 @@ const ImageToImageTabParameters = () => {
       <ParamControlNetCollapse />
       <ParamLoraCollapse />
       <ParamDynamicPromptsCollapse />
-      <ParamVariationCollapse />
+      {/* <ParamVariationCollapse /> */}
       <ParamNoiseCollapse />
       <ParamSymmetryCollapse />
       <ParamSeamlessCollapse />
@@ -31,4 +30,4 @@ const ImageToImageTabParameters = () => {
   );
 };
 
-export default memo(ImageToImageTabParameters);
+export default ImageToImageTabParameters;
