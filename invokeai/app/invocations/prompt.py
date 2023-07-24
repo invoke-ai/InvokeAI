@@ -98,6 +98,19 @@ class PromptsFromFileInvocation(BaseInvocation):
         return PromptCollectionOutput(prompt_collection=prompts, count=len(prompts))
 
 
+class PromptsToFileInvocationOutput(BaseInvocationOutput):
+    """Base class for invocation that writes to a file and returns nothing of use"""
+    #fmt: off
+    type: Literal["prompts_to_file_output"] = "prompts_to_file_output"
+    #fmt: on
+
+    class Config:
+        schema_extra = {
+            'required': [
+                'type'
+            ]
+        }
+
 class PromptsToFileInvocation(BaseInvocation):
     '''Save prompts to a text file'''
     # fmt: off
@@ -109,6 +122,7 @@ class PromptsToFileInvocation(BaseInvocation):
     append: bool = Field(default=True, description="Append or overwrite file")
     #fmt: on
 
+
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
@@ -118,7 +132,7 @@ class PromptsToFileInvocation(BaseInvocation):
             },
         }
         
-    def invoke(self, context: InvocationContext) -> BaseInvocationOutput:
+    def invoke(self, context: InvocationContext) -> PromptsToFileInvocationOutput:
         if self.append:
             file_mode = 'a'
         else:
@@ -131,7 +145,7 @@ class PromptsToFileInvocation(BaseInvocation):
             else:
                 f.write((self.prompts or '') + '\n')
  
-        return BaseInvocationOutput()
+        return PromptsToFileInvocationOutput()
 
 
 class PromptPosNegOutput(BaseInvocationOutput):
