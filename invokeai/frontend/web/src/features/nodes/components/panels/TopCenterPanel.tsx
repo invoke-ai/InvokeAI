@@ -2,11 +2,11 @@ import { HStack } from '@chakra-ui/react';
 import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
 import { memo } from 'react';
 import { Panel } from 'reactflow';
-import LoadNodesButton from '../ui/LoadNodesButton';
+import ClearGraphButton from '../ui/ClearGraphButton';
+import LoadGraphButton from '../ui/LoadGraphButton';
 import NodeInvokeButton from '../ui/NodeInvokeButton';
 import ReloadSchemaButton from '../ui/ReloadSchemaButton';
-import SaveNodesButton from '../ui/SaveNodesButton';
-import ClearNodesButton from '../ui/ClearNodesButton';
+import SaveGraphButton from '../ui/SaveGraphButton';
 
 const TopCenterPanel = () => {
   return (
@@ -15,9 +15,9 @@ const TopCenterPanel = () => {
         <NodeInvokeButton />
         <CancelButton />
         <ReloadSchemaButton />
-        <SaveNodesButton />
-        <LoadNodesButton />
-        <ClearNodesButton />
+        <SaveGraphButton />
+        <LoadGraphButton />
+        <ClearGraphButton />
       </HStack>
     </Panel>
   );
