@@ -1,11 +1,13 @@
 import ast
 import pathlib
-from typing import Dict, List, TypedDict
+from collections import OrderedDict
+from typing import Dict, List
 
 from pydantic import BaseModel
 
 from ...backend.util.logging import getLogger
 from ..services.config import get_invokeai_config
+from .util import unique_list
 
 
 class Extension(BaseModel):
@@ -14,21 +16,33 @@ class Extension(BaseModel):
 
 
 class InvokeAIExtensionManager():
+    """
+    InvokeAI's Extension Manager - Controls all extension related operations.
+    """
+
     def __init__(self) -> None:
         self.logger = getLogger('Extension Manager')
         self.config = get_invokeai_config()
         self.community_nodes_dir: pathlib.Path = self.config.nodes_path
         assert self.community_nodes_dir.is_dir()
 
-    def get_extensions(self):
+    def get_extensions(self) -> Dict[str, Extension]:
+        """ Returns an object with paths to all folders in the extension directory """
         available_extensions: Dict[str, Extension] = {}
+
         for extension in self.community_nodes_dir.iterdir():
             if extension.is_dir() and not extension.name.startswith('__'):
                 available_extensions[extension.stem] = Extension(
                     name=extension.stem, path=extension)
+                
         return available_extensions
 
-    def load_extension(self, extension: Extension):
+    def load_extension(self, extension: Extension) -> List | None:
+        """
+        Takes an `Extension` and returns a `list` of all node files that contain Invocations
+        in that extension, which can then be appended to the original extension list.
+        Returns `None` if no Invocations are found.
+        """
         # Search for py files that are not named __init__.py in extensions root directory
         py_files = list(extension.path.glob('*.py'))
         py_files = [
@@ -67,13 +81,15 @@ class InvokeAIExtensionManager():
             self.logger.warn(
                 f'Extension: {extension.name}, No Nodes Found In: {nodes_not_found} - NOT LOADED!')
 
-        return loaded_nodes if len(loaded_nodes) > 0 else None
+        return unique_list(loaded_nodes) if len(loaded_nodes) > 0 else None
 
     def load_extensions(self) -> List:
         loaded_extensions = []
         available_extensions = self.get_extensions()
+
         for extension in available_extensions.values():
             loaded_extension = self.load_extension(extension)
-            if loaded_extension:
+            if loaded_extension and loaded_extension not in loaded_extensions:
                 loaded_extensions.extend(loaded_extension)
-        return loaded_extensions
+                
+        return unique_list(loaded_extensions)
