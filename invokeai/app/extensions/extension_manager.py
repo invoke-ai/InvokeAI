@@ -60,13 +60,14 @@ class InvokeAIExtensionManager():
             nodes_found.extend(invocations)
             loaded_nodes.append((file.parent / file.stem).__str__())
 
-        self.logger.info(
-            f'Extension: {extension.name}, Nodes: {nodes_found} - LOADED!')
+        if len(loaded_nodes) > 0:
+            self.logger.info(
+                f'Extension: {extension.name}, Nodes: {nodes_found} - LOADED!')
         if len(nodes_not_found) > 0:
             self.logger.warn(
                 f'Extension: {extension.name}, No Nodes Found In: {nodes_not_found} - NOT LOADED!')
 
-        return loaded_nodes
+        return loaded_nodes if len(loaded_nodes) > 0 else None
 
     def load_extensions(self) -> List:
         loaded_extensions = []
