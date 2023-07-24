@@ -136,19 +136,16 @@ command-line options by giving the `--help` argument:
 
 ```
 (.venv) > invokeai-web --help
-usage: InvokeAI [-h] [--host HOST] [--port PORT] [--allow_origins [ALLOW_ORIGINS ...]] [--allow_credentials | --no-allow_credentials]
-                [--allow_methods [ALLOW_METHODS ...]] [--allow_headers [ALLOW_HEADERS ...]] [--esrgan | --no-esrgan]
-                [--internet_available | --no-internet_available] [--log_tokenization | --no-log_tokenization]
-                [--nsfw_checker | --no-nsfw_checker] [--patchmatch | --no-patchmatch] [--restore | --no-restore]
-                [--always_use_cpu | --no-always_use_cpu] [--free_gpu_mem | --no-free_gpu_mem] [--max_cache_size MAX_CACHE_SIZE]
-                [--max_vram_cache_size MAX_VRAM_CACHE_SIZE] [--precision {auto,float16,float32,autocast}]
-                [--sequential_guidance | --no-sequential_guidance] [--xformers_enabled | --no-xformers_enabled]
-                [--tiled_decode | --no-tiled_decode] [--root ROOT] [--autoimport_dir AUTOIMPORT_DIR] [--lora_dir LORA_DIR]
-                [--embedding_dir EMBEDDING_DIR] [--controlnet_dir CONTROLNET_DIR] [--conf_path CONF_PATH] [--models_dir MODELS_DIR]
-                [--legacy_conf_dir LEGACY_CONF_DIR] [--db_dir DB_DIR] [--outdir OUTDIR] [--from_file FROM_FILE]
-                [--use_memory_db | --no-use_memory_db] [--model MODEL] [--log_handlers [LOG_HANDLERS ...]]
-                [--log_format {plain,color,syslog,legacy}] [--log_level {debug,info,warning,error,critical}]
-...
+usage: InvokeAI [-h] [--host HOST] [--port PORT] [--allow_origins [ALLOW_ORIGINS ...]] [--allow_credentials | --no-allow_credentials] [--allow_methods [ALLOW_METHODS ...]]
+                [--allow_headers [ALLOW_HEADERS ...]] [--esrgan | --no-esrgan] [--internet_available | --no-internet_available] [--log_tokenization | --no-log_tokenization]
+                [--nsfw_checker | --no-nsfw_checker] [--invisible_watermark | --no-invisible_watermark] [--patchmatch | --no-patchmatch] [--restore | --no-restore]
+                [--always_use_cpu | --no-always_use_cpu] [--free_gpu_mem | --no-free_gpu_mem] [--max_loaded_models MAX_LOADED_MODELS] [--max_cache_size MAX_CACHE_SIZE]
+                [--max_vram_cache_size MAX_VRAM_CACHE_SIZE] [--gpu_mem_reserved GPU_MEM_RESERVED] [--precision {auto,float16,float32,autocast}]
+                [--sequential_guidance | --no-sequential_guidance] [--xformers_enabled | --no-xformers_enabled] [--tiled_decode | --no-tiled_decode] [--root ROOT]
+                [--autoimport_dir AUTOIMPORT_DIR] [--lora_dir LORA_DIR] [--embedding_dir EMBEDDING_DIR] [--controlnet_dir CONTROLNET_DIR] [--conf_path CONF_PATH]
+                [--models_dir MODELS_DIR] [--legacy_conf_dir LEGACY_CONF_DIR] [--db_dir DB_DIR] [--outdir OUTDIR] [--from_file FROM_FILE]
+                [--use_memory_db | --no-use_memory_db] [--model MODEL] [--log_handlers [LOG_HANDLERS ...]] [--log_format {plain,color,syslog,legacy}]
+                [--log_level {debug,info,warning,error,critical}] [--version | --no-version]
 ```
 
 ## The Configuration Settings
@@ -179,6 +176,7 @@ These configuration settings allow you to enable and disable various InvokeAI fe
 | `internet_available` | `true`     | When a resource is not available locally, try to fetch it via the internet |
 | `log_tokenization` | `false`      | Before each text2image generation, print a color-coded representation of the prompt to the console; this can help understand why a prompt is not working as expected |
 | `nsfw_checker` | `true`     | Activate the NSFW checker to blur out risque images |
+| `invisible_watermark` | `true` | Write an invisible watermark 'InvokeAI' into generated images for use by AI image detectors |
 | `patchmatch` | `true`     | Activate the "patchmatch" algorithm for improved inpainting |
 | `restore`    | `true`     | Activate the facial restoration features (DEPRECATED; restoration features will be removed in 3.0.0) |
 
