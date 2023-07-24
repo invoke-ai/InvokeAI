@@ -102,8 +102,7 @@
         "openInNewTab": "Open in New Tab",
         "dontAskMeAgain": "Don't ask me again",
         "areYouSure": "Are you sure?",
-        "imagePrompt": "Image Prompt",
-        "clearNodes": "Are you sure you want to clear all nodes?"
+        "imagePrompt": "Image Prompt"
     },
     "gallery": {
         "generations": "Generations",
@@ -615,6 +614,11 @@
         "initialImageNotSetDesc": "Could not load initial image",
         "nodesSaved": "Nodes Saved",
         "nodesLoaded": "Nodes Loaded",
+        "nodesNotValidGraph": "Not a valid InvokeAI Node Graph",
+        "nodesNotValidJSON": "Not a valid JSON",
+        "nodesCorruptedGraph": "Cannot load. Graph seems to be corrupted.",
+        "nodesUnrecognizedTypes": "Cannot load. Graph has unrecognized types",
+        "nodesBrokenConnections": "Cannot load. Some connections are broken.",
         "nodesLoadedFailed": "Failed To Load Nodes",
         "nodesCleared": "Nodes Cleared"
     },
@@ -700,9 +704,10 @@
     },
     "nodes": {
         "reloadSchema": "Reload Schema",
-        "saveNodes": "Save Nodes",
-        "loadNodes": "Load Nodes",
-        "clearNodes": "Clear Nodes",
+        "saveGraph": "Save Graph",
+        "loadGraph": "Load Graph (saved from Node Editor) (Do not copy-paste metadata)",
+        "clearGraph": "Clear Graph",
+        "clearGraphDesc": "Are you sure you want to clear all nodes?",
         "zoomInNodes": "Zoom In",
         "zoomOutNodes": "Zoom Out",
         "fitViewportNodes": "Fit View",
