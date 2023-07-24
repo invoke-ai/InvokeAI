@@ -116,7 +116,11 @@ class InvokeAIExtensionManager():
 
     def load_extensions(self) -> List:
         loaded_extensions = []
+
+        self.logger.info('Scanning Extensions....')
         available_extensions = self.get_extensions()
+        if len(available_extensions) > 0:
+            self.logger.info(f'Found {len(available_extensions)} extension(s). Loading ...')
 
         for extension in available_extensions.values():
             loaded_extension = self.load_extension(extension)
