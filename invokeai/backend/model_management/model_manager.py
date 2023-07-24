@@ -391,7 +391,7 @@ class ModelManager(object):
         base_model: BaseModelType,
         model_type: ModelType,
     ) -> str:
-        return f"{base_model}/{model_type}/{model_name}"
+        return f"{base_model.value}/{model_type.value}/{model_name}"
 
     @classmethod
     def parse_key(cls, model_key: str) -> Tuple[str, BaseModelType, ModelType]:

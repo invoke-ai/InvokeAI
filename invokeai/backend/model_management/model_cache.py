@@ -163,7 +163,6 @@ class ModelCache(object):
         submodel: Optional[SubModelType] = None,
         gpu_load: bool = True,
     ) -> Any:
-
         if not isinstance(model_path, Path):
             model_path = Path(model_path)
 
