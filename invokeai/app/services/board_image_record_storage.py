@@ -135,7 +135,6 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         board_id: str,
         image_name: str,
     ) -> None:
-        print(f'DEBUG: board_id={board_id}, image_name={image_name}')
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -147,7 +146,6 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 (board_id, image_name, board_id),
             )
             self._conn.commit()
-            print('got here')
         except sqlite3.Error as e:
             self._conn.rollback()
             raise e
