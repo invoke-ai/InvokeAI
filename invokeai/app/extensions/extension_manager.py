@@ -3,10 +3,11 @@ import pathlib
 from collections import OrderedDict
 from typing import Dict, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from ...backend.util.logging import getLogger
 from ..services.config import get_invokeai_config
+from .extension_config_manager import ExtensionConfigManager
 from .util import unique_list
 
 
@@ -36,6 +37,19 @@ class InvokeAIExtensionManager():
                     name=extension.stem, path=extension)
                 
         return available_extensions
+    
+    def get_extension_config(self, extension: Extension):
+        extension_config_file = extension.path / 'config.yaml'
+
+        if extension_config_file.is_file():
+            try:
+                extension_config_manager = ExtensionConfigManager(extension_config_file)
+                return extension_config_manager.config
+            except ValidationError as e:
+                for error in e.errors():
+                    self.logger.error(f"{extension.name}: Config Validation Failed - {error['loc']}: {error['msg']} ({error['type']})")
+        else:
+            self.logger.warn(f'No config found for extension: {extension.name}')
 
     def load_extension(self, extension: Extension) -> List | None:
         """
@@ -43,6 +57,12 @@ class InvokeAIExtensionManager():
         in that extension, which can then be appended to the original extension list.
         Returns `None` if no Invocations are found.
         """
+        extension_name = extension.name
+        
+        extension_config = self.get_extension_config(extension)
+        if extension_config:
+            extension_name = extension_config.name or extension_name
+
         # Search for py files that are not named __init__.py in extensions root directory
         py_files = list(extension.path.glob('*.py'))
         py_files = [
@@ -50,7 +70,7 @@ class InvokeAIExtensionManager():
 
         if len(py_files) == 0:
             self.logger.warn(
-                f'Extension: "{extension.name}" failed to load. No node files found.')
+                f'Extension: "{extension_name}" failed to load. No node files found.')
             return None
 
         # Every py file in the root directory of the extension is loaded as an invocation
@@ -76,10 +96,10 @@ class InvokeAIExtensionManager():
 
         if len(loaded_nodes) > 0:
             self.logger.info(
-                f'Extension: {extension.name}, Nodes: {nodes_found} - LOADED!')
+                f'Extension: {extension_name}, Nodes: {nodes_found} - LOADED!')
         if len(nodes_not_found) > 0:
             self.logger.warn(
-                f'Extension: {extension.name}, No Nodes Found In: {nodes_not_found} - NOT LOADED!')
+                f'Extension: {extension_name}, No Nodes Found In: {nodes_not_found} - NOT LOADED!')
 
         return unique_list(loaded_nodes) if len(loaded_nodes) > 0 else None
 
