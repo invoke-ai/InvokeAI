@@ -49,7 +49,7 @@ export const buildLinearTextToImageGraph = (
   }
 
   /**
-v   * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
+   * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
    * ids.
    *

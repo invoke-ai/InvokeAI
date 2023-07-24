@@ -4,24 +4,21 @@ from typing import Literal, Optional
 
 import numpy
 from PIL import Image, ImageFilter, ImageOps, ImageChops
-from pydantic import BaseModel, Field
+from pydantic import Field
 from pathlib import Path
 from typing import Union
 from invokeai.app.invocations.metadata import CoreMetadata
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from transformers import AutoFeatureExtractor
-from ..models.image import ImageCategory, ImageField, ResourceOrigin
+from ..models.image import (
+    ImageCategory, ImageField, ResourceOrigin,
+    PILInvocationConfig, ImageOutput, MaskOutput,
+)    
 from .baseinvocation import (
     BaseInvocation,
-    BaseInvocationOutput,
     InvocationContext,
     InvocationConfig,
 )
-from .image_defs import (
-    PILInvocationConfig,
-    ImageOutput,
-    MaskOutput,
-    )
 from ..services.config import InvokeAIAppConfig
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend import SilenceWarnings
@@ -644,7 +641,7 @@ class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
         device = choose_torch_device()
         
         if self.enabled:
-            logger.info("Running NSFW checker")
+            logger.debug("Running NSFW checker")
             safety_checker = StableDiffusionSafetyChecker.from_pretrained(config.models_path / 'core/convert/stable-diffusion-safety-checker')
             feature_extractor = AutoFeatureExtractor.from_pretrained(config.models_path / 'core/convert/stable-diffusion-safety-checker')
 
@@ -681,8 +678,8 @@ class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
         )
     
     def _get_caution_img(self)->Image:
-        import invokeai.assets.web as web_assets
-        caution = Image.open(Path(web_assets.__path__[0]) / 'caution.png')
+        import invokeai.app.assets.images as image_assets
+        caution = Image.open(Path(image_assets.__path__[0]) / 'caution.png')
         return caution.resize((caution.width // 2, caution.height //2))
 
 class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
@@ -716,7 +713,7 @@ class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
         logger = context.services.logger
         image = context.services.images.get_pil_image(self.image.image_name)
         if self.enabled:
-            logger.info("Running invisible watermarker")
+            logger.debug("Running invisible watermarker")
             bgr = cv2.cvtColor(numpy.array(image.convert("RGB")), cv2.COLOR_RGB2BGR)
             wm = self.text
             encoder = WatermarkEncoder()
