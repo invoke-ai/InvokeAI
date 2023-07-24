@@ -1,5 +1,10 @@
 import { logger } from 'app/logging/logger';
-import { CanvasState, isCanvasMaskLine } from '../store/canvasTypes';
+import { Vector2d } from 'konva/lib/types';
+import {
+  CanvasLayerState,
+  Dimensions,
+  isCanvasMaskLine,
+} from '../store/canvasTypes';
 import createMaskStage from './createMaskStage';
 import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { konvaNodeToBlob } from './konvaNodeToBlob';
@@ -8,7 +13,13 @@ import { konvaNodeToImageData } from './konvaNodeToImageData';
 /**
  * Gets Blob and ImageData objects for the base and mask layers
  */
-export const getCanvasData = async (canvasState: CanvasState) => {
+export const getCanvasData = async (
+  layerState: CanvasLayerState,
+  boundingBoxCoordinates: Vector2d,
+  boundingBoxDimensions: Dimensions,
+  isMaskEnabled: boolean,
+  shouldPreserveMaskedArea: boolean
+) => {
   const log = logger('canvas');
 
   const canvasBaseLayer = getCanvasBaseLayer();
@@ -18,14 +29,6 @@ export const getCanvasData = async (canvasState: CanvasState) => {
     log.error('Unable to find canvas / stage');
     return;
   }
-
-  const {
-    layerState: { objects },
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    isMaskEnabled,
-    shouldPreserveMaskedArea,
-  } = canvasState;
 
   const boundingBox = {
     ...boundingBoxCoordinates,
@@ -57,7 +60,7 @@ export const getCanvasData = async (canvasState: CanvasState) => {
 
   // For the mask layer, use the normal boundingBox
   const maskStage = await createMaskStage(
-    isMaskEnabled ? objects.filter(isCanvasMaskLine) : [], // only include mask lines, and only if mask is enabled
+    isMaskEnabled ? layerState.objects.filter(isCanvasMaskLine) : [], // only include mask lines, and only if mask is enabled
     boundingBox,
     shouldPreserveMaskedArea
   );
