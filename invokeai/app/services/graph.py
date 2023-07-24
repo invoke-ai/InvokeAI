@@ -241,6 +241,13 @@ InvocationsUnion = Union[BaseInvocation.get_invocations()]  # type: ignore
 InvocationOutputsUnion = Union[BaseInvocationOutput.get_all_subclasses_tuple()]  # type: ignore
 
 
+
+class Batch(BaseModel):
+    batch_id: Optional[str] = Field(default_factory=uuid.uuid4().__str__, description="Identifier for this batch")
+    data: list[InvocationsUnion] = Field(description="Mapping of ")
+    node_id: str = Field(description="ID of the node to batch")
+
+
 class Graph(BaseModel):
     id: str = Field(description="The id of this graph", default_factory=lambda: uuid.uuid4().__str__())
     # TODO: use a list (and never use dict in a BaseModel) because pydantic/fastapi hates me
@@ -251,13 +258,16 @@ class Graph(BaseModel):
         description="The connections between nodes and their fields in this graph",
         default_factory=list,
     )
+    batches: list[Batch] = Field(
+        description="List of batch configs to apply to this session",
+        default_factory=list,
+    )
 
     def add_node(self, node: BaseInvocation) -> None:
         """Adds a node to a graph
 
         :raises NodeAlreadyInGraphError: the node is already present in the graph.
         """
-
         if node.id in self.nodes:
             raise NodeAlreadyInGraphError()
 
@@ -793,6 +803,8 @@ class GraphExecutionState(BaseModel):
     # TODO: Store a reference to the graph instead of the actual graph?
     graph: Graph = Field(description="The graph being executed")
 
+    batch_index: list[int] = Field(description="Tracker for which batch is currently being processed", default_factory=list)
+
     # The graph of materialized nodes
     execution_graph: Graph = Field(
         description="The expanded graph of activated and executed nodes",
@@ -864,6 +876,13 @@ class GraphExecutionState(BaseModel):
         # Get values from edges
         if next_node is not None:
             self._prepare_inputs(next_node)
+
+        if sum(self.batch_index) != 0:
+            for index in self.batch_index:
+                if self.batch_index[index] > 0:
+                    self.executed.clear()
+                    self.batch_index[index] -= 1
+                    return next(self)
 
         # If next is still none, there's no next node, return None
         return next_node
@@ -954,7 +973,7 @@ class GraphExecutionState(BaseModel):
             new_node = copy.deepcopy(node)
 
             # Create the node id (use a random uuid)
-            new_node.id = str(uuid.uuid4())
+            new_node.id = str(f"{uuid.uuid4()}-{node.id}")
 
             # Set the iteration index for iteration invocations
             if isinstance(new_node, IterateInvocation):

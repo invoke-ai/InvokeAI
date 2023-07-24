@@ -21,11 +21,17 @@ class Invoker:
     ) -> Optional[str]:
         """Determines the next node to invoke and enqueues it, preparing if needed.
         Returns the id of the queued node, or `None` if there are no nodes left to enqueue."""
-
         # Get the next invocation
         invocation = graph_execution_state.next()
         if not invocation:
             return None
+        (index, batch) = next(((i,b) for i,b in enumerate(graph_execution_state.graph.batches) if b.node_id in invocation.id), (None, None))
+        if batch:
+            # assert(isinstance(invocation.type, batch.node_type), f"Type mismatch between nodes and batch config on {invocation.id}")
+            batch_index = graph_execution_state.batch_index[index]
+            datum = batch.data[batch_index]
+            for param in datum.keys():
+                invocation[param] = datum[param]
 
         # Save the execution state
         self.services.graph_execution_manager.set(graph_execution_state)
@@ -45,6 +51,11 @@ class Invoker:
     def create_execution_state(self, graph: Optional[Graph] = None) -> GraphExecutionState:
         """Creates a new execution state for the given graph"""
         new_state = GraphExecutionState(graph=Graph() if graph is None else graph)
+        if graph.batches:
+            batch_index = list()
+            for batch in graph.batches:
+                batch_index.append(len(batch.data)-1)
+            new_state.batch_index = batch_index
         self.services.graph_execution_manager.set(new_state)
         return new_state
 
