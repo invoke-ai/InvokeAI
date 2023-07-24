@@ -32,6 +32,7 @@ class Invoker:
             datum = batch.data[batch_index]
             for param in datum.keys():
                 invocation[param] = datum[param]
+            # TODO graph.update_node
 
         # Save the execution state
         self.services.graph_execution_manager.set(graph_execution_state)
@@ -52,10 +53,10 @@ class Invoker:
         """Creates a new execution state for the given graph"""
         new_state = GraphExecutionState(graph=Graph() if graph is None else graph)
         if graph.batches:
-            batch_index = list()
+            batch_indices = list()
             for batch in graph.batches:
-                batch_index.append(len(batch.data)-1)
-            new_state.batch_index = batch_index
+                batch_indices.append(len(batch.data)-1)
+            new_state.batch_indices = batch_indices
         self.services.graph_execution_manager.set(new_state)
         return new_state
 
