@@ -16,6 +16,8 @@ import {
   POSITIVE_CONDITIONING,
   TEXT_TO_IMAGE_GRAPH,
   TEXT_TO_LATENTS,
+  NSFW_CHECKER,
+  WATERMARKER,
 } from './constants';
 
 /**
@@ -107,6 +109,16 @@ export const buildCanvasTextToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
+        is_intermediate: true,
+      },
+      [NSFW_CHECKER]: {
+        type: 'img_nsfw',
+        id: NSFW_CHECKER,
+        is_intermediate: true,
+      },
+      [WATERMARKER]: {
+        type: 'img_watermark',
+        id: WATERMARKER,
         is_intermediate: !shouldAutoSave,
       },
     },
@@ -183,6 +195,26 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: NSFW_CHECKER,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: NSFW_CHECKER,
+          field: 'image',
+        },
+        destination: {
+          node_id: WATERMARKER,
+          field: 'image',
+        },
+      },
+      {
+        source: {
           node_id: NOISE,
           field: 'noise',
         },
@@ -221,7 +253,7 @@ export const buildCanvasTextToImageGraph = (
       field: 'metadata',
     },
     destination: {
-      node_id: LATENTS_TO_IMAGE,
+      node_id: WATERMARKER,
       field: 'metadata',
     },
   });

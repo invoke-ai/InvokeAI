@@ -7,10 +7,9 @@ from PIL import Image, ImageFilter, ImageOps, ImageChops
 from pydantic import BaseModel, Field
 from pathlib import Path
 from typing import Union
-
+from invokeai.app.invocations.metadata import CoreMetadata
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from transformers import AutoFeatureExtractor
-
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
@@ -18,52 +17,14 @@ from .baseinvocation import (
     InvocationContext,
     InvocationConfig,
 )
+from .image_defs import (
+    PILInvocationConfig,
+    ImageOutput,
+    MaskOutput,
+    )
+from ..services.config import InvokeAIAppConfig
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend import SilenceWarnings
-
-class PILInvocationConfig(BaseModel):
-    """Helper class to provide all PIL invocations with additional config"""
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "tags": ["PIL", "image"],
-            },
-        }
-
-
-class ImageOutput(BaseInvocationOutput):
-    """Base class for invocations that output an image"""
-
-    # fmt: off
-    type: Literal["image_output"] = "image_output"
-    image:      ImageField = Field(default=None, description="The output image")
-    width:             int = Field(description="The width of the image in pixels")
-    height:            int = Field(description="The height of the image in pixels")
-    # fmt: on
-
-    class Config:
-        schema_extra = {"required": ["type", "image", "width", "height"]}
-
-
-class MaskOutput(BaseInvocationOutput):
-    """Base class for invocations that output a mask"""
-
-    # fmt: off
-    type: Literal["mask"] = "mask"
-    mask:      ImageField = Field(default=None, description="The output mask")
-    width:            int = Field(description="The width of the mask in pixels")
-    height:           int = Field(description="The height of the mask in pixels")
-    # fmt: on
-
-    class Config:
-        schema_extra = {
-            "required": [
-                "type",
-                "mask",
-            ]
-        }
-
 
 class LoadImageInvocation(BaseInvocation):
     """Load an image and provide it as output."""
@@ -656,13 +617,15 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
 
 class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
     """Add blur to NSFW-flagged images"""
+    DEFAULT_ENABLED = InvokeAIAppConfig.get_config().nsfw_checker
 
     # fmt: off
     type: Literal["img_nsfw"] = "img_nsfw"
 
     # Inputs
     image: Optional[ImageField]  = Field(default=None, description="The image to check")
-    active: bool = Field(default=True, description="Whether the NSFW checker is active")
+    enabled: bool = Field(default=DEFAULT_ENABLED, description="Whether the NSFW checker is enabled")
+    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")    
     # fmt: on
 
     class Config(InvocationConfig):
@@ -676,55 +639,46 @@ class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
         
-        if not self.active:
-            return ImageOutput(
-                image=ImageField(image_name=self.image.image_name),
-                width=image.width,
-                height=image.height,
-            )
-
         config = context.services.configuration
         logger = context.services.logger
         device = choose_torch_device()
         
-        logger.info("Running NSFW checker")
-        safety_checker = StableDiffusionSafetyChecker.from_pretrained(config.models_path / 'core/convert/stable-diffusion-safety-checker')
-        feature_extractor = AutoFeatureExtractor.from_pretrained(config.models_path / 'core/convert/stable-diffusion-safety-checker')
-        
-        features = feature_extractor([image], return_tensors="pt")
-        features.to(device)
-        safety_checker.to(device)
+        if self.enabled:
+            logger.info("Running NSFW checker")
+            safety_checker = StableDiffusionSafetyChecker.from_pretrained(config.models_path / 'core/convert/stable-diffusion-safety-checker')
+            feature_extractor = AutoFeatureExtractor.from_pretrained(config.models_path / 'core/convert/stable-diffusion-safety-checker')
 
-        x_image = numpy.array(image).astype(numpy.float32) / 255.0
-        x_image = x_image[None].transpose(0, 3, 1, 2)
-        with SilenceWarnings():
-            checked_image, has_nsfw_concept = safety_checker(images=x_image, clip_input=features.pixel_values)
+            features = feature_extractor([image], return_tensors="pt")
+            features.to(device)
+            safety_checker.to(device)
 
-        logger.info(f"NSFW scan result: {has_nsfw_concept[0]}")
-        if has_nsfw_concept[0]:
-            blurry_image = image.filter(filter=ImageFilter.GaussianBlur(radius=32))
-            caution = self._get_caution_img()
-            blurry_image.paste(caution,(0,0),caution)
+            x_image = numpy.array(image).astype(numpy.float32) / 255.0
+            x_image = x_image[None].transpose(0, 3, 1, 2)
+            with SilenceWarnings():
+                checked_image, has_nsfw_concept = safety_checker(images=x_image, clip_input=features.pixel_values)
 
-            image_dto = context.services.images.create(
-                image=blurry_image,
-                image_origin=ResourceOrigin.INTERNAL,
-                image_category=ImageCategory.GENERAL,
-                node_id=self.id,
-                session_id=context.graph_execution_state_id,
-                is_intermediate=self.is_intermediate,
-            )
-            return ImageOutput(
-                image=ImageField(image_name=image_dto.image_name),
-                width=image_dto.width,
-                height=image_dto.height,
-            )
-        else:
-            return ImageOutput(
-                image=ImageField(image_name=self.image.image_name),
-                width=image.width,
-                height=image.height,
-            )
+            logger.info(f"NSFW scan result: {has_nsfw_concept[0]}")
+            if has_nsfw_concept[0]:
+                blurry_image = image.filter(filter=ImageFilter.GaussianBlur(radius=32))
+                caution = self._get_caution_img()
+                blurry_image.paste(caution,(0,0),caution)
+                image = blurry_image
+
+        image_dto = context.services.images.create(
+            image=image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+            metadata=self.metadata.dict() if self.metadata else None,
+        )
+                
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
     
     def _get_caution_img(self)->Image:
         import invokeai.assets.web as web_assets
@@ -733,12 +687,18 @@ class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
 
 class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
     """ Add an invisible watermark to an image """
+
+    # to avoid circular import
+    DEFAULT_ENABLED = InvokeAIAppConfig.get_config().invisible_watermark
+    
     # fmt: off
     type: Literal["img_watermark"] = "img_watermark"
 
     # Inputs
     image: Optional[ImageField]  = Field(default=None, description="The image to check")
     text: str = Field(default='InvokeAI', description="Watermark text")
+    enabled: bool = Field(default=DEFAULT_ENABLED, description="Whether the invisible watermark is enabled")
+    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")    
     # fmt: on
 
     class Config(InvocationConfig):
@@ -753,23 +713,28 @@ class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
         import cv2
         from imwatermark import WatermarkEncoder
         
+        logger = context.services.logger
         image = context.services.images.get_pil_image(self.image.image_name)
-        bgr = cv2.cvtColor(numpy.array(image.convert("RGB")), cv2.COLOR_RGB2BGR)
-        wm = self.text
-        encoder = WatermarkEncoder()
-        encoder.set_watermark('bytes', wm.encode('utf-8'))
-        bgr_encoded = encoder.encode(bgr, 'dwtDct')
-        new_image = Image.fromarray(
-            cv2.cvtColor(bgr_encoded, cv2.COLOR_BGR2RGB)
-        ).convert("RGBA")
+        if self.enabled:
+            logger.info("Running invisible watermarker")
+            bgr = cv2.cvtColor(numpy.array(image.convert("RGB")), cv2.COLOR_RGB2BGR)
+            wm = self.text
+            encoder = WatermarkEncoder()
+            encoder.set_watermark('bytes', wm.encode('utf-8'))
+            bgr_encoded = encoder.encode(bgr, 'dwtDct')
+            new_image = Image.fromarray(
+                cv2.cvtColor(bgr_encoded, cv2.COLOR_BGR2RGB)
+            ).convert("RGBA")
+            image = new_image
         
         image_dto = context.services.images.create(
-            image=new_image,
+            image=image,
             image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            metadata=self.metadata.dict() if self.metadata else None,
         )
 
         return ImageOutput(

@@ -22,6 +22,8 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  NSFW_CHECKER,
+  WATERMARKER,
 } from './constants';
 
 /**
@@ -183,6 +185,26 @@ export const buildLinearImageToImageGraph = (
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'latents',
+        },
+      },
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: NSFW_CHECKER,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: NSFW_CHECKER,
+          field: 'image',
+        },
+        destination: {
+          node_id: WATERMARKER,
+          field: 'image',
         },
       },
       {
@@ -362,7 +384,7 @@ export const buildLinearImageToImageGraph = (
       field: 'metadata',
     },
     destination: {
-      node_id: LATENTS_TO_IMAGE,
+      node_id: WATERMARKER,
       field: 'metadata',
     },
   });

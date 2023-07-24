@@ -16,6 +16,8 @@ import {
   POSITIVE_CONDITIONING,
   TEXT_TO_IMAGE_GRAPH,
   TEXT_TO_LATENTS,
+  NSFW_CHECKER,
+  WATERMARKER,
 } from './constants';
 
 export const buildLinearTextToImageGraph = (
@@ -47,7 +49,7 @@ export const buildLinearTextToImageGraph = (
   }
 
   /**
-   * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
+v   * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
    * ids.
    *
@@ -180,6 +182,26 @@ export const buildLinearTextToImageGraph = (
           field: 'noise',
         },
       },
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: NSFW_CHECKER,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: NSFW_CHECKER,
+          field: 'image',
+        },
+        destination: {
+          node_id: WATERMARKER,
+          field: 'image',
+        },
+      },
     ],
   };
 
@@ -210,7 +232,7 @@ export const buildLinearTextToImageGraph = (
       field: 'metadata',
     },
     destination: {
-      node_id: LATENTS_TO_IMAGE,
+      node_id: WATERMARKER,
       field: 'metadata',
     },
   });

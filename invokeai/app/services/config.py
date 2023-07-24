@@ -365,6 +365,7 @@ setting environment variables INVOKEAI_<setting>.
     internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models", category='Features')
     log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", category='Features')
     nsfw_checker        : bool = Field(default=True, description="Enable/disable the NSFW checker", category='Features')
+    invisible_watermark : bool = Field(default=True, description="Enable/disable the invisible watermark", category='Features')
     patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
     restore             : bool = Field(default=True, description="Enable/disable face restoration code (DEPRECATED)", category='DEPRECATED')
 
