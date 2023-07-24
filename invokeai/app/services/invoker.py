@@ -28,7 +28,7 @@ class Invoker:
         (index, batch) = next(((i,b) for i,b in enumerate(graph_execution_state.graph.batches) if b.node_id in invocation.id), (None, None))
         if batch:
             # assert(isinstance(invocation.type, batch.node_type), f"Type mismatch between nodes and batch config on {invocation.id}")
-            batch_index = graph_execution_state.batch_index[index]
+            batch_index = graph_execution_state.batch_indices[index]
             datum = batch.data[batch_index]
             for param in datum.keys():
                 invocation[param] = datum[param]

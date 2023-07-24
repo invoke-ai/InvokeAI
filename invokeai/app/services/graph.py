@@ -803,7 +803,7 @@ class GraphExecutionState(BaseModel):
     # TODO: Store a reference to the graph instead of the actual graph?
     graph: Graph = Field(description="The graph being executed")
 
-    batch_index: list[int] = Field(description="Tracker for which batch is currently being processed", default_factory=list)
+    batch_indices: list[int] = Field(description="Tracker for which batch is currently being processed", default_factory=list)
 
     # The graph of materialized nodes
     execution_graph: Graph = Field(
@@ -877,11 +877,11 @@ class GraphExecutionState(BaseModel):
         if next_node is not None:
             self._prepare_inputs(next_node)
 
-        if sum(self.batch_index) != 0:
-            for index in self.batch_index:
-                if self.batch_index[index] > 0:
+        if sum(self.batch_indices) != 0:
+            for index in self.batch_indices:
+                if self.batch_indices[index] > 0:
                     self.executed.clear()
-                    self.batch_index[index] -= 1
+                    self.batch_indices[index] -= 1
                     return next(self)
 
         # If next is still none, there's no next node, return None
