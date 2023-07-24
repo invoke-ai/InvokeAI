@@ -3,6 +3,8 @@
 from contextlib import ExitStack
 from typing import List, Literal, Optional, Union
 
+import torchvision.transforms as T
+from torchvision.transforms.functional import resize as tv_resize
 import einops
 import torch
 from diffusers import ControlNetModel
@@ -394,6 +396,9 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
     strength: float = Field(
         default=0.7, ge=0, le=1,
         description="The strength of the latents to use")
+    mask: Optional[ImageField] = Field(
+        None, description="Mask",
+    )
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -409,10 +414,25 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             },
         }
 
+    def prep_mask_tensor(self, context, lantents):
+        if self.mask is None:
+            return None
+
+        mask_image = context.services.images.get_pil_image(self.mask.image_name)
+        if mask_image.mode != "L":
+            # FIXME: why do we get passed an RGB image here? We can only use single-channel.
+            mask_image = mask_image.convert("L")
+        mask_tensor = image_resized_to_grid_as_tensor(mask_image, normalize=False)
+        mask_tensor = tv_resize(
+            mask_tensor, lantents.shape[-2:], T.InterpolationMode.BILINEAR
+        )
+        return mask_tensor
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         noise = context.services.latents.get(self.noise.latents_name)
         latent = context.services.latents.get(self.latents.latents_name)
+        mask = self.prep_mask_tensor(context, latent)
 
         # Get the source node id (we are invoking the prepared node)
         graph_execution_state = context.services.graph_execution_manager.get(
@@ -441,6 +461,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
 
             noise = noise.to(device=unet.device, dtype=unet.dtype)
             latent = latent.to(device=unet.device, dtype=unet.dtype)
+            mask = mask.to(device=unet.device, dtype=unet.dtype)
 
             scheduler = get_scheduler(
                 context=context,
@@ -470,6 +491,15 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 device=unet.device,
             )
 
+            def _apply_mask_on_step(step_output, timestep, conditioning_data):
+                noised_init = scheduler.add_noise(initial_latents, noise, timestep.unsqueeze(0))
+                step_output.prev_sample = step_output.prev_sample * (1 - mask) + noised_init * mask
+                return step_output
+
+            additional_guidance = []
+            if mask is not None:
+                additional_guidance.append(_apply_mask_on_step)
+
             result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
                 latents=initial_latents,
                 timesteps=timesteps,
@@ -477,7 +507,8 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 num_inference_steps=self.steps,
                 conditioning_data=conditioning_data,
                 control_data=control_data,  # list[ControlNetData]
-                callback=step_callback
+                callback=step_callback,
+                additional_guidance=additional_guidance,
             )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
