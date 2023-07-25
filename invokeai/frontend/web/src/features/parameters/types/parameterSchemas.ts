@@ -43,6 +43,42 @@ export const isValidNegativePrompt = (
 ): val is NegativePromptParam => zNegativePrompt.safeParse(val).success;
 
 /**
+ * Zod schema for SDXL positive style prompt parameter
+ */
+export const zPositiveStylePromptSDXL = z.string();
+/**
+ * Type alias for SDXL positive style prompt parameter, inferred from its zod schema
+ */
+export type PositiveStylePromptSDXLParam = z.infer<
+  typeof zPositiveStylePromptSDXL
+>;
+/**
+ * Validates/type-guards a value as a SDXL positive style prompt parameter
+ */
+export const isValidSDXLPositiveStylePrompt = (
+  val: unknown
+): val is PositiveStylePromptSDXLParam =>
+  zPositiveStylePromptSDXL.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL negative style prompt parameter
+ */
+export const zNegativeStylePromptSDXL = z.string();
+/**
+ * Type alias for SDXL negative style prompt parameter, inferred from its zod schema
+ */
+export type NegativeStylePromptSDXLParam = z.infer<
+  typeof zNegativeStylePromptSDXL
+>;
+/**
+ * Validates/type-guards a value as a SDXL negative style prompt parameter
+ */
+export const isValidSDXLNegativeStylePrompt = (
+  val: unknown
+): val is NegativeStylePromptSDXLParam =>
+  zNegativeStylePromptSDXL.safeParse(val).success;
+
+/**
  * Zod schema for steps parameter
  */
 export const zSteps = z.number().int().min(1);
