@@ -148,7 +148,15 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
     getMainModels: build.query<EntityState<MainModelConfigEntity>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'main' } }),
+      query: () => {
+        const params = {
+          model_type: 'main',
+          base_models: ['sd-1', 'sd-2', 'sdxl'],
+        };
+
+        const query = queryString.stringify(params, { arrayFormat: 'none' });
+        return `models/?${query}`;
+      },
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
           { type: 'MainModel', id: LIST_TAG },
@@ -183,7 +191,7 @@ export const modelsApi = api.injectEndpoints({
       {
         query: () => ({
           url: 'models/',
-          params: { model_type: 'main', base_models: 'sdxl-refiner' },
+          params: { model_type: 'main', base_models: ['sdxl-refiner'] },
         }),
         providesTags: (result, error, arg) => {
           const tags: ApiFullTagDescription[] = [

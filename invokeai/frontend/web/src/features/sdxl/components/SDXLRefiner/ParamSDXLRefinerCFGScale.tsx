@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
+import { useIsRefinerAvailable } from 'features/sdxl/hooks/useIsRefinerAvailable';
 import { setRefinerCFGScale } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,12 +12,11 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   [stateSelector],
   ({ sdxl, ui, hotkeys }) => {
-    const { refinerCFGScale, isRefinerAvailable } = sdxl;
+    const { refinerCFGScale } = sdxl;
     const { shouldUseSliders } = ui;
     const { shift } = hotkeys;
 
     return {
-      isRefinerAvailable,
       refinerCFGScale,
       shouldUseSliders,
       shift,
@@ -26,8 +26,8 @@ const selector = createSelector(
 );
 
 const ParamSDXLRefinerCFGScale = () => {
-  const { refinerCFGScale, shouldUseSliders, shift, isRefinerAvailable } =
-    useAppSelector(selector);
+  const { refinerCFGScale, shouldUseSliders, shift } = useAppSelector(selector);
+  const isRefinerAvailable = useIsRefinerAvailable();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 

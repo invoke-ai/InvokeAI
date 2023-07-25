@@ -10,7 +10,6 @@ import { MainModelField } from 'services/api/types';
 type SDXLInitialState = {
   positiveStylePrompt: PositiveStylePromptSDXLParam;
   negativeStylePrompt: NegativeStylePromptSDXLParam;
-  isRefinerAvailable: boolean;
   shouldUseSDXLRefiner: boolean;
   refinerModel: MainModelField | null;
   refinerSteps: number;
@@ -23,7 +22,6 @@ type SDXLInitialState = {
 const sdxlInitialState: SDXLInitialState = {
   positiveStylePrompt: '',
   negativeStylePrompt: '',
-  isRefinerAvailable: false,
   shouldUseSDXLRefiner: false,
   refinerModel: null,
   refinerSteps: 20,
@@ -42,9 +40,6 @@ const sdxlSlice = createSlice({
     },
     setNegativeStylePromptSDXL: (state, action: PayloadAction<string>) => {
       state.negativeStylePrompt = action.payload;
-    },
-    setIsRefinerAvailable: (state, action: PayloadAction<boolean>) => {
-      state.isRefinerAvailable = action.payload;
     },
     setShouldUseSDXLRefiner: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSDXLRefiner = action.payload;
@@ -76,7 +71,6 @@ const sdxlSlice = createSlice({
 export const {
   setPositiveStylePromptSDXL,
   setNegativeStylePromptSDXL,
-  setIsRefinerAvailable,
   setShouldUseSDXLRefiner,
   refinerModelChanged,
   setRefinerSteps,

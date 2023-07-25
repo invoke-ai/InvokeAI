@@ -3,17 +3,17 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
+import { useIsRefinerAvailable } from 'features/sdxl/hooks/useIsRefinerAvailable';
 import { setRefinerAestheticScore } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 
 const selector = createSelector(
   [stateSelector],
   ({ sdxl, hotkeys }) => {
-    const { refinerAestheticScore, isRefinerAvailable } = sdxl;
+    const { refinerAestheticScore } = sdxl;
     const { shift } = hotkeys;
 
     return {
-      isRefinerAvailable,
       refinerAestheticScore,
       shift,
     };
@@ -22,8 +22,10 @@ const selector = createSelector(
 );
 
 const ParamSDXLRefinerAestheticScore = () => {
-  const { refinerAestheticScore, shift, isRefinerAvailable } =
-    useAppSelector(selector);
+  const { refinerAestheticScore, shift } = useAppSelector(selector);
+
+  const isRefinerAvailable = useIsRefinerAvailable();
+
   const dispatch = useAppDispatch();
 
   const handleChange = useCallback(

@@ -7,6 +7,7 @@ import {
   SCHEDULER_LABEL_MAP,
   SchedulerParam,
 } from 'features/parameters/types/parameterSchemas';
+import { useIsRefinerAvailable } from 'features/sdxl/hooks/useIsRefinerAvailable';
 import { setRefinerScheduler } from 'features/sdxl/store/sdxlSlice';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
@@ -15,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   stateSelector,
   ({ ui, sdxl }) => {
-    const { refinerScheduler, isRefinerAvailable } = sdxl;
+    const { refinerScheduler } = sdxl;
     const { favoriteSchedulers: enabledSchedulers } = ui;
 
     const data = map(SCHEDULER_LABEL_MAP, (label, name) => ({
@@ -27,7 +28,6 @@ const selector = createSelector(
     })).sort((a, b) => a.label.localeCompare(b.label));
 
     return {
-      isRefinerAvailable,
       refinerScheduler,
       data,
     };
@@ -38,9 +38,8 @@ const selector = createSelector(
 const ParamSDXLRefinerScheduler = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { refinerScheduler, data, isRefinerAvailable } =
-    useAppSelector(selector);
-
+  const { refinerScheduler, data } = useAppSelector(selector);
+  const isRefinerAvailable = useIsRefinerAvailable();
   const handleChange = useCallback(
     (v: string | null) => {
       if (!v) {

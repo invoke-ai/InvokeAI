@@ -40,7 +40,7 @@ const ParamMainModelSelect = () => {
     const data: SelectItem[] = [];
 
     forEach(mainModels.entities, (model, id) => {
-      if (!model || ['sdxl-refiner'].includes(model.base_model)) {
+      if (!model) {
         return;
       }
 

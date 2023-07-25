@@ -138,7 +138,7 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
             "ui": {
                 "title": "SDXL Refiner Model Loader",
                 "tags": ["model", "loader", "sdxl_refiner"],
-                "type_hints": {"model": "model"},
+                "type_hints": {"model": "refiner_model"},
             },
         }
 

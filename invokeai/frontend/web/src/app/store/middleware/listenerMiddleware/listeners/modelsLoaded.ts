@@ -11,7 +11,7 @@ import {
 } from 'features/parameters/types/parameterSchemas';
 import {
   refinerModelChanged,
-  setIsRefinerAvailable,
+  setShouldUseSDXLRefiner,
 } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
 import { modelsApi } from 'services/api/endpoints/models';
@@ -92,7 +92,7 @@ export const addModelsLoadedListener = () => {
       if (!firstModel) {
         // No models loaded at all
         dispatch(refinerModelChanged(null));
-        dispatch(setIsRefinerAvailable(false));
+        dispatch(setShouldUseSDXLRefiner(false));
         return;
       }
 
@@ -107,7 +107,6 @@ export const addModelsLoadedListener = () => {
       }
 
       dispatch(refinerModelChanged(result.data));
-      dispatch(setIsRefinerAvailable(true));
     },
   });
   startAppListening({

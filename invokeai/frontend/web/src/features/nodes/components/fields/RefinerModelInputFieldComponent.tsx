@@ -1,28 +1,31 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
+import {
+  RefinerModelInputFieldTemplate,
+  RefinerModelInputFieldValue,
+} from 'features/nodes/types/types';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
-import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGetSDXLRefinerModelsQuery } from 'services/api/endpoints/models';
+import { FieldComponentProps } from './types';
 
-const selector = createSelector(
-  stateSelector,
-  (state) => ({ model: state.sdxl.refinerModel }),
-  defaultSelectorOptions
-);
+const RefinerModelInputFieldComponent = (
+  props: FieldComponentProps<
+    RefinerModelInputFieldValue,
+    RefinerModelInputFieldTemplate
+  >
+) => {
+  const { nodeId, field } = props;
 
-const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
-
-  const { model } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   const { data: refinerModels, isLoading } = useGetSDXLRefinerModelsQuery();
 
@@ -53,9 +56,9 @@ const ParamSDXLRefinerModelSelect = () => {
   const selectedModel = useMemo(
     () =>
       refinerModels?.entities[
-        `${model?.base_model}/main/${model?.model_name}`
+        `${field.value?.base_model}/main/${field.value?.model_name}`
       ] ?? null,
-    [refinerModels?.entities, model]
+    [field.value?.base_model, field.value?.model_name, refinerModels?.entities]
   );
 
   const handleChangeModel = useCallback(
@@ -70,14 +73,20 @@ const ParamSDXLRefinerModelSelect = () => {
         return;
       }
 
-      dispatch(refinerModelChanged(newModel));
+      dispatch(
+        fieldValueChanged({
+          nodeId,
+          fieldName: field.name,
+          value: newModel,
+        })
+      );
     },
-    [dispatch]
+    [dispatch, field.name, nodeId]
   );
 
   return isLoading ? (
     <IAIMantineSearchableSelect
-      label="Refiner Model"
+      label={t('modelManager.model')}
       placeholder="Loading..."
       disabled={true}
       data={[]}
@@ -86,14 +95,15 @@ const ParamSDXLRefinerModelSelect = () => {
     <Flex w="100%" alignItems="center" gap={2}>
       <IAIMantineSearchableSelect
         tooltip={selectedModel?.description}
-        label="Refiner Model"
+        label={
+          selectedModel?.base_model && MODEL_TYPE_MAP[selectedModel?.base_model]
+        }
         value={selectedModel?.id}
         placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
         data={data}
         error={data.length === 0}
         disabled={data.length === 0}
         onChange={handleChangeModel}
-        w="100%"
       />
       <Box mt={7}>
         <SyncModelsButton iconMode />
@@ -102,4 +112,4 @@ const ParamSDXLRefinerModelSelect = () => {
   );
 };
 
-export default memo(ParamSDXLRefinerModelSelect);
+export default memo(RefinerModelInputFieldComponent);
