@@ -295,7 +295,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
 
 
         unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict()
+            **self.unet.unet.dict(), context=context
         )
         do_classifier_free_guidance = True
         cross_attention_kwargs = None
@@ -555,7 +555,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
             del noise
 
         unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict()
+            **self.unet.unet.dict(), context=context,
         )
         do_classifier_free_guidance = True
         cross_attention_kwargs = None
