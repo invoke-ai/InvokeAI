@@ -41,14 +41,9 @@ class Invoker:
 
         return invocation.id
 
-    def create_execution_state(self, graph: Optional[Graph] = None) -> GraphExecutionState:
+    def create_execution_state(self, graph: Optional[Graph] = None, batch_indices: list[int] = list()) -> GraphExecutionState:
         """Creates a new execution state for the given graph"""
-        new_state = GraphExecutionState(graph=Graph() if graph is None else graph)
-        if graph.batches:
-            batch_indices = list()
-            for batch in graph.batches:
-                batch_indices.append(len(batch.data)-1)
-            new_state.batch_indices = batch_indices
+        new_state = GraphExecutionState(graph=Graph() if graph is None else graph, batch_indices=batch_indices)
         self.services.graph_execution_manager.set(new_state)
         return new_state
 

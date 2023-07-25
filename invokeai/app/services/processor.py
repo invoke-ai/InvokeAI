@@ -6,6 +6,7 @@ from ..invocations.baseinvocation import InvocationContext
 from .invocation_queue import InvocationQueueItem
 from .invoker import InvocationProcessorABC, Invoker
 from ..models.exceptions import CanceledException
+from .graph import GraphExecutionState
 
 import invokeai.backend.util.logging as logger
 class DefaultInvocationProcessor(InvocationProcessorABC):
@@ -73,7 +74,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         error_type=e.__class__.__name__,
                         error=traceback.format_exc(),
                     )
-                    continue  
+                    continue
                 # get the source node id to provide to clients (the prepared node id is not as useful)
                 source_node_id = graph_execution_state.prepared_source_mapping[invocation.id]
 
@@ -165,6 +166,15 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             error_type=e.__class__.__name__,
                             error=traceback.format_exc()
                         )
+                elif queue_item.invoke_all and sum(graph_execution_state.batch_indices) > 0:
+                        batch_indicies = graph_execution_state.batch_indices.copy()
+                        for index in range(len(batch_indicies)):
+                            if batch_indicies[index] > 0:
+                                batch_indicies[index] -= 1
+                                break
+                        new_ges = GraphExecutionState(graph=graph_execution_state.graph, batch_indices=batch_indicies)
+                        self.__invoker.services.graph_execution_manager.set(new_ges)
+                        self.__invoker.invoke(new_ges, invoke_all=True)
                 elif is_complete:
                     self.__invoker.services.events.emit_graph_execution_complete(
                         graph_execution_state.id

@@ -818,6 +818,8 @@ class GraphExecutionState(BaseModel):
         default_factory=list,
     )
 
+    batch_indices: list[int] = Field(description="Tracker for which batch is currently being processed", default_factory=list)
+
     # The results of executed nodes
     results: dict[
         str, Annotated[InvocationOutputsUnion, Field(discriminator="type")]
@@ -855,14 +857,14 @@ class GraphExecutionState(BaseModel):
             ]
         }
 
-    def next(self, batch_indices: list = list()) -> Optional[BaseInvocation]:
+    def next(self) -> Optional[BaseInvocation]:
         """Gets the next node ready to execute."""
 
         # TODO: enable multiple nodes to execute simultaneously by tracking currently executing nodes
         #       possibly with a timeout?
 
-        # If there are no prepared nodes, prepare some nodes
         self._apply_batch_config()
+        # If there are no prepared nodes, prepare some nodes
         next_node = self._get_next_node()
         if next_node is None:
             prepared_id = self._prepare()
@@ -871,15 +873,10 @@ class GraphExecutionState(BaseModel):
             while prepared_id is not None:
                 prepared_id = self._prepare()
                 next_node = self._get_next_node()
+
         # Get values from edges
         if next_node is not None:
             self._prepare_inputs(next_node)
-        if next_node is None and sum(self.batch_indices) != 0:
-            for index in range(len(self.batch_indices)):
-                if self.batch_indices[index] > 0:
-                    self.batch_indices[index] -= 1
-                    self.executed.clear()
-                    return self.next()
 
         # If next is still none, there's no next node, return None
         return next_node
@@ -909,7 +906,7 @@ class GraphExecutionState(BaseModel):
     def is_complete(self) -> bool:
         """Returns true if the graph is complete"""
         node_ids = set(self.graph.nx_graph_flat().nodes)
-        return sum(self.batch_indices) == 0 and (self.has_error() or all((k in self.executed for k in node_ids)))
+        return self.has_error() or all((k in self.executed for k in node_ids))
 
     def has_error(self) -> bool:
         """Returns true if the graph has any errors"""

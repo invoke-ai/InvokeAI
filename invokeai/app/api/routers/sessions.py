@@ -35,7 +35,12 @@ async def create_session(
     )
 ) -> GraphExecutionState:
     """Creates a new session, optionally initializing it with an invocation graph"""
-    session = ApiDependencies.invoker.create_execution_state(graph)
+
+    batch_indices = list()
+    if graph.batches:
+        for batch in graph.batches:
+            batch_indices.append(len(batch.data)-1)
+    session = ApiDependencies.invoker.create_execution_state(graph, batch_indices)
     return session
 
 
