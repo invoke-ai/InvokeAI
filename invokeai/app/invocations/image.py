@@ -8,8 +8,6 @@ from pydantic import Field
 from pathlib import Path
 from typing import Union
 from invokeai.app.invocations.metadata import CoreMetadata
-from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
-from transformers import AutoFeatureExtractor
 from ..models.image import (
     ImageCategory, ImageField, ResourceOrigin,
     PILInvocationConfig, ImageOutput, MaskOutput,
@@ -19,9 +17,8 @@ from .baseinvocation import (
     InvocationContext,
     InvocationConfig,
 )
-from ..services.config import InvokeAIAppConfig
-from invokeai.backend.util.devices import choose_torch_device
-from invokeai.backend import SilenceWarnings
+from invokeai.backend.image_util.safety_checker import SafetyChecker
+from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 
 class LoadImageInvocation(BaseInvocation):
     """Load an image and provide it as output."""
@@ -614,14 +611,12 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
 
 class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
     """Add blur to NSFW-flagged images"""
-    DEFAULT_ENABLED = InvokeAIAppConfig.get_config().nsfw_checker
 
     # fmt: off
     type: Literal["img_nsfw"] = "img_nsfw"
 
     # Inputs
     image: Optional[ImageField]  = Field(default=None, description="The image to check")
-    enabled: bool = Field(default=DEFAULT_ENABLED, description="Whether the NSFW checker is enabled")
     metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")    
     # fmt: on
 
@@ -636,30 +631,14 @@ class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
         
-        config = context.services.configuration
         logger = context.services.logger
-        device = choose_torch_device()
-        
-        if self.enabled:
-            logger.debug("Running NSFW checker")
-            safety_checker = StableDiffusionSafetyChecker.from_pretrained(config.models_path / 'core/convert/stable-diffusion-safety-checker')
-            feature_extractor = AutoFeatureExtractor.from_pretrained(config.models_path / 'core/convert/stable-diffusion-safety-checker')
-
-            features = feature_extractor([image], return_tensors="pt")
-            features.to(device)
-            safety_checker.to(device)
-
-            x_image = numpy.array(image).astype(numpy.float32) / 255.0
-            x_image = x_image[None].transpose(0, 3, 1, 2)
-            with SilenceWarnings():
-                checked_image, has_nsfw_concept = safety_checker(images=x_image, clip_input=features.pixel_values)
-
-            logger.info(f"NSFW scan result: {has_nsfw_concept[0]}")
-            if has_nsfw_concept[0]:
-                blurry_image = image.filter(filter=ImageFilter.GaussianBlur(radius=32))
-                caution = self._get_caution_img()
-                blurry_image.paste(caution,(0,0),caution)
-                image = blurry_image
+        logger.debug("Running NSFW checker")
+        if SafetyChecker.has_nsfw_concept(image):
+            logger.info("A potentially NSFW image has been detected. Image will be blurred.")
+            blurry_image = image.filter(filter=ImageFilter.GaussianBlur(radius=32))
+            caution = self._get_caution_img()
+            blurry_image.paste(caution,(0,0),caution)
+            image = blurry_image
 
         image_dto = context.services.images.create(
             image=image,
@@ -685,16 +664,12 @@ class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
 class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
     """ Add an invisible watermark to an image """
 
-    # to avoid circular import
-    DEFAULT_ENABLED = InvokeAIAppConfig.get_config().invisible_watermark
-    
     # fmt: off
     type: Literal["img_watermark"] = "img_watermark"
 
     # Inputs
     image: Optional[ImageField]  = Field(default=None, description="The image to check")
     text: str = Field(default='InvokeAI', description="Watermark text")
-    enabled: bool = Field(default=DEFAULT_ENABLED, description="Whether the invisible watermark is enabled")
     metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")    
     # fmt: on
 
@@ -707,25 +682,10 @@ class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        import cv2
-        from imwatermark import WatermarkEncoder
-        
-        logger = context.services.logger
         image = context.services.images.get_pil_image(self.image.image_name)
-        if self.enabled:
-            logger.debug("Running invisible watermarker")
-            bgr = cv2.cvtColor(numpy.array(image.convert("RGB")), cv2.COLOR_RGB2BGR)
-            wm = self.text
-            encoder = WatermarkEncoder()
-            encoder.set_watermark('bytes', wm.encode('utf-8'))
-            bgr_encoded = encoder.encode(bgr, 'dwtDct')
-            new_image = Image.fromarray(
-                cv2.cvtColor(bgr_encoded, cv2.COLOR_BGR2RGB)
-            ).convert("RGBA")
-            image = new_image
-        
+        new_image = InvisibleWatermark.add_watermark(image, self.text)
         image_dto = context.services.images.create(
-            image=image,
+            image=new_image,
             image_origin=ResourceOrigin.INTERNAL,
             image_category=ImageCategory.GENERAL,
             node_id=self.id,
