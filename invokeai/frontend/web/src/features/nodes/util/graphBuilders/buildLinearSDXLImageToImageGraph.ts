@@ -397,7 +397,7 @@ export const buildLinearSDXLImageToImageGraph = (
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, LATENTS_TO_IMAGE);
+    addSDXLRefinerToGraph(state, graph, SDXL_LATENTS_TO_LATENTS);
   }
 
   // add dynamic prompts - also sets up core iteration and seed
