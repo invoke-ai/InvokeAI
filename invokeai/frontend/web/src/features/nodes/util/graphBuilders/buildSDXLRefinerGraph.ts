@@ -1,32 +1,163 @@
 import { RootState } from 'app/store/store';
 import { MetadataAccumulatorInvocation } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
-import { METADATA_ACCUMULATOR, SDXL_TEXT_TO_LATENTS } from './constants';
+import {
+  LATENTS_TO_IMAGE,
+  METADATA_ACCUMULATOR,
+  SDXL_MODEL_LOADER,
+  SDXL_REFINER_LATENTS_TO_LATENTS,
+  SDXL_REFINER_MODEL_LOADER,
+  SDXL_REFINER_NEGATIVE_CONDITIONING,
+  SDXL_REFINER_POSITIVE_CONDITIONING,
+} from './constants';
 
 export const addSDXLRefinerToGraph = (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string
 ): void => {
-  const { shouldUseSDXLRefiner, model } = state.generation;
+  const { positivePrompt, negativePrompt } = state.generation;
+  const {
+    refinerModel,
+    refinerAestheticScore,
+    positiveStylePrompt,
+    negativeStylePrompt,
+    refinerSteps,
+    refinerScheduler,
+    refinerCFGScale,
+    refinerStart,
+  } = state.sdxl;
+
+  if (!refinerModel) return;
 
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
     | MetadataAccumulatorInvocation
     | undefined;
 
-  if (!shouldUseSDXLRefiner) return;
+  // Unplug SDXL Latents Generation To Latents To Image
+  graph.edges = graph.edges.filter(
+    (e) =>
+      !(e.source.node_id === baseNodeId && ['latents'].includes(e.source.field))
+  );
 
-  // Unplug SDXL Text To Latents To Latents To Image
   graph.edges = graph.edges.filter(
     (e) =>
       !(
-        e.source.node_id === SDXL_TEXT_TO_LATENTS &&
-        ['latents'].includes(e.source.field)
+        e.source.node_id === SDXL_MODEL_LOADER &&
+        ['vae'].includes(e.source.field)
       )
   );
 
-  //   graph.nodes[SDXL_REFINER_MODEL_LOADER] = {
-  //     id: SDXL_REFINER_MODEL_LOADER,
-  //     type: 'sdxl_refiner_model_loader',
-  //   };
+  graph.nodes[SDXL_REFINER_MODEL_LOADER] = {
+    type: 'sdxl_refiner_model_loader',
+    id: SDXL_REFINER_MODEL_LOADER,
+    model: refinerModel,
+  };
+  graph.nodes[SDXL_REFINER_POSITIVE_CONDITIONING] = {
+    type: 'sdxl_refiner_compel_prompt',
+    id: SDXL_REFINER_POSITIVE_CONDITIONING,
+    style: `${positivePrompt} ${positiveStylePrompt}`,
+    aesthetic_score: refinerAestheticScore,
+  };
+  graph.nodes[SDXL_REFINER_NEGATIVE_CONDITIONING] = {
+    type: 'sdxl_refiner_compel_prompt',
+    id: SDXL_REFINER_NEGATIVE_CONDITIONING,
+    style: `${negativePrompt} ${negativeStylePrompt}`,
+    aesthetic_score: refinerAestheticScore,
+  };
+  graph.nodes[SDXL_REFINER_LATENTS_TO_LATENTS] = {
+    type: 'l2l_sdxl',
+    id: SDXL_REFINER_LATENTS_TO_LATENTS,
+    cfg_scale: refinerCFGScale,
+    steps: refinerSteps / (1 - refinerStart),
+    scheduler: refinerScheduler,
+    denoising_start: refinerStart,
+  };
+  // graph.nodes[LATENTS_TO_IMAGE] = {
+  //   type: 'l2i',
+  //   id: LATENTS_TO_IMAGE,
+  // };
+
+  graph.edges.push(
+    {
+      source: {
+        node_id: SDXL_REFINER_MODEL_LOADER,
+        field: 'unet',
+      },
+      destination: {
+        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        field: 'unet',
+      },
+    },
+    {
+      source: {
+        node_id: SDXL_REFINER_MODEL_LOADER,
+        field: 'vae',
+      },
+      destination: {
+        node_id: LATENTS_TO_IMAGE,
+        field: 'vae',
+      },
+    },
+    {
+      source: {
+        node_id: SDXL_REFINER_MODEL_LOADER,
+        field: 'clip2',
+      },
+      destination: {
+        node_id: SDXL_REFINER_POSITIVE_CONDITIONING,
+        field: 'clip2',
+      },
+    },
+    {
+      source: {
+        node_id: SDXL_REFINER_MODEL_LOADER,
+        field: 'clip2',
+      },
+      destination: {
+        node_id: SDXL_REFINER_NEGATIVE_CONDITIONING,
+        field: 'clip2',
+      },
+    },
+    {
+      source: {
+        node_id: SDXL_REFINER_POSITIVE_CONDITIONING,
+        field: 'conditioning',
+      },
+      destination: {
+        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        field: 'positive_conditioning',
+      },
+    },
+    {
+      source: {
+        node_id: SDXL_REFINER_NEGATIVE_CONDITIONING,
+        field: 'conditioning',
+      },
+      destination: {
+        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        field: 'negative_conditioning',
+      },
+    },
+    {
+      source: {
+        node_id: baseNodeId,
+        field: 'latents',
+      },
+      destination: {
+        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        field: 'latents',
+      },
+    },
+    {
+      source: {
+        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        field: 'latents',
+      },
+      destination: {
+        node_id: LATENTS_TO_IMAGE,
+        field: 'latents',
+      },
+    }
+  );
 };

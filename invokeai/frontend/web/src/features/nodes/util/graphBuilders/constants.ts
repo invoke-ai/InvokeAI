@@ -27,6 +27,11 @@ export const SDXL_MODEL_LOADER = 'sdxl_model_loader';
 export const SDXL_TEXT_TO_LATENTS = 't2l_sdxl';
 export const SDXL_LATENTS_TO_LATENTS = 'l2l_sdxl';
 export const SDXL_REFINER_MODEL_LOADER = 'sdxl_refiner_model_loader';
+export const SDXL_REFINER_POSITIVE_CONDITIONING =
+  'sdxl_refiner_positive_conditioning';
+export const SDXL_REFINER_NEGATIVE_CONDITIONING =
+  'sdxl_refiner_negative_conditioning';
+export const SDXL_REFINER_LATENTS_TO_LATENTS = 'l2l_sdxl_refiner';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';

@@ -7,6 +7,7 @@ import {
   ImageToLatentsInvocation,
 } from 'services/api/types';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addSDXLRefinerToGraph } from './buildSDXLRefinerGraph';
 import {
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
@@ -44,7 +45,12 @@ export const buildLinearSDXLImageToImageGraph = (
     shouldUseNoiseSettings,
   } = state.generation;
 
-  const { positiveStylePrompt, negativeStylePrompt } = state.sdxl;
+  const {
+    positiveStylePrompt,
+    negativeStylePrompt,
+    shouldUseSDXLRefiner,
+    refinerStart,
+  } = state.sdxl;
 
   // TODO: add batch functionality
   // const {
@@ -115,7 +121,7 @@ export const buildLinearSDXLImageToImageGraph = (
         cfg_scale,
         scheduler,
         steps,
-        denoising_start: 1 - strength,
+        denoising_start: shouldUseSDXLRefiner ? refinerStart : 1 - strength,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -388,6 +394,11 @@ export const buildLinearSDXLImageToImageGraph = (
       field: 'metadata',
     },
   });
+
+  // Add Refiner if enabled
+  if (shouldUseSDXLRefiner) {
+    addSDXLRefinerToGraph(state, graph, LATENTS_TO_IMAGE);
+  }
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

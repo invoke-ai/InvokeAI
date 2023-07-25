@@ -3,6 +3,7 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addSDXLRefinerToGraph } from './buildSDXLRefinerGraph';
 import {
   LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
@@ -32,7 +33,12 @@ export const buildLinearSDXLTextToImageGraph = (
     shouldUseNoiseSettings,
   } = state.generation;
 
-  const { positiveStylePrompt, negativeStylePrompt } = state.sdxl;
+  const {
+    positiveStylePrompt,
+    negativeStylePrompt,
+    shouldUseSDXLRefiner,
+    refinerStart,
+  } = state.sdxl;
 
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
@@ -86,6 +92,7 @@ export const buildLinearSDXLTextToImageGraph = (
         cfg_scale,
         scheduler,
         steps,
+        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -227,6 +234,11 @@ export const buildLinearSDXLTextToImageGraph = (
       field: 'metadata',
     },
   });
+
+  // Add Refiner if enabled
+  if (shouldUseSDXLRefiner) {
+    addSDXLRefinerToGraph(state, graph, SDXL_TEXT_TO_LATENTS);
+  }
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
