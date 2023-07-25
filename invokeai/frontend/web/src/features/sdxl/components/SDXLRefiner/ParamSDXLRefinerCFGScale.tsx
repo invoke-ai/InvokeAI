@@ -3,66 +3,69 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAINumberInput from 'common/components/IAINumberInput';
-
 import IAISlider from 'common/components/IAISlider';
-import { setRefinerSteps } from 'features/sdxl/store/sdxlSlice';
+import { setRefinerCFGScale } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
-  ({ sdxl, ui }) => {
-    const { refinerSteps } = sdxl;
+  ({ sdxl, ui, hotkeys }) => {
+    const { refinerCFGScale } = sdxl;
     const { shouldUseSliders } = ui;
+    const { shift } = hotkeys;
 
     return {
-      refinerSteps,
+      refinerCFGScale,
       shouldUseSliders,
+      shift,
     };
   },
   defaultSelectorOptions
 );
 
-const ParamSDXLRefinerSteps = () => {
-  const { refinerSteps, shouldUseSliders } = useAppSelector(selector);
+const ParamSDXLRefinerCFGScale = () => {
+  const { refinerCFGScale, shouldUseSliders, shift } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const handleChange = useCallback(
-    (v: number) => {
-      dispatch(setRefinerSteps(v));
-    },
+    (v: number) => dispatch(setRefinerCFGScale(v)),
     [dispatch]
   );
-  const handleReset = useCallback(() => {
-    dispatch(setRefinerSteps(20));
-  }, [dispatch]);
+
+  const handleReset = useCallback(
+    () => dispatch(setRefinerCFGScale(7)),
+    [dispatch]
+  );
 
   return shouldUseSliders ? (
     <IAISlider
-      label={t('parameters.steps')}
+      label={t('parameters.cfgScale')}
+      step={shift ? 0.1 : 0.5}
       min={1}
-      max={100}
-      step={1}
+      max={20}
       onChange={handleChange}
       handleReset={handleReset}
-      value={refinerSteps}
+      value={refinerCFGScale}
+      sliderNumberInputProps={{ max: 200 }}
       withInput
       withReset
       withSliderMarks
-      sliderNumberInputProps={{ max: 500 }}
+      isInteger={false}
     />
   ) : (
     <IAINumberInput
-      label={t('parameters.steps')}
+      label={t('parameters.cfgScale')}
+      step={0.5}
       min={1}
-      max={500}
-      step={1}
+      max={200}
       onChange={handleChange}
-      value={refinerSteps}
+      value={refinerCFGScale}
+      isInteger={false}
       numberInputFieldProps={{ textAlign: 'center' }}
     />
   );
 };
 
-export default memo(ParamSDXLRefinerSteps);
+export default memo(ParamSDXLRefinerCFGScale);

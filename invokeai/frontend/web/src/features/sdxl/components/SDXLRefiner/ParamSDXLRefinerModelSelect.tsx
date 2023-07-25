@@ -19,7 +19,7 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const ParamRefinerModelSelect = () => {
+const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
 
   const { model } = useAppSelector(selector);
@@ -103,4 +103,4 @@ const ParamRefinerModelSelect = () => {
   );
 };
 
-export default memo(ParamRefinerModelSelect);
+export default memo(ParamSDXLRefinerModelSelect);
