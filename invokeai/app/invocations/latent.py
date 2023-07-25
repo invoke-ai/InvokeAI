@@ -376,9 +376,8 @@ class TextToLatentsInvocation(BaseInvocation):
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         result_latents = result_latents.to("cpu")
-        torch.cuda.empty_cache()
-
-        name = f'{context.graph_execution_state_id}__{self.id}'
+        import uuid
+        name = f'{context.graph_execution_state_id}__{self.id}_{uuid.uuid4()}'
         context.services.latents.save(name, result_latents)
         return build_latents_output(latents_name=name, latents=result_latents)
 

@@ -73,8 +73,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         error_type=e.__class__.__name__,
                         error=traceback.format_exc(),
                     )
-                    continue
-
+                    continue  
                 # get the source node id to provide to clients (the prepared node id is not as useful)
                 source_node_id = graph_execution_state.prepared_source_mapping[invocation.id]
 
