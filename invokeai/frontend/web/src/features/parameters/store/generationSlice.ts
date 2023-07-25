@@ -51,6 +51,7 @@ export interface GenerationState {
   verticalSymmetrySteps: number;
   model: MainModelField | null;
   vae: VaeModelParam | null;
+  vaePrecision: 'fp16' | 'fp32';
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
   clipSkip: number;
@@ -89,6 +90,7 @@ export const initialGenerationState: GenerationState = {
   verticalSymmetrySteps: 0,
   model: null,
   vae: null,
+  vaePrecision: 'fp32',
   seamlessXAxis: false,
   seamlessYAxis: false,
   clipSkip: 0,
@@ -241,6 +243,9 @@ export const generationSlice = createSlice({
       // null is a valid VAE!
       state.vae = action.payload;
     },
+    vaePrecisionChanged: (state, action: PayloadAction<'fp16' | 'fp32'>) => {
+      state.vaePrecision = action.payload;
+    },
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
@@ -327,6 +332,7 @@ export const {
   shouldUseCpuNoiseChanged,
   setShouldShowAdvancedOptions,
   setAspectRatio,
+  vaePrecisionChanged,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

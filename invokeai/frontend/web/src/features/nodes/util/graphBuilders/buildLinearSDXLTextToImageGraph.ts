@@ -31,6 +31,7 @@ export const buildLinearSDXLTextToImageGraph = (
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
+    vaePrecision,
   } = state.generation;
 
   const {
@@ -97,6 +98,7 @@ export const buildLinearSDXLTextToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
+        fp32: vaePrecision === 'fp32' ? true : false,
       },
     },
     edges: [
