@@ -7,9 +7,8 @@ import {
   ImageToLatentsInvocation,
 } from 'services/api/types';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
-import { addSDXLRefinerToGraph } from './buildSDXLRefinerGraph';
+import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import {
-  IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
@@ -17,6 +16,7 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_LATENTS_TO_LATENTS,
   SDXL_MODEL_LOADER,
 } from './constants';
@@ -53,16 +53,6 @@ export const buildLinearSDXLImageToImageGraph = (
     refinerStart,
   } = state.sdxl;
 
-  // TODO: add batch functionality
-  // const {
-  //   isEnabled: isBatchEnabled,
-  //   imageNames: batchImageNames,
-  //   asInitialImage,
-  // } = state.batch;
-
-  // const shouldBatch =
-  //   isBatchEnabled && batchImageNames.length > 0 && asInitialImage;
-
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -88,7 +78,7 @@ export const buildLinearSDXLImageToImageGraph = (
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    id: IMAGE_TO_IMAGE_GRAPH,
+    id: SDXL_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
       [SDXL_MODEL_LOADER]: {
         type: 'sdxl_model_loader',
@@ -328,42 +318,6 @@ export const buildLinearSDXLImageToImageGraph = (
     });
   }
 
-  // TODO: add batch functionality
-  // if (isBatchEnabled && asInitialImage && batchImageNames.length > 0) {
-  //   // we are going to connect an iterate up to the init image
-  //   delete (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image;
-
-  //   const imageCollection: ImageCollectionInvocation = {
-  //     id: IMAGE_COLLECTION,
-  //     type: 'image_collection',
-  //     images: batchImageNames.map((image_name) => ({ image_name })),
-  //   };
-
-  //   const imageCollectionIterate: IterateInvocation = {
-  //     id: IMAGE_COLLECTION_ITERATE,
-  //     type: 'iterate',
-  //   };
-
-  //   graph.nodes[IMAGE_COLLECTION] = imageCollection;
-  //   graph.nodes[IMAGE_COLLECTION_ITERATE] = imageCollectionIterate;
-
-  //   graph.edges.push({
-  //     source: { node_id: IMAGE_COLLECTION, field: 'collection' },
-  //     destination: {
-  //       node_id: IMAGE_COLLECTION_ITERATE,
-  //       field: 'collection',
-  //     },
-  //   });
-
-  //   graph.edges.push({
-  //     source: { node_id: IMAGE_COLLECTION_ITERATE, field: 'item' },
-  //     destination: {
-  //       node_id: IMAGE_TO_LATENTS,
-  //       field: 'image',
-  //     },
-  //   });
-  // }
-
   // add metadata accumulator, which is only mostly populated - some fields are added later
   graph.nodes[METADATA_ACCUMULATOR] = {
     id: METADATA_ACCUMULATOR,
@@ -385,6 +339,8 @@ export const buildLinearSDXLImageToImageGraph = (
     clip_skip: clipSkip,
     strength,
     init_image: initialImage.imageName,
+    positive_style_prompt: positiveStylePrompt,
+    negative_style_prompt: negativeStylePrompt,
   };
 
   graph.edges.push({

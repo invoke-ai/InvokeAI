@@ -3,7 +3,7 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
-import { addSDXLRefinerToGraph } from './buildSDXLRefinerGraph';
+import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import {
   LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
@@ -224,6 +224,8 @@ export const buildLinearSDXLTextToImageGraph = (
     controlnets: [],
     loras: [],
     clip_skip: clipSkip,
+    positive_style_prompt: positiveStylePrompt,
+    negative_style_prompt: negativeStylePrompt,
   };
 
   graph.edges.push({

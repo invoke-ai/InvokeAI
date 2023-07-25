@@ -5,6 +5,7 @@ import {
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
+  SDXL_LATENTS_TO_LATENTS,
   SDXL_MODEL_LOADER,
   SDXL_REFINER_LATENTS_TO_LATENTS,
   SDXL_REFINER_MODEL_LOADER,
@@ -35,6 +36,15 @@ export const addSDXLRefinerToGraph = (
     | MetadataAccumulatorInvocation
     | undefined;
 
+  if (metadataAccumulator) {
+    metadataAccumulator.refiner_model = refinerModel;
+    metadataAccumulator.refiner_aesthetic_store = refinerAestheticScore;
+    metadataAccumulator.refiner_cfg_scale = refinerCFGScale;
+    metadataAccumulator.refiner_scheduler = refinerScheduler;
+    metadataAccumulator.refiner_start = refinerStart;
+    metadataAccumulator.refiner_steps = refinerSteps;
+  }
+
   // Unplug SDXL Latents Generation To Latents To Image
   graph.edges = graph.edges.filter(
     (e) =>
@@ -48,6 +58,21 @@ export const addSDXLRefinerToGraph = (
         ['vae'].includes(e.source.field)
       )
   );
+
+  // connect the VAE back to the i2l, which we just removed in the filter
+  // but only if we are doing l2l
+  if (baseNodeId === SDXL_LATENTS_TO_LATENTS) {
+    graph.edges.push({
+      source: {
+        node_id: SDXL_MODEL_LOADER,
+        field: 'vae',
+      },
+      destination: {
+        node_id: IMAGE_TO_LATENTS,
+        field: 'vae',
+      },
+    });
+  }
 
   graph.nodes[SDXL_REFINER_MODEL_LOADER] = {
     type: 'sdxl_refiner_model_loader',
@@ -76,16 +101,6 @@ export const addSDXLRefinerToGraph = (
   };
 
   graph.edges.push(
-    {
-      source: {
-        node_id: SDXL_MODEL_LOADER,
-        field: 'vae',
-      },
-      destination: {
-        node_id: IMAGE_TO_LATENTS,
-        field: 'vae',
-      },
-    },
     {
       source: {
         node_id: SDXL_REFINER_MODEL_LOADER,
