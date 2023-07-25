@@ -15,6 +15,7 @@ import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainM
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { forEach } from 'lodash-es';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   stateSelector,
@@ -29,6 +30,7 @@ const ParamMainModelSelect = () => {
   const { model } = useAppSelector(selector);
 
   const { data: mainModels, isLoading } = useGetMainModelsQuery();
+  const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
 
   const data = useMemo(() => {
     if (!mainModels) {
@@ -98,9 +100,11 @@ const ParamMainModelSelect = () => {
         onChange={handleChangeModel}
         w="100%"
       />
-      <Box mt={7}>
-        <SyncModelsButton iconMode />
-      </Box>
+      {isSyncModelEnabled && (
+        <Box mt={7}>
+          <SyncModelsButton iconMode />
+        </Box>
+      )}
     </Flex>
   );
 };
