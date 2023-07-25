@@ -12,10 +12,11 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   [stateSelector],
   ({ sdxl, ui }) => {
-    const { refinerSteps } = sdxl;
+    const { refinerSteps, isRefinerAvailable } = sdxl;
     const { shouldUseSliders } = ui;
 
     return {
+      isRefinerAvailable,
       refinerSteps,
       shouldUseSliders,
     };
@@ -24,7 +25,8 @@ const selector = createSelector(
 );
 
 const ParamSDXLRefinerSteps = () => {
-  const { refinerSteps, shouldUseSliders } = useAppSelector(selector);
+  const { refinerSteps, shouldUseSliders, isRefinerAvailable } =
+    useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -51,6 +53,7 @@ const ParamSDXLRefinerSteps = () => {
       withReset
       withSliderMarks
       sliderNumberInputProps={{ max: 500 }}
+      isDisabled={!isRefinerAvailable}
     />
   ) : (
     <IAINumberInput
@@ -61,6 +64,7 @@ const ParamSDXLRefinerSteps = () => {
       onChange={handleChange}
       value={refinerSteps}
       numberInputFieldProps={{ textAlign: 'center' }}
+      isDisabled={!isRefinerAvailable}
     />
   );
 };

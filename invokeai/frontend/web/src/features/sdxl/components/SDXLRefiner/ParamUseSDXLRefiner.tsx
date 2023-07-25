@@ -24,7 +24,7 @@ export default function ParamUseSDXLRefiner() {
       label="Use Refiner"
       isChecked={shouldUseSDXLRefiner}
       onChange={handleUseSDXLRefinerChange}
-      isDisabled={isRefinerAvailable}
+      isDisabled={!isRefinerAvailable}
     />
   );
 }

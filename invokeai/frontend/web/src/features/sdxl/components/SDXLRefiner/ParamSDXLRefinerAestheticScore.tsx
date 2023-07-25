@@ -9,10 +9,11 @@ import { memo, useCallback } from 'react';
 const selector = createSelector(
   [stateSelector],
   ({ sdxl, hotkeys }) => {
-    const { refinerAestheticScore } = sdxl;
+    const { refinerAestheticScore, isRefinerAvailable } = sdxl;
     const { shift } = hotkeys;
 
     return {
+      isRefinerAvailable,
       refinerAestheticScore,
       shift,
     };
@@ -21,7 +22,8 @@ const selector = createSelector(
 );
 
 const ParamSDXLRefinerAestheticScore = () => {
-  const { refinerAestheticScore, shift } = useAppSelector(selector);
+  const { refinerAestheticScore, shift, isRefinerAvailable } =
+    useAppSelector(selector);
   const dispatch = useAppDispatch();
 
   const handleChange = useCallback(
@@ -48,6 +50,7 @@ const ParamSDXLRefinerAestheticScore = () => {
       withReset
       withSliderMarks
       isInteger={false}
+      isDisabled={!isRefinerAvailable}
     />
   );
 };

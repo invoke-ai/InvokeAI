@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   stateSelector,
   ({ ui, sdxl }) => {
-    const { refinerScheduler } = sdxl;
+    const { refinerScheduler, isRefinerAvailable } = sdxl;
     const { favoriteSchedulers: enabledSchedulers } = ui;
 
     const data = map(SCHEDULER_LABEL_MAP, (label, name) => ({
@@ -27,6 +27,7 @@ const selector = createSelector(
     })).sort((a, b) => a.label.localeCompare(b.label));
 
     return {
+      isRefinerAvailable,
       refinerScheduler,
       data,
     };
@@ -37,7 +38,8 @@ const selector = createSelector(
 const ParamSDXLRefinerScheduler = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { refinerScheduler, data } = useAppSelector(selector);
+  const { refinerScheduler, data, isRefinerAvailable } =
+    useAppSelector(selector);
 
   const handleChange = useCallback(
     (v: string | null) => {
@@ -56,6 +58,7 @@ const ParamSDXLRefinerScheduler = () => {
       value={refinerScheduler}
       data={data}
       onChange={handleChange}
+      disabled={!isRefinerAvailable}
     />
   );
 };

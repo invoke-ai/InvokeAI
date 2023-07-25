@@ -11,11 +11,12 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   [stateSelector],
   ({ sdxl, ui, hotkeys }) => {
-    const { refinerCFGScale } = sdxl;
+    const { refinerCFGScale, isRefinerAvailable } = sdxl;
     const { shouldUseSliders } = ui;
     const { shift } = hotkeys;
 
     return {
+      isRefinerAvailable,
       refinerCFGScale,
       shouldUseSliders,
       shift,
@@ -25,7 +26,8 @@ const selector = createSelector(
 );
 
 const ParamSDXLRefinerCFGScale = () => {
-  const { refinerCFGScale, shouldUseSliders, shift } = useAppSelector(selector);
+  const { refinerCFGScale, shouldUseSliders, shift, isRefinerAvailable } =
+    useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -53,6 +55,7 @@ const ParamSDXLRefinerCFGScale = () => {
       withReset
       withSliderMarks
       isInteger={false}
+      isDisabled={!isRefinerAvailable}
     />
   ) : (
     <IAINumberInput
@@ -64,6 +67,7 @@ const ParamSDXLRefinerCFGScale = () => {
       value={refinerCFGScale}
       isInteger={false}
       numberInputFieldProps={{ textAlign: 'center' }}
+      isDisabled={!isRefinerAvailable}
     />
   );
 };

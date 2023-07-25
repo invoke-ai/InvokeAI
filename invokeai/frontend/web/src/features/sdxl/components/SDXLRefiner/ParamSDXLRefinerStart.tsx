@@ -9,10 +9,11 @@ import { memo, useCallback } from 'react';
 const selector = createSelector(
   [stateSelector],
   ({ sdxl, hotkeys }) => {
-    const { refinerStart } = sdxl;
+    const { refinerStart, isRefinerAvailable } = sdxl;
     const { shift } = hotkeys;
 
     return {
+      isRefinerAvailable,
       refinerStart,
       shift,
     };
@@ -21,7 +22,7 @@ const selector = createSelector(
 );
 
 const ParamSDXLRefinerStart = () => {
-  const { refinerStart, shift } = useAppSelector(selector);
+  const { refinerStart, shift, isRefinerAvailable } = useAppSelector(selector);
   const dispatch = useAppDispatch();
 
   const handleChange = useCallback(
@@ -48,6 +49,7 @@ const ParamSDXLRefinerStart = () => {
       withReset
       withSliderMarks
       isInteger={false}
+      isDisabled={!isRefinerAvailable}
     />
   );
 };

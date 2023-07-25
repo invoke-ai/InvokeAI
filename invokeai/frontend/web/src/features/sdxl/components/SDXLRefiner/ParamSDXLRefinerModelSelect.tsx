@@ -11,7 +11,7 @@ import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useGetSDXLRefinerModelsQuery } from 'services/api/endpoints/models';
 
 const selector = createSelector(
   stateSelector,
@@ -24,39 +24,37 @@ const ParamSDXLRefinerModelSelect = () => {
 
   const { model } = useAppSelector(selector);
 
-  const { data: mainModels, isLoading } = useGetMainModelsQuery();
+  const { data: sdxlModels, isLoading } = useGetSDXLRefinerModelsQuery();
 
   const data = useMemo(() => {
-    if (!mainModels) {
+    if (!sdxlModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(mainModels.entities, (model, id) => {
+    forEach(sdxlModels.entities, (model, id) => {
       if (!model) {
         return;
       }
 
-      if (['sdxl-refiner'].includes(model.base_model)) {
-        data.push({
-          value: id,
-          label: model.model_name,
-          group: MODEL_TYPE_MAP[model.base_model],
-        });
-      }
+      data.push({
+        value: id,
+        label: model.model_name,
+        group: MODEL_TYPE_MAP[model.base_model],
+      });
     });
 
     return data;
-  }, [mainModels]);
+  }, [sdxlModels]);
 
   // grab the full model entity from the RTK Query cache
   // TODO: maybe we should just store the full model entity in state?
   const selectedModel = useMemo(
     () =>
-      mainModels?.entities[`${model?.base_model}/main/${model?.model_name}`] ??
+      sdxlModels?.entities[`${model?.base_model}/main/${model?.model_name}`] ??
       null,
-    [mainModels?.entities, model]
+    [sdxlModels?.entities, model]
   );
 
   const handleChangeModel = useCallback(
