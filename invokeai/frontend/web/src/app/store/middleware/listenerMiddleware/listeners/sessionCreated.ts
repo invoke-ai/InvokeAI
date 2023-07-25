@@ -33,12 +33,11 @@ export const addSessionCreatedRejectedListener = () => {
     effect: (action) => {
       const log = logger('session');
       if (action.payload) {
-        const { error } = action.payload;
+        const { error, status } = action.payload;
         const graph = parseify(action.meta.arg);
-        const stringifiedError = JSON.stringify(error);
         log.error(
-          { graph, error: serializeError(error) },
-          `Problem creating session: ${stringifiedError}`
+          { graph, status, error: serializeError(error) },
+          `Problem creating session`
         );
       }
     },
