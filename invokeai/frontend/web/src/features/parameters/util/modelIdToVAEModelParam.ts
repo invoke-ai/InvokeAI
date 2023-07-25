@@ -1,12 +1,11 @@
+import { logger } from 'app/logging/logger';
 import { VaeModelParam, zVaeModel } from '../types/parameterSchemas';
-import { log } from 'app/logging/useLogger';
-
-const moduleLog = log.child({ module: 'models' });
 
 export const modelIdToVAEModelParam = (
   vaeModelId: string
 ): VaeModelParam | undefined => {
-  const [base_model, model_type, model_name] = vaeModelId.split('/');
+  const log = logger('models');
+  const [base_model, _model_type, model_name] = vaeModelId.split('/');
 
   const result = zVaeModel.safeParse({
     base_model,
@@ -14,7 +13,7 @@ export const modelIdToVAEModelParam = (
   });
 
   if (!result.success) {
-    moduleLog.error(
+    log.error(
       {
         vaeModelId,
         errors: result.error.format(),

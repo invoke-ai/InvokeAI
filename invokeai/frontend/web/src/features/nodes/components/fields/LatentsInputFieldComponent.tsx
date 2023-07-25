@@ -6,10 +6,8 @@ import { memo } from 'react';
 import { FieldComponentProps } from './types';
 
 const LatentsInputFieldComponent = (
-  props: FieldComponentProps<LatentsInputFieldValue, LatentsInputFieldTemplate>
+  _props: FieldComponentProps<LatentsInputFieldValue, LatentsInputFieldTemplate>
 ) => {
-  const { nodeId, field } = props;
-
   return null;
 };
 

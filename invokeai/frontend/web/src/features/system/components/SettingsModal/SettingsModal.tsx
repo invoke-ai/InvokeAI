@@ -12,14 +12,14 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
+import { VALID_LOG_LEVELS } from 'app/logging/logger';
 import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { systemSelector } from 'features/system/store/systemSelectors';
+import { setShouldShowAdvancedOptions } from 'features/parameters/store/generationSlice';
 import {
-  SystemState,
   consoleLogLevelChanged,
   setEnableImageDebugging,
   setIsNodesEnabled,
@@ -27,18 +27,14 @@ import {
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
 } from 'features/system/store/systemSlice';
-import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
-  setShouldShowAdvancedOptions,
   setShouldShowProgressInViewer,
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
-import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash-es';
 import {
   ChangeEvent,
-  PropsWithChildren,
   ReactElement,
   cloneElement,
   useCallback,
@@ -49,10 +45,11 @@ import { LogLevelName } from 'roarr';
 import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
+import StyledFlex from './StyledFlex';
 
 const selector = createSelector(
-  [systemSelector, uiSelector],
-  (system: SystemState, ui: UIState) => {
+  [stateSelector],
+  ({ system, ui, generation }) => {
     const {
       shouldConfirmOnDelete,
       enableImageDebugging,
@@ -66,8 +63,9 @@ const selector = createSelector(
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
       shouldShowProgressInViewer,
-      shouldShowAdvancedOptions,
     } = ui;
+
+    const { shouldShowAdvancedOptions } = generation;
 
     return {
       shouldConfirmOnDelete,
@@ -349,22 +347,3 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 };
 
 export default SettingsModal;
-
-export const StyledFlex = (props: PropsWithChildren) => {
-  return (
-    <Flex
-      sx={{
-        flexDirection: 'column',
-        gap: 2,
-        p: 4,
-        borderRadius: 'base',
-        bg: 'base.100',
-        _dark: {
-          bg: 'base.900',
-        },
-      }}
-    >
-      {props.children}
-    </Flex>
-  );
-};

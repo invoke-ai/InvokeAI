@@ -1,14 +1,13 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import { serializeError } from 'serialize-error';
 import { sessionCreated } from 'services/api/thunks/session';
 import { startAppListening } from '..';
 
-const moduleLog = log.child({ namespace: 'session' });
-
 export const addSessionCreatedPendingListener = () => {
   startAppListening({
     actionCreator: sessionCreated.pending,
-    effect: (action, { getState, dispatch }) => {
+    effect: () => {
       //
     },
   });
@@ -17,9 +16,13 @@ export const addSessionCreatedPendingListener = () => {
 export const addSessionCreatedFulfilledListener = () => {
   startAppListening({
     actionCreator: sessionCreated.fulfilled,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action) => {
+      const log = logger('session');
       const session = action.payload;
-      moduleLog.debug({ data: { session } }, `Session created (${session.id})`);
+      log.debug(
+        { session: parseify(session) },
+        `Session created (${session.id})`
+      );
     },
   });
 };
@@ -27,18 +30,14 @@ export const addSessionCreatedFulfilledListener = () => {
 export const addSessionCreatedRejectedListener = () => {
   startAppListening({
     actionCreator: sessionCreated.rejected,
-    effect: (action, { getState, dispatch }) => {
+    effect: (action) => {
+      const log = logger('session');
       if (action.payload) {
-        const { arg, error } = action.payload;
-        const stringifiedError = JSON.stringify(error);
-        moduleLog.error(
-          {
-            data: {
-              arg,
-              error: serializeError(error),
-            },
-          },
-          `Problem creating session: ${stringifiedError}`
+        const { error, status } = action.payload;
+        const graph = parseify(action.meta.arg);
+        log.error(
+          { graph, status, error: serializeError(error) },
+          `Problem creating session`
         );
       }
     },

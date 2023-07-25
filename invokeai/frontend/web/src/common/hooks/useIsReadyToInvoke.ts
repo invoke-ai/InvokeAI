@@ -2,17 +2,16 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { validateSeedWeights } from 'common/util/seedWeightPairs';
+// import { validateSeedWeights } from 'common/util/seedWeightPairs';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { modelsApi } from '../../services/api/endpoints/models';
 import { forEach } from 'lodash-es';
+import { modelsApi } from '../../services/api/endpoints/models';
 
 const readinessSelector = createSelector(
   [stateSelector, activeTabNameSelector],
   (state, activeTabName) => {
     const { generation, system } = state;
-    const { shouldGenerateVariations, seedWeights, initialImage, seed } =
-      generation;
+    const { initialImage } = generation;
 
     const { isProcessing, isConnected } = system;
 
@@ -44,19 +43,19 @@ const readinessSelector = createSelector(
       reasonsWhyNotReady.push('System Disconnected');
     }
 
-    // Cannot generate variations without valid seed weights
-    if (
-      shouldGenerateVariations &&
-      (!(validateSeedWeights(seedWeights) || seedWeights === '') || seed === -1)
-    ) {
-      isReady = false;
-      reasonsWhyNotReady.push('Seed-Weights badly formatted.');
-    }
+    // // Cannot generate variations without valid seed weights
+    // if (
+    //   shouldGenerateVariations &&
+    //   (!(validateSeedWeights(seedWeights) || seedWeights === '') || seed === -1)
+    // ) {
+    //   isReady = false;
+    //   reasonsWhyNotReady.push('Seed-Weights badly formatted.');
+    // }
 
     forEach(state.controlNet.controlNets, (controlNet, id) => {
       if (!controlNet.model) {
         isReady = false;
-        reasonsWhyNotReady.push('ControlNet ${id} has no model selected.');
+        reasonsWhyNotReady.push(`ControlNet ${id} has no model selected.`);
       }
     });
 

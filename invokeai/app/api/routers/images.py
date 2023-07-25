@@ -40,8 +40,14 @@ async def upload_image(
     response: Response,
     image_category: ImageCategory = Query(description="The category of the image"),
     is_intermediate: bool = Query(description="Whether this is an intermediate image"),
+    board_id: Optional[str] = Query(
+        default=None, description="The board to add this image to, if any"
+    ),
     session_id: Optional[str] = Query(
         default=None, description="The session ID associated with this upload, if any"
+    ),
+    crop_visible: Optional[bool] = Query(
+        default=False, description="Whether to crop the image"
     ),
 ) -> ImageDTO:
     """Uploads an image"""
@@ -52,6 +58,9 @@ async def upload_image(
 
     try:
         pil_image = Image.open(io.BytesIO(contents))
+        if crop_visible:
+            bbox = pil_image.getbbox()
+            pil_image = pil_image.crop(bbox)
     except:
         # Error opening the image
         raise HTTPException(status_code=415, detail="Failed to read image")
@@ -62,6 +71,7 @@ async def upload_image(
             image_origin=ResourceOrigin.EXTERNAL,
             image_category=image_category,
             session_id=session_id,
+            board_id=board_id,
             is_intermediate=is_intermediate,
         )
 

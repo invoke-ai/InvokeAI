@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import {
@@ -15,8 +15,7 @@ import { imagesApi } from 'services/api/endpoints/images';
 import { sessionCreated } from 'services/api/thunks/session';
 import { ImageDTO } from 'services/api/types';
 import { startAppListening } from '..';
-
-const moduleLog = log.child({ namespace: 'invoke' });
+import { parseify } from 'common/util/serialize';
 
 /**
  * This listener is responsible invoking the canvas. This involves a number of steps:
@@ -36,13 +35,29 @@ export const addUserInvokedCanvasListener = () => {
     predicate: (action): action is ReturnType<typeof userInvoked> =>
       userInvoked.match(action) && action.payload === 'unifiedCanvas',
     effect: async (action, { getState, dispatch, take }) => {
+      const log = logger('session');
+
       const state = getState();
 
+      const {
+        layerState,
+        boundingBoxCoordinates,
+        boundingBoxDimensions,
+        isMaskEnabled,
+        shouldPreserveMaskedArea,
+      } = state.canvas;
+
       // Build canvas blobs
-      const canvasBlobsAndImageData = await getCanvasData(state);
+      const canvasBlobsAndImageData = await getCanvasData(
+        layerState,
+        boundingBoxCoordinates,
+        boundingBoxDimensions,
+        isMaskEnabled,
+        shouldPreserveMaskedArea
+      );
 
       if (!canvasBlobsAndImageData) {
-        moduleLog.error('Unable to create canvas data');
+        log.error('Unable to create canvas data');
         return;
       }
 
@@ -64,7 +79,7 @@ export const addUserInvokedCanvasListener = () => {
         ]);
       }
 
-      moduleLog.debug(`Generation mode: ${generationMode}`);
+      log.debug(`Generation mode: ${generationMode}`);
 
       // Temp placeholders for the init and mask images
       let canvasInitImage: ImageDTO | undefined;
@@ -73,7 +88,7 @@ export const addUserInvokedCanvasListener = () => {
       // For img2img and inpaint/outpaint, we need to upload the init images
       if (['img2img', 'inpaint', 'outpaint'].includes(generationMode)) {
         // upload the image, saving the request id
-        const { requestId: initImageUploadedRequestId } = dispatch(
+        canvasInitImage = await dispatch(
           imagesApi.endpoints.uploadImage.initiate({
             file: new File([baseBlob], 'canvasInitImage.png', {
               type: 'image/png',
@@ -81,23 +96,13 @@ export const addUserInvokedCanvasListener = () => {
             image_category: 'general',
             is_intermediate: true,
           })
-        );
-
-        // Wait for the image to be uploaded, matching by request id
-        const [{ payload }] = await take(
-          // TODO: figure out how to narrow this action's type
-          (action) =>
-            imagesApi.endpoints.uploadImage.matchFulfilled(action) &&
-            action.meta.requestId === initImageUploadedRequestId
-        );
-
-        canvasInitImage = payload as ImageDTO;
+        ).unwrap();
       }
 
       // For inpaint/outpaint, we also need to upload the mask layer
       if (['inpaint', 'outpaint'].includes(generationMode)) {
         // upload the image, saving the request id
-        const { requestId: maskImageUploadedRequestId } = dispatch(
+        canvasMaskImage = await dispatch(
           imagesApi.endpoints.uploadImage.initiate({
             file: new File([maskBlob], 'canvasMaskImage.png', {
               type: 'image/png',
@@ -105,17 +110,7 @@ export const addUserInvokedCanvasListener = () => {
             image_category: 'mask',
             is_intermediate: true,
           })
-        );
-
-        // Wait for the image to be uploaded, matching by request id
-        const [{ payload }] = await take(
-          // TODO: figure out how to narrow this action's type
-          (action) =>
-            imagesApi.endpoints.uploadImage.matchFulfilled(action) &&
-            action.meta.requestId === maskImageUploadedRequestId
-        );
-
-        canvasMaskImage = payload as ImageDTO;
+        ).unwrap();
       }
 
       const graph = buildCanvasGraph(
@@ -125,7 +120,7 @@ export const addUserInvokedCanvasListener = () => {
         canvasMaskImage
       );
 
-      moduleLog.debug({ graph }, `Canvas graph built`);
+      log.debug({ graph: parseify(graph) }, `Canvas graph built`);
 
       // currently this action is just listened to for logging
       dispatch(canvasGraphBuilt(graph));
@@ -141,14 +136,14 @@ export const addUserInvokedCanvasListener = () => {
           sessionCreated.fulfilled.match(action) &&
           action.meta.requestId === sessionCreatedRequestId
       );
-      const sessionId = sessionCreatedAction.payload.id;
+      const session_id = sessionCreatedAction.payload.id;
 
       // Associate the init image with the session, now that we have the session ID
       if (['img2img', 'inpaint'].includes(generationMode) && canvasInitImage) {
         dispatch(
-          imagesApi.endpoints.updateImage.initiate({
+          imagesApi.endpoints.changeImageSessionId.initiate({
             imageDTO: canvasInitImage,
-            changes: { session_id: sessionId },
+            session_id,
           })
         );
       }
@@ -156,9 +151,9 @@ export const addUserInvokedCanvasListener = () => {
       // Associate the mask image with the session, now that we have the session ID
       if (['inpaint'].includes(generationMode) && canvasMaskImage) {
         dispatch(
-          imagesApi.endpoints.updateImage.initiate({
+          imagesApi.endpoints.changeImageSessionId.initiate({
             imageDTO: canvasMaskImage,
-            changes: { session_id: sessionId },
+            session_id,
           })
         );
       }
@@ -167,7 +162,7 @@ export const addUserInvokedCanvasListener = () => {
       if (!state.canvas.layerState.stagingArea.boundingBox) {
         dispatch(
           stagingAreaInitialized({
-            sessionId,
+            sessionId: session_id,
             boundingBox: {
               ...state.canvas.boundingBoxCoordinates,
               ...state.canvas.boundingBoxDimensions,
@@ -177,7 +172,7 @@ export const addUserInvokedCanvasListener = () => {
       }
 
       // Flag the session with the canvas session ID
-      dispatch(canvasSessionIdChanged(sessionId));
+      dispatch(canvasSessionIdChanged(session_id));
 
       // We are ready to invoke the session!
       dispatch(sessionReadyToInvoke());

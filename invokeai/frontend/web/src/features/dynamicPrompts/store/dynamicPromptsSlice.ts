@@ -1,5 +1,4 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
 
 export interface DynamicPromptsState {
   isEnabled: boolean;
@@ -32,9 +31,6 @@ export const dynamicPromptsSlice = createSlice({
       state.isEnabled = !state.isEnabled;
     },
   },
-  extraReducers: (builder) => {
-    //
-  },
 });
 
 export const {
@@ -45,6 +41,3 @@ export const {
 } = dynamicPromptsSlice.actions;
 
 export default dynamicPromptsSlice.reducer;
-
-export const dynamicPromptsSelector = (state: RootState) =>
-  state.dynamicPrompts;

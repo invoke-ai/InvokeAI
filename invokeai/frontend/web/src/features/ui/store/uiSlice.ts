@@ -4,7 +4,7 @@ import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName } from './tabMap';
-import { AddNewModelType, UIState } from './uiTypes';
+import { UIState } from './uiTypes';
 
 export const initialUIState: UIState = {
   activeTab: 0,
@@ -14,14 +14,11 @@ export const initialUIState: UIState = {
   shouldUseCanvasBetaLayout: false,
   shouldShowExistingModelsInSearch: false,
   shouldUseSliders: false,
-  addNewModelUIOption: null,
   shouldPinGallery: true,
   shouldShowGallery: true,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
   shouldShowEmbeddingPicker: false,
-  shouldShowAdvancedOptions: false,
-  aspectRatio: null,
   favoriteSchedulers: [],
 };
 
@@ -56,9 +53,6 @@ export const uiSlice = createSlice({
     },
     setShouldUseSliders: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSliders = action.payload;
-    },
-    setAddNewModelUIOption: (state, action: PayloadAction<AddNewModelType>) => {
-      state.addNewModelUIOption = action.payload;
     },
     setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
       state.shouldShowGallery = action.payload;
@@ -102,12 +96,6 @@ export const uiSlice = createSlice({
     toggleEmbeddingPicker: (state) => {
       state.shouldShowEmbeddingPicker = !state.shouldShowEmbeddingPicker;
     },
-    setShouldShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowAdvancedOptions = action.payload;
-    },
-    setAspectRatio: (state, action: PayloadAction<number | null>) => {
-      state.aspectRatio = action.payload;
-    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
@@ -124,7 +112,6 @@ export const {
   setShouldUseCanvasBetaLayout,
   setShouldShowExistingModelsInSearch,
   setShouldUseSliders,
-  setAddNewModelUIOption,
   setShouldHidePreview,
   setShouldShowGallery,
   togglePanels,
@@ -135,8 +122,6 @@ export const {
   setShouldShowProgressInViewer,
   favoriteSchedulersChanged,
   toggleEmbeddingPicker,
-  setShouldShowAdvancedOptions,
-  setAspectRatio,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

@@ -37,7 +37,7 @@ export const buildNodesGraph = (state: RootState): Graph => {
 
   // Reduce the node editor nodes into invocation graph nodes
   const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>(
-    (nodesAccumulator, node, nodeIndex) => {
+    (nodesAccumulator, node) => {
       const { id, data } = node;
       const { type, inputs } = data;
 
@@ -50,7 +50,7 @@ export const buildNodesGraph = (state: RootState): Graph => {
 
           return inputsAccumulator;
         },
-        {} as Record<Exclude<string, 'id' | 'type'>, any>
+        {} as Record<Exclude<string, 'id' | 'type'>, unknown>
       );
 
       // Build this specific node
@@ -72,7 +72,7 @@ export const buildNodesGraph = (state: RootState): Graph => {
 
   // Reduce the node editor edges into invocation graph edges
   const parsedEdges = edges.reduce<NonNullable<Graph['edges']>>(
-    (edgesAccumulator, edge, edgeIndex) => {
+    (edgesAccumulator, edge) => {
       const { source, target, sourceHandle, targetHandle } = edge;
 
       // Format the edges and add to the edges array

@@ -1,7 +1,5 @@
 import {
-  Badge,
   Box,
-  ChakraProps,
   Editable,
   EditableInput,
   EditablePreview,
@@ -17,23 +15,16 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
+import SelectionOverlay from 'common/components/SelectionOverlay';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FaFolder } from 'react-icons/fa';
+import { FaUser } from 'react-icons/fa';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
+import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
 
-const AUTO_ADD_BADGE_STYLES: ChakraProps['sx'] = {
-  bg: 'accent.200',
-  color: 'blackAlpha.900',
-};
-
-const BASE_BADGE_STYLES: ChakraProps['sx'] = {
-  bg: 'base.500',
-  color: 'whiteAlpha.900',
-};
 interface GalleryBoardProps {
   board: BoardDTO;
   isSelected: boolean;
@@ -59,7 +50,13 @@ const GalleryBoard = memo(
     );
 
     const { isSelectedForAutoAdd } = useAppSelector(selector);
-
+    const [isHovered, setIsHovered] = useState(false);
+    const handleMouseOver = useCallback(() => {
+      setIsHovered(true);
+    }, []);
+    const handleMouseOut = useCallback(() => {
+      setIsHovered(false);
+    }, []);
     const { currentData: coverImage } = useGetImageDTOQuery(
       board.cover_image_name ?? skipToken
     );
@@ -84,26 +81,30 @@ const GalleryBoard = memo(
     );
 
     const handleSubmit = useCallback(
-      (newBoardName: string) => {
-        if (!newBoardName) {
-          // empty strings are not allowed
+      async (newBoardName: string) => {
+        // empty strings are not allowed
+        if (!newBoardName.trim()) {
           setLocalBoardName(board_name);
           return;
         }
+
+        // don't updated the board name if it hasn't changed
         if (newBoardName === board_name) {
-          // don't updated the board name if it hasn't changed
           return;
         }
-        updateBoard({ board_id, changes: { board_name: newBoardName } })
-          .unwrap()
-          .then((response) => {
-            // update local state
-            setLocalBoardName(response.board_name);
-          })
-          .catch(() => {
-            // revert on error
-            setLocalBoardName(board_name);
-          });
+
+        try {
+          const { board_name } = await updateBoard({
+            board_id,
+            changes: { board_name: newBoardName },
+          }).unwrap();
+
+          // update local state
+          setLocalBoardName(board_name);
+        } catch {
+          // revert on error
+          setLocalBoardName(board_name);
+        }
       },
       [board_id, board_name, updateBoard]
     );
@@ -117,6 +118,8 @@ const GalleryBoard = memo(
         sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}
       >
         <Flex
+          onMouseOver={handleMouseOver}
+          onMouseOut={handleMouseOut}
           sx={{
             position: 'relative',
             justifyContent: 'center',
@@ -143,57 +146,49 @@ const GalleryBoard = memo(
                   alignItems: 'center',
                   borderRadius: 'base',
                   cursor: 'pointer',
+                  bg: 'base.200',
+                  _dark: {
+                    bg: 'base.800',
+                  },
                 }}
               >
-                <Flex
-                  sx={{
-                    w: 'full',
-                    h: 'full',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderRadius: 'base',
-                    bg: 'base.200',
-                    _dark: {
-                      bg: 'base.800',
-                    },
-                  }}
-                >
-                  {coverImage?.thumbnail_url ? (
-                    <Image
-                      src={coverImage?.thumbnail_url}
-                      draggable={false}
+                {coverImage?.thumbnail_url ? (
+                  <Image
+                    src={coverImage?.thumbnail_url}
+                    draggable={false}
+                    sx={{
+                      objectFit: 'cover',
+                      w: 'full',
+                      h: 'full',
+                      maxH: 'full',
+                      borderRadius: 'base',
+                      borderBottomRadius: 'lg',
+                    }}
+                  />
+                ) : (
+                  <Flex
+                    sx={{
+                      w: 'full',
+                      h: 'full',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Icon
+                      boxSize={12}
+                      as={FaUser}
                       sx={{
-                        maxW: 'full',
-                        maxH: 'full',
-                        borderRadius: 'base',
-                        borderBottomRadius: 'lg',
+                        mt: -6,
+                        opacity: 0.7,
+                        color: 'base.500',
+                        _dark: {
+                          color: 'base.500',
+                        },
                       }}
                     />
-                  ) : (
-                    <Flex
-                      sx={{
-                        w: 'full',
-                        h: 'full',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Icon
-                        boxSize={12}
-                        as={FaFolder}
-                        sx={{
-                          mt: -3,
-                          opacity: 0.7,
-                          color: 'base.500',
-                          _dark: {
-                            color: 'base.500',
-                          },
-                        }}
-                      />
-                    </Flex>
-                  )}
-                </Flex>
-                <Flex
+                  </Flex>
+                )}
+                {/* <Flex
                   sx={{
                     position: 'absolute',
                     insetInlineEnd: 0,
@@ -201,33 +196,14 @@ const GalleryBoard = memo(
                     p: 1,
                   }}
                 >
-                  <Badge
-                    variant="solid"
-                    sx={
-                      isSelectedForAutoAdd
-                        ? AUTO_ADD_BADGE_STYLES
-                        : BASE_BADGE_STYLES
-                    }
-                  >
-                    {board.image_count}
+                  <Badge variant="solid" sx={BASE_BADGE_STYLES}>
+                    {totalImages}/{totalAssets}
                   </Badge>
-                </Flex>
-                <Box
-                  className="selection-box"
-                  sx={{
-                    position: 'absolute',
-                    top: 0,
-                    insetInlineEnd: 0,
-                    bottom: 0,
-                    insetInlineStart: 0,
-                    borderRadius: 'base',
-                    transitionProperty: 'common',
-                    transitionDuration: 'common',
-                    shadow: isSelected ? 'selected.light' : undefined,
-                    _dark: {
-                      shadow: isSelected ? 'selected.dark' : undefined,
-                    },
-                  }}
+                </Flex> */}
+                {isSelectedForAutoAdd && <AutoAddIcon />}
+                <SelectionOverlay
+                  isSelected={isSelected}
+                  isHovered={isHovered}
                 />
                 <Flex
                   sx={{

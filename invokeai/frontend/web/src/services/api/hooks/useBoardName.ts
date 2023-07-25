@@ -1,22 +1,11 @@
-import { BoardId } from 'features/gallery/store/gallerySlice';
+import { BoardId } from 'features/gallery/store/types';
 import { useListAllBoardsQuery } from '../endpoints/boards';
 
 export const useBoardName = (board_id: BoardId | null | undefined) => {
   const { boardName } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
-      let boardName = '';
-      if (board_id === 'images') {
-        boardName = 'Images';
-      } else if (board_id === 'assets') {
-        boardName = 'Assets';
-      } else if (board_id === 'no_board') {
-        boardName = 'No Board';
-      } else if (board_id === 'batch') {
-        boardName = 'Batch';
-      } else {
-        const selectedBoard = data?.find((b) => b.board_id === board_id);
-        boardName = selectedBoard?.board_name || 'Unknown Board';
-      }
+      const selectedBoard = data?.find((b) => b.board_id === board_id);
+      const boardName = selectedBoard?.board_name || 'Uncategorized';
 
       return { boardName };
     },

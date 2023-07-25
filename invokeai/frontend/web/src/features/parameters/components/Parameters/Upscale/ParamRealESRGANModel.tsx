@@ -7,7 +7,6 @@ import {
   ESRGANModelName,
   esrganModelNameChanged,
 } from 'features/parameters/store/postprocessingSlice';
-import { useTranslation } from 'react-i18next';
 
 export const ESRGAN_MODEL_NAMES: SelectItem[] = [
   {

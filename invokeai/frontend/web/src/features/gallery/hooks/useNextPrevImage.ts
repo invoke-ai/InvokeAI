@@ -1,11 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  IMAGE_LIMIT,
-  imageSelected,
-  selectImagesById,
-} from 'features/gallery/store/gallerySlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { clamp, isEqual } from 'lodash-es';
 import { useCallback } from 'react';
 import {
@@ -15,6 +11,7 @@ import {
   useLazyListImagesQuery,
 } from 'services/api/endpoints/images';
 import { selectListImagesBaseQueryArgs } from '../store/gallerySelectors';
+import { IMAGE_LIMIT } from '../store/types';
 
 export const nextPrevImageButtonsSelector = createSelector(
   [stateSelector, selectListImagesBaseQueryArgs],
@@ -53,8 +50,8 @@ export const nextPrevImageButtonsSelector = createSelector(
 
     const prevImageIndex = clamp(currentImageIndex - 1, 0, images.length - 1);
 
-    const nextImageId = images[nextImageIndex].image_name;
-    const prevImageId = images[prevImageIndex].image_name;
+    const nextImageId = images[nextImageIndex]?.image_name;
+    const prevImageId = images[prevImageIndex]?.image_name;
 
     const nextImage = selectors.selectById(data, nextImageId);
     const prevImage = selectors.selectById(data, prevImageId);
@@ -65,7 +62,7 @@ export const nextPrevImageButtonsSelector = createSelector(
       isOnFirstImage: currentImageIndex === 0,
       isOnLastImage:
         !isNaN(currentImageIndex) && currentImageIndex === imagesLength - 1,
-      areMoreImagesAvailable: data?.total ?? 0 > imagesLength,
+      areMoreImagesAvailable: (data?.total ?? 0) > imagesLength,
       isFetching: status === 'pending',
       nextImage,
       prevImage,

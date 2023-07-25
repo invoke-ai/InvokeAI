@@ -1,19 +1,18 @@
-import { startAppListening } from '../..';
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import {
   appSocketInvocationError,
   socketInvocationError,
 } from 'services/events/actions';
-
-const moduleLog = log.child({ namespace: 'socketio' });
+import { startAppListening } from '../..';
 
 export const addInvocationErrorEventListener = () => {
   startAppListening({
     actionCreator: socketInvocationError,
-    effect: (action, { dispatch, getState }) => {
-      moduleLog.error(
+    effect: (action, { dispatch }) => {
+      const log = logger('socketio');
+      log.error(
         action.payload,
-        `Invocation error (${action.payload.data.node.type}): ${action.payload.data.error}`
+        `Invocation error (${action.payload.data.node.type})`
       );
       dispatch(appSocketInvocationError(action.payload));
     },

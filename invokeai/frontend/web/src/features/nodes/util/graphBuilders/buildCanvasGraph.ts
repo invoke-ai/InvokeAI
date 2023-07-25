@@ -1,12 +1,9 @@
-import { log } from 'app/logging/useLogger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { ImageDTO } from 'services/api/types';
 import { buildCanvasImageToImageGraph } from './buildCanvasImageToImageGraph';
 import { buildCanvasInpaintGraph } from './buildCanvasInpaintGraph';
 import { buildCanvasTextToImageGraph } from './buildCanvasTextToImageGraph';
-
-const moduleLog = log.child({ namespace: 'nodes' });
 
 export const buildCanvasGraph = (
   state: RootState,

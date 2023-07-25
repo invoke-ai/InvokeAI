@@ -11,7 +11,7 @@ import {
   useDraggable as useOriginalDraggable,
   useDroppable as useOriginalDroppable,
 } from '@dnd-kit/core';
-import { BoardId } from 'features/gallery/store/gallerySlice';
+import { BoardId } from 'features/gallery/store/types';
 import { ImageDTO } from 'services/api/types';
 
 type BaseDropData = {
@@ -175,9 +175,7 @@ export const isValidDrop = (
         const destinationBoard = overData.context.boardId;
 
         const isSameBoard = currentBoard === destinationBoard;
-        const isDestinationValid = !currentBoard
-          ? destinationBoard !== 'no_board'
-          : true;
+        const isDestinationValid = !currentBoard ? destinationBoard : true;
 
         return !isSameBoard && isDestinationValid;
       }

@@ -1,7 +1,6 @@
 import { UseToastOptions } from '@chakra-ui/react';
-import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-
-import { InvokeLogLevel } from 'app/logging/useLogger';
+import { PayloadAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { InvokeLogLevel } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { t } from 'i18next';
@@ -17,13 +16,16 @@ import {
   appSocketGraphExecutionStateComplete,
   appSocketInvocationComplete,
   appSocketInvocationError,
+  appSocketInvocationRetrievalError,
   appSocketInvocationStarted,
+  appSocketSessionRetrievalError,
   appSocketSubscribed,
   appSocketUnsubscribed,
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
-import { makeToast } from '../../../app/components/Toaster';
-import { LANGUAGES } from '../components/LanguagePicker';
+import { makeToast } from '../util/makeToast';
+import { LANGUAGES } from './constants';
+import { startCase } from 'lodash-es';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -74,7 +76,8 @@ export interface SystemState {
    */
   consoleLogLevel: InvokeLogLevel;
   shouldLogToConsole: boolean;
-  statusTranslationKey: any;
+  // TODO: probably better to not store keys here, should just be a string that maps to the translation key
+  statusTranslationKey: string;
   /**
    * When a session is canceled, its ID is stored here until a new session is created.
    */
@@ -125,7 +128,7 @@ export const systemSlice = createSlice({
     setIsProcessing: (state, action: PayloadAction<boolean>) => {
       state.isProcessing = action.payload;
     },
-    setCurrentStatus: (state, action: any) => {
+    setCurrentStatus: (state, action: PayloadAction<string>) => {
       state.statusTranslationKey = action.payload;
     },
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
@@ -289,25 +292,6 @@ export const systemSlice = createSlice({
     });
 
     /**
-     * Invocation Error
-     */
-    builder.addCase(appSocketInvocationError, (state) => {
-      state.isProcessing = false;
-      state.isCancelable = true;
-      // state.currentIteration = 0;
-      // state.totalIterations = 0;
-      state.currentStatusHasSteps = false;
-      state.currentStep = 0;
-      state.totalSteps = 0;
-      state.statusTranslationKey = 'common.statusError';
-      state.progressImage = null;
-
-      state.toastQueue.push(
-        makeToast({ title: t('toast.serverError'), status: 'error' })
-      );
-    });
-
-    /**
      * Graph Execution State Complete
      */
     builder.addCase(appSocketGraphExecutionStateComplete, (state) => {
@@ -372,7 +356,35 @@ export const systemSlice = createSlice({
       state.progressImage = null;
 
       state.toastQueue.push(
-        makeToast({ title: t('toast.serverError'), status: 'error' })
+        makeToast({
+          title: t('toast.serverError'),
+          status: 'error',
+          description:
+            action.payload?.status === 422 ? 'Validation Error' : undefined,
+        })
+      );
+    });
+
+    /**
+     * Any server error
+     */
+    builder.addMatcher(isAnyServerError, (state, action) => {
+      state.isProcessing = false;
+      state.isCancelable = true;
+      // state.currentIteration = 0;
+      // state.totalIterations = 0;
+      state.currentStatusHasSteps = false;
+      state.currentStep = 0;
+      state.totalSteps = 0;
+      state.statusTranslationKey = 'common.statusError';
+      state.progressImage = null;
+
+      state.toastQueue.push(
+        makeToast({
+          title: t('toast.serverError'),
+          status: 'error',
+          description: startCase(action.payload.data.error_type),
+        })
       );
     });
   },
@@ -400,3 +412,9 @@ export const {
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
+
+const isAnyServerError = isAnyOf(
+  appSocketInvocationError,
+  appSocketSessionRetrievalError,
+  appSocketInvocationRetrievalError
+);

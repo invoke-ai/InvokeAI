@@ -6,9 +6,8 @@ import { memo } from 'react';
 import { FieldComponentProps } from './types';
 
 const VaeInputFieldComponent = (
-  props: FieldComponentProps<VaeInputFieldValue, VaeInputFieldTemplate>
+  _props: FieldComponentProps<VaeInputFieldValue, VaeInputFieldTemplate>
 ) => {
-  const { nodeId, field } = props;
   return null;
 };
 

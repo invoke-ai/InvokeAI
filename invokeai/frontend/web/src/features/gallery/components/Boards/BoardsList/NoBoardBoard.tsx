@@ -1,54 +1,172 @@
-import { Text } from '@chakra-ui/react';
+import { Box, Flex, Image, Text } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
-import {
-  INITIAL_IMAGE_LIMIT,
-  boardIdSelected,
-} from 'features/gallery/store/gallerySlice';
-import { FaFolderOpen } from 'react-icons/fa';
-import { useDispatch } from 'react-redux';
-import {
-  ListImagesArgs,
-  useListImagesQuery,
-} from 'services/api/endpoints/images';
-import GenericBoard from './GenericBoard';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import InvokeAILogoImage from 'assets/images/logo.png';
+import IAIDroppable from 'common/components/IAIDroppable';
+import SelectionOverlay from 'common/components/SelectionOverlay';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { useBoardName } from 'services/api/hooks/useBoardName';
+import AutoAddIcon from '../AutoAddIcon';
+import BoardContextMenu from '../BoardContextMenu';
+interface Props {
+  isSelected: boolean;
+}
 
-const baseQueryArg: ListImagesArgs = {
-  board_id: 'none',
-  offset: 0,
-  limit: INITIAL_IMAGE_LIMIT,
-  is_intermediate: false,
-};
+const selector = createSelector(
+  stateSelector,
+  ({ gallery }) => {
+    const { autoAddBoardId } = gallery;
+    return { autoAddBoardId };
+  },
+  defaultSelectorOptions
+);
 
-const NoBoardBoard = ({ isSelected }: { isSelected: boolean }) => {
-  const dispatch = useDispatch();
+const NoBoardBoard = memo(({ isSelected }: Props) => {
+  const dispatch = useAppDispatch();
+  const { autoAddBoardId } = useAppSelector(selector);
+  const boardName = useBoardName(undefined);
+  const handleSelectBoard = useCallback(() => {
+    dispatch(boardIdSelected(undefined));
+  }, [dispatch]);
+  const [isHovered, setIsHovered] = useState(false);
+  const handleMouseOver = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+  const handleMouseOut = useCallback(() => {
+    setIsHovered(false);
+  }, []);
 
-  const handleClick = () => {
-    dispatch(boardIdSelected('no_board'));
-  };
-
-  const { total } = useListImagesQuery(baseQueryArg, {
-    selectFromResult: ({ data }) => ({ total: data?.total ?? 0 }),
-  });
-
-  // TODO: Do we support making 'images' 'assets? if yes, we need to handle this
-  const droppableData: MoveBoardDropData = {
-    id: 'all-images-board',
-    actionType: 'MOVE_BOARD',
-    context: { boardId: 'no_board' },
-  };
+  const droppableData: MoveBoardDropData = useMemo(
+    () => ({
+      id: 'no_board',
+      actionType: 'MOVE_BOARD',
+      context: { boardId: undefined },
+    }),
+    []
+  );
 
   return (
-    <GenericBoard
-      board_id="no_board"
-      droppableData={droppableData}
-      dropLabel={<Text fontSize="md">Move</Text>}
-      onClick={handleClick}
-      isSelected={isSelected}
-      icon={FaFolderOpen}
-      label="No Board"
-      badgeCount={total}
-    />
+    <Box sx={{ w: 'full', h: 'full', touchAction: 'none', userSelect: 'none' }}>
+      <Flex
+        onMouseOver={handleMouseOver}
+        onMouseOut={handleMouseOut}
+        sx={{
+          position: 'relative',
+          justifyContent: 'center',
+          alignItems: 'center',
+          aspectRatio: '1/1',
+          borderRadius: 'base',
+          w: 'full',
+          h: 'full',
+        }}
+      >
+        <BoardContextMenu>
+          {(ref) => (
+            <Flex
+              ref={ref}
+              onClick={handleSelectBoard}
+              sx={{
+                w: 'full',
+                h: 'full',
+                position: 'relative',
+                justifyContent: 'center',
+                alignItems: 'center',
+                borderRadius: 'base',
+                cursor: 'pointer',
+                bg: 'base.200',
+                _dark: {
+                  bg: 'base.800',
+                },
+              }}
+            >
+              <Flex
+                sx={{
+                  w: 'full',
+                  h: 'full',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                {/* <Icon
+                  boxSize={12}
+                  as={FaBucket}
+                  sx={{
+                    opacity: 0.7,
+                    color: 'base.500',
+                    _dark: {
+                      color: 'base.500',
+                    },
+                  }}
+                /> */}
+                <Image
+                  src={InvokeAILogoImage}
+                  alt="invoke-ai-logo"
+                  sx={{
+                    opacity: 0.4,
+                    filter: 'grayscale(1)',
+                    mt: -6,
+                    w: 16,
+                    h: 16,
+                    minW: 16,
+                    minH: 16,
+                    userSelect: 'none',
+                  }}
+                />
+              </Flex>
+              {/* <Flex
+                sx={{
+                  position: 'absolute',
+                  insetInlineEnd: 0,
+                  top: 0,
+                  p: 1,
+                }}
+              >
+                <Badge variant="solid" sx={BASE_BADGE_STYLES}>
+                  {totalImages}/{totalAssets}
+                </Badge>
+              </Flex> */}
+              {!autoAddBoardId && <AutoAddIcon />}
+              <Flex
+                sx={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  p: 1,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  w: 'full',
+                  maxW: 'full',
+                  borderBottomRadius: 'base',
+                  bg: isSelected ? 'accent.400' : 'base.500',
+                  color: isSelected ? 'base.50' : 'base.100',
+                  _dark: {
+                    bg: isSelected ? 'accent.500' : 'base.600',
+                    color: isSelected ? 'base.50' : 'base.100',
+                  },
+                  lineHeight: 'short',
+                  fontSize: 'xs',
+                  fontWeight: isSelected ? 700 : 500,
+                }}
+              >
+                {boardName}
+              </Flex>
+              <SelectionOverlay isSelected={isSelected} isHovered={isHovered} />
+              <IAIDroppable
+                data={droppableData}
+                dropLabel={<Text fontSize="md">Move</Text>}
+              />
+            </Flex>
+          )}
+        </BoardContextMenu>
+      </Flex>
+    </Box>
   );
-};
+});
+
+NoBoardBoard.displayName = 'HoverableBoard';
 
 export default NoBoardBoard;

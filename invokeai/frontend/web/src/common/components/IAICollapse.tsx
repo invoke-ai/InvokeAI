@@ -92,7 +92,10 @@ const IAICollapse = (props: IAIToggleCollapseProps) => {
           sx={{
             p: 4,
             borderBottomRadius: 'base',
-            bg: mode('base.100', 'base.800')(colorMode),
+            bg: 'base.100',
+            _dark: {
+              bg: 'base.800',
+            },
           }}
         >
           {children}

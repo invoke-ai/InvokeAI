@@ -1,21 +1,17 @@
-import { ButtonGroup, Collapse, Flex, Grid, GridItem } from '@chakra-ui/react';
+import { Collapse, Flex, Grid, GridItem } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { AnimatePresence, motion } from 'framer-motion';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import { memo, useCallback, useState } from 'react';
-import { FaSearch } from 'react-icons/fa';
+import { memo, useState } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { BoardDTO } from 'services/api/types';
-import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 import DeleteBoardModal from '../DeleteBoardModal';
 import AddBoardButton from './AddBoardButton';
 import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';
-import SystemBoardButton from './SystemBoardButton';
+import NoBoardBoard from './NoBoardBoard';
 
 const selector = createSelector(
   [stateSelector],
@@ -35,17 +31,12 @@ const BoardsList = (props: Props) => {
   const { isOpen } = props;
   const { selectedBoardId, searchText } = useAppSelector(selector);
   const { data: boards } = useListAllBoardsQuery();
-  const isBatchEnabled = useFeatureStatus('batches').isFeatureEnabled;
   const filteredBoards = searchText
     ? boards?.filter((board) =>
         board.board_name.toLowerCase().includes(searchText.toLowerCase())
       )
     : boards;
   const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
-  const [isSearching, setIsSearching] = useState(false);
-  const handleClickSearchIcon = useCallback(() => {
-    setIsSearching((v) => !v);
-  }, []);
 
   return (
     <>
@@ -61,54 +52,7 @@ const BoardsList = (props: Props) => {
           }}
         >
           <Flex sx={{ gap: 2, alignItems: 'center' }}>
-            <AnimatePresence mode="popLayout">
-              {isSearching ? (
-                <motion.div
-                  key="boards-search"
-                  initial={{
-                    opacity: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    transition: { duration: 0.1 },
-                  }}
-                  style={{ width: '100%' }}
-                >
-                  <BoardsSearch setIsSearching={setIsSearching} />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="system-boards-select"
-                  initial={{
-                    opacity: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    transition: { duration: 0.1 },
-                  }}
-                  style={{ width: '100%' }}
-                >
-                  <ButtonGroup sx={{ w: 'full', ps: 1.5 }} isAttached>
-                    <SystemBoardButton board_id="images" />
-                    <SystemBoardButton board_id="assets" />
-                    <SystemBoardButton board_id="no_board" />
-                  </ButtonGroup>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <IAIIconButton
-              aria-label="Search Boards"
-              size="sm"
-              isChecked={isSearching}
-              onClick={handleClickSearchIcon}
-              icon={<FaSearch />}
-            />
+            <BoardsSearch />
             <AddBoardButton />
           </Flex>
           <OverlayScrollbarsComponent
@@ -126,10 +70,13 @@ const BoardsList = (props: Props) => {
             <Grid
               className="list-container"
               sx={{
-                gridTemplateColumns: `repeat(auto-fill, minmax(96px, 1fr));`,
+                gridTemplateColumns: `repeat(auto-fill, minmax(108px, 1fr));`,
                 maxH: 346,
               }}
             >
+              <GridItem sx={{ p: 1.5 }}>
+                <NoBoardBoard isSelected={selectedBoardId === undefined} />
+              </GridItem>
               {filteredBoards &&
                 filteredBoards.map((board) => (
                   <GridItem key={board.board_id} sx={{ p: 1.5 }}>

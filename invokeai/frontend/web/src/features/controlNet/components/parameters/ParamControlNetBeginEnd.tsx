@@ -55,11 +55,6 @@ const ParamControlNetBeginEnd = (props: Props) => {
     [controlNetId, dispatch]
   );
 
-  const handleStepPctReset = useCallback(() => {
-    dispatch(controlNetBeginStepPctChanged({ controlNetId, beginStepPct: 0 }));
-    dispatch(controlNetEndStepPctChanged({ controlNetId, endStepPct: 1 }));
-  }, [controlNetId, dispatch]);
-
   return (
     <FormControl isDisabled={!isEnabled}>
       <FormLabel>Begin / End Step Percentage</FormLabel>

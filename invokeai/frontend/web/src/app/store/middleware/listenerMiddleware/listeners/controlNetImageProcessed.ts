@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
@@ -9,20 +9,16 @@ import { Graph, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 import { startAppListening } from '..';
 
-const moduleLog = log.child({ namespace: 'controlNet' });
-
 export const addControlNetImageProcessedListener = () => {
   startAppListening({
     actionCreator: controlNetImageProcessed,
-    effect: async (
-      action,
-      { dispatch, getState, take, unsubscribe, subscribe }
-    ) => {
+    effect: async (action, { dispatch, getState, take }) => {
+      const log = logger('session');
       const { controlNetId } = action.payload;
       const controlNet = getState().controlNet.controlNets[controlNetId];
 
       if (!controlNet.controlImage) {
-        moduleLog.error('Unable to process ControlNet image');
+        log.error('Unable to process ControlNet image');
         return;
       }
 
@@ -70,8 +66,8 @@ export const addControlNetImageProcessedListener = () => {
 
         const processedControlImage = payload as ImageDTO;
 
-        moduleLog.debug(
-          { data: { arg: action.payload, processedControlImage } },
+        log.debug(
+          { controlNetId: action.payload, processedControlImage },
           'ControlNet image processed'
         );
 

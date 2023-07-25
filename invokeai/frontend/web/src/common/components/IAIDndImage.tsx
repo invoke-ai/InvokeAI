@@ -18,12 +18,20 @@ import {
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
-import { MouseEvent, ReactElement, SyntheticEvent, memo } from 'react';
+import {
+  MouseEvent,
+  ReactElement,
+  SyntheticEvent,
+  memo,
+  useCallback,
+  useState,
+} from 'react';
 import { FaImage, FaUndo, FaUpload } from 'react-icons/fa';
 import { ImageDTO, PostUploadAction } from 'services/api/types';
 import { mode } from 'theme/util/mode';
 import IAIDraggable from './IAIDraggable';
 import IAIDroppable from './IAIDroppable';
+import SelectionOverlay from './SelectionOverlay';
 
 type IAIDndImageProps = {
   imageDTO: ImageDTO | undefined;
@@ -49,6 +57,7 @@ type IAIDndImageProps = {
   thumbnail?: boolean;
   noContentFallback?: ReactElement;
   useThumbailFallback?: boolean;
+  withHoverOverlay?: boolean;
 };
 
 const IAIDndImage = (props: IAIDndImageProps) => {
@@ -75,9 +84,17 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     resetIcon = <FaUndo />,
     noContentFallback = <IAINoContentFallback icon={FaImage} />,
     useThumbailFallback,
+    withHoverOverlay = false,
   } = props;
 
   const { colorMode } = useColorMode();
+  const [isHovered, setIsHovered] = useState(false);
+  const handleMouseOver = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+  const handleMouseOut = useCallback(() => {
+    setIsHovered(false);
+  }, []);
 
   const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
     postUploadAction,
@@ -105,6 +122,8 @@ const IAIDndImage = (props: IAIDndImageProps) => {
       {(ref) => (
         <Flex
           ref={ref}
+          onMouseOver={handleMouseOver}
+          onMouseOut={handleMouseOut}
           sx={{
             width: 'full',
             height: 'full',
@@ -147,14 +166,16 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                   maxW: 'full',
                   maxH: 'full',
                   borderRadius: 'base',
-                  shadow: isSelected ? 'selected.light' : undefined,
-                  _dark: {
-                    shadow: isSelected ? 'selected.dark' : undefined,
-                  },
                   ...imageSx,
                 }}
               />
-              {withMetadataOverlay && <ImageMetadataOverlay image={imageDTO} />}
+              {withMetadataOverlay && (
+                <ImageMetadataOverlay imageDTO={imageDTO} />
+              )}
+              <SelectionOverlay
+                isSelected={isSelected}
+                isHovered={withHoverOverlay ? isHovered : false}
+              />
             </Flex>
           )}
           {!imageDTO && !isUploadDisabled && (

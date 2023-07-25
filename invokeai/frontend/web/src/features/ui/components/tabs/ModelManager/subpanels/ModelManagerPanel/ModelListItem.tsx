@@ -1,6 +1,6 @@
 import { DeleteIcon } from '@chakra-ui/icons';
 import { Badge, Flex, Text, Tooltip } from '@chakra-ui/react';
-import { makeToast } from 'app/components/Toaster';
+import { makeToast } from 'features/system/util/makeToast';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';

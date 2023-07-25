@@ -6,9 +6,8 @@ import { memo } from 'react';
 import { FieldComponentProps } from './types';
 
 const UNetInputFieldComponent = (
-  props: FieldComponentProps<UNetInputFieldValue, UNetInputFieldTemplate>
+  _props: FieldComponentProps<UNetInputFieldValue, UNetInputFieldTemplate>
 ) => {
-  const { nodeId, field } = props;
   return null;
 };
 

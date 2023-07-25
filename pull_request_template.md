@@ -13,7 +13,7 @@
 - [ ] No, because:
 
       
-## Have you updated relevant documentation?
+## Have you updated all relevant documentation?
 - [ ] Yes
 - [ ] No
 
