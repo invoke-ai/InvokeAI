@@ -88,7 +88,7 @@ const ParamMainModelSelect = () => {
       data={[]}
     />
   ) : (
-    <Flex w="100%" alignItems="center" gap={2}>
+    <Flex w="100%" alignItems="center" gap={3}>
       <IAIMantineSearchableSelect
         tooltip={selectedModel?.description}
         label={t('modelManager.model')}
