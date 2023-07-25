@@ -1,19 +1,36 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import {
+  MainModelParam,
   NegativeStylePromptSDXLParam,
   PositiveStylePromptSDXLParam,
+  SchedulerParam,
 } from 'features/parameters/types/parameterSchemas';
+import { MainModelField } from 'services/api/types';
 
 type SDXLInitialState = {
-  shouldUseSDXLRefiner: boolean;
   positiveStylePrompt: PositiveStylePromptSDXLParam;
   negativeStylePrompt: NegativeStylePromptSDXLParam;
+  isRefinerAvailable: boolean;
+  shouldUseSDXLRefiner: boolean;
+  refinerModel: MainModelField | null;
+  refinerSteps: number;
+  refinerCFGScale: number;
+  refinerScheduler: SchedulerParam;
+  refinerAestheticScore: number;
+  refinerStart: number;
 };
 
 const sdxlInitialState: SDXLInitialState = {
-  shouldUseSDXLRefiner: false,
   positiveStylePrompt: '',
   negativeStylePrompt: '',
+  isRefinerAvailable: false,
+  shouldUseSDXLRefiner: false,
+  refinerModel: null,
+  refinerSteps: 20,
+  refinerCFGScale: 7.5,
+  refinerScheduler: 'euler',
+  refinerAestheticScore: 6,
+  refinerStart: 0.7,
 };
 
 const sdxlSlice = createSlice({
@@ -26,8 +43,32 @@ const sdxlSlice = createSlice({
     setNegativeStylePromptSDXL: (state, action: PayloadAction<string>) => {
       state.negativeStylePrompt = action.payload;
     },
+    setIsRefinerAvailable: (state, action: PayloadAction<boolean>) => {
+      state.isRefinerAvailable = action.payload;
+    },
     setShouldUseSDXLRefiner: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSDXLRefiner = action.payload;
+    },
+    refinerModelChanged: (
+      state,
+      action: PayloadAction<MainModelParam | null>
+    ) => {
+      state.refinerModel = action.payload;
+    },
+    setRefinerSteps: (state, action: PayloadAction<number>) => {
+      state.refinerSteps = action.payload;
+    },
+    setRefinerCFGScale: (state, action: PayloadAction<number>) => {
+      state.refinerCFGScale = action.payload;
+    },
+    setRefinerScheduler: (state, action: PayloadAction<SchedulerParam>) => {
+      state.refinerScheduler = action.payload;
+    },
+    setRefinerAestheticScore: (state, action: PayloadAction<number>) => {
+      state.refinerAestheticScore = action.payload;
+    },
+    setRefinerStart: (state, action: PayloadAction<number>) => {
+      state.refinerStart = action.payload;
     },
   },
 });
@@ -35,7 +76,14 @@ const sdxlSlice = createSlice({
 export const {
   setPositiveStylePromptSDXL,
   setNegativeStylePromptSDXL,
+  setIsRefinerAvailable,
   setShouldUseSDXLRefiner,
+  refinerModelChanged,
+  setRefinerSteps,
+  setRefinerCFGScale,
+  setRefinerScheduler,
+  setRefinerAestheticScore,
+  setRefinerStart,
 } = sdxlSlice.actions;
 
 export default sdxlSlice.reducer;

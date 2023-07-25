@@ -6,6 +6,7 @@ import ProcessButtons from 'features/parameters/components/ProcessButtons/Proces
 import TextToImageTabCoreParameters from 'features/ui/components/tabs/TextToImage/TextToImageTabCoreParameters';
 import ParamSDXLNegativeStyleConditioning from './ParamSDXLNegativeStyleConditioning';
 import ParamSDXLPositiveStyleConditioning from './ParamSDXLPositiveStyleConditioning';
+import ParamSDXLRefinerCollapse from './ParamSDXLRefinerCollapse';
 
 const SDXLTextToImageTabParameters = () => {
   return (
@@ -16,6 +17,7 @@ const SDXLTextToImageTabParameters = () => {
       <ParamSDXLNegativeStyleConditioning />
       <ProcessButtons />
       <TextToImageTabCoreParameters />
+      <ParamSDXLRefinerCollapse />
       <ParamDynamicPromptsCollapse />
       <ParamNoiseCollapse />
     </>
