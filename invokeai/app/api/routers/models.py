@@ -87,7 +87,7 @@ async def update_model(
                 new_name = info.model_name,
                 new_base = info.base_model,
             )
-            logger.info(f'Successfully renamed {base_model}/{model_name}=>{info.base_model}/{info.model_name}')
+            logger.info(f'Successfully renamed {base_model.value}/{model_name}=>{info.base_model}/{info.model_name}')
             # update information to support an update of attributes
             model_name = info.model_name
             base_model = info.base_model
@@ -98,7 +98,7 @@ async def update_model(
             )
             if new_info.get('path') != previous_info.get('path'):  # model manager moved model path during rename - don't overwrite it
                 info.path = new_info.get('path')
-            
+
         ApiDependencies.invoker.services.model_manager.update_model(
             model_name=model_name,
             base_model=base_model,
