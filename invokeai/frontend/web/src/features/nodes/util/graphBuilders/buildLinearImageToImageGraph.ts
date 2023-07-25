@@ -46,6 +46,7 @@ export const buildLinearImageToImageGraph = (
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
+    vaePrecision,
   } = state.generation;
 
   // TODO: add batch functionality
@@ -113,6 +114,7 @@ export const buildLinearImageToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
+        fp32: vaePrecision === 'fp32' ? true : false,
       },
       [LATENTS_TO_LATENTS]: {
         type: 'l2l',
@@ -129,6 +131,7 @@ export const buildLinearImageToImageGraph = (
         // image: {
         //   image_name: initialImage.image_name,
         // },
+        fp32: vaePrecision === 'fp32' ? true : false,
       },
     },
     edges: [
