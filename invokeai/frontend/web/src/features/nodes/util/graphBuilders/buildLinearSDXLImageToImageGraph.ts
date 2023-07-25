@@ -6,22 +6,18 @@ import {
   ImageResizeInvocation,
   ImageToLatentsInvocation,
 } from 'services/api/types';
-import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
-import { addLoRAsToGraph } from './addLoRAsToGraph';
-import { addVAEToGraph } from './addVAEToGraph';
 import {
-  CLIP_SKIP,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
-  LATENTS_TO_LATENTS,
-  MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  SDXL_LATENTS_TO_LATENTS,
+  SDXL_MODEL_LOADER,
 } from './constants';
 
 /**
@@ -85,23 +81,18 @@ export const buildLinearSDXLImageToImageGraph = (
   const graph: NonNullableGraph = {
     id: IMAGE_TO_IMAGE_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+      [SDXL_MODEL_LOADER]: {
+        type: 'sdxl_model_loader',
+        id: SDXL_MODEL_LOADER,
         model,
       },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        skipped_layers: clipSkip,
-      },
       [POSITIVE_CONDITIONING]: {
-        type: 'compel',
+        type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: 'compel',
+        type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
       },
@@ -114,13 +105,13 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
       },
-      [LATENTS_TO_LATENTS]: {
-        type: 'l2l',
-        id: LATENTS_TO_LATENTS,
+      [SDXL_LATENTS_TO_LATENTS]: {
+        type: 'l2l_sdxl',
+        id: SDXL_LATENTS_TO_LATENTS,
         cfg_scale,
         scheduler,
         steps,
-        strength,
+        denoising_start: 1 - strength,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -134,27 +125,37 @@ export const buildLinearSDXLImageToImageGraph = (
     edges: [
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: SDXL_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: SDXL_LATENTS_TO_LATENTS,
           field: 'unet',
         },
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'clip',
+          node_id: SDXL_MODEL_LOADER,
+          field: 'vae',
         },
         destination: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
+          node_id: LATENTS_TO_IMAGE,
+          field: 'vae',
         },
       },
       {
         source: {
-          node_id: CLIP_SKIP,
+          node_id: SDXL_MODEL_LOADER,
+          field: 'vae',
+        },
+        destination: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'vae',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -164,7 +165,17 @@ export const buildLinearSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: CLIP_SKIP,
+          node_id: SDXL_MODEL_LOADER,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -174,7 +185,17 @@ export const buildLinearSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: SDXL_MODEL_LOADER,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_LATENTS_TO_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -188,7 +209,7 @@ export const buildLinearSDXLImageToImageGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: SDXL_LATENTS_TO_LATENTS,
           field: 'latents',
         },
       },
@@ -198,18 +219,8 @@ export const buildLinearSDXLImageToImageGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: SDXL_LATENTS_TO_LATENTS,
           field: 'noise',
-        },
-      },
-      {
-        source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'negative_conditioning',
         },
       },
       {
@@ -218,8 +229,18 @@ export const buildLinearSDXLImageToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: SDXL_LATENTS_TO_LATENTS,
           field: 'positive_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: SDXL_LATENTS_TO_LATENTS,
+          field: 'negative_conditioning',
         },
       },
     ],
@@ -334,7 +355,7 @@ export const buildLinearSDXLImageToImageGraph = (
   graph.nodes[METADATA_ACCUMULATOR] = {
     id: METADATA_ACCUMULATOR,
     type: 'metadata_accumulator',
-    generation_mode: 'img2img',
+    generation_mode: 'sdxl_img2img',
     cfg_scale,
     height,
     width,
@@ -345,9 +366,9 @@ export const buildLinearSDXLImageToImageGraph = (
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
-    vae: undefined, // option; set in addVAEToGraph
-    controlnets: [], // populated in addControlNetToLinearGraph
-    loras: [], // populated in addLoRAsToGraph
+    vae: undefined,
+    controlnets: [],
+    loras: [],
     clip_skip: clipSkip,
     strength,
     init_image: initialImage.imageName,
@@ -364,17 +385,8 @@ export const buildLinearSDXLImageToImageGraph = (
     },
   });
 
-  // add LoRA support
-  addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
-
-  // optionally add custom VAE
-  addVAEToGraph(state, graph);
-
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
-
-  // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, LATENTS_TO_LATENTS);
 
   return graph;
 };
