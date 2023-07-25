@@ -23,8 +23,11 @@ export const METADATA_ACCUMULATOR = 'metadata_accumulator';
 export const REALESRGAN = 'esrgan';
 export const DIVIDE = 'divide';
 export const SCALE = 'scale_image';
+export const SDXL_MODEL_LOADER = 'sdxl_model_loader';
+export const SDXL_TEXT_TO_LATENTS = 't2l_sdxl';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';
+export const SDXL_TEXT_TO_IMAGE_GRAPH = 'sdxl_text_to_image_graph';
 export const IMAGE_TO_IMAGE_GRAPH = 'image_to_image_graph';
 export const INPAINT_GRAPH = 'inpaint_graph';
