@@ -18,7 +18,13 @@ const selector = createSelector(
 const ParamLoraList = () => {
   const { loras } = useAppSelector(selector);
 
-  return map(loras, (lora) => <ParamLora key={lora.model_name} lora={lora} />);
+  return (
+    <>
+      {map(loras, (lora) => (
+        <ParamLora key={lora.model_name} lora={lora} />
+      ))}
+    </>
+  );
 };
 
 export default ParamLoraList;

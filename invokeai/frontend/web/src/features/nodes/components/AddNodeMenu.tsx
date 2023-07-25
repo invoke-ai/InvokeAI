@@ -1,6 +1,7 @@
 import { Flex, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
@@ -9,7 +10,7 @@ import { forwardRef, useCallback } from 'react';
 import 'reactflow/dist/style.css';
 import { AnyInvocationType } from 'services/events/types';
 import { useBuildInvocation } from '../hooks/useBuildInvocation';
-import { nodeAdded, nodesSelector } from '../store/nodesSlice';
+import { nodeAdded } from '../store/nodesSlice';
 
 type NodeTemplate = {
   label: string;
@@ -18,8 +19,8 @@ type NodeTemplate = {
 };
 
 const selector = createSelector(
-  nodesSelector,
-  (nodes) => {
+  [stateSelector],
+  ({ nodes }) => {
     const data: NodeTemplate[] = map(nodes.invocationTemplates, (template) => {
       return {
         label: template.title,

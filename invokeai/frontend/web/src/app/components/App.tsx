@@ -14,6 +14,7 @@ import FloatingParametersPanelButtons from 'features/ui/components/FloatingParam
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 import ParametersDrawer from 'features/ui/components/ParametersDrawer';
 import i18n from 'i18n';
+import { size } from 'lodash-es';
 import { ReactNode, memo, useEffect } from 'react';
 import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
 import GlobalHotkeys from './GlobalHotkeys';
@@ -29,8 +30,7 @@ interface Props {
 const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   const language = useAppSelector(languageSelector);
 
-  const log = useLogger();
-
+  const logger = useLogger();
   const dispatch = useAppDispatch();
 
   useEffect(() => {
@@ -38,9 +38,11 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   }, [language]);
 
   useEffect(() => {
-    log.info({ namespace: 'App', data: config }, 'Received config');
-    dispatch(configChanged(config));
-  }, [dispatch, config, log]);
+    if (size(config)) {
+      logger.info({ namespace: 'App', config }, 'Received config');
+      dispatch(configChanged(config));
+    }
+  }, [dispatch, config, logger]);
 
   useEffect(() => {
     dispatch(appStarted());

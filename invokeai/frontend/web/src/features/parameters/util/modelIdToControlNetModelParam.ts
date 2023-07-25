@@ -1,13 +1,12 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { zControlNetModel } from 'features/parameters/types/parameterSchemas';
 import { ControlNetModelField } from 'services/api/types';
-
-const moduleLog = log.child({ module: 'models' });
 
 export const modelIdToControlNetModelParam = (
   controlNetModelId: string
 ): ControlNetModelField | undefined => {
-  const [base_model, model_type, model_name] = controlNetModelId.split('/');
+  const log = logger('models');
+  const [base_model, _model_type, model_name] = controlNetModelId.split('/');
 
   const result = zControlNetModel.safeParse({
     base_model,
@@ -15,7 +14,7 @@ export const modelIdToControlNetModelParam = (
   });
 
   if (!result.success) {
-    moduleLog.error(
+    log.error(
       {
         controlNetModelId,
         errors: result.error.format(),

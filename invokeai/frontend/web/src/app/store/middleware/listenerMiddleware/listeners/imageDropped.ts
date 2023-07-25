@@ -3,7 +3,7 @@ import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'app/components/ImageDnd/typesafeDnd';
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
 import {
@@ -15,8 +15,6 @@ import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '../';
 
-const moduleLog = log.child({ namespace: 'dnd' });
-
 export const dndDropped = createAction<{
   overData: TypesafeDroppableData;
   activeData: TypesafeDraggableData;
@@ -25,14 +23,11 @@ export const dndDropped = createAction<{
 export const addImageDroppedListener = () => {
   startAppListening({
     actionCreator: dndDropped,
-    effect: async (action, { dispatch, getState, take }) => {
+    effect: async (action, { dispatch }) => {
+      const log = logger('images');
       const { activeData, overData } = action.payload;
-      const state = getState();
 
-      moduleLog.debug(
-        { data: { activeData, overData } },
-        'Image or selection dropped'
-      );
+      log.debug({ activeData, overData }, 'Image or selection dropped');
 
       // set current image
       if (

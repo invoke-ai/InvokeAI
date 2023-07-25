@@ -7,7 +7,7 @@ type Props = {
   isEnabled: boolean;
 };
 
-const ZoeDepthProcessor = (props: Props) => {
+const ZoeDepthProcessor = (_props: Props) => {
   // Has no parameters?
   return null;
 };

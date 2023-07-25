@@ -2,8 +2,7 @@ import { Update } from '@reduxjs/toolkit';
 import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
-  boardIdSelected,
-} from 'features/gallery/store/gallerySlice';
+} from 'features/gallery/store/types';
 import {
   BoardDTO,
   ImageDTO,

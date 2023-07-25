@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
@@ -25,8 +25,6 @@ import {
   RESIZE,
 } from './constants';
 
-const moduleLog = log.child({ namespace: 'nodes' });
-
 /**
  * Builds the Canvas tab's Image to Image graph.
  */
@@ -34,6 +32,7 @@ export const buildCanvasImageToImageGraph = (
   state: RootState,
   initialImage: ImageDTO
 ): NonNullableGraph => {
+  const log = logger('nodes');
   const {
     positivePrompt,
     negativePrompt,
@@ -53,7 +52,7 @@ export const buildCanvasImageToImageGraph = (
   const { shouldAutoSave } = state.canvas;
 
   if (!model) {
-    moduleLog.error('No model found in state');
+    log.error('No model found in state');
     throw new Error('No model found in state');
   }
 

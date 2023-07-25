@@ -1,5 +1,6 @@
 import { Divider, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
@@ -9,20 +10,18 @@ import ParamControlNetFeatureToggle from 'features/controlNet/components/paramet
 import {
   controlNetAdded,
   controlNetModelChanged,
-  controlNetSelector,
 } from 'features/controlNet/store/controlNetSlice';
 import { getValidControlNets } from 'features/controlNet/util/getValidControlNets';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { map } from 'lodash-es';
 import { Fragment, memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { FaPlus } from 'react-icons/fa';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 import { v4 as uuidv4 } from 'uuid';
 
 const selector = createSelector(
-  controlNetSelector,
-  (controlNet) => {
+  [stateSelector],
+  ({ controlNet }) => {
     const { controlNets, isEnabled } = controlNet;
 
     const validControlNets = getValidControlNets(controlNets);
@@ -38,7 +37,6 @@ const selector = createSelector(
 );
 
 const ParamControlNetCollapse = () => {
-  const { t } = useTranslation();
   const { controlNetsArray, activeLabel } = useAppSelector(selector);
   const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
   const dispatch = useAppDispatch();

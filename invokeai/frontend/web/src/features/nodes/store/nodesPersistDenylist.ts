@@ -1,4 +1,4 @@
-import { NodesState } from './nodesSlice';
+import { NodesState } from './types';
 
 /**
  * Nodes slice persist denylist

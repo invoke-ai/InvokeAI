@@ -2,32 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { uniq } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
-import { ImageCategory } from 'services/api/types';
-
-export const IMAGE_CATEGORIES: ImageCategory[] = ['general'];
-export const ASSETS_CATEGORIES: ImageCategory[] = [
-  'control',
-  'mask',
-  'user',
-  'other',
-];
-export const INITIAL_IMAGE_LIMIT = 100;
-export const IMAGE_LIMIT = 20;
-
-export type GalleryView = 'images' | 'assets';
-// export type BoardId = 'no_board' | (string & Record<never, never>);
-export type BoardId = string | undefined;
-
-type GalleryState = {
-  selection: string[];
-  shouldAutoSwitch: boolean;
-  autoAddBoardId: string | undefined;
-  galleryImageMinimumWidth: number;
-  selectedBoardId: BoardId;
-  galleryView: GalleryView;
-  batchImageNames: string[];
-  isBatchEnabled: boolean;
-};
+import { BoardId, GalleryState, GalleryView } from './types';
 
 export const initialGalleryState: GalleryState = {
   selection: [],
@@ -44,40 +19,44 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState: initialGalleryState,
   reducers: {
-    imageRangeEndSelected: (state, action: PayloadAction<string>) => {
-      // MULTI SELECT LOGIC
-      // const rangeEndImageName = action.payload;
-      // const lastSelectedImage = state.selection[state.selection.length - 1];
-      // const filteredImages = selectFilteredImagesLocal(state);
-      // const lastClickedIndex = filteredImages.findIndex(
-      //   (n) => n.image_name === lastSelectedImage
-      // );
-      // const currentClickedIndex = filteredImages.findIndex(
-      //   (n) => n.image_name === rangeEndImageName
-      // );
-      // if (lastClickedIndex > -1 && currentClickedIndex > -1) {
-      //   // We have a valid range!
-      //   const start = Math.min(lastClickedIndex, currentClickedIndex);
-      //   const end = Math.max(lastClickedIndex, currentClickedIndex);
-      //   const imagesToSelect = filteredImages
-      //     .slice(start, end + 1)
-      //     .map((i) => i.image_name);
-      //   state.selection = uniq(state.selection.concat(imagesToSelect));
-      // }
+    imageRangeEndSelected: () => {
+      // TODO
     },
-    imageSelectionToggled: (state, action: PayloadAction<string>) => {
-      // MULTI SELECT LOGIC
-      // if (
-      //   state.selection.includes(action.payload) &&
-      //   state.selection.length > 1
-      // ) {
-      //   state.selection = state.selection.filter(
-      //     (imageName) => imageName !== action.payload
-      //   );
-      // } else {
-      //   state.selection = uniq(state.selection.concat(action.payload));
-      // }
+    // imageRangeEndSelected: (state, action: PayloadAction<string>) => {
+    // const rangeEndImageName = action.payload;
+    // const lastSelectedImage = state.selection[state.selection.length - 1];
+    // const filteredImages = selectFilteredImagesLocal(state);
+    // const lastClickedIndex = filteredImages.findIndex(
+    //   (n) => n.image_name === lastSelectedImage
+    // );
+    // const currentClickedIndex = filteredImages.findIndex(
+    //   (n) => n.image_name === rangeEndImageName
+    // );
+    // if (lastClickedIndex > -1 && currentClickedIndex > -1) {
+    //   // We have a valid range!
+    //   const start = Math.min(lastClickedIndex, currentClickedIndex);
+    //   const end = Math.max(lastClickedIndex, currentClickedIndex);
+    //   const imagesToSelect = filteredImages
+    //     .slice(start, end + 1)
+    //     .map((i) => i.image_name);
+    //   state.selection = uniq(state.selection.concat(imagesToSelect));
+    // }
+    // },
+    imageSelectionToggled: () => {
+      // TODO
     },
+    // imageSelectionToggled: (state, action: PayloadAction<string>) => {
+    // TODO: multiselect
+    // if (
+    //   state.selection.includes(action.payload) &&
+    //   state.selection.length > 1
+    // ) {
+    //   state.selection = state.selection.filter(
+    //     (imageName) => imageName !== action.payload
+    //   );
+    // } else {
+    //   state.selection = uniq(state.selection.concat(action.payload));
+    // }
     imageSelected: (state, action: PayloadAction<string | null>) => {
       state.selection = action.payload ? [action.payload] : [];
     },
@@ -157,7 +136,6 @@ export const gallerySlice = createSlice({
 });
 
 export const {
-  imagesRemoved,
   imageRangeEndSelected,
   imageSelectionToggled,
   imageSelected,

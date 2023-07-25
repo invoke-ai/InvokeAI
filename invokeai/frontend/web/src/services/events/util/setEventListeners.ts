@@ -1,42 +1,42 @@
 import { MiddlewareAPI } from '@reduxjs/toolkit';
+import { logger } from 'app/logging/logger';
 import { AppDispatch, RootState } from 'app/store/store';
-import { getTimestamp } from 'common/util/getTimestamp';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { Socket } from 'socket.io-client';
 import {
+  socketConnected,
+  socketDisconnected,
   socketGeneratorProgress,
   socketGraphExecutionStateComplete,
   socketInvocationComplete,
   socketInvocationError,
+  socketInvocationRetrievalError,
   socketInvocationStarted,
-  socketConnected,
-  socketDisconnected,
-  socketSubscribed,
-  socketModelLoadStarted,
   socketModelLoadCompleted,
+  socketModelLoadStarted,
+  socketSessionRetrievalError,
+  socketSubscribed,
 } from '../actions';
 import { ClientToServerEvents, ServerToClientEvents } from '../types';
-import { Logger } from 'roarr';
-import { JsonObject } from 'roarr/dist/types';
-import { makeToast } from '../../../app/components/Toaster';
-import { addToast } from '../../../features/system/store/systemSlice';
 
 type SetEventListenersArg = {
   socket: Socket<ServerToClientEvents, ClientToServerEvents>;
   storeApi: MiddlewareAPI<AppDispatch, RootState>;
-  log: Logger<JsonObject>;
 };
 
 export const setEventListeners = (arg: SetEventListenersArg) => {
-  const { socket, storeApi, log } = arg;
+  const { socket, storeApi } = arg;
   const { dispatch, getState } = storeApi;
 
   /**
    * Connect
    */
   socket.on('connect', () => {
+    const log = logger('socketio');
     log.debug('Connected');
 
-    dispatch(socketConnected({ timestamp: getTimestamp() }));
+    dispatch(socketConnected());
 
     const { sessionId } = getState().system;
 
@@ -45,8 +45,6 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
       dispatch(
         socketSubscribed({
           sessionId,
-          timestamp: getTimestamp(),
-          boardId: getState().gallery.selectedBoardId,
         })
       );
     }
@@ -54,7 +52,9 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
 
   socket.on('connect_error', (error) => {
     if (error && error.message) {
-      const data: string | undefined = (error as any).data;
+      const data: string | undefined = (
+        error as unknown as { data: string | undefined }
+      ).data;
       if (data === 'ERR_UNAUTHENTICATED') {
         dispatch(
           addToast(
@@ -73,28 +73,28 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
    * Disconnect
    */
   socket.on('disconnect', () => {
-    dispatch(socketDisconnected({ timestamp: getTimestamp() }));
+    dispatch(socketDisconnected());
   });
 
   /**
    * Invocation started
    */
   socket.on('invocation_started', (data) => {
-    dispatch(socketInvocationStarted({ data, timestamp: getTimestamp() }));
+    dispatch(socketInvocationStarted({ data }));
   });
 
   /**
    * Generator progress
    */
   socket.on('generator_progress', (data) => {
-    dispatch(socketGeneratorProgress({ data, timestamp: getTimestamp() }));
+    dispatch(socketGeneratorProgress({ data }));
   });
 
   /**
    * Invocation error
    */
   socket.on('invocation_error', (data) => {
-    dispatch(socketInvocationError({ data, timestamp: getTimestamp() }));
+    dispatch(socketInvocationError({ data }));
   });
 
   /**
@@ -104,7 +104,6 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(
       socketInvocationComplete({
         data,
-        timestamp: getTimestamp(),
       })
     );
   });
@@ -116,7 +115,6 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(
       socketGraphExecutionStateComplete({
         data,
-        timestamp: getTimestamp(),
       })
     );
   });
@@ -128,7 +126,6 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(
       socketModelLoadStarted({
         data,
-        timestamp: getTimestamp(),
       })
     );
   });
@@ -140,7 +137,28 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(
       socketModelLoadCompleted({
         data,
-        timestamp: getTimestamp(),
+      })
+    );
+  });
+
+  /**
+   * Session retrieval error
+   */
+  socket.on('session_retrieval_error', (data) => {
+    dispatch(
+      socketSessionRetrievalError({
+        data,
+      })
+    );
+  });
+
+  /**
+   * Invocation retrieval error
+   */
+  socket.on('invocation_retrieval_error', (data) => {
+    dispatch(
+      socketInvocationRetrievalError({
+        data,
       })
     );
   });

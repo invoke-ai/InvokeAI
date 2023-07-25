@@ -2,7 +2,7 @@ import { As, Badge, Flex } from '@chakra-ui/react';
 import { TypesafeDroppableData } from 'app/components/ImageDnd/typesafeDnd';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { BoardId } from 'features/gallery/store/gallerySlice';
+import { BoardId } from 'features/gallery/store/types';
 import { ReactNode } from 'react';
 import BoardContextMenu from '../BoardContextMenu';
 

@@ -1,23 +1,19 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider, { IAIFullSliderProps } from 'common/components/IAISlider';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setHeight, setWidth } from 'features/parameters/store/generationSlice';
-import { configSelector } from 'features/system/store/configSelectors';
-import { hotkeysSelector } from 'features/ui/store/hotkeysSlice';
-import { uiSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
-  [generationSelector, hotkeysSelector, configSelector, uiSelector],
-  (generation, hotkeys, config, ui) => {
+  [stateSelector],
+  ({ generation, hotkeys, config }) => {
     const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
       config.sd.width;
-    const { width } = generation;
-    const { aspectRatio } = ui;
+    const { width, aspectRatio } = generation;
 
     const step = hotkeys.shift ? fineStep : coarseStep;
 

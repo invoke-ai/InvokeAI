@@ -1,15 +1,14 @@
 import { Flex, Icon, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isEqual } from 'lodash-es';
-import { useTranslation } from 'react-i18next';
-import { systemSelector } from '../store/systemSelectors';
-import { ResourceKey } from 'i18next';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { AnimatePresence, motion } from 'framer-motion';
+import { ResourceKey } from 'i18next';
 import { useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaCircle } from 'react-icons/fa';
 import { useHoverDirty } from 'react-use';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { systemSelector } from '../store/systemSelectors';
 
 const statusIndicatorSelector = createSelector(
   systemSelector,

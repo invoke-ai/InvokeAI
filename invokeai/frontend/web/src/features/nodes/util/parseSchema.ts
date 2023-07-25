@@ -24,6 +24,7 @@ const invocationDenylist = [
 export const parseSchema = (openAPI: OpenAPIV3.Document) => {
   // filter out non-invocation schemas, plus some tricky invocations for now
   const filteredSchemas = filter(
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     openAPI.components!.schemas,
     (schema, key) =>
       key.includes('Invocation') &&
@@ -102,6 +103,7 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
       // some special handling is needed for collect, iterate and range nodes
       if (type === 'iterate') {
         // this is guaranteed to be a SchemaObject
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const iterationOutput = openAPI.components!.schemas![
           'IterateInvocationOutput'
         ] as OpenAPIV3.SchemaObject;
