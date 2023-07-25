@@ -116,49 +116,49 @@ There are several node grouping concepts that can be examined with a narrow focu
 
 As described, an initial noise tensor is necessary for the latent diffusion process. As a result, all non-image *ToLatents nodes require a noise node input.  
 
-<img width="654" alt="groupsnoise" src="https://i.imgur.com/QywzADu.webp?maxwidth=760&fidelity=grand">
+![groupsnoise](../assets/nodes/groupsnoise.png)
 
 ### Conditioning
 
 As described, conditioning is necessary for the latent diffusion process, whether empty or not. As a result, all non-image *ToLatents nodes require positive and negative conditioning inputs. Conditioning is reliant on a CLIP tokenizer provided by the Model Loader node.
 
-<img width="1024" alt="groupsconditioning" src="https://i.imgur.com/Tiyy3zR.webp?maxwidth=1520&fidelity=grand">
+![groupsconditioning](../assets/nodes/groupsconditioning.png)
 
 ### Image Space & VAE
 
 The ImageToLatents node doesn't require a noise node input, but requires a VAE input to convert the image from image space into latent space. In reverse, the LatentsToImage node requires a VAE input to convert from latent space back into image space.
 
-<img width="637" alt="groupsimgvae" src="https://i.imgur.com/dc0eAIg.webp?maxwidth=760&fidelity=grand">
+![groupsimgvae](../assets/nodes/groupsimgvae.png)
 
 ### Defined & Random Seeds
 
 It is common to want to use both the same seed (for continuity) and random seeds (for variance). To define a seed, simply enter it into the 'Seed' field on a noise node. Conversely, the RandomInt node generates a random integer between 'Low' and 'High', and can be used as input to the 'Seed' edge point on a noise node to randomize your seed.
 
-<img width="922" alt="groupsrandseed" src="https://i.imgur.com/gSaKeMV.webp?maxwidth=1520&fidelity=grand">
+![groupsrandseed](../assets/nodes/groupsrandseed.png)
 
 ### Control
 
 Control means to guide the diffusion process to adhere to a defined input or structure. Control can be provided as input to non-image *ToLatents nodes from ControlNet nodes. ControlNet nodes usually require an image processor which converts an input image for use with ControlNet.
 
-<img width="805" alt="groupscontrol" src="https://i.imgur.com/x1TAAXw.webp?maxwidth=1520&fidelity=grand">
+![groupscontrol](../assets/nodes/groupscontrol.png)
 
 ### LoRA
 
 The Lora Loader node lets you load a LoRA (say that ten times fast) and pass it as output to both the Prompt (Compel) and non-image *ToLatents nodes. A model's CLIP tokenizer is passed through the LoRA into Prompt (Compel), where it affects conditioning. A model's U-Net is also passed through the LoRA into a non-image *ToLatents node, where it affects noise prediction.
 
-<img width="993" alt="groupslora" src="https://i.imgur.com/Kr9lNgE.webp?maxwidth=1520&fidelity=grand">
+![groupslora](../assets/nodes/groupslora.png)
 
 ### Scaling
 
 Use the ImageScale, ScaleLatents, and Upscale nodes to upscale images and/or latent images. The chosen method differs across contexts. However, be aware that latents are already noisy and compressed at their original resolution; scaling an image could produce more detailed results.
 
-<img width="644" alt="groupsallscale" src="https://i.imgur.com/IEYtgzk.webp?maxwidth=760&fidelity=grand">
+![groupsallscale](../assets/nodes/groupsallscale.png)
 
 ### Iteration + Multiple Images as Input
 
 Iteration is a common concept in any processing, and means to repeat a process with given input. In nodes, you're able to use the Iterate node to iterate through collections usually gathered by the Collect node. The Iterate node has many potential uses, from processing a collection of images one after another, to varying seeds across multiple image generations and more. This screenshot demonstrates how to collect several images and pass them out one at a time.
 
-<img width="788" alt="groupsiterate" src="https://i.imgur.com/Mr5nCT9.webp?maxwidth=1520&fidelity=grand">
+![groupsiterate](../assets/nodes/groupsiterate.png)
 
 ### Multiple Image Generation + Random Seeds
 
@@ -166,7 +166,7 @@ Multiple image generation in the node editor is done using the RandomRange node.
 
 To control seeds across generations takes some care. The first row in the screenshot will generate multiple images with different seeds, but using the same RandomRange parameters across invocations will result in the same group of random seeds being used across the images, producing repeatable results. In the second row, adding the RandomInt node as input to RandomRange's 'Seed' edge point will ensure that seeds are varied across all images across invocations, producing varied results.
 
-<img width="1027" alt="groupsmultigenseeding" src="https://i.imgur.com/8Isihyc.webp?maxwidth=1520&fidelity=grand">
+![groupsmultigenseeding](../assets/nodes/groupsmultigenseeding.png)
 
 ## Examples
 
@@ -174,7 +174,7 @@ With our knowledge of node grouping and the diffusion process, let’s break dow
 
 ### Basic text-to-image Node Graph
 
-<img width="875" alt="nodest2i" src="https://i.imgur.com/GSU0xF9.webp?maxwidth=1520&fidelity=grand">
+![nodest2i](../assets/nodes/nodest2i.png)
 
 - Model Loader: A necessity to generating images (as we’ve read above). We choose our model from the dropdown. It outputs a U-Net, CLIP tokenizer, and VAE.
 - Prompt (Compel): Another necessity. Two prompt nodes are created. One will output positive conditioning (what you want, ‘dog’), one will output negative (what you don’t want, ‘cat’). They both input the CLIP tokenizer that the Model Loader node outputs.
@@ -184,7 +184,7 @@ With our knowledge of node grouping and the diffusion process, let’s break dow
 
 ### Basic image-to-image Node Graph
 
-<img width="998" alt="nodesi2i" src="https://i.imgur.com/7woyOEQ.webp?maxwidth=1520&fidelity=grand">
+![nodesi2i](../assets/nodes/nodesi2i.png)
 
 - Model Loader: Choose a model from the dropdown.
 - Prompt (Compel): Two prompt nodes. One positive (dog), one negative (dog). Same CLIP inputs from the Model Loader node as before.
@@ -195,7 +195,7 @@ With our knowledge of node grouping and the diffusion process, let’s break dow
 
 ### Basic ControlNet Node Graph
 
-<img width="703" alt="nodescontrol" src="https://i.imgur.com/fXcb2nR.webp?maxwidth=760&fidelity=grand">
+![nodescontrol](../assets/nodes/nodescontrol.png)
 
 - Model Loader
 - Prompt (Compel)
