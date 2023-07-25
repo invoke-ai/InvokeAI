@@ -44,6 +44,7 @@ from invokeai.app.services.config import (
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 from invokeai.frontend.install.widgets import (
+    SingleSelectColumns,
     CenteredButtonPress,
     FileBox,
     IntTitleSlider,
@@ -288,44 +289,10 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             )
 
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name="== BASIC OPTIONS ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
-            scroll_exit=True,
-        )
-        self.nextrely -= 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Select an output directory for images:",
-            editable=False,
-            color="CONTROL",
-        )
-        self.outdir = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name="(<tab> autocompletes, ctrl-N advances):",
-            value=str(default_output_dir()),
-            select_dir=True,
-            must_exist=False,
-            use_two_lines=False,
-            labelColor="GOOD",
-            begin_entry_at=40,
-            scroll_exit=True,
-        )
-        self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Activate the NSFW checker to blur images showing potential sexual imagery:",
-            editable=False,
-            color="CONTROL",
-        )
         self.nsfw_checker = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name="NSFW checker",
+            name="Activate the NSFW checker to blur images showing potential sexual imagery",
             value=old_opts.nsfw_checker,
-            relx=5,
             scroll_exit=True,
         )
         self.nextrely += 1
@@ -349,15 +316,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
-            name="== ADVANCED OPTIONS ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
-            scroll_exit=True,
-        )
-        self.nextrely -= 1
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
             name="GPU Management",
             begin_entry_at=0,
             editable=False,
@@ -369,34 +327,49 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             npyscreen.Checkbox,
             name="Free GPU memory after each generation",
             value=old_opts.free_gpu_mem,
+            max_width=45,
             relx=5,
             scroll_exit=True,
         )
+        self.nextrely -= 1
         self.xformers_enabled = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name="Enable xformers support if available",
+            name="Enable xformers support",
             value=old_opts.xformers_enabled,
-            relx=5,
+            max_width=30,
+            relx=50,
             scroll_exit=True,
         )
+        self.nextrely -=1
         self.always_use_cpu = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Force CPU to be used on GPU systems",
             value=old_opts.always_use_cpu,
-            relx=5,
+            relx=80,
             scroll_exit=True,
         )
         precision = old_opts.precision or (
             "float32" if program_opts.full_precision else "auto"
         )
+        self.nextrely +=1
+        self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
+            name="Floating Point Precision",
+            begin_entry_at=0,
+            editable=False,
+            color="CONTROL",
+            scroll_exit=True,
+        )
+        self.nextrely -=1
         self.precision = self.add_widget_intelligent(
-            npyscreen.TitleSelectOne,
-            columns = 2,
+            SingleSelectColumns,
+            columns = 3,
             name="Precision",
             values=PRECISION_CHOICES,
             value=PRECISION_CHOICES.index(precision),
             begin_entry_at=3,
-            max_height=len(PRECISION_CHOICES) + 1,
+            max_height=2,
+            max_width=80,
             scroll_exit=True,
         )
         self.max_cache_size = self.add_widget_intelligent(
@@ -409,16 +382,22 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             scroll_exit=True,
         )
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models (<tab> autocompletes, ctrl-N advances):",
-            editable=False,
-            color="CONTROL",
+        self.outdir = self.add_widget_intelligent(
+            FileBox,
+            name="Output directory for images (<tab> autocompletes, ctrl-N advances):",
+            value=str(default_output_dir()),
+            select_dir=True,
+            must_exist=False,
+            use_two_lines=False,
+            labelColor="GOOD",
+            begin_entry_at=68,
+            max_height=3,
+            scroll_exit=True,
         )
         self.autoimport_dirs = {}
         self.autoimport_dirs['autoimport_dir'] = self.add_widget_intelligent(
                 FileBox,
-                name=f'Autoimport Folder',
+                name=f'Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models',
                 value=str(config.root_path / config.autoimport_dir),
                 select_dir=True,
                 must_exist=False,
@@ -429,15 +408,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
                 scroll_exit=True
             )
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name="== LICENSE ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
-            scroll_exit=True,
-        )
-        self.nextrely -= 1
         label = """BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ
 AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT
 https://huggingface.co/spaces/CompVis/stable-diffusion-license
@@ -466,7 +436,6 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
             CenteredButtonPress,
             name=label,
             relx=(window_width - len(label)) // 2,
-            rely=-3,
             when_pressed_function=self.on_ok,
         )
 
@@ -542,7 +511,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
             "MAIN",
             editOptsForm,
             name="InvokeAI Startup Options",
-            cycle_widgets=True,
+            cycle_widgets=False,
         )
         if not (self.program_opts.skip_sd_weights or self.program_opts.default_only):
             self.model_select = self.addForm(
