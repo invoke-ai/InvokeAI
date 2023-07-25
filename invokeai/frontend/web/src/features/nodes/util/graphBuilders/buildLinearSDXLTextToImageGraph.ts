@@ -32,6 +32,8 @@ export const buildLinearSDXLTextToImageGraph = (
     shouldUseNoiseSettings,
   } = state.generation;
 
+  const { positiveStylePrompt, negativeStylePrompt } = state.sdxl;
+
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
@@ -63,11 +65,13 @@ export const buildLinearSDXLTextToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
+        style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
+        style: negativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',

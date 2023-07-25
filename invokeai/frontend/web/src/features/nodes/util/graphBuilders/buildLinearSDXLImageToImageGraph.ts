@@ -44,6 +44,8 @@ export const buildLinearSDXLImageToImageGraph = (
     shouldUseNoiseSettings,
   } = state.generation;
 
+  const { positiveStylePrompt, negativeStylePrompt } = state.sdxl;
+
   // TODO: add batch functionality
   // const {
   //   isEnabled: isBatchEnabled,
@@ -90,11 +92,13 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
+        style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
+        style: negativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
