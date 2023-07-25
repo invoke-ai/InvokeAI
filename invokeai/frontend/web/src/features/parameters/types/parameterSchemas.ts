@@ -296,6 +296,20 @@ export type StrengthParam = z.infer<typeof zStrength>;
 export const isValidStrength = (val: unknown): val is StrengthParam =>
   zStrength.safeParse(val).success;
 
+/**
+ * Zod schema for a precision parameter
+ */
+export const zPrecision = z.enum(['fp16', 'fp32']);
+/**
+ * Type alias for precision parameter, inferred from its zod schema
+ */
+export type PrecisionParam = z.infer<typeof zPrecision>;
+/**
+ * Validates/type-guards a value as a precision parameter
+ */
+export const isValidPrecision = (val: unknown): val is PrecisionParam =>
+  zPrecision.safeParse(val).success;
+
 // /**
 //  * Zod schema for BaseModelType
 //  */

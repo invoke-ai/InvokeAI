@@ -11,6 +11,7 @@ import {
   MainModelParam,
   NegativePromptParam,
   PositivePromptParam,
+  PrecisionParam,
   SchedulerParam,
   SeedParam,
   StepsParam,
@@ -51,7 +52,7 @@ export interface GenerationState {
   verticalSymmetrySteps: number;
   model: MainModelField | null;
   vae: VaeModelParam | null;
-  vaePrecision: 'fp16' | 'fp32';
+  vaePrecision: PrecisionParam;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
   clipSkip: number;
@@ -243,7 +244,7 @@ export const generationSlice = createSlice({
       // null is a valid VAE!
       state.vae = action.payload;
     },
-    vaePrecisionChanged: (state, action: PayloadAction<'fp16' | 'fp32'>) => {
+    vaePrecisionChanged: (state, action: PayloadAction<PrecisionParam>) => {
       state.vaePrecision = action.payload;
     },
     setClipSkip: (state, action: PayloadAction<number>) => {
