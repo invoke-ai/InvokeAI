@@ -2,6 +2,7 @@ import { RootState } from 'app/store/store';
 import { MetadataAccumulatorInvocation } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
 import {
+  IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
   SDXL_MODEL_LOADER,
@@ -73,12 +74,18 @@ export const addSDXLRefinerToGraph = (
     scheduler: refinerScheduler,
     denoising_start: refinerStart,
   };
-  // graph.nodes[LATENTS_TO_IMAGE] = {
-  //   type: 'l2i',
-  //   id: LATENTS_TO_IMAGE,
-  // };
 
   graph.edges.push(
+    {
+      source: {
+        node_id: SDXL_MODEL_LOADER,
+        field: 'vae',
+      },
+      destination: {
+        node_id: IMAGE_TO_LATENTS,
+        field: 'vae',
+      },
+    },
     {
       source: {
         node_id: SDXL_REFINER_MODEL_LOADER,
