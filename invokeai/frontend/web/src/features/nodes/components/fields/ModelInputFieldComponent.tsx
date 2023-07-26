@@ -16,6 +16,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
+import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
 
 const ModelInputFieldComponent = (
   props: FieldComponentProps<MainModelInputFieldValue, ModelInputFieldTemplate>
@@ -24,6 +25,7 @@ const ModelInputFieldComponent = (
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
 
   const { data: mainModels, isLoading } = useGetMainModelsQuery();
 
@@ -103,9 +105,11 @@ const ModelInputFieldComponent = (
         disabled={data.length === 0}
         onChange={handleChangeModel}
       />
-      <Box mt={7}>
-        <SyncModelsButton iconMode />
-      </Box>
+      {isSyncModelEnabled && (
+        <Box mt={7}>
+          <SyncModelsButton iconMode />
+        </Box>
+      )}
     </Flex>
   );
 };
