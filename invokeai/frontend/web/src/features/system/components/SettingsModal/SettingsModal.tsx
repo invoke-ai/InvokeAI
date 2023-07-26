@@ -10,6 +10,7 @@ import {
   ModalOverlay,
   Text,
   useDisclosure,
+  useColorMode,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { VALID_LOG_LEVELS } from 'app/logging/logger';
@@ -46,6 +47,10 @@ import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
 import StyledFlex from './StyledFlex';
+import { useFeatureStatus } from '../../hooks/useFeatureStatus';
+import { LANGUAGES } from '../../store/constants';
+import { languageChanged } from '../../store/systemSlice';
+import { languageSelector } from '../../store/systemSelectors';
 
 const selector = createSelector(
   [stateSelector],
@@ -166,6 +171,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     [dispatch]
   );
 
+  const handleLanguageChanged = useCallback(
+    (l: string) => {
+      dispatch(languageChanged(l as keyof typeof LANGUAGES));
+    },
+    [dispatch]
+  );
+
   const handleLogToConsoleChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldLogToConsoleChanged(e.target.checked));
@@ -179,6 +191,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     },
     [dispatch]
   );
+
+  const { colorMode, toggleColorMode } = useColorMode();
+
+  const isLocalizationEnabled =
+    useFeatureStatus('localization').isFeatureEnabled;
+  const language = useAppSelector(languageSelector);
 
   return (
     <>
@@ -226,6 +244,11 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
               <StyledFlex>
                 <Heading size="sm">{t('settings.ui')}</Heading>
                 <SettingSwitch
+                  label={t('common.darkMode')}
+                  isChecked={colorMode === 'dark'}
+                  onChange={toggleColorMode}
+                />
+                <SettingSwitch
                   label={t('settings.useSlidersForAll')}
                   isChecked={shouldUseSliders}
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -267,6 +290,16 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     onChange={handleToggleNodes}
                   />
                 )}
+                <IAIMantineSelect
+                  disabled={!isLocalizationEnabled}
+                  label={t('common.languagePickerLabel')}
+                  value={language}
+                  data={Object.entries(LANGUAGES).map(([value, label]) => ({
+                    value,
+                    label,
+                  }))}
+                  onChange={handleLanguageChanged}
+                />
               </StyledFlex>
 
               {shouldShowDeveloperSettings && (

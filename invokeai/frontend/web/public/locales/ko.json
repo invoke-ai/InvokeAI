@@ -1,5 +1,6 @@
 {
     "common": {
+        "communityLabel": "지역 사회",
         "themeLabel": "테마 설정",
         "languagePickerLabel": "언어 설정",
         "reportBugLabel": "버그 리포트",

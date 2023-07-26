@@ -1,5 +1,6 @@
 {
     "common": {
+        "communityLabel": "社区",
         "hotkeysLabel": "快捷键",
         "themeLabel": "主题",
         "languagePickerLabel": "语言",
