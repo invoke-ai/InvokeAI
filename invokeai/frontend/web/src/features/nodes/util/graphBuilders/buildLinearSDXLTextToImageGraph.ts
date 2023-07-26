@@ -14,6 +14,8 @@ import {
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SDXL_TEXT_TO_LATENTS,
 } from './constants';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 
 export const buildLinearSDXLTextToImageGraph = (
   state: RootState
@@ -246,6 +248,17 @@ export const buildLinearSDXLTextToImageGraph = (
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph);
+  }
 
   return graph;
 };

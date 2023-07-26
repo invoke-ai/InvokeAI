@@ -9,7 +9,9 @@ import {
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   IMAGE_TO_IMAGE_GRAPH,
@@ -297,42 +299,6 @@ export const buildLinearImageToImageGraph = (
     });
   }
 
-  // TODO: add batch functionality
-  // if (isBatchEnabled && asInitialImage && batchImageNames.length > 0) {
-  //   // we are going to connect an iterate up to the init image
-  //   delete (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image;
-
-  //   const imageCollection: ImageCollectionInvocation = {
-  //     id: IMAGE_COLLECTION,
-  //     type: 'image_collection',
-  //     images: batchImageNames.map((image_name) => ({ image_name })),
-  //   };
-
-  //   const imageCollectionIterate: IterateInvocation = {
-  //     id: IMAGE_COLLECTION_ITERATE,
-  //     type: 'iterate',
-  //   };
-
-  //   graph.nodes[IMAGE_COLLECTION] = imageCollection;
-  //   graph.nodes[IMAGE_COLLECTION_ITERATE] = imageCollectionIterate;
-
-  //   graph.edges.push({
-  //     source: { node_id: IMAGE_COLLECTION, field: 'collection' },
-  //     destination: {
-  //       node_id: IMAGE_COLLECTION_ITERATE,
-  //       field: 'collection',
-  //     },
-  //   });
-
-  //   graph.edges.push({
-  //     source: { node_id: IMAGE_COLLECTION_ITERATE, field: 'item' },
-  //     destination: {
-  //       node_id: IMAGE_TO_LATENTS,
-  //       field: 'image',
-  //     },
-  //   });
-  // }
-
   // add metadata accumulator, which is only mostly populated - some fields are added later
   graph.nodes[METADATA_ACCUMULATOR] = {
     id: METADATA_ACCUMULATOR,
@@ -356,17 +322,6 @@ export const buildLinearImageToImageGraph = (
     init_image: initialImage.imageName,
   };
 
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: LATENTS_TO_IMAGE,
-      field: 'metadata',
-    },
-  });
-
   // add LoRA support
   addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
 
@@ -378,6 +333,17 @@ export const buildLinearImageToImageGraph = (
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, LATENTS_TO_LATENTS);
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph);
+  }
 
   return graph;
 };

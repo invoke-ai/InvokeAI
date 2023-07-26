@@ -28,7 +28,6 @@ InvokeAI:
     always_use_cpu: false
     free_gpu_mem: false
   Features:
-    nsfw_checker: true
     restore: true
     esrgan: true
     patchmatch: true
@@ -92,18 +91,18 @@ Typical usage at the top level file:
 
  from invokeai.app.services.config import InvokeAIAppConfig
 
- # get global configuration and print its nsfw_checker value
+ # get global configuration and print its cache size
  conf = InvokeAIAppConfig.get_config()
  conf.parse_args()
- print(conf.nsfw_checker)
+ print(conf.max_cache_size)
 
 Typical usage in a backend module:
 
  from invokeai.app.services.config import InvokeAIAppConfig
 
- # get global configuration and print its nsfw_checker value
+ # get global configuration and print its cache size value
  conf = InvokeAIAppConfig.get_config()
- print(conf.nsfw_checker)
+ print(conf.max_cache_size)
 
 
 Computed properties:
@@ -277,7 +276,7 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def _excluded_from_yaml(self)->List[str]:
         # combination of deprecated parameters and internal ones that shouldn't be exposed as invokeai.yaml options
-        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model', 'restore', 'root']
+        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model', 'restore', 'root', 'nsfw_checker']
 
     class Config:
         env_file_encoding = 'utf-8'
@@ -364,7 +363,6 @@ setting environment variables INVOKEAI_<setting>.
     esrgan              : bool = Field(default=True, description="Enable/disable upscaling code", category='Features')
     internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models", category='Features')
     log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", category='Features')
-    nsfw_checker        : bool = Field(default=True, description="Enable/disable the NSFW checker", category='Features')
     patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
     restore             : bool = Field(default=True, description="Enable/disable face restoration code (DEPRECATED)", category='DEPRECATED')
 
@@ -374,6 +372,7 @@ setting environment variables INVOKEAI_<setting>.
     max_cache_size      : float = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching", category='Memory/Performance')
     max_vram_cache_size : float = Field(default=2.75, ge=0, description="Amount of VRAM reserved for model storage", category='Memory/Performance')
     gpu_mem_reserved    : float = Field(default=2.75, ge=0, description="DEPRECATED: use max_vram_cache_size. Amount of VRAM reserved for model storage", category='DEPRECATED')
+    nsfw_checker        : bool = Field(default=True, description="DEPRECATED: use Web settings to enable/disable", category='DEPRECATED')
     precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='auto',description='Floating point precision', category='Memory/Performance')
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
@@ -525,6 +524,16 @@ setting environment variables INVOKEAI_<setting>.
         """Return true if patchmatch true"""
         return self.patchmatch
 
+    @property
+    def nsfw_checker(self)->bool:
+        """ NSFW node is always active and disabled from Web UIe"""
+        return True
+
+    @property
+    def invisible_watermark(self)->bool:
+        """ invisible watermark node is always active and disabled from Web UIe"""
+        return True
+    
     @staticmethod
     def find_root()->Path:
         '''
