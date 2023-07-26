@@ -5,7 +5,9 @@ import { initialGenerationState } from 'features/parameters/store/generationSlic
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   LATENTS_TO_IMAGE,
@@ -16,8 +18,6 @@ import {
   POSITIVE_CONDITIONING,
   TEXT_TO_IMAGE_GRAPH,
   TEXT_TO_LATENTS,
-  NSFW_CHECKER,
-  WATERMARKER,
 } from './constants';
 
 /**
@@ -109,16 +109,6 @@ export const buildCanvasTextToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
-        is_intermediate: true,
-      },
-      [NSFW_CHECKER]: {
-        type: 'img_nsfw',
-        id: NSFW_CHECKER,
-        is_intermediate: true,
-      },
-      [WATERMARKER]: {
-        type: 'img_watermark',
-        id: WATERMARKER,
         is_intermediate: !shouldAutoSave,
       },
     },
@@ -195,26 +185,6 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: NSFW_CHECKER,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: NSFW_CHECKER,
-          field: 'image',
-        },
-        destination: {
-          node_id: WATERMARKER,
-          field: 'image',
-        },
-      },
-      {
-        source: {
           node_id: NOISE,
           field: 'noise',
         },
@@ -247,17 +217,6 @@ export const buildCanvasTextToImageGraph = (
     clip_skip: clipSkip,
   };
 
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: WATERMARKER,
-      field: 'metadata',
-    },
-  });
-
   // add LoRA support
   addLoRAsToGraph(state, graph, TEXT_TO_LATENTS);
 
@@ -269,6 +228,17 @@ export const buildCanvasTextToImageGraph = (
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, TEXT_TO_LATENTS);
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph);
+  }
 
   return graph;
 };

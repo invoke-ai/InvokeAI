@@ -20,6 +20,8 @@ import {
   SDXL_LATENTS_TO_LATENTS,
   SDXL_MODEL_LOADER,
 } from './constants';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 
 /**
  * Builds the Image to Image tab graph.
@@ -364,6 +366,17 @@ export const buildLinearSDXLImageToImageGraph = (
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph);
+  }
 
   return graph;
 };

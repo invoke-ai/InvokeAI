@@ -26,6 +26,8 @@ import {
   setShouldConfirmOnDelete,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
+  shouldUseNSFWCheckerChanged,
+  shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
 import {
   setShouldShowProgressInViewer,
@@ -42,6 +44,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
+import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
@@ -57,6 +60,8 @@ const selector = createSelector(
       shouldLogToConsole,
       shouldAntialiasProgressImage,
       isNodesEnabled,
+      shouldUseNSFWChecker,
+      shouldUseWatermarker,
     } = system;
 
     const {
@@ -78,6 +83,8 @@ const selector = createSelector(
       shouldAntialiasProgressImage,
       shouldShowAdvancedOptions,
       isNodesEnabled,
+      shouldUseNSFWChecker,
+      shouldUseWatermarker,
     };
   },
   {
@@ -120,6 +127,16 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     }
   }, [shouldShowDeveloperSettings, dispatch]);
 
+  const { isNSFWCheckerAvailable, isWatermarkerAvailable } =
+    useGetAppConfigQuery(undefined, {
+      selectFromResult: ({ data }) => ({
+        isNSFWCheckerAvailable:
+          data?.nsfw_methods.includes('nsfw_checker') ?? false,
+        isWatermarkerAvailable:
+          data?.watermarking_methods.includes('invisible_watermark') ?? false,
+      }),
+    });
+
   const {
     isOpen: isSettingsModalOpen,
     onOpen: onSettingsModalOpen,
@@ -143,6 +160,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     shouldAntialiasProgressImage,
     shouldShowAdvancedOptions,
     isNodesEnabled,
+    shouldUseNSFWChecker,
+    shouldUseWatermarker,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -221,6 +240,22 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
               <StyledFlex>
                 <Heading size="sm">{t('settings.generation')}</Heading>
                 <SettingsSchedulers />
+                <SettingSwitch
+                  label="Enable NSFW Checker"
+                  isDisabled={!isNSFWCheckerAvailable}
+                  isChecked={shouldUseNSFWChecker}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(shouldUseNSFWCheckerChanged(e.target.checked))
+                  }
+                />
+                <SettingSwitch
+                  label="Enable Invisible Watermark"
+                  isDisabled={!isWatermarkerAvailable}
+                  isChecked={shouldUseWatermarker}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(shouldUseWatermarkerChanged(e.target.checked))
+                  }
+                />
               </StyledFlex>
 
               <StyledFlex>
