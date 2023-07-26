@@ -14,6 +14,7 @@ from .base import (
     read_checkpoint_meta,
     classproperty,
     InvalidModelException,
+    ModelNotFoundException,
 )
 from .sdxl import StableDiffusionXLModel
 import invokeai.backend.util.logging as logger
@@ -268,12 +269,17 @@ def _convert_ckpt_and_cache(
     # to avoid circular import errors
     from ..convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
     from ...util.devices import choose_torch_device, torch_dtype
-    
+
+    model_base_to_model_type = {BaseModelType.StableDiffusion1: 'FrozenCLIPEmbedder',
+                                BaseModelType.StableDiffusion2: 'FrozenOpenCLIPEmbedder',
+                                }
+
     logger.info(f'Converting {weights} to diffusers format')
     with SilenceWarnings():        
         convert_ckpt_to_diffusers(
             weights,
             output_path,
+            model_type=model_base_to_model_type[version],
             model_version=version,
             model_variant=model_config.variant,
             original_config_file=config_file,
