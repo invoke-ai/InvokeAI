@@ -139,9 +139,9 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     useGetAppConfigQuery(undefined, {
       selectFromResult: ({ data }) => ({
         isNSFWCheckerAvailable:
-          data?.nsfw_methods.includes('nsfw_checker') ?? false,
+          data?.nsfw_methods?.includes('nsfw_checker') ?? false,
         isWatermarkerAvailable:
-          data?.watermarking_methods.includes('invisible_watermark') ?? false,
+          data?.watermarking_methods?.includes('invisible_watermark') ?? false,
       }),
     });
 
