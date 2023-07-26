@@ -50,6 +50,7 @@ export const buildLinearSDXLImageToImageGraph = (
   const {
     positiveStylePrompt,
     negativeStylePrompt,
+    shouldConcatSDXLStylePrompt,
     shouldUseSDXLRefiner,
     refinerStart,
     sdxlImg2ImgDenoisingStrength: strength,
@@ -91,13 +92,17 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: `${positivePrompt} ${positiveStylePrompt}`,
+        style: shouldConcatSDXLStylePrompt
+          ? `${positivePrompt} ${positiveStylePrompt}`
+          : positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: `${negativePrompt} ${negativeStylePrompt}`,
+        style: shouldConcatSDXLStylePrompt
+          ? `${negativePrompt} ${negativeStylePrompt}`
+          : negativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
