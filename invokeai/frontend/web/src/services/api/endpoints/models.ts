@@ -52,7 +52,16 @@ type UpdateMainModelArg = {
   body: MainModelConfig;
 };
 
+type UpdateLoRAModelArg = {
+  base_model: BaseModelType;
+  model_name: string;
+  body: LoRAModelConfig;
+};
+
 type UpdateMainModelResponse =
+  paths['/api/v1/models/{base_model}/{model_type}/{model_name}']['patch']['responses']['200']['content']['application/json'];
+
+type UpdateLoRAModelResponse =
   paths['/api/v1/models/{base_model}/{model_type}/{model_name}']['patch']['responses']['200']['content']['application/json'];
 
 type DeleteMainModelArg = {
@@ -324,6 +333,19 @@ export const modelsApi = api.injectEndpoints({
         );
       },
     }),
+    updateLoRAModels: build.mutation<
+      UpdateLoRAModelResponse,
+      UpdateLoRAModelArg
+    >({
+      query: ({ base_model, model_name, body }) => {
+        return {
+          url: `models/${base_model}/lora/${model_name}`,
+          method: 'PATCH',
+          body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
+    }),
     deleteLoRAModels: build.mutation<
       DeleteLoRAModelResponse,
       DeleteLoRAModelArg
@@ -484,6 +506,7 @@ export const {
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
   useDeleteLoRAModelsMutation,
+  useUpdateLoRAModelsMutation,
   useSyncModelsMutation,
   useGetModelsInFolderQuery,
   useGetCheckpointConfigsQuery,
