@@ -32,11 +32,6 @@ export default function ParamSeed() {
       isInvalid={seed < 0 && shouldGenerateVariations}
       onChange={handleChangeSeed}
       value={seed}
-      formControlProps={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 3, // really this should work with 2 but seems to need to be 3 to match gap 2?
-      }}
     />
   );
 }

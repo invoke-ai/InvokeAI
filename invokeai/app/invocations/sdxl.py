@@ -138,7 +138,7 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
             "ui": {
                 "title": "SDXL Refiner Model Loader",
                 "tags": ["model", "loader", "sdxl_refiner"],
-                "type_hints": {"model": "model"},
+                "type_hints": {"model": "refiner_model"},
             },
         }
 
@@ -295,7 +295,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
 
 
         unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict()
+            **self.unet.unet.dict(), context=context
         )
         do_classifier_free_guidance = True
         cross_attention_kwargs = None
@@ -463,8 +463,8 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
     unet: UNetField = Field(default=None, description="UNet submodel")
     latents: Optional[LatentsField] = Field(description="Initial latents")
 
-    denoising_start: float = Field(default=0.0, ge=0, lt=1, description="")
-    denoising_end: float = Field(default=1.0, gt=0, le=1, description="")
+    denoising_start: float = Field(default=0.0, ge=0, le=1, description="")
+    denoising_end: float = Field(default=1.0, ge=0, le=1, description="")
 
     #control: Union[ControlField, list[ControlField]] = Field(default=None, description="The control to use")
     #seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
@@ -549,13 +549,13 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
         num_inference_steps = num_inference_steps - t_start
 
         # apply noise(if provided)
-        if self.noise is not None:
+        if self.noise is not None and timesteps.shape[0] > 0:
             noise = context.services.latents.get(self.noise.latents_name)
             latents = scheduler.add_noise(latents, noise, timesteps[:1])
             del noise
 
         unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict()
+            **self.unet.unet.dict(), context=context,
         )
         do_classifier_free_guidance = True
         cross_attention_kwargs = None

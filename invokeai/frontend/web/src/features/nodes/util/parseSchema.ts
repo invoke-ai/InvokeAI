@@ -13,7 +13,12 @@ import {
   buildOutputFieldTemplates,
 } from './fieldTemplateBuilders';
 
-const RESERVED_FIELD_NAMES = ['id', 'type', 'is_intermediate', 'metadata'];
+const getReservedFieldNames = (type: string): string[] => {
+  if (type === 'l2i') {
+    return ['id', 'type', 'metadata'];
+  }
+  return ['id', 'type', 'is_intermediate', 'metadata'];
+};
 
 const invocationDenylist = [
   'Graph',
@@ -21,11 +26,11 @@ const invocationDenylist = [
   'MetadataAccumulatorInvocation',
 ];
 
-export const parseSchema = (openAPI: OpenAPIV3.Document) => {
-  // filter out non-invocation schemas, plus some tricky invocations for now
+export const parseSchema = (
+  openAPI: OpenAPIV3.Document
+): Record<string, InvocationTemplate> => {
   const filteredSchemas = filter(
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    openAPI.components!.schemas,
+    openAPI.components?.schemas,
     (schema, key) =>
       key.includes('Invocation') &&
       !key.includes('InvocationOutput') &&
@@ -35,21 +40,17 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
   const invocations = filteredSchemas.reduce<
     Record<string, InvocationTemplate>
   >((acc, schema) => {
-    // only want SchemaObjects
     if (isInvocationSchemaObject(schema)) {
       const type = schema.properties.type.default;
+      const RESERVED_FIELD_NAMES = getReservedFieldNames(type);
 
       const title = schema.ui?.title ?? schema.title.replace('Invocation', '');
-
       const typeHints = schema.ui?.type_hints;
 
       const inputs: Record<string, InputFieldTemplate> = {};
 
       if (type === 'collect') {
-        const itemProperty = schema.properties[
-          'item'
-        ] as InvocationSchemaObject;
-        // Handle the special Collect node
+        const itemProperty = schema.properties.item as InvocationSchemaObject;
         inputs.item = {
           type: 'item',
           name: 'item',
@@ -60,10 +61,8 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
           default: undefined,
         };
       } else if (type === 'iterate') {
-        const itemProperty = schema.properties[
-          'collection'
-        ] as InvocationSchemaObject;
-
+        const itemProperty = schema.properties
+          .collection as InvocationSchemaObject;
         inputs.collection = {
           type: 'array',
           name: 'collection',
@@ -74,18 +73,18 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
           inputKind: 'connection',
         };
       } else {
-        // All other nodes
         reduce(
           schema.properties,
           (inputsAccumulator, property, propertyName) => {
             if (
-              // `type` and `id` are not valid inputs/outputs
               !RESERVED_FIELD_NAMES.includes(propertyName) &&
               isSchemaObject(property)
             ) {
-              const field: InputFieldTemplate | undefined =
-                buildInputFieldTemplate(property, propertyName, typeHints);
-
+              const field = buildInputFieldTemplate(
+                property,
+                propertyName,
+                typeHints
+              );
               if (field) {
                 inputsAccumulator[propertyName] = field;
               }
@@ -97,22 +96,17 @@ export const parseSchema = (openAPI: OpenAPIV3.Document) => {
       }
 
       const rawOutput = (schema as InvocationSchemaObject).output;
-
       let outputs: Record<string, OutputFieldTemplate>;
 
-      // some special handling is needed for collect, iterate and range nodes
       if (type === 'iterate') {
-        // this is guaranteed to be a SchemaObject
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const iterationOutput = openAPI.components!.schemas![
+        const iterationOutput = openAPI.components?.schemas?.[
           'IterateInvocationOutput'
         ] as OpenAPIV3.SchemaObject;
-
         outputs = {
           item: {
             name: 'item',
-            title: iterationOutput.title ?? '',
-            description: iterationOutput.description ?? '',
+            title: iterationOutput?.title ?? '',
+            description: iterationOutput?.description ?? '',
             type: 'array',
           },
         };
