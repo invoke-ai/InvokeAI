@@ -38,7 +38,6 @@ const SiteHeader = () => {
           as={IAIIconButton}
           variant="link"
           aria-label={t('accessibility.menu')}
-          tooltip={t('accessibility.menu')}
           icon={<FaBars />}
         />
         <MenuList>
@@ -51,7 +50,7 @@ const SiteHeader = () => {
               </Link>
             )}
             {isBugLinkEnabled && (
-              <Link href={`${githubLink}/issues}`} target="_blank">
+              <Link href={`${githubLink}/issues`} target="_blank">
                 <MenuItem icon={<FaBug />}>
                   {t('common.reportBugLabel')}
                 </MenuItem>
