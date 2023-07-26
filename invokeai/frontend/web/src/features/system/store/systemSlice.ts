@@ -121,8 +121,8 @@ export const initialSystemState: SystemState = {
   language: 'en',
   isUploading: false,
   isNodesEnabled: false,
-  shouldUseNSFWChecker: true,
-  shouldUseWatermarker: true,
+  shouldUseNSFWChecker: false,
+  shouldUseWatermarker: false,
 };
 
 export const systemSlice = createSlice({
