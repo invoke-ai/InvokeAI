@@ -767,8 +767,8 @@ def main():
         if migrate_if_needed(opt, config.root_path):
             sys.exit(0)
 
-        if not config.model_conf_path.exists():
-            initialize_rootdir(config.root_path, opt.yes_to_all)
+        # run this unconditionally in case new directories need to be added
+        initialize_rootdir(config.root_path, opt.yes_to_all)
 
         models_to_download = default_user_selections(opt)
         new_init_file = config.root_path / 'invokeai.yaml'
