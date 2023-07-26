@@ -315,20 +315,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             scroll_exit=True,
         )
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Activate the NSFW checker to blur images showing potential sexual imagery:",
-            editable=False,
-            color="CONTROL",
-        )
-        self.nsfw_checker = self.add_widget_intelligent(
-            npyscreen.Checkbox,
-            name="NSFW checker",
-            value=old_opts.nsfw_checker,
-            relx=5,
-            scroll_exit=True,
-        )
-        self.nextrely += 1
         label = """HuggingFace access token (OPTIONAL) for automatic model downloads. See https://huggingface.co/settings/tokens."""
         for line in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
@@ -506,7 +492,6 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
 
         for attr in [
                 "outdir",
-                "nsfw_checker",
                 "free_gpu_mem",
                 "max_cache_size",
                 "xformers_enabled",
@@ -564,8 +549,6 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
-    if not init_file.exists():
-        opts.nsfw_checker = True
     return opts
 
 def default_user_selections(program_opts: Namespace) -> InstallSelections:
@@ -689,7 +672,6 @@ def migrate_init_file(legacy_format:Path):
 
     # a few places where the field names have changed and we have to
     # manually add in the new names/values
-    new.nsfw_checker = old.safety_checker
     new.xformers_enabled = old.xformers
     new.conf_path = old.conf
     new.root = legacy_format.parent.resolve()
