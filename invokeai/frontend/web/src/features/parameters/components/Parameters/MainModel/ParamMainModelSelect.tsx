@@ -65,7 +65,11 @@ const ParamMainModelSelect = () => {
       });
     });
     forEach(onnxModels?.entities, (model, id) => {
-      if (!model) {
+      if (
+        !model ||
+        activeTabName === 'unifiedCanvas' ||
+        activeTabName === 'img2img'
+      ) {
         return;
       }
 
