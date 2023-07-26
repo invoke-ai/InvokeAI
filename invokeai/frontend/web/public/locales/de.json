@@ -1,5 +1,6 @@
 {
     "common": {
+        "communityLabel": "Gemeinschaft",
         "themeLabel": "Thema",
         "languagePickerLabel": "Sprachauswahl",
         "reportBugLabel": "Fehler melden",
