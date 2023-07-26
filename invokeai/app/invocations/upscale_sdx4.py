@@ -49,26 +49,15 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
 
         # TODO: are there upscaler LoRA? ControlNet? document if not
 
-        unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict(), context=context,
-        )
-        vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(), context=context,
-        )
+        model_manager = context.services.model_manager
+        unet_info = model_manager.get_model(**self.unet.unet.dict(), context=context)
+        vae_info = model_manager.get_model(**self.vae.vae.dict(), context=context)
 
         # ¿what is this context manager doing?
         with unet_info as unet, vae_info as vae:
             # don't re-use the same scheduler instance for both fields
-            low_res_scheduler = get_scheduler(
-                context=context,
-                scheduler_info=self.unet.scheduler,
-                scheduler_name=self.scheduler,
-            )
-            scheduler = get_scheduler(
-                context=context,
-                scheduler_info=self.unet.scheduler,
-                scheduler_name=self.scheduler,
-            )
+            low_res_scheduler = get_scheduler(context, self.unet.scheduler, self.scheduler)
+            scheduler = get_scheduler(context, self.unet.scheduler, self.scheduler)
 
             conditioning_data = self.get_conditioning_data(context, scheduler, unet)
 
