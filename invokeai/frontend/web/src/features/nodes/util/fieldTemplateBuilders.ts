@@ -23,7 +23,6 @@ import {
   ModelInputFieldTemplate,
   OutputFieldTemplate,
   RefinerModelInputFieldTemplate,
-  RefinerModelInputFieldValue,
   StringInputFieldTemplate,
   TypeHints,
   UNetInputFieldTemplate,
