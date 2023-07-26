@@ -673,6 +673,7 @@ class ModelManager(object):
 
         self.models[model_key] = model_config
         self.commit()
+
         return AddModelResult(
             name = model_name,
             model_type = model_type,
@@ -840,7 +841,7 @@ class ModelManager(object):
         Returns the preamble for the config file.
         """
         return textwrap.dedent(
-            """\
+            """
             # This file describes the alternative machine learning models
             # available to InvokeAI script.
             #

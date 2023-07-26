@@ -1,6 +1,5 @@
 import { Badge, Divider, Flex, Text } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
-import { makeToast } from 'features/system/util/makeToast';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
@@ -8,6 +7,7 @@ import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -115,7 +115,7 @@ export default function CheckpointModelEdit(props: CheckpointModelEditProps) {
             {MODEL_TYPE_MAP[model.base_model]} Model
           </Text>
         </Flex>
-        {!['sdxl', 'sdxl-refiner'].includes(model.base_model) ? (
+        {![''].includes(model.base_model) ? (
           <ModelConvert model={model} />
         ) : (
           <Badge

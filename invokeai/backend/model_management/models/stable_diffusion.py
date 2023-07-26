@@ -15,8 +15,11 @@ from .base import (
     classproperty,
     InvalidModelException,
 )
+from .sdxl import StableDiffusionXLModel
+import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from omegaconf import OmegaConf
+
 
 class StableDiffusion1ModelFormat(str, Enum):
     Checkpoint = "checkpoint"
@@ -235,42 +238,17 @@ class StableDiffusion2Model(DiffusersModel):
         else:
             return model_path
 
-def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
-    ckpt_configs = {
-        BaseModelType.StableDiffusion1: {
-            ModelVariantType.Normal: "v1-inference.yaml",
-            ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
-        },
-        BaseModelType.StableDiffusion2: {
-            ModelVariantType.Normal: "v2-inference-v.yaml", # best guess, as we can't differentiate with base(512)
-            ModelVariantType.Inpaint: "v2-inpainting-inference.yaml",
-            ModelVariantType.Depth: "v2-midas-inference.yaml",
-        },
-        # note that these .yaml files don't yet exist!
-        BaseModelType.StableDiffusionXL: {
-            ModelVariantType.Normal: "xl-inference-v.yaml",
-            ModelVariantType.Inpaint: "xl-inpainting-inference.yaml",
-            ModelVariantType.Depth: "xl-midas-inference.yaml",
-        }
-    }
-
-    app_config = InvokeAIAppConfig.get_config()
-    try:
-        config_path = app_config.legacy_conf_path / ckpt_configs[version][variant]
-        if config_path.is_relative_to(app_config.root_path):
-            config_path = config_path.relative_to(app_config.root_path)
-        return str(config_path)
-            
-    except:
-        return None
-
-
 # TODO: rework
-# Note that convert_ckpt_to_diffuses does not currently support conversion of SDXL models
+# pass precision - currently defaulting to fp16
 def _convert_ckpt_and_cache(
-    version: BaseModelType,
-    model_config: Union[StableDiffusion1Model.CheckpointConfig, StableDiffusion2Model.CheckpointConfig],
-    output_path: str,
+        version: BaseModelType,
+        model_config: Union[StableDiffusion1Model.CheckpointConfig,
+                            StableDiffusion2Model.CheckpointConfig,
+                            StableDiffusionXLModel.CheckpointConfig,
+                            ],
+        output_path: str,
+        use_save_model: bool=False,
+        **kwargs,
 ) -> str:
     """
     Convert the checkpoint model indicated in mconfig into a
@@ -289,6 +267,9 @@ def _convert_ckpt_and_cache(
 
     # to avoid circular import errors
     from ..convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
+    from ...util.devices import choose_torch_device, torch_dtype
+    
+    logger.info(f'Converting {weights} to diffusers format')
     with SilenceWarnings():        
         convert_ckpt_to_diffusers(
             weights,
@@ -298,5 +279,43 @@ def _convert_ckpt_and_cache(
             original_config_file=config_file,
             extract_ema=True,
             scan_needed=True,
+            from_safetensors = weights.suffix == ".safetensors",
+            precision = torch_dtype(choose_torch_device()),
+            **kwargs,
         )
     return output_path
+
+def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
+    ckpt_configs = {
+        BaseModelType.StableDiffusion1: {
+            ModelVariantType.Normal: "v1-inference.yaml",
+            ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
+        },
+        BaseModelType.StableDiffusion2: {
+            ModelVariantType.Normal: "v2-inference-v.yaml", # best guess, as we can't differentiate with base(512)
+            ModelVariantType.Inpaint: "v2-inpainting-inference.yaml",
+            ModelVariantType.Depth: "v2-midas-inference.yaml",
+        },
+        BaseModelType.StableDiffusionXL: {
+            ModelVariantType.Normal: "sd_xl_base.yaml",
+            ModelVariantType.Inpaint: None,
+            ModelVariantType.Depth: None,
+        },
+        BaseModelType.StableDiffusionXLRefiner: {
+            ModelVariantType.Normal: "sd_xl_refiner.yaml",
+            ModelVariantType.Inpaint: None,
+            ModelVariantType.Depth: None,
+        },
+    }
+
+    app_config = InvokeAIAppConfig.get_config()
+    try:
+        config_path = app_config.legacy_conf_path / ckpt_configs[version][variant]
+        if config_path.is_relative_to(app_config.root_path):
+            config_path = config_path.relative_to(app_config.root_path)
+        return str(config_path)
+            
+    except:
+        return None
+
+
