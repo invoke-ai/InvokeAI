@@ -10,6 +10,7 @@ import { MainModelField } from 'services/api/types';
 type SDXLInitialState = {
   positiveStylePrompt: PositiveStylePromptSDXLParam;
   negativeStylePrompt: NegativeStylePromptSDXLParam;
+  shouldConcatSDXLStylePrompt: boolean;
   shouldUseSDXLRefiner: boolean;
   sdxlImg2ImgDenoisingStrength: number;
   refinerModel: MainModelField | null;
@@ -23,6 +24,7 @@ type SDXLInitialState = {
 const sdxlInitialState: SDXLInitialState = {
   positiveStylePrompt: '',
   negativeStylePrompt: '',
+  shouldConcatSDXLStylePrompt: true,
   shouldUseSDXLRefiner: false,
   sdxlImg2ImgDenoisingStrength: 0.7,
   refinerModel: null,
@@ -42,6 +44,9 @@ const sdxlSlice = createSlice({
     },
     setNegativeStylePromptSDXL: (state, action: PayloadAction<string>) => {
       state.negativeStylePrompt = action.payload;
+    },
+    setShouldConcatSDXLStylePrompt: (state, action: PayloadAction<boolean>) => {
+      state.shouldConcatSDXLStylePrompt = action.payload;
     },
     setShouldUseSDXLRefiner: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSDXLRefiner = action.payload;
@@ -76,6 +81,7 @@ const sdxlSlice = createSlice({
 export const {
   setPositiveStylePromptSDXL,
   setNegativeStylePromptSDXL,
+  setShouldConcatSDXLStylePrompt,
   setShouldUseSDXLRefiner,
   setSDXLImg2ImgDenoisingStrength,
   refinerModelChanged,
