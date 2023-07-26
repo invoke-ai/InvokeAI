@@ -1,16 +1,29 @@
-import { Flex, Link, MenuGroup, Spacer } from '@chakra-ui/react';
-import { memo } from 'react';
-import StatusIndicator from './StatusIndicator';
-
-import { Menu, MenuButton, MenuItem, MenuList } from '@chakra-ui/react';
+import {
+  Flex,
+  Menu,
+  MenuButton,
+  MenuGroup,
+  MenuItem,
+  MenuList,
+  Spacer,
+} from '@chakra-ui/react';
 import IAIIconButton from 'common/components/IAIIconButton';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaBars, FaBug, FaDiscord, FaKeyboard } from 'react-icons/fa';
-import { MdSettings } from 'react-icons/md';
+import {
+  FaBars,
+  FaBug,
+  FaCog,
+  FaDiscord,
+  FaGithub,
+  FaKeyboard,
+} from 'react-icons/fa';
+import { menuListMotionProps } from 'theme/components/menu';
 import { useFeatureStatus } from '../hooks/useFeatureStatus';
 import HotkeysModal from './HotkeysModal/HotkeysModal';
 import InvokeAILogoComponent from './InvokeAILogoComponent';
 import SettingsModal from './SettingsModal/SettingsModal';
+import StatusIndicator from './StatusIndicator';
 
 const SiteHeader = () => {
   const { t } = useTranslation();
@@ -39,29 +52,39 @@ const SiteHeader = () => {
           variant="link"
           aria-label={t('accessibility.menu')}
           icon={<FaBars />}
+          sx={{ boxSize: 8 }}
         />
-        <MenuList>
+        <MenuList motionProps={menuListMotionProps}>
           <MenuGroup title={t('common.communityLabel')}>
             {isGithubLinkEnabled && (
-              <Link href={githubLink} target="_blank">
-                <MenuItem icon={<FaDiscord />}>
-                  {t('common.githubLabel')}
-                </MenuItem>
-              </Link>
+              <MenuItem
+                as="a"
+                href={githubLink}
+                target="_blank"
+                icon={<FaGithub />}
+              >
+                {t('common.githubLabel')}
+              </MenuItem>
             )}
             {isBugLinkEnabled && (
-              <Link href={`${githubLink}/issues`} target="_blank">
-                <MenuItem icon={<FaBug />}>
-                  {t('common.reportBugLabel')}
-                </MenuItem>
-              </Link>
+              <MenuItem
+                as="a"
+                href={`${githubLink}/issues`}
+                target="_blank"
+                icon={<FaBug />}
+              >
+                {t('common.reportBugLabel')}
+              </MenuItem>
             )}
             {isDiscordLinkEnabled && (
-              <Link href={discordLink} target="_blank">
-                <MenuItem icon={<FaDiscord />}>
-                  {t('common.discordLabel')}
-                </MenuItem>
-              </Link>
+              <MenuItem
+                as="a"
+                href={discordLink}
+                target="_blank"
+                icon={<FaDiscord />}
+              >
+                {t('common.discordLabel')}
+              </MenuItem>
             )}
           </MenuGroup>
           <MenuGroup title={t('common.settingsLabel')}>
@@ -71,7 +94,7 @@ const SiteHeader = () => {
               </MenuItem>
             </HotkeysModal>
             <SettingsModal>
-              <MenuItem as="button" icon={<MdSettings />}>
+              <MenuItem as="button" icon={<FaCog />}>
                 {t('common.settingsLabel')}
               </MenuItem>
             </SettingsModal>
