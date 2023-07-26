@@ -31,7 +31,7 @@ class ProbeBase(object):
     pass
 
 class ModelProbe(object):
-    
+
     PROBES = {
         'diffusers': { },
         'checkpoint': { },
@@ -40,12 +40,13 @@ class ModelProbe(object):
     CLASS2TYPE = {
         'StableDiffusionPipeline' : ModelType.Main,
         'StableDiffusionInpaintPipeline' : ModelType.Main,
+        'StableDiffusionUpscalePipeline': ModelType.Main,
         'StableDiffusionXLPipeline' : ModelType.Main,
         'StableDiffusionXLImg2ImgPipeline' : ModelType.Main,
         'AutoencoderKL' : ModelType.Vae,
         'ControlNetModel' : ModelType.ControlNet,
     }
-    
+
     @classmethod
     def register_probe(cls,
                        format: Literal['diffusers','checkpoint'],
@@ -142,7 +143,7 @@ class ModelProbe(object):
             # diffusers-ti
             if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
                 return ModelType.TextualInversion
-        
+
         raise InvalidModelException(f"Unable to determine model type for {model_path}")
 
     @classmethod
@@ -204,7 +205,7 @@ class ProbeBase(object):
 
     def get_variant_type(self)->ModelVariantType:
         pass
-    
+
     def get_scheduler_prediction_type(self)->SchedulerPredictionType:
         pass
 
@@ -356,7 +357,7 @@ class FolderProbeBase(ProbeBase):
 
     def get_format(self)->str:
         return 'diffusers'
-    
+
 class PipelineFolderProbe(FolderProbeBase):
     def get_base_type(self)->BaseModelType:
         if self.model:
@@ -365,7 +366,7 @@ class PipelineFolderProbe(FolderProbeBase):
             with open(self.folder_path / 'unet' / 'config.json','r') as file:
                 unet_conf = json.load(file)
         if unet_conf['cross_attention_dim'] == 768:
-            return BaseModelType.StableDiffusion1  
+            return BaseModelType.StableDiffusion1
         elif unet_conf['cross_attention_dim'] == 1024:
             return BaseModelType.StableDiffusion2
         elif unet_conf['cross_attention_dim'] == 1280:
@@ -387,7 +388,7 @@ class PipelineFolderProbe(FolderProbeBase):
             return SchedulerPredictionType.Epsilon
         else:
             return None
-        
+
     def get_variant_type(self)->ModelVariantType:
         # This only works for pipelines! Any kind of
         # exception results in our returning the
@@ -399,7 +400,7 @@ class PipelineFolderProbe(FolderProbeBase):
                 config_file = self.folder_path / 'unet' / 'config.json'
                 with open(config_file,'r') as file:
                     conf = json.load(file)
-                
+
             in_channels = conf['in_channels']
             if in_channels == 9:
                 return ModelVariantType.Inpaint
@@ -418,7 +419,7 @@ class VaeFolderProbe(FolderProbeBase):
 class TextualInversionFolderProbe(FolderProbeBase):
     def get_format(self)->str:
         return None
-    
+
     def get_base_type(self)->BaseModelType:
         path = self.folder_path / 'learned_embeds.bin'
         if not path.exists():
