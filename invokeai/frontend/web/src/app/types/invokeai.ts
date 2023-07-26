@@ -95,7 +95,8 @@ export type AppFeature =
   | 'localization'
   | 'consoleLogging'
   | 'dynamicPrompting'
-  | 'batches';
+  | 'batches'
+  | 'syncModels';
 
 /**
  * A disable-able Stable Diffusion feature

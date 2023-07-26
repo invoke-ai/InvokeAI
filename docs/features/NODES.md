@@ -116,49 +116,49 @@ There are several node grouping concepts that can be examined with a narrow focu
 
 As described, an initial noise tensor is necessary for the latent diffusion process. As a result, all non-image *ToLatents nodes require a noise node input.  
 
-<img width="654" alt="groupsnoise" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/2e8d297e-ad55-4d27-bc93-c119dad2a2c5">
+![groupsnoise](../assets/nodes/groupsnoise.png)
 
 ### Conditioning
 
 As described, conditioning is necessary for the latent diffusion process, whether empty or not. As a result, all non-image *ToLatents nodes require positive and negative conditioning inputs. Conditioning is reliant on a CLIP tokenizer provided by the Model Loader node.
 
-<img width="1024" alt="groupsconditioning" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/f8f7ad8a-8d9c-418e-b5ad-1437b774b27e">
+![groupsconditioning](../assets/nodes/groupsconditioning.png)
 
 ### Image Space & VAE
 
 The ImageToLatents node doesn't require a noise node input, but requires a VAE input to convert the image from image space into latent space. In reverse, the LatentsToImage node requires a VAE input to convert from latent space back into image space.
 
-<img width="637" alt="groupsimgvae" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/dd99969c-e0a8-4f78-9b17-3ffe179cef9a">
+![groupsimgvae](../assets/nodes/groupsimgvae.png)
 
 ### Defined & Random Seeds
 
 It is common to want to use both the same seed (for continuity) and random seeds (for variance). To define a seed, simply enter it into the 'Seed' field on a noise node. Conversely, the RandomInt node generates a random integer between 'Low' and 'High', and can be used as input to the 'Seed' edge point on a noise node to randomize your seed.
 
-<img width="922" alt="groupsrandseed" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/af55bc20-60f6-438e-aba5-3ec871443710">
+![groupsrandseed](../assets/nodes/groupsrandseed.png)
 
 ### Control
 
 Control means to guide the diffusion process to adhere to a defined input or structure. Control can be provided as input to non-image *ToLatents nodes from ControlNet nodes. ControlNet nodes usually require an image processor which converts an input image for use with ControlNet.
 
-<img width="805" alt="groupscontrol" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/cc9c5de7-23a7-46c8-bbad-1f3609d999a6">
+![groupscontrol](../assets/nodes/groupscontrol.png)
 
 ### LoRA
 
 The Lora Loader node lets you load a LoRA (say that ten times fast) and pass it as output to both the Prompt (Compel) and non-image *ToLatents nodes. A model's CLIP tokenizer is passed through the LoRA into Prompt (Compel), where it affects conditioning. A model's U-Net is also passed through the LoRA into a non-image *ToLatents node, where it affects noise prediction.
 
-<img width="993" alt="groupslora" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/630962b0-d914-4505-b3ea-ccae9b0269da">
+![groupslora](../assets/nodes/groupslora.png)
 
 ### Scaling
 
 Use the ImageScale, ScaleLatents, and Upscale nodes to upscale images and/or latent images. The chosen method differs across contexts. However, be aware that latents are already noisy and compressed at their original resolution; scaling an image could produce more detailed results.
 
-<img width="644" alt="groupsallscale" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/99314f05-dd9f-4b6d-b378-31de55346a13">
+![groupsallscale](../assets/nodes/groupsallscale.png)
 
 ### Iteration + Multiple Images as Input
 
 Iteration is a common concept in any processing, and means to repeat a process with given input. In nodes, you're able to use the Iterate node to iterate through collections usually gathered by the Collect node. The Iterate node has many potential uses, from processing a collection of images one after another, to varying seeds across multiple image generations and more. This screenshot demonstrates how to collect several images and pass them out one at a time.
 
-<img width="788" alt="groupsiterate" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/4af5ca27-82c9-4018-8c5b-024d3ee0a121">
+![groupsiterate](../assets/nodes/groupsiterate.png)
 
 ### Multiple Image Generation + Random Seeds
 
@@ -166,7 +166,7 @@ Multiple image generation in the node editor is done using the RandomRange node.
 
 To control seeds across generations takes some care. The first row in the screenshot will generate multiple images with different seeds, but using the same RandomRange parameters across invocations will result in the same group of random seeds being used across the images, producing repeatable results. In the second row, adding the RandomInt node as input to RandomRange's 'Seed' edge point will ensure that seeds are varied across all images across invocations, producing varied results.
 
-<img width="1027" alt="groupsmultigenseeding" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/518d1b2b-fed1-416b-a052-ab06552521b3">
+![groupsmultigenseeding](../assets/nodes/groupsmultigenseeding.png)
 
 ## Examples
 
@@ -174,7 +174,7 @@ With our knowledge of node grouping and the diffusion process, let’s break dow
 
 ### Basic text-to-image Node Graph
 
-<img width="875" alt="nodest2i" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/17c67720-c376-4db8-94f0-5e00381a61ee">
+![nodest2i](../assets/nodes/nodest2i.png)
 
 - Model Loader: A necessity to generating images (as we’ve read above). We choose our model from the dropdown. It outputs a U-Net, CLIP tokenizer, and VAE.
 - Prompt (Compel): Another necessity. Two prompt nodes are created. One will output positive conditioning (what you want, ‘dog’), one will output negative (what you don’t want, ‘cat’). They both input the CLIP tokenizer that the Model Loader node outputs.
@@ -184,7 +184,7 @@ With our knowledge of node grouping and the diffusion process, let’s break dow
 
 ### Basic image-to-image Node Graph
 
-<img width="998" alt="nodesi2i" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/3f2c95d5-cee7-4415-9b79-b46ee60a92fe">
+![nodesi2i](../assets/nodes/nodesi2i.png)
 
 - Model Loader: Choose a model from the dropdown.
 - Prompt (Compel): Two prompt nodes. One positive (dog), one negative (dog). Same CLIP inputs from the Model Loader node as before.
@@ -195,7 +195,7 @@ With our knowledge of node grouping and the diffusion process, let’s break dow
 
 ### Basic ControlNet Node Graph
 
-<img width="703" alt="nodescontrol" src="https://github.com/ymgenesis/InvokeAI/assets/25252829/b02ded86-ceb4-44a2-9910-e19ad184d471">
+![nodescontrol](../assets/nodes/nodescontrol.png)
 
 - Model Loader
 - Prompt (Compel)
