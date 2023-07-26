@@ -22,7 +22,6 @@
         "showOptionsPanel": "Näytä asetukset"
     },
     "common": {
-        "communityLabel": "Yhteisö",
         "postProcessDesc2": "Erillinen käyttöliittymä tullaan julkaisemaan helpottaaksemme työnkulkua jälkikäsittelyssä.",
         "training": "Kouluta",
         "statusLoadingModel": "Ladataan mallia",
