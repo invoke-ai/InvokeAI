@@ -7,7 +7,9 @@ import {
   ImageToLatentsInvocation,
 } from 'services/api/types';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
@@ -20,8 +22,6 @@ import {
   SDXL_LATENTS_TO_LATENTS,
   SDXL_MODEL_LOADER,
 } from './constants';
-import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 
 /**
  * Builds the Image to Image tab graph.
@@ -91,13 +91,13 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: positiveStylePrompt,
+        style: `${positivePrompt} ${positiveStylePrompt}`,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: negativeStylePrompt,
+        style: `${negativePrompt} ${negativeStylePrompt}`,
       },
       [NOISE]: {
         type: 'noise',
