@@ -17,6 +17,7 @@ export const FIELD_TYPE_MAP: Record<string, FieldType> = {
   ClipField: 'clip',
   VaeField: 'vae',
   model: 'model',
+  refiner_model: 'refiner_model',
   vae_model: 'vae_model',
   lora_model: 'lora_model',
   controlnet_model: 'controlnet_model',
@@ -118,6 +119,12 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'teal',
     colorCssVar: getColorTokenCssVariable('teal'),
     title: 'Model',
+    description: 'Models are models.',
+  },
+  refiner_model: {
+    color: 'teal',
+    colorCssVar: getColorTokenCssVariable('teal'),
+    title: 'Refiner Model',
     description: 'Models are models.',
   },
   vae_model: {

@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import { parseify } from 'common/util/serialize';
 import { textToImageGraphBuilt } from 'features/nodes/store/actions';
+import { buildLinearSDXLTextToImageGraph } from 'features/nodes/util/graphBuilders/buildLinearSDXLTextToImageGraph';
 import { buildLinearTextToImageGraph } from 'features/nodes/util/graphBuilders/buildLinearTextToImageGraph';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
 import { sessionCreated } from 'services/api/thunks/session';
@@ -14,8 +15,15 @@ export const addUserInvokedTextToImageListener = () => {
     effect: async (action, { getState, dispatch, take }) => {
       const log = logger('session');
       const state = getState();
+      const model = state.generation.model;
 
-      const graph = buildLinearTextToImageGraph(state);
+      let graph;
+
+      if (model && model.base_model === 'sdxl') {
+        graph = buildLinearSDXLTextToImageGraph(state);
+      } else {
+        graph = buildLinearTextToImageGraph(state);
+      }
 
       dispatch(textToImageGraphBuilt(graph));
 

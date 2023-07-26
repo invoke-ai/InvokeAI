@@ -6,28 +6,25 @@ import {
   ImageResizeInvocation,
   ImageToLatentsInvocation,
 } from 'services/api/types';
-import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
-import { addLoRAsToGraph } from './addLoRAsToGraph';
-import { addVAEToGraph } from './addVAEToGraph';
+import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import {
-  CLIP_SKIP,
-  IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
-  LATENTS_TO_LATENTS,
-  MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  SDXL_IMAGE_TO_IMAGE_GRAPH,
+  SDXL_LATENTS_TO_LATENTS,
+  SDXL_MODEL_LOADER,
 } from './constants';
 
 /**
  * Builds the Image to Image tab graph.
  */
-export const buildLinearImageToImageGraph = (
+export const buildLinearSDXLImageToImageGraph = (
   state: RootState
 ): NonNullableGraph => {
   const log = logger('nodes');
@@ -39,7 +36,6 @@ export const buildLinearImageToImageGraph = (
     scheduler,
     steps,
     initialImage,
-    img2imgStrength: strength,
     shouldFitToWidthHeight,
     width,
     height,
@@ -49,15 +45,13 @@ export const buildLinearImageToImageGraph = (
     vaePrecision,
   } = state.generation;
 
-  // TODO: add batch functionality
-  // const {
-  //   isEnabled: isBatchEnabled,
-  //   imageNames: batchImageNames,
-  //   asInitialImage,
-  // } = state.batch;
-
-  // const shouldBatch =
-  //   isBatchEnabled && batchImageNames.length > 0 && asInitialImage;
+  const {
+    positiveStylePrompt,
+    negativeStylePrompt,
+    shouldUseSDXLRefiner,
+    refinerStart,
+    sdxlImg2ImgDenoisingStrength: strength,
+  } = state.sdxl;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -84,27 +78,24 @@ export const buildLinearImageToImageGraph = (
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    id: IMAGE_TO_IMAGE_GRAPH,
+    id: SDXL_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+      [SDXL_MODEL_LOADER]: {
+        type: 'sdxl_model_loader',
+        id: SDXL_MODEL_LOADER,
         model,
       },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        skipped_layers: clipSkip,
-      },
       [POSITIVE_CONDITIONING]: {
-        type: 'compel',
+        type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
+        style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: 'compel',
+        type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
+        style: negativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
@@ -116,13 +107,16 @@ export const buildLinearImageToImageGraph = (
         id: LATENTS_TO_IMAGE,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
-      [LATENTS_TO_LATENTS]: {
-        type: 'l2l',
-        id: LATENTS_TO_LATENTS,
+      [SDXL_LATENTS_TO_LATENTS]: {
+        type: 'l2l_sdxl',
+        id: SDXL_LATENTS_TO_LATENTS,
         cfg_scale,
         scheduler,
         steps,
-        strength,
+        denoising_start: shouldUseSDXLRefiner
+          ? Math.min(refinerStart, 1 - strength)
+          : 1 - strength,
+        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -137,27 +131,37 @@ export const buildLinearImageToImageGraph = (
     edges: [
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: SDXL_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: SDXL_LATENTS_TO_LATENTS,
           field: 'unet',
         },
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'clip',
+          node_id: SDXL_MODEL_LOADER,
+          field: 'vae',
         },
         destination: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
+          node_id: LATENTS_TO_IMAGE,
+          field: 'vae',
         },
       },
       {
         source: {
-          node_id: CLIP_SKIP,
+          node_id: SDXL_MODEL_LOADER,
+          field: 'vae',
+        },
+        destination: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'vae',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -167,7 +171,17 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: CLIP_SKIP,
+          node_id: SDXL_MODEL_LOADER,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -177,7 +191,17 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: SDXL_MODEL_LOADER,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_LATENTS_TO_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -191,7 +215,7 @@ export const buildLinearImageToImageGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: SDXL_LATENTS_TO_LATENTS,
           field: 'latents',
         },
       },
@@ -201,18 +225,8 @@ export const buildLinearImageToImageGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: SDXL_LATENTS_TO_LATENTS,
           field: 'noise',
-        },
-      },
-      {
-        source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'negative_conditioning',
         },
       },
       {
@@ -221,8 +235,18 @@ export const buildLinearImageToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: SDXL_LATENTS_TO_LATENTS,
           field: 'positive_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: SDXL_LATENTS_TO_LATENTS,
+          field: 'negative_conditioning',
         },
       },
     ],
@@ -297,47 +321,11 @@ export const buildLinearImageToImageGraph = (
     });
   }
 
-  // TODO: add batch functionality
-  // if (isBatchEnabled && asInitialImage && batchImageNames.length > 0) {
-  //   // we are going to connect an iterate up to the init image
-  //   delete (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image;
-
-  //   const imageCollection: ImageCollectionInvocation = {
-  //     id: IMAGE_COLLECTION,
-  //     type: 'image_collection',
-  //     images: batchImageNames.map((image_name) => ({ image_name })),
-  //   };
-
-  //   const imageCollectionIterate: IterateInvocation = {
-  //     id: IMAGE_COLLECTION_ITERATE,
-  //     type: 'iterate',
-  //   };
-
-  //   graph.nodes[IMAGE_COLLECTION] = imageCollection;
-  //   graph.nodes[IMAGE_COLLECTION_ITERATE] = imageCollectionIterate;
-
-  //   graph.edges.push({
-  //     source: { node_id: IMAGE_COLLECTION, field: 'collection' },
-  //     destination: {
-  //       node_id: IMAGE_COLLECTION_ITERATE,
-  //       field: 'collection',
-  //     },
-  //   });
-
-  //   graph.edges.push({
-  //     source: { node_id: IMAGE_COLLECTION_ITERATE, field: 'item' },
-  //     destination: {
-  //       node_id: IMAGE_TO_LATENTS,
-  //       field: 'image',
-  //     },
-  //   });
-  // }
-
   // add metadata accumulator, which is only mostly populated - some fields are added later
   graph.nodes[METADATA_ACCUMULATOR] = {
     id: METADATA_ACCUMULATOR,
     type: 'metadata_accumulator',
-    generation_mode: 'img2img',
+    generation_mode: 'sdxl_img2img',
     cfg_scale,
     height,
     width,
@@ -348,12 +336,14 @@ export const buildLinearImageToImageGraph = (
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
-    vae: undefined, // option; set in addVAEToGraph
-    controlnets: [], // populated in addControlNetToLinearGraph
-    loras: [], // populated in addLoRAsToGraph
+    vae: undefined,
+    controlnets: [],
+    loras: [],
     clip_skip: clipSkip,
-    strength,
+    strength: strength,
     init_image: initialImage.imageName,
+    positive_style_prompt: positiveStylePrompt,
+    negative_style_prompt: negativeStylePrompt,
   };
 
   graph.edges.push({
@@ -367,17 +357,13 @@ export const buildLinearImageToImageGraph = (
     },
   });
 
-  // add LoRA support
-  addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
-
-  // optionally add custom VAE
-  addVAEToGraph(state, graph);
+  // Add Refiner if enabled
+  if (shouldUseSDXLRefiner) {
+    addSDXLRefinerToGraph(state, graph, SDXL_LATENTS_TO_LATENTS);
+  }
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
-
-  // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, LATENTS_TO_LATENTS);
 
   return graph;
 };

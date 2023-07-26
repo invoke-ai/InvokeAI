@@ -11,6 +11,7 @@ import {
   useGetMainModelsQuery,
 } from 'services/api/endpoints/models';
 import ModelListItem from './ModelListItem';
+import { ALL_BASE_MODELS } from 'services/api/constants';
 
 type ModelListProps = {
   selectedModelId: string | undefined;
@@ -26,13 +27,13 @@ const ModelList = (props: ModelListProps) => {
   const [modelFormatFilter, setModelFormatFilter] =
     useState<ModelFormat>('images');
 
-  const { filteredDiffusersModels } = useGetMainModelsQuery(undefined, {
+  const { filteredDiffusersModels } = useGetMainModelsQuery(ALL_BASE_MODELS, {
     selectFromResult: ({ data }) => ({
       filteredDiffusersModels: modelsFilter(data, 'diffusers', nameFilter),
     }),
   });
 
-  const { filteredCheckpointModels } = useGetMainModelsQuery(undefined, {
+  const { filteredCheckpointModels } = useGetMainModelsQuery(ALL_BASE_MODELS, {
     selectFromResult: ({ data }) => ({
       filteredCheckpointModels: modelsFilter(data, 'checkpoint', nameFilter),
     }),
