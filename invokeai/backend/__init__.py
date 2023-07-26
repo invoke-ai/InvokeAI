@@ -12,4 +12,4 @@ from .model_management import (
     ModelManager, ModelCache, BaseModelType,
     ModelType, SubModelType, ModelInfo
     )
-from .safety_checker import SafetyChecker
+from .model_management.models import SilenceWarnings

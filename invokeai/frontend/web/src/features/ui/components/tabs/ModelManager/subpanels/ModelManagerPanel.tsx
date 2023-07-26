@@ -8,10 +8,11 @@ import {
 import CheckpointModelEdit from './ModelManagerPanel/CheckpointModelEdit';
 import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
+import { ALL_BASE_MODELS } from 'services/api/constants';
 
 export default function ModelManagerPanel() {
   const [selectedModelId, setSelectedModelId] = useState<string>();
-  const { model } = useGetMainModelsQuery(undefined, {
+  const { model } = useGetMainModelsQuery(ALL_BASE_MODELS, {
     selectFromResult: ({ data }) => ({
       model: selectedModelId ? data?.entities[selectedModelId] : undefined,
     }),

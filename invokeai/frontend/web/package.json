@@ -53,11 +53,11 @@
     ]
   },
   "dependencies": {
-    "@chakra-ui/anatomy": "^2.1.1",
+    "@chakra-ui/anatomy": "^2.2.0",
     "@chakra-ui/icons": "^2.0.19",
-    "@chakra-ui/react": "^2.7.1",
+    "@chakra-ui/react": "^2.8.0",
     "@chakra-ui/styled-system": "^2.9.1",
-    "@chakra-ui/theme-tools": "^2.0.18",
+    "@chakra-ui/theme-tools": "^2.1.0",
     "@dagrejs/graphlib": "^2.1.13",
     "@dnd-kit/core": "^6.0.8",
     "@dnd-kit/modifiers": "^6.0.1",

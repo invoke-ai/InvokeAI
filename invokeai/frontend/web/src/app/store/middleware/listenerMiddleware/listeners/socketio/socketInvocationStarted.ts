@@ -21,7 +21,10 @@ export const addInvocationStartedEventListener = () => {
         return;
       }
 
-      log.debug(action.payload, 'Invocation started');
+      log.debug(
+        action.payload,
+        `Invocation started (${action.payload.data.node.type})`
+      );
       dispatch(appSocketInvocationStarted(action.payload));
     },
   });

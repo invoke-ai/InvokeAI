@@ -16,7 +16,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import { configSelector } from 'features/system/store/configSelectors';
-import { InvokeTabName } from 'features/ui/store/tabMap';
+import { InvokeTabName, tabMap } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
 import { ResourceKey } from 'i18next';
 import { isEqual } from 'lodash-es';
@@ -172,13 +172,22 @@ const InvokeTabs = () => {
   const { ref: galleryPanelRef, minSizePct: galleryMinSizePct } =
     useMinimumPanelSize(MIN_GALLERY_WIDTH, DEFAULT_GALLERY_PCT, 'app');
 
+  const handleTabChange = useCallback(
+    (index: number) => {
+      const activeTabName = tabMap[index];
+      if (!activeTabName) {
+        return;
+      }
+      dispatch(setActiveTab(activeTabName));
+    },
+    [dispatch]
+  );
+
   return (
     <Tabs
       defaultIndex={activeTab}
       index={activeTab}
-      onChange={(index: number) => {
-        dispatch(setActiveTab(index));
-      }}
+      onChange={handleTabChange}
       sx={{
         flexGrow: 1,
         gap: 4,

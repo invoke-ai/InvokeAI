@@ -20,6 +20,8 @@ import {
   RANDOM_INT,
   RANGE_OF_SIZE,
 } from './constants';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -247,6 +249,17 @@ export const buildCanvasInpaintGraph = (
   } else {
     // User specified seed, so set the start of the range of size to the seed
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
+  }
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph, INPAINT);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph, INPAINT);
   }
 
   return graph;

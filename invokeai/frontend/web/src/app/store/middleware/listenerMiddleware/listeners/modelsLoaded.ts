@@ -9,13 +9,19 @@ import {
   zMainModel,
   zVaeModel,
 } from 'features/parameters/types/parameterSchemas';
+import {
+  refinerModelChanged,
+  setShouldUseSDXLRefiner,
+} from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
 import { modelsApi } from 'services/api/endpoints/models';
 import { startAppListening } from '..';
 
 export const addModelsLoadedListener = () => {
   startAppListening({
-    matcher: modelsApi.endpoints.getMainModels.matchFulfilled,
+    predicate: (state, action) =>
+      modelsApi.endpoints.getMainModels.matchFulfilled(action) &&
+      !action.meta.arg.originalArgs.includes('sdxl-refiner'),
     effect: async (action, { getState, dispatch }) => {
       // models loaded, we need to ensure the selected model is available and if not, select the first one
       const log = logger('models');
@@ -57,6 +63,54 @@ export const addModelsLoadedListener = () => {
       }
 
       dispatch(modelChanged(result.data));
+    },
+  });
+  startAppListening({
+    predicate: (state, action) =>
+      modelsApi.endpoints.getMainModels.matchFulfilled(action) &&
+      action.meta.arg.originalArgs.includes('sdxl-refiner'),
+    effect: async (action, { getState, dispatch }) => {
+      // models loaded, we need to ensure the selected model is available and if not, select the first one
+      const log = logger('models');
+      log.info(
+        { models: action.payload.entities },
+        `SDXL Refiner models loaded (${action.payload.ids.length})`
+      );
+
+      const currentModel = getState().sdxl.refinerModel;
+
+      const isCurrentModelAvailable = some(
+        action.payload.entities,
+        (m) =>
+          m?.model_name === currentModel?.model_name &&
+          m?.base_model === currentModel?.base_model
+      );
+
+      if (isCurrentModelAvailable) {
+        return;
+      }
+
+      const firstModelId = action.payload.ids[0];
+      const firstModel = action.payload.entities[firstModelId];
+
+      if (!firstModel) {
+        // No models loaded at all
+        dispatch(refinerModelChanged(null));
+        dispatch(setShouldUseSDXLRefiner(false));
+        return;
+      }
+
+      const result = zMainModel.safeParse(firstModel);
+
+      if (!result.success) {
+        log.error(
+          { error: result.error.format() },
+          'Failed to parse SDXL Refiner Model'
+        );
+        return;
+      }
+
+      dispatch(refinerModelChanged(result.data));
     },
   });
   startAppListening({
