@@ -95,7 +95,7 @@ export const addSDXLRefinerToGraph = (
     type: 'l2l_sdxl',
     id: SDXL_REFINER_LATENTS_TO_LATENTS,
     cfg_scale: refinerCFGScale,
-    steps: refinerStart === 1 ? 1000 : refinerSteps / (1 - refinerStart),
+    steps: refinerSteps / (1 - Math.min(refinerStart, 0.99)),
     scheduler: refinerScheduler,
     denoising_start: refinerStart,
     denoising_end: 1,
