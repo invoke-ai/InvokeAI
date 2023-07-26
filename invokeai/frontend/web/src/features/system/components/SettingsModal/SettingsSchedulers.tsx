@@ -10,9 +10,9 @@ import { map } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const data = map(SCHEDULER_LABEL_MAP, (value, label) => ({
-  value,
-  label,
+const data = map(SCHEDULER_LABEL_MAP, (label, name) => ({
+  value: name,
+  label: label,
 })).sort((a, b) => a.label.localeCompare(b.label));
 
 export default function SettingsSchedulers() {
