@@ -39,7 +39,6 @@ export const buildLinearSDXLImageToImageGraph = (
     shouldFitToWidthHeight,
     width,
     height,
-    img2imgStrength: strength,
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
@@ -51,6 +50,7 @@ export const buildLinearSDXLImageToImageGraph = (
     negativeStylePrompt,
     shouldUseSDXLRefiner,
     refinerStart,
+    sdxlImg2ImgDenoisingStrength: strength,
   } = state.sdxl;
 
   /**

@@ -11,6 +11,7 @@ type SDXLInitialState = {
   positiveStylePrompt: PositiveStylePromptSDXLParam;
   negativeStylePrompt: NegativeStylePromptSDXLParam;
   shouldUseSDXLRefiner: boolean;
+  sdxlImg2ImgDenoisingStrength: number;
   refinerModel: MainModelField | null;
   refinerSteps: number;
   refinerCFGScale: number;
@@ -23,6 +24,7 @@ const sdxlInitialState: SDXLInitialState = {
   positiveStylePrompt: '',
   negativeStylePrompt: '',
   shouldUseSDXLRefiner: false,
+  sdxlImg2ImgDenoisingStrength: 0.7,
   refinerModel: null,
   refinerSteps: 20,
   refinerCFGScale: 7.5,
@@ -43,6 +45,9 @@ const sdxlSlice = createSlice({
     },
     setShouldUseSDXLRefiner: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSDXLRefiner = action.payload;
+    },
+    setSDXLImg2ImgDenoisingStrength: (state, action: PayloadAction<number>) => {
+      state.sdxlImg2ImgDenoisingStrength = action.payload;
     },
     refinerModelChanged: (
       state,
@@ -72,6 +77,7 @@ export const {
   setPositiveStylePromptSDXL,
   setNegativeStylePromptSDXL,
   setShouldUseSDXLRefiner,
+  setSDXLImg2ImgDenoisingStrength,
   refinerModelChanged,
   setRefinerSteps,
   setRefinerCFGScale,

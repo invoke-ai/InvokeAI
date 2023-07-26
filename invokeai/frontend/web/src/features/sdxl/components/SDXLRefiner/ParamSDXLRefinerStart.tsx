@@ -9,20 +9,17 @@ import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable'
 
 const selector = createSelector(
   [stateSelector],
-  ({ sdxl, hotkeys }) => {
+  ({ sdxl }) => {
     const { refinerStart } = sdxl;
-    const { shift } = hotkeys;
-
     return {
       refinerStart,
-      shift,
     };
   },
   defaultSelectorOptions
 );
 
 const ParamSDXLRefinerStart = () => {
-  const { refinerStart, shift } = useAppSelector(selector);
+  const { refinerStart } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const isRefinerAvailable = useIsRefinerAvailable();
   const handleChange = useCallback(
@@ -38,13 +35,13 @@ const ParamSDXLRefinerStart = () => {
   return (
     <IAISlider
       label="Refiner Start"
-      step={shift ? 0.05 : 0.01}
+      step={0.01}
       min={0.01}
-      max={1}
+      max={0.99}
       onChange={handleChange}
       handleReset={handleReset}
       value={refinerStart}
-      sliderNumberInputProps={{ max: 1 }}
+      sliderNumberInputProps={{ max: 0.99 }}
       withInput
       withReset
       withSliderMarks

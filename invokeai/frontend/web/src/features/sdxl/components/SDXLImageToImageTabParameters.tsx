@@ -4,10 +4,10 @@ import ParamPositiveConditioning from 'features/parameters/components/Parameters
 import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/ParamNoiseCollapse';
 // import ParamVariationCollapse from 'features/parameters/components/Parameters/Variations/ParamVariationCollapse';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
-import ImageToImageTabCoreParameters from 'features/ui/components/tabs/ImageToImage/ImageToImageTabCoreParameters';
 import ParamSDXLNegativeStyleConditioning from './ParamSDXLNegativeStyleConditioning';
 import ParamSDXLPositiveStyleConditioning from './ParamSDXLPositiveStyleConditioning';
 import ParamSDXLRefinerCollapse from './ParamSDXLRefinerCollapse';
+import SDXLImageToImageTabCoreParameters from './SDXLImageToImageTabCoreParameters';
 
 const SDXLImageToImageTabParameters = () => {
   return (
@@ -17,7 +17,7 @@ const SDXLImageToImageTabParameters = () => {
       <ParamNegativeConditioning />
       <ParamSDXLNegativeStyleConditioning />
       <ProcessButtons />
-      <ImageToImageTabCoreParameters />
+      <SDXLImageToImageTabCoreParameters />
       <ParamSDXLRefinerCollapse />
       <ParamDynamicPromptsCollapse />
       <ParamNoiseCollapse />
