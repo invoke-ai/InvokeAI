@@ -288,33 +288,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             )
 
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name="== BASIC OPTIONS ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
-            scroll_exit=True,
-        )
-        self.nextrely -= 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Select an output directory for images:",
-            editable=False,
-            color="CONTROL",
-        )
-        self.outdir = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name="(<tab> autocompletes, ctrl-N advances):",
-            value=str(default_output_dir()),
-            select_dir=True,
-            must_exist=False,
-            use_two_lines=False,
-            labelColor="GOOD",
-            begin_entry_at=40,
-            scroll_exit=True,
-        )
-        self.nextrely += 1
         label = """HuggingFace access token (OPTIONAL) for automatic model downloads. See https://huggingface.co/settings/tokens."""
         for line in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
@@ -333,15 +306,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             scroll_exit=True,
         )
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name="== ADVANCED OPTIONS ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
-            scroll_exit=True,
-        )
-        self.nextrely -= 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
             name="GPU Management",
@@ -400,6 +364,18 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             value="Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models (<tab> autocompletes, ctrl-N advances):",
             editable=False,
             color="CONTROL",
+        )
+        self.outdir = self.add_widget_intelligent(
+            FileBox,
+            name="Output directory for images (<tab> autocompletes, ctrl-N advances):",
+            value=str(default_output_dir()),
+            select_dir=True,
+            must_exist=False,
+            use_two_lines=False,
+            labelColor="GOOD",
+            begin_entry_at=40,
+            max_height=3,
+            scroll_exit=True,
         )
         self.autoimport_dirs = {}
         self.autoimport_dirs['autoimport_dir'] = self.add_widget_intelligent(
@@ -527,7 +503,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
             "MAIN",
             editOptsForm,
             name="InvokeAI Startup Options",
-            cycle_widgets=True,
+            cycle_widgets=False,
         )
         if not (self.program_opts.skip_sd_weights or self.program_opts.default_only):
             self.model_select = self.addForm(
@@ -535,7 +511,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
                 addModelsForm,
                 name="Install Stable Diffusion Models",
                 multipage=True,
-                cycle_widgets=True,
+                cycle_widgets=False,
             )
 
     def new_opts(self):
