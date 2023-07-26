@@ -13,6 +13,7 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { forEach } from 'lodash-es';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
@@ -35,6 +36,8 @@ const ParamMainModelSelect = () => {
     NON_REFINER_BASE_MODELS
   );
 
+  const activeTabName = useAppSelector(activeTabNameSelector);
+
   const data = useMemo(() => {
     if (!mainModels) {
       return [];
@@ -43,7 +46,10 @@ const ParamMainModelSelect = () => {
     const data: SelectItem[] = [];
 
     forEach(mainModels.entities, (model, id) => {
-      if (!model) {
+      if (
+        !model ||
+        (activeTabName === 'unifiedCanvas' && model.base_model === 'sdxl')
+      ) {
         return;
       }
 
@@ -55,7 +61,7 @@ const ParamMainModelSelect = () => {
     });
 
     return data;
-  }, [mainModels]);
+  }, [mainModels, activeTabName]);
 
   // grab the full model entity from the RTK Query cache
   // TODO: maybe we should just store the full model entity in state?
