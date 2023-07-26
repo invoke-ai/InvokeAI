@@ -1,45 +1,43 @@
-import { useAppDispatch } from 'app/store/storeHooks';
-import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
-import {
-  MainModelInputFieldValue,
-  ModelInputFieldTemplate,
-} from 'features/nodes/types/types';
-
 import { Box, Flex } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
+import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
+import { REFINER_BASE_MODELS } from 'services/api/constants';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
-import { FieldComponentProps } from './types';
-import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
 
-const ModelInputFieldComponent = (
-  props: FieldComponentProps<MainModelInputFieldValue, ModelInputFieldTemplate>
-) => {
-  const { nodeId, field } = props;
+const selector = createSelector(
+  stateSelector,
+  (state) => ({ model: state.sdxl.refinerModel }),
+  defaultSelectorOptions
+);
 
+const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
   const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
 
-  const { data: mainModels, isLoading } = useGetMainModelsQuery(
-    NON_REFINER_BASE_MODELS
-  );
+  const { model } = useAppSelector(selector);
+
+  const { data: refinerModels, isLoading } =
+    useGetMainModelsQuery(REFINER_BASE_MODELS);
 
   const data = useMemo(() => {
-    if (!mainModels) {
+    if (!refinerModels) {
       return [];
     }
 
     const data: SelectItem[] = [];
 
-    forEach(mainModels.entities, (model, id) => {
+    forEach(refinerModels.entities, (model, id) => {
       if (!model) {
         return;
       }
@@ -52,16 +50,16 @@ const ModelInputFieldComponent = (
     });
 
     return data;
-  }, [mainModels]);
+  }, [refinerModels]);
 
   // grab the full model entity from the RTK Query cache
   // TODO: maybe we should just store the full model entity in state?
   const selectedModel = useMemo(
     () =>
-      mainModels?.entities[
-        `${field.value?.base_model}/main/${field.value?.model_name}`
+      refinerModels?.entities[
+        `${model?.base_model}/main/${model?.model_name}`
       ] ?? null,
-    [field.value?.base_model, field.value?.model_name, mainModels?.entities]
+    [refinerModels?.entities, model]
   );
 
   const handleChangeModel = useCallback(
@@ -76,20 +74,14 @@ const ModelInputFieldComponent = (
         return;
       }
 
-      dispatch(
-        fieldValueChanged({
-          nodeId,
-          fieldName: field.name,
-          value: newModel,
-        })
-      );
+      dispatch(refinerModelChanged(newModel));
     },
-    [dispatch, field.name, nodeId]
+    [dispatch]
   );
 
   return isLoading ? (
     <IAIMantineSearchableSelect
-      label={t('modelManager.model')}
+      label="Refiner Model"
       placeholder="Loading..."
       disabled={true}
       data={[]}
@@ -98,15 +90,14 @@ const ModelInputFieldComponent = (
     <Flex w="100%" alignItems="center" gap={2}>
       <IAIMantineSearchableSelect
         tooltip={selectedModel?.description}
-        label={
-          selectedModel?.base_model && MODEL_TYPE_MAP[selectedModel?.base_model]
-        }
+        label="Refiner Model"
         value={selectedModel?.id}
         placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
         data={data}
         error={data.length === 0}
         disabled={data.length === 0}
         onChange={handleChangeModel}
+        w="100%"
       />
       {isSyncModelEnabled && (
         <Box mt={7}>
@@ -117,4 +108,4 @@ const ModelInputFieldComponent = (
   );
 };
 
-export default memo(ModelInputFieldComponent);
+export default memo(ParamSDXLRefinerModelSelect);

@@ -2,23 +2,20 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
-import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
-import { addLoRAsToGraph } from './addLoRAsToGraph';
-import { addVAEToGraph } from './addVAEToGraph';
+import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import {
-  CLIP_SKIP,
   LATENTS_TO_IMAGE,
-  MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  TEXT_TO_IMAGE_GRAPH,
-  TEXT_TO_LATENTS,
+  SDXL_MODEL_LOADER,
+  SDXL_TEXT_TO_IMAGE_GRAPH,
+  SDXL_TEXT_TO_LATENTS,
 } from './constants';
 
-export const buildLinearTextToImageGraph = (
+export const buildLinearSDXLTextToImageGraph = (
   state: RootState
 ): NonNullableGraph => {
   const log = logger('nodes');
@@ -36,6 +33,13 @@ export const buildLinearTextToImageGraph = (
     shouldUseNoiseSettings,
     vaePrecision,
   } = state.generation;
+
+  const {
+    positiveStylePrompt,
+    negativeStylePrompt,
+    shouldUseSDXLRefiner,
+    refinerStart,
+  } = state.sdxl;
 
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
@@ -57,27 +61,24 @@ export const buildLinearTextToImageGraph = (
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    id: TEXT_TO_IMAGE_GRAPH,
+    id: SDXL_TEXT_TO_IMAGE_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+      [SDXL_MODEL_LOADER]: {
+        type: 'sdxl_model_loader',
+        id: SDXL_MODEL_LOADER,
         model,
       },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        skipped_layers: clipSkip,
-      },
       [POSITIVE_CONDITIONING]: {
-        type: 'compel',
+        type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
+        style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: 'compel',
+        type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
+        style: negativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
@@ -86,12 +87,13 @@ export const buildLinearTextToImageGraph = (
         height,
         use_cpu,
       },
-      [TEXT_TO_LATENTS]: {
-        type: 't2l',
-        id: TEXT_TO_LATENTS,
+      [SDXL_TEXT_TO_LATENTS]: {
+        type: 't2l_sdxl',
+        id: SDXL_TEXT_TO_LATENTS,
         cfg_scale,
         scheduler,
         steps,
+        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -102,27 +104,27 @@ export const buildLinearTextToImageGraph = (
     edges: [
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'clip',
-        },
-        destination: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: SDXL_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: SDXL_TEXT_TO_LATENTS,
           field: 'unet',
         },
       },
       {
         source: {
-          node_id: CLIP_SKIP,
+          node_id: SDXL_MODEL_LOADER,
+          field: 'vae',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'vae',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -132,7 +134,17 @@ export const buildLinearTextToImageGraph = (
       },
       {
         source: {
-          node_id: CLIP_SKIP,
+          node_id: SDXL_MODEL_LOADER,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -142,11 +154,21 @@ export const buildLinearTextToImageGraph = (
       },
       {
         source: {
+          node_id: SDXL_MODEL_LOADER,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      },
+      {
+        source: {
           node_id: POSITIVE_CONDITIONING,
           field: 'conditioning',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: SDXL_TEXT_TO_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -156,18 +178,8 @@ export const buildLinearTextToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: SDXL_TEXT_TO_LATENTS,
           field: 'negative_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: TEXT_TO_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
         },
       },
       {
@@ -176,8 +188,18 @@ export const buildLinearTextToImageGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: SDXL_TEXT_TO_LATENTS,
           field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_TEXT_TO_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
         },
       },
     ],
@@ -187,7 +209,7 @@ export const buildLinearTextToImageGraph = (
   graph.nodes[METADATA_ACCUMULATOR] = {
     id: METADATA_ACCUMULATOR,
     type: 'metadata_accumulator',
-    generation_mode: 'txt2img',
+    generation_mode: 'sdxl_txt2img',
     cfg_scale,
     height,
     width,
@@ -198,10 +220,12 @@ export const buildLinearTextToImageGraph = (
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
-    vae: undefined, // option; set in addVAEToGraph
-    controlnets: [], // populated in addControlNetToLinearGraph
-    loras: [], // populated in addLoRAsToGraph
+    vae: undefined,
+    controlnets: [],
+    loras: [],
     clip_skip: clipSkip,
+    positive_style_prompt: positiveStylePrompt,
+    negative_style_prompt: negativeStylePrompt,
   };
 
   graph.edges.push({
@@ -215,17 +239,13 @@ export const buildLinearTextToImageGraph = (
     },
   });
 
-  // add LoRA support
-  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS);
-
-  // optionally add custom VAE
-  addVAEToGraph(state, graph);
+  // Add Refiner if enabled
+  if (shouldUseSDXLRefiner) {
+    addSDXLRefinerToGraph(state, graph, SDXL_TEXT_TO_LATENTS);
+  }
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
-
-  // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, TEXT_TO_LATENTS);
 
   return graph;
 };
