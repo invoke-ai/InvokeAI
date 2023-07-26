@@ -8,6 +8,7 @@ import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSe
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
@@ -22,6 +23,7 @@ const selector = createSelector(
 
 const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
+  const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
 
   const { model } = useAppSelector(selector);
 
@@ -97,9 +99,11 @@ const ParamSDXLRefinerModelSelect = () => {
         onChange={handleChangeModel}
         w="100%"
       />
-      <Box mt={7}>
-        <SyncModelsButton iconMode />
-      </Box>
+      {isSyncModelEnabled && (
+        <Box mt={7}>
+          <SyncModelsButton iconMode />
+        </Box>
+      )}
     </Flex>
   );
 };

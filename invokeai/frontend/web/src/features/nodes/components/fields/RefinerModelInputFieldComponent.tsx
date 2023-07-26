@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { REFINER_BASE_MODELS } from 'services/api/constants';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 
 const RefinerModelInputFieldComponent = (
   props: FieldComponentProps<
@@ -27,7 +28,7 @@ const RefinerModelInputFieldComponent = (
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
+  const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
   const { data: refinerModels, isLoading } =
     useGetMainModelsQuery(REFINER_BASE_MODELS);
 
@@ -107,9 +108,11 @@ const RefinerModelInputFieldComponent = (
         disabled={data.length === 0}
         onChange={handleChangeModel}
       />
-      <Box mt={7}>
-        <SyncModelsButton iconMode />
-      </Box>
+      {isSyncModelEnabled && (
+        <Box mt={7}>
+          <SyncModelsButton iconMode />
+        </Box>
+      )}
     </Flex>
   );
 };
