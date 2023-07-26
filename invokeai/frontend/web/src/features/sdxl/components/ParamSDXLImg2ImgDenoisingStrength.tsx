@@ -37,8 +37,8 @@ const ParamSDXLImg2ImgDenoisingStrength = () => {
     <IAISlider
       label={`${t('parameters.denoisingStrength')}`}
       step={0.01}
-      min={0.01}
-      max={0.99}
+      min={0}
+      max={1}
       onChange={handleChange}
       handleReset={handleReset}
       value={sdxlImg2ImgDenoisingStrength}
