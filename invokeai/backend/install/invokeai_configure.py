@@ -558,7 +558,7 @@ def default_user_selections(program_opts: Namespace) -> InstallSelections:
 
 # -------------------------------------
 def initialize_rootdir(root: Path, yes_to_all: bool = False):
-    logger.info("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
+    logger.info("Initializing InvokeAI runtime directory")
     for name in (
             "models",
             "databases",
@@ -788,15 +788,14 @@ def main():
                 sys.exit(0)
                 
         if opt.skip_support_models:
-            logger.info("SKIPPING SUPPORT MODEL DOWNLOADS PER USER REQUEST")
+            logger.info("Skipping support models at user's request")
         else:
-            logger.info("CHECKING/UPDATING SUPPORT MODELS")
+            logger.info("Installing support models")
             download_support_models()
 
         if opt.skip_sd_weights:
-            logger.warning("SKIPPING DIFFUSION WEIGHTS DOWNLOAD PER USER REQUEST")
+            logger.warning("Skipping diffusion weights download per user request")
         elif models_to_download:
-            logger.info("DOWNLOADING DIFFUSION WEIGHTS")
             process_and_execute(opt, models_to_download)
 
         postscript(errors=errors)
