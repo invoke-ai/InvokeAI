@@ -553,7 +553,7 @@ class AddModelApplication(npyscreen.NPSAppManaged):
     def onStart(self):
         npyscreen.setTheme(npyscreen.Themes.DefaultTheme)
         self.main_form = self.addForm(
-            "MAIN", addModelsForm, name="Install Stable Diffusion Models", cycle_widgets=True,
+            "MAIN", addModelsForm, name="Install Stable Diffusion Models", cycle_widgets=False,
         )
 
 class StderrToMessage():

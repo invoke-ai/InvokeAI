@@ -1,18 +1,15 @@
-import { startAppListening } from '..';
-import { log } from 'app/logging/useLogger';
+import { imageDeletionConfirmed } from 'features/imageDeletion/store/actions';
+import { selectImageUsage } from 'features/imageDeletion/store/imageDeletionSelectors';
 import {
-  imageDeletionConfirmed,
   imageToDeleteSelected,
   isModalOpenChanged,
-  selectImageUsage,
 } from 'features/imageDeletion/store/imageDeletionSlice';
-
-const moduleLog = log.child({ namespace: 'image' });
+import { startAppListening } from '..';
 
 export const addImageToDeleteSelectedListener = () => {
   startAppListening({
     actionCreator: imageToDeleteSelected,
-    effect: async (action, { dispatch, getState, condition }) => {
+    effect: async (action, { dispatch, getState }) => {
       const imageDTO = action.payload;
       const state = getState();
       const { shouldConfirmOnDelete } = state.system;

@@ -27,12 +27,9 @@ const selector = createSelector(
 const InitialImage = () => {
   const { initialImage } = useAppSelector(selector);
 
-  const {
-    currentData: imageDTO,
-    isLoading,
-    isError,
-    isSuccess,
-  } = useGetImageDTOQuery(initialImage?.imageName ?? skipToken);
+  const { currentData: imageDTO } = useGetImageDTOQuery(
+    initialImage?.imageName ?? skipToken
+  );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
     if (imageDTO) {

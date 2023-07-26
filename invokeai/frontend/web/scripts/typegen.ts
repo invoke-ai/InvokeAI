@@ -10,7 +10,7 @@ async function main() {
   );
   const types = await openapiTS(OPENAPI_URL, {
     exportType: true,
-    transform: (schemaObject, metadata) => {
+    transform: (schemaObject) => {
       if ('format' in schemaObject && schemaObject.format === 'binary') {
         return schemaObject.nullable ? 'Blob | null' : 'Blob';
       }

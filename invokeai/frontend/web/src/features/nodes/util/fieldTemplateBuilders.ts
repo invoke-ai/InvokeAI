@@ -22,6 +22,7 @@ import {
   LoRAModelInputFieldTemplate,
   ModelInputFieldTemplate,
   OutputFieldTemplate,
+  RefinerModelInputFieldTemplate,
   StringInputFieldTemplate,
   TypeHints,
   UNetInputFieldTemplate,
@@ -170,6 +171,21 @@ const buildModelInputFieldTemplate = ({
   const template: ModelInputFieldTemplate = {
     ...baseField,
     type: 'model',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildRefinerModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): RefinerModelInputFieldTemplate => {
+  const template: RefinerModelInputFieldTemplate = {
+    ...baseField,
+    type: 'refiner_model',
     inputRequirement: 'always',
     inputKind: 'direct',
     default: schemaObject.default ?? undefined,
@@ -417,14 +433,17 @@ export const getFieldType = (
     // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
     if (schemaObject.allOf) {
       rawFieldType = refObjectToFieldType(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         schemaObject.allOf![0] as OpenAPIV3.ReferenceObject
       );
     } else if (schemaObject.anyOf) {
       rawFieldType = refObjectToFieldType(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         schemaObject.anyOf![0] as OpenAPIV3.ReferenceObject
       );
     } else if (schemaObject.oneOf) {
       rawFieldType = refObjectToFieldType(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         schemaObject.oneOf![0] as OpenAPIV3.ReferenceObject
       );
     }
@@ -489,6 +508,9 @@ export const buildInputFieldTemplate = (
   if (['model'].includes(fieldType)) {
     return buildModelInputFieldTemplate({ schemaObject, baseField });
   }
+  if (['refiner_model'].includes(fieldType)) {
+    return buildRefinerModelInputFieldTemplate({ schemaObject, baseField });
+  }
   if (['vae_model'].includes(fieldType)) {
     return buildVaeModelInputFieldTemplate({ schemaObject, baseField });
   }
@@ -547,6 +569,7 @@ export const buildOutputFieldTemplates = (
   const outputSchemaName = refObject.$ref.split('/').slice(-1)[0];
 
   // get the output schema itself
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const outputSchema = openAPI.components!.schemas![outputSchemaName];
 
   if (isSchemaObject(outputSchema)) {

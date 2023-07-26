@@ -299,10 +299,11 @@ class ModelManagerService(ModelManagerServiceBase):
         else:
             config_file = config.root_dir / "configs/models.yaml"
             
-        logger.debug(f'config file={config_file}')
+        logger.debug(f'Config file={config_file}')
 
         device = torch.device(choose_torch_device())
-        logger.debug(f'GPU device = {device}')
+        device_name =  torch.cuda.get_device_name() if device==torch.device('cuda') else ''
+        logger.info(f'GPU device = {device} {device_name}')
 
         precision = config.precision
         if precision == "auto":
@@ -599,7 +600,7 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         Return list of all models found in the designated directory.
         """
-        search = FindModels(directory,self.logger)
+        search = FindModels([directory], self.logger)
         return search.list_models()
 
     def sync_to_config(self):

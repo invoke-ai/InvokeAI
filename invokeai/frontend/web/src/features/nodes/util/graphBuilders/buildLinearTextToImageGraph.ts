@@ -1,13 +1,13 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
-import { BaseModelType, OnnxModelField } from 'services/api/types';
-
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   LATENTS_TO_IMAGE,
@@ -21,11 +21,10 @@ import {
   TEXT_TO_LATENTS,
 } from './constants';
 
-const moduleLog = log.child({ namespace: 'nodes' });
-
 export const buildLinearTextToImageGraph = (
   state: RootState
 ): NonNullableGraph => {
+  const log = logger('nodes');
   const {
     positivePrompt,
     negativePrompt,
@@ -38,6 +37,7 @@ export const buildLinearTextToImageGraph = (
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
+    vaePrecision,
   } = state.generation;
 
   const use_cpu = shouldUseNoiseSettings
@@ -45,7 +45,7 @@ export const buildLinearTextToImageGraph = (
     : initialGenerationState.shouldUseCpuNoise;
 
   if (!model) {
-    moduleLog.error('No model found in state');
+    log.error('No model found in state');
     throw new Error('No model found in state');
   }
 
@@ -103,6 +103,7 @@ export const buildLinearTextToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: onnx_model_type ? 'l2i_onnx' : 'l2i',
         id: LATENTS_TO_IMAGE,
+        fp32: vaePrecision === 'fp32' ? true : false,
       },
     },
     edges: [
@@ -210,17 +211,6 @@ export const buildLinearTextToImageGraph = (
     clip_skip: clipSkip,
   };
 
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: LATENTS_TO_IMAGE,
-      field: 'metadata',
-    },
-  });
-
   // add LoRA support
   addLoRAsToGraph(state, graph, TEXT_TO_LATENTS, model_loader);
 
@@ -232,6 +222,17 @@ export const buildLinearTextToImageGraph = (
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, TEXT_TO_LATENTS);
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph);
+  }
 
   return graph;
 };

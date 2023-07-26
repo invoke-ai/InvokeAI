@@ -1,7 +1,7 @@
 # Copyright (c) 2023 Lincoln D. Stein and The InvokeAI Development Team
 
 """
-invokeai.util.logging
+invokeai.backend.util.logging
 
 Logging class for InvokeAI that produces console messages
 

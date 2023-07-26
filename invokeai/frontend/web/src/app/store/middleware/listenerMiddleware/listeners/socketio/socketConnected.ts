@@ -1,18 +1,18 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
+import { LIST_TAG } from 'services/api';
+import { appInfoApi } from 'services/api/endpoints/appInfo';
 import { modelsApi } from 'services/api/endpoints/models';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
 import { startAppListening } from '../..';
 
-const moduleLog = log.child({ namespace: 'socketio' });
-
 export const addSocketConnectedEventListener = () => {
   startAppListening({
     actionCreator: socketConnected,
     effect: (action, { dispatch, getState }) => {
-      const { timestamp } = action.payload;
+      const log = logger('socketio');
 
-      moduleLog.debug({ timestamp }, 'Connected');
+      log.debug('Connected');
 
       const { nodes, config } = getState();
 
@@ -26,11 +26,18 @@ export const addSocketConnectedEventListener = () => {
       dispatch(appSocketConnected(action.payload));
 
       // update all server state
-      dispatch(modelsApi.endpoints.getMainModels.initiate());
-      dispatch(modelsApi.endpoints.getControlNetModels.initiate());
-      dispatch(modelsApi.endpoints.getLoRAModels.initiate());
-      dispatch(modelsApi.endpoints.getTextualInversionModels.initiate());
-      dispatch(modelsApi.endpoints.getVaeModels.initiate());
+      dispatch(
+        modelsApi.util.invalidateTags([
+          { type: 'MainModel', id: LIST_TAG },
+          { type: 'SDXLRefinerModel', id: LIST_TAG },
+          { type: 'LoRAModel', id: LIST_TAG },
+          { type: 'ControlNetModel', id: LIST_TAG },
+          { type: 'VaeModel', id: LIST_TAG },
+          { type: 'TextualInversionModel', id: LIST_TAG },
+          { type: 'ScannedModels', id: LIST_TAG },
+        ])
+      );
+      dispatch(appInfoApi.util.invalidateTags(['AppConfig', 'AppVersion']));
     },
   });
 };

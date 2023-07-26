@@ -26,6 +26,8 @@ import {
   FaSave,
 } from 'react-icons/fa';
 import { stagingAreaImageSaved } from '../store/actions';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 const selector = createSelector(
   [canvasSelector],
@@ -123,6 +125,10 @@ const IAICanvasStagingAreaToolbar = () => {
     [dispatch, sessionId]
   );
 
+  const { data: imageDTO } = useGetImageDTOQuery(
+    currentStagingAreaImage?.imageName ?? skipToken
+  );
+
   if (!currentStagingAreaImage) return null;
 
   return (
@@ -173,14 +179,19 @@ const IAICanvasStagingAreaToolbar = () => {
         <IAIIconButton
           tooltip={t('unifiedCanvas.saveToGallery')}
           aria-label={t('unifiedCanvas.saveToGallery')}
+          isDisabled={!imageDTO || !imageDTO.is_intermediate}
           icon={<FaSave />}
-          onClick={() =>
+          onClick={() => {
+            if (!imageDTO) {
+              return;
+            }
+
             dispatch(
               stagingAreaImageSaved({
-                imageName: currentStagingAreaImage.imageName,
+                imageDTO,
               })
-            )
-          }
+            );
+          }}
           colorScheme="accent"
         />
         <IAIIconButton

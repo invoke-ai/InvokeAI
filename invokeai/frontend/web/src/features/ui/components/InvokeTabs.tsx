@@ -16,7 +16,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import { configSelector } from 'features/system/store/configSelectors';
-import { InvokeTabName } from 'features/ui/store/tabMap';
+import { InvokeTabName, tabMap } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
 import { ResourceKey } from 'i18next';
 import { isEqual } from 'lodash-es';
@@ -37,6 +37,7 @@ import NodesTab from './tabs/Nodes/NodesTab';
 import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
+import { systemSelector } from '../../system/store/systemSelectors';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -84,18 +85,27 @@ const tabs: InvokeTabInfo[] = [
 ];
 
 const enabledTabsSelector = createSelector(
-  configSelector,
-  (config) => {
+  [configSelector, systemSelector],
+  (config, system) => {
     const { disabledTabs } = config;
+    const { isNodesEnabled } = system;
 
-    return tabs.filter((tab) => !disabledTabs.includes(tab.id));
+    const enabledTabs = tabs.filter((tab) => {
+      if (tab.id === 'nodes') {
+        return isNodesEnabled && !disabledTabs.includes(tab.id);
+      } else {
+        return !disabledTabs.includes(tab.id);
+      }
+    });
+
+    return enabledTabs;
   },
   {
     memoizeOptions: { resultEqualityCheck: isEqual },
   }
 );
 
-const MIN_GALLERY_WIDTH = 300;
+const MIN_GALLERY_WIDTH = 350;
 const DEFAULT_GALLERY_PCT = 20;
 export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager'];
 
@@ -162,13 +172,22 @@ const InvokeTabs = () => {
   const { ref: galleryPanelRef, minSizePct: galleryMinSizePct } =
     useMinimumPanelSize(MIN_GALLERY_WIDTH, DEFAULT_GALLERY_PCT, 'app');
 
+  const handleTabChange = useCallback(
+    (index: number) => {
+      const activeTabName = tabMap[index];
+      if (!activeTabName) {
+        return;
+      }
+      dispatch(setActiveTab(activeTabName));
+    },
+    [dispatch]
+  );
+
   return (
     <Tabs
       defaultIndex={activeTab}
       index={activeTab}
-      onChange={(index: number) => {
-        dispatch(setActiveTab(index));
-      }}
+      onChange={handleTabChange}
       sx={{
         flexGrow: 1,
         gap: 4,

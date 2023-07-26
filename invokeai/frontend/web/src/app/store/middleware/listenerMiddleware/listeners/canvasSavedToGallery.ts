@@ -1,23 +1,21 @@
+import { logger } from 'app/logging/logger';
 import { canvasSavedToGallery } from 'features/canvas/store/actions';
-import { startAppListening } from '..';
-import { log } from 'app/logging/useLogger';
-import { imageUploaded } from 'services/api/thunks/image';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
-import { imageUpserted } from 'features/gallery/store/gallerySlice';
-
-const moduleLog = log.child({ namespace: 'canvasSavedToGalleryListener' });
+import { imagesApi } from 'services/api/endpoints/images';
+import { startAppListening } from '..';
 
 export const addCanvasSavedToGalleryListener = () => {
   startAppListening({
     actionCreator: canvasSavedToGallery,
-    effect: async (action, { dispatch, getState, take }) => {
+    effect: async (action, { dispatch, getState }) => {
+      const log = logger('canvas');
       const state = getState();
 
       const blob = await getBaseLayerBlob(state);
 
       if (!blob) {
-        moduleLog.error('Problem getting base layer blob');
+        log.error('Problem getting base layer blob');
         dispatch(
           addToast({
             title: 'Problem Saving Canvas',
@@ -28,28 +26,21 @@ export const addCanvasSavedToGalleryListener = () => {
         return;
       }
 
-      const imageUploadedRequest = dispatch(
-        imageUploaded({
+      dispatch(
+        imagesApi.endpoints.uploadImage.initiate({
           file: new File([blob], 'savedCanvas.png', {
             type: 'image/png',
           }),
           image_category: 'general',
           is_intermediate: false,
+          board_id: state.gallery.autoAddBoardId,
+          crop_visible: true,
           postUploadAction: {
-            type: 'TOAST_CANVAS_SAVED_TO_GALLERY',
+            type: 'TOAST',
+            toastOptions: { title: 'Canvas Saved to Gallery' },
           },
         })
       );
-
-      const [{ payload: uploadedImageDTO }] = await take(
-        (
-          uploadedImageAction
-        ): uploadedImageAction is ReturnType<typeof imageUploaded.fulfilled> =>
-          imageUploaded.fulfilled.match(uploadedImageAction) &&
-          uploadedImageAction.meta.requestId === imageUploadedRequest.requestId
-      );
-
-      dispatch(imageUpserted(uploadedImageDTO));
     },
   });
 };

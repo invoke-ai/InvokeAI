@@ -22,8 +22,8 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import \
     PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from ...backend.util.devices import choose_torch_device, torch_dtype
 from ...backend.model_management import ModelPatcher
+from ...backend.util.devices import choose_torch_device, torch_dtype, choose_precision
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
@@ -31,6 +31,7 @@ from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
 from .image import ImageOutput
 from .model import ModelInfo, UNetField, VaeField
+from invokeai.app.util.controlnet_utils import prepare_control_image
 
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,
@@ -38,6 +39,9 @@ from diffusers.models.attention_processor import (
     LoRAXFormersAttnProcessor,
     XFormersAttnProcessor,
 )
+
+
+DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
 
 class LatentsField(BaseModel):
@@ -286,7 +290,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 #        and add in batch_size, num_images_per_prompt?
                 #        and do real check for classifier_free_guidance?
                 # prepare_control_image should return torch.Tensor of shape(batch_size, 3, height, width)
-                control_image = model.prepare_control_image(
+                control_image = prepare_control_image(
                     image=input_image,
                     do_classifier_free_guidance=do_classifier_free_guidance,
                     width=control_width_resize,
@@ -296,13 +300,18 @@ class TextToLatentsInvocation(BaseInvocation):
                     device=control_model.device,
                     dtype=control_model.dtype,
                     control_mode=control_info.control_mode,
+                    resize_mode=control_info.resize_mode,
                 )
                 control_item = ControlNetData(
-                    model=control_model, image_tensor=control_image,
+                    model=control_model,
+                    image_tensor=control_image,
                     weight=control_info.control_weight,
                     begin_step_percent=control_info.begin_step_percent,
                     end_step_percent=control_info.end_step_percent,
                     control_mode=control_info.control_mode,
+                    # any resizing needed should currently be happening in prepare_control_image(),
+                    #    but adding resize_mode to ControlNetData in case needed in the future
+                    resize_mode=control_info.resize_mode,
                 )
                 control_data.append(control_item)
                 # MultiControlNetModel has been refactored out, just need list[ControlNetData]
@@ -493,8 +502,8 @@ class LatentsToImageInvocation(BaseInvocation):
     vae: VaeField = Field(default=None, description="Vae submodel")
     tiled: bool = Field(
         default=False,
-        description="Decode latents by overlaping tiles(less memory consumption)")
-    fp32: bool = Field(False, description="Decode in full precision")
+        description="Decode latents by overlapping tiles(less memory consumption)")
+    fp32: bool = Field(DEFAULT_PRECISION=='float32', description="Decode in full precision")
     metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")
 
     # Schema customisation
@@ -599,7 +608,7 @@ class ResizeLatentsInvocation(BaseInvocation):
     antialias: bool = Field(
         default=False,
         description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
-    
+
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
@@ -645,7 +654,7 @@ class ScaleLatentsInvocation(BaseInvocation):
     antialias: bool = Field(
         default=False,
         description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
-    
+
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
@@ -688,7 +697,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     tiled: bool = Field(
         default=False,
         description="Encode latents by overlaping tiles(less memory consumption)")
-    fp32: bool = Field(False, description="Decode in full precision")
+    fp32: bool = Field(DEFAULT_PRECISION=='float32', description="Decode in full precision")
 
 
     # Schema customisation
@@ -756,7 +765,7 @@ class ImageToLatentsInvocation(BaseInvocation):
                     dtype=vae.dtype
                 )  # FIXME: uses torch.randn. make reproducible!
 
-            latents = 0.18215 * latents
+            latents = vae.config.scaling_factor * latents
             latents = latents.to(dtype=orig_dtype)
 
         name = f"{context.graph_execution_state_id}__{self.id}"

@@ -78,7 +78,6 @@ const ParametersDrawer = () => {
         }}
       >
         <Flex
-          paddingTop={1.5}
           paddingBottom={4}
           justifyContent="space-between"
           alignItems="center"

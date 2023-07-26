@@ -1,25 +1,19 @@
-import { useAppDispatch } from 'app/store/storeHooks';
-
-import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   ImageCollectionInputFieldTemplate,
   ImageCollectionInputFieldValue,
 } from 'features/nodes/types/types';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 
-import { FieldComponentProps } from './types';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { ImageDTO } from 'services/api/types';
 import { Flex } from '@chakra-ui/react';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { uniq, uniqBy } from 'lodash-es';
 import {
   NodesMultiImageDropData,
   isValidDrop,
   useDroppable,
 } from 'app/components/ImageDnd/typesafeDnd';
+import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { FieldComponentProps } from './types';
 
 const ImageCollectionInputFieldComponent = (
   props: FieldComponentProps<
@@ -29,20 +23,20 @@ const ImageCollectionInputFieldComponent = (
 ) => {
   const { nodeId, field } = props;
 
-  const dispatch = useAppDispatch();
+  // const dispatch = useAppDispatch();
 
-  const handleDrop = useCallback(
-    ({ image_name }: ImageDTO) => {
-      dispatch(
-        fieldValueChanged({
-          nodeId,
-          fieldName: field.name,
-          value: uniqBy([...(field.value ?? []), { image_name }], 'image_name'),
-        })
-      );
-    },
-    [dispatch, field.name, field.value, nodeId]
-  );
+  // const handleDrop = useCallback(
+  //   ({ image_name }: ImageDTO) => {
+  //     dispatch(
+  //       fieldValueChanged({
+  //         nodeId,
+  //         fieldName: field.name,
+  //         value: uniqBy([...(field.value ?? []), { image_name }], 'image_name'),
+  //       })
+  //     );
+  //   },
+  //   [dispatch, field.name, field.value, nodeId]
+  // );
 
   const droppableData: NodesMultiImageDropData = {
     id: `node-${nodeId}-${field.name}`,
@@ -54,21 +48,20 @@ const ImageCollectionInputFieldComponent = (
     isOver,
     setNodeRef: setDroppableRef,
     active,
-    over,
   } = useDroppable({
     id: `node_${nodeId}`,
     data: droppableData,
   });
 
-  const handleReset = useCallback(() => {
-    dispatch(
-      fieldValueChanged({
-        nodeId,
-        fieldName: field.name,
-        value: undefined,
-      })
-    );
-  }, [dispatch, field.name, nodeId]);
+  // const handleReset = useCallback(() => {
+  //   dispatch(
+  //     fieldValueChanged({
+  //       nodeId,
+  //       fieldName: field.name,
+  //       value: undefined,
+  //     })
+  //   );
+  // }, [dispatch, field.name, nodeId]);
 
   return (
     <Flex

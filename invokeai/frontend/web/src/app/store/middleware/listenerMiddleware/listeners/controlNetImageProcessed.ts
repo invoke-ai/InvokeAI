@@ -1,28 +1,24 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
+import { imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
-import { imageDTOReceived } from 'services/api/thunks/image';
 import { sessionCreated } from 'services/api/thunks/session';
-import { Graph } from 'services/api/types';
+import { Graph, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 import { startAppListening } from '..';
-
-const moduleLog = log.child({ namespace: 'controlNet' });
 
 export const addControlNetImageProcessedListener = () => {
   startAppListening({
     actionCreator: controlNetImageProcessed,
-    effect: async (
-      action,
-      { dispatch, getState, take, unsubscribe, subscribe }
-    ) => {
+    effect: async (action, { dispatch, getState, take }) => {
+      const log = logger('session');
       const { controlNetId } = action.payload;
       const controlNet = getState().controlNet.controlNets[controlNetId];
 
       if (!controlNet.controlImage) {
-        moduleLog.error('Unable to process ControlNet image');
+        log.error('Unable to process ControlNet image');
         return;
       }
 
@@ -62,15 +58,16 @@ export const addControlNetImageProcessedListener = () => {
           invocationCompleteAction.payload.data.result.image;
 
         // Wait for the ImageDTO to be received
-        const [imageMetadataReceivedAction] = await take(
-          (action): action is ReturnType<typeof imageDTOReceived.fulfilled> =>
-            imageDTOReceived.fulfilled.match(action) &&
+        const [{ payload }] = await take(
+          (action) =>
+            imagesApi.endpoints.getImageDTO.matchFulfilled(action) &&
             action.payload.image_name === image_name
         );
-        const processedControlImage = imageMetadataReceivedAction.payload;
 
-        moduleLog.debug(
-          { data: { arg: action.payload, processedControlImage } },
+        const processedControlImage = payload as ImageDTO;
+
+        log.debug(
+          { controlNetId: action.payload, processedControlImage },
           'ControlNet image processed'
         );
 

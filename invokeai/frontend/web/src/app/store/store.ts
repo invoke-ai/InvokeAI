@@ -5,13 +5,9 @@ import {
   combineReducers,
   configureStore,
 } from '@reduxjs/toolkit';
-
-import dynamicMiddlewares from 'redux-dynamic-middlewares';
-import { rememberEnhancer, rememberReducer } from 'redux-remember';
-
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import controlNetReducer from 'features/controlNet/store/controlNetSlice';
-import dynamicPromptsReducer from 'features/dynamicPrompts/store/slice';
+import dynamicPromptsReducer from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import boardsReducer from 'features/gallery/store/boardSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
 import imageDeletionReducer from 'features/imageDeletion/store/imageDeletionSlice';
@@ -19,14 +15,14 @@ import loraReducer from 'features/lora/store/loraSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
+import sdxlReducer from 'features/sdxl/store/sdxlSlice';
 import configReducer from 'features/system/store/configSlice';
 import systemReducer from 'features/system/store/systemSlice';
 import modelmanagerReducer from 'features/ui/components/tabs/ModelManager/store/modelManagerSlice';
 import hotkeysReducer from 'features/ui/store/hotkeysSlice';
 import uiReducer from 'features/ui/store/uiSlice';
-
-import { listenerMiddleware } from './middleware/listenerMiddleware';
-
+import dynamicMiddlewares from 'redux-dynamic-middlewares';
+import { rememberEnhancer, rememberReducer } from 'redux-remember';
 import { api } from 'services/api';
 import { LOCALSTORAGE_PREFIX } from './constants';
 import { serialize } from './enhancers/reduxRemember/serialize';
@@ -34,6 +30,7 @@ import { unserialize } from './enhancers/reduxRemember/unserialize';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
+import { listenerMiddleware } from './middleware/listenerMiddleware';
 
 const allReducers = {
   canvas: canvasReducer,
@@ -51,6 +48,7 @@ const allReducers = {
   imageDeletion: imageDeletionReducer,
   lora: loraReducer,
   modelmanager: modelmanagerReducer,
+  sdxl: sdxlReducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -62,6 +60,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'canvas',
   'gallery',
   'generation',
+  'sdxl',
   'nodes',
   'postprocessing',
   'system',
@@ -121,6 +120,7 @@ export const store = configureStore({
 
 export type AppGetState = typeof store.getState;
 export type RootState = ReturnType<typeof store.getState>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, AnyAction>;
 export type AppDispatch = typeof store.dispatch;
 export const stateSelector = (state: RootState) => state;

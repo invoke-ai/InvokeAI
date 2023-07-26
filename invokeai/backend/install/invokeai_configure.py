@@ -23,6 +23,7 @@ from urllib import request
 
 import npyscreen
 import transformers
+import omegaconf
 from diffusers import AutoencoderKL
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
@@ -31,6 +32,7 @@ from omegaconf import OmegaConf
 from tqdm import tqdm
 from transformers import (
     CLIPTextModel,
+    CLIPTextConfig,
     CLIPTokenizer,
     AutoFeatureExtractor,
     BertTokenizerFast,
@@ -44,6 +46,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
+    FileBox,
     IntTitleSlider,
     set_min_terminal_size,
     CyclingForm,
@@ -53,6 +56,7 @@ from invokeai.frontend.install.widgets import (
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
     hf_download_from_pretrained,
+    hf_download_with_resume,
     InstallSelections,
     ModelInstall,
 )
@@ -202,6 +206,15 @@ def download_conversion_models():
         pipeline = CLIPTextModel.from_pretrained(repo_id, subfolder="text_encoder", **kwargs)
         pipeline.save_pretrained(target_dir / 'stable-diffusion-2-clip' / 'text_encoder', safe_serialization=True)
 
+        # sd-xl - tokenizer_2
+        repo_id = "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
+        _, model_name = repo_id.split('/')
+        pipeline = CLIPTokenizer.from_pretrained(repo_id, **kwargs)
+        pipeline.save_pretrained(target_dir / model_name, safe_serialization=True)
+        
+        pipeline = CLIPTextConfig.from_pretrained(repo_id, **kwargs)
+        pipeline.save_pretrained(target_dir / model_name, safe_serialization=True)
+        
         # VAE
         logger.info('Downloading stable diffusion VAE')
         vae = AutoencoderKL.from_pretrained('stabilityai/sd-vae-ft-mse', **kwargs)
@@ -286,47 +299,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             )
 
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name="== BASIC OPTIONS ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
-            scroll_exit=True,
-        )
-        self.nextrely -= 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Select an output directory for images:",
-            editable=False,
-            color="CONTROL",
-        )
-        self.outdir = self.add_widget_intelligent(
-            npyscreen.TitleFilename,
-            name="(<tab> autocompletes, ctrl-N advances):",
-            value=str(default_output_dir()),
-            select_dir=True,
-            must_exist=False,
-            use_two_lines=False,
-            labelColor="GOOD",
-            begin_entry_at=40,
-            scroll_exit=True,
-        )
-        self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Activate the NSFW checker to blur images showing potential sexual imagery:",
-            editable=False,
-            color="CONTROL",
-        )
-        self.nsfw_checker = self.add_widget_intelligent(
-            npyscreen.Checkbox,
-            name="NSFW checker",
-            value=old_opts.nsfw_checker,
-            relx=5,
-            scroll_exit=True,
-        )
-        self.nextrely += 1
         label = """HuggingFace access token (OPTIONAL) for automatic model downloads. See https://huggingface.co/settings/tokens."""
         for line in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
@@ -345,15 +317,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             scroll_exit=True,
         )
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name="== ADVANCED OPTIONS ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
-            scroll_exit=True,
-        )
-        self.nextrely -= 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
             name="GPU Management",
@@ -409,21 +372,33 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value="Directories containing textual inversion, controlnet and LoRA models (<tab> autocompletes, ctrl-N advances):",
+            value="Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models (<tab> autocompletes, ctrl-N advances):",
             editable=False,
             color="CONTROL",
         )
+        self.outdir = self.add_widget_intelligent(
+            FileBox,
+            name="Output directory for images (<tab> autocompletes, ctrl-N advances):",
+            value=str(default_output_dir()),
+            select_dir=True,
+            must_exist=False,
+            use_two_lines=False,
+            labelColor="GOOD",
+            begin_entry_at=40,
+            max_height=3,
+            scroll_exit=True,
+        )
         self.autoimport_dirs = {}
-        for description, config_name, path in autoimport_paths(old_opts):
-            self.autoimport_dirs[config_name] = self.add_widget_intelligent(
-                npyscreen.TitleFilename,
-                name=description+':',
-                value=str(path),
+        self.autoimport_dirs['autoimport_dir'] = self.add_widget_intelligent(
+                FileBox,
+                name=f'Autoimport Folder',
+                value=str(config.root_path / config.autoimport_dir),
                 select_dir=True,
                 must_exist=False,
                 use_two_lines=False,
                 labelColor="GOOD",
                 begin_entry_at=32,
+                max_height = 3,
                 scroll_exit=True
             )
         self.nextrely += 1
@@ -504,7 +479,6 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
 
         for attr in [
                 "outdir",
-                "nsfw_checker",
                 "free_gpu_mem",
                 "max_cache_size",
                 "xformers_enabled",
@@ -540,7 +514,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
             "MAIN",
             editOptsForm,
             name="InvokeAI Startup Options",
-            cycle_widgets=True,
+            cycle_widgets=False,
         )
         if not (self.program_opts.skip_sd_weights or self.program_opts.default_only):
             self.model_select = self.addForm(
@@ -548,7 +522,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
                 addModelsForm,
                 name="Install Stable Diffusion Models",
                 multipage=True,
-                cycle_widgets=True,
+                cycle_widgets=False,
             )
 
     def new_opts(self):
@@ -560,15 +534,19 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
     editApp.run()
     return editApp.new_opts()
 
-
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
-    if not init_file.exists():
-        opts.nsfw_checker = True
     return opts
 
 def default_user_selections(program_opts: Namespace) -> InstallSelections:
-    installer = ModelInstall(config)
+    
+    try:
+        installer = ModelInstall(config)
+    except omegaconf.errors.ConfigKeyError:
+        logger.warning('Your models.yaml file is corrupt or out of date. Reinitializing')
+        initialize_rootdir(config.root_path, True)
+        installer = ModelInstall(config)
+        
     models = installer.all_models()
     return InstallSelections(
         install_models=[models[installer.default_model()].path or models[installer.default_model()].repo_id]
@@ -576,19 +554,8 @@ def default_user_selections(program_opts: Namespace) -> InstallSelections:
         else [models[x].path or models[x].repo_id for x in installer.recommended_models()]
         if program_opts.yes_to_all
         else list(),
-#        scan_directory=None,
-#        autoscan_on_startup=None,
     )
 
-# -------------------------------------
-def autoimport_paths(config: InvokeAIAppConfig):
-    return [
-        ('Checkpoints & diffusers models', 'autoimport_dir', config.root_path / config.autoimport_dir),
-        ('LoRA/LyCORIS models',            'lora_dir',       config.root_path / config.lora_dir),
-        ('Controlnet models',              'controlnet_dir', config.root_path / config.controlnet_dir),
-        ('Textual Inversion Embeddings',   'embedding_dir',  config.root_path / config.embedding_dir),
-    ]
-    
 # -------------------------------------
 def initialize_rootdir(root: Path, yes_to_all: bool = False):
     logger.info("** INITIALIZING INVOKEAI RUNTIME DIRECTORY **")
@@ -664,6 +631,9 @@ def write_opts(opts: Namespace, init_file: Path):
     with open(init_file,'w', encoding='utf-8') as file:
         file.write(new_config.to_yaml())
 
+    if hasattr(opts,'hf_token') and opts.hf_token:
+        HfLogin(opts.hf_token)
+
 # -------------------------------------
 def default_output_dir() -> Path:
     return config.root_path / "outputs"
@@ -689,7 +659,6 @@ def migrate_init_file(legacy_format:Path):
 
     # a few places where the field names have changed and we have to
     # manually add in the new names/values
-    new.nsfw_checker = old.safety_checker
     new.xformers_enabled = old.xformers
     new.conf_path = old.conf
     new.root = legacy_format.parent.resolve()

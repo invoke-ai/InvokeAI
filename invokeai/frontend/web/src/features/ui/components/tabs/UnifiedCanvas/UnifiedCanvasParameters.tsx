@@ -7,9 +7,8 @@ import ParamControlNetCollapse from 'features/parameters/components/Parameters/C
 import ParamNegativeConditioning from 'features/parameters/components/Parameters/Core/ParamNegativeConditioning';
 import ParamPositiveConditioning from 'features/parameters/components/Parameters/Core/ParamPositiveConditioning';
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
-import ParamVariationCollapse from 'features/parameters/components/Parameters/Variations/ParamVariationCollapse';
+// import ParamVariationCollapse from 'features/parameters/components/Parameters/Variations/ParamVariationCollapse';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
-import { memo } from 'react';
 import UnifiedCanvasCoreParameters from './UnifiedCanvasCoreParameters';
 
 const UnifiedCanvasParameters = () => {
@@ -22,7 +21,7 @@ const UnifiedCanvasParameters = () => {
       <ParamControlNetCollapse />
       <ParamLoraCollapse />
       <ParamDynamicPromptsCollapse />
-      <ParamVariationCollapse />
+      {/* <ParamVariationCollapse /> */}
       <ParamSymmetryCollapse />
       <ParamSeamCorrectionCollapse />
       <ParamInfillAndScalingCollapse />
@@ -31,4 +30,4 @@ const UnifiedCanvasParameters = () => {
   );
 };
 
-export default memo(UnifiedCanvasParameters);
+export default UnifiedCanvasParameters;

@@ -6,22 +6,33 @@ from typing import TYPE_CHECKING, Optional
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.invocations.metadata import ImageMetadata
-from invokeai.app.models.image import (ImageCategory,
-                                       InvalidImageCategoryException,
-                                       InvalidOriginException, ResourceOrigin)
-from invokeai.app.services.board_image_record_storage import \
-    BoardImageRecordStorageBase
-from invokeai.app.services.graph import Graph
+from invokeai.app.models.image import (
+    ImageCategory,
+    InvalidImageCategoryException,
+    InvalidOriginException,
+    ResourceOrigin,
+)
+from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
 from invokeai.app.services.image_file_storage import (
-    ImageFileDeleteException, ImageFileNotFoundException,
-    ImageFileSaveException, ImageFileStorageBase)
+    ImageFileDeleteException,
+    ImageFileNotFoundException,
+    ImageFileSaveException,
+    ImageFileStorageBase,
+)
 from invokeai.app.services.image_record_storage import (
-    ImageRecordDeleteException, ImageRecordNotFoundException,
-    ImageRecordSaveException, ImageRecordStorageBase, OffsetPaginatedResults)
+    ImageRecordDeleteException,
+    ImageRecordNotFoundException,
+    ImageRecordSaveException,
+    ImageRecordStorageBase,
+    OffsetPaginatedResults,
+)
 from invokeai.app.services.item_storage import ItemStorageABC
-from invokeai.app.services.models.image_record import (ImageDTO, ImageRecord,
-                                                       ImageRecordChanges,
-                                                       image_record_to_dto)
+from invokeai.app.services.models.image_record import (
+    ImageDTO,
+    ImageRecord,
+    ImageRecordChanges,
+    image_record_to_dto,
+)
 from invokeai.app.services.resource_name import NameServiceBase
 from invokeai.app.services.urls import UrlServiceBase
 from invokeai.app.util.metadata import get_metadata_graph_from_raw_session
@@ -41,6 +52,7 @@ class ImageServiceABC(ABC):
         image_category: ImageCategory,
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
+        board_id: Optional[str] = None,
         is_intermediate: bool = False,
         metadata: Optional[dict] = None,
     ) -> ImageDTO:
@@ -110,6 +122,11 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def delete_intermediates(self) -> int:
+        """Deletes all intermediate images."""
+        pass
+
+    @abstractmethod
     def delete_images_on_board(self, board_id: str):
         """Deletes all images on a board."""
         pass
@@ -158,6 +175,7 @@ class ImageService(ImageServiceABC):
         image_category: ImageCategory,
         node_id: Optional[str] = None,
         session_id: Optional[str] = None,
+        board_id: Optional[str] = None,
         is_intermediate: bool = False,
         metadata: Optional[dict] = None,
     ) -> ImageDTO:
@@ -198,11 +216,13 @@ class ImageService(ImageServiceABC):
                 metadata=metadata,
                 session_id=session_id,
             )
-
+            if board_id is not None:
+                self._services.board_image_records.add_image_to_board(
+                    board_id=board_id, image_name=image_name
+                )
             self._services.image_files.save(
                 image_name=image_name, image=image, metadata=metadata, graph=graph
             )
-
             image_dto = self.get_dto(image_name)
 
             return image_dto
@@ -213,7 +233,7 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Failed to save image file")
             raise
         except Exception as e:
-            self._services.logger.error("Problem saving image record and file")
+            self._services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
 
     def update(
@@ -378,16 +398,31 @@ class ImageService(ImageServiceABC):
 
     def delete_images_on_board(self, board_id: str):
         try:
-            images = self._services.board_image_records.get_images_for_board(board_id)
-            image_name_list = list(
-                map(
-                    lambda r: r.image_name,
-                    images.items,
+            image_names = (
+                self._services.board_image_records.get_all_board_image_names_for_board(
+                    board_id
                 )
             )
-            for image_name in image_name_list:
+            for image_name in image_names:
                 self._services.image_files.delete(image_name)
-            self._services.image_records.delete_many(image_name_list)
+            self._services.image_records.delete_many(image_names)
+        except ImageRecordDeleteException:
+            self._services.logger.error(f"Failed to delete image records")
+            raise
+        except ImageFileDeleteException:
+            self._services.logger.error(f"Failed to delete image files")
+            raise
+        except Exception as e:
+            self._services.logger.error("Problem deleting image records and files")
+            raise e
+
+    def delete_intermediates(self) -> int:
+        try:
+            image_names = self._services.image_records.delete_intermediates()
+            count = len(image_names)
+            for image_name in image_names:
+                self._services.image_files.delete(image_name)
+            return count
         except ImageRecordDeleteException:
             self._services.logger.error(f"Failed to delete image records")
             raise

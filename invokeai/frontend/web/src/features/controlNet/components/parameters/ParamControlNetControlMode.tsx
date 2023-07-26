@@ -8,7 +8,6 @@ import {
   controlNetControlModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
 import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 
 type ParamControlNetControlModeProps = {
   controlNetId: string;
@@ -41,8 +40,6 @@ export default function ParamControlNetControlMode(
   );
 
   const { controlMode, isEnabled } = useAppSelector(selector);
-
-  const { t } = useTranslation();
 
   const handleControlModeChange = useCallback(
     (controlMode: ControlModes) => {

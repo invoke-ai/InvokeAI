@@ -10,7 +10,6 @@ import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToControlNetModelParam } from 'features/parameters/util/modelIdToControlNetModelParam';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 
@@ -23,7 +22,6 @@ const ControlNetModelInputFieldComponent = (
   const { nodeId, field } = props;
   const controlNetModel = field.value;
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
 
   const { data: controlNetModels } = useGetControlNetModelsQuery();
 

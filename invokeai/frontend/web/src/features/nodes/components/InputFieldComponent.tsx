@@ -20,6 +20,7 @@ import StringInputFieldComponent from './fields/StringInputFieldComponent';
 import UnetInputFieldComponent from './fields/UnetInputFieldComponent';
 import VaeInputFieldComponent from './fields/VaeInputFieldComponent';
 import VaeModelInputFieldComponent from './fields/VaeModelInputFieldComponent';
+import RefinerModelInputFieldComponent from './fields/RefinerModelInputFieldComponent';
 
 type InputFieldComponentProps = {
   nodeId: string;
@@ -148,6 +149,16 @@ const InputFieldComponent = (props: InputFieldComponentProps) => {
   if (type === 'model' && template.type === 'model') {
     return (
       <ModelInputFieldComponent
+        nodeId={nodeId}
+        field={field}
+        template={template}
+      />
+    );
+  }
+
+  if (type === 'refiner_model' && template.type === 'refiner_model') {
+    return (
+      <RefinerModelInputFieldComponent
         nodeId={nodeId}
         field={field}
         template={template}

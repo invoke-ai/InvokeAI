@@ -251,7 +251,9 @@ from .model_search import ModelSearch
 from .models import (
     BaseModelType, ModelType, SubModelType,
     ModelError, SchedulerPredictionType, MODEL_CLASSES,
-    ModelConfigBase, ModelNotFoundException, InvalidModelException,
+    ModelConfigBase,
+    ModelNotFoundException, InvalidModelException,
+    DuplicateModelException,
 )
 
 # We are only starting to number the config file with release 3.
@@ -671,6 +673,7 @@ class ModelManager(object):
 
         self.models[model_key] = model_config
         self.commit()
+
         return AddModelResult(
             name = model_name,
             model_type = model_type,
@@ -838,7 +841,7 @@ class ModelManager(object):
         Returns the preamble for the config file.
         """
         return textwrap.dedent(
-            """\
+            """
             # This file describes the alternative machine learning models
             # available to InvokeAI script.
             #
@@ -858,7 +861,7 @@ class ModelManager(object):
         loaded_files = set()
         new_models_found = False
 
-        self.logger.info(f'scanning {self.app_config.models_path} for new models')
+        self.logger.info(f'Scanning {self.app_config.models_path} for new models')
         with Chdir(self.app_config.root_path):
             for model_key, model_config in list(self.models.items()):
                 model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
@@ -891,15 +894,18 @@ class ModelManager(object):
                             model_name = model_path.name if model_path.is_dir() else model_path.stem
                             model_key = self.create_key(model_name, cur_base_model, cur_model_type)
 
-                            if model_key in self.models:
-                                raise Exception(f"Model with key {model_key} added twice")
-
-                            if model_path.is_relative_to(self.app_config.root_path):
-                                model_path = model_path.relative_to(self.app_config.root_path)
                             try:
+                                if model_key in self.models:
+                                    raise DuplicateModelException(f"Model with key {model_key} added twice")
+
+                                if model_path.is_relative_to(self.app_config.root_path):
+                                    model_path = model_path.relative_to(self.app_config.root_path)
+                                    
                                 model_config: ModelConfigBase = model_class.probe_config(str(model_path))
                                 self.models[model_key] = model_config
                                 new_models_found = True
+                            except DuplicateModelException as e:
+                                self.logger.warning(e)
                             except InvalidModelException:
                                 self.logger.warning(f"Not a valid model: {model_path}")
                             except NotImplementedError as e:
@@ -938,20 +944,29 @@ class ModelManager(object):
             def models_found(self):
                 return self.new_models_found
 
+        config = self.app_config
+
+        # LS: hacky
+        # Patch in the SD VAE from core so that it is available for use by the UI
+        try:
+            self.heuristic_import({config.root_path / 'models/core/convert/sd-vae-ft-mse'})
+        except:
+            pass
 
         installer = ModelInstall(config = self.app_config,
                                  model_manager = self,
                                  prediction_type_helper = ask_user_for_prediction_type,
                                  )
-        config = self.app_config
         known_paths = {config.root_path / x['path'] for x in self.list_models()}
         directories = {config.root_path / x for x in [config.autoimport_dir,
                                                       config.lora_dir,
                                                       config.embedding_dir,
-                                                      config.controlnet_dir]
+                                                      config.controlnet_dir,
+                                                      ] if x
                        }
         scanner = ScanAndImport(directories, self.logger, ignore=known_paths, installer=installer)
         scanner.search()
+        
         return scanner.models_found()
 
     def heuristic_import(self,

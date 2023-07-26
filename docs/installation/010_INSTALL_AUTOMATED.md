@@ -124,9 +124,9 @@ experimental versions later.
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest),
     and look for a file named:
 
-    - InvokeAI-installer-v2.X.X.zip
+    - InvokeAI-installer-v3.X.X.zip
 
-    where "2.X.X" is the latest released version. The file is located
+    where "3.X.X" is the latest released version. The file is located
     at the very bottom of the release page, under **Assets**.
 
 4.  **Unpack the installer**: Unpack the zip file into a convenient directory. This will create a new

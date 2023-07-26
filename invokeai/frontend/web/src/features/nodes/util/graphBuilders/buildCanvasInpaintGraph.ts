@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
@@ -21,8 +21,8 @@ import {
   RANDOM_INT,
   RANGE_OF_SIZE,
 } from './constants';
-
-const moduleLog = log.child({ namespace: 'nodes' });
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -32,6 +32,7 @@ export const buildCanvasInpaintGraph = (
   canvasInitImage: ImageDTO,
   canvasMaskImage: ImageDTO
 ): NonNullableGraph => {
+  const log = logger('nodes');
   const {
     positivePrompt,
     negativePrompt,
@@ -54,7 +55,7 @@ export const buildCanvasInpaintGraph = (
   } = state.generation;
 
   if (!model) {
-    moduleLog.error('No model found in state');
+    log.error('No model found in state');
     throw new Error('No model found in state');
   }
 
@@ -62,7 +63,11 @@ export const buildCanvasInpaintGraph = (
   const { width, height } = state.canvas.boundingBoxDimensions;
 
   // We may need to set the inpaint width and height to scale the image
-  const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
+  const {
+    scaledBoundingBoxDimensions,
+    boundingBoxScaleMethod,
+    shouldAutoSave,
+  } = state.canvas;
 
   const model_loader = model.model_type.includes('onnx')
     ? ONNX_MODEL_LOADER
@@ -73,6 +78,7 @@ export const buildCanvasInpaintGraph = (
     id: INPAINT_GRAPH,
     nodes: {
       [INPAINT]: {
+        is_intermediate: !shouldAutoSave,
         type: 'inpaint',
         id: INPAINT,
         steps,
@@ -106,26 +112,31 @@ export const buildCanvasInpaintGraph = (
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
+        is_intermediate: true,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'compel',
         id: NEGATIVE_CONDITIONING,
+        is_intermediate: true,
         prompt: negativePrompt,
       },
       [model_loader]: {
         type: model_loader,
         id: model_loader,
+        is_intermediate: true,
         model,
       },
       [CLIP_SKIP]: {
         type: 'clip_skip',
         id: CLIP_SKIP,
+        is_intermediate: true,
         skipped_layers: clipSkip,
       },
       [RANGE_OF_SIZE]: {
         type: 'range_of_size',
         id: RANGE_OF_SIZE,
+        is_intermediate: true,
         // seed - must be connected manually
         // start: 0,
         size: iterations,
@@ -134,6 +145,7 @@ export const buildCanvasInpaintGraph = (
       [ITERATE]: {
         type: 'iterate',
         id: ITERATE,
+        is_intermediate: true,
       },
     },
     edges: [
@@ -243,6 +255,17 @@ export const buildCanvasInpaintGraph = (
   } else {
     // User specified seed, so set the start of the range of size to the seed
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
+  }
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph, INPAINT);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph, INPAINT);
   }
 
   return graph;

@@ -6,10 +6,8 @@ import { memo } from 'react';
 import { FieldComponentProps } from './types';
 
 const ControlInputFieldComponent = (
-  props: FieldComponentProps<ControlInputFieldValue, ControlInputFieldTemplate>
+  _props: FieldComponentProps<ControlInputFieldValue, ControlInputFieldTemplate>
 ) => {
-  const { nodeId, field } = props;
-
   return null;
 };
 

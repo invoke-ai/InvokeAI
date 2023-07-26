@@ -1,6 +1,16 @@
-import { BoardDTO, OffsetPaginatedResults_BoardDTO_ } from 'services/api/types';
+import { Update } from '@reduxjs/toolkit';
+import {
+  ASSETS_CATEGORIES,
+  IMAGE_CATEGORIES,
+} from 'features/gallery/store/types';
+import {
+  BoardDTO,
+  ImageDTO,
+  OffsetPaginatedResults_BoardDTO_,
+} from 'services/api/types';
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
 import { paths } from '../schema';
+import { getListImagesUrl, imagesAdapter, imagesApi } from './images';
 
 type ListBoardsArg = NonNullable<
   paths['/api/v1/boards/']['get']['parameters']['query']
@@ -10,6 +20,9 @@ type UpdateBoardArg =
   paths['/api/v1/boards/{board_id}']['patch']['parameters']['path'] & {
     changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
   };
+
+type DeleteBoardResult =
+  paths['/api/v1/boards/{board_id}']['delete']['responses']['200']['content']['application/json'];
 
 export const boardsApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -59,6 +72,16 @@ export const boardsApi = api.injectEndpoints({
       },
     }),
 
+    listAllImageNamesForBoard: build.query<Array<string>, string>({
+      query: (board_id) => ({
+        url: `boards/${board_id}/image_names`,
+      }),
+      providesTags: (result, error, arg) => [
+        { type: 'ImageNameList', id: arg },
+      ],
+      keepUnusedDataFor: 0,
+    }),
+
     /**
      * Boards Mutations
      */
@@ -82,20 +105,166 @@ export const boardsApi = api.injectEndpoints({
         { type: 'Board', id: arg.board_id },
       ],
     }),
-    deleteBoard: build.mutation<void, string>({
+
+    deleteBoard: build.mutation<DeleteBoardResult, string>({
       query: (board_id) => ({ url: `boards/${board_id}`, method: 'DELETE' }),
-      invalidatesTags: (result, error, arg) => [{ type: 'Board', id: arg }],
+      invalidatesTags: (result, error, board_id) => [
+        { type: 'Board', id: LIST_TAG },
+        // invalidate the 'No Board' cache
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: 'none',
+            categories: IMAGE_CATEGORIES,
+          }),
+        },
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: 'none',
+            categories: ASSETS_CATEGORIES,
+          }),
+        },
+        { type: 'BoardImagesTotal', id: 'none' },
+        { type: 'BoardAssetsTotal', id: 'none' },
+      ],
+      async onQueryStarted(board_id, { dispatch, queryFulfilled, getState }) {
+        /**
+         * Cache changes for deleteBoard:
+         * - Update every image in the 'getImageDTO' cache that has the board_id
+         * - Update every image in the 'All Images' cache that has the board_id
+         * - Update every image in the 'All Assets' cache that has the board_id
+         * - Invalidate the 'No Board' cache:
+         *   Ideally we'd be able to insert all deleted images into the cache, but we don't
+         *   have access to the deleted images DTOs - only the names, and a network request
+         *   for all of a board's DTOs could be very large. Instead, we invalidate the 'No Board'
+         *   cache.
+         */
+
+        try {
+          const { data } = await queryFulfilled;
+          const { deleted_board_images } = data;
+
+          // update getImageDTO caches
+          deleted_board_images.forEach((image_id) => {
+            dispatch(
+              imagesApi.util.updateQueryData(
+                'getImageDTO',
+                image_id,
+                (draft) => {
+                  draft.board_id = undefined;
+                }
+              )
+            );
+          });
+
+          // update 'All Images' & 'All Assets' caches
+          const queryArgsToUpdate = [
+            {
+              categories: IMAGE_CATEGORIES,
+            },
+            {
+              categories: ASSETS_CATEGORIES,
+            },
+          ];
+
+          const updates: Update<ImageDTO>[] = deleted_board_images.map(
+            (image_name) => ({
+              id: image_name,
+              changes: { board_id: undefined },
+            })
+          );
+
+          queryArgsToUpdate.forEach((queryArgs) => {
+            dispatch(
+              imagesApi.util.updateQueryData(
+                'listImages',
+                queryArgs,
+                (draft) => {
+                  const oldTotal = draft.total;
+                  const newState = imagesAdapter.updateMany(draft, updates);
+                  const delta = newState.total - oldTotal;
+                  draft.total = draft.total + delta;
+                }
+              )
+            );
+          });
+        } catch {
+          //no-op
+        }
+      },
     }),
-    deleteBoardAndImages: build.mutation<void, string>({
+
+    deleteBoardAndImages: build.mutation<DeleteBoardResult, string>({
       query: (board_id) => ({
         url: `boards/${board_id}`,
         method: 'DELETE',
         params: { include_images: true },
       }),
-      invalidatesTags: (result, error, arg) => [
-        { type: 'Board', id: arg },
-        { type: 'Image', id: LIST_TAG },
+      invalidatesTags: (result, error, board_id) => [
+        { type: 'Board', id: LIST_TAG },
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: 'none',
+            categories: IMAGE_CATEGORIES,
+          }),
+        },
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: 'none',
+            categories: ASSETS_CATEGORIES,
+          }),
+        },
+        { type: 'BoardImagesTotal', id: 'none' },
+        { type: 'BoardAssetsTotal', id: 'none' },
       ],
+      async onQueryStarted(board_id, { dispatch, queryFulfilled, getState }) {
+        /**
+         * Cache changes for deleteBoardAndImages:
+         * - ~~Remove every image in the 'getImageDTO' cache that has the board_id~~
+         *   This isn't actually possible, you cannot remove cache entries with RTK Query.
+         *   Instead, we rely on the UI to remove all components that use the deleted images.
+         * - Remove every image in the 'All Images' cache that has the board_id
+         * - Remove every image in the 'All Assets' cache that has the board_id
+         */
+
+        try {
+          const { data } = await queryFulfilled;
+          const { deleted_images } = data;
+
+          // update 'All Images' & 'All Assets' caches
+          const queryArgsToUpdate = [
+            {
+              categories: IMAGE_CATEGORIES,
+            },
+            {
+              categories: ASSETS_CATEGORIES,
+            },
+          ];
+
+          queryArgsToUpdate.forEach((queryArgs) => {
+            dispatch(
+              imagesApi.util.updateQueryData(
+                'listImages',
+                queryArgs,
+                (draft) => {
+                  const oldTotal = draft.total;
+                  const newState = imagesAdapter.removeMany(
+                    draft,
+                    deleted_images
+                  );
+                  const delta = newState.total - oldTotal;
+                  draft.total = draft.total + delta;
+                }
+              )
+            );
+          });
+        } catch {
+          //no-op
+        }
+      },
     }),
   }),
 });
@@ -107,4 +276,5 @@ export const {
   useUpdateBoardMutation,
   useDeleteBoardMutation,
   useDeleteBoardAndImagesMutation,
+  useListAllImageNamesForBoardQuery,
 } = boardsApi;

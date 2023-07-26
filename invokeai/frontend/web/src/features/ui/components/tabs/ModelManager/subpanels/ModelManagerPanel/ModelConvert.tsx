@@ -7,7 +7,7 @@ import {
   Tooltip,
   UnorderedList,
 } from '@chakra-ui/react';
-import { makeToast } from 'app/components/Toaster';
+import { makeToast } from 'features/system/util/makeToast';
 // import { convertToDiffusers } from 'app/socketio/actions';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';

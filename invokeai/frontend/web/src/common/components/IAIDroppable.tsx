@@ -5,12 +5,12 @@ import {
   useDroppable,
 } from 'app/components/ImageDnd/typesafeDnd';
 import { AnimatePresence } from 'framer-motion';
-import { memo, useRef } from 'react';
+import { ReactNode, memo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import IAIDropOverlay from './IAIDropOverlay';
 
 type IAIDroppableProps = {
-  dropLabel?: string;
+  dropLabel?: ReactNode;
   disabled?: boolean;
   data?: TypesafeDroppableData;
 };

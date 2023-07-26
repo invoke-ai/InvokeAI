@@ -16,16 +16,16 @@ import IAIButton from 'common/components/IAIButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 
+import { stateSelector } from 'app/store/store';
 import { ChangeEvent, memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import ImageUsageMessage from './ImageUsageMessage';
-import { stateSelector } from 'app/store/store';
+import { imageDeletionConfirmed } from '../store/actions';
+import { selectImageUsage } from '../store/imageDeletionSelectors';
 import {
-  imageDeletionConfirmed,
   imageToDeleteCleared,
   isModalOpenChanged,
-  selectImageUsage,
 } from '../store/imageDeletionSlice';
+import ImageUsageMessage from './ImageUsageMessage';
 
 const selector = createSelector(
   [stateSelector, selectImageUsage],

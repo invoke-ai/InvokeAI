@@ -3,6 +3,8 @@ export const POSITIVE_CONDITIONING = 'positive_conditioning';
 export const NEGATIVE_CONDITIONING = 'negative_conditioning';
 export const TEXT_TO_LATENTS = 'text_to_latents';
 export const LATENTS_TO_IMAGE = 'latents_to_image';
+export const NSFW_CHECKER = 'nsfw_checker';
+export const WATERMARKER = 'invisible_watermark';
 export const NOISE = 'noise';
 export const RANDOM_INT = 'rand_int';
 export const RANGE_OF_SIZE = 'range_of_size';
@@ -24,8 +26,19 @@ export const METADATA_ACCUMULATOR = 'metadata_accumulator';
 export const REALESRGAN = 'esrgan';
 export const DIVIDE = 'divide';
 export const SCALE = 'scale_image';
+export const SDXL_MODEL_LOADER = 'sdxl_model_loader';
+export const SDXL_TEXT_TO_LATENTS = 't2l_sdxl';
+export const SDXL_LATENTS_TO_LATENTS = 'l2l_sdxl';
+export const SDXL_REFINER_MODEL_LOADER = 'sdxl_refiner_model_loader';
+export const SDXL_REFINER_POSITIVE_CONDITIONING =
+  'sdxl_refiner_positive_conditioning';
+export const SDXL_REFINER_NEGATIVE_CONDITIONING =
+  'sdxl_refiner_negative_conditioning';
+export const SDXL_REFINER_LATENTS_TO_LATENTS = 'l2l_sdxl_refiner';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';
+export const SDXL_TEXT_TO_IMAGE_GRAPH = 'sdxl_text_to_image_graph';
+export const SDXL_IMAGE_TO_IMAGE_GRAPH = 'sxdl_image_to_image_graph';
 export const IMAGE_TO_IMAGE_GRAPH = 'image_to_image_graph';
 export const INPAINT_GRAPH = 'inpaint_graph';

@@ -2,7 +2,11 @@ import inspect
 from enum import Enum
 from pydantic import BaseModel
 from typing import Literal, get_origin
-from .base import BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase, ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings, ModelNotFoundException, InvalidModelException
+from .base import (
+    BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase,
+    ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings,
+    ModelNotFoundException, InvalidModelException, DuplicateModelException
+    )
 from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
 from .sdxl import StableDiffusionXLModel
 from .vae import VaeModel
