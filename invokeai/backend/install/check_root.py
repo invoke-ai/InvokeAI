@@ -23,7 +23,9 @@ def check_invokeai_root(config: InvokeAIAppConfig):
         print()
         print('== STARTUP ABORTED ==')
         print('** One or more necessary files is missing from your InvokeAI root directory **')
-        print('** Please rerun the configuration script to fix this problem. From the launcher, this is option [7] **')
+        print('** Please rerun the configuration script to fix this problem. **')
+        print('** From the launcher, selection option [7]. **')
+        print('** From the command line, activate the virtual environment and run "invokeai-configure --yes --skip-sd-weights" **')
         input('Press any key to continue...')
         sys.exit(0)
 
