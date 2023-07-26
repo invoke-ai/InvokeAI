@@ -217,6 +217,17 @@ export const buildCanvasTextToImageGraph = (
     clip_skip: clipSkip,
   };
 
+  graph.edges.push({
+    source: {
+      node_id: METADATA_ACCUMULATOR,
+      field: 'metadata',
+    },
+    destination: {
+      node_id: LATENTS_TO_IMAGE,
+      field: 'metadata',
+    },
+  });
+
   // add LoRA support
   addLoRAsToGraph(state, graph, TEXT_TO_LATENTS);
 
@@ -238,22 +249,6 @@ export const buildCanvasTextToImageGraph = (
   if (state.system.shouldUseWatermarker) {
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph);
-  }
-
-  if (
-    !state.system.shouldUseNSFWChecker &&
-    !state.system.shouldUseWatermarker
-  ) {
-    graph.edges.push({
-      source: {
-        node_id: METADATA_ACCUMULATOR,
-        field: 'metadata',
-      },
-      destination: {
-        node_id: LATENTS_TO_IMAGE,
-        field: 'metadata',
-      },
-    });
   }
 
   return graph;
