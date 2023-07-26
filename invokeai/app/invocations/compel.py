@@ -95,7 +95,7 @@ class CompelInvocation(BaseInvocation):
         def _lora_loader():
             for lora in self.clip.loras:
                 lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"}))
+                    **lora.dict(exclude={"weight"}), context=context)
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
@@ -171,16 +171,16 @@ class CompelInvocation(BaseInvocation):
 class SDXLPromptInvocationBase:
     def run_clip_raw(self, context, clip_field, prompt, get_pooled):
         tokenizer_info = context.services.model_manager.get_model(
-            **clip_field.tokenizer.dict(),
+            **clip_field.tokenizer.dict(), context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **clip_field.text_encoder.dict(),
+            **clip_field.text_encoder.dict(), context=context,
         )
 
         def _lora_loader():
             for lora in clip_field.loras:
                 lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"}))
+                    **lora.dict(exclude={"weight"}), context=context)
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
@@ -196,6 +196,7 @@ class SDXLPromptInvocationBase:
                         model_name=name,
                         base_model=clip_field.text_encoder.base_model,
                         model_type=ModelType.TextualInversion,
+                        context=context,
                     ).context.model
                 )
             except ModelNotFoundException:
@@ -240,16 +241,16 @@ class SDXLPromptInvocationBase:
 
     def run_clip_compel(self, context, clip_field, prompt, get_pooled):
         tokenizer_info = context.services.model_manager.get_model(
-            **clip_field.tokenizer.dict(),
+            **clip_field.tokenizer.dict(), context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **clip_field.text_encoder.dict(),
+            **clip_field.text_encoder.dict(), context=context,
         )
 
         def _lora_loader():
             for lora in clip_field.loras:
                 lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"}))
+                    **lora.dict(exclude={"weight"}), context=context)
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
@@ -265,6 +266,7 @@ class SDXLPromptInvocationBase:
                         model_name=name,
                         base_model=clip_field.text_encoder.base_model,
                         model_type=ModelType.TextualInversion,
+                        context=context,
                     ).context.model
                 )
             except ModelNotFoundException:

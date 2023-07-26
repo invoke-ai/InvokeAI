@@ -2,16 +2,19 @@ from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from invokeai.app.invocations.baseinvocation import (BaseInvocation,
-                                                     BaseInvocationOutput, InvocationConfig,
-                                                     InvocationContext)
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    InvocationConfig,
+    InvocationContext,
+)
 from invokeai.app.invocations.controlnet_image_processors import ControlField
-from invokeai.app.invocations.model import (LoRAModelField, MainModelField,
-                                            VAEModelField)
+from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
 
 
 class LoRAMetadataField(BaseModel):
     """LoRA metadata for an image generated in InvokeAI."""
+
     lora: LoRAModelField = Field(description="The LoRA model")
     weight: float = Field(description="The weight of the LoRA model")
 
@@ -19,7 +22,9 @@ class LoRAMetadataField(BaseModel):
 class CoreMetadata(BaseModel):
     """Core generation metadata for an image generated in InvokeAI."""
 
-    generation_mode: str = Field(description="The generation mode that output this image",)
+    generation_mode: str = Field(
+        description="The generation mode that output this image",
+    )
     positive_prompt: str = Field(description="The positive prompt parameter")
     negative_prompt: str = Field(description="The negative prompt parameter")
     width: int = Field(description="The width parameter")
@@ -29,10 +34,20 @@ class CoreMetadata(BaseModel):
     cfg_scale: float = Field(description="The classifier-free guidance scale parameter")
     steps: int = Field(description="The number of steps used for inference")
     scheduler: str = Field(description="The scheduler used for inference")
-    clip_skip: int = Field(description="The number of skipped CLIP layers",)
+    clip_skip: int = Field(
+        description="The number of skipped CLIP layers",
+    )
     model: MainModelField = Field(description="The main model used for inference")
-    controlnets: list[ControlField]= Field(description="The ControlNets used for inference")
+    controlnets: list[ControlField] = Field(
+        description="The ControlNets used for inference"
+    )
     loras: list[LoRAMetadataField] = Field(description="The LoRAs used for inference")
+    vae: Union[VAEModelField, None] = Field(
+        default=None,
+        description="The VAE used for decoding, if the main model's default was not used",
+    )
+
+    # Latents-to-Latents
     strength: Union[float, None] = Field(
         default=None,
         description="The strength used for latents-to-latents",
@@ -40,9 +55,34 @@ class CoreMetadata(BaseModel):
     init_image: Union[str, None] = Field(
         default=None, description="The name of the initial image"
     )
-    vae: Union[VAEModelField, None] = Field(
+
+    # SDXL
+    positive_style_prompt: Union[str, None] = Field(
+        default=None, description="The positive style prompt parameter"
+    )
+    negative_style_prompt: Union[str, None] = Field(
+        default=None, description="The negative style prompt parameter"
+    )
+
+    # SDXL Refiner
+    refiner_model: Union[MainModelField, None] = Field(
+        default=None, description="The SDXL Refiner model used"
+    )
+    refiner_cfg_scale: Union[float, None] = Field(
         default=None,
-        description="The VAE used for decoding, if the main model's default was not used",
+        description="The classifier-free guidance scale parameter used for the refiner",
+    )
+    refiner_steps: Union[int, None] = Field(
+        default=None, description="The number of steps used for the refiner"
+    )
+    refiner_scheduler: Union[str, None] = Field(
+        default=None, description="The scheduler used for the refiner"
+    )
+    refiner_aesthetic_store: Union[float, None] = Field(
+        default=None, description="The aesthetic score used for the refiner"
+    )
+    refiner_start: Union[float, None] = Field(
+        default=None, description="The start value used for refiner denoising"
     )
 
 
@@ -71,7 +111,9 @@ class MetadataAccumulatorInvocation(BaseInvocation):
 
     type: Literal["metadata_accumulator"] = "metadata_accumulator"
 
-    generation_mode: str = Field(description="The generation mode that output this image",)
+    generation_mode: str = Field(
+        description="The generation mode that output this image",
+    )
     positive_prompt: str = Field(description="The positive prompt parameter")
     negative_prompt: str = Field(description="The negative prompt parameter")
     width: int = Field(description="The width parameter")
@@ -81,9 +123,13 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     cfg_scale: float = Field(description="The classifier-free guidance scale parameter")
     steps: int = Field(description="The number of steps used for inference")
     scheduler: str = Field(description="The scheduler used for inference")
-    clip_skip: int = Field(description="The number of skipped CLIP layers",)
+    clip_skip: int = Field(
+        description="The number of skipped CLIP layers",
+    )
     model: MainModelField = Field(description="The main model used for inference")
-    controlnets: list[ControlField]= Field(description="The ControlNets used for inference")
+    controlnets: list[ControlField] = Field(
+        description="The ControlNets used for inference"
+    )
     loras: list[LoRAMetadataField] = Field(description="The LoRAs used for inference")
     strength: Union[float, None] = Field(
         default=None,
@@ -97,36 +143,44 @@ class MetadataAccumulatorInvocation(BaseInvocation):
         description="The VAE used for decoding, if the main model's default was not used",
     )
 
+    # SDXL
+    positive_style_prompt: Union[str, None] = Field(
+        default=None, description="The positive style prompt parameter"
+    )
+    negative_style_prompt: Union[str, None] = Field(
+        default=None, description="The negative style prompt parameter"
+    )
+
+    # SDXL Refiner
+    refiner_model: Union[MainModelField, None] = Field(
+        default=None, description="The SDXL Refiner model used"
+    )
+    refiner_cfg_scale: Union[float, None] = Field(
+        default=None,
+        description="The classifier-free guidance scale parameter used for the refiner",
+    )
+    refiner_steps: Union[int, None] = Field(
+        default=None, description="The number of steps used for the refiner"
+    )
+    refiner_scheduler: Union[str, None] = Field(
+        default=None, description="The scheduler used for the refiner"
+    )
+    refiner_aesthetic_store: Union[float, None] = Field(
+        default=None, description="The aesthetic score used for the refiner"
+    )
+    refiner_start: Union[float, None] = Field(
+        default=None, description="The start value used for refiner denoising"
+    )
+
     class Config(InvocationConfig):
         schema_extra = {
             "ui": {
                 "title": "Metadata Accumulator",
-                "tags": ["image", "metadata", "generation"]
+                "tags": ["image", "metadata", "generation"],
             },
         }
-
 
     def invoke(self, context: InvocationContext) -> MetadataAccumulatorOutput:
         """Collects and outputs a CoreMetadata object"""
 
-        return MetadataAccumulatorOutput(
-            metadata=CoreMetadata(
-                generation_mode=self.generation_mode,
-                positive_prompt=self.positive_prompt,
-                negative_prompt=self.negative_prompt,
-                width=self.width,
-                height=self.height,
-                seed=self.seed,
-                rand_device=self.rand_device,
-                cfg_scale=self.cfg_scale,
-                steps=self.steps,
-                scheduler=self.scheduler,
-                model=self.model,
-                strength=self.strength,
-                init_image=self.init_image,
-                vae=self.vae,
-                controlnets=self.controlnets,
-                loras=self.loras,
-                clip_skip=self.clip_skip,
-            )
-        )
+        return MetadataAccumulatorOutput(metadata=CoreMetadata(**self.dict()))

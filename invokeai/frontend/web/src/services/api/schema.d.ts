@@ -1015,6 +1015,11 @@ export type components = {
        */
       loras: (components["schemas"]["LoRAMetadataField"])[];
       /**
+       * Vae 
+       * @description The VAE used for decoding, if the main model's default was not used
+       */
+      vae?: components["schemas"]["VAEModelField"];
+      /**
        * Strength 
        * @description The strength used for latents-to-latents
        */
@@ -1025,10 +1030,45 @@ export type components = {
        */
       init_image?: string;
       /**
-       * Vae 
-       * @description The VAE used for decoding, if the main model's default was not used
+       * Positive Style Prompt 
+       * @description The positive style prompt parameter
        */
-      vae?: components["schemas"]["VAEModelField"];
+      positive_style_prompt?: string;
+      /**
+       * Negative Style Prompt 
+       * @description The negative style prompt parameter
+       */
+      negative_style_prompt?: string;
+      /**
+       * Refiner Model 
+       * @description The SDXL Refiner model used
+       */
+      refiner_model?: components["schemas"]["MainModelField"];
+      /**
+       * Refiner Cfg Scale 
+       * @description The classifier-free guidance scale parameter used for the refiner
+       */
+      refiner_cfg_scale?: number;
+      /**
+       * Refiner Steps 
+       * @description The number of steps used for the refiner
+       */
+      refiner_steps?: number;
+      /**
+       * Refiner Scheduler 
+       * @description The scheduler used for the refiner
+       */
+      refiner_scheduler?: string;
+      /**
+       * Refiner Aesthetic Store 
+       * @description The aesthetic score used for the refiner
+       */
+      refiner_aesthetic_store?: number;
+      /**
+       * Refiner Start 
+       * @description The start value used for refiner denoising
+       */
+      refiner_start?: number;
     };
     /**
      * CvInpaintInvocation 
@@ -3268,6 +3308,46 @@ export type components = {
        * @description The VAE used for decoding, if the main model's default was not used
        */
       vae?: components["schemas"]["VAEModelField"];
+      /**
+       * Positive Style Prompt 
+       * @description The positive style prompt parameter
+       */
+      positive_style_prompt?: string;
+      /**
+       * Negative Style Prompt 
+       * @description The negative style prompt parameter
+       */
+      negative_style_prompt?: string;
+      /**
+       * Refiner Model 
+       * @description The SDXL Refiner model used
+       */
+      refiner_model?: components["schemas"]["MainModelField"];
+      /**
+       * Refiner Cfg Scale 
+       * @description The classifier-free guidance scale parameter used for the refiner
+       */
+      refiner_cfg_scale?: number;
+      /**
+       * Refiner Steps 
+       * @description The number of steps used for the refiner
+       */
+      refiner_steps?: number;
+      /**
+       * Refiner Scheduler 
+       * @description The scheduler used for the refiner
+       */
+      refiner_scheduler?: string;
+      /**
+       * Refiner Aesthetic Store 
+       * @description The aesthetic score used for the refiner
+       */
+      refiner_aesthetic_store?: number;
+      /**
+       * Refiner Start 
+       * @description The start value used for refiner denoising
+       */
+      refiner_start?: number;
     };
     /**
      * MetadataAccumulatorOutput 
@@ -5356,6 +5436,12 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
+     * StableDiffusion1ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
      * StableDiffusion2ModelFormat 
      * @description An enumeration. 
      * @enum {string}
@@ -5367,12 +5453,6 @@ export type components = {
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusion1ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
