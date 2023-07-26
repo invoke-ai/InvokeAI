@@ -104,6 +104,7 @@ type ConfigOptions = {
   shouldShowAdvancedOptionsSettings: boolean;
   shouldShowClearIntermediates: boolean;
   shouldShowNodesToggle: boolean;
+  shouldShowLocalizationToggle: boolean;
 };
 
 type SettingsModalProps = {
@@ -125,6 +126,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowClearIntermediates =
     config?.shouldShowClearIntermediates ?? true;
   const shouldShowNodesToggle = config?.shouldShowNodesToggle ?? true;
+  const shouldShowLocalizationToggle =
+    config?.shouldShowLocalizationToggle ?? true;
 
   useEffect(() => {
     if (!shouldShowDeveloperSettings) {
@@ -325,16 +328,18 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     onChange={handleToggleNodes}
                   />
                 )}
-                <IAIMantineSelect
-                  disabled={!isLocalizationEnabled}
-                  label={t('common.languagePickerLabel')}
-                  value={language}
-                  data={Object.entries(LANGUAGES).map(([value, label]) => ({
-                    value,
-                    label,
-                  }))}
-                  onChange={handleLanguageChanged}
-                />
+                {shouldShowLocalizationToggle && (
+                  <IAIMantineSelect
+                    disabled={!isLocalizationEnabled}
+                    label={t('common.languagePickerLabel')}
+                    value={language}
+                    data={Object.entries(LANGUAGES).map(([value, label]) => ({
+                      value,
+                      label,
+                    }))}
+                    onChange={handleLanguageChanged}
+                  />
+                )}
               </StyledFlex>
 
               {shouldShowDeveloperSettings && (
