@@ -36,12 +36,11 @@ const ParamSDXLRefinerStart = () => {
     <IAISlider
       label="Refiner Start"
       step={0.01}
-      min={0.01}
-      max={0.99}
+      min={0}
+      max={1}
       onChange={handleChange}
       handleReset={handleReset}
       value={refinerStart}
-      sliderNumberInputProps={{ max: 0.99 }}
       withInput
       withReset
       withSliderMarks

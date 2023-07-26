@@ -46,7 +46,6 @@ const ParamSDXLImg2ImgDenoisingStrength = () => {
       withInput
       withSliderMarks
       withReset
-      sliderNumberInputProps={{ max: 0.99 }}
     />
   );
 };
