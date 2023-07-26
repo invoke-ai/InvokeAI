@@ -61,11 +61,13 @@ A noise scheduler (eg. DPM++ 2M Karras) schedules the subtraction of noise from 
 | ImageInverseLerp                   | Inverse linear interpolation of all pixels of an image |
 | ImageLerp                          | Linear interpolation of all pixels of an image |
 | ImageMultiply                      | Multiplies two images together using `PIL.ImageChops.Multiply()` |
+| ImageNSFWBlurInvocation            | Detects and blurs images that may contain sexually explicit content |
 | ImagePaste                         | Pastes an image into another image |
 | ImageProcessor                     | Base class for invocations that reprocess images for ControlNet |
 | ImageResize                        | Resizes an image to specific dimensions |
 | ImageScale                         | Scales an image by a factor |
 | ImageToLatents                     | Scales latents by a given factor |
+| ImageWatermarkInvocation           | Adds an invisible watermark to images |
 | InfillColor                        | Infills transparent areas of an image with a solid color |
 | InfillPatchMatch                   | Infills transparent areas of an image using the PatchMatch algorithm |
 | InfillTile                         | Infills transparent areas of an image with tiles of the image |

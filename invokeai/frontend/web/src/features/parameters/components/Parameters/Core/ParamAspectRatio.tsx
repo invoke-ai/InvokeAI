@@ -7,9 +7,9 @@ import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
 
 const aspectRatios = [
   { name: 'Free', value: null },
-  { name: 'Portrait', value: 0.67 / 1 },
-  { name: 'Wide', value: 16 / 9 },
-  { name: 'Square', value: 1 / 1 },
+  { name: '2:3', value: 2 / 3 },
+  { name: '16:9', value: 16 / 9 },
+  { name: '1:1', value: 1 / 1 },
 ];
 
 export default function ParamAspectRatio() {

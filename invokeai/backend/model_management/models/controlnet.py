@@ -1,7 +1,8 @@
 import os
 import torch
 from enum import Enum
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Literal
 from .base import (
     ModelBase,
     ModelConfigBase,
@@ -15,6 +16,7 @@ from .base import (
     InvalidModelException,
     ModelNotFoundException,
 )
+from invokeai.app.services.config import InvokeAIAppConfig
 
 class ControlNetModelFormat(str, Enum):
     Checkpoint = "checkpoint"
@@ -24,8 +26,12 @@ class ControlNetModel(ModelBase):
     #model_class: Type
     #model_size: int
 
-    class Config(ModelConfigBase):
-        model_format: ControlNetModelFormat
+    class DiffusersConfig(ModelConfigBase):
+        model_format: Literal[ControlNetModelFormat.Diffusers]
+
+    class CheckpointConfig(ModelConfigBase):
+        model_format: Literal[ControlNetModelFormat.Checkpoint]
+        config: str
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.ControlNet
@@ -99,13 +105,51 @@ class ControlNetModel(ModelBase):
 
     @classmethod
     def convert_if_required(
+            cls,
+            model_path: str,
+            output_path: str,
+            config: ModelConfigBase,
+            base_model: BaseModelType,
+    ) -> str:
+        if cls.detect_format(model_path) == ControlNetModelFormat.Checkpoint:
+            return _convert_controlnet_ckpt_and_cache(
+                model_path = model_path,
+                model_config = config.config,
+                output_path = output_path,
+                base_model = base_model,
+                )
+        else:
+            return model_path
+
+@classmethod
+def _convert_controlnet_ckpt_and_cache(
         cls,
         model_path: str,
         output_path: str,
-        config: ModelConfigBase, # empty config or config of parent model
         base_model: BaseModelType,
-    ) -> str:
-        if cls.detect_format(model_path) != ControlNetModelFormat.Diffusers:
-            raise NotImplementedError("Checkpoint controlnet models currently unsupported")
-        else:
-            return model_path
+        model_config: ControlNetModel.CheckpointConfig,
+) -> str:
+    """
+    Convert the controlnet from checkpoint format to diffusers format,
+    cache it to disk, and return Path to converted
+    file. If already on disk then just returns Path.
+    """
+    app_config = InvokeAIAppConfig.get_config()
+    weights = app_config.root_path / model_path
+    output_path = Path(output_path)
+
+    # return cached version if it exists
+    if output_path.exists():
+        return output_path
+
+    # to avoid circular import errors
+    from ..convert_ckpt_to_diffusers import convert_controlnet_to_diffusers
+    convert_controlnet_to_diffusers(
+        weights,
+        output_path,
+        original_config_file = app_config.root_path / model_config,
+        image_size = 512,
+        scan_needed = True,
+        from_safetensors = weights.suffix == ".safetensors"
+    )
+    return output_path

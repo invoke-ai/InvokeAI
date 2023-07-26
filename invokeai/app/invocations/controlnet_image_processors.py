@@ -20,7 +20,7 @@ from ...backend.model_management import BaseModelType, ModelType
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
-from .image import ImageOutput, PILInvocationConfig
+from ..models.image import ImageOutput, PILInvocationConfig
 
 CONTROLNET_DEFAULT_MODELS = [
     ###########################################

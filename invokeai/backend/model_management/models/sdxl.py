@@ -1,5 +1,6 @@
 import os
 import json
+import invokeai.backend.util.logging as logger
 from enum import Enum
 from pydantic import Field
 from typing import Literal, Optional
@@ -48,7 +49,7 @@ class StableDiffusionXLModel(DiffusersModel):
         if model_format == StableDiffusionXLModelFormat.Checkpoint:
             if ckpt_config_path:
                 ckpt_config = OmegaConf.load(ckpt_config_path)
-                ckpt_config["model"]["params"]["unet_config"]["params"]["in_channels"]
+                in_channels = ckpt_config["model"]["params"]["unet_config"]["params"]["in_channels"]
 
             else:
                 checkpoint = read_checkpoint_meta(path)
@@ -108,7 +109,20 @@ class StableDiffusionXLModel(DiffusersModel):
         config: ModelConfigBase,
         base_model: BaseModelType,
     ) -> str:
+        # The convert script adapted from the diffusers package uses
+        # strings for the base model type. To avoid making too many
+        # source code changes, we simply translate here
+        model_base_to_model_type = {BaseModelType.StableDiffusionXL: 'SDXL',
+                                    BaseModelType.StableDiffusionXLRefiner: 'SDXL-Refiner',
+                                    }
         if isinstance(config, cls.CheckpointConfig):
-            raise NotImplementedError('conversion of SDXL checkpoint models to diffusers format is not yet supported')
+            from invokeai.backend.model_management.models.stable_diffusion import _convert_ckpt_and_cache
+            return _convert_ckpt_and_cache(
+                version=base_model,
+                model_config=config,
+                output_path=output_path,
+                model_type=model_base_to_model_type[base_model],
+                use_safetensors=False, # corrupts sdxl models for some reason
+            )
         else:
             return model_path

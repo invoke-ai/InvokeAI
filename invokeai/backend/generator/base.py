@@ -28,7 +28,6 @@ from diffusers.schedulers import SchedulerMixin as Scheduler
 import invokeai.backend.util.logging as logger
 from ..image_util import configure_model_padding
 from ..util.util import rand_perlin_2d
-from ..safety_checker import SafetyChecker
 from ..stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from ..stable_diffusion.schedulers import SCHEDULER_MAP
 
@@ -52,7 +51,6 @@ class InvokeAIGeneratorBasicParams:
     v_symmetry_time_pct: Optional[float]=None
     variation_amount: float = 0.0
     with_variations: list=field(default_factory=list)
-    safety_checker: Optional[SafetyChecker]=None
 
 @dataclass
 class InvokeAIGeneratorOutput:
@@ -240,7 +238,6 @@ class Generator:
         self.seed = None
         self.latent_channels = model.unet.config.in_channels
         self.downsampling_factor = downsampling  # BUG: should come from model or config
-        self.safety_checker = None
         self.perlin = 0.0
         self.threshold = 0
         self.variation_amount = 0
@@ -277,12 +274,10 @@ class Generator:
         perlin=0.0,
         h_symmetry_time_pct=None,
         v_symmetry_time_pct=None,
-        safety_checker: SafetyChecker=None,
         free_gpu_mem: bool = False,
         **kwargs,
     ):
         scope = nullcontext
-        self.safety_checker = safety_checker
         self.free_gpu_mem = free_gpu_mem
         attention_maps_images = []
         attention_maps_callback = lambda saver: attention_maps_images.append(
@@ -328,9 +323,6 @@ class Generator:
 
                 # Pass on the seed in case a layer beneath us needs to generate noise on its own.
                 image = make_image(x_T, seed)
-
-                if self.safety_checker is not None:
-                    image = self.safety_checker.check(image)
 
                 results.append([image, seed, attention_maps_images])
 

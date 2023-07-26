@@ -58,7 +58,15 @@ LEGACY_CONFIGS = {
             SchedulerPredictionType.Epsilon: 'v2-inpainting-inference.yaml',
             SchedulerPredictionType.VPrediction: 'v2-inpainting-inference-v.yaml',
         }
-    }
+    },
+    
+    BaseModelType.StableDiffusionXL: {
+        ModelVariantType.Normal: 'sd_xl_base.yaml',
+    },
+    
+    BaseModelType.StableDiffusionXLRefiner: {
+        ModelVariantType.Normal: 'sd_xl_refiner.yaml',
+    },
 }
 
 @dataclass
@@ -330,6 +338,7 @@ class ModelInstall(object):
             description = str(description),
             model_format = info.format,
             )
+        legacy_conf = None
         if info.model_type == ModelType.Main:
             attributes.update(dict(variant = info.variant_type,))
             if info.format=="checkpoint":
@@ -344,11 +353,17 @@ class ModelInstall(object):
                 except KeyError:
                     legacy_conf = Path(self.config.legacy_conf_dir, 'v1-inference.yaml')  # best guess
                     
-                attributes.update(
-                    dict(
-                        config = str(legacy_conf)
-                    )
+        if info.model_type == ModelType.ControlNet and info.format=="checkpoint":
+            possible_conf = path.with_suffix('.yaml')
+            if possible_conf.exists():
+                legacy_conf = str(self.relative_to_root(possible_conf))
+
+        if legacy_conf:
+            attributes.update(
+                dict(
+                    config = str(legacy_conf)
                 )
+            )
         return attributes
 
     def relative_to_root(self, path: Path)->Path:

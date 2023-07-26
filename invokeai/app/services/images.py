@@ -216,16 +216,13 @@ class ImageService(ImageServiceABC):
                 metadata=metadata,
                 session_id=session_id,
             )
-
             if board_id is not None:
                 self._services.board_image_records.add_image_to_board(
                     board_id=board_id, image_name=image_name
                 )
-
             self._services.image_files.save(
                 image_name=image_name, image=image, metadata=metadata, graph=graph
             )
-
             image_dto = self.get_dto(image_name)
 
             return image_dto
@@ -236,7 +233,7 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Failed to save image file")
             raise
         except Exception as e:
-            self._services.logger.error("Problem saving image record and file")
+            self._services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
 
     def update(

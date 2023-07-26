@@ -134,6 +134,12 @@ export type ESRGANInvocation = TypeReq<
 export type DivideInvocation = TypeReq<
   components['schemas']['DivideInvocation']
 >;
+export type ImageNSFWBlurInvocation = TypeReq<
+  components['schemas']['ImageNSFWBlurInvocation']
+>;
+export type ImageWatermarkInvocation = TypeReq<
+  components['schemas']['ImageWatermarkInvocation']
+>;
 
 // ControlNet Nodes
 export type ControlNetInvocation = TypeReq<
