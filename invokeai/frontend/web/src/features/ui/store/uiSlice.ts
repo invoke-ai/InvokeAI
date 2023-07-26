@@ -26,7 +26,7 @@ export const uiSlice = createSlice({
   name: 'ui',
   initialState: initialUIState,
   reducers: {
-    setActiveTab: (state, action: PayloadAction<number | InvokeTabName>) => {
+    setActiveTab: (state, action: PayloadAction<InvokeTabName>) => {
       setActiveTabReducer(state, action.payload);
     },
     setShouldPinParametersPanel: (state, action: PayloadAction<boolean>) => {
