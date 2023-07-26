@@ -583,7 +583,10 @@ class IAIOnnxRuntimeModel:
                 providers.append(self.provider)
             else:
                 providers = get_available_providers()
-            self.session = InferenceSession(self.proto.SerializeToString(), providers=providers, sess_options=sess)
+            try:
+                self.session = InferenceSession(self.proto.SerializeToString(), providers=providers, sess_options=sess)
+            except Exception as e:
+                raise e 
             #self.session = InferenceSession("tmp.onnx", providers=[self.provider], sess_options=self.sess_options)
             # self.io_binding = self.session.io_binding()
 
