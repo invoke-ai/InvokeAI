@@ -7,11 +7,11 @@ import {
   SCHEDULER_LABEL_MAP,
   SchedulerParam,
 } from 'features/parameters/types/parameterSchemas';
-import { useIsRefinerAvailable } from 'features/sdxl/hooks/useIsRefinerAvailable';
 import { setRefinerScheduler } from 'features/sdxl/store/sdxlSlice';
 import { map } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
 
 const selector = createSelector(
   stateSelector,

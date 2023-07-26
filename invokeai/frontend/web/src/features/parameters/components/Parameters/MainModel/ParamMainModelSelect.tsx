@@ -14,6 +14,7 @@ import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { forEach } from 'lodash-es';
+import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
@@ -29,8 +30,10 @@ const ParamMainModelSelect = () => {
 
   const { model } = useAppSelector(selector);
 
-  const { data: mainModels, isLoading } = useGetMainModelsQuery();
   const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
+  const { data: mainModels, isLoading } = useGetMainModelsQuery(
+    NON_REFINER_BASE_MODELS
+  );
 
   const data = useMemo(() => {
     if (!mainModels) {

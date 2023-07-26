@@ -13,7 +13,8 @@ import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetSDXLRefinerModelsQuery } from 'services/api/endpoints/models';
+import { REFINER_BASE_MODELS } from 'services/api/constants';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 
 const RefinerModelInputFieldComponent = (
@@ -27,7 +28,8 @@ const RefinerModelInputFieldComponent = (
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { data: refinerModels, isLoading } = useGetSDXLRefinerModelsQuery();
+  const { data: refinerModels, isLoading } =
+    useGetMainModelsQuery(REFINER_BASE_MODELS);
 
   const data = useMemo(() => {
     if (!refinerModels) {

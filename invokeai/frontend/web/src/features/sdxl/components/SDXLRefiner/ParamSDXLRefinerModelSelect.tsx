@@ -11,7 +11,8 @@ import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import { useGetSDXLRefinerModelsQuery } from 'services/api/endpoints/models';
+import { REFINER_BASE_MODELS } from 'services/api/constants';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 const selector = createSelector(
   stateSelector,
@@ -24,7 +25,8 @@ const ParamSDXLRefinerModelSelect = () => {
 
   const { model } = useAppSelector(selector);
 
-  const { data: refinerModels, isLoading } = useGetSDXLRefinerModelsQuery();
+  const { data: refinerModels, isLoading } =
+    useGetMainModelsQuery(REFINER_BASE_MODELS);
 
   const data = useMemo(() => {
     if (!refinerModels) {

@@ -19,7 +19,9 @@ import { startAppListening } from '..';
 
 export const addModelsLoadedListener = () => {
   startAppListening({
-    matcher: modelsApi.endpoints.getMainModels.matchFulfilled,
+    predicate: (state, action) =>
+      modelsApi.endpoints.getMainModels.matchFulfilled(action) &&
+      !action.meta.arg.originalArgs.includes('sdxl-refiner'),
     effect: async (action, { getState, dispatch }) => {
       // models loaded, we need to ensure the selected model is available and if not, select the first one
       const log = logger('models');
@@ -64,7 +66,9 @@ export const addModelsLoadedListener = () => {
     },
   });
   startAppListening({
-    matcher: modelsApi.endpoints.getSDXLRefinerModels.matchFulfilled,
+    predicate: (state, action) =>
+      modelsApi.endpoints.getMainModels.matchFulfilled(action) &&
+      action.meta.arg.originalArgs.includes('sdxl-refiner'),
     effect: async (action, { getState, dispatch }) => {
       // models loaded, we need to ensure the selected model is available and if not, select the first one
       const log = logger('models');

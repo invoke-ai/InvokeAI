@@ -1,9 +1,9 @@
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
-import { useIsRefinerAvailable } from 'features/sdxl/hooks/useIsRefinerAvailable';
 import { setShouldUseSDXLRefiner } from 'features/sdxl/store/sdxlSlice';
 import { ChangeEvent } from 'react';
+import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
 
 export default function ParamUseSDXLRefiner() {
   const shouldUseSDXLRefiner = useAppSelector(

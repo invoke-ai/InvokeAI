@@ -4,10 +4,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
-import { useIsRefinerAvailable } from 'features/sdxl/hooks/useIsRefinerAvailable';
 import { setRefinerSteps } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
 
 const selector = createSelector(
   [stateSelector],

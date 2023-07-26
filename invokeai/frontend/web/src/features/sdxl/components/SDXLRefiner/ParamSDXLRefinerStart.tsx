@@ -3,9 +3,9 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
-import { useIsRefinerAvailable } from 'features/sdxl/hooks/useIsRefinerAvailable';
 import { setRefinerStart } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
+import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
 
 const selector = createSelector(
   [stateSelector],
