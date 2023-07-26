@@ -18,6 +18,11 @@ def choose_torch_device() -> torch.device:
         return CPU_DEVICE
     if torch.cuda.is_available():
         return torch.device("cuda")
+    try:
+        import torch_directml
+        return torch_directml.device()
+    except ModuleNotFoundError:
+        pass
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         return torch.device("mps")
     return CPU_DEVICE

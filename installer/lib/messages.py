@@ -169,6 +169,10 @@ def graphical_accelerator():
         "an [gold1 b]AMD[/] GPU (using ROCm™)",
         "rocm",
     )
+    directml = (
+        "a GPU supporting [gold1 b]DirectML[/] with installed drivers",
+        "directml",
+    )
     cpu = (
         "no compatible GPU, or specifically prefer to use the CPU",
         "cpu",
@@ -179,7 +183,7 @@ def graphical_accelerator():
     )
 
     if OS == "Windows":
-        options = [nvidia, cpu]
+        options = [nvidia, directml, cpu]
     if OS == "Linux":
         options = [nvidia, amd, cpu]
     elif OS == "Darwin":
