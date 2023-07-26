@@ -8,20 +8,21 @@ import {
   RangeOfSizeInvocation,
 } from 'services/api/types';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   INPAINT,
   INPAINT_GRAPH,
   ITERATE,
   MAIN_MODEL_LOADER,
+  METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
 } from './constants';
-import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -251,6 +252,27 @@ export const buildCanvasInpaintGraph = (
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
   }
 
+  // add metadata accumulator, which is only mostly populated - some fields are added later
+  graph.nodes[METADATA_ACCUMULATOR] = {
+    id: METADATA_ACCUMULATOR,
+    type: 'metadata_accumulator',
+    generation_mode: 'txt2img',
+    cfg_scale,
+    height,
+    width,
+    positive_prompt: '', // set in addDynamicPromptsToGraph
+    negative_prompt: negativePrompt,
+    model,
+    seed: 0, // set in addDynamicPromptsToGraph
+    steps,
+    rand_device: 'cpu',
+    scheduler,
+    vae: undefined, // option; set in addVAEToGraph
+    controlnets: [], // populated in addControlNetToLinearGraph
+    loras: [], // populated in addLoRAsToGraph
+    clip_skip: clipSkip,
+  };
+
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!
@@ -260,6 +282,22 @@ export const buildCanvasInpaintGraph = (
   if (state.system.shouldUseWatermarker) {
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, INPAINT);
+  }
+
+  if (
+    !state.system.shouldUseNSFWChecker &&
+    !state.system.shouldUseWatermarker
+  ) {
+    graph.edges.push({
+      source: {
+        node_id: METADATA_ACCUMULATOR,
+        field: 'metadata',
+      },
+      destination: {
+        node_id: INPAINT,
+        field: 'metadata',
+      },
+    });
   }
 
   return graph;
