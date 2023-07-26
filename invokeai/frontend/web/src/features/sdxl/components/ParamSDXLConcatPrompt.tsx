@@ -19,11 +19,7 @@ export default function ParamSDXLConcatPrompt() {
   return (
     <Box
       sx={{
-        px: 4,
-        py: 2,
-        borderRadius: 4,
-        bg: 'base.100',
-        _dark: { bg: 'base.800' },
+        px: 2,
       }}
     >
       <IAISwitch

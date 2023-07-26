@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import TextToImageSDXLTabParameters from 'features/sdxl/components/SDXLTextToImageTabParameters';
+import SDXLTextToImageTabParameters from 'features/sdxl/components/SDXLTextToImageTabParameters';
 import { memo } from 'react';
 import ParametersPinnedWrapper from '../../ParametersPinnedWrapper';
 import TextToImageTabMain from './TextToImageTabMain';
@@ -13,7 +13,7 @@ const TextToImageTab = () => {
     <Flex sx={{ gap: 4, w: 'full', h: 'full' }}>
       <ParametersPinnedWrapper>
         {model && model.base_model === 'sdxl' ? (
-          <TextToImageSDXLTabParameters />
+          <SDXLTextToImageTabParameters />
         ) : (
           <TextToImageTabParameters />
         )}
