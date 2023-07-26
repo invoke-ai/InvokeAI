@@ -98,6 +98,7 @@ export const addSDXLRefinerToGraph = (
     steps: refinerSteps / (1 - refinerStart),
     scheduler: refinerScheduler,
     denoising_start: refinerStart,
+    denoising_end: 1,
   };
 
   graph.edges.push(

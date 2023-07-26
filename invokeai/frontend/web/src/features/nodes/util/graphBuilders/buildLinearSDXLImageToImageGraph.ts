@@ -36,10 +36,10 @@ export const buildLinearSDXLImageToImageGraph = (
     scheduler,
     steps,
     initialImage,
-    img2imgStrength: strength,
     shouldFitToWidthHeight,
     width,
     height,
+    img2imgStrength: strength,
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
@@ -113,7 +113,10 @@ export const buildLinearSDXLImageToImageGraph = (
         cfg_scale,
         scheduler,
         steps,
-        denoising_start: shouldUseSDXLRefiner ? refinerStart : 1 - strength,
+        denoising_start: shouldUseSDXLRefiner
+          ? Math.min(refinerStart, 1 - strength)
+          : 1 - strength,
+        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -337,7 +340,7 @@ export const buildLinearSDXLImageToImageGraph = (
     controlnets: [],
     loras: [],
     clip_skip: clipSkip,
-    strength,
+    strength: strength,
     init_image: initialImage.imageName,
     positive_style_prompt: positiveStylePrompt,
     negative_style_prompt: negativeStylePrompt,

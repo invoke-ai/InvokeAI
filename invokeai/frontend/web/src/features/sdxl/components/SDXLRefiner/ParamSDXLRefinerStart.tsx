@@ -38,7 +38,7 @@ const ParamSDXLRefinerStart = () => {
   return (
     <IAISlider
       label="Refiner Start"
-      step={shift ? 0.1 : 0.01}
+      step={shift ? 0.05 : 0.01}
       min={0.01}
       max={1}
       onChange={handleChange}
