@@ -16,6 +16,7 @@ import {
   useImportMainModelsMutation,
 } from 'services/api/endpoints/models';
 import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
+import { ALL_BASE_MODELS } from 'services/api/constants';
 
 export default function FoundModelsList() {
   const searchFolder = useAppSelector(
@@ -24,7 +25,7 @@ export default function FoundModelsList() {
   const [nameFilter, setNameFilter] = useState<string>('');
 
   // Get paths of models that are already installed
-  const { data: installedModels } = useGetMainModelsQuery();
+  const { data: installedModels } = useGetMainModelsQuery(ALL_BASE_MODELS);
 
   // Get all model paths from a given directory
   const { foundModels, alreadyInstalled, filteredModels } =

@@ -10,7 +10,9 @@ import {
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   IMAGE_TO_IMAGE_GRAPH,
@@ -23,8 +25,6 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
-  NSFW_CHECKER,
-  WATERMARKER,
 } from './constants';
 
 /**
@@ -105,11 +105,6 @@ export const buildCanvasImageToImageGraph = (
         is_intermediate: true,
         skipped_layers: clipSkip,
       },
-      [LATENTS_TO_IMAGE]: {
-        type: 'l2i',
-        id: LATENTS_TO_IMAGE,
-        is_intermediate: true,
-      },
       [LATENTS_TO_LATENTS]: {
         type: 'l2l',
         id: LATENTS_TO_LATENTS,
@@ -128,15 +123,10 @@ export const buildCanvasImageToImageGraph = (
         //   image_name: initialImage.image_name,
         // },
       },
-      [NSFW_CHECKER]: {
-        type: 'img_nsfw',
-        id: NSFW_CHECKER,
-        is_intermediate: true,
-      },
-      [WATERMARKER]: {
+      [LATENTS_TO_IMAGE]: {
+        type: 'l2i',
+        id: LATENTS_TO_IMAGE,
         is_intermediate: !shouldAutoSave,
-        type: 'img_watermark',
-        id: WATERMARKER,
       },
     },
     edges: [
@@ -178,26 +168,6 @@ export const buildCanvasImageToImageGraph = (
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: NSFW_CHECKER,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: NSFW_CHECKER,
-          field: 'image',
-        },
-        destination: {
-          node_id: WATERMARKER,
-          field: 'image',
         },
       },
       {
@@ -342,17 +312,6 @@ export const buildCanvasImageToImageGraph = (
     init_image: initialImage.image_name,
   };
 
-  graph.edges.push({
-    source: {
-      node_id: METADATA_ACCUMULATOR,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: WATERMARKER,
-      field: 'metadata',
-    },
-  });
-
   // add LoRA support
   addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
 
@@ -364,6 +323,17 @@ export const buildCanvasImageToImageGraph = (
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, LATENTS_TO_LATENTS);
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph);
+  }
 
   return graph;
 };

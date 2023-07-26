@@ -65,11 +65,14 @@ import { addGeneratorProgressEventListener as addGeneratorProgressListener } fro
 import { addGraphExecutionStateCompleteEventListener as addGraphExecutionStateCompleteListener } from './listeners/socketio/socketGraphExecutionStateComplete';
 import { addInvocationCompleteEventListener as addInvocationCompleteListener } from './listeners/socketio/socketInvocationComplete';
 import { addInvocationErrorEventListener as addInvocationErrorListener } from './listeners/socketio/socketInvocationError';
+import { addInvocationRetrievalErrorEventListener } from './listeners/socketio/socketInvocationRetrievalError';
 import { addInvocationStartedEventListener as addInvocationStartedListener } from './listeners/socketio/socketInvocationStarted';
 import { addModelLoadEventListener } from './listeners/socketio/socketModelLoad';
+import { addSessionRetrievalErrorEventListener } from './listeners/socketio/socketSessionRetrievalError';
 import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
+import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
 import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
@@ -153,6 +156,8 @@ addSocketDisconnectedListener();
 addSocketSubscribedListener();
 addSocketUnsubscribedListener();
 addModelLoadEventListener();
+addSessionRetrievalErrorEventListener();
+addInvocationRetrievalErrorEventListener();
 
 // Session Created
 addSessionCreatedPendingListener();
@@ -197,3 +202,6 @@ addFirstListImagesListener();
 
 // Ad-hoc upscale workflwo
 addUpscaleRequestedListener();
+
+// Tab Change
+addTabChangedListener();

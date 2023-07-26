@@ -39,8 +39,22 @@ export const addUserInvokedCanvasListener = () => {
 
       const state = getState();
 
+      const {
+        layerState,
+        boundingBoxCoordinates,
+        boundingBoxDimensions,
+        isMaskEnabled,
+        shouldPreserveMaskedArea,
+      } = state.canvas;
+
       // Build canvas blobs
-      const canvasBlobsAndImageData = await getCanvasData(state);
+      const canvasBlobsAndImageData = await getCanvasData(
+        layerState,
+        boundingBoxCoordinates,
+        boundingBoxDimensions,
+        isMaskEnabled,
+        shouldPreserveMaskedArea
+      );
 
       if (!canvasBlobsAndImageData) {
         log.error('Unable to create canvas data');

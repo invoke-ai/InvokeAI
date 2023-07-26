@@ -39,21 +39,41 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 try:
                     queue_item: InvocationQueueItem = self.__invoker.services.queue.get()
                 except Exception as e:
-                    logger.debug("Exception while getting from queue: %s" % e)
+                    self.__invoker.services.logger.error("Exception while getting from queue:\n%s" % e)
 
                 if not queue_item:  # Probably stopping
                     # do not hammer the queue
                     time.sleep(0.5)
                     continue
 
-                graph_execution_state = (
-                    self.__invoker.services.graph_execution_manager.get(
-                        queue_item.graph_execution_state_id
+                try:
+                    graph_execution_state = (
+                        self.__invoker.services.graph_execution_manager.get(
+                            queue_item.graph_execution_state_id
+                        )
                     )
-                )
-                invocation = graph_execution_state.execution_graph.get_node(
-                    queue_item.invocation_id
-                )
+                except Exception as e:
+                    self.__invoker.services.logger.error("Exception while retrieving session:\n%s" % e)
+                    self.__invoker.services.events.emit_session_retrieval_error(
+                        graph_execution_state_id=queue_item.graph_execution_state_id,
+                        error_type=e.__class__.__name__,
+                        error=traceback.format_exc(),
+                    )
+                    continue
+                
+                try:
+                    invocation = graph_execution_state.execution_graph.get_node(
+                        queue_item.invocation_id
+                    )
+                except Exception as e:
+                    self.__invoker.services.logger.error("Exception while retrieving invocation:\n%s" % e)
+                    self.__invoker.services.events.emit_invocation_retrieval_error(
+                        graph_execution_state_id=queue_item.graph_execution_state_id,
+                        node_id=queue_item.invocation_id,
+                        error_type=e.__class__.__name__,
+                        error=traceback.format_exc(),
+                    )
+                    continue
 
                 # get the source node id to provide to clients (the prepared node id is not as useful)
                 source_node_id = graph_execution_state.prepared_source_mapping[invocation.id]
@@ -114,11 +134,13 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         graph_execution_state
                     )
 
+                    self.__invoker.services.logger.error("Error while invoking:\n%s" % e)
                     # Send error event
                     self.__invoker.services.events.emit_invocation_error(
                         graph_execution_state_id=graph_execution_state.id,
                         node=invocation.dict(),
                         source_node_id=source_node_id,
+                        error_type=e.__class__.__name__,
                         error=error,
                     )
 
@@ -136,11 +158,12 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     try:
                         self.__invoker.invoke(graph_execution_state, invoke_all=True)
                     except Exception as e:
-                        logger.error("Error while invoking: %s" % e)
+                        self.__invoker.services.logger.error("Error while invoking:\n%s" % e)
                         self.__invoker.services.events.emit_invocation_error(
                             graph_execution_state_id=graph_execution_state.id,
                             node=invocation.dict(),
                             source_node_id=source_node_id,
+                            error_type=e.__class__.__name__,
                             error=traceback.format_exc()
                         )
                 elif is_complete:
