@@ -1,3 +1,4 @@
+import { memo, ChangeEvent } from 'react';
 import { Textarea, Input } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
@@ -5,8 +6,9 @@ import {
   StringInputFieldTemplate,
   StringInputFieldValue,
 } from 'features/nodes/types/types';
-import { ChangeEvent, memo } from 'react';
 import { FieldComponentProps } from './types';
+
+const FIELD_PADDING = 20;
 
 const StringInputFieldComponent = (
   props: FieldComponentProps<
@@ -31,12 +33,13 @@ const StringInputFieldComponent = (
     );
   };
 
-  const textareaWidth = nodeWidth - 20;
+  const textareaWidth = nodeWidth - FIELD_PADDING;
+
+  const textareaFieldNames = ['prompt', 'text'];
 
   return (
     <>
-      {field.name.toLowerCase() === 'prompt' ||
-      field.name.toLowerCase() === 'text' ? (
+      {textareaFieldNames.includes(field.name.toLowerCase()) ? (
         <Textarea
           style={{
             height: '150px',
