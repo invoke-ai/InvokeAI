@@ -501,7 +501,7 @@ class LatentsToImageInvocation(BaseInvocation):
     vae: VaeField = Field(default=None, description="Vae submodel")
     tiled: bool = Field(
         default=False,
-        description="Decode latents by overlaping tiles(less memory consumption)")
+        description="Decode latents by overlapping tiles(less memory consumption)")
     fp32: bool = Field(DEFAULT_PRECISION=='float32', description="Decode in full precision")
     metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")
 

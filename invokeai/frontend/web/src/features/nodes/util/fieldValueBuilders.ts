@@ -76,6 +76,10 @@ export const buildInputFieldValue = (
       fieldValue.value = undefined;
     }
 
+    if (template.type === 'refiner_model') {
+      fieldValue.value = undefined;
+    }
+
     if (template.type === 'vae_model') {
       fieldValue.value = undefined;
     }

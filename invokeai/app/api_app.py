@@ -203,7 +203,10 @@ def invoke_api():
                 return find_port(port=port + 1)
             else:
                 return port
-
+            
+    from invokeai.backend.install.check_root import check_invokeai_root
+    check_invokeai_root(app_config)  # note, may exit with an exception if root not set up
+    
     port = find_port(app_config.port)
     if port != app_config.port:
         logger.warn(f"Port {app_config.port} in use, using port {port}")

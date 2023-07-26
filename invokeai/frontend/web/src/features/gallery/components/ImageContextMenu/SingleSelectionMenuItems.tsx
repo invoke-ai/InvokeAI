@@ -1,5 +1,6 @@
-import { Link, MenuItem } from '@chakra-ui/react';
+import { MenuItem } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -33,10 +34,9 @@ import {
   useRemoveImageFromBoardMutation,
 } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
+import { useDebounce } from 'use-debounce';
 import { AddImageToBoardContext } from '../../../../app/contexts/AddImageToBoardContext';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
-import { useDebounce } from 'use-debounce';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -154,21 +154,29 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   return (
     <>
-      <Link href={imageDTO.image_url} target="_blank">
-        <MenuItem icon={<FaExternalLinkAlt />}>
-          {t('common.openInNewTab')}
-        </MenuItem>
-      </Link>
+      <MenuItem
+        as="a"
+        href={imageDTO.image_url}
+        target="_blank"
+        icon={<FaExternalLinkAlt />}
+      >
+        {t('common.openInNewTab')}
+      </MenuItem>
       {isClipboardAPIAvailable && (
         <MenuItem icon={<FaCopy />} onClickCapture={handleCopyImage}>
           {t('parameters.copyImage')}
         </MenuItem>
       )}
-      <Link download={true} href={imageDTO.image_url} target="_blank">
-        <MenuItem icon={<FaDownload />} w="100%">
-          {t('parameters.downloadImage')}
-        </MenuItem>
-      </Link>
+      <MenuItem
+        as="a"
+        download={true}
+        href={imageDTO.image_url}
+        target="_blank"
+        icon={<FaDownload />}
+        w="100%"
+      >
+        {t('parameters.downloadImage')}
+      </MenuItem>
       <MenuItem
         icon={<FaQuoteRight />}
         onClickCapture={handleRecallPrompt}
