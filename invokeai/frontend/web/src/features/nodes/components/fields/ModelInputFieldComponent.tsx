@@ -19,7 +19,6 @@ import {
   useGetOnnxModelsQuery,
 } from 'services/api/endpoints/models';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
 
