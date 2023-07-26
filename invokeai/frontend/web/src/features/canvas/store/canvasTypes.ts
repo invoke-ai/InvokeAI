@@ -168,4 +168,7 @@ export interface CanvasState {
   stageDimensions: Dimensions;
   stageScale: number;
   tool: CanvasTool;
+  generationMode?: GenerationMode;
 }
+
+export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';

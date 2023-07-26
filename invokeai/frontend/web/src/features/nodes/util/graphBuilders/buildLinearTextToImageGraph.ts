@@ -34,6 +34,7 @@ export const buildLinearTextToImageGraph = (
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
+    vaePrecision,
   } = state.generation;
 
   const use_cpu = shouldUseNoiseSettings
@@ -95,6 +96,7 @@ export const buildLinearTextToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
+        fp32: vaePrecision === 'fp32' ? true : false,
       },
     },
     edges: [
