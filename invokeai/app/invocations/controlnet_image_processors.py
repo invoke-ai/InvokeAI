@@ -6,20 +6,29 @@ from typing import Dict, List, Literal, Optional, Union
 
 import cv2
 import numpy as np
-from controlnet_aux import (CannyDetector, ContentShuffleDetector, HEDdetector,
-                            LeresDetector, LineartAnimeDetector,
-                            LineartDetector, MediapipeFaceDetector,
-                            MidasDetector, MLSDdetector, NormalBaeDetector,
-                            OpenposeDetector, PidiNetDetector, SamDetector,
-                            ZoeDetector)
+from controlnet_aux import (
+    CannyDetector,
+    ContentShuffleDetector,
+    HEDdetector,
+    LeresDetector,
+    LineartAnimeDetector,
+    LineartDetector,
+    MediapipeFaceDetector,
+    MidasDetector,
+    MLSDdetector,
+    NormalBaeDetector,
+    OpenposeDetector,
+    PidiNetDetector,
+    SamDetector,
+    ZoeDetector,
+)
 from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
 from pydantic import BaseModel, Field, validator
 
 from ...backend.model_management import BaseModelType, ModelType
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
-from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
-                             InvocationConfig, InvocationContext)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
 from ..models.image import ImageOutput, PILInvocationConfig
 
 CONTROLNET_DEFAULT_MODELS = [
@@ -34,7 +43,6 @@ CONTROLNET_DEFAULT_MODELS = [
     "lllyasviel/sd-controlnet-scribble",
     "lllyasviel/sd-controlnet-normal",
     "lllyasviel/sd-controlnet-mlsd",
-
     #############################################
     # lllyasviel sd v1.5, ControlNet v1.1 models
     #############################################
@@ -56,7 +64,6 @@ CONTROLNET_DEFAULT_MODELS = [
     "lllyasviel/control_v11e_sd15_shuffle",
     "lllyasviel/control_v11e_sd15_ip2p",
     "lllyasviel/control_v11f1e_sd15_tile",
-
     #################################################
     #  thibaud sd v2.1 models (ControlNet v1.0? or v1.1?
     ##################################################
@@ -71,7 +78,6 @@ CONTROLNET_DEFAULT_MODELS = [
     "thibaud/controlnet-sd21-lineart-diffusers",
     "thibaud/controlnet-sd21-normalbae-diffusers",
     "thibaud/controlnet-sd21-ade20k-diffusers",
-
     ##############################################
     #  ControlNetMediaPipeface, ControlNet v1.1
     ##############################################
@@ -83,10 +89,17 @@ CONTROLNET_DEFAULT_MODELS = [
 ]
 
 CONTROLNET_NAME_VALUES = Literal[tuple(CONTROLNET_DEFAULT_MODELS)]
-CONTROLNET_MODE_VALUES = Literal[tuple(
-    ["balanced", "more_prompt", "more_control", "unbalanced"])]
-CONTROLNET_RESIZE_VALUES = Literal[tuple(
-    ["just_resize", "crop_resize", "fill_resize", "just_resize_simple",])]
+CONTROLNET_MODE_VALUES = Literal[tuple(["balanced", "more_prompt", "more_control", "unbalanced"])]
+CONTROLNET_RESIZE_VALUES = Literal[
+    tuple(
+        [
+            "just_resize",
+            "crop_resize",
+            "fill_resize",
+            "just_resize_simple",
+        ]
+    )
+]
 
 
 class ControlNetModelField(BaseModel):
@@ -98,21 +111,17 @@ class ControlNetModelField(BaseModel):
 
 class ControlField(BaseModel):
     image: ImageField = Field(default=None, description="The control image")
-    control_model: Optional[ControlNetModelField] = Field(
-        default=None, description="The ControlNet model to use")
+    control_model: Optional[ControlNetModelField] = Field(default=None, description="The ControlNet model to use")
     # control_weight: Optional[float] = Field(default=1, description="weight given to controlnet")
-    control_weight: Union[float, List[float]] = Field(
-        default=1, description="The weight given to the ControlNet")
+    control_weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(
-        default=0, ge=0, le=1,
-        description="When the ControlNet is first applied (% of total steps)")
+        default=0, ge=0, le=1, description="When the ControlNet is first applied (% of total steps)"
+    )
     end_step_percent: float = Field(
-        default=1, ge=0, le=1,
-        description="When the ControlNet is last applied (% of total steps)")
-    control_mode: CONTROLNET_MODE_VALUES = Field(
-        default="balanced", description="The control mode to use")
-    resize_mode: CONTROLNET_RESIZE_VALUES = Field(
-        default="just_resize", description="The resize mode to use")
+        default=1, ge=0, le=1, description="When the ControlNet is last applied (% of total steps)"
+    )
+    control_mode: CONTROLNET_MODE_VALUES = Field(default="balanced", description="The control mode to use")
+    resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode to use")
 
     @validator("control_weight")
     def validate_control_weight(cls, v):
@@ -120,11 +129,10 @@ class ControlField(BaseModel):
         if isinstance(v, list):
             for i in v:
                 if i < -1 or i > 2:
-                    raise ValueError(
-                        'Control weights must be within -1 to 2 range')
+                    raise ValueError("Control weights must be within -1 to 2 range")
         else:
             if v < -1 or v > 2:
-                raise ValueError('Control weights must be within -1 to 2 range')
+                raise ValueError("Control weights must be within -1 to 2 range")
         return v
 
     class Config:
@@ -136,12 +144,13 @@ class ControlField(BaseModel):
                     "control_model": "controlnet_model",
                     # "control_weight": "number",
                 }
-            }
+            },
         }
 
 
 class ControlOutput(BaseInvocationOutput):
     """node output for ControlNet info"""
+
     # fmt: off
     type: Literal["control_output"] = "control_output"
     control: ControlField = Field(default=None, description="The control info")
@@ -150,6 +159,7 @@ class ControlOutput(BaseInvocationOutput):
 
 class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
+
     # fmt: off
     type: Literal["controlnet"] = "controlnet"
     # Inputs
@@ -176,7 +186,7 @@ class ControlNetInvocation(BaseInvocation):
                     # "cfg_scale": "float",
                     "cfg_scale": "number",
                     "control_weight": "float",
-                }
+                },
             },
         }
 
@@ -205,10 +215,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Image Processor",
-                "tags": ["image", "processor"]
-            },
+            "ui": {"title": "Image Processor", "tags": ["image", "processor"]},
         }
 
     def run_processor(self, image):
@@ -233,7 +240,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
             image_category=ImageCategory.CONTROL,
             session_id=context.graph_execution_state_id,
             node_id=self.id,
-            is_intermediate=self.is_intermediate
+            is_intermediate=self.is_intermediate,
         )
 
         """Builds an ImageOutput and its ImageField"""
@@ -248,9 +255,9 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-class CannyImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class CannyImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Canny edge detection for ControlNet"""
+
     # fmt: off
     type: Literal["canny_image_processor"] = "canny_image_processor"
     # Input
@@ -260,22 +267,18 @@ class CannyImageProcessorInvocation(
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Canny Processor",
-                "tags": ["controlnet", "canny", "image", "processor"]
-            },
+            "ui": {"title": "Canny Processor", "tags": ["controlnet", "canny", "image", "processor"]},
         }
 
     def run_processor(self, image):
         canny_processor = CannyDetector()
-        processed_image = canny_processor(
-            image, self.low_threshold, self.high_threshold)
+        processed_image = canny_processor(image, self.low_threshold, self.high_threshold)
         return processed_image
 
 
-class HedImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class HedImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies HED edge detection to image"""
+
     # fmt: off
     type: Literal["hed_image_processor"] = "hed_image_processor"
     # Inputs
@@ -288,27 +291,25 @@ class HedImageProcessorInvocation(
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Softedge(HED) Processor",
-                "tags": ["controlnet", "softedge", "hed", "image", "processor"]
-            },
+            "ui": {"title": "Softedge(HED) Processor", "tags": ["controlnet", "softedge", "hed", "image", "processor"]},
         }
 
     def run_processor(self, image):
         hed_processor = HEDdetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = hed_processor(image,
-                                        detect_resolution=self.detect_resolution,
-                                        image_resolution=self.image_resolution,
-                                        # safe not supported in controlnet_aux v0.0.3
-                                        # safe=self.safe,
-                                        scribble=self.scribble,
-                                        )
+        processed_image = hed_processor(
+            image,
+            detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution,
+            # safe not supported in controlnet_aux v0.0.3
+            # safe=self.safe,
+            scribble=self.scribble,
+        )
         return processed_image
 
 
-class LineartImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class LineartImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies line art processing to image"""
+
     # fmt: off
     type: Literal["lineart_image_processor"] = "lineart_image_processor"
     # Inputs
@@ -319,24 +320,20 @@ class LineartImageProcessorInvocation(
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Lineart Processor",
-                "tags": ["controlnet", "lineart", "image", "processor"]
-            },
+            "ui": {"title": "Lineart Processor", "tags": ["controlnet", "lineart", "image", "processor"]},
         }
 
     def run_processor(self, image):
-        lineart_processor = LineartDetector.from_pretrained(
-            "lllyasviel/Annotators")
+        lineart_processor = LineartDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = lineart_processor(
-            image, detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution, coarse=self.coarse)
+            image, detect_resolution=self.detect_resolution, image_resolution=self.image_resolution, coarse=self.coarse
+        )
         return processed_image
 
 
-class LineartAnimeImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies line art anime processing to image"""
+
     # fmt: off
     type: Literal["lineart_anime_image_processor"] = "lineart_anime_image_processor"
     # Inputs
@@ -348,23 +345,23 @@ class LineartAnimeImageProcessorInvocation(
         schema_extra = {
             "ui": {
                 "title": "Lineart Anime Processor",
-                "tags": ["controlnet", "lineart", "anime", "image", "processor"]
+                "tags": ["controlnet", "lineart", "anime", "image", "processor"],
             },
         }
 
     def run_processor(self, image):
-        processor = LineartAnimeDetector.from_pretrained(
-            "lllyasviel/Annotators")
-        processed_image = processor(image,
-                                    detect_resolution=self.detect_resolution,
-                                    image_resolution=self.image_resolution,
-                                    )
+        processor = LineartAnimeDetector.from_pretrained("lllyasviel/Annotators")
+        processed_image = processor(
+            image,
+            detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution,
+        )
         return processed_image
 
 
-class OpenposeImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class OpenposeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies Openpose processing to image"""
+
     # fmt: off
     type: Literal["openpose_image_processor"] = "openpose_image_processor"
     # Inputs
@@ -375,25 +372,23 @@ class OpenposeImageProcessorInvocation(
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Openpose Processor",
-                "tags": ["controlnet", "openpose", "image", "processor"]
-            },
+            "ui": {"title": "Openpose Processor", "tags": ["controlnet", "openpose", "image", "processor"]},
         }
 
     def run_processor(self, image):
-        openpose_processor = OpenposeDetector.from_pretrained(
-            "lllyasviel/Annotators")
+        openpose_processor = OpenposeDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = openpose_processor(
-            image, detect_resolution=self.detect_resolution,
+            image,
+            detect_resolution=self.detect_resolution,
             image_resolution=self.image_resolution,
-            hand_and_face=self.hand_and_face,)
+            hand_and_face=self.hand_and_face,
+        )
         return processed_image
 
 
-class MidasDepthImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class MidasDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies Midas depth processing to image"""
+
     # fmt: off
     type: Literal["midas_depth_image_processor"] = "midas_depth_image_processor"
     # Inputs
@@ -405,26 +400,24 @@ class MidasDepthImageProcessorInvocation(
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Midas (Depth) Processor",
-                "tags": ["controlnet", "midas", "depth", "image", "processor"]
-            },
+            "ui": {"title": "Midas (Depth) Processor", "tags": ["controlnet", "midas", "depth", "image", "processor"]},
         }
 
     def run_processor(self, image):
         midas_processor = MidasDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = midas_processor(image,
-                                          a=np.pi * self.a_mult,
-                                          bg_th=self.bg_th,
-                                          # dept_and_normal not supported in controlnet_aux v0.0.3
-                                          # depth_and_normal=self.depth_and_normal,
-                                          )
+        processed_image = midas_processor(
+            image,
+            a=np.pi * self.a_mult,
+            bg_th=self.bg_th,
+            # dept_and_normal not supported in controlnet_aux v0.0.3
+            # depth_and_normal=self.depth_and_normal,
+        )
         return processed_image
 
 
-class NormalbaeImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class NormalbaeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies NormalBae processing to image"""
+
     # fmt: off
     type: Literal["normalbae_image_processor"] = "normalbae_image_processor"
     # Inputs
@@ -434,24 +427,20 @@ class NormalbaeImageProcessorInvocation(
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Normal BAE Processor",
-                "tags": ["controlnet", "normal", "bae", "image", "processor"]
-            },
+            "ui": {"title": "Normal BAE Processor", "tags": ["controlnet", "normal", "bae", "image", "processor"]},
         }
 
     def run_processor(self, image):
-        normalbae_processor = NormalBaeDetector.from_pretrained(
-            "lllyasviel/Annotators")
+        normalbae_processor = NormalBaeDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = normalbae_processor(
-            image, detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution)
+            image, detect_resolution=self.detect_resolution, image_resolution=self.image_resolution
+        )
         return processed_image
 
 
-class MlsdImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class MlsdImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies MLSD processing to image"""
+
     # fmt: off
     type: Literal["mlsd_image_processor"] = "mlsd_image_processor"
     # Inputs
@@ -463,24 +452,24 @@ class MlsdImageProcessorInvocation(
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "MLSD Processor",
-                "tags": ["controlnet", "mlsd", "image", "processor"]
-            },
+            "ui": {"title": "MLSD Processor", "tags": ["controlnet", "mlsd", "image", "processor"]},
         }
 
     def run_processor(self, image):
         mlsd_processor = MLSDdetector.from_pretrained("lllyasviel/Annotators")
         processed_image = mlsd_processor(
-            image, detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution, thr_v=self.thr_v,
-            thr_d=self.thr_d)
+            image,
+            detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution,
+            thr_v=self.thr_v,
+            thr_d=self.thr_d,
+        )
         return processed_image
 
 
-class PidiImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class PidiImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies PIDI processing to image"""
+
     # fmt: off
     type: Literal["pidi_image_processor"] = "pidi_image_processor"
     # Inputs
@@ -492,25 +481,24 @@ class PidiImageProcessorInvocation(
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "PIDI Processor",
-                "tags": ["controlnet", "pidi", "image", "processor"]
-            },
+            "ui": {"title": "PIDI Processor", "tags": ["controlnet", "pidi", "image", "processor"]},
         }
 
     def run_processor(self, image):
-        pidi_processor = PidiNetDetector.from_pretrained(
-            "lllyasviel/Annotators")
+        pidi_processor = PidiNetDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = pidi_processor(
-            image, detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution, safe=self.safe,
-            scribble=self.scribble)
+            image,
+            detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution,
+            safe=self.safe,
+            scribble=self.scribble,
+        )
         return processed_image
 
 
-class ContentShuffleImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies content shuffle processing to image"""
+
     # fmt: off
     type: Literal["content_shuffle_image_processor"] = "content_shuffle_image_processor"
     # Inputs
@@ -525,48 +513,45 @@ class ContentShuffleImageProcessorInvocation(
         schema_extra = {
             "ui": {
                 "title": "Content Shuffle Processor",
-                "tags": ["controlnet", "contentshuffle", "image", "processor"]
+                "tags": ["controlnet", "contentshuffle", "image", "processor"],
             },
         }
 
     def run_processor(self, image):
         content_shuffle_processor = ContentShuffleDetector()
-        processed_image = content_shuffle_processor(image,
-                                                    detect_resolution=self.detect_resolution,
-                                                    image_resolution=self.image_resolution,
-                                                    h=self.h,
-                                                    w=self.w,
-                                                    f=self.f
-                                                    )
+        processed_image = content_shuffle_processor(
+            image,
+            detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution,
+            h=self.h,
+            w=self.w,
+            f=self.f,
+        )
         return processed_image
 
 
 # should work with controlnet_aux >= 0.0.4 and timm <= 0.6.13
-class ZoeDepthImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies Zoe depth processing to image"""
+
     # fmt: off
     type: Literal["zoe_depth_image_processor"] = "zoe_depth_image_processor"
     # fmt: on
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Zoe (Depth) Processor",
-                "tags": ["controlnet", "zoe", "depth", "image", "processor"]
-            },
+            "ui": {"title": "Zoe (Depth) Processor", "tags": ["controlnet", "zoe", "depth", "image", "processor"]},
         }
 
     def run_processor(self, image):
-        zoe_depth_processor = ZoeDetector.from_pretrained(
-            "lllyasviel/Annotators")
+        zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = zoe_depth_processor(image)
         return processed_image
 
 
-class MediapipeFaceProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies mediapipe face processing to image"""
+
     # fmt: off
     type: Literal["mediapipe_face_processor"] = "mediapipe_face_processor"
     # Inputs
@@ -576,26 +561,22 @@ class MediapipeFaceProcessorInvocation(
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Mediapipe Processor",
-                "tags": ["controlnet", "mediapipe", "image", "processor"]
-            },
+            "ui": {"title": "Mediapipe Processor", "tags": ["controlnet", "mediapipe", "image", "processor"]},
         }
 
     def run_processor(self, image):
         # MediaPipeFaceDetector throws an error if image has alpha channel
         #     so convert to RGB if needed
-        if image.mode == 'RGBA':
-            image = image.convert('RGB')
+        if image.mode == "RGBA":
+            image = image.convert("RGB")
         mediapipe_face_processor = MediapipeFaceDetector()
-        processed_image = mediapipe_face_processor(
-            image, max_faces=self.max_faces, min_confidence=self.min_confidence)
+        processed_image = mediapipe_face_processor(image, max_faces=self.max_faces, min_confidence=self.min_confidence)
         return processed_image
 
 
-class LeresImageProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class LeresImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies leres processing to image"""
+
     # fmt: off
     type: Literal["leres_image_processor"] = "leres_image_processor"
     # Inputs
@@ -608,24 +589,23 @@ class LeresImageProcessorInvocation(
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Leres (Depth) Processor",
-                "tags": ["controlnet", "leres", "depth", "image", "processor"]
-            },
+            "ui": {"title": "Leres (Depth) Processor", "tags": ["controlnet", "leres", "depth", "image", "processor"]},
         }
 
     def run_processor(self, image):
         leres_processor = LeresDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = leres_processor(
-            image, thr_a=self.thr_a, thr_b=self.thr_b, boost=self.boost,
+            image,
+            thr_a=self.thr_a,
+            thr_b=self.thr_b,
+            boost=self.boost,
             detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution)
+            image_resolution=self.image_resolution,
+        )
         return processed_image
 
 
-class TileResamplerProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
-
+class TileResamplerProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     # fmt: off
     type: Literal["tile_image_processor"] = "tile_image_processor"
     # Inputs
@@ -637,16 +617,17 @@ class TileResamplerProcessorInvocation(
         schema_extra = {
             "ui": {
                 "title": "Tile Resample Processor",
-                "tags": ["controlnet", "tile", "resample", "image", "processor"]
+                "tags": ["controlnet", "tile", "resample", "image", "processor"],
             },
         }
 
     # tile_resample copied from sd-webui-controlnet/scripts/processor.py
-    def tile_resample(self,
-                      np_img: np.ndarray,
-                      res=512,   # never used?
-                      down_sampling_rate=1.0,
-                      ):
+    def tile_resample(
+        self,
+        np_img: np.ndarray,
+        res=512,  # never used?
+        down_sampling_rate=1.0,
+    ):
         np_img = HWC3(np_img)
         if down_sampling_rate < 1.1:
             return np_img
@@ -658,36 +639,41 @@ class TileResamplerProcessorInvocation(
 
     def run_processor(self, img):
         np_img = np.array(img, dtype=np.uint8)
-        processed_np_image = self.tile_resample(np_img,
-                                                # res=self.tile_size,
-                                                down_sampling_rate=self.down_sampling_rate
-                                                )
+        processed_np_image = self.tile_resample(
+            np_img,
+            # res=self.tile_size,
+            down_sampling_rate=self.down_sampling_rate,
+        )
         processed_image = Image.fromarray(processed_np_image)
         return processed_image
 
 
-class SegmentAnythingProcessorInvocation(
-        ImageProcessorInvocation, PILInvocationConfig):
+class SegmentAnythingProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig):
     """Applies segment anything processing to image"""
+
     # fmt: off
     type: Literal["segment_anything_processor"] = "segment_anything_processor"
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {"ui": {"title": "Segment Anything Processor", "tags": [
-            "controlnet", "segment", "anything", "sam", "image", "processor"]}, }
+        schema_extra = {
+            "ui": {
+                "title": "Segment Anything Processor",
+                "tags": ["controlnet", "segment", "anything", "sam", "image", "processor"],
+            },
+        }
 
     def run_processor(self, image):
         # segment_anything_processor = SamDetector.from_pretrained("ybelkada/segment-anything", subfolder="checkpoints")
         segment_anything_processor = SamDetectorReproducibleColors.from_pretrained(
-            "ybelkada/segment-anything", subfolder="checkpoints")
+            "ybelkada/segment-anything", subfolder="checkpoints"
+        )
         np_img = np.array(image, dtype=np.uint8)
         processed_image = segment_anything_processor(np_img)
         return processed_image
 
 
 class SamDetectorReproducibleColors(SamDetector):
-
     # overriding SamDetector.show_anns() method to use reproducible colors for segmentation image
     #     base class show_anns() method randomizes colors,
     #     which seems to also lead to non-reproducible image generation
@@ -695,19 +681,15 @@ class SamDetectorReproducibleColors(SamDetector):
     def show_anns(self, anns: List[Dict]):
         if len(anns) == 0:
             return
-        sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
-        h, w = anns[0]['segmentation'].shape
-        final_img = Image.fromarray(
-            np.zeros((h, w, 3), dtype=np.uint8), mode="RGB")
+        sorted_anns = sorted(anns, key=(lambda x: x["area"]), reverse=True)
+        h, w = anns[0]["segmentation"].shape
+        final_img = Image.fromarray(np.zeros((h, w, 3), dtype=np.uint8), mode="RGB")
         palette = ade_palette()
         for i, ann in enumerate(sorted_anns):
-            m = ann['segmentation']
+            m = ann["segmentation"]
             img = np.empty((m.shape[0], m.shape[1], 3), dtype=np.uint8)
             # doing modulo just in case number of annotated regions exceeds number of colors in palette
             ann_color = palette[i % len(palette)]
             img[:, :] = ann_color
-            final_img.paste(
-                Image.fromarray(img, mode="RGB"),
-                (0, 0),
-                Image.fromarray(np.uint8(m * 255)))
+            final_img.paste(Image.fromarray(img, mode="RGB"), (0, 0), Image.fromarray(np.uint8(m * 255)))
         return np.array(final_img, dtype=np.uint8)

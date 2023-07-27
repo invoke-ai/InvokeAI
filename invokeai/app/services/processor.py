@@ -8,6 +8,8 @@ from .invoker import InvocationProcessorABC, Invoker
 from ..models.exceptions import CanceledException
 
 import invokeai.backend.util.logging as logger
+
+
 class DefaultInvocationProcessor(InvocationProcessorABC):
     __invoker_thread: Thread
     __stop_event: Event
@@ -24,9 +26,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
             target=self.__process,
             kwargs=dict(stop_event=self.__stop_event),
         )
-        self.__invoker_thread.daemon = (
-            True  # TODO: make async and do not use threads
-        )
+        self.__invoker_thread.daemon = True  # TODO: make async and do not use threads
         self.__invoker_thread.start()
 
     def stop(self, *args, **kwargs) -> None:
@@ -47,10 +47,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     continue
 
                 try:
-                    graph_execution_state = (
-                        self.__invoker.services.graph_execution_manager.get(
-                            queue_item.graph_execution_state_id
-                        )
+                    graph_execution_state = self.__invoker.services.graph_execution_manager.get(
+                        queue_item.graph_execution_state_id
                     )
                 except Exception as e:
                     self.__invoker.services.logger.error("Exception while retrieving session:\n%s" % e)
@@ -60,11 +58,9 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         error=traceback.format_exc(),
                     )
                     continue
-                
+
                 try:
-                    invocation = graph_execution_state.execution_graph.get_node(
-                        queue_item.invocation_id
-                    )
+                    invocation = graph_execution_state.execution_graph.get_node(queue_item.invocation_id)
                 except Exception as e:
                     self.__invoker.services.logger.error("Exception while retrieving invocation:\n%s" % e)
                     self.__invoker.services.events.emit_invocation_retrieval_error(
@@ -82,7 +78,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 self.__invoker.services.events.emit_invocation_started(
                     graph_execution_state_id=graph_execution_state.id,
                     node=invocation.dict(),
-                    source_node_id=source_node_id
+                    source_node_id=source_node_id,
                 )
 
                 # Invoke
@@ -95,18 +91,14 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     )
 
                     # Check queue to see if this is canceled, and skip if so
-                    if self.__invoker.services.queue.is_canceled(
-                        graph_execution_state.id
-                    ):
+                    if self.__invoker.services.queue.is_canceled(graph_execution_state.id):
                         continue
 
                     # Save outputs and history
                     graph_execution_state.complete(invocation.id, outputs)
 
                     # Save the state changes
-                    self.__invoker.services.graph_execution_manager.set(
-                        graph_execution_state
-                    )
+                    self.__invoker.services.graph_execution_manager.set(graph_execution_state)
 
                     # Send complete event
                     self.__invoker.services.events.emit_invocation_complete(
@@ -130,9 +122,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     graph_execution_state.set_node_error(invocation.id, error)
 
                     # Save the state changes
-                    self.__invoker.services.graph_execution_manager.set(
-                        graph_execution_state
-                    )
+                    self.__invoker.services.graph_execution_manager.set(graph_execution_state)
 
                     self.__invoker.services.logger.error("Error while invoking:\n%s" % e)
                     # Send error event
@@ -147,9 +137,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     pass
 
                 # Check queue to see if this is canceled, and skip if so
-                if self.__invoker.services.queue.is_canceled(
-                    graph_execution_state.id
-                ):
+                if self.__invoker.services.queue.is_canceled(graph_execution_state.id):
                     continue
 
                 # Queue any further commands if invoking all
@@ -164,12 +152,10 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             node=invocation.dict(),
                             source_node_id=source_node_id,
                             error_type=e.__class__.__name__,
-                            error=traceback.format_exc()
+                            error=traceback.format_exc(),
                         )
                 elif is_complete:
-                    self.__invoker.services.events.emit_graph_execution_complete(
-                        graph_execution_state.id
-                    )
+                    self.__invoker.services.events.emit_graph_execution_complete(graph_execution_state.id)
 
         except KeyboardInterrupt:
             pass  # Log something? KeyboardInterrupt is probably not going to be seen by the processor

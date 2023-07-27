@@ -41,7 +41,7 @@ if __name__ == "__main__":
         type=Path,
         default=None,
     )
-    
+
     args = parser.parse_args()
 
     inst = Installer()

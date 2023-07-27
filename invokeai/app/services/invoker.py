@@ -7,6 +7,7 @@ from .graph import Graph, GraphExecutionState
 from .invocation_queue import InvocationQueueItem
 from .invocation_services import InvocationServices
 
+
 class Invoker:
     """The invoker, used to execute invocations"""
 
@@ -16,9 +17,7 @@ class Invoker:
         self.services = services
         self._start()
 
-    def invoke(
-        self, graph_execution_state: GraphExecutionState, invoke_all: bool = False
-    ) -> Optional[str]:
+    def invoke(self, graph_execution_state: GraphExecutionState, invoke_all: bool = False) -> Optional[str]:
         """Determines the next node to invoke and enqueues it, preparing if needed.
         Returns the id of the queued node, or `None` if there are no nodes left to enqueue."""
 
