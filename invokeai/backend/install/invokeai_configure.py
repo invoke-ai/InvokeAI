@@ -13,8 +13,8 @@ import os
 import shutil
 import textwrap
 import traceback
-import warnings
 import yaml
+import warnings
 from argparse import Namespace
 from pathlib import Path
 from shutil import get_terminal_size
@@ -57,7 +57,6 @@ from invokeai.frontend.install.widgets import (
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
     hf_download_from_pretrained,
-    hf_download_with_resume,
     InstallSelections,
     ModelInstall,
 )
@@ -584,7 +583,18 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
     path = dest / 'core'
     path.mkdir(parents=True, exist_ok=True)
 
-    with open(root / 'configs' / 'models.yaml','w') as yaml_file:
+    maybe_create_models_yaml(root)
+
+def maybe_create_models_yaml(root: Path):
+    models_yaml = root / 'configs' / 'models.yaml'
+    if models_yaml.exists():
+        if OmegaConf.load(models_yaml).get('__metadata__'):  # up to date
+            return
+        else:
+            logger.info('Creating new models.yaml, original saved as models.yaml.orig')
+            models_yaml.rename(models_yaml.parent / 'models.yaml.orig')
+    
+    with open(models_yaml,'w') as yaml_file:
         yaml_file.write(yaml.dump({'__metadata__':
                                    {'version':'3.0.0'}
                                    }
