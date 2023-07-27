@@ -223,11 +223,15 @@ def invoke_api():
     )
     server = uvicorn.Server(config)
 
+    all_loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+
     # replace uvicorn's logger with InvokeAI's for consistent appearance
-    logging.getLogger("uvicorn").handlers.clear()
-    for ch in logger.handlers:
-        logging.getLogger("uvicorn").addHandler(ch)
-        
+    for logname in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
+        l = logging.getLogger(logname)
+        l.handlers.clear()
+        for ch in logger.handlers:
+            l.addHandler(ch)
+    
     loop.run_until_complete(server.serve())
 
 if __name__ == "__main__":
