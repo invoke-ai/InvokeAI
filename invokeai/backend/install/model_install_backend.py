@@ -154,7 +154,7 @@ class ModelInstall(object):
         models = set()
         for key, value in self.datasets.items():
             name,base,model_type = ModelManager.parse_key(key)
-            if all_models or model_type==ModelType.Main:
+            if all_models or model_type in [ModelType.Main, ModelType.Vae]:
                 models.add(key)
         return models
 
