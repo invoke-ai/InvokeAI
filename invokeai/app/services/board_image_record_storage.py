@@ -207,9 +207,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             raise e
         finally:
             self._lock.release()
-        return OffsetPaginatedResults(
-            items=images, offset=offset, limit=limit, total=count
-        )
+        return OffsetPaginatedResults(items=images, offset=offset, limit=limit, total=count)
 
     def get_all_board_image_names_for_board(self, board_id: str) -> list[str]:
         try:

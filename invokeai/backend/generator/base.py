@@ -33,61 +33,66 @@ from ..stable_diffusion.schedulers import SCHEDULER_MAP
 
 downsampling = 8
 
+
 @dataclass
 class InvokeAIGeneratorBasicParams:
-    seed: Optional[int]=None
-    width: int=512
-    height: int=512
-    cfg_scale: float=7.5
-    steps: int=20
-    ddim_eta: float=0.0
-    scheduler: str='ddim'
-    precision: str='float16'
-    perlin: float=0.0
-    threshold: float=0.0
-    seamless: bool=False
-    seamless_axes: List[str]=field(default_factory=lambda: ['x', 'y'])
-    h_symmetry_time_pct: Optional[float]=None
-    v_symmetry_time_pct: Optional[float]=None
+    seed: Optional[int] = None
+    width: int = 512
+    height: int = 512
+    cfg_scale: float = 7.5
+    steps: int = 20
+    ddim_eta: float = 0.0
+    scheduler: str = "ddim"
+    precision: str = "float16"
+    perlin: float = 0.0
+    threshold: float = 0.0
+    seamless: bool = False
+    seamless_axes: List[str] = field(default_factory=lambda: ["x", "y"])
+    h_symmetry_time_pct: Optional[float] = None
+    v_symmetry_time_pct: Optional[float] = None
     variation_amount: float = 0.0
-    with_variations: list=field(default_factory=list)
+    with_variations: list = field(default_factory=list)
+
 
 @dataclass
 class InvokeAIGeneratorOutput:
-    '''
+    """
     InvokeAIGeneratorOutput is a dataclass that contains the outputs of a generation
     operation, including the image, its seed, the model name used to generate the image
     and the model hash, as well as all the generate() parameters that went into
     generating the image (in .params, also available as attributes)
-    '''
+    """
+
     image: Image.Image
     seed: int
     model_hash: str
     attention_maps_images: List[Image.Image]
     params: Namespace
 
+
 # we are interposing a wrapper around the original Generator classes so that
 # old code that calls Generate will continue to work.
 class InvokeAIGenerator(metaclass=ABCMeta):
-    def __init__(self,
-                 model_info: dict,
-                 params: InvokeAIGeneratorBasicParams=InvokeAIGeneratorBasicParams(),
-                 **kwargs,
-                 ):
-        self.model_info=model_info
-        self.params=params
+    def __init__(
+        self,
+        model_info: dict,
+        params: InvokeAIGeneratorBasicParams = InvokeAIGeneratorBasicParams(),
+        **kwargs,
+    ):
+        self.model_info = model_info
+        self.params = params
         self.kwargs = kwargs
 
     def generate(
         self,
         conditioning: tuple,
         scheduler,
-        callback: Optional[Callable]=None,
-        step_callback: Optional[Callable]=None,
-        iterations: int=1,
+        callback: Optional[Callable] = None,
+        step_callback: Optional[Callable] = None,
+        iterations: int = 1,
         **keyword_args,
-    )->Iterator[InvokeAIGeneratorOutput]:
-        '''
+    ) -> Iterator[InvokeAIGeneratorOutput]:
+        """
         Return an iterator across the indicated number of generations.
         Each time the iterator is called it will return an InvokeAIGeneratorOutput
         object. Use like this:
@@ -107,7 +112,7 @@ class InvokeAIGenerator(metaclass=ABCMeta):
            for o in outputs:
                print(o.image, o.seed)
 
-        '''
+        """
         generator_args = dataclasses.asdict(self.params)
         generator_args.update(keyword_args)
 
@@ -118,22 +123,21 @@ class InvokeAIGenerator(metaclass=ABCMeta):
             gen_class = self._generator_class()
             generator = gen_class(model, self.params.precision, **self.kwargs)
             if self.params.variation_amount > 0:
-                generator.set_variation(generator_args.get('seed'),
-                                        generator_args.get('variation_amount'),
-                                        generator_args.get('with_variations')
-                                        )
+                generator.set_variation(
+                    generator_args.get("seed"),
+                    generator_args.get("variation_amount"),
+                    generator_args.get("with_variations"),
+                )
 
             if isinstance(model, DiffusionPipeline):
                 for component in [model.unet, model.vae]:
-                    configure_model_padding(component,
-                                            generator_args.get('seamless',False),
-                                            generator_args.get('seamless_axes')
-                                            )
+                    configure_model_padding(
+                        component, generator_args.get("seamless", False), generator_args.get("seamless_axes")
+                    )
             else:
-                configure_model_padding(model,
-                                        generator_args.get('seamless',False),
-                                        generator_args.get('seamless_axes')
-                                        )
+                configure_model_padding(
+                    model, generator_args.get("seamless", False), generator_args.get("seamless_axes")
+                )
 
             iteration_count = range(iterations) if iterations else itertools.count(start=0, step=1)
             for i in iteration_count:
@@ -147,66 +151,66 @@ class InvokeAIGenerator(metaclass=ABCMeta):
                     image=results[0][0],
                     seed=results[0][1],
                     attention_maps_images=results[0][2],
-                    model_hash = model_hash,
-                    params=Namespace(model_name=model_name,**generator_args),
+                    model_hash=model_hash,
+                    params=Namespace(model_name=model_name, **generator_args),
                 )
                 if callback:
                     callback(output)
             yield output
 
     @classmethod
-    def schedulers(self)->List[str]:
-        '''
+    def schedulers(self) -> List[str]:
+        """
         Return list of all the schedulers that we currently handle.
-        '''
+        """
         return list(SCHEDULER_MAP.keys())
 
     def load_generator(self, model: StableDiffusionGeneratorPipeline, generator_class: Type[Generator]):
         return generator_class(model, self.params.precision)
 
     @classmethod
-    def _generator_class(cls)->Type[Generator]:
-        '''
+    def _generator_class(cls) -> Type[Generator]:
+        """
         In derived classes return the name of the generator to apply.
         If you don't override will return the name of the derived
         class, which nicely parallels the generator class names.
-        '''
+        """
         return Generator
+
 
 # ------------------------------------
 class Img2Img(InvokeAIGenerator):
-    def generate(self,
-               init_image: Union[Image.Image, torch.FloatTensor],
-               strength: float=0.75,
-               **keyword_args
-               )->Iterator[InvokeAIGeneratorOutput]:
-        return super().generate(init_image=init_image,
-                                strength=strength,
-                                **keyword_args
-                                )
+    def generate(
+        self, init_image: Union[Image.Image, torch.FloatTensor], strength: float = 0.75, **keyword_args
+    ) -> Iterator[InvokeAIGeneratorOutput]:
+        return super().generate(init_image=init_image, strength=strength, **keyword_args)
+
     @classmethod
     def _generator_class(cls):
         from .img2img import Img2Img
+
         return Img2Img
+
 
 # ------------------------------------
 # Takes all the arguments of Img2Img and adds the mask image and the seam/infill stuff
 class Inpaint(Img2Img):
-    def generate(self,
-                 mask_image: Union[Image.Image, torch.FloatTensor],
-                 # Seam settings - when 0, doesn't fill seam
-                 seam_size: int = 96,
-                 seam_blur: int = 16,
-                 seam_strength: float = 0.7,
-                 seam_steps: int = 30,
-                 tile_size: int = 32,
-                 inpaint_replace=False,
-                 infill_method=None,
-                 inpaint_width=None,
-                 inpaint_height=None,
-                 inpaint_fill: tuple(int) = (0x7F, 0x7F, 0x7F, 0xFF),
-                 **keyword_args
-                 )->Iterator[InvokeAIGeneratorOutput]:
+    def generate(
+        self,
+        mask_image: Union[Image.Image, torch.FloatTensor],
+        # Seam settings - when 0, doesn't fill seam
+        seam_size: int = 96,
+        seam_blur: int = 16,
+        seam_strength: float = 0.7,
+        seam_steps: int = 30,
+        tile_size: int = 32,
+        inpaint_replace=False,
+        infill_method=None,
+        inpaint_width=None,
+        inpaint_height=None,
+        inpaint_fill: tuple(int) = (0x7F, 0x7F, 0x7F, 0xFF),
+        **keyword_args,
+    ) -> Iterator[InvokeAIGeneratorOutput]:
         return super().generate(
             mask_image=mask_image,
             seam_size=seam_size,
@@ -219,12 +223,15 @@ class Inpaint(Img2Img):
             inpaint_width=inpaint_width,
             inpaint_height=inpaint_height,
             inpaint_fill=inpaint_fill,
-            **keyword_args
+            **keyword_args,
         )
+
     @classmethod
     def _generator_class(cls):
         from .inpaint import Inpaint
+
         return Inpaint
+
 
 class Generator:
     downsampling_factor: int
@@ -251,9 +258,7 @@ class Generator:
         Returns a function returning an image derived from the prompt and the initial image
         Return value depends on the seed at the time you call it
         """
-        raise NotImplementedError(
-            "image_iterator() must be implemented in a descendent class"
-        )
+        raise NotImplementedError("image_iterator() must be implemented in a descendent class")
 
     def set_variation(self, seed, variation_amount, with_variations):
         self.seed = seed
@@ -280,9 +285,7 @@ class Generator:
         scope = nullcontext
         self.free_gpu_mem = free_gpu_mem
         attention_maps_images = []
-        attention_maps_callback = lambda saver: attention_maps_images.append(
-            saver.get_stacked_maps_image()
-        )
+        attention_maps_callback = lambda saver: attention_maps_images.append(saver.get_stacked_maps_image())
         make_image = self.get_make_image(
             sampler=sampler,
             init_image=init_image,
@@ -327,11 +330,7 @@ class Generator:
                 results.append([image, seed, attention_maps_images])
 
                 if image_callback is not None:
-                    attention_maps_image = (
-                        None
-                        if len(attention_maps_images) == 0
-                        else attention_maps_images[-1]
-                    )
+                    attention_maps_image = None if len(attention_maps_images) == 0 else attention_maps_images[-1]
                     image_callback(
                         image,
                         seed,
@@ -342,9 +341,7 @@ class Generator:
                 seed = self.new_seed()
 
                 # Free up memory from the last generation.
-                clear_cuda_cache = (
-                    kwargs["clear_cuda_cache"] if "clear_cuda_cache" in kwargs else None
-                )
+                clear_cuda_cache = kwargs["clear_cuda_cache"] if "clear_cuda_cache" in kwargs else None
                 if clear_cuda_cache is not None:
                     clear_cuda_cache()
 
@@ -371,14 +368,8 @@ class Generator:
 
         # Get the original alpha channel of the mask if there is one.
         # Otherwise it is some other black/white image format ('1', 'L' or 'RGB')
-        pil_init_mask = (
-            init_mask.getchannel("A")
-            if init_mask.mode == "RGBA"
-            else init_mask.convert("L")
-        )
-        pil_init_image = init_image.convert(
-            "RGBA"
-        )  # Add an alpha channel if one doesn't exist
+        pil_init_mask = init_mask.getchannel("A") if init_mask.mode == "RGBA" else init_mask.convert("L")
+        pil_init_image = init_image.convert("RGBA")  # Add an alpha channel if one doesn't exist
 
         # Build an image with only visible pixels from source to use as reference for color-matching.
         init_rgb_pixels = np.asarray(init_image.convert("RGB"), dtype=np.uint8)
@@ -404,10 +395,7 @@ class Generator:
             np_matched_result[:, :, :] = (
                 (
                     (
-                        (
-                            np_matched_result[:, :, :].astype(np.float32)
-                            - gen_means[None, None, :]
-                        )
+                        (np_matched_result[:, :, :].astype(np.float32) - gen_means[None, None, :])
                         / gen_std[None, None, :]
                     )
                     * init_std[None, None, :]
@@ -433,9 +421,7 @@ class Generator:
         else:
             blurred_init_mask = pil_init_mask
 
-        multiplied_blurred_init_mask = ImageChops.multiply(
-            blurred_init_mask, self.pil_image.split()[-1]
-        )
+        multiplied_blurred_init_mask = ImageChops.multiply(blurred_init_mask, self.pil_image.split()[-1])
 
         # Paste original on color-corrected generation (using blurred mask)
         matched_result.paste(init_image, (0, 0), mask=multiplied_blurred_init_mask)
@@ -461,10 +447,7 @@ class Generator:
 
         latent_image = samples[0].permute(1, 2, 0) @ v1_5_latent_rgb_factors
         latents_ubyte = (
-            ((latent_image + 1) / 2)
-            .clamp(0, 1)  # change scale from -1..1 to 0..1
-            .mul(0xFF)  # to 0..255
-            .byte()
+            ((latent_image + 1) / 2).clamp(0, 1).mul(0xFF).byte()  # change scale from -1..1 to 0..1  # to 0..255
         ).cpu()
 
         return Image.fromarray(latents_ubyte.numpy())
@@ -494,9 +477,7 @@ class Generator:
         temp_height = int((height + 7) / 8) * 8
         noise = torch.stack(
             [
-                rand_perlin_2d(
-                    (temp_height, temp_width), (8, 8), device=self.model.device
-                ).to(fixdevice)
+                rand_perlin_2d((temp_height, temp_width), (8, 8), device=self.model.device).to(fixdevice)
                 for _ in range(input_channels)
             ],
             dim=0,
@@ -573,8 +554,6 @@ class Generator:
             device=device,
         )
         if self.perlin > 0.0:
-            perlin_noise = self.get_perlin_noise(
-                width // self.downsampling_factor, height // self.downsampling_factor
-            )
+            perlin_noise = self.get_perlin_noise(width // self.downsampling_factor, height // self.downsampling_factor)
             x = (1 - self.perlin) * x + self.perlin * perlin_noise
         return x

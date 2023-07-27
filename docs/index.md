@@ -148,7 +148,7 @@ images in full-precision mode:
 - [Model Merging](features/MODEL_MERGING.md)
 - [ControlNet Models](features/CONTROLNET.md)
 - [Style/Subject Concepts and Embeddings](features/CONCEPTS.md)
-- [Not Safe for Work (NSFW) Checker](features/NSFW.md)
+- [Watermarking and the Not Safe for Work (NSFW) Checker](features/WATERMARK+NSFW.md)
 <!-- seperator -->
 ### Prompt Engineering
 - [Prompt Syntax](features/PROMPTS.md)

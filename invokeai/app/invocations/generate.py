@@ -6,8 +6,7 @@ from typing import Literal, Optional, get_args
 import torch
 from pydantic import Field
 
-from invokeai.app.models.image import (ColorField, ImageCategory, ImageField,
-                                       ResourceOrigin)
+from invokeai.app.models.image import ColorField, ImageCategory, ImageField, ResourceOrigin
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.generator.inpaint import infill_methods
 
@@ -25,12 +24,11 @@ from contextlib import contextmanager, ExitStack, ContextDecorator
 
 SAMPLER_NAME_VALUES = Literal[tuple(InvokeAIGenerator.schedulers())]
 INFILL_METHODS = Literal[tuple(infill_methods())]
-DEFAULT_INFILL_METHOD = (
-    "patchmatch" if "patchmatch" in get_args(INFILL_METHODS) else "tile"
-)
+DEFAULT_INFILL_METHOD = "patchmatch" if "patchmatch" in get_args(INFILL_METHODS) else "tile"
 
 
 from .latent import get_scheduler
+
 
 class OldModelContext(ContextDecorator):
     model: StableDiffusionGeneratorPipeline
@@ -43,6 +41,7 @@ class OldModelContext(ContextDecorator):
 
     def __exit__(self, *exc):
         return False
+
 
 class OldModelInfo:
     name: str
@@ -64,20 +63,34 @@ class InpaintInvocation(BaseInvocation):
 
     positive_conditioning: Optional[ConditioningField] = Field(description="Positive conditioning for generation")
     negative_conditioning: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
-    seed:        int = Field(ge=0, le=SEED_MAX, description="The seed to use (omit for random)", default_factory=get_random_seed)
-    steps:       int = Field(default=30, gt=0, description="The number of steps to use to generate the image")
-    width:       int = Field(default=512, multiple_of=8, gt=0, description="The width of the resulting image", )
-    height:      int = Field(default=512, multiple_of=8, gt=0, description="The height of the resulting image", )
-    cfg_scale: float = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
+    seed: int = Field(
+        ge=0, le=SEED_MAX, description="The seed to use (omit for random)", default_factory=get_random_seed
+    )
+    steps: int = Field(default=30, gt=0, description="The number of steps to use to generate the image")
+    width: int = Field(
+        default=512,
+        multiple_of=8,
+        gt=0,
+        description="The width of the resulting image",
+    )
+    height: int = Field(
+        default=512,
+        multiple_of=8,
+        gt=0,
+        description="The height of the resulting image",
+    )
+    cfg_scale: float = Field(
+        default=7.5,
+        ge=1,
+        description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt",
+    )
+    scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use")
     unet: UNetField = Field(default=None, description="UNet model")
     vae: VaeField = Field(default=None, description="Vae model")
 
     # Inputs
     image: Optional[ImageField] = Field(description="The input image")
-    strength: float = Field(
-        default=0.75, gt=0, le=1, description="The strength of the original image"
-    )
+    strength: float = Field(default=0.75, gt=0, le=1, description="The strength of the original image")
     fit: bool = Field(
         default=True,
         description="Whether or not the result should be fit to the aspect ratio of the input image",
@@ -86,18 +99,10 @@ class InpaintInvocation(BaseInvocation):
     # Inputs
     mask: Optional[ImageField] = Field(description="The mask")
     seam_size: int = Field(default=96, ge=1, description="The seam inpaint size (px)")
-    seam_blur: int = Field(
-        default=16, ge=0, description="The seam inpaint blur radius (px)"
-    )
-    seam_strength: float = Field(
-        default=0.75, gt=0, le=1, description="The seam inpaint strength"
-    )
-    seam_steps: int = Field(
-        default=30, ge=1, description="The number of steps to use for seam inpaint"
-    )
-    tile_size: int = Field(
-        default=32, ge=1, description="The tile infill method size (px)"
-    )
+    seam_blur: int = Field(default=16, ge=0, description="The seam inpaint blur radius (px)")
+    seam_strength: float = Field(default=0.75, gt=0, le=1, description="The seam inpaint strength")
+    seam_steps: int = Field(default=30, ge=1, description="The number of steps to use for seam inpaint")
+    tile_size: int = Field(default=32, ge=1, description="The tile infill method size (px)")
     infill_method: INFILL_METHODS = Field(
         default=DEFAULT_INFILL_METHOD,
         description="The method used to infill empty regions (px)",
@@ -128,10 +133,7 @@ class InpaintInvocation(BaseInvocation):
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "tags": ["stable-diffusion", "image"],
-                "title": "Inpaint"
-            },
+            "ui": {"tags": ["stable-diffusion", "image"], "title": "Inpaint"},
         }
 
     def dispatch_progress(
@@ -162,18 +164,23 @@ class InpaintInvocation(BaseInvocation):
         def _lora_loader():
             for lora in self.unet.loras:
                 lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"}), context=context,)
+                    **lora.dict(exclude={"weight"}),
+                    context=context,
+                )
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
-        
-        unet_info = context.services.model_manager.get_model(**self.unet.unet.dict(), context=context,)
-        vae_info = context.services.model_manager.get_model(**self.vae.vae.dict(), context=context,)
 
-        with vae_info as vae,\
-                ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),\
-                unet_info as unet:
+        unet_info = context.services.model_manager.get_model(
+            **self.unet.unet.dict(),
+            context=context,
+        )
+        vae_info = context.services.model_manager.get_model(
+            **self.vae.vae.dict(),
+            context=context,
+        )
 
+        with vae_info as vae, ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()), unet_info as unet:
             device = context.services.model_manager.mgr.cache.execution_device
             dtype = context.services.model_manager.mgr.cache.precision
 
@@ -197,21 +204,11 @@ class InpaintInvocation(BaseInvocation):
             )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = (
-            None
-            if self.image is None
-            else context.services.images.get_pil_image(self.image.image_name)
-        )
-        mask = (
-            None
-            if self.mask is None
-            else context.services.images.get_pil_image(self.mask.image_name)
-        )
+        image = None if self.image is None else context.services.images.get_pil_image(self.image.image_name)
+        mask = None if self.mask is None else context.services.images.get_pil_image(self.mask.image_name)
 
         # Get the source node id (we are invoking the prepared node)
-        graph_execution_state = context.services.graph_execution_manager.get(
-            context.graph_execution_state_id
-        )
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
         scheduler = get_scheduler(

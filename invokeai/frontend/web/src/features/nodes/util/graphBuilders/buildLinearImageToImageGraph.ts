@@ -322,6 +322,17 @@ export const buildLinearImageToImageGraph = (
     init_image: initialImage.imageName,
   };
 
+  graph.edges.push({
+    source: {
+      node_id: METADATA_ACCUMULATOR,
+      field: 'metadata',
+    },
+    destination: {
+      node_id: LATENTS_TO_IMAGE,
+      field: 'metadata',
+    },
+  });
+
   // add LoRA support
   addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
 
