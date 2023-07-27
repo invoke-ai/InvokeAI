@@ -581,6 +581,8 @@ class IAIOnnxRuntimeModel:
                 providers.append(self.provider)
             else:
                 providers = get_available_providers()
+            if "TensorrtExecutionProvider" in providers:
+                providers.remove("TensorrtExecutionProvider")
             try:
                 self.session = InferenceSession(self.proto.SerializeToString(), providers=providers, sess_options=sess)
             except Exception as e:
