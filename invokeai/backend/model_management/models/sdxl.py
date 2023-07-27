@@ -112,16 +112,12 @@ class StableDiffusionXLModel(DiffusersModel):
         # The convert script adapted from the diffusers package uses
         # strings for the base model type. To avoid making too many
         # source code changes, we simply translate here
-        model_base_to_model_type = {BaseModelType.StableDiffusionXL: 'SDXL',
-                                    BaseModelType.StableDiffusionXLRefiner: 'SDXL-Refiner',
-                                    }
         if isinstance(config, cls.CheckpointConfig):
             from invokeai.backend.model_management.models.stable_diffusion import _convert_ckpt_and_cache
             return _convert_ckpt_and_cache(
                 version=base_model,
                 model_config=config,
                 output_path=output_path,
-                model_type=model_base_to_model_type[base_model],
                 use_safetensors=False, # corrupts sdxl models for some reason
             )
         else:

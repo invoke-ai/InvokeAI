@@ -149,16 +149,17 @@ class ModelInstall(object):
         for i in installed:
             print(f"{i['model_name']}\t{i['base_model']}\t{i['path']}")
 
-    def starter_models(self)->Set[str]:
+    # logic here a little reversed to maintain backward compatibility
+    def starter_models(self, all_models: bool=False)->Set[str]:
         models = set()
         for key, value in self.datasets.items():
             name,base,model_type = ModelManager.parse_key(key)
-            if model_type==ModelType.Main:
+            if all_models or model_type in [ModelType.Main, ModelType.Vae]:
                 models.add(key)
         return models
 
     def recommended_models(self)->Set[str]:
-        starters = self.starter_models()
+        starters = self.starter_models(all_models=True)
         return set([x for x in starters if self.datasets[x].get('recommended',False)])
     
     def default_model(self)->str:

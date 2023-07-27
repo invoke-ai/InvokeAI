@@ -93,13 +93,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.nextrely -= 1
         self.add_widget_intelligent(
             npyscreen.FixedText,
-            value="Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields,",
-            editable=False,
-            color="CAUTION",
-        )
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Use cursor arrows to make a selection, and space to toggle checkboxes.",
+            value="Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields. Cursor keys navigate, and <space> selects.",
             editable=False,
             color="CAUTION",
         )
@@ -161,33 +155,40 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             BufferBox,
             name='Log Messages',
             editable=False,
-            max_height = 10,
+            max_height = 8,
         )
         
         self.nextrely += 1
         done_label = "APPLY CHANGES"
         back_label = "BACK"
+        cancel_label = "CANCEL"
+        current_position = self.nextrely
         if self.multipage:
             self.back_button = self.add_widget_intelligent(
                 npyscreen.ButtonPress,
                 name=back_label,
-                rely=-3,
                 when_pressed_function=self.on_back,
             )
         else:
+            self.nextrely = current_position
+            self.cancel_button = self.add_widget_intelligent(
+                npyscreen.ButtonPress,
+                name=cancel_label,
+                when_pressed_function=self.on_cancel
+            )
+            self.nextrely = current_position
             self.ok_button = self.add_widget_intelligent(
                 npyscreen.ButtonPress,
                 name=done_label,
                 relx=(window_width - len(done_label)) // 2,
-                rely=-3,
-                when_pressed_function=self.on_execute
+                 when_pressed_function=self.on_execute
             )
 
         label = "APPLY CHANGES & EXIT"
+        self.nextrely = current_position
         self.done = self.add_widget_intelligent(
             npyscreen.ButtonPress,
             name=label,
-            rely=-3,
             relx=window_width-len(label)-15,
             when_pressed_function=self.on_done,
         )
