@@ -16,9 +16,7 @@ class SocketIO:
         self.__sio.on("subscribe", handler=self._handle_sub)
         self.__sio.on("unsubscribe", handler=self._handle_unsub)
 
-        local_handler.register(
-            event_name=EventServiceBase.session_event, _func=self._handle_session_event
-        )
+        local_handler.register(event_name=EventServiceBase.session_event, _func=self._handle_session_event)
 
     async def _handle_session_event(self, event: Event):
         await self.__sio.emit(

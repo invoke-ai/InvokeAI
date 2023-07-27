@@ -12,6 +12,7 @@ CUDA_DEVICE = torch.device("cuda")
 MPS_DEVICE = torch.device("mps")
 config = InvokeAIAppConfig.get_config()
 
+
 def choose_torch_device() -> torch.device:
     """Convenience routine for guessing which GPU device to run model on"""
     if config.always_use_cpu:

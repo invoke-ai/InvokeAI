@@ -8,9 +8,7 @@ from .txt2mask import Txt2Mask
 from .util import InitImageResizer, make_grid
 
 
-def debug_image(
-    debug_image, debug_text, debug_show=True, debug_result=False, debug_status=False
-):
+def debug_image(debug_image, debug_text, debug_show=True, debug_result=False, debug_status=False):
     if not debug_status:
         return
 

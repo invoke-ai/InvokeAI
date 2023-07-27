@@ -3,6 +3,7 @@ import asyncio
 import sys
 from inspect import signature
 
+import logging
 import uvicorn
 import socket
 
@@ -16,9 +17,10 @@ from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pathlib import Path
 from pydantic.schema import schema
 
-#This should come early so that modules can log their initialization properly
+# This should come early so that modules can log their initialization properly
 from .services.config import InvokeAIAppConfig
 from ..backend.util.logging import InvokeAILogger
+
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
 logger = InvokeAILogger.getLogger(config=app_config)
@@ -27,7 +29,7 @@ from invokeai.version.invokeai_version import __version__
 # we call this early so that the message appears before
 # other invokeai initialization messages
 if app_config.version:
-    print(f'InvokeAI version {__version__}')
+    print(f"InvokeAI version {__version__}")
     sys.exit(0)
 
 import invokeai.frontend.web as web_dir
@@ -37,17 +39,18 @@ from .api.dependencies import ApiDependencies
 from .api.routers import sessions, models, images, boards, board_images, app_info
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation
-    
+
 
 import torch
 import invokeai.backend.util.hotfixes
+
 if torch.backends.mps.is_available():
     import invokeai.backend.util.mps_fixes
 
 # fix for windows mimetypes registry entries being borked
 # see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
-mimetypes.add_type('application/javascript', '.js')
-mimetypes.add_type('text/css', '.css')
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("text/css", ".css")
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
@@ -57,13 +60,12 @@ app = FastAPI(title="Invoke AI", docs_url=None, redoc_url=None)
 event_handler_id: int = id(app)
 app.add_middleware(
     EventHandlerASGIMiddleware,
-    handlers=[
-        local_handler
-    ],  # TODO: consider doing this in services to support different configurations
+    handlers=[local_handler],  # TODO: consider doing this in services to support different configurations
     middleware_id=event_handler_id,
 )
 
 socket_io = SocketIO(app)
+
 
 # Add startup event to load dependencies
 @app.on_event("startup")
@@ -76,9 +78,7 @@ async def startup_event():
         allow_headers=app_config.allow_headers,
     )
 
-    ApiDependencies.initialize(
-        config=app_config, event_handler_id=event_handler_id, logger=logger
-    )
+    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
 
 
 # Shut down threads
@@ -103,7 +103,8 @@ app.include_router(boards.boards_router, prefix="/api")
 
 app.include_router(board_images.board_images_router, prefix="/api")
 
-app.include_router(app_info.app_router, prefix='/api')
+app.include_router(app_info.app_router, prefix="/api")
+
 
 # Build a custom OpenAPI to include all outputs
 # TODO: can outputs be included on metadata of invocation schemas somehow?
@@ -144,6 +145,7 @@ def custom_openapi():
         invoker_schema["output"] = outputs_ref
 
     from invokeai.backend.model_management.models import get_model_config_enums
+
     for model_config_format_enum in set(get_model_config_enums()):
         name = model_config_format_enum.__qualname__
 
@@ -166,7 +168,8 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 # Override API doc favicons
-app.mount("/static", StaticFiles(directory=Path(web_dir.__path__[0], 'static/dream_web')), name="static")
+app.mount("/static", StaticFiles(directory=Path(web_dir.__path__[0], "static/dream_web")), name="static")
+
 
 @app.get("/docs", include_in_schema=False)
 def overridden_swagger():
@@ -187,11 +190,8 @@ def overridden_redoc():
 
 
 # Must mount *after* the other routes else it borks em
-app.mount("/", 
-          StaticFiles(directory=Path(web_dir.__path__[0],"dist"), 
-                      html=True
-                     ), name="ui"
-         )
+app.mount("/", StaticFiles(directory=Path(web_dir.__path__[0], "dist"), html=True), name="ui")
+
 
 def invoke_api():
     def find_port(port: int):
@@ -203,19 +203,35 @@ def invoke_api():
                 return find_port(port=port + 1)
             else:
                 return port
-            
+
     from invokeai.backend.install.check_root import check_invokeai_root
+
     check_invokeai_root(app_config)  # note, may exit with an exception if root not set up
-    
+
     port = find_port(app_config.port)
     if port != app_config.port:
         logger.warn(f"Port {app_config.port} in use, using port {port}")
+        
     # Start our own event loop for eventing usage
     loop = asyncio.new_event_loop()
-    config = uvicorn.Config(app=app, host=app_config.host, port=port, loop=loop)
-    # Use access_log to turn off logging
+    config = uvicorn.Config(
+        app=app,
+        host=app_config.host,
+        port=port,
+        loop=loop,
+        log_level=app_config.log_level,
+    )
     server = uvicorn.Server(config)
+
+    # replace uvicorn's loggers with InvokeAI's for consistent appearance
+    for logname in ["uvicorn.access", "uvicorn"]:
+        l = logging.getLogger(logname)
+        l.handlers.clear()
+        for ch in logger.handlers:
+            l.addHandler(ch)
+    
     loop.run_until_complete(server.serve())
+
 
 if __name__ == "__main__":
     invoke_api()

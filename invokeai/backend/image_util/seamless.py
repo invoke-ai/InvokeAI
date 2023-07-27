@@ -5,12 +5,8 @@ def _conv_forward_asymmetric(self, input, weight, bias):
     """
     Patch for Conv2d._conv_forward that supports asymmetric padding
     """
-    working = nn.functional.pad(
-        input, self.asymmetric_padding["x"], mode=self.asymmetric_padding_mode["x"]
-    )
-    working = nn.functional.pad(
-        working, self.asymmetric_padding["y"], mode=self.asymmetric_padding_mode["y"]
-    )
+    working = nn.functional.pad(input, self.asymmetric_padding["x"], mode=self.asymmetric_padding_mode["x"])
+    working = nn.functional.pad(working, self.asymmetric_padding["y"], mode=self.asymmetric_padding_mode["y"])
     return nn.functional.conv2d(
         working,
         weight,
@@ -32,18 +28,14 @@ def configure_model_padding(model, seamless, seamless_axes):
             if seamless:
                 m.asymmetric_padding_mode = {}
                 m.asymmetric_padding = {}
-                m.asymmetric_padding_mode["x"] = (
-                    "circular" if ("x" in seamless_axes) else "constant"
-                )
+                m.asymmetric_padding_mode["x"] = "circular" if ("x" in seamless_axes) else "constant"
                 m.asymmetric_padding["x"] = (
                     m._reversed_padding_repeated_twice[0],
                     m._reversed_padding_repeated_twice[1],
                     0,
                     0,
                 )
-                m.asymmetric_padding_mode["y"] = (
-                    "circular" if ("y" in seamless_axes) else "constant"
-                )
+                m.asymmetric_padding_mode["y"] = "circular" if ("y" in seamless_axes) else "constant"
                 m.asymmetric_padding["y"] = (
                     0,
                     0,
