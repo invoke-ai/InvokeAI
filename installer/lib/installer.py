@@ -229,7 +229,7 @@ class InvokeAiInstance:
         # install torch first to ensure the correct version gets installed.
         # works with either source or wheel install with negligible impact on installation times.
         messages.simple_banner("Installing PyTorch :fire:")
-        # self.install_torch(extra_index_url, find_links)
+        self.install_torch(extra_index_url, find_links)
 
         messages.simple_banner("Installing the InvokeAI Application :art:")
         self.install_app(extra_index_url, optional_modules, find_links)
