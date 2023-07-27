@@ -11,30 +11,20 @@ class BoardRecord(BaseModel):
     """The unique ID of the board."""
     board_name: str = Field(description="The name of the board.")
     """The name of the board."""
-    created_at: Union[datetime, str] = Field(
-        description="The created timestamp of the board."
-    )
+    created_at: Union[datetime, str] = Field(description="The created timestamp of the board.")
     """The created timestamp of the image."""
-    updated_at: Union[datetime, str] = Field(
-        description="The updated timestamp of the board."
-    )
+    updated_at: Union[datetime, str] = Field(description="The updated timestamp of the board.")
     """The updated timestamp of the image."""
-    deleted_at: Union[datetime, str, None] = Field(
-        description="The deleted timestamp of the board."
-    )
+    deleted_at: Union[datetime, str, None] = Field(description="The deleted timestamp of the board.")
     """The updated timestamp of the image."""
-    cover_image_name: Optional[str] = Field(
-        description="The name of the cover image of the board."
-    )
+    cover_image_name: Optional[str] = Field(description="The name of the cover image of the board.")
     """The name of the cover image of the board."""
 
 
 class BoardDTO(BoardRecord):
     """Deserialized board record with cover image URL and image count."""
 
-    cover_image_name: Optional[str] = Field(
-        description="The name of the board's cover image."
-    )
+    cover_image_name: Optional[str] = Field(description="The name of the board's cover image.")
     """The URL of the thumbnail of the most recent image in the board."""
     image_count: int = Field(description="The number of images in the board.")
     """The number of images in the board."""

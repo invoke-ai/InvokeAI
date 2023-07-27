@@ -23,6 +23,7 @@
         "menu": "Menu"
     },
     "common": {
+        "communityLabel": "Community",
         "hotkeysLabel": "Hotkeys",
         "darkMode": "Dark Mode",
         "lightMode": "Light Mode",

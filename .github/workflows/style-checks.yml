@@ -1,0 +1,27 @@
+name: Black  # TODO: add isort and flake8 later
+
+on:
+  pull_request: {}
+  push:
+    branches: master
+    tags: "*"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies with pip
+        run: |
+          pip install --upgrade pip wheel
+          pip install .[test]
+
+      # - run: isort --check-only .
+      - run: black --check .
+      # - run: flake8

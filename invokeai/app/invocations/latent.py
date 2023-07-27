@@ -375,7 +375,7 @@ class TextToLatentsInvocation(BaseInvocation):
 
             name = f"{context.graph_execution_state_id}__{self.id}"
             context.services.latents.save(name, result_latents)
-        return build_latents_output(latents_name=name, latents=result_latents)
+            return build_latents_output(latents_name=name, latents=result_latents)
 
 
 class LatentsToLatentsInvocation(TextToLatentsInvocation):
@@ -492,7 +492,7 @@ class LatentsToImageInvocation(BaseInvocation):
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to generate an image from")
     vae: VaeField = Field(default=None, description="Vae submodel")
-    tiled: bool = Field(default=False, description="Decode latents by overlaping tiles(less memory consumption)")
+    tiled: bool = Field(default=False, description="Decode latents by overlaping tiles (less memory consumption)")
     fp32: bool = Field(DEFAULT_PRECISION == "float32", description="Decode in full precision")
     metadata: Optional[CoreMetadata] = Field(
         default=None, description="Optional core metadata to be written to the image"

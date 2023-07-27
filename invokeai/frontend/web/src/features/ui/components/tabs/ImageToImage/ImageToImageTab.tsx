@@ -1,7 +1,9 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import InitialImageDisplay from 'features/parameters/components/Parameters/ImageToImage/InitialImageDisplay';
+import SDXLImageToImageTabParameters from 'features/sdxl/components/SDXLImageToImageTabParameters';
 import { memo, useCallback, useRef } from 'react';
 import {
   ImperativePanelGroupHandle,
@@ -16,6 +18,7 @@ import ImageToImageTabParameters from './ImageToImageTabParameters';
 const ImageToImageTab = () => {
   const dispatch = useAppDispatch();
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
+  const model = useAppSelector((state: RootState) => state.generation.model);
 
   const handleDoubleClickHandle = useCallback(() => {
     if (!panelGroupRef.current) {
@@ -28,7 +31,11 @@ const ImageToImageTab = () => {
   return (
     <Flex sx={{ gap: 4, w: 'full', h: 'full' }}>
       <ParametersPinnedWrapper>
-        <ImageToImageTabParameters />
+        {model && model.base_model === 'sdxl' ? (
+          <SDXLImageToImageTabParameters />
+        ) : (
+          <ImageToImageTabParameters />
+        )}
       </ParametersPinnedWrapper>
       <Box sx={{ w: 'full', h: 'full' }}>
         <PanelGroup

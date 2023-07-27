@@ -1,7 +1,10 @@
 import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import SDXLImageToImageTabParameters from 'features/sdxl/components/SDXLImageToImageTabParameters';
+import SDXLTextToImageTabParameters from 'features/sdxl/components/SDXLTextToImageTabParameters';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import {
   activeTabNameSelector,
@@ -39,13 +42,23 @@ const ParametersDrawer = () => {
     dispatch(setShouldShowParametersPanel(false));
   };
 
+  const model = useAppSelector((state: RootState) => state.generation.model);
+
   const drawerContent = useMemo(() => {
     if (activeTabName === 'txt2img') {
-      return <TextToImageTabParameters />;
+      return model && model.base_model === 'sdxl' ? (
+        <SDXLTextToImageTabParameters />
+      ) : (
+        <TextToImageTabParameters />
+      );
     }
 
     if (activeTabName === 'img2img') {
-      return <ImageToImageTabParameters />;
+      return model && model.base_model === 'sdxl' ? (
+        <SDXLImageToImageTabParameters />
+      ) : (
+        <ImageToImageTabParameters />
+      );
     }
 
     if (activeTabName === 'unifiedCanvas') {
@@ -53,7 +66,7 @@ const ParametersDrawer = () => {
     }
 
     return null;
-  }, [activeTabName]);
+  }, [activeTabName, model]);
 
   if (shouldPinParametersPanel) {
     return null;

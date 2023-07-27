@@ -30,9 +30,7 @@ def infill_methods() -> list[str]:
 
 
 INFILL_METHODS = Literal[tuple(infill_methods())]
-DEFAULT_INFILL_METHOD = (
-    "patchmatch" if "patchmatch" in get_args(INFILL_METHODS) else "tile"
-)
+DEFAULT_INFILL_METHOD = "patchmatch" if "patchmatch" in get_args(INFILL_METHODS) else "tile"
 
 
 def infill_patchmatch(im: Image.Image) -> Image.Image:
@@ -44,9 +42,7 @@ def infill_patchmatch(im: Image.Image) -> Image.Image:
         return im
 
     # Patchmatch (note, we may want to expose patch_size? Increasing it significantly impacts performance though)
-    im_patched_np = PatchMatch.inpaint(
-        im.convert("RGB"), ImageOps.invert(im.split()[-1]), patch_size=3
-    )
+    im_patched_np = PatchMatch.inpaint(im.convert("RGB"), ImageOps.invert(im.split()[-1]), patch_size=3)
     im_patched = Image.fromarray(im_patched_np, mode="RGB")
     return im_patched
 
@@ -68,9 +64,7 @@ def get_tile_images(image: np.ndarray, width=8, height=8):
     )
 
 
-def tile_fill_missing(
-    im: Image.Image, tile_size: int = 16, seed: Optional[int] = None
-) -> Image.Image:
+def tile_fill_missing(im: Image.Image, tile_size: int = 16, seed: Optional[int] = None) -> Image.Image:
     # Only fill if there's an alpha layer
     if im.mode != "RGBA":
         return im
@@ -103,9 +97,7 @@ def tile_fill_missing(
     # Find all invalid tiles and replace with a random valid tile
     replace_count = (tiles_mask == False).sum()
     rng = np.random.default_rng(seed=seed)
-    tiles_all[np.logical_not(tiles_mask)] = filtered_tiles[
-        rng.choice(filtered_tiles.shape[0], replace_count), :, :, :
-    ]
+    tiles_all[np.logical_not(tiles_mask)] = filtered_tiles[rng.choice(filtered_tiles.shape[0], replace_count), :, :, :]
 
     # Convert back to an image
     tiles_all = tiles_all.reshape(tshape)
@@ -126,9 +118,7 @@ class InfillColorInvocation(BaseInvocation):
     """Infills transparent areas of an image with a solid color"""
 
     type: Literal["infill_rgba"] = "infill_rgba"
-    image: Optional[ImageField] = Field(
-        default=None, description="The image to infill"
-    )
+    image: Optional[ImageField] = Field(default=None, description="The image to infill")
     color: ColorField = Field(
         default=ColorField(r=127, g=127, b=127, a=255),
         description="The color to use to infill",
@@ -136,10 +126,7 @@ class InfillColorInvocation(BaseInvocation):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Color Infill",
-                "tags": ["image", "inpaint", "color", "infill"]
-            },
+            "ui": {"title": "Color Infill", "tags": ["image", "inpaint", "color", "infill"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -171,9 +158,7 @@ class InfillTileInvocation(BaseInvocation):
 
     type: Literal["infill_tile"] = "infill_tile"
 
-    image: Optional[ImageField] = Field(
-        default=None, description="The image to infill"
-    )
+    image: Optional[ImageField] = Field(default=None, description="The image to infill")
     tile_size: int = Field(default=32, ge=1, description="The tile size (px)")
     seed: int = Field(
         ge=0,
@@ -184,18 +169,13 @@ class InfillTileInvocation(BaseInvocation):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Tile Infill",
-                "tags": ["image", "inpaint", "tile", "infill"]
-            },
+            "ui": {"title": "Tile Infill", "tags": ["image", "inpaint", "tile", "infill"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
-        infilled = tile_fill_missing(
-            image.copy(), seed=self.seed, tile_size=self.tile_size
-        )
+        infilled = tile_fill_missing(image.copy(), seed=self.seed, tile_size=self.tile_size)
         infilled.paste(image, (0, 0), image.split()[-1])
 
         image_dto = context.services.images.create(
@@ -219,16 +199,11 @@ class InfillPatchMatchInvocation(BaseInvocation):
 
     type: Literal["infill_patchmatch"] = "infill_patchmatch"
 
-    image: Optional[ImageField] = Field(
-        default=None, description="The image to infill"
-    )
+    image: Optional[ImageField] = Field(default=None, description="The image to infill")
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Patch Match Infill",
-                "tags": ["image", "inpaint", "patchmatch", "infill"]
-            },
+            "ui": {"title": "Patch Match Infill", "tags": ["image", "inpaint", "patchmatch", "infill"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:

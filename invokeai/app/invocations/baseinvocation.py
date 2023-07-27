@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from inspect import signature
-from typing import (TYPE_CHECKING, Dict, List, Literal, TypedDict, get_args,
-                    get_type_hints)
+from typing import TYPE_CHECKING, Dict, List, Literal, TypedDict, get_args, get_type_hints
 
 from pydantic import BaseConfig, BaseModel, Field
 
