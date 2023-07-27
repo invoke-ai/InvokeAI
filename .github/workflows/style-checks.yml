@@ -1,6 +1,6 @@
 name: Black  # TODO: add isort and flake8 later
 
-on: 
+on:
   pull_request: {}
   push:
     branches: master
