@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Lincoln Stein (https://github.com/lstein) and the InvokeAI Development Team
 
-'''Invokeai configuration system.
+"""Invokeai configuration system.
 
 Arguments and fields are taken from the pydantic definition of the
 model.  Defaults can be set by creating a yaml configuration file that
@@ -158,7 +158,7 @@ two configs are kept in separate sections of the config file:
         outdir: outputs
      ...
 
-'''
+"""
 from __future__ import annotations
 import argparse
 import pydoc
@@ -170,64 +170,68 @@ from pathlib import Path
 from pydantic import BaseSettings, Field, parse_obj_as
 from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_type_hints, get_args
 
-INIT_FILE = Path('invokeai.yaml')
-MODEL_CORE = Path('models/core')
-DB_FILE   = Path('invokeai.db')
-LEGACY_INIT_FILE = Path('invokeai.init')
+INIT_FILE = Path("invokeai.yaml")
+MODEL_CORE = Path("models/core")
+DB_FILE = Path("invokeai.db")
+LEGACY_INIT_FILE = Path("invokeai.init")
+
 
 class InvokeAISettings(BaseSettings):
-    '''
+    """
     Runtime configuration settings in which default values are
     read from an omegaconf .yaml file.
-    '''
-    initconf             : ClassVar[DictConfig] = None
-    argparse_groups      : ClassVar[Dict] = {}
+    """
 
-    def parse_args(self, argv: list=sys.argv[1:]):
+    initconf: ClassVar[DictConfig] = None
+    argparse_groups: ClassVar[Dict] = {}
+
+    def parse_args(self, argv: list = sys.argv[1:]):
         parser = self.get_parser()
         opt = parser.parse_args(argv)
         for name in self.__fields__:
             if name not in self._excluded():
-                setattr(self, name, getattr(opt,name))
+                setattr(self, name, getattr(opt, name))
 
-    def to_yaml(self)->str:
+    def to_yaml(self) -> str:
         """
         Return a YAML string representing our settings. This can be used
         as the contents of `invokeai.yaml` to restore settings later.
         """
         cls = self.__class__
-        type = get_args(get_type_hints(cls)['type'])[0]
-        field_dict = dict({type:dict()})
-        for name,field in self.__fields__.items():
+        type = get_args(get_type_hints(cls)["type"])[0]
+        field_dict = dict({type: dict()})
+        for name, field in self.__fields__.items():
             if name in cls._excluded_from_yaml():
                 continue
             category = field.field_info.extra.get("category") or "Uncategorized"
-            value = getattr(self,name)
+            value = getattr(self, name)
             if category not in field_dict[type]:
                 field_dict[type][category] = dict()
             # keep paths as strings to make it easier to read
-            field_dict[type][category][name] = str(value) if isinstance(value,Path) else value
+            field_dict[type][category][name] = str(value) if isinstance(value, Path) else value
         conf = OmegaConf.create(field_dict)
         return OmegaConf.to_yaml(conf)
 
     @classmethod
     def add_parser_arguments(cls, parser):
-        if 'type' in get_type_hints(cls):
-            settings_stanza = get_args(get_type_hints(cls)['type'])[0]
+        if "type" in get_type_hints(cls):
+            settings_stanza = get_args(get_type_hints(cls)["type"])[0]
         else:
             settings_stanza = "Uncategorized"
 
-        env_prefix = cls.Config.env_prefix if hasattr(cls.Config,'env_prefix') else settings_stanza.upper()
+        env_prefix = cls.Config.env_prefix if hasattr(cls.Config, "env_prefix") else settings_stanza.upper()
 
-        initconf = cls.initconf.get(settings_stanza) \
-            if cls.initconf and settings_stanza in cls.initconf \
-               else OmegaConf.create()
+        initconf = (
+            cls.initconf.get(settings_stanza)
+            if cls.initconf and settings_stanza in cls.initconf
+            else OmegaConf.create()
+        )
 
         # create an upcase version of the environment in
         # order to achieve case-insensitive environment
         # variables (the way Windows does)
         upcase_environ = dict()
-        for key,value in os.environ.items():
+        for key, value in os.environ.items():
             upcase_environ[key.upper()] = value
 
         fields = cls.__fields__
@@ -237,8 +241,8 @@ class InvokeAISettings(BaseSettings):
             if name not in cls._excluded():
                 current_default = field.default
 
-                category = field.field_info.extra.get("category","Uncategorized")
-                env_name = env_prefix + '_' + name
+                category = field.field_info.extra.get("category", "Uncategorized")
+                env_name = env_prefix + "_" + name
                 if category in initconf and name in initconf.get(category):
                     field.default = initconf.get(category).get(name)
                 if env_name.upper() in upcase_environ:
@@ -248,15 +252,15 @@ class InvokeAISettings(BaseSettings):
                 field.default = current_default
 
     @classmethod
-    def cmd_name(self, command_field: str='type')->str:
+    def cmd_name(self, command_field: str = "type") -> str:
         hints = get_type_hints(self)
         if command_field in hints:
             return get_args(hints[command_field])[0]
         else:
-            return 'Uncategorized'
+            return "Uncategorized"
 
     @classmethod
-    def get_parser(cls)->ArgumentParser:
+    def get_parser(cls) -> ArgumentParser:
         parser = PagingArgumentParser(
             prog=cls.cmd_name(),
             description=cls.__doc__,
@@ -269,24 +273,41 @@ class InvokeAISettings(BaseSettings):
         parser.add_parser(cls.cmd_name(), help=cls.__doc__)
 
     @classmethod
-    def _excluded(self)->List[str]:
+    def _excluded(self) -> List[str]:
         # internal fields that shouldn't be exposed as command line options
-        return ['type','initconf']
-    
+        return ["type", "initconf"]
+
     @classmethod
-    def _excluded_from_yaml(self)->List[str]:
+    def _excluded_from_yaml(self) -> List[str]:
         # combination of deprecated parameters and internal ones that shouldn't be exposed as invokeai.yaml options
-        return ['type','initconf', 'gpu_mem_reserved', 'max_loaded_models', 'version', 'from_file', 'model', 'restore', 'root', 'nsfw_checker']
+        return [
+            "type",
+            "initconf",
+            "gpu_mem_reserved",
+            "max_loaded_models",
+            "version",
+            "from_file",
+            "model",
+            "restore",
+            "root",
+            "nsfw_checker",
+        ]
 
     class Config:
-        env_file_encoding = 'utf-8'
+        env_file_encoding = "utf-8"
         arbitrary_types_allowed = True
         case_sensitive = True
 
     @classmethod
-    def add_field_argument(cls, command_parser, name: str, field, default_override = None):
+    def add_field_argument(cls, command_parser, name: str, field, default_override=None):
         field_type = get_type_hints(cls).get(name)
-        default = default_override if default_override is not None else field.default if field.default_factory is None else field.default_factory()
+        default = (
+            default_override
+            if default_override is not None
+            else field.default
+            if field.default_factory is None
+            else field.default_factory()
+        )
         if category := field.field_info.extra.get("category"):
             if category not in cls.argparse_groups:
                 cls.argparse_groups[category] = command_parser.add_argument_group(category)
@@ -315,10 +336,10 @@ class InvokeAISettings(BaseSettings):
             argparse_group.add_argument(
                 f"--{name}",
                 dest=name,
-                nargs='*',
+                nargs="*",
                 type=field.type_,
                 default=default,
-                action=argparse.BooleanOptionalAction if field.type_==bool else 'store',
+                action=argparse.BooleanOptionalAction if field.type_ == bool else "store",
                 help=field.field_info.description,
             )
         else:
@@ -327,31 +348,35 @@ class InvokeAISettings(BaseSettings):
                 dest=name,
                 type=field.type_,
                 default=default,
-                action=argparse.BooleanOptionalAction if field.type_==bool else 'store',
+                action=argparse.BooleanOptionalAction if field.type_ == bool else "store",
                 help=field.field_info.description,
             )
-def _find_root()->Path:
+
+
+def _find_root() -> Path:
     venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
         root = Path(os.environ.get("INVOKEAI_ROOT")).resolve()
-    elif any([(venv.parent/x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE, MODEL_CORE]]):
+    elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE, MODEL_CORE]]):
         root = (venv.parent).resolve()
     else:
         root = Path("~/invokeai").expanduser().resolve()
     return root
 
+
 class InvokeAIAppConfig(InvokeAISettings):
-    '''
-Generate images using Stable Diffusion. Use "invokeai" to launch
-the command-line client (recommended for experts only), or
-"invokeai-web" to launch the web server. Global options
-can be changed by editing the file "INVOKEAI_ROOT/invokeai.yaml" or by
-setting environment variables INVOKEAI_<setting>.
-     '''
+    """
+    Generate images using Stable Diffusion. Use "invokeai" to launch
+    the command-line client (recommended for experts only), or
+    "invokeai-web" to launch the web server. Global options
+    can be changed by editing the file "INVOKEAI_ROOT/invokeai.yaml" or by
+    setting environment variables INVOKEAI_<setting>.
+    """
+
     singleton_config: ClassVar[InvokeAIAppConfig] = None
     singleton_init: ClassVar[Dict] = None
 
-    #fmt: off
+    # fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
     host                : str = Field(default="127.0.0.1", description="IP address to bind to", category='Web Server')
     port                : int = Field(default=9090, description="Port to bind to", category='Web Server')
@@ -399,16 +424,16 @@ setting environment variables INVOKEAI_<setting>.
     log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
-    #fmt: on
+    # fmt: on
 
-    def parse_args(self, argv: List[str]=None, conf: DictConfig = None, clobber=False):
-        '''
+    def parse_args(self, argv: List[str] = None, conf: DictConfig = None, clobber=False):
+        """
         Update settings with contents of init file, environment, and
         command-line settings.
         :param conf: alternate Omegaconf dictionary object
         :param argv: aternate sys.argv list
         :param clobber: ovewrite any initialization parameters passed during initialization
-        '''
+        """
         # Set the runtime root directory. We parse command-line switches here
         # in order to pick up the --root_dir option.
         super().parse_args(argv)
@@ -425,135 +450,139 @@ setting environment variables INVOKEAI_<setting>.
         if self.singleton_init and not clobber:
             hints = get_type_hints(self.__class__)
             for k in self.singleton_init:
-                setattr(self,k,parse_obj_as(hints[k],self.singleton_init[k]))
+                setattr(self, k, parse_obj_as(hints[k], self.singleton_init[k]))
 
     @classmethod
-    def get_config(cls,**kwargs)->InvokeAIAppConfig:
-        '''
+    def get_config(cls, **kwargs) -> InvokeAIAppConfig:
+        """
         This returns a singleton InvokeAIAppConfig configuration object.
-        '''
-        if cls.singleton_config is None \
-           or type(cls.singleton_config)!=cls \
-           or (kwargs and cls.singleton_init != kwargs):
+        """
+        if (
+            cls.singleton_config is None
+            or type(cls.singleton_config) != cls
+            or (kwargs and cls.singleton_init != kwargs)
+        ):
             cls.singleton_config = cls(**kwargs)
             cls.singleton_init = kwargs
         return cls.singleton_config
 
     @property
-    def root_path(self)->Path:
-        '''
+    def root_path(self) -> Path:
+        """
         Path to the runtime root directory
-        '''
+        """
         if self.root:
             return Path(self.root).expanduser().absolute()
         else:
             return self.find_root()
 
     @property
-    def root_dir(self)->Path:
-        '''
+    def root_dir(self) -> Path:
+        """
         Alias for above.
-        '''
+        """
         return self.root_path
 
-    def _resolve(self,partial_path:Path)->Path:
+    def _resolve(self, partial_path: Path) -> Path:
         return (self.root_path / partial_path).resolve()
 
     @property
-    def init_file_path(self)->Path:
-        '''
+    def init_file_path(self) -> Path:
+        """
         Path to invokeai.yaml
-        '''
+        """
         return self._resolve(INIT_FILE)
 
     @property
-    def output_path(self)->Path:
-        '''
+    def output_path(self) -> Path:
+        """
         Path to defaults outputs directory.
-        '''
+        """
         return self._resolve(self.outdir)
 
     @property
-    def db_path(self)->Path:
-        '''
+    def db_path(self) -> Path:
+        """
         Path to the invokeai.db file.
-        '''
+        """
         return self._resolve(self.db_dir) / DB_FILE
 
     @property
-    def model_conf_path(self)->Path:
-        '''
+    def model_conf_path(self) -> Path:
+        """
         Path to models configuration file.
-        '''
+        """
         return self._resolve(self.conf_path)
 
     @property
-    def legacy_conf_path(self)->Path:
-        '''
+    def legacy_conf_path(self) -> Path:
+        """
         Path to directory of legacy configuration files (e.g. v1-inference.yaml)
-        '''
+        """
         return self._resolve(self.legacy_conf_dir)
 
     @property
-    def models_path(self)->Path:
-        '''
+    def models_path(self) -> Path:
+        """
         Path to the models directory
-        '''
+        """
         return self._resolve(self.models_dir)
 
     @property
-    def autoconvert_path(self)->Path:
-        '''
+    def autoconvert_path(self) -> Path:
+        """
         Path to the directory containing models to be imported automatically at startup.
-        '''
+        """
         return self._resolve(self.autoconvert_dir) if self.autoconvert_dir else None
 
     # the following methods support legacy calls leftover from the Globals era
     @property
-    def full_precision(self)->bool:
+    def full_precision(self) -> bool:
         """Return true if precision set to float32"""
-        return self.precision=='float32'
+        return self.precision == "float32"
 
     @property
-    def disable_xformers(self)->bool:
+    def disable_xformers(self) -> bool:
         """Return true if xformers_enabled is false"""
         return not self.xformers_enabled
 
     @property
-    def try_patchmatch(self)->bool:
+    def try_patchmatch(self) -> bool:
         """Return true if patchmatch true"""
         return self.patchmatch
 
     @property
-    def nsfw_checker(self)->bool:
-        """ NSFW node is always active and disabled from Web UIe"""
+    def nsfw_checker(self) -> bool:
+        """NSFW node is always active and disabled from Web UIe"""
         return True
 
     @property
-    def invisible_watermark(self)->bool:
-        """ invisible watermark node is always active and disabled from Web UIe"""
+    def invisible_watermark(self) -> bool:
+        """invisible watermark node is always active and disabled from Web UIe"""
         return True
-    
+
     @staticmethod
-    def find_root()->Path:
-        '''
+    def find_root() -> Path:
+        """
         Choose the runtime root directory when not specified on command line or
         init file.
-        '''
+        """
         return _find_root()
 
 
 class PagingArgumentParser(argparse.ArgumentParser):
-    '''
+    """
     A custom ArgumentParser that uses pydoc to page its output.
     It also supports reading defaults from an init file.
-    '''
+    """
+
     def print_help(self, file=None):
         text = self.format_help()
         pydoc.pager(text)
 
-def get_invokeai_config(**kwargs)->InvokeAIAppConfig:
-    '''
+
+def get_invokeai_config(**kwargs) -> InvokeAIAppConfig:
+    """
     Legacy function which returns InvokeAIAppConfig.get_config()
-    '''
+    """
     return InvokeAIAppConfig.get_config(**kwargs)

@@ -11,6 +11,7 @@ import invokeai.frontend.web.dist as frontend
 import invokeai.configs as configs
 import invokeai.app.assets.images as image_assets
 
+
 class ConfigsTestCase(unittest.TestCase):
     """Test the configuration related imports and objects"""
 

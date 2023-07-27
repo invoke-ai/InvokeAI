@@ -15,9 +15,7 @@ from pydantic import BaseModel, Field, Extra
 
 class BoardChanges(BaseModel, extra=Extra.forbid):
     board_name: Optional[str] = Field(description="The board's new name.")
-    cover_image_name: Optional[str] = Field(
-        description="The name of the board's new cover image."
-    )
+    cover_image_name: Optional[str] = Field(description="The name of the board's new cover image.")
 
 
 class BoardRecordNotFoundException(Exception):
@@ -292,9 +290,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
 
             count = cast(int, self._cursor.fetchone()[0])
 
-            return OffsetPaginatedResults[BoardRecord](
-                items=boards, offset=offset, limit=limit, total=count
-            )
+            return OffsetPaginatedResults[BoardRecord](items=boards, offset=offset, limit=limit, total=count)
 
         except sqlite3.Error as e:
             self._conn.rollback()

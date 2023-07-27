@@ -9,14 +9,17 @@ from invokeai.backend import SilenceWarnings
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.devices import choose_torch_device
 import invokeai.backend.util.logging as logger
+
 config = InvokeAIAppConfig.get_config()
 
-CHECKER_PATH = 'core/convert/stable-diffusion-safety-checker'
+CHECKER_PATH = "core/convert/stable-diffusion-safety-checker"
+
 
 class SafetyChecker:
     """
     Wrapper around SafetyChecker model.
     """
+
     safety_checker = None
     feature_extractor = None
     tried_load: bool = False
@@ -25,21 +28,19 @@ class SafetyChecker:
     def _load_safety_checker(self):
         if self.tried_load:
             return
-        
+
         if config.nsfw_checker:
             try:
                 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
                 from transformers import AutoFeatureExtractor
-                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(
-                    config.models_path / CHECKER_PATH
-                )
-                self.feature_extractor = AutoFeatureExtractor.from_pretrained(
-                    config.models_path / CHECKER_PATH)
-                logger.info('NSFW checker initialized')
+
+                self.safety_checker = StableDiffusionSafetyChecker.from_pretrained(config.models_path / CHECKER_PATH)
+                self.feature_extractor = AutoFeatureExtractor.from_pretrained(config.models_path / CHECKER_PATH)
+                logger.info("NSFW checker initialized")
             except Exception as e:
-                logger.warning(f'Could not load NSFW checker: {str(e)}')
+                logger.warning(f"Could not load NSFW checker: {str(e)}")
         else:
-            logger.info('NSFW checker loading disabled')
+            logger.info("NSFW checker loading disabled")
         self.tried_load = True
 
     @classmethod
@@ -51,7 +52,7 @@ class SafetyChecker:
     def has_nsfw_concept(self, image: Image) -> bool:
         if not self.safety_checker_available():
             return False
-        
+
         device = choose_torch_device()
         features = self.feature_extractor([image], return_tensors="pt")
         features.to(device)

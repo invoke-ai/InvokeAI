@@ -261,9 +261,7 @@ def srmd_degradation(x, k, sf=3):
           year={2018}
         }
     """
-    x = ndimage.filters.convolve(
-        x, np.expand_dims(k, axis=2), mode="wrap"
-    )  # 'nearest' | 'mirror'
+    x = ndimage.filters.convolve(x, np.expand_dims(k, axis=2), mode="wrap")  # 'nearest' | 'mirror'
     x = bicubic_degradation(x, sf=sf)
     return x
 
@@ -393,21 +391,15 @@ def add_Gaussian_noise(img, noise_level1=2, noise_level2=25):
     noise_level = random.randint(noise_level1, noise_level2)
     rnum = np.random.rand()
     if rnum > 0.6:  # add color Gaussian noise
-        img = img + np.random.normal(0, noise_level / 255.0, img.shape).astype(
-            np.float32
-        )
+        img = img + np.random.normal(0, noise_level / 255.0, img.shape).astype(np.float32)
     elif rnum < 0.4:  # add grayscale Gaussian noise
-        img = img + np.random.normal(
-            0, noise_level / 255.0, (*img.shape[:2], 1)
-        ).astype(np.float32)
+        img = img + np.random.normal(0, noise_level / 255.0, (*img.shape[:2], 1)).astype(np.float32)
     else:  # add  noise
         L = noise_level2 / 255.0
         D = np.diag(np.random.rand(3))
         U = orth(np.random.rand(3, 3))
         conv = np.dot(np.dot(np.transpose(U), D), U)
-        img = img + np.random.multivariate_normal(
-            [0, 0, 0], np.abs(L**2 * conv), img.shape[:2]
-        ).astype(np.float32)
+        img = img + np.random.multivariate_normal([0, 0, 0], np.abs(L**2 * conv), img.shape[:2]).astype(np.float32)
     img = np.clip(img, 0.0, 1.0)
     return img
 
@@ -417,21 +409,15 @@ def add_speckle_noise(img, noise_level1=2, noise_level2=25):
     img = np.clip(img, 0.0, 1.0)
     rnum = random.random()
     if rnum > 0.6:
-        img += img * np.random.normal(0, noise_level / 255.0, img.shape).astype(
-            np.float32
-        )
+        img += img * np.random.normal(0, noise_level / 255.0, img.shape).astype(np.float32)
     elif rnum < 0.4:
-        img += img * np.random.normal(
-            0, noise_level / 255.0, (*img.shape[:2], 1)
-        ).astype(np.float32)
+        img += img * np.random.normal(0, noise_level / 255.0, (*img.shape[:2], 1)).astype(np.float32)
     else:
         L = noise_level2 / 255.0
         D = np.diag(np.random.rand(3))
         U = orth(np.random.rand(3, 3))
         conv = np.dot(np.dot(np.transpose(U), D), U)
-        img += img * np.random.multivariate_normal(
-            [0, 0, 0], np.abs(L**2 * conv), img.shape[:2]
-        ).astype(np.float32)
+        img += img * np.random.multivariate_normal([0, 0, 0], np.abs(L**2 * conv), img.shape[:2]).astype(np.float32)
     img = np.clip(img, 0.0, 1.0)
     return img
 
@@ -444,9 +430,7 @@ def add_Poisson_noise(img):
     else:
         img_gray = np.dot(img[..., :3], [0.299, 0.587, 0.114])
         img_gray = np.clip((img_gray * 255.0).round(), 0, 255) / 255.0
-        noise_gray = (
-            np.random.poisson(img_gray * vals).astype(np.float32) / vals - img_gray
-        )
+        noise_gray = np.random.poisson(img_gray * vals).astype(np.float32) / vals - img_gray
         img += noise_gray[:, :, np.newaxis]
     img = np.clip(img, 0.0, 1.0)
     return img
@@ -455,9 +439,7 @@ def add_Poisson_noise(img):
 def add_JPEG_noise(img):
     quality_factor = random.randint(80, 95)
     img = cv2.cvtColor(util.single2uint(img), cv2.COLOR_RGB2BGR)
-    result, encimg = cv2.imencode(
-        ".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), quality_factor]
-    )
+    result, encimg = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), quality_factor])
     img = cv2.imdecode(encimg, 1)
     img = cv2.cvtColor(util.uint2single(img), cv2.COLOR_BGR2RGB)
     return img
@@ -544,9 +526,7 @@ def degradation_bsrgan(img, sf=4, lq_patchsize=72, isp_model=None):
                 k = fspecial("gaussian", 25, random.uniform(0.1, 0.6 * sf))
                 k_shifted = shift_pixel(k, sf)
                 k_shifted = k_shifted / k_shifted.sum()  # blur with shifted kernel
-                img = ndimage.filters.convolve(
-                    img, np.expand_dims(k_shifted, axis=2), mode="mirror"
-                )
+                img = ndimage.filters.convolve(img, np.expand_dims(k_shifted, axis=2), mode="mirror")
                 img = img[0::sf, 0::sf, ...]  # nearest downsampling
             img = np.clip(img, 0.0, 1.0)
 
@@ -653,9 +633,7 @@ def degradation_bsrgan_variant(image, sf=4, isp_model=None):
                 k = fspecial("gaussian", 25, random.uniform(0.1, 0.6 * sf))
                 k_shifted = shift_pixel(k, sf)
                 k_shifted = k_shifted / k_shifted.sum()  # blur with shifted kernel
-                image = ndimage.filters.convolve(
-                    image, np.expand_dims(k_shifted, axis=2), mode="mirror"
-                )
+                image = ndimage.filters.convolve(image, np.expand_dims(k_shifted, axis=2), mode="mirror")
                 image = image[0::sf, 0::sf, ...]  # nearest downsampling
 
             image = np.clip(image, 0.0, 1.0)
@@ -705,9 +683,9 @@ if __name__ == "__main__":
         img_lq = deg_fn(img)["image"]
         img_hq, img_lq = util.uint2single(img_hq), util.uint2single(img_lq)
         print(img_lq)
-        img_lq_bicubic = albumentations.SmallestMaxSize(
-            max_size=h, interpolation=cv2.INTER_CUBIC
-        )(image=img_hq)["image"]
+        img_lq_bicubic = albumentations.SmallestMaxSize(max_size=h, interpolation=cv2.INTER_CUBIC)(image=img_hq)[
+            "image"
+        ]
         print(img_lq.shape)
         print("bicubic", img_lq_bicubic.shape)
         print(img_hq.shape)
@@ -721,7 +699,5 @@ if __name__ == "__main__":
             (int(sf * img_lq.shape[1]), int(sf * img_lq.shape[0])),
             interpolation=0,
         )
-        img_concat = np.concatenate(
-            [lq_bicubic_nearest, lq_nearest, util.single2uint(img_hq)], axis=1
-        )
+        img_concat = np.concatenate([lq_bicubic_nearest, lq_nearest, util.single2uint(img_hq)], axis=1)
         util.imsave(img_concat, str(i) + ".png")
