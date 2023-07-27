@@ -11,6 +11,7 @@ import { modelIdToControlNetModelParam } from 'features/parameters/util/modelIdT
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
+import { BaseModelType } from 'services/api/types';
 import { FieldComponentProps } from './types';
 
 const ControlNetModelInputFieldComponent = (
@@ -53,7 +54,7 @@ const ControlNetModelInputFieldComponent = (
       data.push({
         value: id,
         label: model.model_name,
-        group: MODEL_TYPE_MAP[model.base_model],
+        group: MODEL_TYPE_MAP[model.base_model as BaseModelType],
       });
     });
 
@@ -87,7 +88,8 @@ const ControlNetModelInputFieldComponent = (
     <IAIMantineSelect
       tooltip={selectedModel?.description}
       label={
-        selectedModel?.base_model && MODEL_TYPE_MAP[selectedModel?.base_model]
+        selectedModel?.base_model &&
+        MODEL_TYPE_MAP[selectedModel?.base_model as BaseModelType]
       }
       value={selectedModel?.id ?? null}
       placeholder="Pick one"
