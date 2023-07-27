@@ -62,6 +62,7 @@ dependencies = [
   "npyscreen",
   "numpy<1.24",
   "omegaconf",
+  "onnx",
   "opencv-python",
   "picklescan",
   "pillow",
@@ -104,15 +105,12 @@ dependencies = [
 	   "triton; sys_platform=='linux'",
 ]
 "onnx" = [
-  "onnx",
   "onnxruntime",
 ]
 "onnx-cuda" = [
-  "onnx",
   "onnxruntime-gpu",
 ]
 "onnx-directml" = [
-  "onnx",
   "onnxruntime-directml",
 ]
 
