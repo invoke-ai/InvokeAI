@@ -24,10 +24,6 @@ sdxl-refiner/main/stable-diffusion-xl-refiner-1-0:
    description: Stable Diffusion XL refiner model (12 GB)
    repo_id: stabilityai/stable-diffusion-xl-refiner-1.0
    recommended: False
-sdxl-refiner/main/stable-diffusion-xl-refiner-1-0:
-   description: Stable Diffusion XL refiner model (12 GB)
-   repo_id: stabilityai/stable-diffusion-xl-refiner-1.0
-   recommended: false
 sdxl/vae/sdxl-1-0-vae-fix:
    description: Fine tuned version of the SDXL-1.0 VAE
    repo_id: madebyollin/sdxl-vae-fp16-fix
