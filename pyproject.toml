@@ -177,7 +177,7 @@ output = "coverage/index.xml"
 #=== End: PyTest and Coverage
 
 [tool.flake8]
-max-line-length = 100
+max-line-length = 120
 
 [tool.black]
-line-length = 100
+line-length = 120
