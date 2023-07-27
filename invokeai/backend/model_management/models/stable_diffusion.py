@@ -272,8 +272,9 @@ def _convert_ckpt_and_cache(
 
     model_base_to_model_type = {BaseModelType.StableDiffusion1: 'FrozenCLIPEmbedder',
                                 BaseModelType.StableDiffusion2: 'FrozenOpenCLIPEmbedder',
+                                BaseModelType.StableDiffusionXL: 'SDXL',
+                                BaseModelType.StableDiffusionXLRefiner: 'SDXL-Refiner',
                                 }
-
     logger.info(f'Converting {weights} to diffusers format')
     with SilenceWarnings():        
         convert_ckpt_to_diffusers(
