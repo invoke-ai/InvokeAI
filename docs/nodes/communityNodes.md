@@ -29,8 +29,14 @@ The nodes linked below have been developed and contributed by members of the Inv
 ![2fe2150c-fd08-4e26-8c36-f0610bf441bb](https://github.com/ymgenesis/InvokeAI/assets/25252829/b0f7ecfe-f093-4147-a904-b9f131b41dc9)
 ![831b6b98-4f0f-4360-93c8-69a9c1338cbe](https://github.com/ymgenesis/InvokeAI/assets/25252829/fc7b0622-e361-4155-8a76-082894d084f0)
 
+### Ideal Size
+
+**Description:** This node calculates an ideal image size for a first pass of a multi-pass upscaling. The aim is to avoid duplication that results from choosing a size larger than the model is capable of.
+
+**Node Link:** https://github.com/JPPhoto/ideal-size-node
+
 --------------------------------
-### Super Cool Node Template
+### Example Node Template
 
 **Description:** This node allows you to do super cool things with InvokeAI.
 
@@ -40,13 +46,9 @@ The nodes linked below have been developed and contributed by members of the Inv
 
 **Output Examples** 
 
-![Invoke AI](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png)
-
-### Ideal Size
-
-**Description:** This node calculates an ideal image size for a first pass of a multi-pass upscaling. The aim is to avoid duplication that results from choosing a size larger than the model is capable of.
-
-**Node Link:** https://github.com/JPPhoto/ideal-size-node
+![Example Image](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png){: style="height:115px;width:240px"}
 
 ## Help
 If you run into any issues with a node, please post in the [InvokeAI Discord](https://discord.gg/ZmtBAhwWhy). 
+
+
