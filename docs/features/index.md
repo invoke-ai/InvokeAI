@@ -4,6 +4,9 @@ title: Overview
 
 Here you can find the documentation for InvokeAI's various features.
 
+## The [Getting Started Guide](../help/gettingStartedWithAI) 
+A getting started guide for those new to AI image generation. 
+
 ## The Basics
 ### * The [Web User Interface](WEB.md)
 Guide to the Web interface. Also see the [WebUI Hotkeys Reference Guide](WEBUIHOTKEYS.md)

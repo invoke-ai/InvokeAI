@@ -124,6 +124,7 @@ nav:
       - Overview: 'nodes/overview.md'
     - Features:
       - Overview: 'features/index.md'
+      - New to InvokeAI?: 'help/gettingStartedWithAI.md'
       - Concepts: 'features/CONCEPTS.md'
       - Configuration: 'features/CONFIGURATION.md'
       - ControlNet: 'features/CONTROLNET.md'
@@ -157,7 +158,7 @@ nav:
       - Inpainting: 'deprecated/INPAINTING.md'
       - Outpainting: 'deprecated/OUTPAINTING.md'
     - Help:
-      - Getting Started with AI: 'help/gettingStartedWithAI.md'
+      - Getting Started: 'help/gettingStartedWithAI.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
     - Other:
       - Contributors: 'other/CONTRIBUTORS.md'
