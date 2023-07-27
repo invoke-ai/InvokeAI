@@ -13,8 +13,8 @@ import os
 import shutil
 import textwrap
 import traceback
-import warnings
 import yaml
+import warnings
 from argparse import Namespace
 from pathlib import Path
 from shutil import get_terminal_size
@@ -45,6 +45,7 @@ from invokeai.app.services.config import (
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
 from invokeai.frontend.install.widgets import (
+    SingleSelectColumns,
     CenteredButtonPress,
     FileBox,
     IntTitleSlider,
@@ -56,7 +57,6 @@ from invokeai.frontend.install.widgets import (
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
     hf_download_from_pretrained,
-    hf_download_with_resume,
     InstallSelections,
     ModelInstall,
 )
@@ -330,34 +330,49 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             npyscreen.Checkbox,
             name="Free GPU memory after each generation",
             value=old_opts.free_gpu_mem,
+            max_width=45,
             relx=5,
             scroll_exit=True,
         )
+        self.nextrely -= 1
         self.xformers_enabled = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name="Enable xformers support if available",
+            name="Enable xformers support",
             value=old_opts.xformers_enabled,
-            relx=5,
+            max_width=30,
+            relx=50,
             scroll_exit=True,
         )
+        self.nextrely -=1
         self.always_use_cpu = self.add_widget_intelligent(
             npyscreen.Checkbox,
             name="Force CPU to be used on GPU systems",
             value=old_opts.always_use_cpu,
-            relx=5,
+            relx=80,
             scroll_exit=True,
         )
         precision = old_opts.precision or (
             "float32" if program_opts.full_precision else "auto"
         )
+        self.nextrely +=1
+        self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
+            name="Floating Point Precision",
+            begin_entry_at=0,
+            editable=False,
+            color="CONTROL",
+            scroll_exit=True,
+        )
+        self.nextrely -=1
         self.precision = self.add_widget_intelligent(
-            npyscreen.TitleSelectOne,
-            columns = 2,
+            SingleSelectColumns,
+            columns = 3,
             name="Precision",
             values=PRECISION_CHOICES,
             value=PRECISION_CHOICES.index(precision),
             begin_entry_at=3,
-            max_height=len(PRECISION_CHOICES) + 1,
+            max_height=2,
+            max_width=80,
             scroll_exit=True,
         )
         self.max_cache_size = self.add_widget_intelligent(
@@ -370,12 +385,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             scroll_exit=True,
         )
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.FixedText,
-            value="Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models (<tab> autocompletes, ctrl-N advances):",
-            editable=False,
-            color="CONTROL",
-        )
         self.outdir = self.add_widget_intelligent(
             FileBox,
             name="Output directory for images (<tab> autocompletes, ctrl-N advances):",
@@ -391,7 +400,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.autoimport_dirs = {}
         self.autoimport_dirs['autoimport_dir'] = self.add_widget_intelligent(
                 FileBox,
-                name=f'Autoimport Folder',
+                name=f'Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models',
                 value=str(config.root_path / config.autoimport_dir),
                 select_dir=True,
                 must_exist=False,
@@ -402,18 +411,10 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
                 scroll_exit=True
             )
         self.nextrely += 1
-        self.add_widget_intelligent(
-            npyscreen.TitleFixedText,
-            name="== LICENSE ==",
-            begin_entry_at=0,
-            editable=False,
-            color="CONTROL",
-            scroll_exit=True,
-        )
-        self.nextrely -= 1
         label = """BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ
-AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT
-https://huggingface.co/spaces/CompVis/stable-diffusion-license
+AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSES LOCATED AT
+https://huggingface.co/spaces/CompVis/stable-diffusion-license and
+https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md
 """
         for i in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
@@ -424,7 +425,7 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
             )
         self.license_acceptance = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name="I accept the CreativeML Responsible AI License",
+            name="I accept the CreativeML Responsible AI Licenses",
             value=not first_time,
             relx=2,
             scroll_exit=True,
@@ -439,7 +440,6 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
             CenteredButtonPress,
             name=label,
             relx=(window_width - len(label)) // 2,
-            rely=-3,
             when_pressed_function=self.on_ok,
         )
 
@@ -583,7 +583,18 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
     path = dest / 'core'
     path.mkdir(parents=True, exist_ok=True)
 
-    with open(root / 'configs' / 'models.yaml','w') as yaml_file:
+    maybe_create_models_yaml(root)
+
+def maybe_create_models_yaml(root: Path):
+    models_yaml = root / 'configs' / 'models.yaml'
+    if models_yaml.exists():
+        if OmegaConf.load(models_yaml).get('__metadata__'):  # up to date
+            return
+        else:
+            logger.info('Creating new models.yaml, original saved as models.yaml.orig')
+            models_yaml.rename(models_yaml.parent / 'models.yaml.orig')
+    
+    with open(models_yaml,'w') as yaml_file:
         yaml_file.write(yaml.dump({'__metadata__':
                                    {'version':'3.0.0'}
                                    }

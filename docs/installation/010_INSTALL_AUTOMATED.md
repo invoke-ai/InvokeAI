@@ -215,17 +215,6 @@ experimental versions later.
     Generally the defaults are fine, and you can come back to this screen at
     any time to tweak your system. Here are the options you can adjust:
 
-    - ***Output directory for images***
-      This is the path to a directory in which InvokeAI will store all its
-      generated images.
-
-    - ***NSFW checker***
-      If checked, InvokeAI will test images for potential sexual content
-      and blur them out if found. Note that the NSFW checker consumes
-      an additional 0.6 GB of VRAM on top of the 2-3 GB of VRAM used
-      by most image models. If you have a low VRAM GPU (4-6 GB), you
-      can reduce out of memory errors by disabling the checker.
-
     - ***HuggingFace Access Token***
       InvokeAI has the ability to download embedded styles and subjects
       from the HuggingFace Concept Library on-demand. However, some of
@@ -257,20 +246,30 @@ experimental versions later.
 	and graphics cards. The "autocast" option is deprecated and
 	shouldn't be used unless you are asked to by a member of the team.
 
-    - ***Number of models to cache in CPU memory***
+    - **Size of the RAM cache used for fast model switching***
         This allows you to keep models in memory and switch rapidly among
 	them rather than having them load from disk each time. This slider
-	controls how many models to keep loaded at once. Each
-	model will use 2-4 GB of RAM, so use this cautiously
+	controls how many models to keep loaded at once. A typical SD-1 or SD-2 model
+	uses 2-3 GB of memory. A typical SDXL model uses 6-7 GB. Providing more
+	RAM will allow more models to be co-resident.
 
-    - ***Directory containing embedding/textual inversion files***
-        This is the directory in which you can place custom embedding
-	files (.pt or .bin). During startup, this directory will be
-	scanned and InvokeAI will print out the text terms that
-	are available to trigger the embeddings.
+    - ***Output directory for images***
+      This is the path to a directory in which InvokeAI will store all its
+      generated images.
+
+    - ***Autoimport Folder***
+      This is the directory in which you can place models you have
+	  downloaded and wish to load into InvokeAI. You can place a variety
+	  of models in this directory, including diffusers folders, .ckpt files,
+	  .safetensors files, as well as LoRAs, ControlNet and Textual Inversion
+	  files (both folder and file versions). To help organize this folder,
+	  you can create several levels of subfolders and drop your models into
+      whichever ones you want.
+	
+    - ***Autoimport FolderLICENSE***     
 
     At the bottom of the screen you will see a checkbox for accepting
-    the CreativeML Responsible AI License. You need to accept the license
+    the CreativeML Responsible AI Licenses. You need to accept the license
     in order to download Stable Diffusion models from the next screen.
 
     _You can come back to the startup options form_ as many times as you like.

@@ -23,6 +23,10 @@ sdxl/main/stable-diffusion-xl-base-1-0:
 sdxl-refiner/main/stable-diffusion-xl-refiner-1-0:
    description: Stable Diffusion XL refiner model (12 GB)
    repo_id: stabilityai/stable-diffusion-xl-refiner-1.0
+   recommended: False
+sdxl-refiner/main/stable-diffusion-xl-refiner-1-0:
+   description: Stable Diffusion XL refiner model (12 GB)
+   repo_id: stabilityai/stable-diffusion-xl-refiner-1.0
    recommended: false
 sdxl/vae/sdxl-1-0-vae-fix:
    description: Fine tuned version of the SDXL-1.0 VAE
@@ -52,10 +56,6 @@ sd-1/main/openjourney:
    description: An SD 1.5 model fine tuned on Midjourney; prompt with "mdjrny-v4 style" (2.13 GB)
    repo_id: prompthero/openjourney
    recommended: False
-sd-1/main/portraitplus:
-   description: An SD-1.5 model trained on close range portraits of people; prompt with "portrait+" (2.13 GB)
-   repo_id: wavymulder/portraitplus
-   recommended: False
 sd-1/main/seek.art_MEGA:
    repo_id: coreco/seek.art_MEGA
    description: A general use SD-1.5 "anything" model that supports multiple styles (2.1 GB)
@@ -63,10 +63,6 @@ sd-1/main/seek.art_MEGA:
 sd-1/main/trinart_stable_diffusion_v2:
    description: An SD-1.5 model finetuned with ~40K assorted high resolution manga/anime-style images (2.13 GB)
    repo_id: naclbit/trinart_stable_diffusion_v2
-   recommended: False
-sd-1/main/waifu-diffusion:
-   description: An SD-1.5 model trained on 680k anime/manga-style images (2.13 GB)
-   repo_id: hakurei/waifu-diffusion
    recommended: False
 sd-1/controlnet/canny:
    repo_id: lllyasviel/control_v11p_sd15_canny
