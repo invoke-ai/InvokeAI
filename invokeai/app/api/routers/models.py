@@ -90,7 +90,7 @@ async def update_model(
                 new_name=info.model_name,
                 new_base=info.base_model,
             )
-            logger.info(f"Successfully renamed {base_model}/{model_name}=>{info.base_model}/{info.model_name}")
+            logger.info(f"Successfully renamed {base_model.value}/{model_name}=>{info.base_model}/{info.model_name}")
             # update information to support an update of attributes
             model_name = info.model_name
             base_model = info.base_model
