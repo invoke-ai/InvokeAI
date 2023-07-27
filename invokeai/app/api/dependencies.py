@@ -78,9 +78,7 @@ class ApiDependencies:
         image_record_storage = SqliteImageRecordStorage(db_location)
         image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
         names = SimpleNameService()
-        latents = ForwardCacheLatentsStorage(
-            DiskLatentsStorage(f"{output_folder}/latents")
-        )
+        latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
 
         board_record_storage = SqliteBoardRecordStorage(db_location)
         board_image_record_storage = SqliteBoardImageRecordStorage(db_location)
@@ -125,9 +123,7 @@ class ApiDependencies:
             boards=boards,
             board_images=board_images,
             queue=MemoryInvocationQueue(),
-            graph_library=SqliteItemStorage[LibraryGraph](
-                filename=db_location, table_name="graphs"
-            ),
+            graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs"),
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
             configuration=config,

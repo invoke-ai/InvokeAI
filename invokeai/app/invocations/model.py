@@ -4,17 +4,14 @@ from typing import List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from ...backend.model_management import BaseModelType, ModelType, SubModelType
-from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
-                             InvocationConfig, InvocationContext)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
 
 
 class ModelInfo(BaseModel):
     model_name: str = Field(description="Info to load submodel")
     base_model: BaseModelType = Field(description="Base model")
     model_type: ModelType = Field(description="Info to load submodel")
-    submodel: Optional[SubModelType] = Field(
-        default=None, description="Info to load submodel"
-    )
+    submodel: Optional[SubModelType] = Field(default=None, description="Info to load submodel")
 
 
 class LoraInfo(ModelInfo):
@@ -33,6 +30,7 @@ class ClipField(BaseModel):
     skipped_layers: int = Field(description="Number of skipped layers in text_encoder")
     loras: List[LoraInfo] = Field(description="Loras to apply on model loading")
 
+
 class VaeField(BaseModel):
     # TODO: better naming?
     vae: ModelInfo = Field(description="Info to load vae submodel")
@@ -49,6 +47,7 @@ class ModelLoaderOutput(BaseInvocationOutput):
     vae: VaeField = Field(default=None, description="Vae submodel")
     # fmt: on
 
+
 class MainModelField(BaseModel):
     """Main model field"""
 
@@ -61,6 +60,7 @@ class LoRAModelField(BaseModel):
 
     model_name: str = Field(description="Name of the LoRA model")
     base_model: BaseModelType = Field(description="Base model")
+
 
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
@@ -180,7 +180,7 @@ class MainModelLoaderInvocation(BaseInvocation):
             ),
         )
 
-    
+
 class LoraLoaderOutput(BaseInvocationOutput):
     """Model loader output"""
 
@@ -197,9 +197,7 @@ class LoraLoaderInvocation(BaseInvocation):
 
     type: Literal["lora_loader"] = "lora_loader"
 
-    lora: Union[LoRAModelField, None] = Field(
-        default=None, description="Lora model name"
-    )
+    lora: Union[LoRAModelField, None] = Field(default=None, description="Lora model name")
     weight: float = Field(default=0.75, description="With what weight to apply lora")
 
     unet: Optional[UNetField] = Field(description="UNet model for applying lora")
@@ -228,14 +226,10 @@ class LoraLoaderInvocation(BaseInvocation):
         ):
             raise Exception(f"Unkown lora name: {lora_name}!")
 
-        if self.unet is not None and any(
-            lora.model_name == lora_name for lora in self.unet.loras
-        ):
+        if self.unet is not None and any(lora.model_name == lora_name for lora in self.unet.loras):
             raise Exception(f'Lora "{lora_name}" already applied to unet')
 
-        if self.clip is not None and any(
-            lora.model_name == lora_name for lora in self.clip.loras
-        ):
+        if self.clip is not None and any(lora.model_name == lora_name for lora in self.clip.loras):
             raise Exception(f'Lora "{lora_name}" already applied to clip')
 
         output = LoraLoaderOutput()
