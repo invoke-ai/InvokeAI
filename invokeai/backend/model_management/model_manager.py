@@ -754,7 +754,7 @@ class ModelManager(object):
         # We are taking advantage of a side effect of get_model() that converts check points
         # into cached diffusers directories stored at `location`. It doesn't matter
         # what submodeltype we request here, so we get the smallest.
-        submodel = {"submodel_type": SubModelType.Tokenizer} if model_type==ModelType.Main else {}
+        submodel = {"submodel_type": SubModelType.Scheduler} if model_type==ModelType.Main else {}
         model = self.get_model(model_name,
                                base_model,
                                model_type,
