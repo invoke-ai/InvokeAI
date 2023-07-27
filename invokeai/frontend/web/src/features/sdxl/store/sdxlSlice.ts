@@ -19,6 +19,7 @@ type SDXLInitialState = {
   refinerScheduler: SchedulerParam;
   refinerAestheticScore: number;
   refinerStart: number;
+  sdxlStylePreset: string | undefined;
 };
 
 const sdxlInitialState: SDXLInitialState = {
@@ -33,6 +34,7 @@ const sdxlInitialState: SDXLInitialState = {
   refinerScheduler: 'euler',
   refinerAestheticScore: 6,
   refinerStart: 0.7,
+  sdxlStylePreset: undefined,
 };
 
 const sdxlSlice = createSlice({
@@ -75,6 +77,9 @@ const sdxlSlice = createSlice({
     setRefinerStart: (state, action: PayloadAction<number>) => {
       state.refinerStart = action.payload;
     },
+    setSDXLStylePreset: (state, action: PayloadAction<string | undefined>) => {
+      state.sdxlStylePreset = action.payload;
+    },
   },
 });
 
@@ -90,6 +95,7 @@ export const {
   setRefinerScheduler,
   setRefinerAestheticScore,
   setRefinerStart,
+  setSDXLStylePreset,
 } = sdxlSlice.actions;
 
 export default sdxlSlice.reducer;

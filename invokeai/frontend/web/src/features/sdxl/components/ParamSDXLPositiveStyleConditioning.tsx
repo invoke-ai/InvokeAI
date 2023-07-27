@@ -22,6 +22,7 @@ const promptInputSelector = createSelector(
   ({ sdxl }, activeTabName) => {
     return {
       prompt: sdxl.positiveStylePrompt,
+      sdxlStylePreset: sdxl.sdxlStylePreset,
       activeTabName,
     };
   },
@@ -37,7 +38,8 @@ const promptInputSelector = createSelector(
  */
 const ParamSDXLPositiveStyleConditioning = () => {
   const dispatch = useAppDispatch();
-  const { prompt, activeTabName } = useAppSelector(promptInputSelector);
+  const { prompt, sdxlStylePreset, activeTabName } =
+    useAppSelector(promptInputSelector);
   const isReady = useIsReadyToInvoke();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
@@ -111,7 +113,7 @@ const ParamSDXLPositiveStyleConditioning = () => {
 
   return (
     <Box position="relative">
-      <FormControl>
+      <FormControl isDisabled={sdxlStylePreset !== undefined}>
         <ParamEmbeddingPopover
           isOpen={isOpen}
           onClose={onClose}
@@ -130,7 +132,7 @@ const ParamSDXLPositiveStyleConditioning = () => {
           />
         </ParamEmbeddingPopover>
       </FormControl>
-      {!isOpen && isEmbeddingEnabled && (
+      {!isOpen && isEmbeddingEnabled && sdxlStylePreset === undefined && (
         <Box
           sx={{
             position: 'absolute',

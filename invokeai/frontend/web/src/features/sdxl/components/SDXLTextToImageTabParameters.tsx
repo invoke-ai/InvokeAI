@@ -9,6 +9,7 @@ import ParamSDXLConcatPrompt from './ParamSDXLConcatPrompt';
 import ParamSDXLNegativeStyleConditioning from './ParamSDXLNegativeStyleConditioning';
 import ParamSDXLPositiveStyleConditioning from './ParamSDXLPositiveStyleConditioning';
 import ParamSDXLRefinerCollapse from './ParamSDXLRefinerCollapse';
+import ParamSDXLStylePresetSelect from './ParamSDXLStylePresetSelect';
 
 const SDXLTextToImageTabParameters = () => {
   return (
@@ -27,6 +28,7 @@ const SDXLTextToImageTabParameters = () => {
         <ParamSDXLPositiveStyleConditioning />
         <ParamNegativeConditioning />
         <ParamSDXLNegativeStyleConditioning />
+        <ParamSDXLStylePresetSelect />
         <ParamSDXLConcatPrompt />
       </Flex>
       <ProcessButtons />

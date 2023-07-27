@@ -2,6 +2,10 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
+import {
+  SDXLStylePreset,
+  sdxlStylePresets,
+} from 'features/sdxl/stylePresets/sdxlStylePresets';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
@@ -42,6 +46,7 @@ export const buildLinearSDXLTextToImageGraph = (
     shouldConcatSDXLStylePrompt,
     shouldUseSDXLRefiner,
     refinerStart,
+    sdxlStylePreset,
   } = state.sdxl;
 
   const use_cpu = shouldUseNoiseSettings
@@ -51,6 +56,27 @@ export const buildLinearSDXLTextToImageGraph = (
   if (!model) {
     log.error('No model found in state');
     throw new Error('No model found in state');
+  }
+
+  // Style Parsing
+  let composedPositiveStylePrompt;
+  let composedNegativeStylePrompt;
+
+  if (shouldConcatSDXLStylePrompt) {
+    composedPositiveStylePrompt = `${positivePrompt} ${positiveStylePrompt}`;
+    composedNegativeStylePrompt = `${negativePrompt} ${negativeStylePrompt}`;
+  } else {
+    composedPositiveStylePrompt = positiveStylePrompt;
+    composedNegativeStylePrompt = negativeStylePrompt;
+  }
+
+  if (sdxlStylePreset) {
+    composedPositiveStylePrompt = sdxlStylePresets[
+      sdxlStylePreset as SDXLStylePreset
+    ].positive.replace('{positive_prompt}', positivePrompt);
+    composedNegativeStylePrompt = sdxlStylePresets[
+      sdxlStylePreset as SDXLStylePreset
+    ].negative.replace('{negative_prompt}', negativePrompt);
   }
 
   /**
@@ -75,17 +101,13 @@ export const buildLinearSDXLTextToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${positivePrompt} ${positiveStylePrompt}`
-          : positiveStylePrompt,
+        style: composedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${negativePrompt} ${negativeStylePrompt}`
-          : negativeStylePrompt,
+        style: composedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',

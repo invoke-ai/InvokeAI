@@ -1,4 +1,8 @@
 import { RootState } from 'app/store/store';
+import {
+  SDXLStylePreset,
+  sdxlStylePresets,
+} from 'features/sdxl/stylePresets/sdxlStylePresets';
 import { MetadataAccumulatorInvocation } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
 import {
@@ -28,6 +32,7 @@ export const addSDXLRefinerToGraph = (
     refinerScheduler,
     refinerCFGScale,
     refinerStart,
+    sdxlStylePreset,
   } = state.sdxl;
 
   if (!refinerModel) return;
@@ -43,6 +48,22 @@ export const addSDXLRefinerToGraph = (
     metadataAccumulator.refiner_scheduler = refinerScheduler;
     metadataAccumulator.refiner_start = refinerStart;
     metadataAccumulator.refiner_steps = refinerSteps;
+  }
+
+  // Style Parsing
+  let composedPositivePrompt;
+  let composedNegativePrompt;
+
+  composedPositivePrompt = `${positivePrompt} ${positiveStylePrompt}`;
+  composedNegativePrompt = `${negativePrompt} ${negativeStylePrompt}`;
+
+  if (sdxlStylePreset) {
+    composedPositivePrompt = sdxlStylePresets[
+      sdxlStylePreset as SDXLStylePreset
+    ].positive.replace('{positive_prompt}', positivePrompt);
+    composedNegativePrompt = sdxlStylePresets[
+      sdxlStylePreset as SDXLStylePreset
+    ].negative.replace('{negative_prompt}', negativePrompt);
   }
 
   // Unplug SDXL Latents Generation To Latents To Image
@@ -82,13 +103,13 @@ export const addSDXLRefinerToGraph = (
   graph.nodes[SDXL_REFINER_POSITIVE_CONDITIONING] = {
     type: 'sdxl_refiner_compel_prompt',
     id: SDXL_REFINER_POSITIVE_CONDITIONING,
-    style: `${positivePrompt} ${positiveStylePrompt}`,
+    style: composedPositivePrompt,
     aesthetic_score: refinerAestheticScore,
   };
   graph.nodes[SDXL_REFINER_NEGATIVE_CONDITIONING] = {
     type: 'sdxl_refiner_compel_prompt',
     id: SDXL_REFINER_NEGATIVE_CONDITIONING,
-    style: `${negativePrompt} ${negativeStylePrompt}`,
+    style: composedNegativePrompt,
     aesthetic_score: refinerAestheticScore,
   };
   graph.nodes[SDXL_REFINER_LATENTS_TO_LATENTS] = {
