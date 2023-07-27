@@ -12,6 +12,7 @@ import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
+import { BaseModelType } from 'services/api/types';
 
 type ParamControlNetModelProps = {
   controlNetId: string;
@@ -58,7 +59,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
       data.push({
         value: id,
         label: model.model_name,
-        group: MODEL_TYPE_MAP[model.base_model],
+        group: MODEL_TYPE_MAP[model.base_model as BaseModelType],
         disabled,
         tooltip: disabled
           ? `Incompatible base model: ${model.base_model}`
