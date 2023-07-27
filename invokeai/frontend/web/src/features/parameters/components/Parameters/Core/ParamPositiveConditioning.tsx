@@ -148,7 +148,7 @@ const ParamPositiveConditioning = () => {
         <Box
           sx={{
             position: 'absolute',
-            top: shouldPinParametersPanel ? 6 : 0,
+            top: shouldPinParametersPanel ? 4 : 0,
             insetInlineEnd: 0,
           }}
         >
