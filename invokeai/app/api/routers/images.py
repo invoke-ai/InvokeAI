@@ -40,15 +40,9 @@ async def upload_image(
     response: Response,
     image_category: ImageCategory = Query(description="The category of the image"),
     is_intermediate: bool = Query(description="Whether this is an intermediate image"),
-    board_id: Optional[str] = Query(
-        default=None, description="The board to add this image to, if any"
-    ),
-    session_id: Optional[str] = Query(
-        default=None, description="The session ID associated with this upload, if any"
-    ),
-    crop_visible: Optional[bool] = Query(
-        default=False, description="Whether to crop the image"
-    ),
+    board_id: Optional[str] = Query(default=None, description="The board to add this image to, if any"),
+    session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
+    crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
 ) -> ImageDTO:
     """Uploads an image"""
     if not file.content_type.startswith("image"):
@@ -115,9 +109,7 @@ async def clear_intermediates() -> int:
 )
 async def update_image(
     image_name: str = Path(description="The name of the image to update"),
-    image_changes: ImageRecordChanges = Body(
-        description="The changes to apply to the image"
-    ),
+    image_changes: ImageRecordChanges = Body(description="The changes to apply to the image"),
 ) -> ImageDTO:
     """Updates an image"""
 
@@ -212,15 +204,11 @@ async def get_image_thumbnail(
     """Gets a thumbnail image file"""
 
     try:
-        path = ApiDependencies.invoker.services.images.get_path(
-            image_name, thumbnail=True
-        )
+        path = ApiDependencies.invoker.services.images.get_path(image_name, thumbnail=True)
         if not ApiDependencies.invoker.services.images.validate_path(path):
             raise HTTPException(status_code=404)
 
-        response = FileResponse(
-            path, media_type="image/webp", content_disposition_type="inline"
-        )
+        response = FileResponse(path, media_type="image/webp", content_disposition_type="inline")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         return response
     except Exception as e:
@@ -239,9 +227,7 @@ async def get_image_urls(
 
     try:
         image_url = ApiDependencies.invoker.services.images.get_url(image_name)
-        thumbnail_url = ApiDependencies.invoker.services.images.get_url(
-            image_name, thumbnail=True
-        )
+        thumbnail_url = ApiDependencies.invoker.services.images.get_url(image_name, thumbnail=True)
         return ImageUrlsDTO(
             image_name=image_name,
             image_url=image_url,
@@ -257,15 +243,9 @@ async def get_image_urls(
     response_model=OffsetPaginatedResults[ImageDTO],
 )
 async def list_image_dtos(
-    image_origin: Optional[ResourceOrigin] = Query(
-        default=None, description="The origin of images to list."
-    ),
-    categories: Optional[list[ImageCategory]] = Query(
-        default=None, description="The categories of image to include."
-    ),
-    is_intermediate: Optional[bool] = Query(
-        default=None, description="Whether to list intermediate images."
-    ),
+    image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
+    categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
+    is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
     board_id: Optional[str] = Query(
         default=None,
         description="The board id to filter by. Use 'none' to find images without a board.",

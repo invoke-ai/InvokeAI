@@ -9,19 +9,16 @@ from ...backend.stable_diffusion import PipelineIntermediateState
 from invokeai.app.services.config import InvokeAIAppConfig
 
 
-def sample_to_lowres_estimated_image(samples, latent_rgb_factors, smooth_matrix = None):
+def sample_to_lowres_estimated_image(samples, latent_rgb_factors, smooth_matrix=None):
     latent_image = samples[0].permute(1, 2, 0) @ latent_rgb_factors
 
     if smooth_matrix is not None:
         latent_image = latent_image.unsqueeze(0).permute(3, 0, 1, 2)
-        latent_image = torch.nn.functional.conv2d(latent_image, smooth_matrix.reshape((1,1,3,3)), padding=1)
+        latent_image = torch.nn.functional.conv2d(latent_image, smooth_matrix.reshape((1, 1, 3, 3)), padding=1)
         latent_image = latent_image.permute(1, 2, 3, 0).squeeze(0)
 
     latents_ubyte = (
-        ((latent_image + 1) / 2)
-        .clamp(0, 1)  # change scale from -1..1 to 0..1
-        .mul(0xFF)  # to 0..255
-        .byte()
+        ((latent_image + 1) / 2).clamp(0, 1).mul(0xFF).byte()  # change scale from -1..1 to 0..1  # to 0..255
     ).cpu()
 
     return Image.fromarray(latents_ubyte.numpy())
@@ -92,6 +89,7 @@ def stable_diffusion_step_callback(
         total_steps=node["steps"],
     )
 
+
 def stable_diffusion_xl_step_callback(
     context: InvocationContext,
     node: dict,
@@ -106,9 +104,9 @@ def stable_diffusion_xl_step_callback(
     sdxl_latent_rgb_factors = torch.tensor(
         [
             #   R        G        B
-            [ 0.3816,  0.4930,  0.5320],
-            [-0.3753,  0.1631,  0.1739],
-            [ 0.1770,  0.3588, -0.2048],
+            [0.3816, 0.4930, 0.5320],
+            [-0.3753, 0.1631, 0.1739],
+            [0.1770, 0.3588, -0.2048],
             [-0.4350, -0.2644, -0.4289],
         ],
         dtype=sample.dtype,
@@ -117,9 +115,9 @@ def stable_diffusion_xl_step_callback(
 
     sdxl_smooth_matrix = torch.tensor(
         [
-            #[ 0.0478,  0.1285,  0.0478],
-            #[ 0.1285,  0.2948,  0.1285],
-            #[ 0.0478,  0.1285,  0.0478],
+            # [ 0.0478,  0.1285,  0.0478],
+            # [ 0.1285,  0.2948,  0.1285],
+            # [ 0.0478,  0.1285,  0.0478],
             [0.0358, 0.0964, 0.0358],
             [0.0964, 0.4711, 0.0964],
             [0.0358, 0.0964, 0.0358],

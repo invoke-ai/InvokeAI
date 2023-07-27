@@ -426,9 +426,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         finally:
             self._lock.release()
 
-        return OffsetPaginatedResults(
-            items=images, offset=offset, limit=limit, total=count
-        )
+        return OffsetPaginatedResults(items=images, offset=offset, limit=limit, total=count)
 
     def delete(self, image_name: str) -> None:
         try:
@@ -465,7 +463,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordDeleteException from e
         finally:
             self._lock.release()
-
 
     def delete_intermediates(self) -> list[str]:
         try:
@@ -505,9 +502,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: bool = False,
     ) -> datetime:
         try:
-            metadata_json = (
-                None if metadata is None else json.dumps(metadata)
-            )
+            metadata_json = None if metadata is None else json.dumps(metadata)
             self._lock.acquire()
             self._cursor.execute(
                 """--sql

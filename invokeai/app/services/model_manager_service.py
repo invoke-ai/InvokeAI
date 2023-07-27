@@ -103,7 +103,7 @@ class ModelManagerServiceBase(ABC):
         }
         """
         pass
-    
+
     @abstractmethod
     def list_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
         """
@@ -125,7 +125,7 @@ class ModelManagerServiceBase(ABC):
         base_model: BaseModelType,
         model_type: ModelType,
         model_attributes: dict,
-        clobber: bool = False
+        clobber: bool = False,
     ) -> AddModelResult:
         """
         Update the named model with a dictionary of attributes. Will fail with an
@@ -148,12 +148,12 @@ class ModelManagerServiceBase(ABC):
         Update the named model with a dictionary of attributes. Will fail with a
         ModelNotFoundException if the name does not already exist.
 
-        On a successful update, the config will be changed in memory. Will fail 
-        with an assertion error if provided attributes are incorrect or 
+        On a successful update, the config will be changed in memory. Will fail
+        with an assertion error if provided attributes are incorrect or
         the model name is missing. Call commit() to write changes to disk.
         """
         pass
-    
+
     @abstractmethod
     def del_model(
         self,
@@ -169,21 +169,20 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def rename_model(self,
-                     model_name: str,
-                     base_model: BaseModelType,
-                     model_type: ModelType,
-                     new_name: str,
-                     ):
+    def rename_model(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        new_name: str,
+    ):
         """
         Rename the indicated model.
         """
         pass
 
     @abstractmethod
-    def list_checkpoint_configs(
-        self
-    )->List[Path]:
+    def list_checkpoint_configs(self) -> List[Path]:
         """
         List the checkpoint config paths from ROOT/configs/stable-diffusion.
         """
@@ -194,7 +193,7 @@ class ModelManagerServiceBase(ABC):
         self,
         model_name: str,
         base_model: BaseModelType,
-        model_type: Union[ModelType.Main,ModelType.Vae],
+        model_type: Union[ModelType.Main, ModelType.Vae],
     ) -> AddModelResult:
         """
         Convert a checkpoint file into a diffusers folder, deleting the cached
@@ -211,11 +210,12 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def heuristic_import(self,
-                         items_to_import: set[str],
-                         prediction_type_helper: Optional[Callable[[Path],SchedulerPredictionType]]=None,
-                         )->dict[str, AddModelResult]:
-        '''Import a list of paths, repo_ids or URLs. Returns the set of
+    def heuristic_import(
+        self,
+        items_to_import: set[str],
+        prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
+    ) -> dict[str, AddModelResult]:
+        """Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.
         :param items_to_import: Set of strings corresponding to models to be imported.
         :param prediction_type_helper: A callback that receives the Path of a Stable Diffusion 2 checkpoint model and returns a SchedulerPredictionType.
@@ -230,19 +230,23 @@ class ModelManagerServiceBase(ABC):
         The result is a set of successfully installed models. Each element
         of the set is a dict corresponding to the newly-created OmegaConf stanza for
         that model.
-        '''
+        """
         pass
 
     @abstractmethod
     def merge_models(
-            self,
-            model_names: List[str] = Field(default=None, min_items=2, max_items=3, description="List of model names to merge"),
-            base_model: Union[BaseModelType,str] = Field(default=None, description="Base model shared by all models to be merged"),
-            merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
-            alpha: Optional[float] = 0.5,
-            interp: Optional[MergeInterpolationMethod] = None,
-            force: Optional[bool] = False,
-            merge_dest_directory: Optional[Path] = None
+        self,
+        model_names: List[str] = Field(
+            default=None, min_items=2, max_items=3, description="List of model names to merge"
+        ),
+        base_model: Union[BaseModelType, str] = Field(
+            default=None, description="Base model shared by all models to be merged"
+        ),
+        merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
+        alpha: Optional[float] = 0.5,
+        interp: Optional[MergeInterpolationMethod] = None,
+        force: Optional[bool] = False,
+        merge_dest_directory: Optional[Path] = None,
     ) -> AddModelResult:
         """
         Merge two to three diffusrs pipeline models and save as a new model.
@@ -250,27 +254,27 @@ class ModelManagerServiceBase(ABC):
         :param base_model: Base model to use for all models
         :param merged_model_name: Name of destination merged model
         :param alpha: Alpha strength to apply to 2d and 3d model
-        :param interp: Interpolation method. None (default) 
+        :param interp: Interpolation method. None (default)
         :param merge_dest_directory: Save the merged model to the designated directory (with 'merged_model_name' appended)
         """
         pass
 
     @abstractmethod
-    def search_for_models(self, directory: Path)->List[Path]:
+    def search_for_models(self, directory: Path) -> List[Path]:
         """
         Return list of all models found in the designated directory.
         """
         pass
-        
+
     @abstractmethod
     def sync_to_config(self):
         """
-        Re-read models.yaml, rescan the models directory, and reimport models 
+        Re-read models.yaml, rescan the models directory, and reimport models
         in the autoimport directories. Call after making changes outside the
         model manager API.
         """
         pass
-        
+
     @abstractmethod
     def commit(self, conf_file: Optional[Path] = None) -> None:
         """
@@ -280,9 +284,11 @@ class ModelManagerServiceBase(ABC):
         """
         pass
 
+
 # simple implementation
 class ModelManagerService(ModelManagerServiceBase):
     """Responsible for managing models on disk and in memory"""
+
     def __init__(
         self,
         config: InvokeAIAppConfig,
@@ -298,17 +304,17 @@ class ModelManagerService(ModelManagerServiceBase):
             config_file = config.model_conf_path
         else:
             config_file = config.root_dir / "configs/models.yaml"
-            
-        logger.debug(f'Config file={config_file}')
+
+        logger.debug(f"Config file={config_file}")
 
         device = torch.device(choose_torch_device())
-        device_name =  torch.cuda.get_device_name() if device==torch.device('cuda') else ''
-        logger.info(f'GPU device = {device} {device_name}')
+        device_name = torch.cuda.get_device_name() if device == torch.device("cuda") else ""
+        logger.info(f"GPU device = {device} {device_name}")
 
         precision = config.precision
         if precision == "auto":
             precision = choose_precision(device)
-        dtype = torch.float32 if precision == 'float32' else torch.float16
+        dtype = torch.float32 if precision == "float32" else torch.float16
 
         # this is transitional backward compatibility
         # support for the deprecated `max_loaded_models`
@@ -316,9 +322,7 @@ class ModelManagerService(ModelManagerServiceBase):
         # cache size is set to 2.5 GB times
         # the number of max_loaded_models. Otherwise
         # use new `max_cache_size` config setting
-        max_cache_size = config.max_cache_size \
-            if hasattr(config,'max_cache_size') \
-               else config.max_loaded_models * 2.5
+        max_cache_size = config.max_cache_size if hasattr(config, "max_cache_size") else config.max_loaded_models * 2.5
 
         logger.debug(f"Maximum RAM cache size: {max_cache_size} GiB")
 
@@ -332,7 +336,7 @@ class ModelManagerService(ModelManagerServiceBase):
             sequential_offload=sequential_offload,
             logger=logger,
         )
-        logger.info('Model manager service initialized')
+        logger.info("Model manager service initialized")
 
     def get_model(
         self,
@@ -371,7 +375,7 @@ class ModelManagerService(ModelManagerServiceBase):
                 base_model=base_model,
                 model_type=model_type,
                 submodel=submodel,
-                model_info=model_info
+                model_info=model_info,
             )
 
         return model_info
@@ -405,9 +409,7 @@ class ModelManagerService(ModelManagerServiceBase):
         return self.mgr.model_names()
 
     def list_models(
-        self,
-        base_model: Optional[BaseModelType] = None,
-        model_type: Optional[ModelType] = None
+        self, base_model: Optional[BaseModelType] = None, model_type: Optional[ModelType] = None
     ) -> list[dict]:
         """
         Return a list of models.
@@ -418,9 +420,7 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         Return information about the model using the same format as list_models()
         """
-        return self.mgr.list_model(model_name=model_name,
-                                   base_model=base_model,
-                                   model_type=model_type)
+        return self.mgr.list_model(model_name=model_name, base_model=base_model, model_type=model_type)
 
     def add_model(
         self,
@@ -429,7 +429,7 @@ class ModelManagerService(ModelManagerServiceBase):
         model_type: ModelType,
         model_attributes: dict,
         clobber: bool = False,
-    )->None:
+    ) -> None:
         """
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
@@ -437,7 +437,7 @@ class ModelManagerService(ModelManagerServiceBase):
         with an assertion error if provided attributes are incorrect or
         the model name is missing. Call commit() to write changes to disk.
         """
-        self.logger.debug(f'add/update model {model_name}')        
+        self.logger.debug(f"add/update model {model_name}")
         return self.mgr.add_model(model_name, base_model, model_type, model_attributes, clobber)
 
     def update_model(
@@ -450,15 +450,15 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         Update the named model with a dictionary of attributes. Will fail with a
         ModelNotFoundException exception if the name does not already exist.
-        On a successful update, the config will be changed in memory. Will fail 
-        with an assertion error if provided attributes are incorrect or 
+        On a successful update, the config will be changed in memory. Will fail
+        with an assertion error if provided attributes are incorrect or
         the model name is missing. Call commit() to write changes to disk.
         """
-        self.logger.debug(f'update model {model_name}')
+        self.logger.debug(f"update model {model_name}")
         if not self.model_exists(model_name, base_model, model_type):
             raise ModelNotFoundException(f"Unknown model {model_name}")
         return self.add_model(model_name, base_model, model_type, model_attributes, clobber=True)
-    
+
     def del_model(
         self,
         model_name: str,
@@ -470,7 +470,7 @@ class ModelManagerService(ModelManagerServiceBase):
         then the underlying weight file or diffusers directory will be deleted
         as well.
         """
-        self.logger.debug(f'delete model {model_name}')
+        self.logger.debug(f"delete model {model_name}")
         self.mgr.del_model(model_name, base_model, model_type)
         self.mgr.commit()
 
@@ -478,8 +478,10 @@ class ModelManagerService(ModelManagerServiceBase):
         self,
         model_name: str,
         base_model: BaseModelType,
-        model_type: Union[ModelType.Main,ModelType.Vae],
-        convert_dest_directory: Optional[Path] = Field(default=None, description="Optional directory location for merged model"),        
+        model_type: Union[ModelType.Main, ModelType.Vae],
+        convert_dest_directory: Optional[Path] = Field(
+            default=None, description="Optional directory location for merged model"
+        ),
     ) -> AddModelResult:
         """
         Convert a checkpoint file into a diffusers folder, deleting the cached
@@ -494,10 +496,10 @@ class ModelManagerService(ModelManagerServiceBase):
         also raise a ValueError in the event that there is a similarly-named diffusers
         directory already in place.
         """
-        self.logger.debug(f'convert model {model_name}')        
+        self.logger.debug(f"convert model {model_name}")
         return self.mgr.convert_model(model_name, base_model, model_type, convert_dest_directory)
 
-    def commit(self, conf_file: Optional[Path]=None):
+    def commit(self, conf_file: Optional[Path] = None):
         """
         Write current configuration out to the indicated file.
         If no conf_file is provided, then replaces the
@@ -524,7 +526,7 @@ class ModelManagerService(ModelManagerServiceBase):
                 base_model=base_model,
                 model_type=model_type,
                 submodel=submodel,
-                model_info=model_info
+                model_info=model_info,
             )
         else:
             context.services.events.emit_model_load_started(
@@ -535,16 +537,16 @@ class ModelManagerService(ModelManagerServiceBase):
                 submodel=submodel,
             )
 
-
     @property
     def logger(self):
         return self.mgr.logger
 
-    def heuristic_import(self,
-                         items_to_import: set[str],
-                         prediction_type_helper: Optional[Callable[[Path],SchedulerPredictionType]]=None,
-                         )->dict[str, AddModelResult]:
-        '''Import a list of paths, repo_ids or URLs. Returns the set of
+    def heuristic_import(
+        self,
+        items_to_import: set[str],
+        prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
+    ) -> dict[str, AddModelResult]:
+        """Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.
         :param items_to_import: Set of strings corresponding to models to be imported.
         :param prediction_type_helper: A callback that receives the Path of a Stable Diffusion 2 checkpoint model and returns a SchedulerPredictionType.
@@ -559,18 +561,24 @@ class ModelManagerService(ModelManagerServiceBase):
         The result is a set of successfully installed models. Each element
         of the set is a dict corresponding to the newly-created OmegaConf stanza for
         that model.
-        '''
-        return self.mgr.heuristic_import(items_to_import, prediction_type_helper)        
+        """
+        return self.mgr.heuristic_import(items_to_import, prediction_type_helper)
 
     def merge_models(
-            self,
-            model_names: List[str] = Field(default=None, min_items=2, max_items=3, description="List of model names to merge"),
-            base_model: Union[BaseModelType,str] = Field(default=None, description="Base model shared by all models to be merged"),
-            merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
-            alpha: Optional[float] = 0.5,
-            interp: Optional[MergeInterpolationMethod] = None,
-            force: Optional[bool] = False,
-            merge_dest_directory: Optional[Path] = Field(default=None, description="Optional directory location for merged model"),
+        self,
+        model_names: List[str] = Field(
+            default=None, min_items=2, max_items=3, description="List of model names to merge"
+        ),
+        base_model: Union[BaseModelType, str] = Field(
+            default=None, description="Base model shared by all models to be merged"
+        ),
+        merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
+        alpha: Optional[float] = 0.5,
+        interp: Optional[MergeInterpolationMethod] = None,
+        force: Optional[bool] = False,
+        merge_dest_directory: Optional[Path] = Field(
+            default=None, description="Optional directory location for merged model"
+        ),
     ) -> AddModelResult:
         """
         Merge two to three diffusrs pipeline models and save as a new model.
@@ -578,25 +586,25 @@ class ModelManagerService(ModelManagerServiceBase):
         :param base_model: Base model to use for all models
         :param merged_model_name: Name of destination merged model
         :param alpha: Alpha strength to apply to 2d and 3d model
-        :param interp: Interpolation method. None (default) 
+        :param interp: Interpolation method. None (default)
         :param merge_dest_directory: Save the merged model to the designated directory (with 'merged_model_name' appended)
         """
         merger = ModelMerger(self.mgr)
         try:
             result = merger.merge_diffusion_models_and_save(
-                model_names = model_names,
-                base_model = base_model,
-                merged_model_name = merged_model_name,
-                alpha = alpha,
-                interp = interp,
-                force = force,
+                model_names=model_names,
+                base_model=base_model,
+                merged_model_name=merged_model_name,
+                alpha=alpha,
+                interp=interp,
+                force=force,
                 merge_dest_directory=merge_dest_directory,
             )
         except AssertionError as e:
             raise ValueError(e)
         return result
 
-    def search_for_models(self, directory: Path)->List[Path]:
+    def search_for_models(self, directory: Path) -> List[Path]:
         """
         Return list of all models found in the designated directory.
         """
@@ -605,28 +613,29 @@ class ModelManagerService(ModelManagerServiceBase):
 
     def sync_to_config(self):
         """
-        Re-read models.yaml, rescan the models directory, and reimport models 
+        Re-read models.yaml, rescan the models directory, and reimport models
         in the autoimport directories. Call after making changes outside the
         model manager API.
         """
         return self.mgr.sync_to_config()
 
-    def list_checkpoint_configs(self)->List[Path]:
+    def list_checkpoint_configs(self) -> List[Path]:
         """
         List the checkpoint config paths from ROOT/configs/stable-diffusion.
         """
         config = self.mgr.app_config
         conf_path = config.legacy_conf_path
         root_path = config.root_path
-        return [(conf_path / x).relative_to(root_path) for x in conf_path.glob('**/*.yaml')]
+        return [(conf_path / x).relative_to(root_path) for x in conf_path.glob("**/*.yaml")]
 
-    def rename_model(self,
-                     model_name: str,
-                     base_model: BaseModelType,
-                     model_type: ModelType,
-                     new_name: str = None,
-                     new_base: BaseModelType = None,
-                     ):
+    def rename_model(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        new_name: str = None,
+        new_base: BaseModelType = None,
+    ):
         """
         Rename the indicated model. Can provide a new name and/or a new base.
         :param model_name: Current name of the model
@@ -635,10 +644,10 @@ class ModelManagerService(ModelManagerServiceBase):
         :param new_name: New name for the model
         :param new_base: New base for the model
         """
-        self.mgr.rename_model(base_model = base_model,
-                              model_type = model_type,
-                              model_name = model_name,
-                              new_name = new_name,
-                              new_base = new_base,
-                              )
-        
+        self.mgr.rename_model(
+            base_model=base_model,
+            model_type=model_type,
+            model_name=model_name,
+            new_name=new_name,
+            new_base=new_base,
+        )

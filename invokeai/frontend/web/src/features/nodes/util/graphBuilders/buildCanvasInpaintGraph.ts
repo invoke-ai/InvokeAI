@@ -8,7 +8,9 @@ import {
   RangeOfSizeInvocation,
 } from 'services/api/types';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   INPAINT,
@@ -20,8 +22,6 @@ import {
   RANDOM_INT,
   RANGE_OF_SIZE,
 } from './constants';
-import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
