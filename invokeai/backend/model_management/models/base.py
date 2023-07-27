@@ -267,18 +267,16 @@ class DiffusersModel(ModelBase):
             try:
                 # TODO: set cache_dir to /dev/null to be sure that cache not used?
                 model = self.child_types[child_type].from_pretrained(
-                    os.path.join(self.model_path, child_type.value),
-                    #subfolder=child_type.value,
+                    self.model_path,
+                    subfolder=child_type.value,
                     torch_dtype=torch_dtype,
                     variant=variant,
                     local_files_only=True,
                 )
                 break
             except Exception as e:
-                print("====ERR LOAD====")
-                print(f"{variant}: {e}")
-                import traceback
-                traceback.print_exc()
+                # print("====ERR LOAD====")
+                # print(f"{variant}: {e}")
                 pass
         else:
             raise Exception(f"Failed to load {self.base_model}:{self.model_type}:{child_type} model")

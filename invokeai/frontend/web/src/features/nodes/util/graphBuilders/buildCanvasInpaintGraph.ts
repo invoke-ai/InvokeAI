@@ -17,7 +17,6 @@ import {
   INPAINT_GRAPH,
   ITERATE,
   MAIN_MODEL_LOADER,
-  ONNX_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
@@ -69,11 +68,6 @@ export const buildCanvasInpaintGraph = (
     shouldAutoSave,
   } = state.canvas;
 
-  const model_loader = model.model_type.includes('onnx')
-    ? ONNX_MODEL_LOADER
-    : MAIN_MODEL_LOADER;
-
-  // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
     nodes: {
@@ -121,9 +115,9 @@ export const buildCanvasInpaintGraph = (
         is_intermediate: true,
         prompt: negativePrompt,
       },
-      [model_loader]: {
-        type: model_loader,
-        id: model_loader,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         is_intermediate: true,
         model,
       },
@@ -151,7 +145,7 @@ export const buildCanvasInpaintGraph = (
     edges: [
       {
         source: {
-          node_id: model_loader,
+          node_id: MAIN_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
@@ -161,7 +155,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: model_loader,
+          node_id: MAIN_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
