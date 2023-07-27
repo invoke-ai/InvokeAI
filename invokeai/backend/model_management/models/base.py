@@ -275,8 +275,8 @@ class DiffusersModel(ModelBase):
                 )
                 break
             except Exception as e:
-                # print("====ERR LOAD====")
-                # print(f"{variant}: {e}")
+                #print("====ERR LOAD====")
+                #print(f"{variant}: {e}")
                 pass
         else:
             raise Exception(f"Failed to load {self.base_model}:{self.model_type}:{child_type} model")

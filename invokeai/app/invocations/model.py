@@ -222,9 +222,6 @@ class LoraLoaderInvocation(BaseInvocation):
         base_model = self.lora.base_model
         lora_name = self.lora.model_name
 
-        # TODO: ui rewrite
-        base_model = BaseModelType.StableDiffusion1
-
         if not context.services.model_manager.model_exists(
             base_model=base_model,
             model_name=lora_name,

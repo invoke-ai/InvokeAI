@@ -19,7 +19,6 @@ import {
   useGetMainModelsQuery,
   useGetOnnxModelsQuery,
 } from 'services/api/endpoints/models';
-import { modelIdToOnnxModelField } from 'features/nodes/util/modelIdToOnnxModelField';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
@@ -39,7 +38,9 @@ const ParamMainModelSelect = () => {
   const { data: mainModels, isLoading } = useGetMainModelsQuery(
     NON_REFINER_BASE_MODELS
   );
-  const { data: onnxModels, isLoading: onnxLoading } = useGetOnnxModelsQuery();
+  const { data: onnxModels, isLoading: onnxLoading } = useGetOnnxModelsQuery(
+    NON_REFINER_BASE_MODELS
+  );
 
   const activeTabName = useAppSelector(activeTabNameSelector);
 
@@ -101,11 +102,7 @@ const ParamMainModelSelect = () => {
         return;
       }
 
-      let newModel = modelIdToMainModelParam(v);
-
-      if (v.includes('onnx')) {
-        newModel = modelIdToOnnxModelField(v);
-      }
+      const newModel = modelIdToMainModelParam(v);
 
       if (!newModel) {
         return;

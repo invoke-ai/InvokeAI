@@ -236,6 +236,11 @@ export const zMainModel = z.object({
  * Type alias for model parameter, inferred from its zod schema
  */
 export type MainModelParam = z.infer<typeof zMainModel>;
+
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type OnnxModelParam = z.infer<typeof zMainModel>;
 /**
  * Validates/type-guards a value as a model parameter
  */

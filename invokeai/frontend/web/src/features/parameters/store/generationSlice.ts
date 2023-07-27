@@ -229,10 +229,7 @@ export const generationSlice = createSlice({
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelChanged: (
-      state,
-      action: PayloadAction<MainModelParam | OnnxModelField | null>
-    ) => {
+    modelChanged: (state, action: PayloadAction<MainModelParam | null>) => {
       state.model = action.payload;
 
       if (state.model === null) {
