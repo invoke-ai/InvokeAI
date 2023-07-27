@@ -46,7 +46,7 @@ Personalize models by adding your own style or subjects.
 
 ## Other Features
 
-### * [The NSFW Checker](NSFW.md)
+### * [The NSFW Checker](WATERMARK+NSFW.md)
 Prevent InvokeAI from displaying unwanted racy images.
 
 ### * [Controlling Logging](LOGGING.md)

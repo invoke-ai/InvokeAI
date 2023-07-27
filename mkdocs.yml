@@ -157,6 +157,7 @@ nav:
       - Inpainting: 'deprecated/INPAINTING.md'
       - Outpainting: 'deprecated/OUTPAINTING.md'
     - Help:
+      - Getting Started with AI: 'help/gettingStartedWithAI.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
     - Other:
       - Contributors: 'other/CONTRIBUTORS.md'
