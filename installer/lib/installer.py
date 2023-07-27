@@ -290,7 +290,7 @@ class InvokeAiInstance:
                 src = str(next(Path(__file__).parent.glob("InvokeAI-*.whl")))
             except StopIteration:
                 try:
-                    src = Path(__file__).parents[2].expanduser().resolve()
+                    src = Path(__file__).parents[1].expanduser().resolve()
                     # if the above directory contains one of these files, we'll do a source install
                     next(src.glob("pyproject.toml"))
                     next(src.glob("invokeai"))
