@@ -42,8 +42,13 @@ export type ControlField = components['schemas']['ControlField'];
 // Model Configs
 export type LoRAModelConfig = components['schemas']['LoRAModelConfig'];
 export type VaeModelConfig = components['schemas']['VaeModelConfig'];
+export type ControlNetModelCheckpointConfig =
+  components['schemas']['ControlNetModelCheckpointConfig'];
+export type ControlNetModelDiffusersConfig =
+  components['schemas']['ControlNetModelDiffusersConfig'];
 export type ControlNetModelConfig =
-  components['schemas']['ControlNetModelConfig'];
+  | ControlNetModelCheckpointConfig
+  | ControlNetModelDiffusersConfig;
 export type TextualInversionModelConfig =
   components['schemas']['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
