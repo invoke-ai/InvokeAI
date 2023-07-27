@@ -17,8 +17,8 @@ from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED,BUTTON3_CLICKED
 
 # minimum size for UIs
-MIN_COLS = 136
-MIN_LINES = 45
+MIN_COLS = 130
+MIN_LINES = 38
 
 # -------------------------------------
 def set_terminal_size(columns: int, lines: int):
@@ -38,13 +38,13 @@ def set_terminal_size(columns: int, lines: int):
     ts = get_terminal_size()
     pause = False
     if ts.columns < columns:
-        print('\033[1mThis window is too narrow for the user interface. Please make it wider.\033[0m')
+        print('\033[1mThis window is too narrow for the user interface.\033[0m')
         pause = True
     if ts.lines < lines:
-        print('\033[1mThis window is too short for the user interface. Please make it taller.\033[0m')
+        print('\033[1mThis window is too short for the user interface.\033[0m')
         pause = True
     if pause:
-        input('Press any key to continue..')
+        input('Maximize the window then press any key to continue..')
 
 def _set_terminal_size_powershell(width: int, height: int):
     script=f'''
