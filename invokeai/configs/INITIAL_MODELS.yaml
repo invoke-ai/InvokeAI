@@ -24,6 +24,14 @@ sdxl-refiner/main/stable-diffusion-xl-refiner-1-0:
    description: Stable Diffusion XL refiner model (12 GB)
    repo_id: stabilityai/stable-diffusion-xl-refiner-1.0
    recommended: False
+sdxl-refiner/main/stable-diffusion-xl-refiner-1-0:
+   description: Stable Diffusion XL refiner model (12 GB)
+   repo_id: stabilityai/stable-diffusion-xl-refiner-1.0
+   recommended: false
+sdxl/vae/sdxl-1-0-vae-fix:
+   description: Fine tuned version of the SDXL-1.0 VAE
+   repo_id: madebyollin/sdxl-vae-fp16-fix
+   recommended: true
 sd-1/main/Analog-Diffusion:
    description: An SD-1.5 model trained on diverse analog photographs (2.13 GB)
    repo_id: wavymulder/Analog-Diffusion
