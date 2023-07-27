@@ -412,8 +412,9 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.nextrely -= 1
         label = """BY DOWNLOADING THE STABLE DIFFUSION WEIGHT FILES, YOU AGREE TO HAVE READ
-AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSE LOCATED AT
-https://huggingface.co/spaces/CompVis/stable-diffusion-license
+AND ACCEPTED THE CREATIVEML RESPONSIBLE AI LICENSES LOCATED AT
+https://huggingface.co/spaces/CompVis/stable-diffusion-license and
+https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md
 """
         for i in textwrap.wrap(label,width=window_width-6):
             self.add_widget_intelligent(
@@ -424,7 +425,7 @@ https://huggingface.co/spaces/CompVis/stable-diffusion-license
             )
         self.license_acceptance = self.add_widget_intelligent(
             npyscreen.Checkbox,
-            name="I accept the CreativeML Responsible AI License",
+            name="I accept the CreativeML Responsible AI Licenses",
             value=not first_time,
             relx=2,
             scroll_exit=True,
