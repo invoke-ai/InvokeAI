@@ -387,7 +387,7 @@ def _calc_model_by_data(model) -> int:
 
 
 def _calc_onnx_model_by_data(model) -> int:
-    tensor_size = model.tensors.size()
+    tensor_size = model.tensors.size() * 2 # The session doubles this
     mem = tensor_size # in bytes
     return mem
 
@@ -608,9 +608,9 @@ class IAIOnnxRuntimeModel:
             # self.io_binding = self.session.io_binding()
 
     def release_session(self):
-        # self.session = None
-        # import gc
-        # gc.collect()
+        self.session = None
+        import gc
+        gc.collect()
         return
 
     def __call__(self, **kwargs):
