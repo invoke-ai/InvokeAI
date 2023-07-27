@@ -35,20 +35,20 @@ def simple_graph():
 def mock_services() -> InvocationServices:
     # NOTE: none of these are actually called by the test invocations
     return InvocationServices(
-        model_manager = None, # type: ignore
-        events = TestEventService(),
-        logger = None, # type: ignore
-        images = None, # type: ignore
-        latents = None, # type: ignore
-        boards = None, # type: ignore
-        board_images = None, # type: ignore
-        queue = MemoryInvocationQueue(),
-        graph_library=SqliteItemStorage[LibraryGraph](
-            filename=sqlite_memory, table_name="graphs"
+        model_manager=None,  # type: ignore
+        events=TestEventService(),
+        logger=None,  # type: ignore
+        images=None,  # type: ignore
+        latents=None,  # type: ignore
+        boards=None,  # type: ignore
+        board_images=None,  # type: ignore
+        queue=MemoryInvocationQueue(),
+        graph_library=SqliteItemStorage[LibraryGraph](filename=sqlite_memory, table_name="graphs"),
+        graph_execution_manager=SqliteItemStorage[GraphExecutionState](
+            filename=sqlite_memory, table_name="graph_executions"
         ),
-        graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = sqlite_memory, table_name = 'graph_executions'),
-        processor = DefaultInvocationProcessor(),
-        configuration = None, # type: ignore
+        processor=DefaultInvocationProcessor(),
+        configuration=None,  # type: ignore
     )
 
 

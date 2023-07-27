@@ -227,7 +227,8 @@ const InvokeTabs = () => {
                 id="gallery"
                 order={3}
                 defaultSize={
-                  galleryMinSizePct > DEFAULT_GALLERY_PCT
+                  galleryMinSizePct > DEFAULT_GALLERY_PCT &&
+                  galleryMinSizePct < 100 // prevent this error https://github.com/bvaughn/react-resizable-panels/blob/main/packages/react-resizable-panels/src/Panel.ts#L96
                     ? galleryMinSizePct
                     : DEFAULT_GALLERY_PCT
                 }

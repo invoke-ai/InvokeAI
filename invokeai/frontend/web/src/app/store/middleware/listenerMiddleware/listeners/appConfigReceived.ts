@@ -10,8 +10,11 @@ export const addAppConfigReceivedListener = () => {
   startAppListening({
     matcher: appInfoApi.endpoints.getAppConfig.matchFulfilled,
     effect: async (action, { getState, dispatch }) => {
-      const { infill_methods, nsfw_methods, watermarking_methods } =
-        action.payload;
+      const {
+        infill_methods = [],
+        nsfw_methods = [],
+        watermarking_methods = [],
+      } = action.payload;
       const infillMethod = getState().generation.infillMethod;
 
       if (!infill_methods.includes(infillMethod)) {

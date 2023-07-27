@@ -28,6 +28,7 @@ from ..invocations.baseinvocation import (
 # in 3.10 this would be "from types import NoneType"
 NoneType = type(None)
 
+
 class EdgeConnection(BaseModel):
     node_id: str = Field(description="The id of the node for this edge connection")
     field: str = Field(description="The field for this connection")
@@ -61,6 +62,7 @@ def get_input_field(node: BaseInvocation, field: str) -> Any:
     node_input_field = node_inputs.get(field) or None
     return node_input_field
 
+
 def is_union_subtype(t1, t2):
     t1_args = get_args(t1)
     t2_args = get_args(t2)
@@ -70,6 +72,7 @@ def is_union_subtype(t1, t2):
     else:
         # t1 is a Union, check that all of its types are in t2_args
         return all(arg in t2_args for arg in t1_args)
+
 
 def is_list_or_contains_list(t):
     t_args = get_args(t)
@@ -154,15 +157,17 @@ class GraphInvocationOutput(BaseInvocationOutput):
 
     class Config:
         schema_extra = {
-            'required': [
-                'type',
-                'image',
+            "required": [
+                "type",
+                "image",
             ]
         }
+
 
 # TODO: Fill this out and move to invocations
 class GraphInvocation(BaseInvocation):
     """Execute a graph"""
+
     type: Literal["graph"] = "graph"
 
     # TODO: figure out how to create a default here
@@ -182,23 +187,21 @@ class IterateInvocationOutput(BaseInvocationOutput):
 
     class Config:
         schema_extra = {
-            'required': [
-                'type',
-                'item',
+            "required": [
+                "type",
+                "item",
             ]
         }
+
 
 # TODO: Fill this out and move to invocations
 class IterateInvocation(BaseInvocation):
     """Iterates over a list of items"""
+
     type: Literal["iterate"] = "iterate"
 
-    collection: list[Any] = Field(
-        description="The list of items to iterate over", default_factory=list
-    )
-    index: int = Field(
-        description="The index, will be provided on executed iterators", default=0
-    )
+    collection: list[Any] = Field(description="The list of items to iterate over", default_factory=list)
+    index: int = Field(description="The index, will be provided on executed iterators", default=0)
 
     def invoke(self, context: InvocationContext) -> IterateInvocationOutput:
         """Produces the outputs as values"""
@@ -212,11 +215,12 @@ class CollectInvocationOutput(BaseInvocationOutput):
 
     class Config:
         schema_extra = {
-            'required': [
-                'type',
-                'collection',
+            "required": [
+                "type",
+                "collection",
             ]
         }
+
 
 class CollectInvocation(BaseInvocation):
     """Collects values into a collection"""
@@ -269,9 +273,7 @@ class Graph(BaseModel):
         if node_path in self.nodes:
             return (self, node_path)
 
-        node_id = (
-            node_path if "." not in node_path else node_path[: node_path.index(".")]
-        )
+        node_id = node_path if "." not in node_path else node_path[: node_path.index(".")]
         if node_id not in self.nodes:
             raise NodeNotFoundError(f"Node {node_path} not found in graph")
 
@@ -333,9 +335,7 @@ class Graph(BaseModel):
                 return False
 
         # Validate all edges reference nodes in the graph
-        node_ids = set(
-            [e.source.node_id for e in self.edges] + [e.destination.node_id for e in self.edges]
-        )
+        node_ids = set([e.source.node_id for e in self.edges] + [e.destination.node_id for e in self.edges])
         if not all((self.has_node(node_id) for node_id in node_ids)):
             return False
 
@@ -361,22 +361,14 @@ class Graph(BaseModel):
         # Validate all iterators
         # TODO: may need to validate all iterators in subgraphs so edge connections in parent graphs will be available
         if not all(
-            (
-                self._is_iterator_connection_valid(n.id)
-                for n in self.nodes.values()
-                if isinstance(n, IterateInvocation)
-            )
+            (self._is_iterator_connection_valid(n.id) for n in self.nodes.values() if isinstance(n, IterateInvocation))
         ):
             return False
 
         # Validate all collectors
         # TODO: may need to validate all collectors in subgraphs so edge connections in parent graphs will be available
         if not all(
-            (
-                self._is_collector_connection_valid(n.id)
-                for n in self.nodes.values()
-                if isinstance(n, CollectInvocation)
-            )
+            (self._is_collector_connection_valid(n.id) for n in self.nodes.values() if isinstance(n, CollectInvocation))
         ):
             return False
 
@@ -395,48 +387,51 @@ class Graph(BaseModel):
         # Validate that an edge to this node+field doesn't already exist
         input_edges = self._get_input_edges(edge.destination.node_id, edge.destination.field)
         if len(input_edges) > 0 and not isinstance(to_node, CollectInvocation):
-            raise InvalidEdgeError(f'Edge to node {edge.destination.node_id} field {edge.destination.field} already exists')
+            raise InvalidEdgeError(
+                f"Edge to node {edge.destination.node_id} field {edge.destination.field} already exists"
+            )
 
         # Validate that no cycles would be created
         g = self.nx_graph_flat()
         g.add_edge(edge.source.node_id, edge.destination.node_id)
         if not nx.is_directed_acyclic_graph(g):
-            raise InvalidEdgeError(f'Edge creates a cycle in the graph: {edge.source.node_id} -> {edge.destination.node_id}')
+            raise InvalidEdgeError(
+                f"Edge creates a cycle in the graph: {edge.source.node_id} -> {edge.destination.node_id}"
+            )
 
         # Validate that the field types are compatible
-        if not are_connections_compatible(
-            from_node, edge.source.field, to_node, edge.destination.field
-        ):
-            raise InvalidEdgeError(f'Fields are incompatible: cannot connect {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
+        if not are_connections_compatible(from_node, edge.source.field, to_node, edge.destination.field):
+            raise InvalidEdgeError(
+                f"Fields are incompatible: cannot connect {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}"
+            )
 
         # Validate if iterator output type matches iterator input type (if this edge results in both being set)
         if isinstance(to_node, IterateInvocation) and edge.destination.field == "collection":
-            if not self._is_iterator_connection_valid(
-                edge.destination.node_id, new_input=edge.source
-            ):
-                raise InvalidEdgeError(f'Iterator input type does not match iterator output type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
+            if not self._is_iterator_connection_valid(edge.destination.node_id, new_input=edge.source):
+                raise InvalidEdgeError(
+                    f"Iterator input type does not match iterator output type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}"
+                )
 
         # Validate if iterator input type matches output type (if this edge results in both being set)
         if isinstance(from_node, IterateInvocation) and edge.source.field == "item":
-            if not self._is_iterator_connection_valid(
-                edge.source.node_id, new_output=edge.destination
-            ):
-                raise InvalidEdgeError(f'Iterator output type does not match iterator input type:, {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
+            if not self._is_iterator_connection_valid(edge.source.node_id, new_output=edge.destination):
+                raise InvalidEdgeError(
+                    f"Iterator output type does not match iterator input type:, {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}"
+                )
 
         # Validate if collector input type matches output type (if this edge results in both being set)
         if isinstance(to_node, CollectInvocation) and edge.destination.field == "item":
-            if not self._is_collector_connection_valid(
-                edge.destination.node_id, new_input=edge.source
-            ):
-                raise InvalidEdgeError(f'Collector output type does not match collector input type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
+            if not self._is_collector_connection_valid(edge.destination.node_id, new_input=edge.source):
+                raise InvalidEdgeError(
+                    f"Collector output type does not match collector input type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}"
+                )
 
         # Validate if collector output type matches input type (if this edge results in both being set)
         if isinstance(from_node, CollectInvocation) and edge.source.field == "collection":
-            if not self._is_collector_connection_valid(
-                edge.source.node_id, new_output=edge.destination
-            ):
-                raise InvalidEdgeError(f'Collector input type does not match collector output type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}')
-
+            if not self._is_collector_connection_valid(edge.source.node_id, new_output=edge.destination):
+                raise InvalidEdgeError(
+                    f"Collector input type does not match collector output type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}"
+                )
 
     def has_node(self, node_path: str) -> bool:
         """Determines whether or not a node exists in the graph."""
@@ -465,17 +460,13 @@ class Graph(BaseModel):
 
         # Ensure the node type matches the new node
         if type(node) != type(new_node):
-            raise TypeError(
-                f"Node {node_path} is type {type(node)} but new node is type {type(new_node)}"
-            )
+            raise TypeError(f"Node {node_path} is type {type(node)} but new node is type {type(new_node)}")
 
         # Ensure the new id is either the same or is not in the graph
         prefix = None if "." not in node_path else node_path[: node_path.rindex(".")]
         new_path = self._get_node_path(new_node.id, prefix=prefix)
         if new_node.id != node.id and self.has_node(new_path):
-            raise NodeAlreadyInGraphError(
-                "Node with id {new_node.id} already exists in graph"
-            )
+            raise NodeAlreadyInGraphError("Node with id {new_node.id} already exists in graph")
 
         # Set the new node in the graph
         graph.nodes[new_node.id] = new_node
@@ -497,9 +488,7 @@ class Graph(BaseModel):
                 graph.add_edge(
                     Edge(
                         source=edge.source,
-                        destination=EdgeConnection(
-                            node_id=new_graph_node_path, field=edge.destination.field
-                        )
+                        destination=EdgeConnection(node_id=new_graph_node_path, field=edge.destination.field),
                     )
                 )
 
@@ -512,16 +501,12 @@ class Graph(BaseModel):
                 )
                 graph.add_edge(
                     Edge(
-                        source=EdgeConnection(
-                            node_id=new_graph_node_path, field=edge.source.field
-                        ),
-                        destination=edge.destination
+                        source=EdgeConnection(node_id=new_graph_node_path, field=edge.source.field),
+                        destination=edge.destination,
                     )
                 )
 
-    def _get_input_edges(
-        self, node_path: str, field: Optional[str] = None
-    ) -> list[Edge]:
+    def _get_input_edges(self, node_path: str, field: Optional[str] = None) -> list[Edge]:
         """Gets all input edges for a node"""
         edges = self._get_input_edges_and_graphs(node_path)
 
@@ -538,7 +523,7 @@ class Graph(BaseModel):
                 destination=EdgeConnection(
                     node_id=self._get_node_path(e.destination.node_id, prefix=prefix),
                     field=e.destination.field,
-                )
+                ),
             )
             for _, prefix, e in filtered_edges
         ]
@@ -550,32 +535,20 @@ class Graph(BaseModel):
         edges = list()
 
         # Return any input edges that appear in this graph
-        edges.extend(
-            [(self, prefix, e) for e in self.edges if e.destination.node_id == node_path]
-        )
+        edges.extend([(self, prefix, e) for e in self.edges if e.destination.node_id == node_path])
 
-        node_id = (
-            node_path if "." not in node_path else node_path[: node_path.index(".")]
-        )
+        node_id = node_path if "." not in node_path else node_path[: node_path.index(".")]
         node = self.nodes[node_id]
 
         if isinstance(node, GraphInvocation):
             graph = node.graph
-            graph_path = (
-                node.id
-                if prefix is None or prefix == ""
-                else self._get_node_path(node.id, prefix=prefix)
-            )
-            graph_edges = graph._get_input_edges_and_graphs(
-                node_path[(len(node_id) + 1) :], prefix=graph_path
-            )
+            graph_path = node.id if prefix is None or prefix == "" else self._get_node_path(node.id, prefix=prefix)
+            graph_edges = graph._get_input_edges_and_graphs(node_path[(len(node_id) + 1) :], prefix=graph_path)
             edges.extend(graph_edges)
 
         return edges
 
-    def _get_output_edges(
-        self, node_path: str, field: str
-    ) -> list[Edge]:
+    def _get_output_edges(self, node_path: str, field: str) -> list[Edge]:
         """Gets all output edges for a node"""
         edges = self._get_output_edges_and_graphs(node_path)
 
@@ -592,7 +565,7 @@ class Graph(BaseModel):
                 destination=EdgeConnection(
                     node_id=self._get_node_path(e.destination.node_id, prefix=prefix),
                     field=e.destination.field,
-                )
+                ),
             )
             for _, prefix, e in filtered_edges
         ]
@@ -604,25 +577,15 @@ class Graph(BaseModel):
         edges = list()
 
         # Return any input edges that appear in this graph
-        edges.extend(
-            [(self, prefix, e) for e in self.edges if e.source.node_id == node_path]
-        )
+        edges.extend([(self, prefix, e) for e in self.edges if e.source.node_id == node_path])
 
-        node_id = (
-            node_path if "." not in node_path else node_path[: node_path.index(".")]
-        )
+        node_id = node_path if "." not in node_path else node_path[: node_path.index(".")]
         node = self.nodes[node_id]
 
         if isinstance(node, GraphInvocation):
             graph = node.graph
-            graph_path = (
-                node.id
-                if prefix is None or prefix == ""
-                else self._get_node_path(node.id, prefix=prefix)
-            )
-            graph_edges = graph._get_output_edges_and_graphs(
-                node_path[(len(node_id) + 1) :], prefix=graph_path
-            )
+            graph_path = node.id if prefix is None or prefix == "" else self._get_node_path(node.id, prefix=prefix)
+            graph_edges = graph._get_output_edges_and_graphs(node_path[(len(node_id) + 1) :], prefix=graph_path)
             edges.extend(graph_edges)
 
         return edges
@@ -646,12 +609,8 @@ class Graph(BaseModel):
             return False
 
         # Get input and output fields (the fields linked to the iterator's input/output)
-        input_field = get_output_field(
-            self.get_node(inputs[0].node_id), inputs[0].field
-        )
-        output_fields = list(
-            [get_input_field(self.get_node(e.node_id), e.field) for e in outputs]
-        )
+        input_field = get_output_field(self.get_node(inputs[0].node_id), inputs[0].field)
+        output_fields = list([get_input_field(self.get_node(e.node_id), e.field) for e in outputs])
 
         # Input type must be a list
         if get_origin(input_field) != list:
@@ -659,12 +618,7 @@ class Graph(BaseModel):
 
         # Validate that all outputs match the input type
         input_field_item_type = get_args(input_field)[0]
-        if not all(
-            (
-                are_connection_types_compatible(input_field_item_type, f)
-                for f in output_fields
-            )
-        ):
+        if not all((are_connection_types_compatible(input_field_item_type, f) for f in output_fields)):
             return False
 
         return True
@@ -684,35 +638,21 @@ class Graph(BaseModel):
             outputs.append(new_output)
 
         # Get input and output fields (the fields linked to the iterator's input/output)
-        input_fields = list(
-            [get_output_field(self.get_node(e.node_id), e.field) for e in inputs]
-        )
-        output_fields = list(
-            [get_input_field(self.get_node(e.node_id), e.field) for e in outputs]
-        )
+        input_fields = list([get_output_field(self.get_node(e.node_id), e.field) for e in inputs])
+        output_fields = list([get_input_field(self.get_node(e.node_id), e.field) for e in outputs])
 
         # Validate that all inputs are derived from or match a single type
         input_field_types = set(
             [
                 t
                 for input_field in input_fields
-                for t in (
-                    [input_field]
-                    if get_origin(input_field) == None
-                    else get_args(input_field)
-                )
+                for t in ([input_field] if get_origin(input_field) == None else get_args(input_field))
                 if t != NoneType
             ]
         )  # Get unique types
         type_tree = nx.DiGraph()
         type_tree.add_nodes_from(input_field_types)
-        type_tree.add_edges_from(
-            [
-                e
-                for e in itertools.permutations(input_field_types, 2)
-                if issubclass(e[1], e[0])
-            ]
-        )
+        type_tree.add_edges_from([e for e in itertools.permutations(input_field_types, 2) if issubclass(e[1], e[0])])
         type_degrees = type_tree.in_degree(type_tree.nodes)
         if sum((t[1] == 0 for t in type_degrees)) != 1:  # type: ignore
             return False  # There is more than one root type
@@ -729,9 +669,7 @@ class Graph(BaseModel):
             return False
 
         # Verify that all outputs match the input type (are a base class or the same class)
-        if not all(
-            (issubclass(input_root_type, get_args(f)[0]) for f in output_fields)
-        ):
+        if not all((issubclass(input_root_type, get_args(f)[0]) for f in output_fields)):
             return False
 
         return True
@@ -751,9 +689,7 @@ class Graph(BaseModel):
         g.add_edges_from(set([(e.source.node_id, e.destination.node_id) for e in self.edges]))
         return g
 
-    def nx_graph_flat(
-        self, nx_graph: Optional[nx.DiGraph] = None, prefix: Optional[str] = None
-    ) -> nx.DiGraph:
+    def nx_graph_flat(self, nx_graph: Optional[nx.DiGraph] = None, prefix: Optional[str] = None) -> nx.DiGraph:
         """Returns a flattened NetworkX DiGraph, including all subgraphs (but not with iterations expanded)"""
         g = nx_graph or nx.DiGraph()
 
@@ -762,26 +698,18 @@ class Graph(BaseModel):
             [
                 self._get_node_path(n.id, prefix)
                 for n in self.nodes.values()
-                if not isinstance(n, GraphInvocation)
-                and not isinstance(n, IterateInvocation)
+                if not isinstance(n, GraphInvocation) and not isinstance(n, IterateInvocation)
             ]
         )
 
         # Expand graph nodes
-        for sgn in (
-            gn for gn in self.nodes.values() if isinstance(gn, GraphInvocation)
-        ):
+        for sgn in (gn for gn in self.nodes.values() if isinstance(gn, GraphInvocation)):
             g = sgn.graph.nx_graph_flat(g, self._get_node_path(sgn.id, prefix))
 
         # TODO: figure out if iteration nodes need to be expanded
 
         unique_edges = set([(e.source.node_id, e.destination.node_id) for e in self.edges])
-        g.add_edges_from(
-            [
-                (self._get_node_path(e[0], prefix), self._get_node_path(e[1], prefix))
-                for e in unique_edges
-            ]
-        )
+        g.add_edges_from([(self._get_node_path(e[0], prefix), self._get_node_path(e[1], prefix)) for e in unique_edges])
         return g
 
 
@@ -800,23 +728,19 @@ class GraphExecutionState(BaseModel):
     )
 
     # Nodes that have been executed
-    executed: set[str] = Field(
-        description="The set of node ids that have been executed", default_factory=set
-    )
+    executed: set[str] = Field(description="The set of node ids that have been executed", default_factory=set)
     executed_history: list[str] = Field(
         description="The list of node ids that have been executed, in order of execution",
         default_factory=list,
     )
 
     # The results of executed nodes
-    results: dict[
-        str, Annotated[InvocationOutputsUnion, Field(discriminator="type")]
-    ] = Field(description="The results of node executions", default_factory=dict)
+    results: dict[str, Annotated[InvocationOutputsUnion, Field(discriminator="type")]] = Field(
+        description="The results of node executions", default_factory=dict
+    )
 
     # Errors raised when executing nodes
-    errors: dict[str, str] = Field(
-        description="Errors raised when executing nodes", default_factory=dict
-    )
+    errors: dict[str, str] = Field(description="Errors raised when executing nodes", default_factory=dict)
 
     # Map of prepared/executed nodes to their original nodes
     prepared_source_mapping: dict[str, str] = Field(
@@ -832,16 +756,16 @@ class GraphExecutionState(BaseModel):
 
     class Config:
         schema_extra = {
-            'required': [
-                'id',
-                'graph',
-                'execution_graph',
-                'executed',
-                'executed_history',
-                'results',
-                'errors',
-                'prepared_source_mapping',
-                'source_prepared_mapping',
+            "required": [
+                "id",
+                "graph",
+                "execution_graph",
+                "executed",
+                "executed_history",
+                "results",
+                "errors",
+                "prepared_source_mapping",
+                "source_prepared_mapping",
             ]
         }
 
@@ -899,9 +823,7 @@ class GraphExecutionState(BaseModel):
         """Returns true if the graph has any errors"""
         return len(self.errors) > 0
 
-    def _create_execution_node(
-        self, node_path: str, iteration_node_map: list[tuple[str, str]]
-    ) -> list[str]:
+    def _create_execution_node(self, node_path: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
         """Prepares an iteration node and connects all edges, returning the new node id"""
 
         node = self.graph.get_node(node_path)
@@ -911,20 +833,12 @@ class GraphExecutionState(BaseModel):
         # If this is an iterator node, we must create a copy for each iteration
         if isinstance(node, IterateInvocation):
             # Get input collection edge (should error if there are no inputs)
-            input_collection_edge = next(
-                iter(self.graph._get_input_edges(node_path, "collection"))
-            )
+            input_collection_edge = next(iter(self.graph._get_input_edges(node_path, "collection")))
             input_collection_prepared_node_id = next(
-                n[1]
-                for n in iteration_node_map
-                if n[0] == input_collection_edge.source.node_id
+                n[1] for n in iteration_node_map if n[0] == input_collection_edge.source.node_id
             )
-            input_collection_prepared_node_output = self.results[
-                input_collection_prepared_node_id
-            ]
-            input_collection = getattr(
-                input_collection_prepared_node_output, input_collection_edge.source.field
-            )
+            input_collection_prepared_node_output = self.results[input_collection_prepared_node_id]
+            input_collection = getattr(input_collection_prepared_node_output, input_collection_edge.source.field)
             self_iteration_count = len(input_collection)
 
         new_nodes = list()
@@ -939,9 +853,7 @@ class GraphExecutionState(BaseModel):
         # For collect nodes, this may contain multiple inputs to the same field
         new_edges = list()
         for edge in input_edges:
-            for input_node_id in (
-                n[1] for n in iteration_node_map if n[0] == edge.source.node_id
-            ):
+            for input_node_id in (n[1] for n in iteration_node_map if n[0] == edge.source.node_id):
                 new_edge = Edge(
                     source=EdgeConnection(node_id=input_node_id, field=edge.source.field),
                     destination=EdgeConnection(node_id="", field=edge.destination.field),
@@ -982,11 +894,7 @@ class GraphExecutionState(BaseModel):
     def _iterator_graph(self) -> nx.DiGraph:
         """Gets a DiGraph with edges to collectors removed so an ancestor search produces all active iterators for any node"""
         g = self.graph.nx_graph_flat()
-        collectors = (
-            n
-            for n in self.graph.nodes
-            if isinstance(self.graph.get_node(n), CollectInvocation)
-        )
+        collectors = (n for n in self.graph.nodes if isinstance(self.graph.get_node(n), CollectInvocation))
         for c in collectors:
             g.remove_edges_from(list(g.in_edges(c)))
         return g
@@ -994,11 +902,7 @@ class GraphExecutionState(BaseModel):
     def _get_node_iterators(self, node_id: str) -> list[str]:
         """Gets iterators for a node"""
         g = self._iterator_graph()
-        iterators = [
-            n
-            for n in nx.ancestors(g, node_id)
-            if isinstance(self.graph.get_node(n), IterateInvocation)
-        ]
+        iterators = [n for n in nx.ancestors(g, node_id) if isinstance(self.graph.get_node(n), IterateInvocation)]
         return iterators
 
     def _prepare(self) -> Optional[str]:
@@ -1045,29 +949,18 @@ class GraphExecutionState(BaseModel):
         if isinstance(next_node, CollectInvocation):
             # Collapse all iterator input mappings and create a single execution node for the collect invocation
             all_iteration_mappings = list(
-                itertools.chain(
-                    *(
-                        ((s, p) for p in self.source_prepared_mapping[s])
-                        for s in next_node_parents
-                    )
-                )
+                itertools.chain(*(((s, p) for p in self.source_prepared_mapping[s]) for s in next_node_parents))
             )
             # all_iteration_mappings = list(set(itertools.chain(*prepared_parent_mappings)))
-            create_results = self._create_execution_node(
-                next_node_id, all_iteration_mappings
-            )
+            create_results = self._create_execution_node(next_node_id, all_iteration_mappings)
             if create_results is not None:
                 new_node_ids.extend(create_results)
         else:  # Iterators or normal nodes
             # Get all iterator combinations for this node
             # Will produce a list of lists of prepared iterator nodes, from which results can be iterated
             iterator_nodes = self._get_node_iterators(next_node_id)
-            iterator_nodes_prepared = [
-                list(self.source_prepared_mapping[n]) for n in iterator_nodes
-            ]
-            iterator_node_prepared_combinations = list(
-                itertools.product(*iterator_nodes_prepared)
-            )
+            iterator_nodes_prepared = [list(self.source_prepared_mapping[n]) for n in iterator_nodes]
+            iterator_node_prepared_combinations = list(itertools.product(*iterator_nodes_prepared))
 
             # Select the correct prepared parents for each iteration
             # For every iterator, the parent must either not be a child of that iterator, or must match the prepared iteration for that iterator
@@ -1096,31 +989,16 @@ class GraphExecutionState(BaseModel):
             return next(iter(prepared_nodes))
 
         # Check if the requested node is an iterator
-        prepared_iterator = next(
-            (n for n in prepared_nodes if n in prepared_iterator_nodes), None
-        )
+        prepared_iterator = next((n for n in prepared_nodes if n in prepared_iterator_nodes), None)
         if prepared_iterator is not None:
             return prepared_iterator
 
         # Filter to only iterator nodes that are a parent of the specified node, in tuple format (prepared, source)
-        iterator_source_node_mapping = [
-            (n, self.prepared_source_mapping[n]) for n in prepared_iterator_nodes
-        ]
-        parent_iterators = [
-            itn
-            for itn in iterator_source_node_mapping
-            if nx.has_path(graph, itn[1], source_node_path)
-        ]
+        iterator_source_node_mapping = [(n, self.prepared_source_mapping[n]) for n in prepared_iterator_nodes]
+        parent_iterators = [itn for itn in iterator_source_node_mapping if nx.has_path(graph, itn[1], source_node_path)]
 
         return next(
-            (
-                n
-                for n in prepared_nodes
-                if all(
-                    nx.has_path(execution_graph, pit[0], n)
-                    for pit in parent_iterators
-                )
-            ),
+            (n for n in prepared_nodes if all(nx.has_path(execution_graph, pit[0], n) for pit in parent_iterators)),
             None,
         )
 
@@ -1130,13 +1008,13 @@ class GraphExecutionState(BaseModel):
 
         # Depth-first search with pre-order traversal is a depth-first topological sort
         sorted_nodes = nx.dfs_preorder_nodes(g)
-        
+
         next_node = next(
             (
                 n
                 for n in sorted_nodes
-                if n not in self.executed # the node must not already be executed...
-                and all((e[0] in self.executed for e in g.in_edges(n))) # ...and all its inputs must be executed
+                if n not in self.executed  # the node must not already be executed...
+                and all((e[0] in self.executed for e in g.in_edges(n)))  # ...and all its inputs must be executed
             ),
             None,
         )
@@ -1221,15 +1099,18 @@ class ExposedNodeOutput(BaseModel):
     field: str = Field(description="The field name of the output")
     alias: str = Field(description="The alias of the output")
 
+
 class LibraryGraph(BaseModel):
     id: str = Field(description="The unique identifier for this library graph", default_factory=uuid.uuid4)
     graph: Graph = Field(description="The graph")
     name: str = Field(description="The name of the graph")
     description: str = Field(description="The description of the graph")
     exposed_inputs: list[ExposedNodeInput] = Field(description="The inputs exposed by this graph", default_factory=list)
-    exposed_outputs: list[ExposedNodeOutput] = Field(description="The outputs exposed by this graph", default_factory=list)
+    exposed_outputs: list[ExposedNodeOutput] = Field(
+        description="The outputs exposed by this graph", default_factory=list
+    )
 
-    @validator('exposed_inputs', 'exposed_outputs')
+    @validator("exposed_inputs", "exposed_outputs")
     def validate_exposed_aliases(cls, v):
         if len(v) != len(set(i.alias for i in v)):
             raise ValueError("Duplicate exposed alias")
@@ -1237,23 +1118,27 @@ class LibraryGraph(BaseModel):
 
     @root_validator
     def validate_exposed_nodes(cls, values):
-        graph = values['graph']
+        graph = values["graph"]
 
         # Validate exposed inputs
-        for exposed_input in values['exposed_inputs']:
+        for exposed_input in values["exposed_inputs"]:
             if not graph.has_node(exposed_input.node_path):
                 raise ValueError(f"Exposed input node {exposed_input.node_path} does not exist")
             node = graph.get_node(exposed_input.node_path)
             if get_input_field(node, exposed_input.field) is None:
-                raise ValueError(f"Exposed input field {exposed_input.field} does not exist on node {exposed_input.node_path}")
+                raise ValueError(
+                    f"Exposed input field {exposed_input.field} does not exist on node {exposed_input.node_path}"
+                )
 
         # Validate exposed outputs
-        for exposed_output in values['exposed_outputs']:
+        for exposed_output in values["exposed_outputs"]:
             if not graph.has_node(exposed_output.node_path):
                 raise ValueError(f"Exposed output node {exposed_output.node_path} does not exist")
             node = graph.get_node(exposed_output.node_path)
             if get_output_field(node, exposed_output.field) is None:
-                raise ValueError(f"Exposed output field {exposed_output.field} does not exist on node {exposed_output.node_path}")
+                raise ValueError(
+                    f"Exposed output field {exposed_output.field} does not exist on node {exposed_output.node_path}"
+                )
 
         return values
 

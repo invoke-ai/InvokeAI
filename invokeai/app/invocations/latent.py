@@ -12,20 +12,21 @@ from pydantic import BaseModel, Field, validator
 
 from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend.model_management.models.base import ModelType
+from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
-    ConditioningData, ControlNetData, StableDiffusionGeneratorPipeline,
-    image_resized_to_grid_as_tensor)
-from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import \
-    PostprocessingSettings
+    ConditioningData,
+    ControlNetData,
+    StableDiffusionGeneratorPipeline,
+    image_resized_to_grid_as_tensor,
+)
+from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_torch_device, torch_dtype, choose_precision
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
-from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
-                             InvocationConfig, InvocationContext)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
 from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
 from .image import ImageOutput
@@ -46,8 +47,7 @@ DEFAULT_PRECISION = choose_precision(choose_torch_device())
 class LatentsField(BaseModel):
     """A latents field used for passing latents between invocations"""
 
-    latents_name: Optional[str] = Field(
-        default=None, description="The name of the latents")
+    latents_name: Optional[str] = Field(default=None, description="The name of the latents")
 
     class Config:
         schema_extra = {"required": ["latents_name"]}
@@ -55,14 +55,15 @@ class LatentsField(BaseModel):
 
 class LatentsOutput(BaseInvocationOutput):
     """Base class for invocations that output latents"""
-    #fmt: off
+
+    # fmt: off
     type: Literal["latents_output"] = "latents_output"
 
     # Inputs
     latents: LatentsField          = Field(default=None, description="The output latents")
     width:                     int = Field(description="The width of the latents in pixels")
     height:                    int = Field(description="The height of the latents in pixels")
-    #fmt: on
+    # fmt: on
 
 
 def build_latents_output(latents_name: str, latents: torch.Tensor):
@@ -73,9 +74,7 @@ def build_latents_output(latents_name: str, latents: torch.Tensor):
     )
 
 
-SAMPLER_NAME_VALUES = Literal[
-    tuple(list(SCHEDULER_MAP.keys()))
-]
+SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
 
 
 def get_scheduler(
@@ -83,11 +82,10 @@ def get_scheduler(
     scheduler_info: ModelInfo,
     scheduler_name: str,
 ) -> Scheduler:
-    scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(
-        scheduler_name, SCHEDULER_MAP['ddim']
-    )
+    scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
     orig_scheduler_info = context.services.model_manager.get_model(
-        **scheduler_info.dict(), context=context,
+        **scheduler_info.dict(),
+        context=context,
     )
     with orig_scheduler_info as orig_scheduler:
         scheduler_config = orig_scheduler.config
@@ -102,7 +100,7 @@ def get_scheduler(
     scheduler = scheduler_class.from_config(scheduler_config)
 
     # hack copied over from generate.py
-    if not hasattr(scheduler, 'uses_inpainting_model'):
+    if not hasattr(scheduler, "uses_inpainting_model"):
         scheduler.uses_inpainting_model = lambda: False
     return scheduler
 
@@ -123,8 +121,8 @@ class TextToLatentsInvocation(BaseInvocation):
     scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
     unet: UNetField = Field(default=None, description="UNet submodel")
     control: Union[ControlField, list[ControlField]] = Field(default=None, description="The control to use")
-    #seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
-    #seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
+    # seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
+    # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
 
     @validator("cfg_scale")
@@ -133,10 +131,10 @@ class TextToLatentsInvocation(BaseInvocation):
         if isinstance(v, list):
             for i in v:
                 if i < 1:
-                    raise ValueError('cfg_scale must be greater than 1')
+                    raise ValueError("cfg_scale must be greater than 1")
         else:
             if v < 1:
-                raise ValueError('cfg_scale must be greater than 1')
+                raise ValueError("cfg_scale must be greater than 1")
         return v
 
     # Schema customisation
@@ -149,8 +147,8 @@ class TextToLatentsInvocation(BaseInvocation):
                     "model": "model",
                     "control": "control",
                     # "cfg_scale": "float",
-                    "cfg_scale": "number"
-                }
+                    "cfg_scale": "number",
+                },
             },
         }
 
@@ -190,16 +188,14 @@ class TextToLatentsInvocation(BaseInvocation):
                 threshold=0.0,  # threshold,
                 warmup=0.2,  # warmup,
                 h_symmetry_time_pct=None,  # h_symmetry_time_pct,
-                v_symmetry_time_pct=None  # v_symmetry_time_pct,
+                v_symmetry_time_pct=None,  # v_symmetry_time_pct,
             ),
         )
 
         conditioning_data = conditioning_data.add_scheduler_args_if_applicable(
             scheduler,
-
             # for ddim scheduler
             eta=0.0,  # ddim_eta
-
             # for ancestral and sde schedulers
             generator=torch.Generator(device=unet.device).manual_seed(0),
         )
@@ -247,7 +243,6 @@ class TextToLatentsInvocation(BaseInvocation):
         exit_stack: ExitStack,
         do_classifier_free_guidance: bool = True,
     ) -> List[ControlNetData]:
-
         # assuming fixed dimensional scaling of 8:1 for image:latents
         control_height_resize = latents_shape[2] * 8
         control_width_resize = latents_shape[3] * 8
@@ -261,7 +256,7 @@ class TextToLatentsInvocation(BaseInvocation):
             control_list = control_input
         else:
             control_list = None
-        if (control_list is None):
+        if control_list is None:
             control_data = None
             # from above handling, any control that is not None should now be of type list[ControlField]
         else:
@@ -281,9 +276,7 @@ class TextToLatentsInvocation(BaseInvocation):
 
                 control_models.append(control_model)
                 control_image_field = control_info.image
-                input_image = context.services.images.get_pil_image(
-                    control_image_field.image_name
-                )
+                input_image = context.services.images.get_pil_image(control_image_field.image_name)
                 # self.image.image_type, self.image.image_name
                 # FIXME: still need to test with different widths, heights, devices, dtypes
                 #        and add in batch_size, num_images_per_prompt?
@@ -318,69 +311,71 @@ class TextToLatentsInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        noise = context.services.latents.get(self.noise.latents_name)
+        with SilenceWarnings():
+            noise = context.services.latents.get(self.noise.latents_name)
 
-        # Get the source node id (we are invoking the prepared node)
-        graph_execution_state = context.services.graph_execution_manager.get(
-            context.graph_execution_state_id
-        )
-        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+            # Get the source node id (we are invoking the prepared node)
+            graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+            source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
-        def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, source_node_id, state)
+            def step_callback(state: PipelineIntermediateState):
+                self.dispatch_progress(context, source_node_id, state)
 
-        def _lora_loader():
-            for lora in self.unet.loras:
-                lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"}), context=context,
-                )
-                yield (lora_info.context.model, lora.weight)
-                del lora_info
-            return
+            def _lora_loader():
+                for lora in self.unet.loras:
+                    lora_info = context.services.model_manager.get_model(
+                        **lora.dict(exclude={"weight"}),
+                        context=context,
+                    )
+                    yield (lora_info.context.model, lora.weight)
+                    del lora_info
+                return
 
-        unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict(), context=context,
-        )
-        with ExitStack() as exit_stack,\
-                ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),\
-                unet_info as unet:
-
-            noise = noise.to(device=unet.device, dtype=unet.dtype)
-
-            scheduler = get_scheduler(
+            unet_info = context.services.model_manager.get_model(
+                **self.unet.unet.dict(),
                 context=context,
-                scheduler_info=self.unet.scheduler,
-                scheduler_name=self.scheduler,
             )
+            with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
+                unet_info.context.model, _lora_loader()
+            ), unet_info as unet:
+                noise = noise.to(device=unet.device, dtype=unet.dtype)
 
-            pipeline = self.create_pipeline(unet, scheduler)
-            conditioning_data = self.get_conditioning_data(context, scheduler, unet)
+                scheduler = get_scheduler(
+                    context=context,
+                    scheduler_info=self.unet.scheduler,
+                    scheduler_name=self.scheduler,
+                )
 
-            control_data = self.prep_control_data(
-                model=pipeline, context=context, control_input=self.control,
-                latents_shape=noise.shape,
-                # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
-                do_classifier_free_guidance=True,
-                exit_stack=exit_stack,
-            )
+                pipeline = self.create_pipeline(unet, scheduler)
+                conditioning_data = self.get_conditioning_data(context, scheduler, unet)
 
-            # TODO: Verify the noise is the right size
-            result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
-                latents=torch.zeros_like(noise, dtype=torch_dtype(unet.device)),
-                noise=noise,
-                num_inference_steps=self.steps,
-                conditioning_data=conditioning_data,
-                control_data=control_data,  # list[ControlNetData]
-                callback=step_callback,
-            )
+                control_data = self.prep_control_data(
+                    model=pipeline,
+                    context=context,
+                    control_input=self.control,
+                    latents_shape=noise.shape,
+                    # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                    do_classifier_free_guidance=True,
+                    exit_stack=exit_stack,
+                )
 
-        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        result_latents = result_latents.to("cpu")
-        torch.cuda.empty_cache()
+                # TODO: Verify the noise is the right size
+                result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
+                    latents=torch.zeros_like(noise, dtype=torch_dtype(unet.device)),
+                    noise=noise,
+                    num_inference_steps=self.steps,
+                    conditioning_data=conditioning_data,
+                    control_data=control_data,  # list[ControlNetData]
+                    callback=step_callback,
+                )
 
-        name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.save(name, result_latents)
-        return build_latents_output(latents_name=name, latents=result_latents)
+            # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+            result_latents = result_latents.to("cpu")
+            torch.cuda.empty_cache()
+
+            name = f"{context.graph_execution_state_id}__{self.id}"
+            context.services.latents.save(name, result_latents)
+            return build_latents_output(latents_name=name, latents=result_latents)
 
 
 class LatentsToLatentsInvocation(TextToLatentsInvocation):
@@ -389,11 +384,8 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
     type: Literal["l2l"] = "l2l"
 
     # Inputs
-    latents: Optional[LatentsField] = Field(
-        description="The latents to use as a base image")
-    strength: float = Field(
-        default=0.7, ge=0, le=1,
-        description="The strength of the latents to use")
+    latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
+    strength: float = Field(default=0.7, ge=0, le=1, description="The strength of the latents to use")
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -405,87 +397,89 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                     "model": "model",
                     "control": "control",
                     "cfg_scale": "number",
-                }
+                },
             },
         }
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        noise = context.services.latents.get(self.noise.latents_name)
-        latent = context.services.latents.get(self.latents.latents_name)
+        with SilenceWarnings():  # this quenches NSFW nag from diffusers
+            noise = context.services.latents.get(self.noise.latents_name)
+            latent = context.services.latents.get(self.latents.latents_name)
 
-        # Get the source node id (we are invoking the prepared node)
-        graph_execution_state = context.services.graph_execution_manager.get(
-            context.graph_execution_state_id
-        )
-        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+            # Get the source node id (we are invoking the prepared node)
+            graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+            source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
-        def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, source_node_id, state)
+            def step_callback(state: PipelineIntermediateState):
+                self.dispatch_progress(context, source_node_id, state)
 
-        def _lora_loader():
-            for lora in self.unet.loras:
-                lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"}), context=context,
-                )
-                yield (lora_info.context.model, lora.weight)
-                del lora_info
-            return
+            def _lora_loader():
+                for lora in self.unet.loras:
+                    lora_info = context.services.model_manager.get_model(
+                        **lora.dict(exclude={"weight"}),
+                        context=context,
+                    )
+                    yield (lora_info.context.model, lora.weight)
+                    del lora_info
+                return
 
-        unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict(), context=context,
-        )
-        with ExitStack() as exit_stack,\
-                ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),\
-                unet_info as unet:
-
-            noise = noise.to(device=unet.device, dtype=unet.dtype)
-            latent = latent.to(device=unet.device, dtype=unet.dtype)
-
-            scheduler = get_scheduler(
+            unet_info = context.services.model_manager.get_model(
+                **self.unet.unet.dict(),
                 context=context,
-                scheduler_info=self.unet.scheduler,
-                scheduler_name=self.scheduler,
             )
+            with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
+                unet_info.context.model, _lora_loader()
+            ), unet_info as unet:
+                noise = noise.to(device=unet.device, dtype=unet.dtype)
+                latent = latent.to(device=unet.device, dtype=unet.dtype)
 
-            pipeline = self.create_pipeline(unet, scheduler)
-            conditioning_data = self.get_conditioning_data(context, scheduler, unet)
+                scheduler = get_scheduler(
+                    context=context,
+                    scheduler_info=self.unet.scheduler,
+                    scheduler_name=self.scheduler,
+                )
 
-            control_data = self.prep_control_data(
-                model=pipeline, context=context, control_input=self.control,
-                latents_shape=noise.shape,
-                # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
-                do_classifier_free_guidance=True,
-                exit_stack=exit_stack,
-            )
+                pipeline = self.create_pipeline(unet, scheduler)
+                conditioning_data = self.get_conditioning_data(context, scheduler, unet)
 
-            # TODO: Verify the noise is the right size
-            initial_latents = latent if self.strength < 1.0 else torch.zeros_like(
-                latent, device=unet.device, dtype=latent.dtype
-            )
+                control_data = self.prep_control_data(
+                    model=pipeline,
+                    context=context,
+                    control_input=self.control,
+                    latents_shape=noise.shape,
+                    # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                    do_classifier_free_guidance=True,
+                    exit_stack=exit_stack,
+                )
 
-            timesteps, _ = pipeline.get_img2img_timesteps(
-                self.steps,
-                self.strength,
-                device=unet.device,
-            )
+                # TODO: Verify the noise is the right size
+                initial_latents = (
+                    latent if self.strength < 1.0 else torch.zeros_like(latent, device=unet.device, dtype=latent.dtype)
+                )
 
-            result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
-                latents=initial_latents,
-                timesteps=timesteps,
-                noise=noise,
-                num_inference_steps=self.steps,
-                conditioning_data=conditioning_data,
-                control_data=control_data,  # list[ControlNetData]
-                callback=step_callback
-            )
+                timesteps, _ = pipeline.get_img2img_timesteps(
+                    self.steps,
+                    self.strength,
+                    device=unet.device,
+                )
 
-        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        result_latents = result_latents.to("cpu")
-        torch.cuda.empty_cache()
+                result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
+                    latents=initial_latents,
+                    timesteps=timesteps,
+                    noise=noise,
+                    num_inference_steps=self.steps,
+                    conditioning_data=conditioning_data,
+                    control_data=control_data,  # list[ControlNetData]
+                    callback=step_callback,
+                )
 
-        name = f'{context.graph_execution_state_id}__{self.id}'
-        context.services.latents.save(name, result_latents)
+            # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+            result_latents = result_latents.to("cpu")
+            torch.cuda.empty_cache()
+
+            name = f"{context.graph_execution_state_id}__{self.id}"
+            context.services.latents.save(name, result_latents)
         return build_latents_output(latents_name=name, latents=result_latents)
 
 
@@ -496,14 +490,13 @@ class LatentsToImageInvocation(BaseInvocation):
     type: Literal["l2i"] = "l2i"
 
     # Inputs
-    latents: Optional[LatentsField] = Field(
-        description="The latents to generate an image from")
+    latents: Optional[LatentsField] = Field(description="The latents to generate an image from")
     vae: VaeField = Field(default=None, description="Vae submodel")
-    tiled: bool = Field(
-        default=False,
-        description="Decode latents by overlapping tiles(less memory consumption)")
-    fp32: bool = Field(DEFAULT_PRECISION=='float32', description="Decode in full precision")
-    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")
+    tiled: bool = Field(default=False, description="Decode latents by overlaping tiles (less memory consumption)")
+    fp32: bool = Field(DEFAULT_PRECISION == "float32", description="Decode in full precision")
+    metadata: Optional[CoreMetadata] = Field(
+        default=None, description="Optional core metadata to be written to the image"
+    )
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -519,7 +512,8 @@ class LatentsToImageInvocation(BaseInvocation):
         latents = context.services.latents.get(self.latents.latents_name)
 
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(), context=context,
+            **self.vae.vae.dict(),
+            context=context,
         )
 
         with vae_info as vae:
@@ -586,8 +580,7 @@ class LatentsToImageInvocation(BaseInvocation):
         )
 
 
-LATENTS_INTERPOLATION_MODE = Literal["nearest", "linear",
-                                     "bilinear", "bicubic", "trilinear", "area", "nearest-exact"]
+LATENTS_INTERPOLATION_MODE = Literal["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"]
 
 
 class ResizeLatentsInvocation(BaseInvocation):
@@ -596,36 +589,30 @@ class ResizeLatentsInvocation(BaseInvocation):
     type: Literal["lresize"] = "lresize"
 
     # Inputs
-    latents: Optional[LatentsField] = Field(
-        description="The latents to resize")
-    width:                         Union[int, None] = Field(default=512,
-        ge=64, multiple_of=8, description="The width to resize to (px)")
-    height:                        Union[int, None] = Field(default=512,
-        ge=64, multiple_of=8, description="The height to resize to (px)")
-    mode:   LATENTS_INTERPOLATION_MODE = Field(
-        default="bilinear", description="The interpolation mode")
+    latents: Optional[LatentsField] = Field(description="The latents to resize")
+    width: Union[int, None] = Field(default=512, ge=64, multiple_of=8, description="The width to resize to (px)")
+    height: Union[int, None] = Field(default=512, ge=64, multiple_of=8, description="The height to resize to (px)")
+    mode: LATENTS_INTERPOLATION_MODE = Field(default="bilinear", description="The interpolation mode")
     antialias: bool = Field(
-        default=False,
-        description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
+        default=False, description="Whether or not to antialias (applied in bilinear and bicubic modes only)"
+    )
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Resize Latents",
-                "tags": ["latents", "resize"]
-            },
+            "ui": {"title": "Resize Latents", "tags": ["latents", "resize"]},
         }
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
         # TODO:
-        device=choose_torch_device()
+        device = choose_torch_device()
 
         resized_latents = torch.nn.functional.interpolate(
-            latents.to(device), size=(self.height // 8, self.width // 8),
-            mode=self.mode, antialias=self.antialias
-            if self.mode in ["bilinear", "bicubic"] else False,
+            latents.to(device),
+            size=(self.height // 8, self.width // 8),
+            mode=self.mode,
+            antialias=self.antialias if self.mode in ["bilinear", "bicubic"] else False,
         )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
@@ -644,35 +631,30 @@ class ScaleLatentsInvocation(BaseInvocation):
     type: Literal["lscale"] = "lscale"
 
     # Inputs
-    latents: Optional[LatentsField] = Field(
-        description="The latents to scale")
-    scale_factor:               float = Field(
-        gt=0, description="The factor by which to scale the latents")
-    mode:  LATENTS_INTERPOLATION_MODE = Field(
-        default="bilinear", description="The interpolation mode")
+    latents: Optional[LatentsField] = Field(description="The latents to scale")
+    scale_factor: float = Field(gt=0, description="The factor by which to scale the latents")
+    mode: LATENTS_INTERPOLATION_MODE = Field(default="bilinear", description="The interpolation mode")
     antialias: bool = Field(
-        default=False,
-        description="Whether or not to antialias (applied in bilinear and bicubic modes only)")
+        default=False, description="Whether or not to antialias (applied in bilinear and bicubic modes only)"
+    )
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Scale Latents",
-                "tags": ["latents", "scale"]
-            },
+            "ui": {"title": "Scale Latents", "tags": ["latents", "scale"]},
         }
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
         # TODO:
-        device=choose_torch_device()
+        device = choose_torch_device()
 
         # resizing
         resized_latents = torch.nn.functional.interpolate(
-            latents.to(device), scale_factor=self.scale_factor, mode=self.mode,
-            antialias=self.antialias
-            if self.mode in ["bilinear", "bicubic"] else False,
+            latents.to(device),
+            scale_factor=self.scale_factor,
+            mode=self.mode,
+            antialias=self.antialias if self.mode in ["bilinear", "bicubic"] else False,
         )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
@@ -693,19 +675,13 @@ class ImageToLatentsInvocation(BaseInvocation):
     # Inputs
     image: Optional[ImageField] = Field(description="The image to encode")
     vae: VaeField = Field(default=None, description="Vae submodel")
-    tiled: bool = Field(
-        default=False,
-        description="Encode latents by overlaping tiles(less memory consumption)")
-    fp32: bool = Field(DEFAULT_PRECISION=='float32', description="Decode in full precision")
-
+    tiled: bool = Field(default=False, description="Encode latents by overlaping tiles(less memory consumption)")
+    fp32: bool = Field(DEFAULT_PRECISION == "float32", description="Decode in full precision")
 
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Image To Latents",
-                "tags": ["latents", "image"]
-            },
+            "ui": {"title": "Image To Latents", "tags": ["latents", "image"]},
         }
 
     @torch.no_grad()
@@ -715,9 +691,10 @@ class ImageToLatentsInvocation(BaseInvocation):
         # )
         image = context.services.images.get_pil_image(self.image.image_name)
 
-        #vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
+        # vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(), context=context,
+            **self.vae.vae.dict(),
+            context=context,
         )
 
         image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
@@ -744,12 +721,12 @@ class ImageToLatentsInvocation(BaseInvocation):
                     vae.post_quant_conv.to(orig_dtype)
                     vae.decoder.conv_in.to(orig_dtype)
                     vae.decoder.mid_block.to(orig_dtype)
-                #else:
+                # else:
                 #    latents = latents.float()
 
             else:
                 vae.to(dtype=torch.float16)
-                #latents = latents.half()
+                # latents = latents.half()
 
             if self.tiled:
                 vae.enable_tiling()
@@ -760,9 +737,7 @@ class ImageToLatentsInvocation(BaseInvocation):
             image_tensor = image_tensor.to(device=vae.device, dtype=vae.dtype)
             with torch.inference_mode():
                 image_tensor_dist = vae.encode(image_tensor).latent_dist
-                latents = image_tensor_dist.sample().to(
-                    dtype=vae.dtype
-                )  # FIXME: uses torch.randn. make reproducible!
+                latents = image_tensor_dist.sample().to(dtype=vae.dtype)  # FIXME: uses torch.randn. make reproducible!
 
             latents = vae.config.scaling_factor * latents
             latents = latents.to(dtype=orig_dtype)
