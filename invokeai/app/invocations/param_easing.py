@@ -12,16 +12,37 @@ import matplotlib.pyplot as plt
 
 from easing_functions import (
     LinearInOut,
-    QuadEaseInOut, QuadEaseIn, QuadEaseOut,
-    CubicEaseInOut, CubicEaseIn, CubicEaseOut,
-    QuarticEaseInOut, QuarticEaseIn, QuarticEaseOut,
-    QuinticEaseInOut, QuinticEaseIn, QuinticEaseOut,
-    SineEaseInOut, SineEaseIn, SineEaseOut,
-    CircularEaseIn, CircularEaseInOut, CircularEaseOut,
-    ExponentialEaseInOut, ExponentialEaseIn, ExponentialEaseOut,
-    ElasticEaseIn, ElasticEaseInOut, ElasticEaseOut,
-    BackEaseIn, BackEaseInOut, BackEaseOut,
-    BounceEaseIn, BounceEaseInOut, BounceEaseOut)
+    QuadEaseInOut,
+    QuadEaseIn,
+    QuadEaseOut,
+    CubicEaseInOut,
+    CubicEaseIn,
+    CubicEaseOut,
+    QuarticEaseInOut,
+    QuarticEaseIn,
+    QuarticEaseOut,
+    QuinticEaseInOut,
+    QuinticEaseIn,
+    QuinticEaseOut,
+    SineEaseInOut,
+    SineEaseIn,
+    SineEaseOut,
+    CircularEaseIn,
+    CircularEaseInOut,
+    CircularEaseOut,
+    ExponentialEaseInOut,
+    ExponentialEaseIn,
+    ExponentialEaseOut,
+    ElasticEaseIn,
+    ElasticEaseInOut,
+    ElasticEaseOut,
+    BackEaseIn,
+    BackEaseInOut,
+    BackEaseOut,
+    BounceEaseIn,
+    BounceEaseInOut,
+    BounceEaseOut,
+)
 
 from .baseinvocation import (
     BaseInvocation,
@@ -45,17 +66,12 @@ class FloatLinearRangeInvocation(BaseInvocation):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Linear Range (Float)",
-                "tags": ["math", "float", "linear", "range"]
-            },
+            "ui": {"title": "Linear Range (Float)", "tags": ["math", "float", "linear", "range"]},
         }
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         param_list = list(np.linspace(self.start, self.stop, self.steps))
-        return FloatCollectionOutput(
-            collection=param_list
-        )
+        return FloatCollectionOutput(collection=param_list)
 
 
 EASING_FUNCTIONS_MAP = {
@@ -92,9 +108,7 @@ EASING_FUNCTIONS_MAP = {
     "BounceInOut": BounceEaseInOut,
 }
 
-EASING_FUNCTION_KEYS: Any = Literal[
-    tuple(list(EASING_FUNCTIONS_MAP.keys()))
-]
+EASING_FUNCTION_KEYS: Any = Literal[tuple(list(EASING_FUNCTIONS_MAP.keys()))]
 
 
 # actually I think for now could just use CollectionOutput (which is list[Any]
@@ -123,12 +137,8 @@ class StepParamEasingInvocation(BaseInvocation):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Param Easing By Step",
-                "tags": ["param", "step", "easing"]
-            },
+            "ui": {"title": "Param Easing By Step", "tags": ["param", "step", "easing"]},
         }
-
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         log_diagnostics = False
@@ -170,12 +180,13 @@ class StepParamEasingInvocation(BaseInvocation):
             # and create reverse copy of list[1:end-1]
             # but if even then number_of_steps/2 === ceil(number_of_steps/2), so can just use ceil always
 
-            base_easing_duration = int(np.ceil(num_easing_steps/2.0))
-            if log_diagnostics: context.services.logger.debug("base easing duration: " + str(base_easing_duration))
-            even_num_steps = (num_easing_steps % 2 == 0)  # even number of steps
-            easing_function = easing_class(start=self.start_value,
-                                           end=self.end_value,
-                                           duration=base_easing_duration - 1)
+            base_easing_duration = int(np.ceil(num_easing_steps / 2.0))
+            if log_diagnostics:
+                context.services.logger.debug("base easing duration: " + str(base_easing_duration))
+            even_num_steps = num_easing_steps % 2 == 0  # even number of steps
+            easing_function = easing_class(
+                start=self.start_value, end=self.end_value, duration=base_easing_duration - 1
+            )
             base_easing_vals = list()
             for step_index in range(base_easing_duration):
                 easing_val = easing_function.ease(step_index)
@@ -214,9 +225,7 @@ class StepParamEasingInvocation(BaseInvocation):
         #
 
         else:  # no mirroring (default)
-            easing_function = easing_class(start=self.start_value,
-                                           end=self.end_value,
-                                           duration=num_easing_steps - 1)
+            easing_function = easing_class(start=self.start_value, end=self.end_value, duration=num_easing_steps - 1)
             for step_index in range(num_easing_steps):
                 step_val = easing_function.ease(step_index)
                 easing_list.append(step_val)
@@ -240,13 +249,11 @@ class StepParamEasingInvocation(BaseInvocation):
             ax = plt.gca()
             ax.xaxis.set_major_locator(MaxNLocator(integer=True))
             buf = io.BytesIO()
-            plt.savefig(buf, format='png')
+            plt.savefig(buf, format="png")
             buf.seek(0)
             im = PIL.Image.open(buf)
             im.show()
             buf.close()
 
         # output array of size steps, each entry list[i] is param value for step i
-        return FloatCollectionOutput(
-            collection=param_list
-        )
+        return FloatCollectionOutput(collection=param_list)

@@ -54,10 +54,7 @@ class AddInvocation(BaseInvocation, MathInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Add",
-                "tags": ["math", "add"]
-            },
+            "ui": {"title": "Add", "tags": ["math", "add"]},
         }
 
     def invoke(self, context: InvocationContext) -> IntOutput:
@@ -75,10 +72,7 @@ class SubtractInvocation(BaseInvocation, MathInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Subtract",
-                "tags": ["math", "subtract"]
-            },
+            "ui": {"title": "Subtract", "tags": ["math", "subtract"]},
         }
 
     def invoke(self, context: InvocationContext) -> IntOutput:
@@ -96,10 +90,7 @@ class MultiplyInvocation(BaseInvocation, MathInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Multiply",
-                "tags": ["math", "multiply"]
-            },
+            "ui": {"title": "Multiply", "tags": ["math", "multiply"]},
         }
 
     def invoke(self, context: InvocationContext) -> IntOutput:
@@ -117,10 +108,7 @@ class DivideInvocation(BaseInvocation, MathInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Divide",
-                "tags": ["math", "divide"]
-            },
+            "ui": {"title": "Divide", "tags": ["math", "divide"]},
         }
 
     def invoke(self, context: InvocationContext) -> IntOutput:
@@ -140,10 +128,7 @@ class RandomIntInvocation(BaseInvocation):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Random Integer",
-                "tags": ["math", "random", "integer"]
-            },
+            "ui": {"title": "Random Integer", "tags": ["math", "random", "integer"]},
         }
 
     def invoke(self, context: InvocationContext) -> IntOutput:

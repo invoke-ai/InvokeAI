@@ -10,7 +10,7 @@ SAMPLER_CHOICES = [
     "lms_k",
     "pndm",
     "heun",
-    'heun_k',
+    "heun_k",
     "euler",
     "euler_k",
     "euler_a",
@@ -76,9 +76,7 @@ def parameters_to_command(params):
     if "variation_amount" in params and params["variation_amount"] > 0:
         switches.append(f'-v {params["variation_amount"]}')
         if "with_variations" in params:
-            seed_weight_pairs = ",".join(
-                f"{seed}:{weight}" for seed, weight in params["with_variations"]
-            )
+            seed_weight_pairs = ",".join(f"{seed}:{weight}" for seed, weight in params["with_variations"])
             switches.append(f"-V {seed_weight_pairs}")
 
     return " ".join(switches)

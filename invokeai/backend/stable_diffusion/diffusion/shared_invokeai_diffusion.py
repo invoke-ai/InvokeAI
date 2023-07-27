@@ -31,6 +31,7 @@ ModelForwardCallback: TypeAlias = Union[
     Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
 ]
 
+
 @dataclass(frozen=True)
 class PostprocessingSettings:
     threshold: float
@@ -81,14 +82,12 @@ class InvokeAIDiffuserComponent:
     @contextmanager
     def custom_attention_context(
         cls,
-        unet: UNet2DConditionModel, # note: also may futz with the text encoder depending on requested LoRAs
+        unet: UNet2DConditionModel,  # note: also may futz with the text encoder depending on requested LoRAs
         extra_conditioning_info: Optional[ExtraConditioningInfo],
-        step_count: int
+        step_count: int,
     ):
         old_attn_processors = None
-        if extra_conditioning_info and (
-            extra_conditioning_info.wants_cross_attention_control
-        ):
+        if extra_conditioning_info and (extra_conditioning_info.wants_cross_attention_control):
             old_attn_processors = unet.attn_processors
             # Load lora conditions into the model
             if extra_conditioning_info.wants_cross_attention_control:
@@ -116,27 +115,15 @@ class InvokeAIDiffuserComponent:
                 return
             saver.add_attention_maps(slice, key)
 
-        tokens_cross_attention_modules = get_cross_attention_modules(
-            self.model, CrossAttentionType.TOKENS
-        )
+        tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
         for identifier, module in tokens_cross_attention_modules:
-            key = (
-                "down"
-                if identifier.startswith("down")
-                else "up"
-                if identifier.startswith("up")
-                else "mid"
-            )
+            key = "down" if identifier.startswith("down") else "up" if identifier.startswith("up") else "mid"
             module.set_attention_slice_calculated_callback(
-                lambda slice, dim, offset, slice_size, key=key: callback(
-                    slice, dim, offset, slice_size, key
-                )
+                lambda slice, dim, offset, slice_size, key=key: callback(slice, dim, offset, slice_size, key)
             )
 
     def remove_attention_map_saving(self):
-        tokens_cross_attention_modules = get_cross_attention_modules(
-            self.model, CrossAttentionType.TOKENS
-        )
+        tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
         for _, module in tokens_cross_attention_modules:
             module.set_attention_slice_calculated_callback(None)
 
@@ -171,10 +158,8 @@ class InvokeAIDiffuserComponent:
         context: Context = self.cross_attention_control_context
         if self.cross_attention_control_context is not None:
             percent_through = step_index / total_step_count
-            cross_attention_control_types_to_do = (
-                context.get_active_cross_attention_control_types_for_step(
-                    percent_through
-                )
+            cross_attention_control_types_to_do = context.get_active_cross_attention_control_types_for_step(
+                percent_through
             )
 
         wants_cross_attention_control = len(cross_attention_control_types_to_do) > 0
@@ -182,7 +167,11 @@ class InvokeAIDiffuserComponent:
 
         if wants_hybrid_conditioning:
             unconditioned_next_x, conditioned_next_x = self._apply_hybrid_conditioning(
-                x, sigma, unconditioning, conditioning, **kwargs,
+                x,
+                sigma,
+                unconditioning,
+                conditioning,
+                **kwargs,
             )
         elif wants_cross_attention_control:
             (
@@ -201,7 +190,11 @@ class InvokeAIDiffuserComponent:
                 unconditioned_next_x,
                 conditioned_next_x,
             ) = self._apply_standard_conditioning_sequentially(
-                x, sigma, unconditioning, conditioning, **kwargs,
+                x,
+                sigma,
+                unconditioning,
+                conditioning,
+                **kwargs,
             )
 
         else:
@@ -209,12 +202,18 @@ class InvokeAIDiffuserComponent:
                 unconditioned_next_x,
                 conditioned_next_x,
             ) = self._apply_standard_conditioning(
-                x, sigma, unconditioning, conditioning, **kwargs,
+                x,
+                sigma,
+                unconditioning,
+                conditioning,
+                **kwargs,
             )
 
         combined_next_x = self._combine(
             # unconditioned_next_x, conditioned_next_x, unconditional_guidance_scale
-            unconditioned_next_x, conditioned_next_x, guidance_scale
+            unconditioned_next_x,
+            conditioned_next_x,
+            guidance_scale,
         )
 
         return combined_next_x
@@ -229,37 +228,47 @@ class InvokeAIDiffuserComponent:
     ) -> torch.Tensor:
         if postprocessing_settings is not None:
             percent_through = step_index / total_step_count
-            latents = self.apply_threshold(
-                postprocessing_settings, latents, percent_through
-            )
-            latents = self.apply_symmetry(
-                postprocessing_settings, latents, percent_through
-            )
+            latents = self.apply_threshold(postprocessing_settings, latents, percent_through)
+            latents = self.apply_symmetry(postprocessing_settings, latents, percent_through)
         return latents
 
     def _concat_conditionings_for_batch(self, unconditioning, conditioning):
         def _pad_conditioning(cond, target_len, encoder_attention_mask):
-            conditioning_attention_mask = torch.ones((cond.shape[0], cond.shape[1]), device=cond.device, dtype=cond.dtype)
+            conditioning_attention_mask = torch.ones(
+                (cond.shape[0], cond.shape[1]), device=cond.device, dtype=cond.dtype
+            )
 
             if cond.shape[1] < max_len:
-                conditioning_attention_mask = torch.cat([
-                    conditioning_attention_mask,
-                    torch.zeros((cond.shape[0], max_len - cond.shape[1]), device=cond.device, dtype=cond.dtype),
-                ], dim=1)
+                conditioning_attention_mask = torch.cat(
+                    [
+                        conditioning_attention_mask,
+                        torch.zeros((cond.shape[0], max_len - cond.shape[1]), device=cond.device, dtype=cond.dtype),
+                    ],
+                    dim=1,
+                )
 
-                cond = torch.cat([
-                    cond,
-                    torch.zeros((cond.shape[0], max_len - cond.shape[1], cond.shape[2]), device=cond.device, dtype=cond.dtype),
-                ], dim=1)
+                cond = torch.cat(
+                    [
+                        cond,
+                        torch.zeros(
+                            (cond.shape[0], max_len - cond.shape[1], cond.shape[2]),
+                            device=cond.device,
+                            dtype=cond.dtype,
+                        ),
+                    ],
+                    dim=1,
+                )
 
             if encoder_attention_mask is None:
                 encoder_attention_mask = conditioning_attention_mask
             else:
-                encoder_attention_mask = torch.cat([
-                    encoder_attention_mask,
-                    conditioning_attention_mask,
-                ])
-            
+                encoder_attention_mask = torch.cat(
+                    [
+                        encoder_attention_mask,
+                        conditioning_attention_mask,
+                    ]
+                )
+
             return cond, encoder_attention_mask
 
         encoder_attention_mask = None
@@ -277,11 +286,11 @@ class InvokeAIDiffuserComponent:
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
 
-        both_conditionings, encoder_attention_mask = self._concat_conditionings_for_batch(
-            unconditioning, conditioning
-        )
+        both_conditionings, encoder_attention_mask = self._concat_conditionings_for_batch(unconditioning, conditioning)
         both_results = self.model_forward_callback(
-            x_twice, sigma_twice, both_conditionings,
+            x_twice,
+            sigma_twice,
+            both_conditionings,
             encoder_attention_mask=encoder_attention_mask,
             **kwargs,
         )
@@ -312,13 +321,17 @@ class InvokeAIDiffuserComponent:
             uncond_mid_block, cond_mid_block = mid_block_additional_residual.chunk(2)
 
         unconditioned_next_x = self.model_forward_callback(
-            x, sigma, unconditioning,
+            x,
+            sigma,
+            unconditioning,
             down_block_additional_residuals=uncond_down_block,
             mid_block_additional_residual=uncond_mid_block,
             **kwargs,
         )
         conditioned_next_x = self.model_forward_callback(
-            x, sigma, conditioning,
+            x,
+            sigma,
+            conditioning,
             down_block_additional_residuals=cond_down_block,
             mid_block_additional_residual=cond_mid_block,
             **kwargs,
@@ -335,13 +348,15 @@ class InvokeAIDiffuserComponent:
         for k in conditioning:
             if isinstance(conditioning[k], list):
                 both_conditionings[k] = [
-                    torch.cat([unconditioning[k][i], conditioning[k][i]])
-                    for i in range(len(conditioning[k]))
+                    torch.cat([unconditioning[k][i], conditioning[k][i]]) for i in range(len(conditioning[k]))
                 ]
             else:
                 both_conditionings[k] = torch.cat([unconditioning[k], conditioning[k]])
         unconditioned_next_x, conditioned_next_x = self.model_forward_callback(
-            x_twice, sigma_twice, both_conditionings, **kwargs,
+            x_twice,
+            sigma_twice,
+            both_conditionings,
+            **kwargs,
         ).chunk(2)
         return unconditioned_next_x, conditioned_next_x
 
@@ -388,9 +403,7 @@ class InvokeAIDiffuserComponent:
         )
 
         # do requested cross attention types for conditioning (positive prompt)
-        cross_attn_processor_context.cross_attention_types_to_do = (
-            cross_attention_control_types_to_do
-        )
+        cross_attn_processor_context.cross_attention_types_to_do = cross_attention_control_types_to_do
         conditioned_next_x = self.model_forward_callback(
             x,
             sigma,
@@ -414,19 +427,14 @@ class InvokeAIDiffuserComponent:
         latents: torch.Tensor,
         percent_through: float,
     ) -> torch.Tensor:
-        if (
-            postprocessing_settings.threshold is None
-            or postprocessing_settings.threshold == 0.0
-        ):
+        if postprocessing_settings.threshold is None or postprocessing_settings.threshold == 0.0:
             return latents
 
         threshold = postprocessing_settings.threshold
         warmup = postprocessing_settings.warmup
 
         if percent_through < warmup:
-            current_threshold = threshold + threshold * 5 * (
-                1 - (percent_through / warmup)
-            )
+            current_threshold = threshold + threshold * 5 * (1 - (percent_through / warmup))
         else:
             current_threshold = threshold
 
@@ -440,18 +448,10 @@ class InvokeAIDiffuserComponent:
 
         if self.debug_thresholding:
             std, mean = [i.item() for i in torch.std_mean(latents)]
-            outside = torch.count_nonzero(
-                (latents < -current_threshold) | (latents > current_threshold)
-            )
-            logger.info(
-                f"Threshold: %={percent_through} threshold={current_threshold:.3f} (of {threshold:.3f})"
-                )
-            logger.debug(
-                f"min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}"
-            )
-            logger.debug(
-                f"{outside / latents.numel() * 100:.2f}% values outside threshold"
-            )
+            outside = torch.count_nonzero((latents < -current_threshold) | (latents > current_threshold))
+            logger.info(f"Threshold: %={percent_through} threshold={current_threshold:.3f} (of {threshold:.3f})")
+            logger.debug(f"min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}")
+            logger.debug(f"{outside / latents.numel() * 100:.2f}% values outside threshold")
 
         if maxval < current_threshold and minval > -current_threshold:
             return latents
@@ -464,25 +464,17 @@ class InvokeAIDiffuserComponent:
             latents = torch.clone(latents)
             maxval = np.clip(maxval * scale, 1, current_threshold)
             num_altered += torch.count_nonzero(latents > maxval)
-            latents[latents > maxval] = (
-                torch.rand_like(latents[latents > maxval]) * maxval
-            )
+            latents[latents > maxval] = torch.rand_like(latents[latents > maxval]) * maxval
 
         if minval < -current_threshold:
             latents = torch.clone(latents)
             minval = np.clip(minval * scale, -current_threshold, -1)
             num_altered += torch.count_nonzero(latents < minval)
-            latents[latents < minval] = (
-                torch.rand_like(latents[latents < minval]) * minval
-            )
+            latents[latents < minval] = torch.rand_like(latents[latents < minval]) * minval
 
         if self.debug_thresholding:
-            logger.debug(
-                f"min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})"
-            )
-            logger.debug(
-                f"{num_altered / latents.numel() * 100:.2f}% values altered"
-            )
+            logger.debug(f"min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})")
+            logger.debug(f"{num_altered / latents.numel() * 100:.2f}% values altered")
 
         return latents
 
@@ -501,15 +493,11 @@ class InvokeAIDiffuserComponent:
 
         # Check for out of bounds
         h_symmetry_time_pct = postprocessing_settings.h_symmetry_time_pct
-        if h_symmetry_time_pct is not None and (
-            h_symmetry_time_pct <= 0.0 or h_symmetry_time_pct > 1.0
-        ):
+        if h_symmetry_time_pct is not None and (h_symmetry_time_pct <= 0.0 or h_symmetry_time_pct > 1.0):
             h_symmetry_time_pct = None
 
         v_symmetry_time_pct = postprocessing_settings.v_symmetry_time_pct
-        if v_symmetry_time_pct is not None and (
-            v_symmetry_time_pct <= 0.0 or v_symmetry_time_pct > 1.0
-        ):
+        if v_symmetry_time_pct is not None and (v_symmetry_time_pct <= 0.0 or v_symmetry_time_pct > 1.0):
             v_symmetry_time_pct = None
 
         dev = latents.device.type
@@ -554,9 +542,7 @@ class InvokeAIDiffuserComponent:
     def estimate_percent_through(self, step_index, sigma):
         if step_index is not None and self.cross_attention_control_context is not None:
             # percent_through will never reach 1.0 (but this is intended)
-            return float(step_index) / float(
-                self.cross_attention_control_context.step_count
-            )
+            return float(step_index) / float(self.cross_attention_control_context.step_count)
         # find the best possible index of the current sigma in the sigma sequence
         smaller_sigmas = torch.nonzero(self.model.sigmas <= sigma)
         sigma_index = smaller_sigmas[-1].item() if smaller_sigmas.shape[0] > 0 else 0
@@ -567,19 +553,13 @@ class InvokeAIDiffuserComponent:
 
     # todo: make this work
     @classmethod
-    def apply_conjunction(
-        cls, x, t, forward_func, uc, c_or_weighted_c_list, global_guidance_scale
-    ):
+    def apply_conjunction(cls, x, t, forward_func, uc, c_or_weighted_c_list, global_guidance_scale):
         x_in = torch.cat([x] * 2)
         t_in = torch.cat([t] * 2)  # aka sigmas
 
         deltas = None
         uncond_latents = None
-        weighted_cond_list = (
-            c_or_weighted_c_list
-            if type(c_or_weighted_c_list) is list
-            else [(c_or_weighted_c_list, 1)]
-        )
+        weighted_cond_list = c_or_weighted_c_list if type(c_or_weighted_c_list) is list else [(c_or_weighted_c_list, 1)]
 
         # below is fugly omg
         conditionings = [uc] + [c for c, weight in weighted_cond_list]
@@ -608,15 +588,11 @@ class InvokeAIDiffuserComponent:
                     deltas = torch.cat((deltas, latents_b - uncond_latents))
 
         # merge the weighted deltas together into a single merged delta
-        per_delta_weights = torch.tensor(
-            weights[1:], dtype=deltas.dtype, device=deltas.device
-        )
+        per_delta_weights = torch.tensor(weights[1:], dtype=deltas.dtype, device=deltas.device)
         normalize = False
         if normalize:
             per_delta_weights /= torch.sum(per_delta_weights)
-        reshaped_weights = per_delta_weights.reshape(
-            per_delta_weights.shape + (1, 1, 1)
-        )
+        reshaped_weights = per_delta_weights.reshape(per_delta_weights.shape + (1, 1, 1))
         deltas_merged = torch.sum(deltas * reshaped_weights, dim=0, keepdim=True)
 
         # old_return_value = super().forward(x, sigma, uncond, cond, cond_scale)
