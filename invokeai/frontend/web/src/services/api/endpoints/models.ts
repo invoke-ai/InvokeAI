@@ -14,6 +14,7 @@ import {
   MergeModelConfig,
   TextualInversionModelConfig,
   VaeModelConfig,
+  ModelType,
 } from 'services/api/types';
 
 import queryString from 'query-string';
@@ -62,6 +63,7 @@ type UpdateMainModelResponse =
 type DeleteMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
+  model_type: ModelType;
 };
 
 type DeleteMainModelResponse = void;
@@ -287,9 +289,9 @@ export const modelsApi = api.injectEndpoints({
       DeleteMainModelResponse,
       DeleteMainModelArg
     >({
-      query: ({ base_model, model_name }) => {
+      query: ({ base_model, model_name, model_type }) => {
         return {
-          url: `models/${base_model}/main/${model_name}`,
+          url: `models/${base_model}/${model_type}/${model_name}`,
           method: 'DELETE',
         };
       },
