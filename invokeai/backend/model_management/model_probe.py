@@ -416,7 +416,14 @@ class PipelineFolderProbe(FolderProbeBase):
 
 class VaeFolderProbe(FolderProbeBase):
     def get_base_type(self)->BaseModelType:
-        return BaseModelType.StableDiffusion1
+        config_file = self.folder_path / 'config.json'
+        if not config_file.exists():
+            raise InvalidModelException(f"Cannot determine base type for {self.folder_path}")
+        with open(config_file,'r') as file:
+            config = json.load(file)
+        return BaseModelType.StableDiffusionXL \
+            if config.get('scaling_factor',0)==0.13025 and config.get('sample_size') in [512, 1024] \
+            else BaseModelType.StableDiffusion1
 
 class TextualInversionFolderProbe(FolderProbeBase):
     def get_format(self)->str:
