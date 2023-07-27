@@ -6,6 +6,7 @@ from .invokeai_version import __version__
 __app_id__ = "invoke-ai/InvokeAI"
 __app_name__ = "InvokeAI"
 
+
 def _ignore_xformers_triton_message_on_windows():
     import logging
 

@@ -66,9 +66,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     def get(self, id: str) -> Optional[T]:
         try:
             self._lock.acquire()
-            self._cursor.execute(
-                f"""SELECT item FROM {self._table_name} WHERE id = ?;""", (str(id),)
-            )
+            self._cursor.execute(f"""SELECT item FROM {self._table_name} WHERE id = ?;""", (str(id),))
             result = self._cursor.fetchone()
         finally:
             self._lock.release()
@@ -81,9 +79,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     def get_raw(self, id: str) -> Optional[str]:
         try:
             self._lock.acquire()
-            self._cursor.execute(
-                f"""SELECT item FROM {self._table_name} WHERE id = ?;""", (str(id),)
-            )
+            self._cursor.execute(f"""SELECT item FROM {self._table_name} WHERE id = ?;""", (str(id),))
             result = self._cursor.fetchone()
         finally:
             self._lock.release()
@@ -96,9 +92,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     def delete(self, id: str):
         try:
             self._lock.acquire()
-            self._cursor.execute(
-                f"""DELETE FROM {self._table_name} WHERE id = ?;""", (str(id),)
-            )
+            self._cursor.execute(f"""DELETE FROM {self._table_name} WHERE id = ?;""", (str(id),))
             self._conn.commit()
         finally:
             self._lock.release()
@@ -122,13 +116,9 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
 
         pageCount = int(count / per_page) + 1
 
-        return PaginatedResults[T](
-            items=items, page=page, pages=pageCount, per_page=per_page, total=count
-        )
+        return PaginatedResults[T](items=items, page=page, pages=pageCount, per_page=per_page, total=count)
 
-    def search(
-        self, query: str, page: int = 0, per_page: int = 10
-    ) -> PaginatedResults[T]:
+    def search(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -149,6 +139,4 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
 
         pageCount = int(count / per_page) + 1
 
-        return PaginatedResults[T](
-            items=items, page=page, pages=pageCount, per_page=per_page, total=count
-        )
+        return PaginatedResults[T](items=items, page=page, pages=pageCount, per_page=per_page, total=count)

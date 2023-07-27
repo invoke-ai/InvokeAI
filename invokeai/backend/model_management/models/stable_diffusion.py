@@ -26,8 +26,8 @@ class StableDiffusion1ModelFormat(str, Enum):
     Checkpoint = "checkpoint"
     Diffusers = "diffusers"
 
-class StableDiffusion1Model(DiffusersModel):
 
+class StableDiffusion1Model(DiffusersModel):
     class DiffusersConfig(ModelConfigBase):
         model_format: Literal[StableDiffusion1ModelFormat.Diffusers]
         vae: Optional[str] = Field(None)
@@ -38,7 +38,7 @@ class StableDiffusion1Model(DiffusersModel):
         vae: Optional[str] = Field(None)
         config: str
         variant: ModelVariantType
-        
+
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion1
         assert model_type == ModelType.Main
@@ -59,7 +59,7 @@ class StableDiffusion1Model(DiffusersModel):
 
             else:
                 checkpoint = read_checkpoint_meta(path)
-                checkpoint = checkpoint.get('state_dict', checkpoint)
+                checkpoint = checkpoint.get("state_dict", checkpoint)
                 in_channels = checkpoint["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
 
         elif model_format == StableDiffusion1ModelFormat.Diffusers:
@@ -67,7 +67,7 @@ class StableDiffusion1Model(DiffusersModel):
             if os.path.exists(unet_config_path):
                 with open(unet_config_path, "r") as f:
                     unet_config = json.loads(f.read())
-                in_channels = unet_config['in_channels']
+                in_channels = unet_config["in_channels"]
 
             else:
                 raise NotImplementedError(f"{path} is not a supported stable diffusion diffusers format")
@@ -88,7 +88,6 @@ class StableDiffusion1Model(DiffusersModel):
         return cls.create_config(
             path=path,
             model_format=model_format,
-
             config=ckpt_config_path,
             variant=variant,
         )
@@ -125,16 +124,17 @@ class StableDiffusion1Model(DiffusersModel):
                 version=BaseModelType.StableDiffusion1,
                 model_config=config,
                 output_path=output_path,
-           )
+            )
         else:
             return model_path
+
 
 class StableDiffusion2ModelFormat(str, Enum):
     Checkpoint = "checkpoint"
     Diffusers = "diffusers"
 
-class StableDiffusion2Model(DiffusersModel):
 
+class StableDiffusion2Model(DiffusersModel):
     # TODO: check that configs overwriten properly
     class DiffusersConfig(ModelConfigBase):
         model_format: Literal[StableDiffusion2ModelFormat.Diffusers]
@@ -167,7 +167,7 @@ class StableDiffusion2Model(DiffusersModel):
 
             else:
                 checkpoint = read_checkpoint_meta(path)
-                checkpoint = checkpoint.get('state_dict', checkpoint)
+                checkpoint = checkpoint.get("state_dict", checkpoint)
                 in_channels = checkpoint["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
 
         elif model_format == StableDiffusion2ModelFormat.Diffusers:
@@ -175,7 +175,7 @@ class StableDiffusion2Model(DiffusersModel):
             if os.path.exists(unet_config_path):
                 with open(unet_config_path, "r") as f:
                     unet_config = json.loads(f.read())
-                in_channels = unet_config['in_channels']
+                in_channels = unet_config["in_channels"]
 
             else:
                 raise Exception("Not supported stable diffusion diffusers format(possibly onnx?)")
@@ -198,7 +198,6 @@ class StableDiffusion2Model(DiffusersModel):
         return cls.create_config(
             path=path,
             model_format=model_format,
-
             config=ckpt_config_path,
             variant=variant,
         )
@@ -239,17 +238,19 @@ class StableDiffusion2Model(DiffusersModel):
         else:
             return model_path
 
+
 # TODO: rework
 # pass precision - currently defaulting to fp16
 def _convert_ckpt_and_cache(
-        version: BaseModelType,
-        model_config: Union[StableDiffusion1Model.CheckpointConfig,
-                            StableDiffusion2Model.CheckpointConfig,
-                            StableDiffusionXLModel.CheckpointConfig,
-                            ],
-        output_path: str,
-        use_save_model: bool=False,
-        **kwargs,
+    version: BaseModelType,
+    model_config: Union[
+        StableDiffusion1Model.CheckpointConfig,
+        StableDiffusion2Model.CheckpointConfig,
+        StableDiffusionXLModel.CheckpointConfig,
+    ],
+    output_path: str,
+    use_save_model: bool = False,
+    **kwargs,
 ) -> str:
     """
     Convert the checkpoint model indicated in mconfig into a
@@ -270,13 +271,14 @@ def _convert_ckpt_and_cache(
     from ..convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
     from ...util.devices import choose_torch_device, torch_dtype
 
-    model_base_to_model_type = {BaseModelType.StableDiffusion1: 'FrozenCLIPEmbedder',
-                                BaseModelType.StableDiffusion2: 'FrozenOpenCLIPEmbedder',
-                                BaseModelType.StableDiffusionXL: 'SDXL',
-                                BaseModelType.StableDiffusionXLRefiner: 'SDXL-Refiner',
-                                }
-    logger.info(f'Converting {weights} to diffusers format')
-    with SilenceWarnings():        
+    model_base_to_model_type = {
+        BaseModelType.StableDiffusion1: "FrozenCLIPEmbedder",
+        BaseModelType.StableDiffusion2: "FrozenOpenCLIPEmbedder",
+        BaseModelType.StableDiffusionXL: "SDXL",
+        BaseModelType.StableDiffusionXLRefiner: "SDXL-Refiner",
+    }
+    logger.info(f"Converting {weights} to diffusers format")
+    with SilenceWarnings():
         convert_ckpt_to_diffusers(
             weights,
             output_path,
@@ -286,11 +288,12 @@ def _convert_ckpt_and_cache(
             original_config_file=config_file,
             extract_ema=True,
             scan_needed=True,
-            from_safetensors = weights.suffix == ".safetensors",
-            precision = torch_dtype(choose_torch_device()),
+            from_safetensors=weights.suffix == ".safetensors",
+            precision=torch_dtype(choose_torch_device()),
             **kwargs,
         )
     return output_path
+
 
 def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
     ckpt_configs = {
@@ -299,7 +302,7 @@ def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
             ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
         },
         BaseModelType.StableDiffusion2: {
-            ModelVariantType.Normal: "v2-inference-v.yaml", # best guess, as we can't differentiate with base(512)
+            ModelVariantType.Normal: "v2-inference-v.yaml",  # best guess, as we can't differentiate with base(512)
             ModelVariantType.Inpaint: "v2-inpainting-inference.yaml",
             ModelVariantType.Depth: "v2-midas-inference.yaml",
         },
@@ -321,8 +324,6 @@ def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
         if config_path.is_relative_to(app_config.root_path):
             config_path = config_path.relative_to(app_config.root_path)
         return str(config_path)
-            
+
     except:
         return None
-
-
