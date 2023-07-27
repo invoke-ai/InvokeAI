@@ -3,6 +3,7 @@ import asyncio
 import sys
 from inspect import signature
 
+import logging
 import uvicorn
 import socket
 
@@ -210,11 +211,23 @@ def invoke_api():
     port = find_port(app_config.port)
     if port != app_config.port:
         logger.warn(f"Port {app_config.port} in use, using port {port}")
+        
     # Start our own event loop for eventing usage
     loop = asyncio.new_event_loop()
-    config = uvicorn.Config(app=app, host=app_config.host, port=port, loop=loop)
-    # Use access_log to turn off logging
+    config = uvicorn.Config(
+        app=app,
+        host=app_config.host,
+        port=port,
+        loop=loop,
+        log_level=app_config.log_level,
+    )
     server = uvicorn.Server(config)
+
+    # replace uvicorn's logger with InvokeAI's for consistent appearance
+    logging.getLogger("uvicorn").handlers.clear()
+    for ch in logger.handlers:
+        logging.getLogger("uvicorn").addHandler(ch)
+        
     loop.run_until_complete(server.serve())
 
 if __name__ == "__main__":
