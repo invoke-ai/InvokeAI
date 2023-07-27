@@ -152,7 +152,10 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getOnnxModels: build.query<EntityState<OnnxModelConfigEntity>, void>({
+    getOnnxModels: build.query<
+      EntityState<OnnxModelConfigEntity>,
+      BaseModelType[]
+    >({
       query: (base_models) => {
         const params = {
           model_type: 'onnx',
