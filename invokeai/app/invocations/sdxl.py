@@ -299,7 +299,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
         with unet_info as unet:
             scheduler.set_timesteps(num_inference_steps, device=unet.device)
             timesteps = scheduler.timesteps
-            
+
             latents = latents.to(device=unet.device, dtype=unet.dtype) * scheduler.init_noise_sigma
 
             extra_step_kwargs = dict()
