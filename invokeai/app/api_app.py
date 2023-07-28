@@ -211,7 +211,7 @@ def invoke_api():
     port = find_port(app_config.port)
     if port != app_config.port:
         logger.warn(f"Port {app_config.port} in use, using port {port}")
-        
+
     # Start our own event loop for eventing usage
     loop = asyncio.new_event_loop()
     config = uvicorn.Config(
@@ -229,7 +229,7 @@ def invoke_api():
         l.handlers.clear()
         for ch in logger.handlers:
             l.addHandler(ch)
-    
+
     loop.run_until_complete(server.serve())
 
 
