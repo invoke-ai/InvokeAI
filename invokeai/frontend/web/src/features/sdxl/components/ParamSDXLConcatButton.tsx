@@ -33,7 +33,7 @@ export default function ParamSDXLConcatButton() {
         insetInlineEnd: 1,
         top: shouldPinParametersPanel ? 12 : 20,
         border: 'none',
-        color: 'base.500',
+        color: shouldConcatSDXLStylePrompt ? 'accent.500' : 'base.500',
         _hover: {
           bg: 'none',
         },

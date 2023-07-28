@@ -72,7 +72,8 @@ export default function SDXLConcatLink() {
           top: '3px',
           p: 1,
           borderRadius: 4,
-          bg: 'accent.200',
+          bg: 'accent.400',
+          color: 'base.50',
           _dark: {
             bg: 'accent.500',
           },
