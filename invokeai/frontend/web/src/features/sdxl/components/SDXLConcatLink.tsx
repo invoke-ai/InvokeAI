@@ -18,14 +18,7 @@ const sharedConcatLinkStyle: CSSObject = {
 
 export default function SDXLConcatLink() {
   return (
-    <Flex
-      sx={{
-        h: 0.5,
-        placeContent: 'center',
-        gap: 2,
-        flexDirection: 'column',
-      }}
-    >
+    <Flex>
       <Box
         as={motion.div}
         initial={{
@@ -43,7 +36,6 @@ export default function SDXLConcatLink() {
           top: '1px',
           borderTop: 'none',
           borderColor: 'base.400',
-          zIndex: 2,
           ...sharedConcatLinkStyle,
           _dark: {
             borderColor: 'accent.500',
