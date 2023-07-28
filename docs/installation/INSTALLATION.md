@@ -41,6 +41,14 @@ You wil need one of the following:
   only)
 - :fontawesome-brands-apple: An Apple computer with an M1 chip.
 
+** SDXL 1.0 Requirements*
+To use SDXL, user must have one of the following: 
+- :simple-nvidia: An NVIDIA-based graphics card with 8 GB or more VRAM memory.
+- :simple-amd: An AMD-based graphics card with 16 GB or more VRAM memory (Linux
+  only)
+- :fontawesome-brands-apple: An Apple computer with an M1 chip.
+
+
 ### :fontawesome-solid-memory: Memory and Disk
 
 - At least 12 GB Main Memory RAM.

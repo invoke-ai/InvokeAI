@@ -42,6 +42,8 @@ This is a high level walkthrough of some of the concepts and terms you’ll see 
 
 ## Terms & Concepts
 
+If you're interested in learning more, check out [this presentation](https://docs.google.com/presentation/d/1IO78i8oEXFTZ5peuHHYkVF-Y3e2M6iM5tCnc-YBfcCM/edit?usp=sharing) from one of our maintainers (@lstein). 
+
 ### Stable Diffusion
 
 Stable Diffusion is deep learning, text-to-image model that is the foundation of the capabilities found in InvokeAI. Since the release of Stable Diffusion, there have been many subsequent models created based on Stable Diffusion that are designed to generate specific types of images. 
@@ -78,16 +80,16 @@ Schedulers can be intricate and there's often a balance to strike between how qu
 
 ### Low-Rank Adaptations / LoRAs
 
-Low-Rank Adaptations (LoRAs) ****are like a smaller, more focused version of model, intended to focus on training a better understanding of how a specific character, style, or concept looks.
+Low-Rank Adaptations (LoRAs) are like a smaller, more focused version of models, intended to focus on training a better understanding of how a specific character, style, or concept looks.
 
-### Embeddings
+### Textual Inversion Embeddings
 
-Embeddings, like LoRAs, assist with more easily prompting for certain characters, styles, or concepts. However, embeddings are trained to more update the relationship between a specific word (known as the “trigger”) and the intended output. Embeddings may sometimes also be referred to as Textual Inversions (TIs).
+Textual Inversion Embeddings, like LoRAs, assist with more easily prompting for certain characters, styles, or concepts. However, embeddings are trained to update the relationship between a specific word (known as the “trigger”) and the intended output. 
 
 ### ControlNet
 
-ControlNet is a neural network model that can be used to control output from models. This can take many forms, such as controlling poses of people in generated images or providing edges to based image generation on. The impact of the ControlNet can also be adjusted to increase or decrease the similarity of the generated image to the ControlNet.
+ControlNets are neural network models that are able to extract key features from an existing image and use these features to guide the output of the image generation model. 
 
 ### VAE
 
-Variational auto-encoder (VAE) is a generative AI algorithm that helps to generate finer details such as better faces, hands, colors etc.
+Variational auto-encoder (VAE) is a encode/decode model that translates the "latents" image produced during the image generation procees to the large pixel images that we see. 
