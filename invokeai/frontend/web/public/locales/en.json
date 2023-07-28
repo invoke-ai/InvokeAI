@@ -340,6 +340,7 @@
         "allModels": "All Models",
         "checkpointModels": "Checkpoints",
         "diffusersModels": "Diffusers",
+        "loraModels": "LoRAs",
         "safetensorModels": "SafeTensors",
         "modelAdded": "Model Added",
         "modelUpdated": "Model Updated",
