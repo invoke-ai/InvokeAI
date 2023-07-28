@@ -33,6 +33,7 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
         default=False,
         description="Decode latents by overlapping tiles(less memory consumption)")
     # TODO: fp32: bool = Field(DEFAULT_PRECISION=='float32', description="Decode in full precision")
+    # FIXME: We inherited the `control` field from the superclass, but don't support it.
 
     class Config(InvocationConfig):
         schema_extra = {
@@ -61,7 +62,7 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
 
             conditioning_data = self.get_conditioning_data(context, scheduler, unet)
 
-            # TODO: file upstream bug; depends on text_encoder reference even if embeds are already encoded
+            # TODO: https://github.com/huggingface/diffusers/issues/4349
             class FakeEncoder:
                 class FakeEncoderConfig:
                     pass
