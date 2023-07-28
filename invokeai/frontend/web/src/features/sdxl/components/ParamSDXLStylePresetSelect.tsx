@@ -52,6 +52,9 @@ export default function ParamSDXLStylePresetSelect() {
       value={sdxlStylePreset ?? 'none'}
       placeholder="Select a preset"
       onChange={sdxlStylePresetChangeHandler}
+      sx={{
+        paddingBottom: 10,
+      }}
     />
   );
 }

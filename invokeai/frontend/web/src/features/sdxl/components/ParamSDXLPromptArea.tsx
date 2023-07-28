@@ -7,6 +7,7 @@ import { AnimatePresence } from 'framer-motion';
 import ParamSDXLConcatButton from './ParamSDXLConcatButton';
 import ParamSDXLNegativeStyleConditioning from './ParamSDXLNegativeStyleConditioning';
 import ParamSDXLPositiveStyleConditioning from './ParamSDXLPositiveStyleConditioning';
+import ParamSDXLStylePresetSelect from './ParamSDXLStylePresetSelect';
 import SDXLConcatLink from './SDXLConcatLink';
 
 export default function ParamSDXLPromptArea() {
@@ -56,6 +57,7 @@ export default function ParamSDXLPromptArea() {
       <ParamSDXLPositiveStyleConditioning />
       <ParamNegativeConditioning />
       <ParamSDXLNegativeStyleConditioning />
+      <ParamSDXLStylePresetSelect />
     </Flex>
   );
 }
