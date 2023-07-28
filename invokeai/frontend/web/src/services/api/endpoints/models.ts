@@ -61,8 +61,7 @@ type UpdateLoRAModelArg = {
 type UpdateMainModelResponse =
   paths['/api/v1/models/{base_model}/{model_type}/{model_name}']['patch']['responses']['200']['content']['application/json'];
 
-type UpdateLoRAModelResponse =
-  paths['/api/v1/models/{base_model}/{model_type}/{model_name}']['patch']['responses']['200']['content']['application/json'];
+type UpdateLoRAModelResponse = UpdateMainModelResponse;
 
 type DeleteMainModelArg = {
   base_model: BaseModelType;
