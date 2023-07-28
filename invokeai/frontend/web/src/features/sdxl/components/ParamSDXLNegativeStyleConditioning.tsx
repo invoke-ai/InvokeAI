@@ -21,14 +21,12 @@ import SDXLConcatLink from './SDXLConcatLink';
 
 const promptInputSelector = createSelector(
   [stateSelector, activeTabNameSelector],
-  ({ sdxl, ui }, activeTabName) => {
+  ({ sdxl }, activeTabName) => {
     const { negativeStylePrompt, shouldConcatSDXLStylePrompt } = sdxl;
-    const { shouldPinParametersPanel } = ui;
 
     return {
       prompt: negativeStylePrompt,
       shouldConcatSDXLStylePrompt,
-      shouldPinParametersPanel,
       activeTabName,
     };
   },
@@ -48,12 +46,8 @@ const ParamSDXLNegativeStyleConditioning = () => {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
 
-  const {
-    prompt,
-    activeTabName,
-    shouldPinParametersPanel,
-    shouldConcatSDXLStylePrompt,
-  } = useAppSelector(promptInputSelector);
+  const { prompt, activeTabName, shouldConcatSDXLStylePrompt } =
+    useAppSelector(promptInputSelector);
 
   const handleChangePrompt = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
