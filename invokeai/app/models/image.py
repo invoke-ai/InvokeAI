@@ -8,6 +8,7 @@ from ..invocations.baseinvocation import (
     InvocationConfig,
 )
 
+
 class ImageField(BaseModel):
     """An image field used for passing image objects between invocations"""
 
@@ -34,6 +35,7 @@ class ProgressImage(BaseModel):
     height: int = Field(description="The effective height of the image in pixels")
     dataURL: str = Field(description="The image data as a b64 data URL")
 
+
 class PILInvocationConfig(BaseModel):
     """Helper class to provide all PIL invocations with additional config"""
 
@@ -43,6 +45,7 @@ class PILInvocationConfig(BaseModel):
                 "tags": ["PIL", "image"],
             },
         }
+
 
 class ImageOutput(BaseInvocationOutput):
     """Base class for invocations that output an image"""
@@ -75,6 +78,7 @@ class MaskOutput(BaseInvocationOutput):
                 "mask",
             ]
         }
+
 
 class ResourceOrigin(str, Enum, metaclass=MetaEnum):
     """The origin of a resource (eg image).
@@ -132,5 +136,3 @@ class InvalidImageCategoryException(ValueError):
 
     def __init__(self, message="Invalid image category."):
         super().__init__(message)
-
-

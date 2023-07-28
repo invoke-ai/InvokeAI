@@ -8,8 +8,7 @@ from pydantic import Field, validator
 from invokeai.app.models.image import ImageField
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
-from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
-                             InvocationConfig, InvocationContext, UIConfig)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext, UIConfig
 
 
 class IntCollectionOutput(BaseInvocationOutput):
@@ -27,8 +26,7 @@ class FloatCollectionOutput(BaseInvocationOutput):
     type: Literal["float_collection"] = "float_collection"
 
     # Outputs
-    collection: list[float] = Field(
-        default=[], description="The float collection")
+    collection: list[float] = Field(default=[], description="The float collection")
 
 
 class ImageCollectionOutput(BaseInvocationOutput):
@@ -37,8 +35,7 @@ class ImageCollectionOutput(BaseInvocationOutput):
     type: Literal["image_collection"] = "image_collection"
 
     # Outputs
-    collection: list[ImageField] = Field(
-        default=[], description="The output images")
+    collection: list[ImageField] = Field(default=[], description="The output images")
 
     class Config:
         schema_extra = {"required": ["type", "collection"]}
@@ -56,10 +53,7 @@ class RangeInvocation(BaseInvocation):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Range",
-                "tags": ["range", "integer", "collection"]
-            },
+            "ui": {"title": "Range", "tags": ["range", "integer", "collection"]},
         }
 
     @validator("stop")
@@ -69,9 +63,7 @@ class RangeInvocation(BaseInvocation):
         return v
 
     def invoke(self, context: InvocationContext) -> IntCollectionOutput:
-        return IntCollectionOutput(
-            collection=list(range(self.start, self.stop, self.step))
-        )
+        return IntCollectionOutput(collection=list(range(self.start, self.stop, self.step)))
 
 
 class RangeOfSizeInvocation(BaseInvocation):
@@ -86,18 +78,11 @@ class RangeOfSizeInvocation(BaseInvocation):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Sized Range",
-                "tags": ["range", "integer", "size", "collection"]
-            },
+            "ui": {"title": "Sized Range", "tags": ["range", "integer", "size", "collection"]},
         }
 
     def invoke(self, context: InvocationContext) -> IntCollectionOutput:
-        return IntCollectionOutput(
-            collection=list(
-                range(
-                    self.start, self.start + self.size,
-                    self.step)))
+        return IntCollectionOutput(collection=list(range(self.start, self.start + self.size, self.step)))
 
 
 class RandomRangeInvocation(BaseInvocation):
@@ -107,9 +92,7 @@ class RandomRangeInvocation(BaseInvocation):
 
     # Inputs
     low: int = Field(default=0, description="The inclusive low value")
-    high: int = Field(
-        default=np.iinfo(np.int32).max, description="The exclusive high value"
-    )
+    high: int = Field(default=np.iinfo(np.int32).max, description="The exclusive high value")
     size: int = Field(default=1, description="The number of values to generate")
     seed: int = Field(
         ge=0,
@@ -120,19 +103,12 @@ class RandomRangeInvocation(BaseInvocation):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Random Range",
-                "tags": ["range", "integer", "random", "collection"]
-            },
+            "ui": {"title": "Random Range", "tags": ["range", "integer", "random", "collection"]},
         }
 
     def invoke(self, context: InvocationContext) -> IntCollectionOutput:
         rng = np.random.default_rng(self.seed)
-        return IntCollectionOutput(
-            collection=list(
-                rng.integers(
-                    low=self.low, high=self.high,
-                    size=self.size)))
+        return IntCollectionOutput(collection=list(rng.integers(low=self.low, high=self.high, size=self.size)))
 
 
 class ImageCollectionInvocation(BaseInvocation):

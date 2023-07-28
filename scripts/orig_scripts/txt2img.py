@@ -15,10 +15,11 @@ from contextlib import contextmanager, nullcontext
 import k_diffusion as K
 import torch.nn as nn
 
-from ldm.util                  import instantiate_from_config
+from ldm.util import instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.plms import PLMSSampler
-from ldm.invoke.devices         import choose_torch_device
+from ldm.invoke.devices import choose_torch_device
+
 
 def chunk(it, size):
     it = iter(it)
@@ -53,23 +54,19 @@ def main():
         type=str,
         nargs="?",
         default="a painting of a virus monster playing guitar",
-        help="the prompt to render"
+        help="the prompt to render",
     )
     parser.add_argument(
-        "--outdir",
-        type=str,
-        nargs="?",
-        help="dir to write results to",
-        default="outputs/txt2img-samples"
+        "--outdir", type=str, nargs="?", help="dir to write results to", default="outputs/txt2img-samples"
     )
     parser.add_argument(
         "--skip_grid",
-        action='store_true',
+        action="store_true",
         help="do not save a grid, only individual samples. Helpful when evaluating lots of samples",
     )
     parser.add_argument(
         "--skip_save",
-        action='store_true',
+        action="store_true",
         help="do not save individual samples. For speed measurements.",
     )
     parser.add_argument(
@@ -80,22 +77,22 @@ def main():
     )
     parser.add_argument(
         "--plms",
-        action='store_true',
+        action="store_true",
         help="use plms sampling",
     )
     parser.add_argument(
         "--klms",
-        action='store_true',
+        action="store_true",
         help="use klms sampling",
     )
     parser.add_argument(
         "--laion400m",
-        action='store_true',
+        action="store_true",
         help="uses the LAION400M model",
     )
     parser.add_argument(
         "--fixed_code",
-        action='store_true',
+        action="store_true",
         help="if enabled, uses the same starting code across samples ",
     )
     parser.add_argument(
@@ -176,11 +173,7 @@ def main():
         help="the seed (for reproducible sampling)",
     )
     parser.add_argument(
-        "--precision",
-        type=str,
-        help="evaluate at this precision",
-        choices=["full", "autocast"],
-        default="autocast"
+        "--precision", type=str, help="evaluate at this precision", choices=["full", "autocast"], default="autocast"
     )
     opt = parser.parse_args()
 
@@ -190,17 +183,17 @@ def main():
         opt.ckpt = "models/ldm/text2img-large/model.ckpt"
         opt.outdir = "outputs/txt2img-samples-laion400m"
 
-
     config = OmegaConf.load(f"{opt.config}")
     model = load_model_from_config(config, f"{opt.ckpt}")
 
     seed_everything(opt.seed)
 
     device = torch.device(choose_torch_device())
-    model  = model.to(device)
+    model = model.to(device)
 
-    #for klms
+    # for klms
     model_wrap = K.external.CompVisDenoiser(model)
+
     class CFGDenoiser(nn.Module):
         def __init__(self, model):
             super().__init__()
@@ -232,10 +225,10 @@ def main():
         print(f"reading prompts from {opt.from_file}")
         with open(opt.from_file, "r") as f:
             data = f.read().splitlines()
-            if (len(data) >= batch_size):
+            if len(data) >= batch_size:
                 data = list(chunk(data, batch_size))
             else:
-                while (len(data) < batch_size):
+                while len(data) < batch_size:
                     data.append(data[-1])
                 data = [data]
 
@@ -247,14 +240,14 @@ def main():
     start_code = None
     if opt.fixed_code:
         shape = [opt.n_samples, opt.C, opt.H // opt.f, opt.W // opt.f]
-        if device.type == 'mps':
-            start_code = torch.randn(shape, device='cpu').to(device)
+        if device.type == "mps":
+            start_code = torch.randn(shape, device="cpu").to(device)
         else:
             torch.randn(shape, device=device)
 
-    precision_scope = autocast if opt.precision=="autocast" else nullcontext
-    if device.type in ['mps', 'cpu']:
-        precision_scope = nullcontext # have to use f32 on mps
+    precision_scope = autocast if opt.precision == "autocast" else nullcontext
+    if device.type in ["mps", "cpu"]:
+        precision_scope = nullcontext  # have to use f32 on mps
     with torch.no_grad():
         with precision_scope(device.type):
             with model.ema_scope():
@@ -271,23 +264,25 @@ def main():
                         shape = [opt.C, opt.H // opt.f, opt.W // opt.f]
 
                         if not opt.klms:
-                            samples_ddim, _ = sampler.sample(S=opt.ddim_steps,
-                                                            conditioning=c,
-                                                            batch_size=opt.n_samples,
-                                                            shape=shape,
-                                                            verbose=False,
-                                                            unconditional_guidance_scale=opt.scale,
-                                                            unconditional_conditioning=uc,
-                                                            eta=opt.ddim_eta,
-                                                            x_T=start_code)
+                            samples_ddim, _ = sampler.sample(
+                                S=opt.ddim_steps,
+                                conditioning=c,
+                                batch_size=opt.n_samples,
+                                shape=shape,
+                                verbose=False,
+                                unconditional_guidance_scale=opt.scale,
+                                unconditional_conditioning=uc,
+                                eta=opt.ddim_eta,
+                                x_T=start_code,
+                            )
                         else:
                             sigmas = model_wrap.get_sigmas(opt.ddim_steps)
                             if start_code:
                                 x = start_code
                             else:
-                                x = torch.randn([opt.n_samples, *shape], device=device) * sigmas[0] # for GPU draw
+                                x = torch.randn([opt.n_samples, *shape], device=device) * sigmas[0]  # for GPU draw
                             model_wrap_cfg = CFGDenoiser(model_wrap)
-                            extra_args = {'cond': c, 'uncond': uc, 'cond_scale': opt.scale}
+                            extra_args = {"cond": c, "uncond": uc, "cond_scale": opt.scale}
                             samples_ddim = K.sampling.sample_lms(model_wrap_cfg, x, sigmas, extra_args=extra_args)
 
                         x_samples_ddim = model.decode_first_stage(samples_ddim)
@@ -295,9 +290,10 @@ def main():
 
                         if not opt.skip_save:
                             for x_sample in x_samples_ddim:
-                                x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
+                                x_sample = 255.0 * rearrange(x_sample.cpu().numpy(), "c h w -> h w c")
                                 Image.fromarray(x_sample.astype(np.uint8)).save(
-                                    os.path.join(sample_path, f"{base_count:05}.png"))
+                                    os.path.join(sample_path, f"{base_count:05}.png")
+                                )
                                 base_count += 1
 
                         if not opt.skip_grid:
@@ -306,18 +302,17 @@ def main():
                 if not opt.skip_grid:
                     # additionally, save as grid
                     grid = torch.stack(all_samples, 0)
-                    grid = rearrange(grid, 'n b c h w -> (n b) c h w')
+                    grid = rearrange(grid, "n b c h w -> (n b) c h w")
                     grid = make_grid(grid, nrow=n_rows)
 
                     # to image
-                    grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
-                    Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f'grid-{grid_count:04}.png'))
+                    grid = 255.0 * rearrange(grid, "c h w -> h w c").cpu().numpy()
+                    Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f"grid-{grid_count:04}.png"))
                     grid_count += 1
 
                 toc = time.time()
 
-    print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
-          f" \nEnjoy.")
+    print(f"Your samples are ready and waiting for you here: \n{outpath} \n" f" \nEnjoy.")
 
 
 if __name__ == "__main__":

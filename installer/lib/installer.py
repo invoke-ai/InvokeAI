@@ -141,15 +141,16 @@ class Installer:
 
         # upgrade pip in Python 3.9 environments
         if int(platform.python_version_tuple()[1]) == 9:
-
             from plumbum import FG, local
 
             pip = local[get_pip_from_venv(venv_dir)]
-            pip[ "install", "--upgrade", "pip"] & FG
+            pip["install", "--upgrade", "pip"] & FG
 
         return venv_dir
 
-    def install(self, root: str = "~/invokeai-3", version: str = "latest", yes_to_all=False, find_links: Path = None) -> None:
+    def install(
+        self, root: str = "~/invokeai-3", version: str = "latest", yes_to_all=False, find_links: Path = None
+    ) -> None:
         """
         Install the InvokeAI application into the given runtime path
 
@@ -175,7 +176,7 @@ class Installer:
         self.instance = InvokeAiInstance(runtime=self.dest, venv=self.venv, version=version)
 
         # install dependencies and the InvokeAI application
-        (extra_index_url,optional_modules) = get_torch_source() if not yes_to_all else (None,None)
+        (extra_index_url, optional_modules) = get_torch_source() if not yes_to_all else (None, None)
         self.instance.install(
             extra_index_url,
             optional_modules,
@@ -188,6 +189,7 @@ class Installer:
         # run through the configuration flow
         self.instance.configure()
 
+
 class InvokeAiInstance:
     """
     Manages an installed instance of InvokeAI, comprising a virtual environment and a runtime directory.
@@ -196,7 +198,6 @@ class InvokeAiInstance:
     """
 
     def __init__(self, runtime: Path, venv: Path, version: str) -> None:
-
         self.runtime = runtime
         self.venv = venv
         self.pip = get_pip_from_venv(venv)
@@ -312,7 +313,7 @@ class InvokeAiInstance:
                 "install",
                 "--require-virtualenv",
                 "--use-pep517",
-                str(src)+(optional_modules if optional_modules else ''),
+                str(src) + (optional_modules if optional_modules else ""),
                 "--find-links" if find_links is not None else None,
                 find_links,
                 "--extra-index-url" if extra_index_url is not None else None,
@@ -329,15 +330,15 @@ class InvokeAiInstance:
 
         # set sys.argv to a consistent state
         new_argv = [sys.argv[0]]
-        for i in range(1,len(sys.argv)):
+        for i in range(1, len(sys.argv)):
             el = sys.argv[i]
-            if el in ['-r','--root']:
+            if el in ["-r", "--root"]:
                 new_argv.append(el)
-                new_argv.append(sys.argv[i+1])
-            elif el in ['-y','--yes','--yes-to-all']:
+                new_argv.append(sys.argv[i + 1])
+            elif el in ["-y", "--yes", "--yes-to-all"]:
                 new_argv.append(el)
         sys.argv = new_argv
-        
+
         import requests  # to catch download exceptions
         from messages import introduction
 
@@ -353,16 +354,16 @@ class InvokeAiInstance:
             invokeai_configure()
             succeeded = True
         except requests.exceptions.ConnectionError as e:
-            print(f'\nA network error was encountered during configuration and download: {str(e)}')
+            print(f"\nA network error was encountered during configuration and download: {str(e)}")
         except OSError as e:
-            print(f'\nAn OS error was encountered during configuration and download: {str(e)}')
+            print(f"\nAn OS error was encountered during configuration and download: {str(e)}")
         except Exception as e:
-            print(f'\nA problem was encountered during the configuration and download steps: {str(e)}')
+            print(f"\nA problem was encountered during the configuration and download steps: {str(e)}")
         finally:
             if not succeeded:
                 print('To try again, find the "invokeai" directory, run the script "invoke.sh" or "invoke.bat"')
-                print('and choose option 7 to fix a broken install, optionally followed by option 5 to install models.')
-                print('Alternatively you can relaunch the installer.')
+                print("and choose option 7 to fix a broken install, optionally followed by option 5 to install models.")
+                print("Alternatively you can relaunch the installer.")
 
     def install_user_scripts(self):
         """
@@ -371,11 +372,11 @@ class InvokeAiInstance:
 
         ext = "bat" if OS == "Windows" else "sh"
 
-        #scripts = ['invoke', 'update']
-        scripts = ['invoke']
-        
+        # scripts = ['invoke', 'update']
+        scripts = ["invoke"]
+
         for script in scripts:
-            src = Path(__file__).parent / '..' / "templates" / f"{script}.{ext}.in"
+            src = Path(__file__).parent / ".." / "templates" / f"{script}.{ext}.in"
             dest = self.runtime / f"{script}.{ext}"
             shutil.copy(src, dest)
             os.chmod(dest, 0o0755)
@@ -420,11 +421,7 @@ def set_sys_path(venv_path: Path) -> None:
     # filter out any paths in sys.path that may be system- or user-wide
     # but leave the temporary bootstrap virtualenv as it contains packages we
     # temporarily need at install time
-    sys.path = list(filter(
-        lambda p: not p.endswith("-packages")
-        or p.find(BOOTSTRAP_VENV_PREFIX) != -1,
-        sys.path
-    ))
+    sys.path = list(filter(lambda p: not p.endswith("-packages") or p.find(BOOTSTRAP_VENV_PREFIX) != -1, sys.path))
 
     # determine site-packages/lib directory location for the venv
     lib = "Lib" if OS == "Windows" else f"lib/python{sys.version_info.major}.{sys.version_info.minor}"
@@ -433,7 +430,7 @@ def set_sys_path(venv_path: Path) -> None:
     sys.path.append(str(Path(venv_path, lib, "site-packages").expanduser().resolve()))
 
 
-def get_torch_source() -> (Union[str, None],str):
+def get_torch_source() -> (Union[str, None], str):
     """
     Determine the extra index URL for pip to use for torch installation.
     This depends on the OS and the graphics accelerator in use.
@@ -461,9 +458,9 @@ def get_torch_source() -> (Union[str, None],str):
         elif device == "cpu":
             url = "https://download.pytorch.org/whl/cpu"
 
-    if device == 'cuda':
-        url = 'https://download.pytorch.org/whl/cu117'
-        optional_modules = '[xformers]'
+    if device == "cuda":
+        url = "https://download.pytorch.org/whl/cu117"
+        optional_modules = "[xformers]"
 
     # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13
 

@@ -56,9 +56,7 @@ from diffusers.schedulers import (
 )
 from diffusers.utils import is_accelerate_available, is_omegaconf_available, is_safetensors_available
 from diffusers.utils.import_utils import BACKENDS_MAPPING
-from diffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import (
-    LDMBertConfig, LDMBertModel
-)
+from diffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertConfig, LDMBertModel
 from diffusers.pipelines.paint_by_example import PaintByExampleImageEncoder
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
@@ -84,6 +82,7 @@ if is_accelerate_available():
 
 logger = InvokeAILogger.getLogger(__name__)
 CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().root_path / MODEL_CORE / "convert"
+
 
 def shave_segments(path, n_shave_prefix_segments=1):
     """
@@ -509,9 +508,7 @@ def convert_ldm_unet_checkpoint(
 
         paths = renew_resnet_paths(resnets)
         meta_path = {"old": f"input_blocks.{i}.0", "new": f"down_blocks.{block_id}.resnets.{layer_in_block_id}"}
-        assign_to_checkpoint(
-            paths, new_checkpoint, unet_state_dict, additional_replacements=[meta_path], config=config
-        )
+        assign_to_checkpoint(paths, new_checkpoint, unet_state_dict, additional_replacements=[meta_path], config=config)
 
         if len(attentions):
             paths = renew_attention_paths(attentions)
@@ -796,7 +793,7 @@ def convert_ldm_bert_checkpoint(checkpoint, config):
 
 def convert_ldm_clip_checkpoint(checkpoint, local_files_only=False, text_encoder=None):
     if text_encoder is None:
-        config = CLIPTextConfig.from_pretrained(CONVERT_MODEL_ROOT / 'clip-vit-large-patch14')
+        config = CLIPTextConfig.from_pretrained(CONVERT_MODEL_ROOT / "clip-vit-large-patch14")
 
         ctx = init_empty_weights if is_accelerate_available() else nullcontext
         with ctx():
@@ -1008,7 +1005,9 @@ def stable_unclip_image_encoder(original_config):
     elif sd_clip_image_embedder_class == "FrozenOpenCLIPImageEmbedder":
         feature_extractor = CLIPImageProcessor()
         # InvokeAI doesn't use CLIPVisionModelWithProjection so it isn't in the core - if this code is hit a download will occur
-        image_encoder = CLIPVisionModelWithProjection.from_pretrained(CONVERT_MODEL_ROOT / "CLIP-ViT-H-14-laion2B-s32B-b79K")
+        image_encoder = CLIPVisionModelWithProjection.from_pretrained(
+            CONVERT_MODEL_ROOT / "CLIP-ViT-H-14-laion2B-s32B-b79K"
+        )
     else:
         raise NotImplementedError(
             f"Unknown CLIP image embedder class in stable diffusion checkpoint {sd_clip_image_embedder_class}"
@@ -1071,17 +1070,17 @@ def convert_controlnet_checkpoint(
     extract_ema,
     use_linear_projection=None,
     cross_attention_dim=None,
-    precision: torch.dtype=torch.float32,
+    precision: torch.dtype = torch.float32,
 ):
     ctrlnet_config = create_unet_diffusers_config(original_config, image_size=image_size, controlnet=True)
     ctrlnet_config["upcast_attention"] = upcast_attention
 
     ctrlnet_config.pop("sample_size")
     original_config = ctrlnet_config.copy()
-    
-    ctrlnet_config.pop('addition_embed_type')
-    ctrlnet_config.pop('addition_time_embed_dim')
-    ctrlnet_config.pop('transformer_layers_per_block')
+
+    ctrlnet_config.pop("addition_embed_type")
+    ctrlnet_config.pop("addition_time_embed_dim")
+    ctrlnet_config.pop("transformer_layers_per_block")
 
     if use_linear_projection is not None:
         ctrlnet_config["use_linear_projection"] = use_linear_projection
@@ -1110,6 +1109,7 @@ def convert_controlnet_checkpoint(
     controlnet.load_state_dict(converted_ctrl_checkpoint)
 
     return controlnet.to(precision)
+
 
 # TO DO - PASS PRECISION
 def download_from_original_stable_diffusion_ckpt(
@@ -1249,8 +1249,8 @@ def download_from_original_stable_diffusion_ckpt(
     # "state_dict" key https://huggingface.co/thibaud/controlnet-canny-sd21
     while "state_dict" in checkpoint:
         checkpoint = checkpoint["state_dict"]
-        
-    logger.debug(f'model_type = {model_type}; original_config_file = {original_config_file}')
+
+    logger.debug(f"model_type = {model_type}; original_config_file = {original_config_file}")
 
     if original_config_file is None:
         key_name_v2_1 = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
@@ -1258,7 +1258,9 @@ def download_from_original_stable_diffusion_ckpt(
         key_name_sd_xl_refiner = "conditioner.embedders.0.model.transformer.resblocks.9.mlp.c_proj.bias"
 
         # model_type = "v1"
-        config_url = "https://raw.githubusercontent.com/CompVis/stable-diffusion/main/configs/stable-diffusion/v1-inference.yaml"
+        config_url = (
+            "https://raw.githubusercontent.com/CompVis/stable-diffusion/main/configs/stable-diffusion/v1-inference.yaml"
+        )
 
         if key_name_v2_1 in checkpoint and checkpoint[key_name_v2_1].shape[-1] == 1024:
             # model_type = "v2"
@@ -1277,7 +1279,10 @@ def download_from_original_stable_diffusion_ckpt(
         original_config_file = BytesIO(requests.get(config_url).content)
 
     original_config = OmegaConf.load(original_config_file)
-    if model_version == BaseModelType.StableDiffusion2 and original_config["model"]["params"]["parameterization"] == "v":
+    if (
+        model_version == BaseModelType.StableDiffusion2
+        and original_config["model"]["params"]["parameterization"] == "v"
+    ):
         prediction_type = "v_prediction"
         upcast_attention = True
         image_size = 768
@@ -1436,7 +1441,7 @@ def download_from_original_stable_diffusion_ckpt(
         config_kwargs = {"subfolder": "text_encoder"}
 
         text_model = convert_open_clip_checkpoint(checkpoint, config_name, **config_kwargs)
-        tokenizer = CLIPTokenizer.from_pretrained(CONVERT_MODEL_ROOT / 'stable-diffusion-2-clip', subfolder="tokenizer")
+        tokenizer = CLIPTokenizer.from_pretrained(CONVERT_MODEL_ROOT / "stable-diffusion-2-clip", subfolder="tokenizer")
 
         if stable_unclip is None:
             if controlnet:
@@ -1491,7 +1496,9 @@ def download_from_original_stable_diffusion_ckpt(
                     prior = PriorTransformer.from_pretrained(karlo_model, subfolder="prior")
 
                     prior_tokenizer = CLIPTokenizer.from_pretrained(CONVERT_MODEL_ROOT / "clip-vit-large-patch14")
-                    prior_text_model = CLIPTextModelWithProjection.from_pretrained(CONVERT_MODEL_ROOT / "clip-vit-large-patch14")
+                    prior_text_model = CLIPTextModelWithProjection.from_pretrained(
+                        CONVERT_MODEL_ROOT / "clip-vit-large-patch14"
+                    )
 
                     prior_scheduler = UnCLIPScheduler.from_pretrained(karlo_model, subfolder="prior_scheduler")
                     prior_scheduler = DDPMScheduler.from_config(prior_scheduler.config)
@@ -1533,11 +1540,19 @@ def download_from_original_stable_diffusion_ckpt(
         text_model = convert_ldm_clip_checkpoint(
             checkpoint, local_files_only=local_files_only, text_encoder=text_encoder
         )
-        tokenizer = CLIPTokenizer.from_pretrained(CONVERT_MODEL_ROOT / "clip-vit-large-patch14") if tokenizer is None else tokenizer
+        tokenizer = (
+            CLIPTokenizer.from_pretrained(CONVERT_MODEL_ROOT / "clip-vit-large-patch14")
+            if tokenizer is None
+            else tokenizer
+        )
 
         if load_safety_checker:
-            safety_checker = StableDiffusionSafetyChecker.from_pretrained(CONVERT_MODEL_ROOT / "stable-diffusion-safety-checker")
-            feature_extractor = AutoFeatureExtractor.from_pretrained(CONVERT_MODEL_ROOT / "stable-diffusion-safety-checker")
+            safety_checker = StableDiffusionSafetyChecker.from_pretrained(
+                CONVERT_MODEL_ROOT / "stable-diffusion-safety-checker"
+            )
+            feature_extractor = AutoFeatureExtractor.from_pretrained(
+                CONVERT_MODEL_ROOT / "stable-diffusion-safety-checker"
+            )
         else:
             safety_checker = None
             feature_extractor = None
@@ -1567,7 +1582,7 @@ def download_from_original_stable_diffusion_ckpt(
         if model_type == "SDXL":
             tokenizer = CLIPTokenizer.from_pretrained(CONVERT_MODEL_ROOT / "clip-vit-large-patch14")
             text_encoder = convert_ldm_clip_checkpoint(checkpoint, local_files_only=local_files_only)
-            
+
             tokenizer_name = CONVERT_MODEL_ROOT / "CLIP-ViT-bigG-14-laion2B-39B-b160k"
             tokenizer_2 = CLIPTokenizer.from_pretrained(tokenizer_name, pad_token="!")
 
@@ -1577,7 +1592,7 @@ def download_from_original_stable_diffusion_ckpt(
                 checkpoint, config_name, prefix="conditioner.embedders.1.model.", has_projection=True, **config_kwargs
             )
 
-            pipe = StableDiffusionXLPipeline (
+            pipe = StableDiffusionXLPipeline(
                 vae=vae.to(precision),
                 text_encoder=text_encoder,
                 tokenizer=tokenizer,
@@ -1686,24 +1701,22 @@ def download_controlnet_from_original_ckpt(
 
     return controlnet
 
-def convert_ldm_vae_to_diffusers(checkpoint, vae_config: DictConfig, image_size: int) -> AutoencoderKL:
-    vae_config = create_vae_diffusers_config(
-        vae_config, image_size=image_size
-    )
 
-    converted_vae_checkpoint = convert_ldm_vae_checkpoint(
-        checkpoint, vae_config
-    )
+def convert_ldm_vae_to_diffusers(checkpoint, vae_config: DictConfig, image_size: int) -> AutoencoderKL:
+    vae_config = create_vae_diffusers_config(vae_config, image_size=image_size)
+
+    converted_vae_checkpoint = convert_ldm_vae_checkpoint(checkpoint, vae_config)
 
     vae = AutoencoderKL(**vae_config)
     vae.load_state_dict(converted_vae_checkpoint)
     return vae
 
+
 def convert_ckpt_to_diffusers(
-        checkpoint_path: Union[str, Path],
-        dump_path: Union[str, Path],
-        use_safetensors: bool=True,
-        **kwargs,
+    checkpoint_path: Union[str, Path],
+    dump_path: Union[str, Path],
+    use_safetensors: bool = True,
+    **kwargs,
 ):
     """
     Takes all the arguments of download_from_original_stable_diffusion_ckpt(),
@@ -1717,10 +1730,11 @@ def convert_ckpt_to_diffusers(
         safe_serialization=use_safetensors and is_safetensors_available(),
     )
 
+
 def convert_controlnet_to_diffusers(
-        checkpoint_path: Union[str, Path],
-        dump_path: Union[str, Path],
-        **kwargs,
+    checkpoint_path: Union[str, Path],
+    dump_path: Union[str, Path],
+    **kwargs,
 ):
     """
     Takes all the arguments of download_controlnet_from_original_ckpt(),
