@@ -713,6 +713,7 @@ class TextualInversionManager(BaseTextualInversionManager):
 
 class ONNXModelPatcher:
     from .models.base import IAIOnnxRuntimeModel, OnnxRuntimeModel
+
     @classmethod
     @contextmanager
     def apply_lora_unet(
