@@ -62,7 +62,6 @@ dependencies = [
   "numpy==1.24.4",
   "omegaconf",
   "onnx",
-  "onnxruntime",
   "opencv-python",
   "picklescan",
   "pillow",
