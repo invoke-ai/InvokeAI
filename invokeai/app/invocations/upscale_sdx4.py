@@ -18,6 +18,9 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
     """Upscales an image using an upscaling diffusion model.
 
     https://huggingface.co/stabilityai/stable-diffusion-x4-upscaler
+
+    The upscaling model is its own thing, independent of other Stable Diffusion text-to-image
+    models. We don't have ControlNet or LoRA support for it. It has its own VAE.
     """
 
     type: Literal["upscale_sdx4"] = "upscale_sdx4"
@@ -47,13 +50,10 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
-        # TODO: are there upscaler LoRA? ControlNet? document if not
-
         model_manager = context.services.model_manager
         unet_info = model_manager.get_model(**self.unet.unet.dict(), context=context)
         vae_info = model_manager.get_model(**self.vae.vae.dict(), context=context)
 
-        # ¿what is this context manager doing?
         with unet_info as unet, vae_info as vae:
             # don't re-use the same scheduler instance for both fields
             low_res_scheduler = get_scheduler(context, self.unet.scheduler, self.scheduler)
@@ -77,9 +77,6 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
                 low_res_scheduler=low_res_scheduler,
                 scheduler=scheduler
             )
-
-            # TODO: file upstream bug; check_inputs fails when given prompt_embeds
-            pipeline.check_inputs = lambda *args, **kwargs: None
 
             if self.tiled or context.services.configuration.tiled_decode:
                 vae.enable_tiling()
