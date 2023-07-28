@@ -229,7 +229,7 @@ class InvokeAiInstance:
         # install torch first to ensure the correct version gets installed.
         # works with either source or wheel install with negligible impact on installation times.
         messages.simple_banner("Installing PyTorch :fire:")
-        self.install_torch(extra_index_url, find_links)
+        # self.install_torch(extra_index_url, find_links)
 
         messages.simple_banner("Installing the InvokeAI Application :art:")
         self.install_app(extra_index_url, optional_modules, find_links)
@@ -289,7 +289,7 @@ class InvokeAiInstance:
                 src = str(next(Path(__file__).parent.glob("InvokeAI-*.whl")))
             except StopIteration:
                 try:
-                    src = Path(__file__).parents[1].expanduser().resolve()
+                    src = Path(__file__).parents[2].expanduser().resolve()
                     # if the above directory contains one of these files, we'll do a source install
                     next(src.glob("pyproject.toml"))
                     next(src.glob("invokeai"))
@@ -467,8 +467,7 @@ def get_torch_source() -> (Union[str, None],str):
 
     if OS == "Windows":
         if device == "directml":
-            url = "https://download.pytorch.org/whl/cpu"
-            optional_modules = "torch-directml"
+            optional_modules = "[torch-directml]"
 
     # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13
 

@@ -99,6 +99,7 @@ dependencies = [
   "pudb",
 ]
 "test" = ["pytest>6.0.0", "pytest-cov"]
+"torch-directml" = ["torch-directml"]
 "xformers" = [
 	   "xformers~=0.0.19; sys_platform!='darwin'",
 	   "triton; sys_platform=='linux'",
