@@ -24,7 +24,7 @@ type ModelListProps = {
 
 type ModelFormat = 'images' | 'checkpoint' | 'diffusers' | 'olive' | 'onnx';
 
-type ModelType = 'main' | 'lora';
+type ModelType = 'main' | 'lora' | 'onnx';
 
 type CombinedModelFormat = ModelFormat | 'lora';
 
@@ -65,13 +65,13 @@ const ModelList = (props: ModelListProps) => {
 
   const { filteredOnnxModels } = useGetOnnxModelsQuery(ALL_BASE_MODELS, {
     selectFromResult: ({ data }) => ({
-      filteredOnnxModels: modelsFilter(data, 'onnx', nameFilter),
+      filteredOnnxModels: modelsFilter(data, 'onnx', 'onnx', nameFilter),
     }),
   });
 
   const { filteredOliveModels } = useGetOnnxModelsQuery(ALL_BASE_MODELS, {
     selectFromResult: ({ data }) => ({
-      filteredOliveModels: modelsFilter(data, 'olive', nameFilter),
+      filteredOliveModels: modelsFilter(data, 'onnx', 'olive', nameFilter),
     }),
   });
 

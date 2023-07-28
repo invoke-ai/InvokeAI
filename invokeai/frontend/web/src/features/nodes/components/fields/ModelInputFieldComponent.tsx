@@ -31,7 +31,7 @@ const ModelInputFieldComponent = (
   const { t } = useTranslation();
   const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
 
-  const { data: onnxModels } = useGetOnnxModelsQuery();
+  const { data: onnxModels } = useGetOnnxModelsQuery(NON_REFINER_BASE_MODELS);
   const { data: mainModels, isLoading } = useGetMainModelsQuery(
     NON_REFINER_BASE_MODELS
   );

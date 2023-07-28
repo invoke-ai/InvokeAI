@@ -2752,7 +2752,7 @@ export type components = {
       vae?: components["schemas"]["VaeField"];
       /**
        * Tiled 
-       * @description Decode latents by overlapping tiles(less memory consumption) 
+       * @description Decode latents by overlaping tiles (less memory consumption) 
        * @default false
        */
       tiled?: boolean;
@@ -3928,8 +3928,11 @@ export type components = {
       path: string;
       /** Description */
       description?: string;
-      /** Model Format */
-      model_format: null;
+      /**
+       * Model Format 
+       * @enum {string}
+       */
+      model_format: "onnx";
       error?: components["schemas"]["ModelError"];
       variant: components["schemas"]["ModelVariantType"];
     };
@@ -3947,8 +3950,11 @@ export type components = {
       path: string;
       /** Description */
       description?: string;
-      /** Model Format */
-      model_format: null;
+      /**
+       * Model Format 
+       * @enum {string}
+       */
+      model_format: "onnx";
       error?: components["schemas"]["ModelError"];
       variant: components["schemas"]["ModelVariantType"];
       prediction_type: components["schemas"]["SchedulerPredictionType"];
@@ -5857,11 +5863,11 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusion2ModelFormat 
+     * StableDiffusionOnnxModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * StableDiffusionXLModelFormat 
      * @description An enumeration. 
@@ -5869,17 +5875,17 @@ export type components = {
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * ControlNetModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
