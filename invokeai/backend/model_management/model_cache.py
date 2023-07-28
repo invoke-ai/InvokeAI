@@ -358,6 +358,7 @@ class ModelCache(object):
             # 2 refs:
             # 1 from cache_entry
             # 1 from getrefcount function
+            # 1 from onnx runtime object
             if not cache_entry.locked and refs <= 3 if "onnx" in model_key else 2:
                 self.logger.debug(
                     f"Unloading model {model_key} to free {(model_size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"

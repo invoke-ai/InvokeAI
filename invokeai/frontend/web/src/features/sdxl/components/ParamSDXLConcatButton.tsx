@@ -1,0 +1,43 @@
+import { RootState } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
+import { FaLink } from 'react-icons/fa';
+import { setShouldConcatSDXLStylePrompt } from '../store/sdxlSlice';
+
+export default function ParamSDXLConcatButton() {
+  const shouldConcatSDXLStylePrompt = useAppSelector(
+    (state: RootState) => state.sdxl.shouldConcatSDXLStylePrompt
+  );
+
+  const shouldPinParametersPanel = useAppSelector(
+    (state: RootState) => state.ui.shouldPinParametersPanel
+  );
+
+  const dispatch = useAppDispatch();
+
+  const handleShouldConcatPromptChange = () => {
+    dispatch(setShouldConcatSDXLStylePrompt(!shouldConcatSDXLStylePrompt));
+  };
+
+  return (
+    <IAIIconButton
+      aria-label="Concat"
+      tooltip="Concatenates Basic Prompt with Style (Recommended)"
+      variant="outline"
+      isChecked={shouldConcatSDXLStylePrompt}
+      onClick={handleShouldConcatPromptChange}
+      icon={<FaLink />}
+      size="xs"
+      sx={{
+        position: 'absolute',
+        insetInlineEnd: 1,
+        top: shouldPinParametersPanel ? 12 : 20,
+        border: 'none',
+        color: shouldConcatSDXLStylePrompt ? 'accent.500' : 'base.500',
+        _hover: {
+          bg: 'none',
+        },
+      }}
+    ></IAIIconButton>
+  );
+}

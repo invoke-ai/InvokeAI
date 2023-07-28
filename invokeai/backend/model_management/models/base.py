@@ -19,13 +19,9 @@ from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callab
 
 import onnx
 from onnx import numpy_helper
-from onnx.external_data_helper import set_external_data
 from onnxruntime import (
     InferenceSession,
-    OrtValue,
     SessionOptions,
-    ExecutionMode,
-    GraphOptimizationLevel,
     get_available_providers,
 )
 
