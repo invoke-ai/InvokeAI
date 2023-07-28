@@ -15,23 +15,36 @@ export default function SDXLConcatLink() {
           h: 0.5,
           placeContent: 'center',
           gap: 2,
-          px: 2,
+          flexDirection: 'column',
         }}
       >
         <Box
           as={motion.div}
           initial={{
             scaleX: 0,
+            borderRadius: 0,
+            borderWidth: 0,
+            display: 'none',
           }}
-          animate={{ scaleX: 1, transition: { duration: 0.3 } }}
+          animate={{
+            display: ['block', 'block', 'block', 'none'],
+            scaleX: [0, 0.25, 0.5, 1],
+            borderRadius: [0, 0, 0, 3],
+            borderWidth: [0, 3, 3, 0],
+            transition: { duration: 0.5, times: [0, 0.25, 0.5, 1] },
+          }}
           sx={{
-            bg: 'accent.300',
-            h: 0.5,
+            position: 'absolute',
+            top: '1px',
+            bg: 'none',
             w: 'full',
-            borderRadius: 9999,
-            transformOrigin: 'right',
+            minH: 2,
+            borderTop: 'none',
+            borderTopRadius: 0,
+            borderColor: 'accent.300',
+            zIndex: 2,
             _dark: {
-              bg: 'accent.500',
+              borderColor: 'accent.600',
             },
           }}
         />
@@ -39,30 +52,57 @@ export default function SDXLConcatLink() {
           as={motion.div}
           initial={{
             opacity: 0,
+            scale: 0,
+            rotate: 0,
           }}
           animate={{
-            opacity: 1,
-            transition: { duration: 0.3 },
+            rotate: 360,
+            opacity: [0, 1, 1, 1],
+            scale: [0, 0.75, 1.5, 1],
+            transition: { duration: 0.6, times: [0, 0.25, 0.5, 1] },
           }}
-          zIndex={2}
-          mt={-1.5}
+          sx={{
+            zIndex: 3,
+            position: 'absolute',
+            left: '48%',
+            top: '3px',
+            p: 1,
+            borderRadius: 4,
+            bg: 'accent.200',
+            _dark: {
+              bg: 'accent.500',
+            },
+          }}
         >
-          <FaLink color="var(--invokeai-colors-accent-400)" />
+          <FaLink size={12} />
         </Box>
         <Box
           as={motion.div}
           initial={{
             scaleX: 0,
+            borderRadius: 0,
+            borderWidth: 0,
+            display: 'none',
           }}
-          animate={{ scaleX: 1, transition: { duration: 0.3 } }}
+          animate={{
+            display: ['block', 'block', 'block', 'none'],
+            scaleX: [0, 0.25, 0.5, 1],
+            borderRadius: [0, 0, 0, 3],
+            borderWidth: [0, 3, 3, 0],
+            transition: { duration: 0.5, times: [0, 0.25, 0.5, 1] },
+          }}
           sx={{
-            bg: 'accent.300',
-            h: 0.5,
+            position: 'absolute',
+            top: '17px',
+            bg: 'none',
             w: 'full',
-            borderRadius: 9999,
-            transformOrigin: 'left',
+            minH: 2,
+            borderBottom: 'none',
+            borderBottomRadius: 0,
+            borderColor: 'accent.300',
+            zIndex: 2,
             _dark: {
-              bg: 'accent.500',
+              borderColor: 'accent.600',
             },
           }}
         />

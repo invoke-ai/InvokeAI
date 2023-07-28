@@ -24,7 +24,7 @@ export default function ParamSDXLPromptArea() {
         sx={{
           position: 'absolute',
           w: 'full',
-          top: shouldPinParametersPanel ? '131px' : '187px',
+          top: shouldPinParametersPanel ? '119px' : '175px',
         }}
       >
         <SDXLConcatLink />
@@ -33,7 +33,7 @@ export default function ParamSDXLPromptArea() {
         sx={{
           position: 'absolute',
           w: 'full',
-          top: shouldPinParametersPanel ? '275px' : '331px',
+          top: shouldPinParametersPanel ? '263px' : '319px',
         }}
       >
         <SDXLConcatLink />
