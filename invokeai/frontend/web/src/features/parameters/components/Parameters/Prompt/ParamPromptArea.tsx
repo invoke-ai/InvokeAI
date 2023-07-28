@@ -8,10 +8,6 @@ export default function ParamPromptArea() {
       sx={{
         flexDirection: 'column',
         gap: 2,
-        p: 2,
-        borderRadius: 4,
-        bg: 'base.100',
-        _dark: { bg: 'base.850' },
       }}
     >
       <ParamPositiveConditioning />

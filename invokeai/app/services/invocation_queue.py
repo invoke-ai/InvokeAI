@@ -7,6 +7,7 @@ from queue import Queue
 from pydantic import BaseModel, Field
 from typing import Optional
 
+
 class InvocationQueueItem(BaseModel):
     graph_execution_state_id: str = Field(description="The ID of the graph execution state")
     invocation_id: str = Field(description="The ID of the node being invoked")
@@ -45,9 +46,11 @@ class MemoryInvocationQueue(InvocationQueueABC):
     def get(self) -> InvocationQueueItem:
         item = self.__queue.get()
 
-        while isinstance(item, InvocationQueueItem) \
-            and item.graph_execution_state_id in self.__cancellations \
-            and self.__cancellations[item.graph_execution_state_id] > item.timestamp:
+        while (
+            isinstance(item, InvocationQueueItem)
+            and item.graph_execution_state_id in self.__cancellations
+            and self.__cancellations[item.graph_execution_state_id] > item.timestamp
+        ):
             item = self.__queue.get()
 
         # Clear old items

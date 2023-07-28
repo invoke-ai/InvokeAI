@@ -102,9 +102,7 @@ class BoardImagesService(BoardImagesServiceABC):
         self,
         board_id: str,
     ) -> list[str]:
-        return self._services.board_image_records.get_all_board_image_names_for_board(
-            board_id
-        )
+        return self._services.board_image_records.get_all_board_image_names_for_board(board_id)
 
     def get_board_for_image(
         self,
@@ -114,9 +112,7 @@ class BoardImagesService(BoardImagesServiceABC):
         return board_id
 
 
-def board_record_to_dto(
-    board_record: BoardRecord, cover_image_name: Optional[str], image_count: int
-) -> BoardDTO:
+def board_record_to_dto(board_record: BoardRecord, cover_image_name: Optional[str], image_count: int) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
         **board_record.dict(exclude={"cover_image_name"}),

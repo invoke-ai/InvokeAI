@@ -17,16 +17,8 @@ from controlnet_aux.util import HWC3, resize_image
 # If you use this, please Cite "High Quality Edge Thinning using Pure Python", Lvmin Zhang, In Mikubill/sd-webui-controlnet.
 
 lvmin_kernels_raw = [
-    np.array([
-        [-1, -1, -1],
-        [0, 1, 0],
-        [1, 1, 1]
-    ], dtype=np.int32),
-    np.array([
-        [0, -1, -1],
-        [1, 1, -1],
-        [0, 1, 0]
-    ], dtype=np.int32)
+    np.array([[-1, -1, -1], [0, 1, 0], [1, 1, 1]], dtype=np.int32),
+    np.array([[0, -1, -1], [1, 1, -1], [0, 1, 0]], dtype=np.int32),
 ]
 
 lvmin_kernels = []
@@ -36,16 +28,8 @@ lvmin_kernels += [np.rot90(x, k=2, axes=(0, 1)) for x in lvmin_kernels_raw]
 lvmin_kernels += [np.rot90(x, k=3, axes=(0, 1)) for x in lvmin_kernels_raw]
 
 lvmin_prunings_raw = [
-    np.array([
-        [-1, -1, -1],
-        [-1, 1, -1],
-        [0, 0, -1]
-    ], dtype=np.int32),
-    np.array([
-        [-1, -1, -1],
-        [-1, 1, -1],
-        [-1, 0, 0]
-    ], dtype=np.int32)
+    np.array([[-1, -1, -1], [-1, 1, -1], [0, 0, -1]], dtype=np.int32),
+    np.array([[-1, -1, -1], [-1, 1, -1], [-1, 0, 0]], dtype=np.int32),
 ]
 
 lvmin_prunings = []
@@ -99,10 +83,10 @@ def nake_nms(x):
 ################################################################################
 # FIXME: not using yet, if used in the future will most likely require modification of preprocessors
 def pixel_perfect_resolution(
-        image: np.ndarray,
-        target_H: int,
-        target_W: int,
-        resize_mode: str,
+    image: np.ndarray,
+    target_H: int,
+    target_W: int,
+    resize_mode: str,
 ) -> int:
     """
     Calculate the estimated resolution for resizing an image while preserving aspect ratio.
@@ -135,7 +119,7 @@ def pixel_perfect_resolution(
 
     if resize_mode == "fill_resize":
         estimation = min(k0, k1) * float(min(raw_H, raw_W))
-    else: # "crop_resize" or "just_resize" (or possibly "just_resize_simple"?)
+    else:  # "crop_resize" or "just_resize" (or possibly "just_resize_simple"?)
         estimation = max(k0, k1) * float(min(raw_H, raw_W))
 
     # print(f"Pixel Perfect Computation:")
@@ -154,13 +138,7 @@ def pixel_perfect_resolution(
 #    modified for InvokeAI
 ###########################################################################
 # def detectmap_proc(detected_map, module, resize_mode, h, w):
-def np_img_resize(
-    np_img: np.ndarray,
-    resize_mode: str,
-    h: int,
-    w: int,
-    device: torch.device = torch.device('cpu')
-):
+def np_img_resize(np_img: np.ndarray, resize_mode: str, h: int, w: int, device: torch.device = torch.device("cpu")):
     # if 'inpaint' in module:
     #     np_img = np_img.astype(np.float32)
     # else:
@@ -184,15 +162,14 @@ def np_img_resize(
         # below is very boring but do not change these. If you change these Apple or Mac may fail.
         y = torch.from_numpy(y)
         y = y.float() / 255.0
-        y = rearrange(y, 'h w c -> 1 c h w')
+        y = rearrange(y, "h w c -> 1 c h w")
         y = y.clone()
         # y = y.to(devices.get_device_for("controlnet"))
         y = y.to(device)
         y = y.clone()
         return y
 
-    def high_quality_resize(x: np.ndarray,
-                            size):
+    def high_quality_resize(x: np.ndarray, size):
         # Written by lvmin
         # Super high-quality control map up-scaling, considering binary, seg, and one-pixel edges
         inpaint_mask = None
@@ -244,7 +221,7 @@ def np_img_resize(
         return y
 
     # if resize_mode == external_code.ResizeMode.RESIZE:
-    if resize_mode == "just_resize": # RESIZE
+    if resize_mode == "just_resize":  # RESIZE
         np_img = high_quality_resize(np_img, (w, h))
         np_img = safe_numpy(np_img)
         return get_pytorch_control(np_img), np_img
@@ -270,19 +247,20 @@ def np_img_resize(
         new_h, new_w, _ = np_img.shape
         pad_h = max(0, (h - new_h) // 2)
         pad_w = max(0, (w - new_w) // 2)
-        high_quality_background[pad_h:pad_h + new_h, pad_w:pad_w + new_w] = np_img
+        high_quality_background[pad_h : pad_h + new_h, pad_w : pad_w + new_w] = np_img
         np_img = high_quality_background
         np_img = safe_numpy(np_img)
         return get_pytorch_control(np_img), np_img
-    else: # resize_mode == "crop_resize"  (INNER_FIT)
+    else:  # resize_mode == "crop_resize"  (INNER_FIT)
         k = max(k0, k1)
         np_img = high_quality_resize(np_img, (safeint(old_w * k), safeint(old_h * k)))
         new_h, new_w, _ = np_img.shape
         pad_h = max(0, (new_h - h) // 2)
         pad_w = max(0, (new_w - w) // 2)
-        np_img = np_img[pad_h:pad_h + h, pad_w:pad_w + w]
+        np_img = np_img[pad_h : pad_h + h, pad_w : pad_w + w]
         np_img = safe_numpy(np_img)
         return get_pytorch_control(np_img), np_img
+
 
 def prepare_control_image(
     # image used to be Union[PIL.Image.Image, List[PIL.Image.Image], torch.Tensor, List[torch.Tensor]]
@@ -301,15 +279,17 @@ def prepare_control_image(
     resize_mode="just_resize_simple",
 ):
     # FIXME: implement "crop_resize_simple" and "fill_resize_simple", or pull them out
-    if (resize_mode == "just_resize_simple" or
-        resize_mode == "crop_resize_simple" or
-        resize_mode == "fill_resize_simple"):
+    if (
+        resize_mode == "just_resize_simple"
+        or resize_mode == "crop_resize_simple"
+        or resize_mode == "fill_resize_simple"
+    ):
         image = image.convert("RGB")
-        if (resize_mode == "just_resize_simple"):
+        if resize_mode == "just_resize_simple":
             image = image.resize((width, height), resample=PIL_INTERPOLATION["lanczos"])
-        elif (resize_mode == "crop_resize_simple"): # not yet implemented
+        elif resize_mode == "crop_resize_simple":  # not yet implemented
             pass
-        elif (resize_mode == "fill_resize_simple"): # not yet implemented
+        elif resize_mode == "fill_resize_simple":  # not yet implemented
             pass
         nimage = np.array(image)
         nimage = nimage[None, :]
@@ -320,7 +300,7 @@ def prepare_control_image(
         timage = torch.from_numpy(nimage)
 
     # use fancy lvmin controlnet resizing
-    elif (resize_mode == "just_resize" or resize_mode == "crop_resize" or resize_mode == "fill_resize"):
+    elif resize_mode == "just_resize" or resize_mode == "crop_resize" or resize_mode == "fill_resize":
         nimage = np.array(image)
         timage, nimage = np_img_resize(
             np_img=nimage,
@@ -336,7 +316,7 @@ def prepare_control_image(
         exit(1)
 
     timage = timage.to(device=device, dtype=dtype)
-    cfg_injection = (control_mode == "more_control" or control_mode == "unbalanced")
+    cfg_injection = control_mode == "more_control" or control_mode == "unbalanced"
     if do_classifier_free_guidance and not cfg_injection:
         timage = torch.cat([timage] * 2)
     return timage
