@@ -26,12 +26,11 @@ class StableDiffusionOnnxModelFormat(str, Enum):
     Olive = "olive"
     Onnx = "onnx"
 
-class ONNXStableDiffusion1Model(DiffusersModel):
 
+class ONNXStableDiffusion1Model(DiffusersModel):
     class Config(ModelConfigBase):
         model_format: Literal[StableDiffusionOnnxModelFormat.Onnx]
         variant: ModelVariantType
-
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion1
@@ -51,7 +50,7 @@ class ONNXStableDiffusion1Model(DiffusersModel):
     @classmethod
     def probe_config(cls, path: str, **kwargs):
         model_format = cls.detect_format(path)
-        in_channels = 4 # TODO:
+        in_channels = 4  # TODO:
 
         if in_channels == 9:
             variant = ModelVariantType.Inpaint
@@ -60,11 +59,9 @@ class ONNXStableDiffusion1Model(DiffusersModel):
         else:
             raise Exception("Unkown stable diffusion 1.* model format")
 
-
         return cls.create_config(
             path=path,
             model_format=model_format,
-
             variant=variant,
         )
 
@@ -87,15 +84,14 @@ class ONNXStableDiffusion1Model(DiffusersModel):
     ) -> str:
         return model_path
 
-class ONNXStableDiffusion2Model(DiffusersModel):
 
+class ONNXStableDiffusion2Model(DiffusersModel):
     # TODO: check that configs overwriten properly
     class Config(ModelConfigBase):
         model_format: Literal[StableDiffusionOnnxModelFormat.Onnx]
         variant: ModelVariantType
         prediction_type: SchedulerPredictionType
         upcast_attention: bool
-
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert base_model == BaseModelType.StableDiffusion2
@@ -114,7 +110,7 @@ class ONNXStableDiffusion2Model(DiffusersModel):
     @classmethod
     def probe_config(cls, path: str, **kwargs):
         model_format = cls.detect_format(path)
-        in_channels = 4 # TODO:
+        in_channels = 4  # TODO:
 
         if in_channels == 9:
             variant = ModelVariantType.Inpaint
@@ -136,7 +132,6 @@ class ONNXStableDiffusion2Model(DiffusersModel):
         return cls.create_config(
             path=path,
             model_format=model_format,
-
             variant=variant,
             prediction_type=prediction_type,
             upcast_attention=upcast_attention,
@@ -160,4 +155,3 @@ class ONNXStableDiffusion2Model(DiffusersModel):
         base_model: BaseModelType,
     ) -> str:
         return model_path
-

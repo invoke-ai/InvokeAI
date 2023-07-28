@@ -22,14 +22,15 @@ from transformers import CLIPTextModel, CLIPTokenizer
 
 # TODO: rename and split this file
 
-class LoRALayerBase:
-    #rank: Optional[int]
-    #alpha: Optional[float]
-    #bias: Optional[torch.Tensor]
-    #layer_key: str
 
-    #@property
-    #def scale(self):
+class LoRALayerBase:
+    # rank: Optional[int]
+    # alpha: Optional[float]
+    # bias: Optional[torch.Tensor]
+    # layer_key: str
+
+    # @property
+    # def scale(self):
     #    return self.alpha / self.rank if (self.alpha and self.rank) else 1.0
 
     def __init__(
@@ -42,11 +43,7 @@ class LoRALayerBase:
         else:
             self.alpha = None
 
-        if (
-            "bias_indices" in values
-            and "bias_values" in values
-            and "bias_size" in values
-        ):
+        if "bias_indices" in values and "bias_values" in values and "bias_size" in values:
             self.bias = torch.sparse_coo_tensor(
                 values["bias_indices"],
                 values["bias_values"],
@@ -56,13 +53,13 @@ class LoRALayerBase:
         else:
             self.bias = None
 
-        self.rank = None # set in layer implementation
+        self.rank = None  # set in layer implementation
         self.layer_key = layer_key
 
     def forward(
         self,
         module: torch.nn.Module,
-        input_h: Any, # for real looks like Tuple[torch.nn.Tensor] but not sure
+        input_h: Any,  # for real looks like Tuple[torch.nn.Tensor] but not sure
         multiplier: float,
     ):
         if type(module) == torch.nn.Conv2d:
@@ -82,12 +79,16 @@ class LoRALayerBase:
 
         bias = self.bias if self.bias is not None else 0
         scale = self.alpha / self.rank if (self.alpha and self.rank) else 1.0
-        return op(
-            *input_h,
-            (weight + bias).view(module.weight.shape),
-            None,
-            **extra_args,
-        ) * multiplier * scale
+        return (
+            op(
+                *input_h,
+                (weight + bias).view(module.weight.shape),
+                None,
+                **extra_args,
+            )
+            * multiplier
+            * scale
+        )
 
     def get_weight(self):
         raise NotImplementedError()
@@ -110,9 +111,9 @@ class LoRALayerBase:
 
 # TODO: find and debug lora/locon with bias
 class LoRALayer(LoRALayerBase):
-    #up: torch.Tensor
-    #mid: Optional[torch.Tensor]
-    #down: torch.Tensor
+    # up: torch.Tensor
+    # mid: Optional[torch.Tensor]
+    # down: torch.Tensor
 
     def __init__(
         self,
@@ -162,12 +163,12 @@ class LoRALayer(LoRALayerBase):
 
 
 class LoHALayer(LoRALayerBase):
-    #w1_a: torch.Tensor
-    #w1_b: torch.Tensor
-    #w2_a: torch.Tensor
-    #w2_b: torch.Tensor
-    #t1: Optional[torch.Tensor] = None
-    #t2: Optional[torch.Tensor] = None
+    # w1_a: torch.Tensor
+    # w1_b: torch.Tensor
+    # w2_a: torch.Tensor
+    # w2_b: torch.Tensor
+    # t1: Optional[torch.Tensor] = None
+    # t2: Optional[torch.Tensor] = None
 
     def __init__(
         self,
@@ -198,12 +199,8 @@ class LoHALayer(LoRALayerBase):
             weight = (self.w1_a @ self.w1_b) * (self.w2_a @ self.w2_b)
 
         else:
-            rebuild1 = torch.einsum(
-                "i j k l, j r, i p -> p r k l", self.t1, self.w1_b, self.w1_a
-            )
-            rebuild2 = torch.einsum(
-                "i j k l, j r, i p -> p r k l", self.t2, self.w2_b, self.w2_a
-            )
+            rebuild1 = torch.einsum("i j k l, j r, i p -> p r k l", self.t1, self.w1_b, self.w1_a)
+            rebuild2 = torch.einsum("i j k l, j r, i p -> p r k l", self.t2, self.w2_b, self.w2_a)
             weight = rebuild1 * rebuild2
 
         return weight
@@ -234,20 +231,20 @@ class LoHALayer(LoRALayerBase):
 
 
 class LoKRLayer(LoRALayerBase):
-    #w1: Optional[torch.Tensor] = None
-    #w1_a: Optional[torch.Tensor] = None
-    #w1_b: Optional[torch.Tensor] = None
-    #w2: Optional[torch.Tensor] = None
-    #w2_a: Optional[torch.Tensor] = None
-    #w2_b: Optional[torch.Tensor] = None
-    #t2: Optional[torch.Tensor] = None
+    # w1: Optional[torch.Tensor] = None
+    # w1_a: Optional[torch.Tensor] = None
+    # w1_b: Optional[torch.Tensor] = None
+    # w2: Optional[torch.Tensor] = None
+    # w2_a: Optional[torch.Tensor] = None
+    # w2_b: Optional[torch.Tensor] = None
+    # t2: Optional[torch.Tensor] = None
 
     def __init__(
         self,
         layer_key: str,
         values: dict,
     ):
-        super().__init__(layer_key, values)        
+        super().__init__(layer_key, values)
 
         if "lokr_w1" in values:
             self.w1 = values["lokr_w1"]
@@ -277,7 +274,7 @@ class LoKRLayer(LoRALayerBase):
         elif "lokr_w2_b" in values:
             self.rank = values["lokr_w2_b"].shape[0]
         else:
-            self.rank = None # unscaled
+            self.rank = None  # unscaled
 
     def get_weight(self):
         w1 = self.w1
@@ -289,7 +286,7 @@ class LoKRLayer(LoRALayerBase):
             if self.t2 is None:
                 w2 = self.w2_a @ self.w2_b
             else:
-                w2 = torch.einsum('i j k l, i p, j r -> p r k l', self.t2, self.w2_a, self.w2_b)
+                w2 = torch.einsum("i j k l, i p, j r -> p r k l", self.t2, self.w2_a, self.w2_b)
 
         if len(w2.shape) == 4:
             w1 = w1.unsqueeze(2).unsqueeze(2)
@@ -328,7 +325,7 @@ class LoKRLayer(LoRALayerBase):
             self.t2 = self.t2.to(device=device, dtype=dtype)
 
 
-class LoRAModel: #(torch.nn.Module):
+class LoRAModel:  # (torch.nn.Module):
     _name: str
     layers: Dict[str, LoRALayer]
     _device: torch.device
@@ -356,7 +353,7 @@ class LoRAModel: #(torch.nn.Module):
 
     @property
     def dtype(self):
-        return self._dtype    
+        return self._dtype
 
     def to(
         self,
@@ -391,7 +388,7 @@ class LoRAModel: #(torch.nn.Module):
         model = cls(
             device=device,
             dtype=dtype,
-            name=file_path.stem, # TODO:
+            name=file_path.stem,  # TODO:
             layers=dict(),
         )
 
@@ -403,7 +400,6 @@ class LoRAModel: #(torch.nn.Module):
         state_dict = cls._group_state(state_dict)
 
         for layer_key, values in state_dict.items():
-
             # lora and locon
             if "lora_down.weight" in values:
                 layer = LoRALayer(layer_key, values)
@@ -418,9 +414,7 @@ class LoRAModel: #(torch.nn.Module):
 
             else:
                 # TODO: diff/ia3/... format
-                print(
-                    f">> Encountered unknown lora layer module in {model.name}: {layer_key}"
-                )
+                print(f">> Encountered unknown lora layer module in {model.name}: {layer_key}")
                 return
 
             # lower memory consumption by removing already parsed layer values
@@ -454,9 +448,10 @@ with LoRAHelper.apply_lora_unet(unet, loras):
 # unmodified unet
 
 """
+
+
 # TODO: rename smth like ModelPatcher and add TI method?
 class ModelPatcher:
-
     @staticmethod
     def _resolve_lora_key(model: torch.nn.Module, lora_key: str, prefix: str) -> Tuple[str, torch.nn.Module]:
         assert "." not in lora_key
@@ -466,10 +461,10 @@ class ModelPatcher:
 
         module = model
         module_key = ""
-        key_parts = lora_key[len(prefix):].split('_')
+        key_parts = lora_key[len(prefix) :].split("_")
 
         submodule_name = key_parts.pop(0)
-        
+
         while len(key_parts) > 0:
             try:
                 module = module.get_submodule(submodule_name)
@@ -488,7 +483,6 @@ class ModelPatcher:
         applied_loras: List[Tuple[LoRAModel, float]],
         layer_name: str,
     ):
-
         def lora_forward(module, input_h, output):
             if len(applied_loras) == 0:
                 return output
@@ -502,7 +496,6 @@ class ModelPatcher:
 
         return lora_forward
 
-
     @classmethod
     @contextmanager
     def apply_lora_unet(
@@ -513,7 +506,6 @@ class ModelPatcher:
         with cls.apply_lora(unet, loras, "lora_unet_"):
             yield
 
-
     @classmethod
     @contextmanager
     def apply_lora_text_encoder(
@@ -523,7 +515,6 @@ class ModelPatcher:
     ):
         with cls.apply_lora(text_encoder, loras, "lora_te_"):
             yield
-
 
     @classmethod
     @contextmanager
@@ -537,7 +528,7 @@ class ModelPatcher:
         try:
             with torch.no_grad():
                 for lora, lora_weight in loras:
-                    #assert lora.device.type == "cpu"
+                    # assert lora.device.type == "cpu"
                     for layer_key, layer in lora.layers.items():
                         if not layer_key.startswith(prefix):
                             continue
@@ -547,7 +538,7 @@ class ModelPatcher:
                             original_weights[module_key] = module.weight.detach().to(device="cpu", copy=True)
 
                         # enable autocast to calc fp16 loras on cpu
-                        #with torch.autocast(device_type="cpu"):
+                        # with torch.autocast(device_type="cpu"):
                         layer.to(dtype=torch.float32)
                         layer_scale = layer.alpha / layer.rank if (layer.alpha and layer.rank) else 1.0
                         layer_weight = layer.get_weight() * lora_weight * layer_scale
@@ -558,13 +549,12 @@ class ModelPatcher:
 
                         module.weight += layer_weight.to(device=module.weight.device, dtype=module.weight.dtype)
 
-            yield # wait for context manager exit
+            yield  # wait for context manager exit
 
         finally:
             with torch.no_grad():
                 for module_key, weight in original_weights.items():
                     model.get_submodule(module_key).weight.copy_(weight)
-
 
     @classmethod
     @contextmanager
@@ -613,7 +603,9 @@ class ModelPatcher:
                             f"Cannot load embedding for {trigger}. It was trained on a model with token dimension {embedding.shape[0]}, but the current model has token dimension {model_embeddings.weight.data[token_id].shape[0]}."
                         )
 
-                    model_embeddings.weight.data[token_id] = embedding.to(device=text_encoder.device, dtype=text_encoder.dtype)
+                    model_embeddings.weight.data[token_id] = embedding.to(
+                        device=text_encoder.device, dtype=text_encoder.dtype
+                    )
                     ti_tokens.append(token_id)
 
                 if len(ti_tokens) > 1:
@@ -624,7 +616,6 @@ class ModelPatcher:
         finally:
             if init_tokens_count and new_tokens_added:
                 text_encoder.resize_token_embeddings(init_tokens_count)
-
 
     @classmethod
     @contextmanager
@@ -644,9 +635,10 @@ class ModelPatcher:
             while len(skipped_layers) > 0:
                 text_encoder.text_model.encoder.layers.append(skipped_layers.pop())
 
+
 class TextualInversionModel:
     name: str
-    embedding: torch.Tensor # [n, 768]|[n, 1280]
+    embedding: torch.Tensor  # [n, 768]|[n, 1280]
 
     @classmethod
     def from_checkpoint(
@@ -658,8 +650,8 @@ class TextualInversionModel:
         if not isinstance(file_path, Path):
             file_path = Path(file_path)
 
-        result = cls() # TODO:
-        result.name = file_path.stem # TODO:
+        result = cls()  # TODO:
+        result.name = file_path.stem  # TODO:
 
         if file_path.suffix == ".safetensors":
             state_dict = load_file(file_path.absolute().as_posix(), device="cpu")
@@ -670,7 +662,9 @@ class TextualInversionModel:
         # difference mostly in metadata
         if "string_to_param" in state_dict:
             if len(state_dict["string_to_param"]) > 1:
-                print(f"Warn: Embedding \"{file_path.name}\" contains multiple tokens, which is not supported. The first token will be used.")
+                print(
+                    f'Warn: Embedding "{file_path.name}" contains multiple tokens, which is not supported. The first token will be used.'
+                )
 
             result.embedding = next(iter(state_dict["string_to_param"].values()))
 
@@ -699,10 +693,7 @@ class TextualInversionManager(BaseTextualInversionManager):
         self.pad_tokens = dict()
         self.tokenizer = tokenizer
 
-    def expand_textual_inversion_token_ids_if_necessary(
-        self, token_ids: list[int]
-    ) -> list[int]:
-
+    def expand_textual_inversion_token_ids_if_necessary(self, token_ids: list[int]) -> list[int]:
         if len(self.pad_tokens) == 0:
             return token_ids
 
@@ -721,7 +712,6 @@ class TextualInversionManager(BaseTextualInversionManager):
 
 
 class ONNXModelPatcher:
-
     @classmethod
     @contextmanager
     def apply_lora_unet(
@@ -731,7 +721,6 @@ class ONNXModelPatcher:
     ):
         with cls.apply_lora(unet, loras, "lora_unet_"):
             yield
-
 
     @classmethod
     @contextmanager
@@ -754,6 +743,7 @@ class ONNXModelPatcher:
         prefix: str,
     ):
         from .models.base import IAIOnnxRuntimeModel
+
         if not isinstance(model, IAIOnnxRuntimeModel):
             raise Exception("Only IAIOnnxRuntimeModel models supported")
 
@@ -830,8 +820,6 @@ class ONNXModelPatcher:
             for name, orig_weight in orig_weights.items():
                 model.tensors[name] = orig_weight
 
-
-
     @classmethod
     @contextmanager
     def apply_ti(
@@ -841,6 +829,7 @@ class ONNXModelPatcher:
         ti_list: List[Any],
     ) -> Tuple[CLIPTokenizer, TextualInversionManager]:
         from .models.base import IAIOnnxRuntimeModel
+
         if not isinstance(text_encoder, IAIOnnxRuntimeModel):
             raise Exception("Only IAIOnnxRuntimeModel models supported")
 
@@ -866,10 +855,7 @@ class ONNXModelPatcher:
             orig_embeddings = text_encoder.tensors["text_model.embeddings.token_embedding.weight"]
 
             embeddings = np.concatenate(
-                (
-                    np.copy(orig_embeddings),
-                    np.zeros((new_tokens_added, orig_embeddings.shape[1]))
-                ),
+                (np.copy(orig_embeddings), np.zeros((new_tokens_added, orig_embeddings.shape[1]))),
                 axis=0,
             )
 
@@ -894,7 +880,9 @@ class ONNXModelPatcher:
                 if len(ti_tokens) > 1:
                     ti_manager.pad_tokens[ti_tokens[0]] = ti_tokens[1:]
 
-            text_encoder.tensors["text_model.embeddings.token_embedding.weight"] = embeddings.astype(orig_embeddings.dtype)
+            text_encoder.tensors["text_model.embeddings.token_embedding.weight"] = embeddings.astype(
+                orig_embeddings.dtype
+            )
 
             yield ti_tokenizer, ti_manager
 

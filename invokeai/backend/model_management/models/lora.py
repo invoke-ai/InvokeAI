@@ -12,18 +12,21 @@ from .base import (
     InvalidModelException,
     ModelNotFoundException,
 )
+
 # TODO: naming
 from ..lora import LoRAModel as LoRAModelRaw
+
 
 class LoRAModelFormat(str, Enum):
     LyCORIS = "lycoris"
     Diffusers = "diffusers"
 
+
 class LoRAModel(ModelBase):
-    #model_size: int
+    # model_size: int
 
     class Config(ModelConfigBase):
-        model_format: LoRAModelFormat # TODO:
+        model_format: LoRAModelFormat  # TODO:
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.Lora

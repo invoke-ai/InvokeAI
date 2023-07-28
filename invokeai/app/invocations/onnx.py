@@ -16,8 +16,7 @@ from diffusers.schedulers import SchedulerMixin as Scheduler
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from ...backend.model_management import ONNXModelPatcher
 from ...backend.util import choose_torch_device
-from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
-                             InvocationConfig, InvocationContext)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
 from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
 from .image import ImageOutput
@@ -49,9 +48,8 @@ ORT_TO_NP_TYPE = {
     "tensor(double)": np.float64,
 }
 
-PRECISION_VALUES = Literal[
-    tuple(list(ORT_TO_NP_TYPE.keys()))
-]
+PRECISION_VALUES = Literal[tuple(list(ORT_TO_NP_TYPE.keys()))]
+
 
 class ONNXPromptInvocation(BaseInvocation):
     type: Literal["prompt_onnx"] = "prompt_onnx"
@@ -66,25 +64,25 @@ class ONNXPromptInvocation(BaseInvocation):
         text_encoder_info = context.services.model_manager.get_model(
             **self.clip.text_encoder.dict(),
         )
-        with tokenizer_info as orig_tokenizer,\
-             text_encoder_info as text_encoder,\
-             ExitStack() as stack:
-
-            #loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.clip.loras]
-            loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
+        with tokenizer_info as orig_tokenizer, text_encoder_info as text_encoder, ExitStack() as stack:
+            # loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.clip.loras]
+            loras = [
+                (context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)
+                for lora in self.clip.loras
+            ]
 
             ti_list = []
             for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
                 name = trigger[1:-1]
                 try:
                     ti_list.append(
-                        #stack.enter_context(
+                        # stack.enter_context(
                         #    context.services.model_manager.get_model(
                         #        model_name=name,
                         #        base_model=self.clip.text_encoder.base_model,
                         #        model_type=ModelType.TextualInversion,
                         #    )
-                        #)
+                        # )
                         context.services.model_manager.get_model(
                             model_name=name,
                             base_model=self.clip.text_encoder.base_model,
@@ -92,15 +90,15 @@ class ONNXPromptInvocation(BaseInvocation):
                         ).context.model
                     )
                 except Exception:
-                    #print(e)
-                    #import traceback
-                    #print(traceback.format_exc())
-                    print(f"Warn: trigger: \"{trigger}\" not found")
+                    # print(e)
+                    # import traceback
+                    # print(traceback.format_exc())
+                    print(f'Warn: trigger: "{trigger}" not found')
             if loras or ti_list:
                 text_encoder.release_session()
-            with ONNXModelPatcher.apply_lora_text_encoder(text_encoder, loras),\
-                 ONNXModelPatcher.apply_ti(orig_tokenizer, text_encoder, ti_list) as (tokenizer, ti_manager):
-
+            with ONNXModelPatcher.apply_lora_text_encoder(text_encoder, loras), ONNXModelPatcher.apply_ti(
+                orig_tokenizer, text_encoder, ti_list
+            ) as (tokenizer, ti_manager):
                 text_encoder.create_session()
 
                 # copy from
@@ -128,7 +126,6 @@ class ONNXPromptInvocation(BaseInvocation):
 
                 prompt_embeds = text_encoder(input_ids=text_input_ids.astype(np.int32))[0]
 
-
         conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
 
         # TODO: hacky but works ;D maybe rename latents somehow?
@@ -139,6 +136,7 @@ class ONNXPromptInvocation(BaseInvocation):
                 conditioning_name=conditioning_name,
             ),
         )
+
 
 # Text to image
 class ONNXTextToLatentsInvocation(BaseInvocation):
@@ -157,8 +155,8 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     precision: PRECISION_VALUES = Field(default = "tensor(float16)", description="The precision to use when generating latents")
     unet: UNetField = Field(default=None, description="UNet submodel")
     control: Union[ControlField, list[ControlField]] = Field(default=None, description="The control to use")
-    #seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
-    #seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
+    # seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
+    # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
 
     @validator("cfg_scale")
@@ -167,10 +165,10 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
         if isinstance(v, list):
             for i in v:
                 if i < 1:
-                    raise ValueError('cfg_scale must be greater than 1')
+                    raise ValueError("cfg_scale must be greater than 1")
         else:
             if v < 1:
-                raise ValueError('cfg_scale must be greater than 1')
+                raise ValueError("cfg_scale must be greater than 1")
         return v
 
     # Schema customisation
@@ -179,11 +177,11 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
             "ui": {
                 "tags": ["latents"],
                 "type_hints": {
-                  "model": "model",
-                  "control": "control",
-                  # "cfg_scale": "float",
-                  "cfg_scale": "number"
-                }
+                    "model": "model",
+                    "control": "control",
+                    # "cfg_scale": "float",
+                    "cfg_scale": "number",
+                },
             },
         }
 
@@ -192,8 +190,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         c, _ = context.services.latents.get(self.positive_conditioning.conditioning_name)
         uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
-        graph_execution_state = context.services.graph_execution_manager.get(
-            context.graph_execution_state_id)
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
         if isinstance(c, torch.Tensor):
             c = c.cpu().numpy()
@@ -211,9 +208,9 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
         # get the initial random noise unless the user supplied it
         do_classifier_free_guidance = True
-        #latents_dtype = prompt_embeds.dtype
-        #latents_shape = (batch_size * num_images_per_prompt, 4, height // 8, width // 8)
-        #if latents.shape != latents_shape:
+        # latents_dtype = prompt_embeds.dtype
+        # latents_shape = (batch_size * num_images_per_prompt, 4, height // 8, width // 8)
+        # if latents.shape != latents_shape:
         #    raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
 
         scheduler = get_scheduler(
@@ -229,8 +226,8 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
             return torch.from_numpy(latent).to(device)
 
         def dispatch_progress(
-                self, context: InvocationContext, source_node_id: str,
-                intermediate_state: PipelineIntermediateState) -> None:
+            self, context: InvocationContext, source_node_id: str, intermediate_state: PipelineIntermediateState
+        ) -> None:
             stable_diffusion_step_callback(
                 context=context,
                 intermediate_state=intermediate_state,
@@ -249,16 +246,17 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
         unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
 
-        with unet_info as unet,\
-             ExitStack() as stack:
-
-            #loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
-            loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.unet.loras]
+        with unet_info as unet, ExitStack() as stack:
+            # loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
+            loras = [
+                (context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)
+                for lora in self.unet.loras
+            ]
 
             if loras:
                 unet.release_session()
             with ONNXModelPatcher.apply_lora_unet(unet, loras):
-                # TODO: 
+                # TODO:
                 _, _, h, w = latents.shape
                 unet.create_session(h, w)
 
@@ -290,27 +288,20 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
                     latents = torch2numpy(scheduler_output.prev_sample)
 
                     state = PipelineIntermediateState(
-                        run_id= "test",
-                        step=i,
-                        timestep=timestep,
-                        latents=scheduler_output.prev_sample
+                        run_id="test", step=i, timestep=timestep, latents=scheduler_output.prev_sample
                     )
-                    dispatch_progress(
-                        self,
-                        context=context,
-                        source_node_id=source_node_id,
-                        intermediate_state=state
-                    )
+                    dispatch_progress(self, context=context, source_node_id=source_node_id, intermediate_state=state)
 
                     # call the callback, if provided
-                    #if callback is not None and i % callback_steps == 0:
+                    # if callback is not None and i % callback_steps == 0:
                     #    callback(i, t, latents)
 
         torch.cuda.empty_cache()
 
-        name = f'{context.graph_execution_state_id}__{self.id}'
+        name = f"{context.graph_execution_state_id}__{self.id}"
         context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=torch.from_numpy(latents))
+
 
 # Latent to image
 class ONNXLatentsToImageInvocation(BaseInvocation):
@@ -321,8 +312,10 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to generate an image from")
     vae: VaeField = Field(default=None, description="Vae submodel")
-    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")
-    #tiled: bool = Field(default=False, description="Decode latents by overlaping tiles(less memory consumption)")
+    metadata: Optional[CoreMetadata] = Field(
+        default=None, description="Optional core metadata to be written to the image"
+    )
+    # tiled: bool = Field(default=False, description="Decode latents by overlaping tiles(less memory consumption)")
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -353,14 +346,11 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
             latents = 1 / 0.18215 * latents
             # image = self.vae_decoder(latent_sample=latents)[0]
             # it seems likes there is a strange result for using half-precision vae decoder if batchsize>1
-            image = np.concatenate(
-                [vae(latent_sample=latents[i : i + 1])[0] for i in range(latents.shape[0])]
-            )
+            image = np.concatenate([vae(latent_sample=latents[i : i + 1])[0] for i in range(latents.shape[0])])
 
             image = np.clip(image / 2 + 0.5, 0, 1)
             image = image.transpose((0, 2, 3, 1))
             image = VaeImageProcessor.numpy_to_pil(image)[0]
-
 
         torch.cuda.empty_cache()
 
@@ -380,17 +370,19 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
             height=image_dto.height,
         )
 
+
 class ONNXModelLoaderOutput(BaseInvocationOutput):
     """Model loader output"""
 
-    #fmt: off
+    # fmt: off
     type: Literal["model_loader_output_onnx"] = "model_loader_output_onnx"
 
     unet: UNetField = Field(default=None, description="UNet submodel")
     clip: ClipField = Field(default=None, description="Tokenizer and text_encoder submodels")
     vae_decoder: VaeField = Field(default=None, description="Vae submodel")
     vae_encoder: VaeField = Field(default=None, description="Vae submodel")
-    #fmt: on
+    # fmt: on
+
 
 class ONNXSD1ModelLoaderInvocation(BaseInvocation):
     """Loading submodels of selected model."""
@@ -403,16 +395,10 @@ class ONNXSD1ModelLoaderInvocation(BaseInvocation):
     # Schema customisation
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "tags": ["model", "loader"],
-                "type_hints": {
-                  "model_name": "model" # TODO: rename to model_name?
-                }
-            },
+            "ui": {"tags": ["model", "loader"], "type_hints": {"model_name": "model"}},  # TODO: rename to model_name?
         }
 
     def invoke(self, context: InvocationContext) -> ONNXModelLoaderOutput:
-
         model_name = "stable-diffusion-v1-5"
         base_model = BaseModelType.StableDiffusion1
 
@@ -423,7 +409,6 @@ class ONNXSD1ModelLoaderInvocation(BaseInvocation):
             model_type=ModelType.ONNX,
         ):
             raise Exception(f"Unkown model name: {model_name}!")
-
 
         return ONNXModelLoaderOutput(
             unet=UNetField(
@@ -471,8 +456,9 @@ class ONNXSD1ModelLoaderInvocation(BaseInvocation):
                     model_type=ModelType.ONNX,
                     submodel=SubModelType.VaeEncoder,
                 ),
-            )
+            ),
         )
+
 
 class OnnxModelField(BaseModel):
     """Onnx model field"""
@@ -480,6 +466,7 @@ class OnnxModelField(BaseModel):
     model_name: str = Field(description="Name of the model")
     base_model: BaseModelType = Field(description="Base model")
     model_type: ModelType = Field(description="Model Type")
+
 
 class OnnxModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
@@ -587,5 +574,5 @@ class OnnxModelLoaderInvocation(BaseInvocation):
                     model_type=model_type,
                     submodel=SubModelType.VaeEncoder,
                 ),
-            )
+            ),
         )

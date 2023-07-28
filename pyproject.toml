@@ -189,3 +189,6 @@ output = "coverage/index.xml"
 
 [flake8]
 max-line-length = 120
+
+[tool.black]
+line-length = 120

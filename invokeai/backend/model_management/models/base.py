@@ -20,31 +20,44 @@ from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callab
 import onnx
 from onnx import numpy_helper
 from onnx.external_data_helper import set_external_data
-from onnxruntime import InferenceSession, OrtValue, SessionOptions, ExecutionMode, GraphOptimizationLevel, get_available_providers
+from onnxruntime import (
+    InferenceSession,
+    OrtValue,
+    SessionOptions,
+    ExecutionMode,
+    GraphOptimizationLevel,
+    get_available_providers,
+)
+
 
 class DuplicateModelException(Exception):
     pass
 
+
 class InvalidModelException(Exception):
     pass
 
+
 class ModelNotFoundException(Exception):
     pass
+
 
 class BaseModelType(str, Enum):
     StableDiffusion1 = "sd-1"
     StableDiffusion2 = "sd-2"
     StableDiffusionXL = "sdxl"
     StableDiffusionXLRefiner = "sdxl-refiner"
-    #Kandinsky2_1 = "kandinsky-2.1"
+    # Kandinsky2_1 = "kandinsky-2.1"
+
 
 class ModelType(str, Enum):
     ONNX = "onnx"
     Main = "main"
     Vae = "vae"
     Lora = "lora"
-    ControlNet = "controlnet" # used by model_probe
+    ControlNet = "controlnet"  # used by model_probe
     TextualInversion = "embedding"
+
 
 class SubModelType(str, Enum):
     UNet = "unet"
@@ -57,23 +70,27 @@ class SubModelType(str, Enum):
     VaeEncoder = "vae_encoder"
     Scheduler = "scheduler"
     SafetyChecker = "safety_checker"
-    #MoVQ = "movq"
+    # MoVQ = "movq"
+
 
 class ModelVariantType(str, Enum):
     Normal = "normal"
     Inpaint = "inpaint"
     Depth = "depth"
 
+
 class SchedulerPredictionType(str, Enum):
     Epsilon = "epsilon"
     VPrediction = "v_prediction"
     Sample = "sample"
-    
+
+
 class ModelError(str, Enum):
     NotFound = "not_found"
 
+
 class ModelConfigBase(BaseModel):
-    path: str # or Path
+    path: str  # or Path
     description: Optional[str] = Field(None)
     model_format: Optional[str] = Field(None)
     error: Optional[ModelError] = Field(None)
@@ -81,13 +98,17 @@ class ModelConfigBase(BaseModel):
     class Config:
         use_enum_values = True
 
+
 class EmptyConfigLoader(ConfigMixin):
     @classmethod
     def load_config(cls, *args, **kwargs):
         cls.config_name = kwargs.pop("config_name")
         return super().load_config(*args, **kwargs)
 
-T_co = TypeVar('T_co', covariant=True)
+
+T_co = TypeVar("T_co", covariant=True)
+
+
 class classproperty(Generic[T_co]):
     def __init__(self, fget: Callable[[Any], T_co]) -> None:
         self.fget = fget
@@ -96,12 +117,13 @@ class classproperty(Generic[T_co]):
         return self.fget(owner)
 
     def __set__(self, instance: Optional[Any], value: Any) -> None:
-        raise AttributeError('cannot set attribute')
+        raise AttributeError("cannot set attribute")
+
 
 class ModelBase(metaclass=ABCMeta):
-    #model_path: str
-    #base_model: BaseModelType
-    #model_type: ModelType
+    # model_path: str
+    # base_model: BaseModelType
+    # model_type: ModelType
 
     def __init__(
         self,
@@ -120,7 +142,7 @@ class ModelBase(metaclass=ABCMeta):
             return None
         elif any(t is None for t in subtypes):
             raise Exception(f"Unsupported definition: {subtypes}")
-        
+
         if subtypes[0] in ["diffusers", "transformers"]:
             res_type = sys.modules[subtypes[0]]
             subtypes = subtypes[1:]
@@ -128,7 +150,6 @@ class ModelBase(metaclass=ABCMeta):
         else:
             res_type = sys.modules["diffusers"]
             res_type = getattr(res_type, "pipelines")
-
 
         for subtype in subtypes:
             res_type = getattr(res_type, subtype)
@@ -138,7 +159,7 @@ class ModelBase(metaclass=ABCMeta):
     def _get_configs(cls):
         with suppress(Exception):
             return cls.__configs
-        
+
         configs = dict()
         for name in dir(cls):
             if name.startswith("__"):
@@ -148,7 +169,7 @@ class ModelBase(metaclass=ABCMeta):
             if not isinstance(value, type) or not issubclass(value, ModelConfigBase):
                 continue
 
-            if hasattr(inspect,'get_annotations'):
+            if hasattr(inspect, "get_annotations"):
                 fields = inspect.get_annotations(value)
             else:
                 fields = value.__annotations__
@@ -161,7 +182,9 @@ class ModelBase(metaclass=ABCMeta):
                 for model_format in field:
                     configs[model_format.value] = value
 
-            elif typing.get_origin(field) is Literal and all(isinstance(arg, str) and isinstance(arg, Enum) for arg in field.__args__):
+            elif typing.get_origin(field) is Literal and all(
+                isinstance(arg, str) and isinstance(arg, Enum) for arg in field.__args__
+            ):
                 for model_format in field.__args__:
                     configs[model_format.value] = value
 
@@ -213,8 +236,8 @@ class ModelBase(metaclass=ABCMeta):
 
 
 class DiffusersModel(ModelBase):
-    #child_types: Dict[str, Type]
-    #child_sizes: Dict[str, int]
+    # child_types: Dict[str, Type]
+    # child_sizes: Dict[str, int]
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         super().__init__(model_path, base_model, model_type)
@@ -224,7 +247,7 @@ class DiffusersModel(ModelBase):
 
         try:
             config_data = DiffusionPipeline.load_config(self.model_path)
-            #config_data = json.loads(os.path.join(self.model_path, "model_index.json"))
+            # config_data = json.loads(os.path.join(self.model_path, "model_index.json"))
         except:
             raise Exception("Invalid diffusers model! (model_index.json not found or invalid)")
 
@@ -238,14 +261,11 @@ class DiffusersModel(ModelBase):
             self.child_types[child_name] = child_type
             self.child_sizes[child_name] = calc_model_size_by_fs(self.model_path, subfolder=child_name)
 
-
-
     def get_size(self, child_type: Optional[SubModelType] = None):
         if child_type is None:
             return sum(self.child_sizes.values())
         else:
             return self.child_sizes[child_type]
-
 
     def get_model(
         self,
@@ -256,7 +276,7 @@ class DiffusersModel(ModelBase):
         if child_type is None:
             raise Exception("Child model type can't be null on diffusers model")
         if child_type not in self.child_types:
-            return None # TODO: or raise
+            return None  # TODO: or raise
 
         if torch_dtype == torch.float16:
             variants = ["fp16", None]
@@ -276,8 +296,8 @@ class DiffusersModel(ModelBase):
                 )
                 break
             except Exception as e:
-                #print("====ERR LOAD====")
-                #print(f"{variant}: {e}")
+                # print("====ERR LOAD====")
+                # print(f"{variant}: {e}")
                 pass
         else:
             raise Exception(f"Failed to load {self.base_model}:{self.model_type}:{child_type} model")
@@ -286,15 +306,10 @@ class DiffusersModel(ModelBase):
         self.child_sizes[child_type] = calc_model_size_by_data(model)
         return model
 
-    #def convert_if_required(model_path: str, cache_path: str, config: Optional[dict]) -> str:
+    # def convert_if_required(model_path: str, cache_path: str, config: Optional[dict]) -> str:
 
 
-
-def calc_model_size_by_fs(
-    model_path: str,
-    subfolder: Optional[str] = None,
-    variant: Optional[str] = None
-):
+def calc_model_size_by_fs(model_path: str, subfolder: Optional[str] = None, variant: Optional[str] = None):
     if subfolder is not None:
         model_path = os.path.join(model_path, subfolder)
 
@@ -336,12 +351,12 @@ def calc_model_size_by_fs(
 
     # calculate files size if there is no index file
     formats = [
-        (".safetensors",), # safetensors
-        (".bin",), # torch
-        (".onnx", ".pb"), # onnx
-        (".msgpack",), # flax
-        (".ckpt",), # tf
-        (".h5",), # tf2
+        (".safetensors",),  # safetensors
+        (".bin",),  # torch
+        (".onnx", ".pb"),  # onnx
+        (".msgpack",),  # flax
+        (".ckpt",),  # tf
+        (".h5",),  # tf2
     ]
 
     for file_format in formats:
@@ -354,9 +369,9 @@ def calc_model_size_by_fs(
             file_stats = os.stat(os.path.join(model_path, model_file))
             model_size += file_stats.st_size
         return model_size
-    
-    #raise NotImplementedError(f"Unknown model structure! Files: {all_files}")
-    return 0 # scheduler/feature_extractor/tokenizer - models without loading to gpu
+
+    # raise NotImplementedError(f"Unknown model structure! Files: {all_files}")
+    return 0  # scheduler/feature_extractor/tokenizer - models without loading to gpu
 
 
 def calc_model_size_by_data(model) -> int:
@@ -377,18 +392,18 @@ def _calc_pipeline_by_data(pipeline) -> int:
         if submodel is not None and isinstance(submodel, torch.nn.Module):
             res += _calc_model_by_data(submodel)
     return res
-    
+
 
 def _calc_model_by_data(model) -> int:
-    mem_params = sum([param.nelement()*param.element_size() for param in model.parameters()])
-    mem_bufs = sum([buf.nelement()*buf.element_size() for buf in model.buffers()])
-    mem = mem_params + mem_bufs # in bytes
+    mem_params = sum([param.nelement() * param.element_size() for param in model.parameters()])
+    mem_bufs = sum([buf.nelement() * buf.element_size() for buf in model.buffers()])
+    mem = mem_params + mem_bufs  # in bytes
     return mem
 
 
 def _calc_onnx_model_by_data(model) -> int:
-    tensor_size = model.tensors.size() * 2 # The session doubles this
-    mem = tensor_size # in bytes
+    tensor_size = model.tensors.size() * 2  # The session doubles this
+    mem = tensor_size  # in bytes
     return mem
 
 
@@ -396,11 +411,15 @@ def _fast_safetensors_reader(path: str):
     checkpoint = dict()
     device = torch.device("meta")
     with open(path, "rb") as f:
-        definition_len = int.from_bytes(f.read(8), 'little')
+        definition_len = int.from_bytes(f.read(8), "little")
         definition_json = f.read(definition_len)
         definition = json.loads(definition_json)
 
-        if "__metadata__" in definition and definition["__metadata__"].get("format", "pt") not in {"pt", "torch", "pytorch"}:
+        if "__metadata__" in definition and definition["__metadata__"].get("format", "pt") not in {
+            "pt",
+            "torch",
+            "pytorch",
+        }:
             raise Exception("Supported only pytorch safetensors files")
         definition.pop("__metadata__", None)
 
@@ -419,6 +438,7 @@ def _fast_safetensors_reader(path: str):
 
     return checkpoint
 
+
 def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
     if str(path).endswith(".safetensors"):
         try:
@@ -430,33 +450,37 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
         if scan:
             scan_result = scan_file_path(path)
             if scan_result.infected_files != 0:
-                raise Exception(f"The model file \"{path}\" is potentially infected by malware. Aborting import.")
+                raise Exception(f'The model file "{path}" is potentially infected by malware. Aborting import.')
         checkpoint = torch.load(path, map_location=torch.device("meta"))
     return checkpoint
+
 
 import warnings
 from diffusers import logging as diffusers_logging
 from transformers import logging as transformers_logging
 
+
 class SilenceWarnings(object):
     def __init__(self):
         self.transformers_verbosity = transformers_logging.get_verbosity()
         self.diffusers_verbosity = diffusers_logging.get_verbosity()
-        
+
     def __enter__(self):
         transformers_logging.set_verbosity_error()
         diffusers_logging.set_verbosity_error()
-        warnings.simplefilter('ignore')
+        warnings.simplefilter("ignore")
 
     def __exit__(self, type, value, traceback):
         transformers_logging.set_verbosity(self.transformers_verbosity)
         diffusers_logging.set_verbosity(self.diffusers_verbosity)
-        warnings.simplefilter('default')
+        warnings.simplefilter("default")
+
 
 ONNX_WEIGHTS_NAME = "model.onnx"
+
+
 class IAIOnnxRuntimeModel:
     class _tensor_access:
-
         def __init__(self, model):
             self.model = model
             self.indexes = dict()
@@ -483,21 +507,20 @@ class IAIOnnxRuntimeModel:
 
         def items(self):
             raise NotImplementedError("tensor.items")
-            #return [(obj.name, obj) for obj in self.raw_proto]
+            # return [(obj.name, obj) for obj in self.raw_proto]
 
         def keys(self):
             return self.indexes.keys()
 
         def values(self):
             raise NotImplementedError("tensor.values")
-            #return [obj for obj in self.raw_proto]
+            # return [obj for obj in self.raw_proto]
 
         def size(self):
             bytesSum = 0
             for node in self.model.proto.graph.initializer:
                 bytesSum += sys.getsizeof(node.raw_data)
             return bytesSum
-
 
     class _access_helper:
         def __init__(self, raw_proto):
@@ -527,7 +550,7 @@ class IAIOnnxRuntimeModel:
 
         def values(self):
             return [obj for obj in self.raw_proto]
-    
+
     def __init__(self, model_path: str, provider: Optional[str]):
         self.path = model_path
         self.session = None
@@ -567,12 +590,12 @@ class IAIOnnxRuntimeModel:
     # TODO: integrate with model manager/cache
     def create_session(self, height=None, width=None):
         if self.session is None or self.session_width != width or self.session_height != height:
-            #onnx.save(self.proto, "tmp.onnx")
-            #onnx.save_model(self.proto, "tmp.onnx", save_as_external_data=True, all_tensors_to_one_file=True, location="tmp.onnx_data", size_threshold=1024, convert_attribute=False)
+            # onnx.save(self.proto, "tmp.onnx")
+            # onnx.save_model(self.proto, "tmp.onnx", save_as_external_data=True, all_tensors_to_one_file=True, location="tmp.onnx_data", size_threshold=1024, convert_attribute=False)
             # TODO: something to be able to get weight when they already moved outside of model proto
-            #(trimmed_model, external_data) = buffer_external_data_tensors(self.proto)
+            # (trimmed_model, external_data) = buffer_external_data_tensors(self.proto)
             sess = SessionOptions()
-            #self._external_data.update(**external_data)
+            # self._external_data.update(**external_data)
             # sess.add_external_initializers(list(self.data.keys()), list(self.data.values()))
             # sess.enable_profiling = True
 
@@ -603,13 +626,14 @@ class IAIOnnxRuntimeModel:
             try:
                 self.session = InferenceSession(self.proto.SerializeToString(), providers=providers, sess_options=sess)
             except Exception as e:
-                raise e 
-            #self.session = InferenceSession("tmp.onnx", providers=[self.provider], sess_options=self.sess_options)
+                raise e
+            # self.session = InferenceSession("tmp.onnx", providers=[self.provider], sess_options=self.sess_options)
             # self.io_binding = self.session.io_binding()
 
     def release_session(self):
         self.session = None
         import gc
+
         gc.collect()
         return
 
@@ -655,4 +679,3 @@ class IAIOnnxRuntimeModel:
 
         # TODO: session options
         return cls(model_path, provider=provider)
-
