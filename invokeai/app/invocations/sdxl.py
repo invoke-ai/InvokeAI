@@ -293,14 +293,14 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
 
         num_inference_steps = self.steps
 
-        latents = latents * scheduler.init_noise_sigma
-
         unet_info = context.services.model_manager.get_model(**self.unet.unet.dict(), context=context)
         do_classifier_free_guidance = True
         cross_attention_kwargs = None
         with unet_info as unet:
             scheduler.set_timesteps(num_inference_steps, device=unet.device)
             timesteps = scheduler.timesteps
+            
+            latents = latents.to(device=unet.device, dtype=unet.dtype) * scheduler.init_noise_sigma
 
             extra_step_kwargs = dict()
             if "eta" in set(inspect.signature(scheduler.step).parameters.keys()):
