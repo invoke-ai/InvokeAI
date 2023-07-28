@@ -548,7 +548,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
         with unet_info as unet:
             # apply denoising_start
             num_inference_steps = self.steps
-            scheduler.set_timesteps(num_inference_steps, device=self.scheduler.device)
+            scheduler.set_timesteps(num_inference_steps, device=unet.device)
 
             t_start = int(round(self.denoising_start * num_inference_steps))
             timesteps = scheduler.timesteps[t_start * scheduler.order :]
