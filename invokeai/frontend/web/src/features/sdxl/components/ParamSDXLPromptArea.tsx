@@ -13,6 +13,10 @@ export default function ParamSDXLPromptArea() {
     (state: RootState) => state.ui.shouldPinParametersPanel
   );
 
+  const shouldConcatSDXLStylePrompt = useAppSelector(
+    (state: RootState) => state.sdxl.shouldConcatSDXLStylePrompt
+  );
+
   return (
     <Flex
       sx={{
@@ -20,24 +24,28 @@ export default function ParamSDXLPromptArea() {
         gap: 2,
       }}
     >
-      <Box
-        sx={{
-          position: 'absolute',
-          w: 'full',
-          top: shouldPinParametersPanel ? '119px' : '175px',
-        }}
-      >
-        <SDXLConcatLink />
-      </Box>
-      <Box
-        sx={{
-          position: 'absolute',
-          w: 'full',
-          top: shouldPinParametersPanel ? '263px' : '319px',
-        }}
-      >
-        <SDXLConcatLink />
-      </Box>
+      {shouldConcatSDXLStylePrompt && (
+        <Box
+          sx={{
+            position: 'absolute',
+            w: 'full',
+            top: shouldPinParametersPanel ? '119px' : '175px',
+          }}
+        >
+          <SDXLConcatLink />
+        </Box>
+      )}
+      {shouldConcatSDXLStylePrompt && (
+        <Box
+          sx={{
+            position: 'absolute',
+            w: 'full',
+            top: shouldPinParametersPanel ? '263px' : '319px',
+          }}
+        >
+          <SDXLConcatLink />
+        </Box>
+      )}
       <ParamPositiveConditioning />
       <ParamSDXLConcatButton />
       <ParamSDXLPositiveStyleConditioning />
