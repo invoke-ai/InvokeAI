@@ -52,8 +52,16 @@ type UpdateMainModelArg = {
   body: MainModelConfig;
 };
 
+type UpdateLoRAModelArg = {
+  base_model: BaseModelType;
+  model_name: string;
+  body: LoRAModelConfig;
+};
+
 type UpdateMainModelResponse =
   paths['/api/v1/models/{base_model}/{model_type}/{model_name}']['patch']['responses']['200']['content']['application/json'];
+
+type UpdateLoRAModelResponse = UpdateMainModelResponse;
 
 type DeleteMainModelArg = {
   base_model: BaseModelType;
@@ -61,6 +69,10 @@ type DeleteMainModelArg = {
 };
 
 type DeleteMainModelResponse = void;
+
+type DeleteLoRAModelArg = DeleteMainModelArg;
+
+type DeleteLoRAModelResponse = void;
 
 type ConvertMainModelArg = {
   base_model: BaseModelType;
@@ -320,6 +332,31 @@ export const modelsApi = api.injectEndpoints({
         );
       },
     }),
+    updateLoRAModels: build.mutation<
+      UpdateLoRAModelResponse,
+      UpdateLoRAModelArg
+    >({
+      query: ({ base_model, model_name, body }) => {
+        return {
+          url: `models/${base_model}/lora/${model_name}`,
+          method: 'PATCH',
+          body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
+    }),
+    deleteLoRAModels: build.mutation<
+      DeleteLoRAModelResponse,
+      DeleteLoRAModelArg
+    >({
+      query: ({ base_model, model_name }) => {
+        return {
+          url: `models/${base_model}/lora/${model_name}`,
+          method: 'DELETE',
+        };
+      },
+      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
+    }),
     getControlNetModels: build.query<
       EntityState<ControlNetModelConfigEntity>,
       void
@@ -467,6 +504,8 @@ export const {
   useAddMainModelsMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
+  useDeleteLoRAModelsMutation,
+  useUpdateLoRAModelsMutation,
   useSyncModelsMutation,
   useGetModelsInFolderQuery,
   useGetCheckpointConfigsQuery,

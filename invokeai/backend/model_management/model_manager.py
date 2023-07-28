@@ -401,7 +401,11 @@ class ModelManager(object):
         base_model: BaseModelType,
         model_type: ModelType,
     ) -> str:
-        return f"{base_model}/{model_type}/{model_name}"
+        # In 3.11, the behavior of (str,enum) when interpolated into a
+        # string has changed. The next two lines are defensive.
+        base_model = BaseModelType(base_model)
+        model_type = ModelType(model_type)
+        return f"{base_model.value}/{model_type.value}/{model_name}"
 
     @classmethod
     def parse_key(cls, model_key: str) -> Tuple[str, BaseModelType, ModelType]:

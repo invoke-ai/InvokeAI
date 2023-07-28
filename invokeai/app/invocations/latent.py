@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, validator
 
 from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend.model_management.models.base import ModelType
+from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
@@ -311,70 +311,71 @@ class TextToLatentsInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        noise = context.services.latents.get(self.noise.latents_name)
+        with SilenceWarnings():
+            noise = context.services.latents.get(self.noise.latents_name)
 
-        # Get the source node id (we are invoking the prepared node)
-        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
-        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+            # Get the source node id (we are invoking the prepared node)
+            graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+            source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
-        def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, source_node_id, state)
+            def step_callback(state: PipelineIntermediateState):
+                self.dispatch_progress(context, source_node_id, state)
 
-        def _lora_loader():
-            for lora in self.unet.loras:
-                lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"}),
+            def _lora_loader():
+                for lora in self.unet.loras:
+                    lora_info = context.services.model_manager.get_model(
+                        **lora.dict(exclude={"weight"}),
+                        context=context,
+                    )
+                    yield (lora_info.context.model, lora.weight)
+                    del lora_info
+                return
+
+            unet_info = context.services.model_manager.get_model(
+                **self.unet.unet.dict(),
+                context=context,
+            )
+            with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
+                unet_info.context.model, _lora_loader()
+            ), unet_info as unet:
+                noise = noise.to(device=unet.device, dtype=unet.dtype)
+
+                scheduler = get_scheduler(
                     context=context,
+                    scheduler_info=self.unet.scheduler,
+                    scheduler_name=self.scheduler,
                 )
-                yield (lora_info.context.model, lora.weight)
-                del lora_info
-            return
 
-        unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict(),
-            context=context,
-        )
-        with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
-            unet_info.context.model, _lora_loader()
-        ), unet_info as unet:
-            noise = noise.to(device=unet.device, dtype=unet.dtype)
+                pipeline = self.create_pipeline(unet, scheduler)
+                conditioning_data = self.get_conditioning_data(context, scheduler, unet)
 
-            scheduler = get_scheduler(
-                context=context,
-                scheduler_info=self.unet.scheduler,
-                scheduler_name=self.scheduler,
-            )
+                control_data = self.prep_control_data(
+                    model=pipeline,
+                    context=context,
+                    control_input=self.control,
+                    latents_shape=noise.shape,
+                    # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                    do_classifier_free_guidance=True,
+                    exit_stack=exit_stack,
+                )
 
-            pipeline = self.create_pipeline(unet, scheduler)
-            conditioning_data = self.get_conditioning_data(context, scheduler, unet)
+                # TODO: Verify the noise is the right size
+                result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
+                    latents=torch.zeros_like(noise, dtype=torch_dtype(unet.device)),
+                    noise=noise,
+                    num_inference_steps=self.steps,
+                    conditioning_data=conditioning_data,
+                    control_data=control_data,  # list[ControlNetData]
+                    callback=step_callback,
+                )
 
-            control_data = self.prep_control_data(
-                model=pipeline,
-                context=context,
-                control_input=self.control,
-                latents_shape=noise.shape,
-                # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
-                do_classifier_free_guidance=True,
-                exit_stack=exit_stack,
-            )
+            # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+            result_latents = result_latents.to("cpu")
+            torch.cuda.empty_cache()
 
-            # TODO: Verify the noise is the right size
-            result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
-                latents=torch.zeros_like(noise, dtype=torch_dtype(unet.device)),
-                noise=noise,
-                num_inference_steps=self.steps,
-                conditioning_data=conditioning_data,
-                control_data=control_data,  # list[ControlNetData]
-                callback=step_callback,
-            )
-
-        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        result_latents = result_latents.to("cpu")
-        torch.cuda.empty_cache()
-
-        name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.save(name, result_latents)
-        return build_latents_output(latents_name=name, latents=result_latents)
+            name = f"{context.graph_execution_state_id}__{self.id}"
+            context.services.latents.save(name, result_latents)
+            return build_latents_output(latents_name=name, latents=result_latents)
 
 
 class LatentsToLatentsInvocation(TextToLatentsInvocation):
@@ -402,82 +403,83 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        noise = context.services.latents.get(self.noise.latents_name)
-        latent = context.services.latents.get(self.latents.latents_name)
+        with SilenceWarnings():  # this quenches NSFW nag from diffusers
+            noise = context.services.latents.get(self.noise.latents_name)
+            latent = context.services.latents.get(self.latents.latents_name)
 
-        # Get the source node id (we are invoking the prepared node)
-        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
-        source_node_id = graph_execution_state.prepared_source_mapping[self.id]
+            # Get the source node id (we are invoking the prepared node)
+            graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
+            source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
-        def step_callback(state: PipelineIntermediateState):
-            self.dispatch_progress(context, source_node_id, state)
+            def step_callback(state: PipelineIntermediateState):
+                self.dispatch_progress(context, source_node_id, state)
 
-        def _lora_loader():
-            for lora in self.unet.loras:
-                lora_info = context.services.model_manager.get_model(
-                    **lora.dict(exclude={"weight"}),
+            def _lora_loader():
+                for lora in self.unet.loras:
+                    lora_info = context.services.model_manager.get_model(
+                        **lora.dict(exclude={"weight"}),
+                        context=context,
+                    )
+                    yield (lora_info.context.model, lora.weight)
+                    del lora_info
+                return
+
+            unet_info = context.services.model_manager.get_model(
+                **self.unet.unet.dict(),
+                context=context,
+            )
+            with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
+                unet_info.context.model, _lora_loader()
+            ), unet_info as unet:
+                noise = noise.to(device=unet.device, dtype=unet.dtype)
+                latent = latent.to(device=unet.device, dtype=unet.dtype)
+
+                scheduler = get_scheduler(
                     context=context,
+                    scheduler_info=self.unet.scheduler,
+                    scheduler_name=self.scheduler,
                 )
-                yield (lora_info.context.model, lora.weight)
-                del lora_info
-            return
 
-        unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict(),
-            context=context,
-        )
-        with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
-            unet_info.context.model, _lora_loader()
-        ), unet_info as unet:
-            noise = noise.to(device=unet.device, dtype=unet.dtype)
-            latent = latent.to(device=unet.device, dtype=unet.dtype)
+                pipeline = self.create_pipeline(unet, scheduler)
+                conditioning_data = self.get_conditioning_data(context, scheduler, unet)
 
-            scheduler = get_scheduler(
-                context=context,
-                scheduler_info=self.unet.scheduler,
-                scheduler_name=self.scheduler,
-            )
+                control_data = self.prep_control_data(
+                    model=pipeline,
+                    context=context,
+                    control_input=self.control,
+                    latents_shape=noise.shape,
+                    # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
+                    do_classifier_free_guidance=True,
+                    exit_stack=exit_stack,
+                )
 
-            pipeline = self.create_pipeline(unet, scheduler)
-            conditioning_data = self.get_conditioning_data(context, scheduler, unet)
+                # TODO: Verify the noise is the right size
+                initial_latents = (
+                    latent if self.strength < 1.0 else torch.zeros_like(latent, device=unet.device, dtype=latent.dtype)
+                )
 
-            control_data = self.prep_control_data(
-                model=pipeline,
-                context=context,
-                control_input=self.control,
-                latents_shape=noise.shape,
-                # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
-                do_classifier_free_guidance=True,
-                exit_stack=exit_stack,
-            )
+                timesteps, _ = pipeline.get_img2img_timesteps(
+                    self.steps,
+                    self.strength,
+                    device=unet.device,
+                )
 
-            # TODO: Verify the noise is the right size
-            initial_latents = (
-                latent if self.strength < 1.0 else torch.zeros_like(latent, device=unet.device, dtype=latent.dtype)
-            )
+                result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
+                    latents=initial_latents,
+                    timesteps=timesteps,
+                    noise=noise,
+                    num_inference_steps=self.steps,
+                    conditioning_data=conditioning_data,
+                    control_data=control_data,  # list[ControlNetData]
+                    callback=step_callback,
+                )
 
-            timesteps, _ = pipeline.get_img2img_timesteps(
-                self.steps,
-                self.strength,
-                device=unet.device,
-            )
+            # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+            result_latents = result_latents.to("cpu")
+            torch.cuda.empty_cache()
 
-            result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
-                latents=initial_latents,
-                timesteps=timesteps,
-                noise=noise,
-                num_inference_steps=self.steps,
-                conditioning_data=conditioning_data,
-                control_data=control_data,  # list[ControlNetData]
-                callback=step_callback,
-            )
-
-        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        result_latents = result_latents.to("cpu")
-        torch.cuda.empty_cache()
-
-        name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.save(name, result_latents)
+            name = f"{context.graph_execution_state_id}__{self.id}"
+            context.services.latents.save(name, result_latents)
         return build_latents_output(latents_name=name, latents=result_latents)
 
 
@@ -490,7 +492,7 @@ class LatentsToImageInvocation(BaseInvocation):
     # Inputs
     latents: Optional[LatentsField] = Field(description="The latents to generate an image from")
     vae: VaeField = Field(default=None, description="Vae submodel")
-    tiled: bool = Field(default=False, description="Decode latents by overlapping tiles(less memory consumption)")
+    tiled: bool = Field(default=False, description="Decode latents by overlaping tiles (less memory consumption)")
     fp32: bool = Field(DEFAULT_PRECISION == "float32", description="Decode in full precision")
     metadata: Optional[CoreMetadata] = Field(
         default=None, description="Optional core metadata to be written to the image"

@@ -57,7 +57,7 @@ class LoRAModel(ModelBase):
 
     @classproperty
     def save_to_config(cls) -> bool:
-        return False
+        return True
 
     @classmethod
     def detect_format(cls, path: str):
