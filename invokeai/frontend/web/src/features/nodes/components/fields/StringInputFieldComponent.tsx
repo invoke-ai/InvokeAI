@@ -1,24 +1,17 @@
-import { memo, ChangeEvent } from 'react';
-import { Textarea, Input } from '@chakra-ui/react';
+import { Input, Textarea } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   StringInputFieldTemplate,
   StringInputFieldValue,
 } from 'features/nodes/types/types';
+import { ChangeEvent, memo } from 'react';
 import { FieldComponentProps } from './types';
 
-const FIELD_PADDING = 20;
-
 const StringInputFieldComponent = (
-  props: FieldComponentProps<
-    StringInputFieldValue,
-    StringInputFieldTemplate
-  > & {
-    nodeWidth: number;
-  }
+  props: FieldComponentProps<StringInputFieldValue, StringInputFieldTemplate>
 ) => {
-  const { nodeId, field, nodeWidth } = props;
+  const { nodeId, field } = props;
   const dispatch = useAppDispatch();
 
   const handleValueChanged = (
@@ -33,30 +26,10 @@ const StringInputFieldComponent = (
     );
   };
 
-  const textareaWidth = nodeWidth - FIELD_PADDING;
-
-  const textareaFieldNames = ['prompt', 'text'];
-
-  return (
-    <>
-      {textareaFieldNames.includes(field.name.toLowerCase()) ? (
-        <Textarea
-          style={{
-            height: '150px',
-            width: `${textareaWidth}px`,
-            overflowY: 'auto',
-          }}
-          onChange={handleValueChanged}
-          value={field.value}
-        />
-      ) : (
-        <Input
-          style={{ width: `${textareaWidth}px` }}
-          onChange={handleValueChanged}
-          value={field.value}
-        />
-      )}
-    </>
+  return field.name.toLowerCase() === 'prompt' ? (
+    <Textarea onChange={handleValueChanged} value={field.value} rows={5} />
+  ) : (
+    <Input onChange={handleValueChanged} value={field.value} />
   );
 };
 
