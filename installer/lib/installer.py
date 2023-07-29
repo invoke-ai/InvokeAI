@@ -168,7 +168,7 @@ class Installer:
 
         messages.welcome()
 
-        default_path = os.environ.get('INVOKEAI_ROOT') or Path(root).expanduser().resolve()
+        default_path = os.environ.get("INVOKEAI_ROOT") or Path(root).expanduser().resolve()
         self.dest = default_path if yes_to_all else messages.dest_path(root)
 
         # create the venv for the app

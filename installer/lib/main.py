@@ -16,7 +16,7 @@ if __name__ == "__main__":
         dest="root",
         type=str,
         help="Destination path for installation",
-        default=os.environ.get('INVOKEAI_ROOT') or "~/invokeai",
+        default=os.environ.get("INVOKEAI_ROOT") or "~/invokeai",
     )
     parser.add_argument(
         "-y",

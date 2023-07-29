@@ -61,6 +61,7 @@ NOPRINT_TRANS_TABLE = {i: None for i in range(0, sys.maxunicode + 1) if not chr(
 # maximum number of installed models we can display before overflowing vertically
 MAX_OTHER_MODELS = 72
 
+
 def make_printable(s: str) -> str:
     """Replace non-printable characters in a string"""
     return s.translate(NOPRINT_TRANS_TABLE)
@@ -298,7 +299,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
         if truncation:
             widgets.update(
-                warning_message = self.add_widget_intelligent(
+                warning_message=self.add_widget_intelligent(
                     npyscreen.FixedText,
                     value=f"Too many models to display (max={MAX_OTHER_MODELS}). Some are not displayed.",
                     editable=False,
