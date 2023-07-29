@@ -228,19 +228,19 @@ the root is the InvokeAI ROOTDIR.
 """
 from __future__ import annotations
 
-import os
 import hashlib
+import os
 import textwrap
-import yaml
+import types
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, List, Tuple, Union, Dict, Set, Callable, types
 from shutil import rmtree, move
+from typing import Optional, List, Tuple, Union, Dict, Set, Callable
 
 import torch
+import yaml
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
-
 from pydantic import BaseModel, Field
 
 import invokeai.backend.util.logging as logger
