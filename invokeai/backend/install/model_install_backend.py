@@ -103,7 +103,6 @@ class ModelInstall(object):
         access_token: str = None,
     ):
         self.config = config
-        # force model manager to be a singleton
         self.mgr = model_manager or ModelManager(config.model_conf_path)
         self.datasets = OmegaConf.load(Dataset_path)
         self.prediction_helper = prediction_type_helper
