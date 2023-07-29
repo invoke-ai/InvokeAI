@@ -460,7 +460,7 @@ class ModelManager(object):
         if not self.model_exists(model_name, base_model, model_type, rescan=True):
             raise ModelNotFoundException(f"Model not found - {model_key}")
 
-        model_config = self.models[model_key]
+        model_config = self._get_model_config(base_model, model_name, model_type)
         model_path = self.app_config.root_path / model_config.path
 
         if not model_path.exists():
@@ -517,6 +517,14 @@ class ModelManager(object):
             precision=self.cache.precision,
             _cache=self.cache,
         )
+
+    def _get_model_config(self, base_model, model_name, model_type) -> ModelConfigBase:
+        model_key = self.create_key(model_name, base_model, model_type)
+        try:
+            model_config = self.models[model_key]
+        except KeyError:
+            raise ModelNotFoundException(f"Model not found - {model_key}")
+        return model_config
 
     def _get_implementation(self, base_model: BaseModelType, model_type: ModelType) -> type[ModelBase]:
         model_class = MODEL_CLASSES[base_model][model_type]
