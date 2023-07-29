@@ -105,7 +105,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             SingleSelectColumns,
             values=[
                 "STARTER MODELS",
-                "MORE MODELS",
+                "MAIN MODELS",
                 "CONTROLNETS",
                 "LORA/LYCORIS",
                 "TEXTUAL INVERSION",
@@ -331,7 +331,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         widgets = self.add_model_widgets(
             model_type=model_type,
             window_width=window_width,
-            install_prompt=f"Additional {model_type.value.title()} models already installed.",
+            install_prompt=f"Installed {model_type.value.title()} models. Unchecked models in the InvokeAI root directory will be deleted. Enter URLs, paths or repo_ids to import.",
             **kwargs,
         )
 
