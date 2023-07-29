@@ -348,7 +348,7 @@ class ModelInstall(object):
             if key in self.datasets:
                 description = self.datasets[key].get("description") or description
 
-        rel_path = self.relative_to_root(path,self.config.models_path)
+        rel_path = self.relative_to_root(path, self.config.models_path)
 
         attributes = dict(
             path=str(rel_path),

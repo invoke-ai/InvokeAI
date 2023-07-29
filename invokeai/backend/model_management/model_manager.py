@@ -423,7 +423,7 @@ class ModelManager(object):
         return (model_name, base_model, model_type)
 
     def _get_model_cache_path(self, model_path):
-        return self.resolve_model_path(".cache" + '/' +  hashlib.md5(str(model_path).encode()).hexdigest())
+        return self.resolve_model_path(".cache" + "/" + hashlib.md5(str(model_path).encode()).hexdigest())
 
     @classmethod
     def initialize_model_config(cls, config_path: Path):
@@ -889,13 +889,13 @@ class ModelManager(object):
         with Chdir(self.app_config.models_path):
             for model_key, model_config in list(self.models.items()):
                 model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
-                
+
                 # Patch for relative path bug in older models.yaml - paths should not
                 # be starting with a hard-coded 'models'. This will also fix up
                 # models.yaml when committed.
-                if model_config.path.startswith('models'):
+                if model_config.path.startswith("models"):
                     model_config.path = str(Path(*Path(model_config.path).parts[1:]))
-                
+
                 model_path = self.app_config.models_path.absolute() / model_config.path
                 if not model_path.exists():
                     model_class = MODEL_CLASSES[cur_base_model][cur_model_type]

@@ -541,6 +541,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             if downloads := section.get("download_ids"):
                 selections.install_models.extend(downloads.value.split())
 
+
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self, opt):
         super().__init__()
@@ -625,9 +626,9 @@ def _ask_user_for_pt_tui(model_path: Path, tui_conn: Connection) -> SchedulerPre
 
 # --------------------------------------------------------
 def process_and_execute(
-        opt: Namespace,
-        selections: InstallSelections,
-        conn_out: Connection = None,
+    opt: Namespace,
+    selections: InstallSelections,
+    conn_out: Connection = None,
 ):
     # need to reinitialize config in subprocess
     config = InvokeAIAppConfig.get_config()
@@ -641,7 +642,7 @@ def process_and_execute(
         logger = InvokeAILogger.getLogger()
         logger.handlers.clear()
         logger.addHandler(logging.StreamHandler(translator))
-        
+
     installer = ModelInstall(config, prediction_type_helper=lambda x: ask_user_for_prediction_type(x, conn_out))
     installer.install(selections)
 
