@@ -139,8 +139,19 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys('s', handleUseSeed, [imageDTO]);
 
   const handleUsePrompt = useCallback(() => {
-    recallBothPrompts(metadata?.positive_prompt, metadata?.negative_prompt);
-  }, [metadata?.negative_prompt, metadata?.positive_prompt, recallBothPrompts]);
+    recallBothPrompts(
+      metadata?.positive_prompt,
+      metadata?.negative_prompt,
+      metadata?.positive_style_prompt,
+      metadata?.negative_style_prompt
+    );
+  }, [
+    metadata?.negative_prompt,
+    metadata?.positive_prompt,
+    metadata?.positive_style_prompt,
+    metadata?.negative_style_prompt,
+    recallBothPrompts,
+  ]);
 
   useHotkeys('p', handleUsePrompt, [imageDTO]);
 
