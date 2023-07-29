@@ -540,6 +540,15 @@ class ModelManager(object):
         model_class = MODEL_CLASSES[base_model][model_type]
         return model_class
 
+    def _instantiate(self, model_name: str, base_model: BaseModelType, model_type: ModelType,
+                     submodel_type: SubModelType = None) -> ModelBase:
+        model_config = self._get_model_config(base_model, model_name, model_type)
+        model_path, is_submodel_override = self._get_model_path(model_config, submodel_type)
+        # FIXME: do non-overriden submodels get the right class?
+        constructor = self._get_implementation(base_model, model_type)
+        instance = constructor(model_path, base_model, model_type)
+        return instance
+
     def model_info(
         self,
         model_name: str,
