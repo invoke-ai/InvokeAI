@@ -153,7 +153,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             BufferBox,
             name="Log Messages",
             editable=False,
-            max_height=8,
+            max_height=15,
         )
 
         self.nextrely += 1
@@ -399,7 +399,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.ok_button.hidden = True
         self.display()
 
-        # for communication with the subprocess
+        # TO DO: Spawn a worker thread, not a subprocess
         parent_conn, child_conn = Pipe()
         p = Process(
             target=process_and_execute,
@@ -414,7 +414,6 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.subprocess_connection = parent_conn
         self.subprocess = p
         app.install_selections = InstallSelections()
-        # process_and_execute(app.opt, app.install_selections)
 
     def on_back(self):
         self.parentApp.switchFormPrevious()
@@ -489,8 +488,6 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
         # rebuild the form, saving and restoring some of the fields that need to be preserved.
         saved_messages = self.monitor.entry_widget.values
-        # autoload_dir = str(config.root_path / self.pipeline_models['autoload_directory'].value)
-        # autoscan = self.pipeline_models['autoscan_on_startup'].value
 
         app.main_form = app.addForm(
             "MAIN",
@@ -543,13 +540,6 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         for section in ui_sections:
             if downloads := section.get("download_ids"):
                 selections.install_models.extend(downloads.value.split())
-
-        # load directory and whether to scan on startup
-        # if self.parentApp.autoload_pending:
-        #     selections.scan_directory = str(config.root_path / self.pipeline_models['autoload_directory'].value)
-        #     self.parentApp.autoload_pending = False
-        # selections.autoscan_on_startup = self.pipeline_models['autoscan_on_startup'].value
-
 
 class AddModelApplication(npyscreen.NPSAppManaged):
     def __init__(self, opt):
@@ -635,10 +625,14 @@ def _ask_user_for_pt_tui(model_path: Path, tui_conn: Connection) -> SchedulerPre
 
 # --------------------------------------------------------
 def process_and_execute(
-    opt: Namespace,
-    selections: InstallSelections,
-    conn_out: Connection = None,
+        opt: Namespace,
+        selections: InstallSelections,
+        conn_out: Connection = None,
 ):
+    # need to reinitialize config in subprocess
+    config = InvokeAIAppConfig.get_config()
+    config.parse_args()
+
     # set up so that stderr is sent to conn_out
     if conn_out:
         translator = StderrToMessage(conn_out)
@@ -647,7 +641,7 @@ def process_and_execute(
         logger = InvokeAILogger.getLogger()
         logger.handlers.clear()
         logger.addHandler(logging.StreamHandler(translator))
-
+        
     installer = ModelInstall(config, prediction_type_helper=lambda x: ask_user_for_prediction_type(x, conn_out))
     installer.install(selections)
 
@@ -685,9 +679,6 @@ def select_and_download_models(opt: Namespace):
     precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
     config.precision = precision
     helper = lambda x: ask_user_for_prediction_type(x)
-    # if do_listings(opt):
-    # pass
-
     installer = ModelInstall(config, prediction_type_helper=helper)
     if opt.list_models:
         installer.list_models(opt.list_models)
@@ -706,8 +697,6 @@ def select_and_download_models(opt: Namespace):
         # needed to support the probe() method running under a subprocess
         torch.multiprocessing.set_start_method("spawn")
 
-        # the third argument is needed in the Windows 11 environment in
-        # order to launch and resize a console window running this program
         set_min_terminal_size(MIN_COLS, MIN_LINES)
         installApp = AddModelApplication(opt)
         try:

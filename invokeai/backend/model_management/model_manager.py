@@ -456,7 +456,7 @@ class ModelManager(object):
                 raise ModelNotFoundException(f"Model not found - {model_key}")
 
         model_config = self.models[model_key]
-        model_path = self.app_config.root_path / model_config.path
+        model_path = self.app_config.models_path / model_config.path
 
         if not model_path.exists():
             if model_class.save_to_config:
@@ -623,7 +623,7 @@ class ModelManager(object):
             self.cache.uncache_model(cache_id)
 
         # if model inside invoke models folder - delete files
-        model_path = self.app_config.root_path / model_cfg.path
+        model_path = self.app_config.models_path / model_cfg.path
         cache_path = self._get_model_cache_path(model_path)
         if cache_path.exists():
             rmtree(str(cache_path))
@@ -656,8 +656,8 @@ class ModelManager(object):
         """
         # relativize paths as they go in - this makes it easier to move the root directory around
         if path := model_attributes.get("path"):
-            if Path(path).is_relative_to(self.app_config.root_path):
-                model_attributes["path"] = str(Path(path).relative_to(self.app_config.root_path))
+            if Path(path).is_relative_to(self.app_config.models_path):
+                model_attributes["path"] = str(Path(path).relative_to(self.app_config.models_path))
 
         model_class = MODEL_CLASSES[base_model][model_type]
         model_config = model_class.create_config(**model_attributes)
@@ -732,7 +732,7 @@ class ModelManager(object):
                 / new_name
             )
             move(old_path, new_path)
-            model_cfg.path = str(new_path.relative_to(self.app_config.root_path))
+            model_cfg.path = str(new_path.relative_to(self.app_config.models_path))
 
         # clean up caches
         old_model_cache = self._get_model_cache_path(old_path)
@@ -795,7 +795,7 @@ class ModelManager(object):
             info["path"] = (
                 str(new_diffusers_path)
                 if dest_directory
-                else str(new_diffusers_path.relative_to(self.app_config.root_path))
+                else str(new_diffusers_path.relative_to(self.app_config.models_path))
             )
             info.pop("config")
 
@@ -883,10 +883,17 @@ class ModelManager(object):
         new_models_found = False
 
         self.logger.info(f"Scanning {self.app_config.models_path} for new models")
-        with Chdir(self.app_config.root_path):
+        with Chdir(self.app_config.models_path):
             for model_key, model_config in list(self.models.items()):
                 model_name, cur_base_model, cur_model_type = self.parse_key(model_key)
-                model_path = self.app_config.root_path.absolute() / model_config.path
+                
+                # Patch for relative path bug in older models.yaml - paths should not
+                # be starting with a hard-coded 'models'. This will also fix up
+                # models.yaml when committed.
+                if model_config.path.startswith('models'):
+                    model_config.path = str(Path(*Path(model_config.path).parts[1:]))
+                
+                model_path = self.app_config.models_path.absolute() / model_config.path
                 if not model_path.exists():
                     model_class = MODEL_CLASSES[cur_base_model][cur_model_type]
                     if model_class.save_to_config:
@@ -919,8 +926,8 @@ class ModelManager(object):
                                 if model_key in self.models:
                                     raise DuplicateModelException(f"Model with key {model_key} added twice")
 
-                                if model_path.is_relative_to(self.app_config.root_path):
-                                    model_path = model_path.relative_to(self.app_config.root_path)
+                                if model_path.is_relative_to(self.app_config.models_path):
+                                    model_path = model_path.relative_to(self.app_config.models_path)
 
                                 model_config: ModelConfigBase = model_class.probe_config(str(model_path))
                                 self.models[model_key] = model_config
@@ -971,7 +978,7 @@ class ModelManager(object):
         # LS: hacky
         # Patch in the SD VAE from core so that it is available for use by the UI
         try:
-            self.heuristic_import({config.root_path / "models/core/convert/sd-vae-ft-mse"})
+            self.heuristic_import({config.models_path / "core/convert/sd-vae-ft-mse"})
         except:
             pass
 

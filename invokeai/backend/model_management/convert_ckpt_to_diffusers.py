@@ -63,7 +63,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionS
 from diffusers.pipelines.stable_diffusion.stable_unclip_image_normalizer import StableUnCLIPImageNormalizer
 
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.app.services.config import InvokeAIAppConfig, MODEL_CORE
+from invokeai.app.services.config import InvokeAIAppConfig
 
 from picklescan.scanner import scan_file_path
 from .models import BaseModelType, ModelVariantType
@@ -81,7 +81,7 @@ if is_accelerate_available():
     from accelerate.utils import set_module_tensor_to_device
 
 logger = InvokeAILogger.getLogger(__name__)
-CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().root_path / MODEL_CORE / "convert"
+CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().models_path / "core/convert"
 
 
 def shave_segments(path, n_shave_prefix_segments=1):
@@ -1281,7 +1281,7 @@ def download_from_original_stable_diffusion_ckpt(
     original_config = OmegaConf.load(original_config_file)
     if (
         model_version == BaseModelType.StableDiffusion2
-        and original_config["model"]["params"]["parameterization"] == "v"
+        and original_config["model"]["params"].get("parameterization") == "v"
     ):
         prediction_type = "v_prediction"
         upcast_attention = True

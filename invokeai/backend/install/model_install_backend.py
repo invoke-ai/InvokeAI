@@ -103,6 +103,7 @@ class ModelInstall(object):
         access_token: str = None,
     ):
         self.config = config
+        # force model manager to be a singleton
         self.mgr = model_manager or ModelManager(config.model_conf_path)
         self.datasets = OmegaConf.load(Dataset_path)
         self.prediction_helper = prediction_type_helper
@@ -273,6 +274,7 @@ class ModelInstall(object):
                 logger.error(f"Unable to download {url}. Skipping.")
             info = ModelProbe().heuristic_probe(location)
             dest = self.config.models_path / info.base_type.value / info.model_type.value / location.name
+            dest.parent.mkdir(parents=True, exist_ok=True)
             models_path = shutil.move(location, dest)
 
         # staged version will be garbage-collected at this time
@@ -346,7 +348,7 @@ class ModelInstall(object):
             if key in self.datasets:
                 description = self.datasets[key].get("description") or description
 
-        rel_path = self.relative_to_root(path)
+        rel_path = self.relative_to_root(path,self.config.models_path)
 
         attributes = dict(
             path=str(rel_path),
@@ -386,8 +388,8 @@ class ModelInstall(object):
             attributes.update(dict(config=str(legacy_conf)))
         return attributes
 
-    def relative_to_root(self, path: Path) -> Path:
-        root = self.config.root_path
+    def relative_to_root(self, path: Path, root: None) -> Path:
+        root = root or self.config.root_path
         if path.is_relative_to(root):
             return path.relative_to(root)
         else:
