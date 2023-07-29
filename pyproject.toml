@@ -59,13 +59,11 @@ dependencies = [
   "matplotlib",                 # needed for plotting of Penner easing functions
   "mediapipe",                  # needed for "mediapipeface" controlnet model
   "npyscreen",
-  "numpy==1.24.4",
   "omegaconf",
   "opencv-python",
   "picklescan",
   "pillow",
   "prompt-toolkit",
-  "pydantic==1.10.10",
   "pympler~=1.0.1",
   "pypatchmatch",
   'pyperclip',
