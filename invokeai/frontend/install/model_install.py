@@ -650,31 +650,6 @@ def process_and_execute(
         conn_out.send_bytes("*done*".encode("utf-8"))
         conn_out.close()
 
-
-def do_listings(opt) -> bool:
-    """List installed models of various sorts, and return
-    True if any were requested."""
-    model_manager = ModelManager(config.model_conf_path)
-    if opt.list_models == "diffusers":
-        print("Diffuser models:")
-        model_manager.print_models()
-    elif opt.list_models == "controlnets":
-        print("Installed Controlnet Models:")
-        cnm = model_manager.list_controlnet_models()
-        print(textwrap.indent("\n".join([x for x in cnm if cnm[x]]), prefix="   "))
-    elif opt.list_models == "loras":
-        print("Installed LoRA/LyCORIS Models:")
-        cnm = model_manager.list_lora_models()
-        print(textwrap.indent("\n".join([x for x in cnm if cnm[x]]), prefix="   "))
-    elif opt.list_models == "tis":
-        print("Installed Textual Inversion Embeddings:")
-        cnm = model_manager.list_ti_models()
-        print(textwrap.indent("\n".join([x for x in cnm if cnm[x]]), prefix="   "))
-    else:
-        return False
-    return True
-
-
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
     precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))

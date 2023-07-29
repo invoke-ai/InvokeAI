@@ -129,7 +129,7 @@ class ModelInstall(object):
             model_dict[key] = ModelLoadInfo(**value)
 
         # supplement with entries in models.yaml
-        installed_models = self.mgr.list_models()
+        installed_models = [x for x in self.mgr.list_models() if not self._is_autoloaded(x)]
 
         for md in installed_models:
             base = md["base_model"]
@@ -147,6 +147,18 @@ class ModelInstall(object):
                     installed=True,
                 )
         return {x: model_dict[x] for x in sorted(model_dict.keys(), key=lambda y: model_dict[y].name.lower())}
+
+    def _is_autoloaded(self, model_info: dict) -> bool:
+        path = model_info.get("path")
+        if not path:
+            return False
+        for autodir in ['autoimport_dir','lora_dir','embedding_dir','controlnet_dir']:
+            if autodir_path := getattr(self.config, autodir):
+                autodir_path = self.config.root_path / autodir_path
+                print(f'{path} => {autodir_path}; is_relative={Path(path).is_relative_to(autodir_path)}',file=log)
+                if Path(path).is_relative_to(autodir_path):
+                    return True
+        return False
 
     def list_models(self, model_type):
         installed = self.mgr.list_models(model_type=model_type)
