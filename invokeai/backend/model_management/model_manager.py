@@ -423,7 +423,7 @@ class ModelManager(object):
         return (model_name, base_model, model_type)
 
     def _get_model_cache_path(self, model_path):
-        return self.app_config.models_path / ".cache" / hashlib.md5(str(model_path).encode()).hexdigest()
+        return self.resolve_model_path(".cache" + '/' +  hashlib.md5(str(model_path).encode()).hexdigest())
 
     @classmethod
     def initialize_model_config(cls, config_path: Path):
@@ -456,7 +456,7 @@ class ModelManager(object):
                 raise ModelNotFoundException(f"Model not found - {model_key}")
 
         model_config = self.models[model_key]
-        model_path = self.app_config.models_path / model_config.path
+        model_path = self.resolve_model_path(model_config.path)
 
         if not model_path.exists():
             if model_class.save_to_config:
@@ -623,7 +623,7 @@ class ModelManager(object):
             self.cache.uncache_model(cache_id)
 
         # if model inside invoke models folder - delete files
-        model_path = self.app_config.models_path / model_cfg.path
+        model_path = self.resolve_model_path(model_cfg.path)
         cache_path = self._get_model_cache_path(model_path)
         if cache_path.exists():
             rmtree(str(cache_path))
@@ -782,7 +782,7 @@ class ModelManager(object):
             **submodel,
         )
         checkpoint_path = self.app_config.root_path / info["path"]
-        old_diffusers_path = self.app_config.models_path / model.location
+        old_diffusers_path = self.resolve_model_path(model.location)
         new_diffusers_path = (
             dest_directory or self.app_config.models_path / base_model.value / model_type.value
         ) / model_name
@@ -809,6 +809,9 @@ class ModelManager(object):
             checkpoint_path.unlink()
 
         return result
+
+    def resolve_model_path(self, path: str) -> Path:
+        return self.app_config.models_path / path
 
     def search_models(self, search_folder):
         self.logger.info(f"Finding Models In: {search_folder}")
