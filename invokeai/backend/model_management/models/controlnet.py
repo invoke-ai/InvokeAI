@@ -17,7 +17,7 @@ from .base import (
     ModelNotFoundException,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
-
+import invokeai.backend.util.logging as logger
 
 class ControlNetModelFormat(str, Enum):
     Checkpoint = "checkpoint"
@@ -66,7 +66,7 @@ class ControlNetModel(ModelBase):
         child_type: Optional[SubModelType] = None,
     ):
         if child_type is not None:
-            raise Exception("There is no child models in controlnet model")
+            raise Exception("There are no child models in controlnet model")
 
         model = None
         for variant in ["fp16", None]:
@@ -123,10 +123,7 @@ class ControlNetModel(ModelBase):
         else:
             return model_path
 
-
-@classmethod
 def _convert_controlnet_ckpt_and_cache(
-    cls,
     model_path: str,
     output_path: str,
     base_model: BaseModelType,
@@ -140,7 +137,8 @@ def _convert_controlnet_ckpt_and_cache(
     app_config = InvokeAIAppConfig.get_config()
     weights = app_config.root_path / model_path
     output_path = Path(output_path)
-
+    
+    logger.info(f"Converting {weights} to diffusers format")
     # return cached version if it exists
     if output_path.exists():
         return output_path
