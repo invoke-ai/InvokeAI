@@ -1070,7 +1070,7 @@ def convert_controlnet_checkpoint(
     extract_ema,
     use_linear_projection=None,
     cross_attention_dim=None,
-    precision: torch.dtype = None,
+    precision: Optional[torch.dtype] = None,
 ):
     ctrlnet_config = create_unet_diffusers_config(original_config, image_size=image_size, controlnet=True)
     ctrlnet_config["upcast_attention"] = upcast_attention
@@ -1120,7 +1120,7 @@ def download_from_original_stable_diffusion_ckpt(
     prediction_type: str = None,
     model_type: str = None,
     extract_ema: bool = False,
-    precision: torch.dtype = None,
+    precision: Optional[torch.dtype] = None,
     scheduler_type: str = "pndm",
     num_in_channels: Optional[int] = None,
     upcast_attention: Optional[bool] = None,
@@ -1647,7 +1647,7 @@ def download_controlnet_from_original_ckpt(
     original_config_file: str,
     image_size: int = 512,
     extract_ema: bool = False,
-    precision: torch.dtype = None,
+    precision: Optional[torch.dtype] = None,
     num_in_channels: Optional[int] = None,
     upcast_attention: Optional[bool] = None,
     device: str = None,
