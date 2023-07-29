@@ -1,19 +1,20 @@
+import inspect
 import json
 import os
 import sys
 import typing
-import inspect
-from enum import Enum
 from abc import ABCMeta, abstractmethod
-from pathlib import Path
-from picklescan.scanner import scan_file_path
-import torch
-import safetensors.torch
-from diffusers import DiffusionPipeline, ConfigMixin
-
+from collections import defaultdict
 from contextlib import suppress
-from pydantic import BaseModel, Field
+from enum import Enum
+from pathlib import Path
 from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
+
+import safetensors.torch
+import torch
+from diffusers import DiffusionPipeline, ConfigMixin
+from picklescan.scanner import scan_file_path
+from pydantic import BaseModel, Field
 
 
 class DuplicateModelException(Exception):
@@ -382,7 +383,7 @@ def _calc_model_by_data(model) -> int:
     return mem
 
 
-def _fast_safetensors_reader(path: str):
+def _fast_safetensors_reader(path: Union[str, Path]):
     checkpoint = dict()
     device = torch.device("meta")
     with open(path, "rb") as f:
@@ -413,6 +414,27 @@ def _fast_safetensors_reader(path: str):
 
     return checkpoint
 
+def calc_sizes_by_dtype(safetensor: Path) -> dict[torch.dtype, int]:
+    """Sum the sizes of all the tensors, grouped by dtype."""
+    tensors = _fast_safetensors_reader(safetensor)
+
+    sizes = defaultdict(int)
+
+    for (key, tensor) in tensors.items():
+        size = tensor.element_size() * tensor.numel()
+        sizes[tensor.dtype] += size
+
+    return sizes
+
+def calc_safetensor_dtype(safetensor: Path) -> torch.dtype:
+    """Find the predominant tensor data type.
+
+    If the file contains multiple types of tensors, return the type with the largest
+    number of bytes allocated to it.
+    """
+    sizes = list(calc_sizes_by_dtype(safetensor).items())
+    sizes.sort(key=lambda x: x[1], reverse=True)
+    return sizes[0][0]
 
 def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
     if str(path).endswith(".safetensors"):
