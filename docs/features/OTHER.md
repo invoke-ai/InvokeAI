@@ -16,21 +16,24 @@ Output Example:
 
 ---
 
-## **Seamless Tiling**
+## **Invisible Watermark**
 
-The seamless tiling mode causes generated images to seamlessly tile
-with itself creating repetitive wallpaper-like patterns. To use it,
-activate the Seamless Tiling option in the Web GUI and then select
-whether to tile on the X (horizontal) and/or Y (vertical) axes. Tiling
-will then be active for the next set of generations.
+In keeping with the principles for responsible AI generation, and to
+help AI researchers avoid synthetic images contaminating their
+training sets, InvokeAI adds an invisible watermark to each of the
+final images it generates. The watermark consists of the text
+"InvokeAI" and can be viewed using the
+[invisible-watermarks](https://github.com/ShieldMnt/invisible-watermark)
+tool.
 
-A nice prompt to test seamless tiling with is:
+Watermarking is controlled using the `invisible-watermark` setting in
+`invokeai.yaml`. To turn it off, add the following line under the `Features`
+category.
 
 ```
-pond garden with lotus by claude monet"
+invisible_watermark: false
 ```
 
----
 
 ## **Weighted Prompts**
 
@@ -39,34 +42,10 @@ priority to them, by adding `:<percent>` to the end of the section you wish to u
 example consider this prompt:
 
 ```bash
-tabby cat:0.25 white duck:0.75 hybrid
+(tabby cat):0.25 (white duck):0.75 hybrid
 ```
 
 This will tell the sampler to invest 25% of its effort on the tabby cat aspect of the image and 75%
 on the white duck aspect (surprisingly, this example actually works). The prompt weights can use any
 combination of integers and floating point numbers, and they do not need to add up to 1.
 
-## **Thresholding and Perlin Noise Initialization Options**
-
-Under the Noise section of the Web UI, you will find two options named
-Perlin Noise and Noise Threshold. [Perlin
-noise](https://en.wikipedia.org/wiki/Perlin_noise) is a type of
-structured noise used to simulate terrain and other natural
-textures. The slider controls the percentage of perlin noise that will
-be mixed into the image at the beginning of generation. Adding a little
-perlin noise to a generation will alter the image substantially.
-
-The noise threshold limits the range of the latent values during
-sampling and helps combat the oversharpening seem with higher CFG
-scale values.
-
-For better intuition into what these options do in practice:
-
-![here is a graphic demonstrating them both](../assets/truncation_comparison.jpg)
-
-In generating this graphic, perlin noise at initialization was
-programmatically varied going across on the diagram by values 0.0,
-0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 0.9, 1.0; and the threshold was varied
-going down from 0, 1, 2, 3, 4, 5, 10, 20, 100. The other options are
-fixed using the prompt "a portrait of a beautiful young lady" a CFG of
-20, 100 steps, and a seed of 1950357039.

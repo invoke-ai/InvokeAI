@@ -3,7 +3,9 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
@@ -37,6 +39,7 @@ export const buildLinearSDXLTextToImageGraph = (
   const {
     positiveStylePrompt,
     negativeStylePrompt,
+    shouldConcatSDXLStylePrompt,
     shouldUseSDXLRefiner,
     refinerStart,
   } = state.sdxl;
@@ -72,13 +75,17 @@ export const buildLinearSDXLTextToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: positiveStylePrompt,
+        style: shouldConcatSDXLStylePrompt
+          ? `${positivePrompt} ${positiveStylePrompt}`
+          : positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: negativeStylePrompt,
+        style: shouldConcatSDXLStylePrompt
+          ? `${negativePrompt} ${negativeStylePrompt}`
+          : negativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
@@ -246,6 +253,17 @@ export const buildLinearSDXLTextToImageGraph = (
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph);
+  }
 
   return graph;
 };

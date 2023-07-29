@@ -1,13 +1,10 @@
 import { logger } from 'app/logging/logger';
+import { LIST_TAG } from 'services/api';
+import { appInfoApi } from 'services/api/endpoints/appInfo';
 import { modelsApi } from 'services/api/endpoints/models';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
 import { startAppListening } from '../..';
-import {
-  ALL_BASE_MODELS,
-  NON_REFINER_BASE_MODELS,
-  REFINER_BASE_MODELS,
-} from 'services/api/constants';
 
 export const addSocketConnectedEventListener = () => {
   startAppListening({
@@ -29,15 +26,18 @@ export const addSocketConnectedEventListener = () => {
       dispatch(appSocketConnected(action.payload));
 
       // update all server state
-      dispatch(modelsApi.endpoints.getMainModels.initiate(REFINER_BASE_MODELS));
       dispatch(
-        modelsApi.endpoints.getMainModels.initiate(NON_REFINER_BASE_MODELS)
+        modelsApi.util.invalidateTags([
+          { type: 'MainModel', id: LIST_TAG },
+          { type: 'SDXLRefinerModel', id: LIST_TAG },
+          { type: 'LoRAModel', id: LIST_TAG },
+          { type: 'ControlNetModel', id: LIST_TAG },
+          { type: 'VaeModel', id: LIST_TAG },
+          { type: 'TextualInversionModel', id: LIST_TAG },
+          { type: 'ScannedModels', id: LIST_TAG },
+        ])
       );
-      dispatch(modelsApi.endpoints.getMainModels.initiate(ALL_BASE_MODELS));
-      dispatch(modelsApi.endpoints.getControlNetModels.initiate());
-      dispatch(modelsApi.endpoints.getLoRAModels.initiate());
-      dispatch(modelsApi.endpoints.getTextualInversionModels.initiate());
-      dispatch(modelsApi.endpoints.getVaeModels.initiate());
+      dispatch(appInfoApi.util.invalidateTags(['AppConfig', 'AppVersion']));
     },
   });
 };

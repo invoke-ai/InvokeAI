@@ -20,6 +20,7 @@ from diffusers.models.controlnet import ControlNetConditioningEmbedding, Control
 
 # Modified ControlNetModel with encoder_attention_mask argument added
 
+
 class ControlNetModel(ModelMixin, ConfigMixin):
     """
     A ControlNet model.
@@ -618,9 +619,7 @@ class ControlNetModel(ModelMixin, ConfigMixin):
             mid_block_res_sample = mid_block_res_sample * conditioning_scale
 
         if self.config.global_pool_conditions:
-            down_block_res_samples = [
-                torch.mean(sample, dim=(2, 3), keepdim=True) for sample in down_block_res_samples
-            ]
+            down_block_res_samples = [torch.mean(sample, dim=(2, 3), keepdim=True) for sample in down_block_res_samples]
             mid_block_res_sample = torch.mean(mid_block_res_sample, dim=(2, 3), keepdim=True)
 
         if not return_dict:
@@ -629,6 +628,7 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         return ControlNetOutput(
             down_block_res_samples=down_block_res_samples, mid_block_res_sample=mid_block_res_sample
         )
+
 
 diffusers.ControlNetModel = ControlNetModel
 diffusers.models.controlnet.ControlNetModel = ControlNetModel
