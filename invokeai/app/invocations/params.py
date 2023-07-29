@@ -6,8 +6,7 @@ from pydantic import Field
 
 from invokeai.app.invocations.prompt import PromptOutput
 
-from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
-                             InvocationConfig, InvocationContext)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
 from .math import FloatOutput, IntOutput
 
 # Pass-through parameter nodes - used by subgraphs
@@ -67,6 +66,7 @@ class ParamStringInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> StringOutput:
         return StringOutput(text=self.text)
+
 
 class ParamPromptInvocation(BaseInvocation):
     """A prompt input parameter"""
