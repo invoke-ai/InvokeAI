@@ -19,6 +19,7 @@ from .base import (
 from invokeai.app.services.config import InvokeAIAppConfig
 import invokeai.backend.util.logging as logger
 
+
 class ControlNetModelFormat(str, Enum):
     Checkpoint = "checkpoint"
     Diffusers = "diffusers"
@@ -123,6 +124,7 @@ class ControlNetModel(ModelBase):
         else:
             return model_path
 
+
 def _convert_controlnet_ckpt_and_cache(
     model_path: str,
     output_path: str,
@@ -137,7 +139,7 @@ def _convert_controlnet_ckpt_and_cache(
     app_config = InvokeAIAppConfig.get_config()
     weights = app_config.root_path / model_path
     output_path = Path(output_path)
-    
+
     logger.info(f"Converting {weights} to diffusers format")
     # return cached version if it exists
     if output_path.exists():

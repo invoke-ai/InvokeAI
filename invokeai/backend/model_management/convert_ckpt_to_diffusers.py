@@ -1252,7 +1252,7 @@ def download_from_original_stable_diffusion_ckpt(
         checkpoint = checkpoint["state_dict"]
 
     logger.debug(f"model_type = {model_type}; original_config_file = {original_config_file}")
-    
+
     precision_probing_key = "model.diffusion_model.input_blocks.0.0.bias"
     logger.debug(f"original checkpoint precision == {checkpoint[precision_probing_key].dtype}")
     precision = precision or checkpoint[precision_probing_key].dtype
@@ -1284,9 +1284,9 @@ def download_from_original_stable_diffusion_ckpt(
         original_config_file = BytesIO(requests.get(config_url).content)
 
     original_config = OmegaConf.load(original_config_file)
-    if original_config['model']['params'].get('use_ema') is not None:
-        extract_ema = original_config['model']['params']['use_ema']
-    
+    if original_config["model"]["params"].get("use_ema") is not None:
+        extract_ema = original_config["model"]["params"]["use_ema"]
+
     if (
         model_version == BaseModelType.StableDiffusion2
         and original_config["model"]["params"].get("parameterization") == "v"
@@ -1689,9 +1689,9 @@ def download_controlnet_from_original_ckpt(
         checkpoint = checkpoint["state_dict"]
 
     # use original precision
-    precision_probing_key = 'input_blocks.0.0.bias'
+    precision_probing_key = "input_blocks.0.0.bias"
     ckpt_precision = checkpoint[precision_probing_key].dtype
-    logger.debug(f'original controlnet precision = {ckpt_precision}')
+    logger.debug(f"original controlnet precision = {ckpt_precision}")
     precision = precision or ckpt_precision
 
     original_config = OmegaConf.load(original_config_file)
