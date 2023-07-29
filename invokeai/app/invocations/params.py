@@ -85,4 +85,4 @@ class ParamPromptInvocation(BaseInvocation):
         }
 
     def invoke(self, context: InvocationContext) -> PromptOutput:
-        return StringOutput(prompt=self.prompt)
+        return PromptOutput(prompt=self.prompt)

@@ -5620,12 +5620,6 @@ export type components = {
       prompt?: string;
     };
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * ControlNetModelFormat 
      * @description An enumeration. 
      * @enum {string}
@@ -5637,6 +5631,12 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionXLModelFormat 
      * @description An enumeration. 
