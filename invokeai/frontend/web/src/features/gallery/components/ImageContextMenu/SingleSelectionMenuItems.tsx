@@ -102,8 +102,19 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
-    recallBothPrompts(metadata?.positive_prompt, metadata?.negative_prompt);
-  }, [metadata?.negative_prompt, metadata?.positive_prompt, recallBothPrompts]);
+    recallBothPrompts(
+      metadata?.positive_prompt,
+      metadata?.negative_prompt,
+      metadata?.positive_style_prompt,
+      metadata?.negative_style_prompt
+    );
+  }, [
+    metadata?.negative_prompt,
+    metadata?.positive_prompt,
+    metadata?.positive_style_prompt,
+    metadata?.negative_style_prompt,
+    recallBothPrompts,
+  ]);
 
   const handleRecallSeed = useCallback(() => {
     recallSeed(metadata?.seed);
