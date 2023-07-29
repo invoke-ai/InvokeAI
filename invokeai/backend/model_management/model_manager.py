@@ -386,13 +386,21 @@ class ModelManager(object):
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
+        rescan = False
     ) -> bool:
         """
         Given a model name, returns True if it is a valid
         identifier.
         """
         model_key = self.create_key(model_name, base_model, model_type)
-        return model_key in self.models
+        exists = model_key in self.models
+
+        # if model not found try to find it (maybe file just pasted)
+        if rescan and not exists:
+            self.scan_models_directory(base_model=base_model, model_type=model_type)
+            exists = model_key in self.models
+
+        return exists
 
     @classmethod
     def create_key(
@@ -449,11 +457,8 @@ class ModelManager(object):
         model_class = self._get_implementation(base_model, model_type)
         model_key = self.create_key(model_name, base_model, model_type)
 
-        # if model not found try to find it (maybe file just pasted)
-        if model_key not in self.models:
-            self.scan_models_directory(base_model=base_model, model_type=model_type)
-            if model_key not in self.models:
-                raise ModelNotFoundException(f"Model not found - {model_key}")
+        if not self.model_exists(model_name, base_model, model_type, rescan=True):
+            raise ModelNotFoundException(f"Model not found - {model_key}")
 
         model_config = self.models[model_key]
         model_path = self.app_config.root_path / model_config.path
