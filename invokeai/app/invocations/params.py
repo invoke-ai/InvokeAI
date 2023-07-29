@@ -4,7 +4,10 @@ from typing import Literal
 
 from pydantic import Field
 
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
+from invokeai.app.invocations.prompt import PromptOutput
+
+from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
+                             InvocationConfig, InvocationContext)
 from .math import FloatOutput, IntOutput
 
 # Pass-through parameter nodes - used by subgraphs
@@ -64,3 +67,17 @@ class ParamStringInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> StringOutput:
         return StringOutput(text=self.text)
+
+class ParamPromptInvocation(BaseInvocation):
+    """A prompt input parameter"""
+
+    type: Literal["param_prompt"] = "param_prompt"
+    prompt: str = Field(default="", description="The prompt value")
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {"tags": ["param", "prompt"], "title": "Prompt"},
+        }
+
+    def invoke(self, context: InvocationContext) -> PromptOutput:
+        return PromptOutput(prompt=self.prompt)
