@@ -26,8 +26,8 @@ const StringInputFieldComponent = (
     );
   };
 
-  return field.name.toLowerCase() === 'prompt' ? (
-    <Textarea onChange={handleValueChanged} value={field.value} rows={5} />
+  return ['prompt', 'style'].includes(field.name.toLowerCase()) ? (
+    <Textarea onChange={handleValueChanged} value={field.value} rows={2} />
   ) : (
     <Input onChange={handleValueChanged} value={field.value} />
   );
