@@ -80,11 +80,11 @@ Q&A</a>]
 
 !!! note
 
-    This fork is rapidly evolving. Please use the [Issues tab](https://github.com/invoke-ai/InvokeAI/issues) to report bugs and make feature requests. Be sure to use the provided templates. They will help aid diagnose issues faster.
+    This software is rapidly evolving. Please use the [Issues tab](https://github.com/invoke-ai/InvokeAI/issues) to report bugs and make feature requests. Be sure to use the provided templates. They will help aid diagnose issues faster.
 
 ## :octicons-package-dependencies-24: Installation
 
-This fork is supported across Linux, Windows and Macintosh. Linux users can use
+This software is supported across Linux, Windows and Macintosh. Linux users can use
 either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
 driver).
 
@@ -95,6 +95,8 @@ driver).
 This method is recommended for experienced users and developers
 #### [Docker Installation](installation/040_INSTALL_DOCKER.md)
 This method is recommended for those familiar with running Docker containers
+#### [Installation Troubleshooting](installation/010_INSTALL_AUTOMATED.md#troubleshooting)
+Installation troubleshooting guide.
 ### Other Installation Guides
   - [PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md)
   - [XFormers](installation/070_INSTALL_XFORMERS.md)
@@ -230,7 +232,7 @@ encouraged to do so.
 
 ## :octicons-person-24: Contributors
 
-This fork is a combined effort of various people from across the world.
+This software is a combined effort of various people from across the world.
 [Check out the list of all these amazing people](other/CONTRIBUTORS.md). We
 thank them for their time, hard work and effort.
 

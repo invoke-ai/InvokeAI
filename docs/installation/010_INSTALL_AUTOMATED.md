@@ -372,7 +372,70 @@ experimental versions later.
         Once InvokeAI is installed, do not move or remove this directory."
 
 
+<a name="troubleshooting"></a>
 ## Troubleshooting
+
+### _OSErrors on Windows while installing dependencies_
+
+During a zip file installation or an online update, installation stops
+with an error like this:
+
+![broken-dependency-screenshot](../assets/troubleshooting/broken-dependency.png){:width="800px"}
+
+This seems to happen particularly often with the `pydantic` and
+`numpy` packages. The most reliable solution requires several manual
+steps to complete installation.
+
+Open up a Powershell window and navigate to the `invokeai` directory
+created by the installer. Then give the following series of commands:
+
+```cmd
+rm .\.venv -r -force
+python -mvenv .venv
+.\.venv\Scripts\activate
+pip install invokeai
+invokeai-configure --root .
+```
+
+If you see anything marked as an error during this process please stop
+and seek help on the Discord [installation support
+channel](https://discord.com/channels/1020123559063990373/1041391462190956654). A
+few warning messages are OK.
+
+If you are updating from a previous version, this should restore your
+system to a working state. If you are installing from scratch, there
+is one additional command to give:
+
+```cmd
+wget -O invoke.bat https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/installer/templates/invoke.bat.in
+```
+
+This will create the `invoke.bat` script needed to launch InvokeAI and
+its related programs.
+
+
+### _Stable Diffusion XL Generation Fails after Trying to Load unet_
+
+InvokeAI is working in other respects, but when trying to generate
+images with Stable Diffusion XL you get a "Server Error". The text log
+in the launch window contains this log line above several more lines of
+error messages:
+
+```INFO --> Loading model:D:\LONG\PATH\TO\MODEL, type sdxl:main:unet```
+
+This failure mode occurs when there is a network glitch during
+downloading the very large SDXL model.
+
+To address this, first go to the Web Model Manager and delete the
+Stable-Diffusion-XL-base-1.X model. Then navigate to HuggingFace and
+manually download the .safetensors version of the model. The 1.0
+version is located at
+https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/tree/main
+and the file is named `sd_xl_base_1.0.safetensors`.
+
+Save this file to disk and then reenter the Model Manager. Navigate to
+Import Models->Add Model, then type (or drag-and-drop) the path to the
+.safetensors file. Press "Add Model".
 
 ### _Package dependency conflicts_
 
