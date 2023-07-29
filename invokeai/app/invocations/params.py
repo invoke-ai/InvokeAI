@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import Field
 
+from invokeai.app.invocations.prompt import PromptOutput
+
 from .baseinvocation import (BaseInvocation, BaseInvocationOutput,
                              InvocationConfig, InvocationContext)
 from .math import FloatOutput, IntOutput
@@ -65,13 +67,6 @@ class ParamStringInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> StringOutput:
         return StringOutput(text=self.text)
-
-class PromptOutput(BaseInvocationOutput):
-    """A string output"""
-
-    type: Literal["prompt_output"] = "prompt_output"
-    prompt: str = Field(default=None, description="The output prompt")
-
 
 class ParamPromptInvocation(BaseInvocation):
     """A prompt input parameter"""
