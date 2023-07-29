@@ -423,7 +423,7 @@ class ModelManager(object):
         return (model_name, base_model, model_type)
 
     def _get_model_cache_path(self, model_path):
-        return self.resolve_model_path(".cache" + "/" + hashlib.md5(str(model_path).encode()).hexdigest())
+        return self.resolve_model_path(Path(".cache") / hashlib.md5(str(model_path).encode()).hexdigest())
 
     @classmethod
     def initialize_model_config(cls, config_path: Path):
