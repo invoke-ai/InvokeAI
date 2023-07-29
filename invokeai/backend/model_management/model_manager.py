@@ -723,13 +723,11 @@ class ModelManager(object):
 
         # if this is a model file/directory that we manage ourselves, we need to move it
         if old_path.is_relative_to(self.app_config.models_path):
-            new_path = (
-                self.resolve_model_path(
-                    Path(
-                        BaseModelType(new_base).value,
-                        ModelType(model_type).value,
-                        new_name,
-                        )
+            new_path = self.resolve_model_path(
+                Path(
+                    BaseModelType(new_base).value,
+                    ModelType(model_type).value,
+                    new_name,
                 )
             )
             move(old_path, new_path)
@@ -811,7 +809,7 @@ class ModelManager(object):
 
         return result
 
-    def resolve_model_path(self, path: Union[Path,str]) -> Path:
+    def resolve_model_path(self, path: Union[Path, str]) -> Path:
         """return relative paths based on configured models_path"""
         return self.app_config.models_path / path
 
@@ -935,7 +933,7 @@ class ModelManager(object):
                             try:
                                 if model_key in self.models:
                                     raise DuplicateModelException(f"Model with key {model_key} added twice")
-                                
+
                                 model_path = self.relative_model_path(model_path)
                                 model_config: ModelConfigBase = model_class.probe_config(str(model_path))
                                 self.models[model_key] = model_config

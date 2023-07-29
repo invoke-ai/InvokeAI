@@ -152,10 +152,9 @@ class ModelInstall(object):
         path = model_info.get("path")
         if not path:
             return False
-        for autodir in ['autoimport_dir','lora_dir','embedding_dir','controlnet_dir']:
+        for autodir in ["autoimport_dir", "lora_dir", "embedding_dir", "controlnet_dir"]:
             if autodir_path := getattr(self.config, autodir):
                 autodir_path = self.config.root_path / autodir_path
-                print(f'{path} => {autodir_path}; is_relative={Path(path).is_relative_to(autodir_path)}',file=log)
                 if Path(path).is_relative_to(autodir_path):
                     return True
         return False

@@ -650,6 +650,7 @@ def process_and_execute(
         conn_out.send_bytes("*done*".encode("utf-8"))
         conn_out.close()
 
+
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
     precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
