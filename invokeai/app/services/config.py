@@ -171,7 +171,6 @@ from pydantic import BaseSettings, Field, parse_obj_as
 from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path("invokeai.yaml")
-MODEL_CORE = Path("models/core")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 
@@ -357,7 +356,7 @@ def _find_root() -> Path:
     venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
         root = Path(os.environ.get("INVOKEAI_ROOT")).resolve()
-    elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE, MODEL_CORE]]):
+    elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]]):
         root = (venv.parent).resolve()
     else:
         root = Path("~/invokeai").expanduser().resolve()

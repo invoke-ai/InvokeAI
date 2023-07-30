@@ -112,7 +112,7 @@ def main():
 
     extras = get_extras()
 
-    print(f":crossed_fingers: Upgrading to [yellow]{tag if tag else release}[/yellow]")
+    print(f":crossed_fingers: Upgrading to [yellow]{tag or release or branch}[/yellow]")
     if release:
         cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_SRC}/{release}.zip" --use-pep517 --upgrade'
     elif tag:
