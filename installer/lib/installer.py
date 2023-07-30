@@ -249,7 +249,7 @@ class InvokeAiInstance:
             pip[
                 "install",
                 "--require-virtualenv",
-                "numpy~=1.24.0",           # choose versions that won't be uninstalled during phase 2
+                "numpy~=1.24.0",  # choose versions that won't be uninstalled during phase 2
                 "urllib3~=1.26.0",
                 "requests~=2.28.0",
                 "torch~=2.0.0",
