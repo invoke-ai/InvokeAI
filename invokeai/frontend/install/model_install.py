@@ -650,7 +650,7 @@ def process_and_execute(
 ):
     # need to reinitialize config in subprocess
     config = InvokeAIAppConfig.get_config()
-    config.parse_args()
+    config.parse_args(['--root',opt.root])
 
     # set up so that stderr is sent to conn_out
     if conn_out:

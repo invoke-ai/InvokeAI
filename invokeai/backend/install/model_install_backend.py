@@ -7,7 +7,7 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import List, Dict, Callable, Union, Set
+from typing import List, Dict, Callable, Union, Set, Optional
 
 import requests
 from diffusers import DiffusionPipeline
@@ -400,7 +400,7 @@ class ModelInstall(object):
             attributes.update(dict(config=str(legacy_conf)))
         return attributes
 
-    def relative_to_root(self, path: Path, root: None) -> Path:
+    def relative_to_root(self, path: Path, root: Optional[Path] = None) -> Path:
         root = root or self.config.root_path
         if path.is_relative_to(root):
             return path.relative_to(root)
