@@ -382,10 +382,9 @@ class ModelManager(object):
         # causing otherwise unreferenced models to be removed from memory
         self._read_models()
 
-    def model_exists(self, model_name: str, base_model: BaseModelType, model_type: ModelType, rescan=False) -> bool:
+    def model_exists(self, model_name: str, base_model: BaseModelType, model_type: ModelType, *, rescan=False) -> bool:
         """
-        Given a model name, returns True if it is a valid
-        identifier.
+        Given a model name, returns True if it is a valid identifier.
         """
         model_key = self.create_key(model_name, base_model, model_type)
         exists = model_key in self.models
@@ -393,7 +392,7 @@ class ModelManager(object):
         # if model not found try to find it (maybe file just pasted)
         if rescan and not exists:
             self.scan_models_directory(base_model=base_model, model_type=model_type)
-            exists = model_key in self.models
+            exists = self.model_exists(model_name, base_model, model_type, rescan=False)
 
         return exists
 
