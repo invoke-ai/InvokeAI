@@ -174,6 +174,7 @@ INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 
+
 class InvokeAISettings(BaseSettings):
     """
     Runtime configuration settings in which default values are
@@ -273,7 +274,7 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def _excluded(self) -> List[str]:
         # internal fields that shouldn't be exposed as command line options
-        return ["type", "initconf","cached_root"]
+        return ["type", "initconf", "cached_root"]
 
     @classmethod
     def _excluded_from_yaml(self) -> List[str]:
@@ -361,6 +362,7 @@ def _find_root() -> Path:
     else:
         root = Path("~/invokeai").expanduser().resolve()
     return root
+
 
 class InvokeAIAppConfig(InvokeAISettings):
     """
