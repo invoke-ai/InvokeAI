@@ -128,7 +128,9 @@ class ModelInstall(object):
             model_dict[key] = ModelLoadInfo(**value)
 
         # supplement with entries in models.yaml
-        installed_models = [x for x in self.mgr.list_models() if not self._is_autoloaded(x)]
+        installed_models = [x for x in self.mgr.list_models()]
+        # suppresses autoloaded models
+        # installed_models = [x for x in self.mgr.list_models() if not self._is_autoloaded(x)]
 
         for md in installed_models:
             base = md["base_model"]
