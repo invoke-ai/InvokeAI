@@ -123,6 +123,7 @@ class StableDiffusion1Model(DiffusersModel):
             return _convert_ckpt_and_cache(
                 version=BaseModelType.StableDiffusion1,
                 model_config=config,
+                load_safety_checker=False,
                 output_path=output_path,
             )
         else:
