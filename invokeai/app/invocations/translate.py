@@ -12,14 +12,16 @@ from .params import StringOutput
 translate_available = False
 try:
     import translators as ts
+
     translate_available = True
 except:
     pass
 
 DEFAULT_PROMPT = "" if translate_available else "To use this node, please 'pip install --upgrade translators'"
 
+
 class TranslateInvocation(BaseInvocation):
-    """ Use the translators package to translate 330 languages into English prompts """
+    """Use the translators package to translate 330 languages into English prompts"""
 
     # fmt: off
     type: Literal["translate"] = "translate"
@@ -35,6 +37,4 @@ class TranslateInvocation(BaseInvocation):
         }
 
     def invoke(self, context: InvocationContext) -> StringOutput:
-        return StringOutput(
-            text = ts.translate_text(self.prompt)
-        )
+        return StringOutput(text=ts.translate_text(self.prompt))
