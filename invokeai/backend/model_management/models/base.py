@@ -292,7 +292,7 @@ class DiffusersModel(ModelBase):
                 )
                 break
             except Exception as e:
-                if not str(e).startswith('Error no file'):
+                if not str(e).startswith("Error no file"):
                     print("====ERR LOAD====")
                     print(f"{variant}: {e}")
                 pass

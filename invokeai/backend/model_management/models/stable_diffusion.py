@@ -22,6 +22,7 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from omegaconf import OmegaConf
 
+
 class StableDiffusion1ModelFormat(str, Enum):
     Checkpoint = "checkpoint"
     Diffusers = "diffusers"
@@ -264,7 +265,7 @@ def _convert_ckpt_and_cache(
     config_file = app_config.root_path / model_config.config
     output_path = Path(output_path)
     variant = model_config.variant
-    pipeline_class = StableDiffusionInpaintPipeline if variant=='inpaint' else StableDiffusionPipeline
+    pipeline_class = StableDiffusionInpaintPipeline if variant == "inpaint" else StableDiffusionPipeline
 
     # return cached version if it exists
     if output_path.exists():
