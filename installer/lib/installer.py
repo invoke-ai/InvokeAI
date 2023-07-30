@@ -149,7 +149,7 @@ class Installer:
         return venv_dir
 
     def install(
-        self, root: str = "~/invokeai-3", version: str = "latest", yes_to_all=False, find_links: Path = None
+        self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False, find_links: Path = None
     ) -> None:
         """
         Install the InvokeAI application into the given runtime path
@@ -168,7 +168,8 @@ class Installer:
 
         messages.welcome()
 
-        self.dest = Path(root).expanduser().resolve() if yes_to_all else messages.dest_path(root)
+        default_path = os.environ.get("INVOKEAI_ROOT") or Path(root).expanduser().resolve()
+        self.dest = default_path if yes_to_all else messages.dest_path(root)
 
         # create the venv for the app
         self.venv = self.app_venv()
