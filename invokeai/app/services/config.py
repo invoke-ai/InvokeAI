@@ -174,7 +174,6 @@ INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 
-
 class InvokeAISettings(BaseSettings):
     """
     Runtime configuration settings in which default values are
@@ -274,7 +273,7 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def _excluded(self) -> List[str]:
         # internal fields that shouldn't be exposed as command line options
-        return ["type", "initconf"]
+        return ["type", "initconf","cached_root"]
 
     @classmethod
     def _excluded_from_yaml(self) -> List[str]:
@@ -290,6 +289,7 @@ class InvokeAISettings(BaseSettings):
             "restore",
             "root",
             "nsfw_checker",
+            "cached_root",
         ]
 
     class Config:
@@ -362,7 +362,6 @@ def _find_root() -> Path:
         root = Path("~/invokeai").expanduser().resolve()
     return root
 
-
 class InvokeAIAppConfig(InvokeAISettings):
     """
     Generate images using Stable Diffusion. Use "invokeai" to launch
@@ -423,6 +422,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
+    cached_root         : Path = Field(default=None,  description="internal use only", category="DEPRECATED")
     # fmt: on
 
     def parse_args(self, argv: List[str] = None, conf: DictConfig = None, clobber=False):
@@ -470,10 +470,15 @@ class InvokeAIAppConfig(InvokeAISettings):
         """
         Path to the runtime root directory
         """
-        if self.root:
-            return Path(self.root).expanduser().absolute()
+        # we cache value of root to protect against it being '.' and the cwd changing
+        if self.cached_root:
+            root = self.cached_root
+        elif self.root:
+            root = Path(self.root).expanduser().absolute()
         else:
-            return self.find_root()
+            root = self.find_root()
+        self.cached_root = root
+        return self.cached_root
 
     @property
     def root_dir(self) -> Path:
