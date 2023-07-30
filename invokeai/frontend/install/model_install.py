@@ -58,6 +58,9 @@ logger = InvokeAILogger.getLogger()
 # from https://stackoverflow.com/questions/92438/stripping-non-printable-characters-from-a-string-in-python
 NOPRINT_TRANS_TABLE = {i: None for i in range(0, sys.maxunicode + 1) if not chr(i).isprintable()}
 
+# maximum number of installed models we can display before overflowing vertically
+MAX_OTHER_MODELS = 72
+
 
 def make_printable(s: str) -> str:
     """Replace non-printable characters in a string"""
@@ -102,7 +105,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             SingleSelectColumns,
             values=[
                 "STARTER MODELS",
-                "MORE MODELS",
+                "MAIN MODELS",
                 "CONTROLNETS",
                 "LORA/LYCORIS",
                 "TEXTUAL INVERSION",
@@ -271,6 +274,11 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 )
             )
 
+            truncation = False
+            if len(model_labels) > MAX_OTHER_MODELS:
+                model_labels = model_labels[0:MAX_OTHER_MODELS]
+                truncation = True
+
             widgets.update(
                 models_selected=self.add_widget_intelligent(
                     MultiSelectColumns,
@@ -287,6 +295,16 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                     scroll_exit=True,
                 ),
                 models=model_list,
+            )
+
+        if truncation:
+            widgets.update(
+                warning_message=self.add_widget_intelligent(
+                    npyscreen.FixedText,
+                    value=f"Too many models to display (max={MAX_OTHER_MODELS}). Some are not displayed.",
+                    editable=False,
+                    color="CAUTION",
+                )
             )
 
         self.nextrely += 1
@@ -313,7 +331,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         widgets = self.add_model_widgets(
             model_type=model_type,
             window_width=window_width,
-            install_prompt=f"Additional {model_type.value.title()} models already installed.",
+            install_prompt=f"Installed {model_type.value.title()} models. Unchecked models in the InvokeAI root directory will be deleted. Enter URLs, paths or repo_ids to import.",
             **kwargs,
         )
 
