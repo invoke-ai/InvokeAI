@@ -8,6 +8,7 @@ export const initialGalleryState: GalleryState = {
   selection: [],
   shouldAutoSwitch: true,
   autoAddBoardId: undefined,
+  autoAssignBoardOnClick: true,
   galleryImageMinimumWidth: 96,
   selectedBoardId: undefined,
   galleryView: 'images',
@@ -66,9 +67,13 @@ export const gallerySlice = createSlice({
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
     },
+    autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
+      state.autoAssignBoardOnClick = action.payload;
+    },
     boardIdSelected: (state, action: PayloadAction<BoardId>) => {
       state.selectedBoardId = action.payload;
       state.galleryView = 'images';
+      state.autoAssignBoardOnClick && (state.autoAddBoardId = action.payload);
     },
     isBatchEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isBatchEnabled = action.payload;
@@ -140,6 +145,7 @@ export const {
   imageSelectionToggled,
   imageSelected,
   shouldAutoSwitchChanged,
+  autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
   boardIdSelected,
   isBatchEnabledChanged,
