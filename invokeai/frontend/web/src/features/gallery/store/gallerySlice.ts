@@ -73,7 +73,6 @@ export const gallerySlice = createSlice({
     boardIdSelected: (state, action: PayloadAction<BoardId>) => {
       state.selectedBoardId = action.payload;
       state.galleryView = 'images';
-      state.autoAssignBoardOnClick && (state.autoAddBoardId = action.payload);
     },
     isBatchEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isBatchEnabled = action.payload;
