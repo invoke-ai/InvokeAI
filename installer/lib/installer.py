@@ -13,7 +13,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Union
 
-SUPPORTED_PYTHON = ">=3.9.0,<3.11"
+SUPPORTED_PYTHON = ">=3.9.0,<=3.11.100"
 INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
 BOOTSTRAP_VENV_PREFIX = "invokeai-installer-tmp"
 
@@ -249,6 +249,9 @@ class InvokeAiInstance:
             pip[
                 "install",
                 "--require-virtualenv",
+                "numpy~=1.24.0",           # choose versions that won't be uninstalled during phase 2
+                "urllib3~=1.26.0",
+                "requests~=2.28.0",
                 "torch~=2.0.0",
                 "torchmetrics==0.11.4",
                 "torchvision>=0.14.1",
