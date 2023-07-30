@@ -7,7 +7,7 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import List, Dict, Callable, Union, Set
+from typing import Optional, List, Dict, Callable, Union, Set
 
 import requests
 from diffusers import DiffusionPipeline
@@ -86,8 +86,8 @@ class ModelLoadInfo:
     name: str
     model_type: ModelType
     base_type: BaseModelType
-    path: Path = None
-    repo_id: str = None
+    path: Optional[Path] = None
+    repo_id: Optional[str] = None
     description: str = ""
     installed: bool = False
     recommended: bool = False
