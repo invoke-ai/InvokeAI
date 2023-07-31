@@ -256,6 +256,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         model_labels = [self.model_labels[x] for x in model_list]
 
         show_recommended = len(self.installed_models) == 0
+        truncated = False
         if len(model_list) > 0:
             max_width = max([len(x) for x in model_labels])
             columns = window_width // (max_width + 8)  # 8 characters for "[x] " and padding
@@ -274,10 +275,9 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 )
             )
 
-            truncation = False
             if len(model_labels) > MAX_OTHER_MODELS:
                 model_labels = model_labels[0:MAX_OTHER_MODELS]
-                truncation = True
+                truncated = True
 
             widgets.update(
                 models_selected=self.add_widget_intelligent(
@@ -297,7 +297,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 models=model_list,
             )
 
-        if truncation:
+        if truncated:
             widgets.update(
                 warning_message=self.add_widget_intelligent(
                     npyscreen.FixedText,
@@ -650,7 +650,8 @@ def process_and_execute(
 ):
     # need to reinitialize config in subprocess
     config = InvokeAIAppConfig.get_config()
-    config.parse_args()
+    args = ["--root", opt.root] if opt.root else []
+    config.parse_args(args)
 
     # set up so that stderr is sent to conn_out
     if conn_out:
