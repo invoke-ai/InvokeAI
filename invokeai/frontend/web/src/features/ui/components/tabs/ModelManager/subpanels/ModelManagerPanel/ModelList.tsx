@@ -35,7 +35,7 @@ const ModelList = (props: ModelListProps) => {
   const [modelFormatFilter, setModelFormatFilter] =
     useState<CombinedModelFormat>('all');
 
-  const { filteredDiffusersModels, isDiffusersModelLoading } =
+  const { filteredDiffusersModels, isLoadingDiffusersModels } =
     useGetMainModelsQuery(ALL_BASE_MODELS, {
       selectFromResult: ({ data, isLoading }) => ({
         filteredDiffusersModels: modelsFilter(
@@ -44,11 +44,11 @@ const ModelList = (props: ModelListProps) => {
           'diffusers',
           nameFilter
         ),
-        isDiffusersModelLoading: isLoading,
+        isLoadingDiffusersModels: isLoading,
       }),
     });
 
-  const { filteredCheckpointModels, isCheckpointModelLoading } =
+  const { filteredCheckpointModels, isLoadingCheckpointModels } =
     useGetMainModelsQuery(ALL_BASE_MODELS, {
       selectFromResult: ({ data, isLoading }) => ({
         filteredCheckpointModels: modelsFilter(
@@ -57,7 +57,7 @@ const ModelList = (props: ModelListProps) => {
           'checkpoint',
           nameFilter
         ),
-        isCheckpointModelLoading: isLoading,
+        isLoadingCheckpointModels: isLoading,
       }),
     });
 
