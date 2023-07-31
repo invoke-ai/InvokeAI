@@ -7,6 +7,7 @@ from typing import Dict, Union, Optional
 
 import torch
 
+
 class LatentsStorageBase(ABC):
     """Responsible for storing and retrieving latents."""
 
@@ -25,7 +26,7 @@ class LatentsStorageBase(ABC):
 
 class ForwardCacheLatentsStorage(LatentsStorageBase):
     """Caches the latest N latents in memory, writing-thorugh to and reading from underlying storage"""
-    
+
     __cache: Dict[str, torch.Tensor]
     __cache_ids: Queue
     __max_cache_size: int
@@ -87,8 +88,6 @@ class DiskLatentsStorage(LatentsStorageBase):
     def delete(self, name: str) -> None:
         latent_path = self.get_path(name)
         latent_path.unlink()
-        
 
     def get_path(self, name: str) -> Path:
         return self.__output_folder / name
-    

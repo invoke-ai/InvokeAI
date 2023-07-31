@@ -85,9 +85,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self.__cache_ids = Queue()
         self.__max_cache_size = 10  # TODO: get this from config
 
-        self.__output_folder: Path = (
-            output_folder if isinstance(output_folder, Path) else Path(output_folder)
-        )
+        self.__output_folder: Path = output_folder if isinstance(output_folder, Path) else Path(output_folder)
         self.__thumbnails_folder = self.__output_folder / "thumbnails"
 
         # Validate required output folders at launch
@@ -120,7 +118,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             image_path = self.get_path(image_name)
 
             pnginfo = PngImagePlugin.PngInfo()
-            
+
             if metadata is not None:
                 pnginfo.add_text("invokeai_metadata", json.dumps(metadata))
             if graph is not None:
@@ -183,9 +181,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def __set_cache(self, image_name: Path, image: PILImageType):
         if not image_name in self.__cache:
             self.__cache[image_name] = image
-            self.__cache_ids.put(
-                image_name
-            )  # TODO: this should refresh position for LRU cache
+            self.__cache_ids.put(image_name)  # TODO: this should refresh position for LRU cache
             if len(self.__cache) > self.__max_cache_size:
                 cache_id = self.__cache_ids.get()
                 if cache_id in self.__cache:

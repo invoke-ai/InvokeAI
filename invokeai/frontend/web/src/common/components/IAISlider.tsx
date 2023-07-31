@@ -114,6 +114,11 @@ const IAISlider = (props: IAIFullSliderProps) => {
     setLocalInputValue(value);
   }, [value]);
 
+  const numberInputMin = useMemo(
+    () => (sliderNumberInputProps?.min ? sliderNumberInputProps.min : min),
+    [min, sliderNumberInputProps?.min]
+  );
+
   const numberInputMax = useMemo(
     () => (sliderNumberInputProps?.max ? sliderNumberInputProps.max : max),
     [max, sliderNumberInputProps?.max]
@@ -129,24 +134,23 @@ const IAISlider = (props: IAIFullSliderProps) => {
   const handleInputBlur = useCallback(
     (e: FocusEvent<HTMLInputElement>) => {
       if (e.target.value === '') {
-        e.target.value = String(min);
+        e.target.value = String(numberInputMin);
       }
       const clamped = clamp(
         isInteger
           ? Math.floor(Number(e.target.value))
           : Number(localInputValue),
-        min,
+        numberInputMin,
         numberInputMax
       );
       const quantized = roundDownToMultiple(clamped, step);
       onChange(quantized);
       setLocalInputValue(quantized);
     },
-    [isInteger, localInputValue, min, numberInputMax, onChange, step]
+    [isInteger, localInputValue, numberInputMin, numberInputMax, onChange, step]
   );
 
   const handleInputChange = useCallback((v: number | string) => {
-    console.log('input');
     setLocalInputValue(v);
   }, []);
 
@@ -310,7 +314,7 @@ const IAISlider = (props: IAIFullSliderProps) => {
 
         {withInput && (
           <NumberInput
-            min={min}
+            min={numberInputMin}
             max={numberInputMax}
             step={step}
             value={localInputValue}

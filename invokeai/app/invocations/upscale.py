@@ -29,16 +29,11 @@ class ESRGANInvocation(BaseInvocation):
 
     type: Literal["esrgan"] = "esrgan"
     image: Union[ImageField, None] = Field(default=None, description="The input image")
-    model_name: ESRGAN_MODELS = Field(
-        default="RealESRGAN_x4plus.pth", description="The Real-ESRGAN model to use"
-    )
+    model_name: ESRGAN_MODELS = Field(default="RealESRGAN_x4plus.pth", description="The Real-ESRGAN model to use")
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Upscale (RealESRGAN)",
-                "tags": ["image", "upscale", "realesrgan"]
-            },
+            "ui": {"title": "Upscale (RealESRGAN)", "tags": ["image", "upscale", "realesrgan"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -108,9 +103,7 @@ class ESRGANInvocation(BaseInvocation):
         upscaled_image, img_mode = upsampler.enhance(cv_image)
 
         # back to PIL
-        pil_image = Image.fromarray(
-            cv.cvtColor(upscaled_image, cv.COLOR_BGR2RGB)
-        ).convert("RGBA")
+        pil_image = Image.fromarray(cv.cvtColor(upscaled_image, cv.COLOR_BGR2RGB)).convert("RGBA")
 
         image_dto = context.services.images.create(
             image=pil_image,
