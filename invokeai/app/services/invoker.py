@@ -20,6 +20,7 @@ class Invoker:
     def invoke(self, graph_execution_state: GraphExecutionState, invoke_all: bool = False) -> Optional[str]:
         """Determines the next node to invoke and enqueues it, preparing if needed.
         Returns the id of the queued node, or `None` if there are no nodes left to enqueue."""
+
         # Get the next invocation
         invocation = graph_execution_state.next()
         if not invocation:
@@ -40,9 +41,9 @@ class Invoker:
 
         return invocation.id
 
-    def create_execution_state(self, graph: Optional[Graph] = None, batch_indices: list[int] = list()) -> GraphExecutionState:
+    def create_execution_state(self, graph: Optional[Graph] = None) -> GraphExecutionState:
         """Creates a new execution state for the given graph"""
-        new_state = GraphExecutionState(graph=Graph() if graph is None else graph, batch_indices=batch_indices)
+        new_state = GraphExecutionState(graph=Graph() if graph is None else graph)
         self.services.graph_execution_manager.set(new_state)
         return new_state
 

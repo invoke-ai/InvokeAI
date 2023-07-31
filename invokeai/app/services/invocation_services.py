@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from logging import Logger
+    from invokeai.app.services.batch_manager import BatchManagerBase
     from invokeai.app.services.board_images import BoardImagesServiceABC
     from invokeai.app.services.boards import BoardServiceABC
     from invokeai.app.services.images import ImageServiceABC
@@ -21,6 +22,7 @@ class InvocationServices:
     """Services that can be used by invocations"""
 
     # TODO: Just forward-declared everything due to circular dependencies. Fix structure.
+    batch_manager: "BatchManagerBase"
     board_images: "BoardImagesServiceABC"
     boards: "BoardServiceABC"
     configuration: "InvokeAIAppConfig"
@@ -36,6 +38,7 @@ class InvocationServices:
 
     def __init__(
         self,
+        batch_manager: "BatchManagerBase",
         board_images: "BoardImagesServiceABC",
         boards: "BoardServiceABC",
         configuration: "InvokeAIAppConfig",
@@ -49,6 +52,7 @@ class InvocationServices:
         processor: "InvocationProcessorABC",
         queue: "InvocationQueueABC",
     ):
+        self.batch_manager = batch_manager
         self.board_images = board_images
         self.boards = boards
         self.boards = boards

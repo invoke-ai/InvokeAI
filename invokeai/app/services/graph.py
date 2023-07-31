@@ -245,13 +245,6 @@ InvocationsUnion = Union[BaseInvocation.get_invocations()]  # type: ignore
 InvocationOutputsUnion = Union[BaseInvocationOutput.get_all_subclasses_tuple()]  # type: ignore
 
 
-
-class Batch(BaseModel):
-    batch_id: Optional[str] = Field(default_factory=uuid.uuid4().__str__, description="Identifier for this batch")
-    data: list[InvocationsUnion] = Field(description="Mapping of ")
-    node_id: str = Field(description="ID of the node to batch")
-
-
 class Graph(BaseModel):
     id: str = Field(description="The id of this graph", default_factory=lambda: uuid.uuid4().__str__())
     # TODO: use a list (and never use dict in a BaseModel) because pydantic/fastapi hates me
@@ -262,16 +255,13 @@ class Graph(BaseModel):
         description="The connections between nodes and their fields in this graph",
         default_factory=list,
     )
-    batches: list[Batch] = Field(
-        description="List of batch configs to apply to this session",
-        default_factory=list,
-    )
 
     def add_node(self, node: BaseInvocation) -> None:
         """Adds a node to a graph
 
         :raises NodeAlreadyInGraphError: the node is already present in the graph.
         """
+
         if node.id in self.nodes:
             raise NodeAlreadyInGraphError()
 
@@ -744,8 +734,6 @@ class GraphExecutionState(BaseModel):
         default_factory=list,
     )
 
-    batch_indices: list[int] = Field(description="Tracker for which batch is currently being processed", default_factory=list)
-
     # The results of executed nodes
     results: dict[str, Annotated[InvocationOutputsUnion, Field(discriminator="type")]] = Field(
         description="The results of node executions", default_factory=dict
@@ -787,7 +775,6 @@ class GraphExecutionState(BaseModel):
         # TODO: enable multiple nodes to execute simultaneously by tracking currently executing nodes
         #       possibly with a timeout?
 
-        self._apply_batch_config()
         # If there are no prepared nodes, prepare some nodes
         next_node = self._get_next_node()
         if next_node is None:
@@ -879,7 +866,7 @@ class GraphExecutionState(BaseModel):
             new_node = copy.deepcopy(node)
 
             # Create the node id (use a random uuid)
-            new_node.id = str(f"{uuid.uuid4()}-{node.id}")
+            new_node.id = str(uuid.uuid4())
 
             # Set the iteration index for iteration invocations
             if isinstance(new_node, IterateInvocation):
@@ -918,20 +905,6 @@ class GraphExecutionState(BaseModel):
         iterators = [n for n in nx.ancestors(g, node_id) if isinstance(self.graph.get_node(n), IterateInvocation)]
         return iterators
 
-    def _apply_batch_config(self):
-        g = self.graph.nx_graph_flat()
-        sorted_nodes = nx.topological_sort(g)
-        batchable_nodes = [n for n in sorted_nodes if n not in self.executed]
-        for npath in batchable_nodes:
-            node = self.graph.get_node(npath)
-            (index, batch) = next(((i,b) for i,b in enumerate(self.graph.batches) if b.node_id in node.id), (None, None))
-            if batch:
-                batch_index = self.batch_indices[index]
-                datum = batch.data[batch_index]
-                datum.id = node.id
-                self.graph.update_node(npath, datum)
-
-
     def _prepare(self) -> Optional[str]:
         # Get flattened source graph
         g = self.graph.nx_graph_flat()
@@ -963,6 +936,7 @@ class GraphExecutionState(BaseModel):
             ),
             None,
         )
+
         if next_node_id == None:
             return None
 
