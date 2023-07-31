@@ -20,6 +20,7 @@ except:
     # need dummy ts for regression tests to pass
     class DummyTranslator:
         @classmethod
+        @property
         def translators_pool(cls) -> List[str]:
             pass
 
