@@ -4,7 +4,7 @@ These are nodes that have been developed by the community, for the community. If
 
 If you'd like to submit a node for the community, please refer to the [node creation overview](./overview.md#contributing-nodes).
 
-To use a node, simply create an aptly folder within the `nodes` folder in your Invoke AI install location. Next, download the .py file and drop it into the folder you created in the `nodes` folder. If there a multiple nodes, you can put them all in the same folder Along with the node, an example node graph should be provided to help you get started with the node. 
+To use a node, simply create an aptly named folder within the `nodes` folder in your Invoke AI install location. Next, download the .py file and drop it into the folder you created in the `nodes` folder. If there a multiple nodes, you can put them all in the same folder Along with the node, an example node graph should be provided to help you get started with the node. 
 
 To use a community node graph, download the the `.json` node graph file and load it into Invoke AI via the **Load Nodes** button on the Node Editor. 
 
