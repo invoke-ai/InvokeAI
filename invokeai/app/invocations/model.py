@@ -53,6 +53,7 @@ class MainModelField(BaseModel):
 
     model_name: str = Field(description="Name of the model")
     base_model: BaseModelType = Field(description="Base model")
+    model_type: ModelType = Field(description="Model Type")
 
 
 class LoRAModelField(BaseModel):

@@ -210,6 +210,14 @@ export type HeightParam = z.infer<typeof zHeight>;
 export const isValidHeight = (val: unknown): val is HeightParam =>
   zHeight.safeParse(val).success;
 
+const zModelType = z.enum([
+  'vae',
+  'lora',
+  'onnx',
+  'main',
+  'controlnet',
+  'embedding',
+]);
 const zBaseModel = z.enum(['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
 
 export type BaseModelParam = z.infer<typeof zBaseModel>;
@@ -221,12 +229,18 @@ export type BaseModelParam = z.infer<typeof zBaseModel>;
 export const zMainModel = z.object({
   model_name: z.string().min(1),
   base_model: zBaseModel,
+  model_type: zModelType,
 });
 
 /**
  * Type alias for model parameter, inferred from its zod schema
  */
 export type MainModelParam = z.infer<typeof zMainModel>;
+
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type OnnxModelParam = z.infer<typeof zMainModel>;
 /**
  * Validates/type-guards a value as a model parameter
  */
