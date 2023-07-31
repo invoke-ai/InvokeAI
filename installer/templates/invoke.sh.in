@@ -82,7 +82,7 @@ do_choice() {
     7)
         clear
         printf "Re-run the configure script to fix a broken install or to complete a major upgrade\n"
-        invokeai-configure --root ${INVOKEAI_ROOT} --yes --default_only
+        invokeai-configure --root ${INVOKEAI_ROOT} --yes --default_only --skip-sd-weights
         ;;
     8)
         clear

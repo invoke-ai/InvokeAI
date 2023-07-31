@@ -58,14 +58,14 @@ dependencies = [
   "invisible-watermark~=0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "matplotlib",                 # needed for plotting of Penner easing functions
   "mediapipe",                  # needed for "mediapipeface" controlnet model
+  "numpy",
   "npyscreen",
-  "numpy==1.24.4",
   "omegaconf",
   "opencv-python",
+  "pydantic==1.*",
   "picklescan",
   "pillow",
   "prompt-toolkit",
-  "pydantic==1.10.10",
   "pympler~=1.0.1",
   "pypatchmatch",
   'pyperclip',
@@ -81,7 +81,7 @@ dependencies = [
   "test-tube~=0.7.5",
   "torch~=2.0.1",
   "torchvision~=0.15.2",
-  "torchmetrics~=1.0.1",
+  "torchmetrics~=0.11.0",
   "torchsde~=0.2.5",
   "transformers~=4.31.0",
   "uvicorn[standard]~=0.21.1",
