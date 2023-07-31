@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Lincoln D. Stein
 
-from typing import Literal
+from typing import Literal, Union, List
 from pydantic import Field
 from .baseinvocation import (
     BaseInvocation,
@@ -17,7 +17,17 @@ try:
 
     translate_available = True
 except:
-    pass
+    # need dummy ts for regression tests to pass
+    class DummyTranslator:
+        @classmethod
+        def translators_pool(cls) -> List[str]:
+            pass
+
+        @classmethod
+        def translate_text(cls, **kwargs) -> Union[str, dict]:
+            pass
+
+    ts = DummyTranslator
 
 DEFAULT_PROMPT = "" if translate_available else "To use this node, please 'pip install --upgrade translators'"
 
