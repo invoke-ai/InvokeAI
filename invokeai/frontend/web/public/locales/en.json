@@ -124,7 +124,8 @@
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
         "images": "Images",
-        "assets": "Assets"
+        "assets": "Assets",
+        "autoAssignBoardOnClick": "Auto-Assign Board on Click"
     },
     "hotkeys": {
         "keyboardShortcuts": "Keyboard Shortcuts",
