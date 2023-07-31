@@ -12,50 +12,41 @@ import IAIDndImage from 'common/components/IAIDndImage';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
-import { controlNetImageChanged } from '../store/controlNetSlice';
+import {
+  ControlNetConfig,
+  controlNetImageChanged,
+} from '../store/controlNetSlice';
 
 type Props = {
-  controlNetId: string;
+  controlNet: ControlNetConfig;
   height: SystemStyleObject['h'];
 };
 
+const selector = createSelector(
+  stateSelector,
+  ({ controlNet }) => {
+    const { pendingControlImages } = controlNet;
+
+    return {
+      pendingControlImages,
+    };
+  },
+  defaultSelectorOptions
+);
+
 const ControlNetImagePreview = (props: Props) => {
-  const { height, controlNetId } = props;
+  const { height } = props;
+  const {
+    controlImage: controlImageName,
+    processedControlImage: processedControlImageName,
+    processorType,
+    isEnabled,
+    controlNetId,
+  } = props.controlNet;
+
   const dispatch = useAppDispatch();
 
-  const selector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ controlNet }) => {
-          const { pendingControlImages } = controlNet;
-          const {
-            controlImage,
-            processedControlImage,
-            processorType,
-            isEnabled,
-          } = controlNet.controlNets[controlNetId];
-
-          return {
-            controlImageName: controlImage,
-            processedControlImageName: processedControlImage,
-            processorType,
-            isEnabled,
-            pendingControlImages,
-          };
-        },
-        defaultSelectorOptions
-      ),
-    [controlNetId]
-  );
-
-  const {
-    controlImageName,
-    processedControlImageName,
-    processorType,
-    pendingControlImages,
-    isEnabled,
-  } = useAppSelector(selector);
+  const { pendingControlImages } = useAppSelector(selector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
