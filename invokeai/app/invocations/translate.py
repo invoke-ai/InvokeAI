@@ -8,6 +8,7 @@ from .baseinvocation import (
     InvocationContext,
     InvocationConfig,
 )
+
 # from .params import StringOutput
 
 translate_available = False
@@ -20,10 +21,13 @@ except:
 
 DEFAULT_PROMPT = "" if translate_available else "To use this node, please 'pip install --upgrade translators'"
 
+
 class TranslateOutput(BaseInvocationOutput):
     """Translated string output"""
+
     type: Literal["translated_string_output"] = "translated_string_output"
     prompt: str = Field(default=None, description="The translated prompt string")
+
 
 class TranslateInvocation(BaseInvocation):
     """Use the translators package to translate 330 languages into English prompts"""
@@ -43,5 +47,5 @@ class TranslateInvocation(BaseInvocation):
         }
 
     def invoke(self, context: InvocationContext) -> TranslateOutput:
-        translation: str= ts.translate_text(self.text, translator=self.translator)
+        translation: str = ts.translate_text(self.text, translator=self.translator)
         return TranslateOutput(prompt=translation)
