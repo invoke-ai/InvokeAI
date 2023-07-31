@@ -385,6 +385,11 @@ class ModelManager(object):
     def model_exists(self, model_name: str, base_model: BaseModelType, model_type: ModelType, *, rescan=False) -> bool:
         """
         Given a model name, returns True if it is a valid identifier.
+
+        :param model_name: symbolic name of the model in models.yaml
+        :param model_type: ModelType enum indicating the type of model to return
+        :param base_model: BaseModelType enum indicating the base model used by this model
+        :param rescan: if True, scan_models_directory
         """
         model_key = self.create_key(model_name, base_model, model_type)
         exists = model_key in self.models
@@ -470,7 +475,7 @@ class ModelManager(object):
 
             else:
                 self.models.pop(model_key, None)
-                raise ModelNotFoundException(f"Model not found - {model_key}")
+                raise ModelNotFoundException(f'Files for model "{model_key}" not found at {model_path}')
 
         # TODO: path
         # TODO: is it accurate to use path as id
@@ -508,7 +513,13 @@ class ModelManager(object):
             _cache=self.cache,
         )
 
-    def _get_model_path(self, model_config: ModelConfigBase, submodel_type: SubModelType = None) -> (Path, bool):
+    def _get_model_path(
+        self, model_config: ModelConfigBase, submodel_type: Optional[SubModelType] = None
+    ) -> (Path, bool):
+        """Extract a model's filesystem path from its config.
+
+        :return: The fully qualified Path of the module (or submodule).
+        """
         model_path = model_config.path
         is_submodel_override = False
 
@@ -523,6 +534,7 @@ class ModelManager(object):
         return model_path, is_submodel_override
 
     def _get_model_config(self, base_model, model_name, model_type) -> ModelConfigBase:
+        """Get a model's config object."""
         model_key = self.create_key(model_name, base_model, model_type)
         try:
             model_config = self.models[model_key]
@@ -531,12 +543,18 @@ class ModelManager(object):
         return model_config
 
     def _get_implementation(self, base_model: BaseModelType, model_type: ModelType) -> type[ModelBase]:
+        """Get the concrete implementation class for a specific model type."""
         model_class = MODEL_CLASSES[base_model][model_type]
         return model_class
 
     def _instantiate(
-        self, model_name: str, base_model: BaseModelType, model_type: ModelType, submodel_type: SubModelType = None
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel_type: Optional[SubModelType] = None,
     ) -> ModelBase:
+        """Make a new instance of this model, without loading it."""
         model_config = self._get_model_config(base_model, model_name, model_type)
         model_path, is_submodel_override = self._get_model_path(model_config, submodel_type)
         # FIXME: do non-overriden submodels get the right class?
