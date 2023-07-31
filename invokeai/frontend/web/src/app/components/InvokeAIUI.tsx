@@ -28,6 +28,7 @@ interface Props extends PropsWithChildren {
   config?: PartialAppConfig;
   headerComponent?: ReactNode;
   middleware?: Middleware[];
+  projectId?: string;
 }
 
 const InvokeAIUI = ({
@@ -36,6 +37,7 @@ const InvokeAIUI = ({
   config,
   headerComponent,
   middleware,
+  projectId,
 }: Props) => {
   useEffect(() => {
     // configure API client token
