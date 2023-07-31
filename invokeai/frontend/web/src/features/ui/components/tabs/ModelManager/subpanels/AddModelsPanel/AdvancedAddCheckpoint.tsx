@@ -28,9 +28,7 @@ export default function AdvancedAddCheckpoint(
 
   const advancedAddCheckpointForm = useForm<CheckpointModelConfig>({
     initialValues: {
-      model_name: model_path
-        ? model_path.split('\\').splice(-1)[0].split('.')[0]
-        : '',
+      model_name: model_path?.split('\\').splice(-1)[0]?.split('.')[0] ?? '',
       base_model: 'sd-1',
       model_type: 'main',
       path: model_path ? model_path : '',

@@ -5,6 +5,7 @@ from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadF
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
+from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.metadata import ImageMetadata
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
@@ -25,7 +26,7 @@ IMAGE_MAX_AGE = 31536000
 
 
 @images_router.post(
-    "/",
+    "/upload",
     operation_id="upload_image",
     responses={
         201: {"description": "The image was uploaded successfully"},
@@ -77,7 +78,7 @@ async def upload_image(
         raise HTTPException(status_code=500, detail="Failed to create image")
 
 
-@images_router.delete("/{image_name}", operation_id="delete_image")
+@images_router.delete("/i/{image_name}", operation_id="delete_image")
 async def delete_image(
     image_name: str = Path(description="The name of the image to delete"),
 ) -> None:
@@ -103,7 +104,7 @@ async def clear_intermediates() -> int:
 
 
 @images_router.patch(
-    "/{image_name}",
+    "/i/{image_name}",
     operation_id="update_image",
     response_model=ImageDTO,
 )
@@ -120,7 +121,7 @@ async def update_image(
 
 
 @images_router.get(
-    "/{image_name}",
+    "/i/{image_name}",
     operation_id="get_image_dto",
     response_model=ImageDTO,
 )
@@ -136,7 +137,7 @@ async def get_image_dto(
 
 
 @images_router.get(
-    "/{image_name}/metadata",
+    "/i/{image_name}/metadata",
     operation_id="get_image_metadata",
     response_model=ImageMetadata,
 )
@@ -152,7 +153,7 @@ async def get_image_metadata(
 
 
 @images_router.get(
-    "/{image_name}/full",
+    "/i/{image_name}/full",
     operation_id="get_image_full",
     response_class=Response,
     responses={
@@ -187,7 +188,7 @@ async def get_image_full(
 
 
 @images_router.get(
-    "/{image_name}/thumbnail",
+    "/i/{image_name}/thumbnail",
     operation_id="get_image_thumbnail",
     response_class=Response,
     responses={
@@ -216,7 +217,7 @@ async def get_image_thumbnail(
 
 
 @images_router.get(
-    "/{image_name}/urls",
+    "/i/{image_name}/urls",
     operation_id="get_image_urls",
     response_model=ImageUrlsDTO,
 )
@@ -265,3 +266,24 @@ async def list_image_dtos(
     )
 
     return image_dtos
+
+
+class DeleteImagesFromListResult(BaseModel):
+    deleted_images: list[str]
+
+
+@images_router.post("/delete", operation_id="delete_images_from_list", response_model=DeleteImagesFromListResult)
+async def delete_images_from_list(
+    image_names: list[str] = Body(description="The list of names of images to delete", embed=True),
+) -> DeleteImagesFromListResult:
+    try:
+        deleted_images: list[str] = []
+        for image_name in image_names:
+            try:
+                ApiDependencies.invoker.services.images.delete(image_name)
+                deleted_images.append(image_name)
+            except:
+                pass
+        return DeleteImagesFromListResult(deleted_images=deleted_images)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete images")

@@ -1,6 +1,6 @@
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { useCallback } from 'react';
-import { UnsafeImageMetadata } from 'services/api/endpoints/images';
+import { UnsafeImageMetadata } from 'services/api/types';
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {
