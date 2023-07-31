@@ -14,6 +14,7 @@ import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
@@ -27,7 +28,9 @@ const ModelInputFieldComponent = (
   const { t } = useTranslation();
   const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
 
-  const { data: mainModels, isLoading } = useGetMainModelsQuery();
+  const { data: mainModels, isLoading } = useGetMainModelsQuery(
+    NON_REFINER_BASE_MODELS
+  );
 
   const data = useMemo(() => {
     if (!mainModels) {

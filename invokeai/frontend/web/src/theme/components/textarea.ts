@@ -13,6 +13,15 @@ const invokeAI = defineStyle((props) => ({
       var(--invokeai-colors-base-200) 70%,
       var(--invokeai-colors-base-200) 100%)`,
   },
+  _disabled: {
+    '::-webkit-resizer': {
+      backgroundImage: `linear-gradient(135deg,
+        var(--invokeai-colors-base-50) 0%,
+        var(--invokeai-colors-base-50) 70%,
+        var(--invokeai-colors-base-200) 70%,
+        var(--invokeai-colors-base-200) 100%)`,
+    },
+  },
   _dark: {
     '::-webkit-resizer': {
       backgroundImage: `linear-gradient(135deg,
@@ -20,6 +29,15 @@ const invokeAI = defineStyle((props) => ({
         var(--invokeai-colors-base-900) 70%,
         var(--invokeai-colors-base-800) 70%,
         var(--invokeai-colors-base-800) 100%)`,
+    },
+    _disabled: {
+      '::-webkit-resizer': {
+        backgroundImage: `linear-gradient(135deg,
+          var(--invokeai-colors-base-900) 0%,
+          var(--invokeai-colors-base-900) 70%,
+          var(--invokeai-colors-base-800) 70%,
+          var(--invokeai-colors-base-800) 100%)`,
+      },
     },
   },
 }));

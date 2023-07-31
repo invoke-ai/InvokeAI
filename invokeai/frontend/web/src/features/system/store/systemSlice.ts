@@ -87,6 +87,8 @@ export interface SystemState {
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
   isNodesEnabled: boolean;
+  shouldUseNSFWChecker: boolean;
+  shouldUseWatermarker: boolean;
 }
 
 export const initialSystemState: SystemState = {
@@ -119,6 +121,8 @@ export const initialSystemState: SystemState = {
   language: 'en',
   isUploading: false,
   isNodesEnabled: false,
+  shouldUseNSFWChecker: false,
+  shouldUseWatermarker: false,
 };
 
 export const systemSlice = createSlice({
@@ -193,6 +197,12 @@ export const systemSlice = createSlice({
     },
     setIsNodesEnabled(state, action: PayloadAction<boolean>) {
       state.isNodesEnabled = action.payload;
+    },
+    shouldUseNSFWCheckerChanged(state, action: PayloadAction<boolean>) {
+      state.shouldUseNSFWChecker = action.payload;
+    },
+    shouldUseWatermarkerChanged(state, action: PayloadAction<boolean>) {
+      state.shouldUseWatermarker = action.payload;
     },
   },
   extraReducers(builder) {
@@ -409,6 +419,8 @@ export const {
   languageChanged,
   progressImageSet,
   setIsNodesEnabled,
+  shouldUseNSFWCheckerChanged,
+  shouldUseWatermarkerChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

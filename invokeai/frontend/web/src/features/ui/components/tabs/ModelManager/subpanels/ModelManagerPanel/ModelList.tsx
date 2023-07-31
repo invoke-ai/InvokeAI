@@ -9,8 +9,11 @@ import { useTranslation } from 'react-i18next';
 import {
   MainModelConfigEntity,
   useGetMainModelsQuery,
+  useGetLoRAModelsQuery,
+  LoRAModelConfigEntity,
 } from 'services/api/endpoints/models';
 import ModelListItem from './ModelListItem';
+import { ALL_BASE_MODELS } from 'services/api/constants';
 
 type ModelListProps = {
   selectedModelId: string | undefined;
@@ -19,22 +22,42 @@ type ModelListProps = {
 
 type ModelFormat = 'images' | 'checkpoint' | 'diffusers';
 
+type ModelType = 'main' | 'lora';
+
+type CombinedModelFormat = ModelFormat | 'lora';
+
 const ModelList = (props: ModelListProps) => {
   const { selectedModelId, setSelectedModelId } = props;
   const { t } = useTranslation();
   const [nameFilter, setNameFilter] = useState<string>('');
   const [modelFormatFilter, setModelFormatFilter] =
-    useState<ModelFormat>('images');
+    useState<CombinedModelFormat>('images');
 
-  const { filteredDiffusersModels } = useGetMainModelsQuery(undefined, {
+  const { filteredDiffusersModels } = useGetMainModelsQuery(ALL_BASE_MODELS, {
     selectFromResult: ({ data }) => ({
-      filteredDiffusersModels: modelsFilter(data, 'diffusers', nameFilter),
+      filteredDiffusersModels: modelsFilter(
+        data,
+        'main',
+        'diffusers',
+        nameFilter
+      ),
     }),
   });
 
-  const { filteredCheckpointModels } = useGetMainModelsQuery(undefined, {
+  const { filteredCheckpointModels } = useGetMainModelsQuery(ALL_BASE_MODELS, {
     selectFromResult: ({ data }) => ({
-      filteredCheckpointModels: modelsFilter(data, 'checkpoint', nameFilter),
+      filteredCheckpointModels: modelsFilter(
+        data,
+        'main',
+        'checkpoint',
+        nameFilter
+      ),
+    }),
+  });
+
+  const { filteredLoraModels } = useGetLoRAModelsQuery(undefined, {
+    selectFromResult: ({ data }) => ({
+      filteredLoraModels: modelsFilter(data, 'lora', undefined, nameFilter),
     }),
   });
 
@@ -66,6 +89,13 @@ const ModelList = (props: ModelListProps) => {
             isChecked={modelFormatFilter === 'checkpoint'}
           >
             {t('modelManager.checkpointModels')}
+          </IAIButton>
+          <IAIButton
+            size="sm"
+            onClick={() => setModelFormatFilter('lora')}
+            isChecked={modelFormatFilter === 'lora'}
+          >
+            {t('modelManager.loraModels')}
           </IAIButton>
         </ButtonGroup>
 
@@ -117,6 +147,24 @@ const ModelList = (props: ModelListProps) => {
                 </Flex>
               </StyledModelContainer>
             )}
+          {['images', 'lora'].includes(modelFormatFilter) &&
+            filteredLoraModels.length > 0 && (
+              <StyledModelContainer>
+                <Flex sx={{ gap: 2, flexDir: 'column' }}>
+                  <Text variant="subtext" fontSize="sm">
+                    LoRAs
+                  </Text>
+                  {filteredLoraModels.map((model) => (
+                    <ModelListItem
+                      key={model.id}
+                      model={model}
+                      isSelected={selectedModelId === model.id}
+                      setSelectedModelId={setSelectedModelId}
+                    />
+                  ))}
+                </Flex>
+              </StyledModelContainer>
+            )}
         </Flex>
       </Flex>
     </Flex>
@@ -125,12 +173,13 @@ const ModelList = (props: ModelListProps) => {
 
 export default ModelList;
 
-const modelsFilter = (
-  data: EntityState<MainModelConfigEntity> | undefined,
-  model_format: ModelFormat,
+const modelsFilter = <T extends MainModelConfigEntity | LoRAModelConfigEntity>(
+  data: EntityState<T> | undefined,
+  model_type: ModelType,
+  model_format: ModelFormat | undefined,
   nameFilter: string
 ) => {
-  const filteredModels: MainModelConfigEntity[] = [];
+  const filteredModels: T[] = [];
   forEach(data?.entities, (model) => {
     if (!model) {
       return;
@@ -140,9 +189,11 @@ const modelsFilter = (
       .toLowerCase()
       .includes(nameFilter.toLowerCase());
 
-    const matchesFormat = model.model_format === model_format;
+    const matchesFormat =
+      model_format === undefined || model.model_format === model_format;
+    const matchesType = model.model_type === model_type;
 
-    if (matchesFilter && matchesFormat) {
+    if (matchesFilter && matchesFormat && matchesType) {
       filteredModels.push(model);
     }
   });

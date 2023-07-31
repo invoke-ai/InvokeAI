@@ -43,6 +43,42 @@ export const isValidNegativePrompt = (
 ): val is NegativePromptParam => zNegativePrompt.safeParse(val).success;
 
 /**
+ * Zod schema for SDXL positive style prompt parameter
+ */
+export const zPositiveStylePromptSDXL = z.string();
+/**
+ * Type alias for SDXL positive style prompt parameter, inferred from its zod schema
+ */
+export type PositiveStylePromptSDXLParam = z.infer<
+  typeof zPositiveStylePromptSDXL
+>;
+/**
+ * Validates/type-guards a value as a SDXL positive style prompt parameter
+ */
+export const isValidSDXLPositiveStylePrompt = (
+  val: unknown
+): val is PositiveStylePromptSDXLParam =>
+  zPositiveStylePromptSDXL.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL negative style prompt parameter
+ */
+export const zNegativeStylePromptSDXL = z.string();
+/**
+ * Type alias for SDXL negative style prompt parameter, inferred from its zod schema
+ */
+export type NegativeStylePromptSDXLParam = z.infer<
+  typeof zNegativeStylePromptSDXL
+>;
+/**
+ * Validates/type-guards a value as a SDXL negative style prompt parameter
+ */
+export const isValidSDXLNegativeStylePrompt = (
+  val: unknown
+): val is NegativeStylePromptSDXLParam =>
+  zNegativeStylePromptSDXL.safeParse(val).success;
+
+/**
  * Zod schema for steps parameter
  */
 export const zSteps = z.number().int().min(1);
@@ -259,6 +295,53 @@ export type StrengthParam = z.infer<typeof zStrength>;
  */
 export const isValidStrength = (val: unknown): val is StrengthParam =>
   zStrength.safeParse(val).success;
+
+/**
+ * Zod schema for a precision parameter
+ */
+export const zPrecision = z.enum(['fp16', 'fp32']);
+/**
+ * Type alias for precision parameter, inferred from its zod schema
+ */
+export type PrecisionParam = z.infer<typeof zPrecision>;
+/**
+ * Validates/type-guards a value as a precision parameter
+ */
+export const isValidPrecision = (val: unknown): val is PrecisionParam =>
+  zPrecision.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL refiner aesthetic score parameter
+ */
+export const zSDXLRefinerAestheticScore = z.number().min(1).max(10);
+/**
+ * Type alias for SDXL refiner aesthetic score parameter, inferred from its zod schema
+ */
+export type SDXLRefinerAestheticScoreParam = z.infer<
+  typeof zSDXLRefinerAestheticScore
+>;
+/**
+ * Validates/type-guards a value as a SDXL refiner aesthetic score parameter
+ */
+export const isValidSDXLRefinerAestheticScore = (
+  val: unknown
+): val is SDXLRefinerAestheticScoreParam =>
+  zSDXLRefinerAestheticScore.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL start parameter
+ */
+export const zSDXLRefinerstart = z.number().min(0).max(1);
+/**
+ * Type alias for SDXL start, inferred from its zod schema
+ */
+export type SDXLRefinerStartParam = z.infer<typeof zSDXLRefinerstart>;
+/**
+ * Validates/type-guards a value as a SDXL refiner aesthetic score parameter
+ */
+export const isValidSDXLRefinerStart = (
+  val: unknown
+): val is SDXLRefinerStartParam => zSDXLRefinerstart.safeParse(val).success;
 
 // /**
 //  * Zod schema for BaseModelType

@@ -1,12 +1,40 @@
 ---
-title: The NSFW Checker
+title: Watermarking, NSFW Image Checking
 ---
 
-# :material-image-off: NSFW Checker
+# :material-image-off: Invisible Watermark and the NSFW Checker
+
+## Watermarking
+
+InvokeAI does not apply watermarking to images by default. However,
+many computer scientists working in the field of generative AI worry
+that a flood of computer-generated imagery will contaminate the image
+data sets needed to train future generations of generative models.
+
+InvokeAI offers an optional watermarking mode that writes a small bit
+of text, **InvokeAI**, into each image that it generates using an
+"invisible" watermarking library that spreads the information
+throughout the image in a way that is not perceptible to the human
+eye. If you are planning to share your generated images on
+internet-accessible services, we encourage you to activate the
+invisible watermark mode in order to help preserve the digital image
+environment.
+
+The downside of watermarking is that it increases the size of the
+image moderately, and has been reported by some individuals to degrade
+image quality. Your mileage may vary.
+
+To read the watermark in an image, activate the InvokeAI virtual
+environment (called the "developer's console" in the launcher) and run
+the command:
+
+```
+invisible-watermark -a decode -t bytes -m dwtDct -l 64 /path/to/image.png
+```
 
 ## The NSFW ("Safety") Checker
 
-The Stable Diffusion image generation models will produce sexual
+Stable Diffusion 1.5-based image generation models will produce sexual
 imagery if deliberately prompted, and will occasionally produce such
 images when this is not intended. Such images are colloquially known
 as "Not Safe for Work" (NSFW). This behavior is due to the nature of
@@ -18,35 +46,17 @@ jurisdictions it may be illegal to publicly distribute such imagery,
 including mounting a publicly-available server that provides
 unfiltered images to the public. Furthermore, the [Stable Diffusion
 weights
-License](https://github.com/invoke-ai/InvokeAI/blob/main/LICENSE-ModelWeights.txt)
-forbids the model from being used to "exploit any of the
+License](https://github.com/invoke-ai/InvokeAI/blob/main/LICENSE-SD1+SD2.txt),
+and the [Stable Diffusion XL
+License][https://github.com/invoke-ai/InvokeAI/blob/main/LICENSE-SDXL.txt]
+both forbid the models from being used to "exploit any of the
 vulnerabilities of a specific group of persons."
 
 For these reasons Stable Diffusion offers a "safety checker," a
 machine learning model trained to recognize potentially disturbing
 imagery. When a potentially NSFW image is detected, the checker will
 blur the image and paste a warning icon on top. The checker can be
-turned on and off on the command line using `--nsfw_checker` and
-`--no-nsfw_checker`.
-
-At installation time, InvokeAI will ask whether the checker should be
-activated by default (neither argument given on the command line). The
-response is stored in the InvokeAI initialization file
-(`invokeai.yaml` in the InvokeAI root directory).  You can change the
-default at any time by opening this file in a text editor and
-changing the line `nsfw_checker:` from true to false or vice-versa:
-
-
-```
-...
-  Features:
-    esrgan: true
-    internet_available: true
-    log_tokenization: false
-    nsfw_checker: true
-    patchmatch: true
-    restore: true
-```
+turned on and off in the Web interface under Settings.
 
 ## Caveats
 
@@ -84,10 +94,3 @@ are encouraged to turn **off** intermediate image rendering when you
 are using the checker. Future versions of InvokeAI will apply
 additional blurring to intermediate images when the checker is active.
 
-### Watermarking
-
-InvokeAI does not apply any sort of watermark to images it
-generates. However, it does write metadata into the PNG data area,
-including the prompt used to generate the image and relevant parameter
-settings. These fields can be examined using the `sd-metadata.py`
-script that comes with the InvokeAI package.
