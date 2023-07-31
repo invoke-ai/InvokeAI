@@ -15,7 +15,7 @@ from ...services.graph import (
     GraphExecutionState,
     NodeAlreadyExecutedError,
 )
-from ...services.batch_manager import Batch
+from ...services.batch_manager import Batch, BatchProcess
 from ...services.item_storage import PaginatedResults
 from ..dependencies import ApiDependencies
 
@@ -42,17 +42,30 @@ async def create_session(
     "/batch",
     operation_id="create_batch",
     responses={
-        200: {"model": GraphExecutionState},
+        200: {"model": BatchProcess},
         400: {"description": "Invalid json"},
     },
 )
 async def create_batch(
     graph: Optional[Graph] = Body(default=None, description="The graph to initialize the session with"),
     batches: list[Batch] = Body(description="Batch config to apply to the given graph")
-) -> GraphExecutionState:
-    """Creates a new session, optionally initializing it with an invocation graph"""
+) -> BatchProcess:
+    """Creates and starts a new new batch process"""
     session = ApiDependencies.invoker.services.batch_manager.run_batch_process(batches, graph)
     return session
+
+
+@session_router.delete(
+    "{batch_process_id}/batch",
+    operation_id="cancel_batch",
+    responses={202: {"description": "The batch is canceled"}},
+)
+async def cancel_batch(
+    batch_process_id: str = Path(description="The id of the batch process to cancel"),
+) -> Response:
+    """Creates and starts a new new batch process"""
+    ApiDependencies.invoker.services.batch_manager.cancel_batch_process(batch_process_id)
+    return Response(status_code=202)
 
 
 @session_router.get(
