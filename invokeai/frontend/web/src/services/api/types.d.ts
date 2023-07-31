@@ -32,6 +32,7 @@ export type ModelType = components['schemas']['ModelType'];
 export type SubModelType = components['schemas']['SubModelType'];
 export type BaseModelType = components['schemas']['BaseModelType'];
 export type MainModelField = components['schemas']['MainModelField'];
+export type OnnxModelField = components['schemas']['OnnxModelField'];
 export type VAEModelField = components['schemas']['VAEModelField'];
 export type LoRAModelField = components['schemas']['LoRAModelField'];
 export type ControlNetModelField =
@@ -58,6 +59,8 @@ export type DiffusersModelConfig =
 export type CheckpointModelConfig =
   | components['schemas']['StableDiffusion1ModelCheckpointConfig']
   | components['schemas']['StableDiffusion2ModelCheckpointConfig']
+  | components['schemas']['StableDiffusion2ModelDiffusersConfig'];
+export type OnnxModelConfig = components['schemas']['ONNXStableDiffusion1ModelConfig']
   | components['schemas']['StableDiffusionXLModelCheckpointConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
@@ -65,7 +68,8 @@ export type AnyModelConfig =
   | VaeModelConfig
   | ControlNetModelConfig
   | TextualInversionModelConfig
-  | MainModelConfig;
+  | MainModelConfig
+  | OnnxModelConfig;
 
 export type MergeModelConfig = components['schemas']['Body_merge_models'];
 export type ConvertModelConfig = components['schemas']['Body_convert_model'];
@@ -126,6 +130,9 @@ export type ImageCollectionInvocation = TypeReq<
 >;
 export type MainModelLoaderInvocation = TypeReq<
   components['schemas']['MainModelLoaderInvocation']
+>;
+export type OnnxModelLoaderInvocation = TypeReq<
+  components['schemas']['OnnxModelLoaderInvocation']
 >;
 export type LoraLoaderInvocation = TypeReq<
   components['schemas']['LoraLoaderInvocation']
