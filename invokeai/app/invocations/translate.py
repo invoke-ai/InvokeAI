@@ -16,19 +16,9 @@ try:
     import translators as ts
 
     translate_available = True
+    TRANSLATORS = tuple(ts.translators_pool)
 except:
-    # need dummy ts for regression tests to pass
-    class DummyTranslator:
-        @classmethod
-        @property
-        def translators_pool(cls) -> List[str]:
-            pass
-
-        @classmethod
-        def translate_text(cls, **kwargs) -> Union[str, dict]:
-            pass
-
-    ts = DummyTranslator
+    TRANSLATORS = ("google", "bing")
 
 DEFAULT_PROMPT = "" if translate_available else "To use this node, please 'pip install --upgrade translators'"
 
@@ -48,7 +38,7 @@ class TranslateInvocation(BaseInvocation):
 
     # Inputs
     text: str = Field(default=DEFAULT_PROMPT, description="Prompt in any language")
-    translator: Literal[tuple(ts.translators_pool)] = Field(default="google", description="The translator service to use")
+    translator: Literal[TRANSLATORS] = Field(default="google", description="The translator service to use")
     # fmt: on
 
     # Schema customisation
