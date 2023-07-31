@@ -7,7 +7,7 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import List, Dict, Callable, Union, Set
+from typing import List, Dict, Callable, Union, Set, Optional
 
 import requests
 from diffusers import DiffusionPipeline
@@ -128,7 +128,9 @@ class ModelInstall(object):
             model_dict[key] = ModelLoadInfo(**value)
 
         # supplement with entries in models.yaml
-        installed_models = self.mgr.list_models()
+        installed_models = [x for x in self.mgr.list_models()]
+        # suppresses autoloaded models
+        # installed_models = [x for x in self.mgr.list_models() if not self._is_autoloaded(x)]
 
         for md in installed_models:
             base = md["base_model"]
@@ -146,6 +148,17 @@ class ModelInstall(object):
                     installed=True,
                 )
         return {x: model_dict[x] for x in sorted(model_dict.keys(), key=lambda y: model_dict[y].name.lower())}
+
+    def _is_autoloaded(self, model_info: dict) -> bool:
+        path = model_info.get("path")
+        if not path:
+            return False
+        for autodir in ["autoimport_dir", "lora_dir", "embedding_dir", "controlnet_dir"]:
+            if autodir_path := getattr(self.config, autodir):
+                autodir_path = self.config.root_path / autodir_path
+                if Path(path).is_relative_to(autodir_path):
+                    return True
+        return False
 
     def list_models(self, model_type):
         installed = self.mgr.list_models(model_type=model_type)
@@ -273,6 +286,7 @@ class ModelInstall(object):
                 logger.error(f"Unable to download {url}. Skipping.")
             info = ModelProbe().heuristic_probe(location)
             dest = self.config.models_path / info.base_type.value / info.model_type.value / location.name
+            dest.parent.mkdir(parents=True, exist_ok=True)
             models_path = shutil.move(location, dest)
 
         # staged version will be garbage-collected at this time
@@ -346,7 +360,7 @@ class ModelInstall(object):
             if key in self.datasets:
                 description = self.datasets[key].get("description") or description
 
-        rel_path = self.relative_to_root(path)
+        rel_path = self.relative_to_root(path, self.config.models_path)
 
         attributes = dict(
             path=str(rel_path),
@@ -386,8 +400,8 @@ class ModelInstall(object):
             attributes.update(dict(config=str(legacy_conf)))
         return attributes
 
-    def relative_to_root(self, path: Path) -> Path:
-        root = self.config.root_path
+    def relative_to_root(self, path: Path, root: Optional[Path] = None) -> Path:
+        root = root or self.config.root_path
         if path.is_relative_to(root):
             return path.relative_to(root)
         else:

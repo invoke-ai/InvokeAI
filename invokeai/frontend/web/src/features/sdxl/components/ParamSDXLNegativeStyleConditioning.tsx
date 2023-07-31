@@ -13,15 +13,20 @@ import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { AnimatePresence } from 'framer-motion';
 import { isEqual } from 'lodash-es';
 import { flushSync } from 'react-dom';
 import { setNegativeStylePromptSDXL } from '../store/sdxlSlice';
+import SDXLConcatLink from './SDXLConcatLink';
 
 const promptInputSelector = createSelector(
   [stateSelector, activeTabNameSelector],
   ({ sdxl }, activeTabName) => {
+    const { negativeStylePrompt, shouldConcatSDXLStylePrompt } = sdxl;
+
     return {
-      prompt: sdxl.negativeStylePrompt,
+      prompt: negativeStylePrompt,
+      shouldConcatSDXLStylePrompt,
       activeTabName,
     };
   },
@@ -37,10 +42,12 @@ const promptInputSelector = createSelector(
  */
 const ParamSDXLNegativeStyleConditioning = () => {
   const dispatch = useAppDispatch();
-  const { prompt, activeTabName } = useAppSelector(promptInputSelector);
   const isReady = useIsReadyToInvoke();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
+
+  const { prompt, activeTabName, shouldConcatSDXLStylePrompt } =
+    useAppSelector(promptInputSelector);
 
   const handleChangePrompt = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -111,6 +118,20 @@ const ParamSDXLNegativeStyleConditioning = () => {
 
   return (
     <Box position="relative">
+      <AnimatePresence>
+        {shouldConcatSDXLStylePrompt && (
+          <Box
+            sx={{
+              position: 'absolute',
+              left: '3',
+              w: '94%',
+              top: '-17px',
+            }}
+          >
+            <SDXLConcatLink />
+          </Box>
+        )}
+      </AnimatePresence>
       <FormControl>
         <ParamEmbeddingPopover
           isOpen={isOpen}

@@ -63,7 +63,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionS
 from diffusers.pipelines.stable_diffusion.stable_unclip_image_normalizer import StableUnCLIPImageNormalizer
 
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.app.services.config import InvokeAIAppConfig, MODEL_CORE
+from invokeai.app.services.config import InvokeAIAppConfig
 
 from picklescan.scanner import scan_file_path
 from .models import BaseModelType, ModelVariantType
@@ -81,7 +81,7 @@ if is_accelerate_available():
     from accelerate.utils import set_module_tensor_to_device
 
 logger = InvokeAILogger.getLogger(__name__)
-CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().root_path / MODEL_CORE / "convert"
+CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().models_path / "core/convert"
 
 
 def shave_segments(path, n_shave_prefix_segments=1):
@@ -1070,7 +1070,7 @@ def convert_controlnet_checkpoint(
     extract_ema,
     use_linear_projection=None,
     cross_attention_dim=None,
-    precision: torch.dtype = torch.float32,
+    precision: Optional[torch.dtype] = None,
 ):
     ctrlnet_config = create_unet_diffusers_config(original_config, image_size=image_size, controlnet=True)
     ctrlnet_config["upcast_attention"] = upcast_attention
@@ -1111,7 +1111,6 @@ def convert_controlnet_checkpoint(
     return controlnet.to(precision)
 
 
-# TO DO - PASS PRECISION
 def download_from_original_stable_diffusion_ckpt(
     checkpoint_path: str,
     model_version: BaseModelType,
@@ -1121,7 +1120,7 @@ def download_from_original_stable_diffusion_ckpt(
     prediction_type: str = None,
     model_type: str = None,
     extract_ema: bool = False,
-    precision: torch.dtype = torch.float32,
+    precision: Optional[torch.dtype] = None,
     scheduler_type: str = "pndm",
     num_in_channels: Optional[int] = None,
     upcast_attention: Optional[bool] = None,
@@ -1194,6 +1193,8 @@ def download_from_original_stable_diffusion_ckpt(
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer)
             to use. If this parameter is `None`, the function will load a new instance of [CLIPTokenizer] by itself, if
             needed.
+        precision (`torch.dtype`, *optional*, defauts to `None`):
+            If not provided the precision will be set to the precision of the original file.
         return: A StableDiffusionPipeline object representing the passed-in `.ckpt`/`.safetensors` file.
     """
 
@@ -1252,6 +1253,10 @@ def download_from_original_stable_diffusion_ckpt(
 
     logger.debug(f"model_type = {model_type}; original_config_file = {original_config_file}")
 
+    precision_probing_key = "model.diffusion_model.input_blocks.0.0.bias"
+    logger.debug(f"original checkpoint precision == {checkpoint[precision_probing_key].dtype}")
+    precision = precision or checkpoint[precision_probing_key].dtype
+
     if original_config_file is None:
         key_name_v2_1 = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
         key_name_sd_xl_base = "conditioner.embedders.1.model.transformer.resblocks.9.mlp.c_proj.bias"
@@ -1279,9 +1284,12 @@ def download_from_original_stable_diffusion_ckpt(
         original_config_file = BytesIO(requests.get(config_url).content)
 
     original_config = OmegaConf.load(original_config_file)
+    if original_config["model"]["params"].get("use_ema") is not None:
+        extract_ema = original_config["model"]["params"]["use_ema"]
+
     if (
         model_version == BaseModelType.StableDiffusion2
-        and original_config["model"]["params"]["parameterization"] == "v"
+        and original_config["model"]["params"].get("parameterization") == "v"
     ):
         prediction_type = "v_prediction"
         upcast_attention = True
@@ -1447,7 +1455,7 @@ def download_from_original_stable_diffusion_ckpt(
             if controlnet:
                 pipe = pipeline_class(
                     vae=vae.to(precision),
-                    text_encoder=text_model,
+                    text_encoder=text_model.to(precision),
                     tokenizer=tokenizer,
                     unet=unet.to(precision),
                     scheduler=scheduler,
@@ -1459,7 +1467,7 @@ def download_from_original_stable_diffusion_ckpt(
             else:
                 pipe = pipeline_class(
                     vae=vae.to(precision),
-                    text_encoder=text_model,
+                    text_encoder=text_model.to(precision),
                     tokenizer=tokenizer,
                     unet=unet.to(precision),
                     scheduler=scheduler,
@@ -1484,8 +1492,8 @@ def download_from_original_stable_diffusion_ckpt(
                     image_noising_scheduler=image_noising_scheduler,
                     # regular denoising components
                     tokenizer=tokenizer,
-                    text_encoder=text_model,
-                    unet=unet,
+                    text_encoder=text_model.to(precision),
+                    unet=unet.to(precision),
                     scheduler=scheduler,
                     # vae
                     vae=vae,
@@ -1560,7 +1568,7 @@ def download_from_original_stable_diffusion_ckpt(
         if controlnet:
             pipe = pipeline_class(
                 vae=vae.to(precision),
-                text_encoder=text_model,
+                text_encoder=text_model.to(precision),
                 tokenizer=tokenizer,
                 unet=unet.to(precision),
                 controlnet=controlnet,
@@ -1571,7 +1579,7 @@ def download_from_original_stable_diffusion_ckpt(
         else:
             pipe = pipeline_class(
                 vae=vae.to(precision),
-                text_encoder=text_model,
+                text_encoder=text_model.to(precision),
                 tokenizer=tokenizer,
                 unet=unet.to(precision),
                 scheduler=scheduler,
@@ -1594,9 +1602,9 @@ def download_from_original_stable_diffusion_ckpt(
 
             pipe = StableDiffusionXLPipeline(
                 vae=vae.to(precision),
-                text_encoder=text_encoder,
+                text_encoder=text_encoder.to(precision),
                 tokenizer=tokenizer,
-                text_encoder_2=text_encoder_2,
+                text_encoder_2=text_encoder_2.to(precision),
                 tokenizer_2=tokenizer_2,
                 unet=unet.to(precision),
                 scheduler=scheduler,
@@ -1639,7 +1647,7 @@ def download_controlnet_from_original_ckpt(
     original_config_file: str,
     image_size: int = 512,
     extract_ema: bool = False,
-    precision: torch.dtype = torch.float32,
+    precision: Optional[torch.dtype] = None,
     num_in_channels: Optional[int] = None,
     upcast_attention: Optional[bool] = None,
     device: str = None,
@@ -1680,6 +1688,12 @@ def download_controlnet_from_original_ckpt(
     while "state_dict" in checkpoint:
         checkpoint = checkpoint["state_dict"]
 
+    # use original precision
+    precision_probing_key = "input_blocks.0.0.bias"
+    ckpt_precision = checkpoint[precision_probing_key].dtype
+    logger.debug(f"original controlnet precision = {ckpt_precision}")
+    precision = precision or ckpt_precision
+
     original_config = OmegaConf.load(original_config_file)
 
     if num_in_channels is not None:
@@ -1699,7 +1713,7 @@ def download_controlnet_from_original_ckpt(
         cross_attention_dim=cross_attention_dim,
     )
 
-    return controlnet
+    return controlnet.to(precision)
 
 
 def convert_ldm_vae_to_diffusers(checkpoint, vae_config: DictConfig, image_size: int) -> AutoencoderKL:

@@ -219,7 +219,7 @@ encouraged to do so.
 
 ## :octicons-person-24: Contributors
 
-This fork is a combined effort of various people from across the world.
+This software is a combined effort of various people from across the world.
 [Check out the list of all these amazing people](other/CONTRIBUTORS.md). We
 thank them for their time, hard work and effort.
 
