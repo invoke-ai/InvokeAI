@@ -6,14 +6,13 @@
 #
 # Coauthor: Kevin Turner http://github.com/keturn
 #
-import sys
 import argparse
 import io
 import os
 import shutil
+import sys
 import textwrap
 import traceback
-import yaml
 import warnings
 from argparse import Namespace
 from pathlib import Path
@@ -22,45 +21,35 @@ from typing import get_type_hints
 from urllib import request
 
 import npyscreen
-import transformers
 import omegaconf
+import transformers
+import yaml
 from diffusers import AutoencoderKL
-from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+from diffusers.pipelines.stable_diffusion.safety_checker import \
+    StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
 from tqdm import tqdm
-from transformers import (
-    CLIPTextModel,
-    CLIPTextConfig,
-    CLIPTokenizer,
-    AutoFeatureExtractor,
-    BertTokenizerFast,
-)
-import invokeai.configs as configs
+from transformers import (AutoFeatureExtractor, BertTokenizerFast,
+                          CLIPTextConfig, CLIPTextModel, CLIPTokenizer)
 
-from invokeai.app.services.config import (
-    InvokeAIAppConfig,
-)
-from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
-from invokeai.frontend.install.widgets import (
-    SingleSelectColumns,
-    CenteredButtonPress,
-    FileBox,
-    IntTitleSlider,
-    set_min_terminal_size,
-    CyclingForm,
-    MIN_COLS,
-    MIN_LINES,
-)
+import invokeai.configs as configs
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
-    hf_download_from_pretrained,
-    InstallSelections,
-    ModelInstall,
-)
-from invokeai.backend.model_management.model_probe import ModelType, BaseModelType
+    InstallSelections, ModelInstall, hf_download_from_pretrained)
+from invokeai.backend.model_management.model_probe import (BaseModelType,
+                                                           ModelType)
+from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.frontend.install.model_install import (addModelsForm,
+                                                     process_and_execute)
+from invokeai.frontend.install.widgets import (MIN_COLS, MIN_LINES,
+                                               CenteredButtonPress,
+                                               CyclingForm, FileBox,
+                                               IntTitleSlider,
+                                               SingleSelectColumns,
+                                               set_min_terminal_size)
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -530,6 +519,22 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
     return editApp.new_opts()
 
 
+def import_paths(config: InvokeAIAppConfig):
+    return [
+        (
+            "Folder for generated and uploaded images (tab autocompletes, return advances)",
+            "outdir",
+            config.root_path / config.outdir,
+        ),
+        (
+            "Folder to scan for new checkpoints, Controlnets, LoRAs and TI models",
+            "autoimport_dir",
+            config.root_path / config.autoimport_dir,
+        ),
+        ("Folder containing nodes to import", "nodes_dir", config.root_path / config.nodes_dir),
+    ]
+
+
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
     return opts
@@ -556,7 +561,7 @@ def default_user_selections(program_opts: Namespace) -> InstallSelections:
 # -------------------------------------
 def initialize_rootdir(root: Path, yes_to_all: bool = False):
     logger.info("Initializing InvokeAI runtime directory")
-    for name in ("models", "databases", "text-inversion-output", "text-inversion-training-data", "configs"):
+    for name in ("models", "databases", "nodes", "text-inversion-output", "text-inversion-training-data", "configs"):
         os.makedirs(os.path.join(root, name), exist_ok=True)
     for model_type in ModelType:
         Path(root, "autoimport", model_type.value).mkdir(parents=True, exist_ok=True)
