@@ -40,6 +40,7 @@ This is a high level walkthrough of some of the concepts and terms you’ll see 
 - Tweak and Iterate - Remember, it’s best to change one thing at a time so you know what is working and what isn't. Sometimes you just need to try a new image, and other times using a new prompt might be the ticket. For testing, consider turning off the “random” Seed - Using the same seed with the same settings will produce the same image, which makes it the perfect way to learn exactly what your changes are doing.
 - Explore Advanced Settings - InvokeAI has a full suite of tools available to allow you complete control over your image creation process - Check out our [docs if you want to learn more](https://invoke-ai.github.io/InvokeAI/features/).
 
+
 ## Terms & Concepts
 
 If you're interested in learning more, check out [this presentation](https://docs.google.com/presentation/d/1IO78i8oEXFTZ5peuHHYkVF-Y3e2M6iM5tCnc-YBfcCM/edit?usp=sharing) from one of our maintainers (@lstein). 
@@ -59,8 +60,6 @@ Models are the magic that power InvokeAI. These files represent the output of tr
 Invoke offers a simple way to download several different models upon installation, but many more can be discovered online, including at ****. Each model can produce a unique style of output, based on the images it was trained on - Try out different models to see which best fits your creative vision!
 
 - *Models that contain “inpainting” in the name are designed for use with the inpainting feature of the Unified Canvas*
-
-### Noise
 
 ### Scheduler
 
@@ -93,3 +92,4 @@ ControlNets are neural network models that are able to extract key features from
 ### VAE
 
 Variational auto-encoder (VAE) is a encode/decode model that translates the "latents" image produced during the image generation procees to the large pixel images that we see. 
+
