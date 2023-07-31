@@ -25,7 +25,11 @@ class InvokeAIExtensionManager:
         self.logger = getLogger("Extension Manager")
         self.config = get_invokeai_config()
         self.community_nodes_dir: pathlib.Path = self.config.nodes_path
-        assert self.community_nodes_dir.is_dir()
+
+        try:
+            assert self.community_nodes_dir.is_dir()
+        except AssertionError:
+            self.logger("Nodes directory is missing. Please make sure it exists.")
 
     def get_extensions(self) -> Dict[str, Extension]:
         """Returns an object with paths to all folders in the extension directory"""
