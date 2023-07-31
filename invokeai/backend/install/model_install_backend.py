@@ -438,7 +438,11 @@ class ModelInstall(object):
         for filename in files:
             filePath = Path(filename)
             p = hf_download_with_resume(
-                repo_id, model_dir=location / filePath.parent, model_name=filePath.name, access_token=self.access_token, subfolder=filePath.parent
+                repo_id,
+                model_dir=location / filePath.parent,
+                model_name=filePath.name,
+                access_token=self.access_token,
+                subfolder=filePath.parent,
             )
             if p:
                 paths.append(p)

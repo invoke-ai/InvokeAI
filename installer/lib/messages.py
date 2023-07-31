@@ -168,7 +168,7 @@ def graphical_accelerator():
         "cuda",
     )
     nvidia_with_dml = (
-        "an [gold1 b]NVIDIA[/] GPU (using CUDA™, and DirectML™ for ONNX)",
+        "an [gold1 b]NVIDIA[/] GPU (using CUDA™, and DirectML™ for ONNX) -- ALPHA",
         "cuda_and_dml",
     )
     amd = (

@@ -54,7 +54,9 @@ class ModelProbe(object):
     }
 
     @classmethod
-    def register_probe(cls, format: Literal["diffusers", "checkpoint", "onnx"], model_type: ModelType, probe_class: ProbeBase):
+    def register_probe(
+        cls, format: Literal["diffusers", "checkpoint", "onnx"], model_type: ModelType, probe_class: ProbeBase
+    ):
         cls.PROBES[format][model_type] = probe_class
 
     @classmethod
@@ -96,7 +98,7 @@ class ModelProbe(object):
                 if format_type == "diffusers"
                 else cls.get_model_type_from_checkpoint(model_path, model)
             )
-            format_type = 'onnx' if model_type == ModelType.ONNX else format_type
+            format_type = "onnx" if model_type == ModelType.ONNX else format_type
             probe_class = cls.PROBES[format_type].get(model_type)
             if not probe_class:
                 return None
@@ -170,7 +172,7 @@ class ModelProbe(object):
         if model:
             class_name = model.__class__.__name__
         else:
-            if (folder_path / 'unet/model.onnx').exists():
+            if (folder_path / "unet/model.onnx").exists():
                 return ModelType.ONNX
             if (folder_path / "learned_embeds.bin").exists():
                 return ModelType.TextualInversion
@@ -473,6 +475,7 @@ class ONNXFolderProbe(FolderProbeBase):
 
     def get_variant_type(self) -> ModelVariantType:
         return ModelVariantType.Normal
+
 
 class ControlNetFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
