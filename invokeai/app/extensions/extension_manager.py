@@ -16,30 +16,29 @@ class Extension(BaseModel):
     path: pathlib.Path
 
 
-class InvokeAIExtensionManager():
+class InvokeAIExtensionManager:
     """
     InvokeAI's Extension Manager - Controls all extension related operations.
     """
 
     def __init__(self) -> None:
-        self.logger = getLogger('Extension Manager')
+        self.logger = getLogger("Extension Manager")
         self.config = get_invokeai_config()
         self.community_nodes_dir: pathlib.Path = self.config.nodes_path
         assert self.community_nodes_dir.is_dir()
 
     def get_extensions(self) -> Dict[str, Extension]:
-        """ Returns an object with paths to all folders in the extension directory """
+        """Returns an object with paths to all folders in the extension directory"""
         available_extensions: Dict[str, Extension] = {}
 
         for extension in self.community_nodes_dir.iterdir():
-            if extension.is_dir() and not extension.name.startswith('__'):
-                available_extensions[extension.stem] = Extension(
-                    name=extension.stem, path=extension)
-                
+            if extension.is_dir() and not extension.name.startswith("__"):
+                available_extensions[extension.stem] = Extension(name=extension.stem, path=extension)
+
         return available_extensions
-    
+
     def get_extension_config(self, extension: Extension):
-        extension_config_file = extension.path / 'config.yaml'
+        extension_config_file = extension.path / "config.yaml"
 
         if extension_config_file.is_file():
             try:
@@ -47,9 +46,11 @@ class InvokeAIExtensionManager():
                 return extension_config_manager.config
             except ValidationError as e:
                 for error in e.errors():
-                    self.logger.error(f"{extension.name}: Config Validation Failed - {error['loc']}: {error['msg']} ({error['type']})")
+                    self.logger.error(
+                        f"{extension.name}: Config Validation Failed - {error['loc']}: {error['msg']} ({error['type']})"
+                    )
         else:
-            self.logger.warn(f'No config found for extension: {extension.name}')
+            self.logger.warn(f"No config found for extension: {extension.name}")
 
     def load_extension(self, extension: Extension) -> List | None:
         """
@@ -58,21 +59,19 @@ class InvokeAIExtensionManager():
         Returns `None` if no Invocations are found.
         """
         extension_name = extension.name
-        extension_version = 'n/a'
-        
+        extension_version = "n/a"
+
         extension_config = self.get_extension_config(extension)
         if extension_config:
             extension_name = extension_config.name or extension_name
             extension_version = extension_config.version or extension_version
 
         # Search for py files that are not named __init__.py in extensions root directory
-        py_files = list(extension.path.glob('*.py'))
-        py_files = [
-            file for file in py_files if not file.name == "__init__.py"]
+        py_files = list(extension.path.glob("*.py"))
+        py_files = [file for file in py_files if not file.name == "__init__.py"]
 
         if len(py_files) == 0:
-            self.logger.warn(
-                f'Extension: "{extension_name}" failed to load. No node files found.')
+            self.logger.warn(f'Extension: "{extension_name}" failed to load. No node files found.')
             return None
 
         # Every py file in the root directory of the extension is loaded as an invocation
@@ -84,10 +83,8 @@ class InvokeAIExtensionManager():
         for file in py_files:
             with open(file) as nodefile:
                 node_file = ast.parse(nodefile.read())
-                classes = [n for n in node_file.body
-                           if isinstance(n, ast.ClassDef)]
-                invocations = [c.name.replace('Invocation', '') for c in classes
-                               if c.name.endswith("Invocation")]
+                classes = [n for n in node_file.body if isinstance(n, ast.ClassDef)]
+                invocations = [c.name.replace("Invocation", "") for c in classes if c.name.endswith("Invocation")]
 
             if len(invocations) == 0:
                 nodes_not_found.append(file.name)
@@ -98,33 +95,35 @@ class InvokeAIExtensionManager():
 
         if len(loaded_nodes) > 0:
             self.logger.info(
-                f'\
+                f"\
                     \n \
                     \nExtension: {extension_name} \
                     \n- Version: {extension_version} \
                     \n- Nodes: {nodes_found} - LOADED! \
-                    \n')
+                    \n"
+            )
         if len(nodes_not_found) > 0:
             self.logger.warn(
-                f'\
+                f"\
                     \n \
                     \nExtension: {extension_name} \
                     \n- No Nodes Found In: {nodes_not_found} - NOT LOADED!\
-                    \n')
+                    \n"
+            )
 
         return unique_list(loaded_nodes) if len(loaded_nodes) > 0 else None
 
     def load_extensions(self) -> List:
         loaded_extensions = []
 
-        self.logger.info('Scanning Extensions....')
+        self.logger.info("Scanning Extensions....")
         available_extensions = self.get_extensions()
         if len(available_extensions) > 0:
-            self.logger.info(f'Found {len(available_extensions)} extension(s). Loading ...')
+            self.logger.info(f"Found {len(available_extensions)} extension(s). Loading ...")
 
         for extension in available_extensions.values():
             loaded_extension = self.load_extension(extension)
             if loaded_extension and loaded_extension not in loaded_extensions:
                 loaded_extensions.extend(loaded_extension)
-                
+
         return unique_list(loaded_extensions)

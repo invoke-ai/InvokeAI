@@ -25,31 +25,30 @@ import omegaconf
 import transformers
 import yaml
 from diffusers import AutoencoderKL
-from diffusers.pipelines.stable_diffusion.safety_checker import \
-    StableDiffusionSafetyChecker
+from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
 from tqdm import tqdm
-from transformers import (AutoFeatureExtractor, BertTokenizerFast,
-                          CLIPTextConfig, CLIPTextModel, CLIPTokenizer)
+from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
-from invokeai.backend.install.model_install_backend import (
-    InstallSelections, ModelInstall, hf_download_from_pretrained)
-from invokeai.backend.model_management.model_probe import (BaseModelType,
-                                                           ModelType)
+from invokeai.backend.install.model_install_backend import InstallSelections, ModelInstall, hf_download_from_pretrained
+from invokeai.backend.model_management.model_probe import BaseModelType, ModelType
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.frontend.install.model_install import (addModelsForm,
-                                                     process_and_execute)
-from invokeai.frontend.install.widgets import (MIN_COLS, MIN_LINES,
-                                               CenteredButtonPress,
-                                               CyclingForm, FileBox,
-                                               IntTitleSlider,
-                                               SingleSelectColumns,
-                                               set_min_terminal_size)
+from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
+from invokeai.frontend.install.widgets import (
+    MIN_COLS,
+    MIN_LINES,
+    CenteredButtonPress,
+    CyclingForm,
+    FileBox,
+    IntTitleSlider,
+    SingleSelectColumns,
+    set_min_terminal_size,
+)
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
