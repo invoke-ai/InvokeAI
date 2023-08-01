@@ -37,6 +37,7 @@ from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService, ImageServiceDependencies
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
+from invokeai.app.services.batch_manager import BatchManager
 from .services.default_graphs import default_text_to_image_graph_id, create_system_graphs
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
@@ -306,6 +307,7 @@ def invoke_cli():
         latents=ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents")),
         images=images,
         boards=boards,
+        batch_manager=BatchManager(),
         board_images=board_images,
         queue=MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs"),

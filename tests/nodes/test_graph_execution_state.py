@@ -48,6 +48,7 @@ def mock_services() -> InvocationServices:
         images=None,  # type: ignore
         latents=None,  # type: ignore
         boards=None,  # type: ignore
+        batch_manager=None,  # type: ignore
         board_images=None,  # type: ignore
         queue=MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](filename=sqlite_memory, table_name="graphs"),

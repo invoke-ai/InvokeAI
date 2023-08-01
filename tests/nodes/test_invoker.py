@@ -40,6 +40,7 @@ def mock_services() -> InvocationServices:
         logger=None,  # type: ignore
         images=None,  # type: ignore
         latents=None,  # type: ignore
+        batch_manager=None,  # type: ignore
         boards=None,  # type: ignore
         board_images=None,  # type: ignore
         queue=MemoryInvocationQueue(),
