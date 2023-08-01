@@ -65,7 +65,6 @@ class ONNXPromptInvocation(BaseInvocation):
             **self.clip.text_encoder.dict(),
         )
         with tokenizer_info as orig_tokenizer, text_encoder_info as text_encoder, ExitStack() as stack:
-            # loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.clip.loras]
             loras = [
                 (context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)
                 for lora in self.clip.loras
@@ -75,20 +74,14 @@ class ONNXPromptInvocation(BaseInvocation):
             for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
                 name = trigger[1:-1]
                 try:
-                    ti_list.append(
-                        # stack.enter_context(
-                        #    context.services.model_manager.get_model(
-                        #        model_name=name,
-                        #        base_model=self.clip.text_encoder.base_model,
-                        #        model_type=ModelType.TextualInversion,
-                        #    )
-                        # )
+                    ti_list.append((
+                        name,
                         context.services.model_manager.get_model(
                             model_name=name,
                             base_model=self.clip.text_encoder.base_model,
                             model_type=ModelType.TextualInversion,
                         ).context.model
-                    )
+                    ))
                 except Exception:
                     # print(e)
                     # import traceback
