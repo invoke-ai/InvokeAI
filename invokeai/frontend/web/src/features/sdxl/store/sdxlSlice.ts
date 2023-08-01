@@ -1,11 +1,10 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import {
-  MainModelParam,
   NegativeStylePromptSDXLParam,
   PositiveStylePromptSDXLParam,
+  SDXLRefinerModelParam,
   SchedulerParam,
 } from 'features/parameters/types/parameterSchemas';
-import { MainModelField } from 'services/api/types';
 
 type SDXLInitialState = {
   positiveStylePrompt: PositiveStylePromptSDXLParam;
@@ -13,7 +12,7 @@ type SDXLInitialState = {
   shouldConcatSDXLStylePrompt: boolean;
   shouldUseSDXLRefiner: boolean;
   sdxlImg2ImgDenoisingStrength: number;
-  refinerModel: MainModelField | null;
+  refinerModel: SDXLRefinerModelParam | null;
   refinerSteps: number;
   refinerCFGScale: number;
   refinerScheduler: SchedulerParam;
@@ -56,7 +55,7 @@ const sdxlSlice = createSlice({
     },
     refinerModelChanged: (
       state,
-      action: PayloadAction<MainModelParam | null>
+      action: PayloadAction<SDXLRefinerModelParam | null>
     ) => {
       state.refinerModel = action.payload;
     },

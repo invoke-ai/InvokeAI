@@ -3,13 +3,14 @@ import { createSlice } from '@reduxjs/toolkit';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
-import { ImageDTO, MainModelField } from 'services/api/types';
+import { ImageDTO } from 'services/api/types';
 import { clipSkipMap } from '../types/constants';
 import {
   CfgScaleParam,
   HeightParam,
   MainModelParam,
   NegativePromptParam,
+  OnnxModelParam,
   PositivePromptParam,
   PrecisionParam,
   SchedulerParam,
@@ -50,7 +51,7 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: MainModelField | null;
+  model: MainModelParam | OnnxModelParam | null;
   vae: VaeModelParam | null;
   vaePrecision: PrecisionParam;
   seamlessXAxis: boolean;
@@ -229,7 +230,10 @@ export const generationSlice = createSlice({
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelChanged: (state, action: PayloadAction<MainModelParam | null>) => {
+    modelChanged: (
+      state,
+      action: PayloadAction<MainModelParam | OnnxModelParam | null>
+    ) => {
       state.model = action.payload;
 
       if (state.model === null) {
@@ -272,11 +276,12 @@ export const generationSlice = createSlice({
       const defaultModel = action.payload.sd?.defaultModel;
 
       if (defaultModel && !state.model) {
-        const [base_model, _model_type, model_name] = defaultModel.split('/');
+        const [base_model, model_type, model_name] = defaultModel.split('/');
 
         const result = zMainModel.safeParse({
           model_name,
           base_model,
+          model_type,
         });
 
         if (result.success) {
