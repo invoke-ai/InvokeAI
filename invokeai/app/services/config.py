@@ -274,7 +274,7 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def _excluded(self) -> List[str]:
         # internal fields that shouldn't be exposed as command line options
-        return ["type", "initconf", "cached_root"]
+        return ["type", "initconf"]
 
     @classmethod
     def _excluded_from_yaml(self) -> List[str]:
@@ -290,7 +290,6 @@ class InvokeAISettings(BaseSettings):
             "restore",
             "root",
             "nsfw_checker",
-            "cached_root",
         ]
 
     class Config:
@@ -357,6 +356,7 @@ def _find_root() -> Path:
     venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
         root = Path(os.environ.get("INVOKEAI_ROOT")).resolve()
+        os.environ["INVOKEAI_ROOT"] = str(root)  # absolutize it to protect against code doing a cwd()
     elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]]):
         root = (venv.parent).resolve()
     else:
@@ -424,7 +424,6 @@ class InvokeAIAppConfig(InvokeAISettings):
     log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
-    cached_root         : Path = Field(default=None,  description="internal use only", category="DEPRECATED")
     # fmt: on
 
     def parse_args(self, argv: List[str] = None, conf: DictConfig = None, clobber=False):
@@ -472,15 +471,11 @@ class InvokeAIAppConfig(InvokeAISettings):
         """
         Path to the runtime root directory
         """
-        # we cache value of root to protect against it being '.' and the cwd changing
-        if self.cached_root:
-            root = self.cached_root
-        elif self.root:
+        if self.root:
             root = Path(self.root).expanduser().absolute()
         else:
             root = self.find_root()
-        self.cached_root = root
-        return self.cached_root
+        return root
 
     @property
     def root_dir(self) -> Path:
