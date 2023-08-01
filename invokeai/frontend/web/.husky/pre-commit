@@ -1,6 +1,4 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-python -m black . --check
-
 cd invokeai/frontend/web/ && npm run lint-staged

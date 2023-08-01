@@ -6,7 +6,7 @@ import {
   modelChanged,
   vaeSelected,
 } from 'features/parameters/store/generationSlice';
-import { zMainModel } from 'features/parameters/types/parameterSchemas';
+import { zMainOrOnnxModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { forEach } from 'lodash-es';
@@ -19,7 +19,7 @@ export const addModelSelectedListener = () => {
       const log = logger('models');
 
       const state = getState();
-      const result = zMainModel.safeParse(action.payload);
+      const result = zMainOrOnnxModel.safeParse(action.payload);
 
       if (!result.success) {
         log.error(

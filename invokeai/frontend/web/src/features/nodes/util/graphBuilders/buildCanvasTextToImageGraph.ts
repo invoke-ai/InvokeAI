@@ -20,6 +20,10 @@ import {
   TEXT_TO_IMAGE_GRAPH,
   TEXT_TO_LATENTS,
 } from './constants';
+import {
+  ONNXTextToLatentsInvocation,
+  TextToLatentsInvocation,
+} from 'services/api/types';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
@@ -53,8 +57,31 @@ export const buildCanvasTextToImageGraph = (
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
-  const onnx_model_type = model.model_type.includes('onnx');
-  const model_loader = onnx_model_type ? ONNX_MODEL_LOADER : MAIN_MODEL_LOADER;
+  const isUsingOnnxModel = model.model_type === 'onnx';
+  const modelLoaderNodeId = isUsingOnnxModel
+    ? ONNX_MODEL_LOADER
+    : MAIN_MODEL_LOADER;
+  const modelLoaderNodeType = isUsingOnnxModel
+    ? 'onnx_model_loader'
+    : 'main_model_loader';
+  const t2lNode: TextToLatentsInvocation | ONNXTextToLatentsInvocation =
+    isUsingOnnxModel
+      ? {
+          type: 't2l_onnx',
+          id: TEXT_TO_LATENTS,
+          is_intermediate: true,
+          cfg_scale,
+          scheduler,
+          steps,
+        }
+      : {
+          type: 't2l',
+          id: TEXT_TO_LATENTS,
+          is_intermediate: true,
+          cfg_scale,
+          scheduler,
+          steps,
+        };
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -70,13 +97,13 @@ export const buildCanvasTextToImageGraph = (
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
       [POSITIVE_CONDITIONING]: {
-        type: onnx_model_type ? 'prompt_onnx' : 'compel',
+        type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
         id: POSITIVE_CONDITIONING,
         is_intermediate: true,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: onnx_model_type ? 'prompt_onnx' : 'compel',
+        type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
         id: NEGATIVE_CONDITIONING,
         is_intermediate: true,
         prompt: negativePrompt,
@@ -89,17 +116,10 @@ export const buildCanvasTextToImageGraph = (
         height,
         use_cpu,
       },
-      [TEXT_TO_LATENTS]: {
-        type: onnx_model_type ? 't2l_onnx' : 't2l',
-        id: TEXT_TO_LATENTS,
-        is_intermediate: true,
-        cfg_scale,
-        scheduler,
-        steps,
-      },
-      [model_loader]: {
-        type: model_loader,
-        id: model_loader,
+      [t2lNode.id]: t2lNode,
+      [modelLoaderNodeId]: {
+        type: modelLoaderNodeType,
+        id: modelLoaderNodeId,
         is_intermediate: true,
         model,
       },
@@ -110,7 +130,7 @@ export const buildCanvasTextToImageGraph = (
         skipped_layers: clipSkip,
       },
       [LATENTS_TO_IMAGE]: {
-        type: onnx_model_type ? 'l2i_onnx' : 'l2i',
+        type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
         id: LATENTS_TO_IMAGE,
         is_intermediate: !shouldAutoSave,
       },
@@ -138,7 +158,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: model_loader,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -168,7 +188,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: model_loader,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -232,10 +252,10 @@ export const buildCanvasTextToImageGraph = (
   });
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS, model_loader);
+  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS, modelLoaderNodeId);
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, model_loader);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

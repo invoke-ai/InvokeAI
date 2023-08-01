@@ -1,17 +1,16 @@
 import { logger } from 'app/logging/logger';
 import {
-  MainModelParam,
-  OnnxModelParam,
-  zMainOrOnnxModel,
+  SDXLRefinerModelParam,
+  zSDXLRefinerModel,
 } from 'features/parameters/types/parameterSchemas';
 
-export const modelIdToMainModelParam = (
+export const modelIdToSDXLRefinerModelParam = (
   mainModelId: string
-): OnnxModelParam | MainModelParam | undefined => {
+): SDXLRefinerModelParam | undefined => {
   const log = logger('models');
   const [base_model, model_type, model_name] = mainModelId.split('/');
 
-  const result = zMainOrOnnxModel.safeParse({
+  const result = zSDXLRefinerModel.safeParse({
     base_model,
     model_name,
     model_type,
