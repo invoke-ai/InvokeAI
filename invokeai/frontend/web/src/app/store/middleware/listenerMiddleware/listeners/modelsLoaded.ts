@@ -6,7 +6,8 @@ import {
   vaeSelected,
 } from 'features/parameters/store/generationSlice';
 import {
-  zMainModel,
+  zMainOrOnnxModel,
+  zSDXLRefinerModel,
   zVaeModel,
 } from 'features/parameters/types/parameterSchemas';
 import {
@@ -36,7 +37,8 @@ export const addModelsLoadedListener = () => {
         action.payload.entities,
         (m) =>
           m?.model_name === currentModel?.model_name &&
-          m?.base_model === currentModel?.base_model
+          m?.base_model === currentModel?.base_model &&
+          m?.model_type === currentModel?.model_type
       );
 
       if (isCurrentModelAvailable) {
@@ -52,7 +54,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const result = zMainModel.safeParse(firstModel);
+      const result = zMainOrOnnxModel.safeParse(firstModel);
 
       if (!result.success) {
         log.error(
@@ -83,7 +85,8 @@ export const addModelsLoadedListener = () => {
         action.payload.entities,
         (m) =>
           m?.model_name === currentModel?.model_name &&
-          m?.base_model === currentModel?.base_model
+          m?.base_model === currentModel?.base_model &&
+          m?.model_type === currentModel?.model_type
       );
 
       if (isCurrentModelAvailable) {
@@ -100,7 +103,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const result = zMainModel.safeParse(firstModel);
+      const result = zSDXLRefinerModel.safeParse(firstModel);
 
       if (!result.success) {
         log.error(

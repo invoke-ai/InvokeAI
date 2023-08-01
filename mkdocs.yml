@@ -36,7 +36,6 @@ theme:
     - navigation.instant
     - navigation.tabs
     - navigation.tabs.sticky
-    - navigation.top
     - navigation.tracking
     - navigation.indexes
     - navigation.path
@@ -102,9 +101,9 @@ plugins:
 nav:
     - Home: 'index.md'
     - Installation:
-      - Overview: 'installation/index.md'
+      - Overview: 'installation/INSTALLATION.md'
       - Installing with the Automated Installer: 'installation/010_INSTALL_AUTOMATED.md'
-      - Installing manually: 'installation/020_INSTALL_MANUAL.md'
+      - Installing Manually: 'installation/020_INSTALL_MANUAL.md'
       - NVIDIA Cuda / AMD ROCm: 'installation/030_INSTALL_CUDA_AND_ROCM.md'
       - Installing with Docker: 'installation/040_INSTALL_DOCKER.md'
       - Installing Models: 'installation/050_INSTALLING_MODELS.md'
@@ -124,6 +123,7 @@ nav:
       - Overview: 'nodes/overview.md'
     - Features:
       - Overview: 'features/index.md'
+      - New to InvokeAI?: 'help/gettingStartedWithAI.md'
       - Concepts: 'features/CONCEPTS.md'
       - Configuration: 'features/CONFIGURATION.md'
       - ControlNet: 'features/CONTROLNET.md'
@@ -157,6 +157,7 @@ nav:
       - Inpainting: 'deprecated/INPAINTING.md'
       - Outpainting: 'deprecated/OUTPAINTING.md'
     - Help:
+      - Getting Started: 'help/gettingStartedWithAI.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
     - Other:
       - Contributors: 'other/CONTRIBUTORS.md'
