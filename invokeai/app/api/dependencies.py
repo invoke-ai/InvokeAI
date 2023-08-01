@@ -68,21 +68,22 @@ class ApiDependencies:
         output_folder = config.output_path
 
         # TODO: build a file/path manager?
-        db_location = config.db_path
-        db_location.parent.mkdir(parents=True, exist_ok=True)
+        db_path = config.db_path
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        db_path_string = str(db_path)
 
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-            filename=db_location, table_name="graph_executions"
+            filename=db_path_string, table_name="graph_executions"
         )
 
         urls = LocalUrlService()
-        image_record_storage = SqliteImageRecordStorage(db_location)
+        image_record_storage = SqliteImageRecordStorage(db_path_string)
         image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
         names = SimpleNameService()
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
 
-        board_record_storage = SqliteBoardRecordStorage(db_location)
-        board_image_record_storage = SqliteBoardImageRecordStorage(db_location)
+        board_record_storage = SqliteBoardRecordStorage(db_path_string)
+        board_image_record_storage = SqliteBoardImageRecordStorage(db_path_string)
 
         boards = BoardService(
             services=BoardServiceDependencies(
@@ -124,7 +125,7 @@ class ApiDependencies:
             boards=boards,
             board_images=board_images,
             queue=MemoryInvocationQueue(),
-            graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs"),
+            graph_library=SqliteItemStorage[LibraryGraph](filename=db_path_string, table_name="graphs"),
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
             configuration=config,
