@@ -82,7 +82,7 @@ const GallerySettingsPopover = () => {
             dispatch(autoAssignBoardOnClickChanged(e.target.checked))
           }
         />
-        {!autoAssignBoardOnClick && <BoardAutoAddSelect />}
+        <BoardAutoAddSelect />
       </Flex>
     </IAIPopover>
   );

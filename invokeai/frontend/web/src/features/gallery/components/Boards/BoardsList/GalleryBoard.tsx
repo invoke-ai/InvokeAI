@@ -27,7 +27,6 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 
 interface GalleryBoardProps {
   board: BoardDTO;
@@ -42,19 +41,24 @@ const GalleryBoard = memo(
       () =>
         createSelector(
           stateSelector,
-          ({ gallery }) => {
+          ({ gallery, system }) => {
             const isSelectedForAutoAdd =
               board.board_id === gallery.autoAddBoardId;
             const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
+            const isProcessing = system.isProcessing;
 
-            return { isSelectedForAutoAdd, autoAssignBoardOnClick };
+            return {
+              isSelectedForAutoAdd,
+              autoAssignBoardOnClick,
+              isProcessing,
+            };
           },
           defaultSelectorOptions
         ),
       [board.board_id]
     );
 
-    const { isSelectedForAutoAdd, autoAssignBoardOnClick } =
+    const { isSelectedForAutoAdd, autoAssignBoardOnClick, isProcessing } =
       useAppSelector(selector);
     const [isHovered, setIsHovered] = useState(false);
     const handleMouseOver = useCallback(() => {
@@ -70,14 +74,12 @@ const GalleryBoard = memo(
     const { board_name, board_id } = board;
     const [localBoardName, setLocalBoardName] = useState(board_name);
 
-    const isReady = useIsReadyToInvoke();
-
     const handleSelectBoard = useCallback(() => {
       dispatch(boardIdSelected(board_id));
-      if (autoAssignBoardOnClick && isReady) {
+      if (autoAssignBoardOnClick && !isProcessing) {
         dispatch(autoAddBoardIdChanged(board_id));
       }
-    }, [board_id, autoAssignBoardOnClick, isReady, dispatch]);
+    }, [board_id, autoAssignBoardOnClick, isProcessing, dispatch]);
 
     const [updateBoard, { isLoading: isUpdateBoardLoading }] =
       useUpdateBoardMutation();
