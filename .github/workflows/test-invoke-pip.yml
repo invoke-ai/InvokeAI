@@ -66,7 +66,7 @@ jobs:
               - 'invokeai/**'
               - '!invokeai/frontend/web/**'
               - 'tests/**'
-      
+
       - name: set test prompt to main branch validation
         if: steps.changed-files.outputs.python_any_changed == 'true'
         run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
