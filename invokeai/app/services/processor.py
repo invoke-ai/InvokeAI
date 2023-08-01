@@ -5,6 +5,7 @@ from threading import Event, Thread, BoundedSemaphore
 from ..invocations.baseinvocation import InvocationContext
 from .invocation_queue import InvocationQueueItem
 from .invoker import InvocationProcessorABC, Invoker
+from .invocation_stats import InvocationStats
 from ..models.exceptions import CanceledException
 
 import invokeai.backend.util.logging as logger
@@ -35,6 +36,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
     def __process(self, stop_event: Event):
         try:
             self.__threadLimit.acquire()
+            statistics = InvocationStats()  # keep track of performance metrics
             while not stop_event.is_set():
                 try:
                     queue_item: InvocationQueueItem = self.__invoker.services.queue.get()
@@ -83,30 +85,32 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
                 # Invoke
                 try:
-                    outputs = invocation.invoke(
-                        InvocationContext(
-                            services=self.__invoker.services,
-                            graph_execution_state_id=graph_execution_state.id,
+                    with statistics.collect_stats(invocation, graph_execution_state):
+                        outputs = invocation.invoke(
+                            InvocationContext(
+                                services=self.__invoker.services,
+                                graph_execution_state_id=graph_execution_state.id,
+                            )
                         )
-                    )
 
-                    # Check queue to see if this is canceled, and skip if so
-                    if self.__invoker.services.queue.is_canceled(graph_execution_state.id):
-                        continue
+                        # Check queue to see if this is canceled, and skip if so
+                        if self.__invoker.services.queue.is_canceled(graph_execution_state.id):
+                            continue
 
-                    # Save outputs and history
-                    graph_execution_state.complete(invocation.id, outputs)
+                        # Save outputs and history
+                        graph_execution_state.complete(invocation.id, outputs)
 
-                    # Save the state changes
-                    self.__invoker.services.graph_execution_manager.set(graph_execution_state)
+                        # Save the state changes
+                        self.__invoker.services.graph_execution_manager.set(graph_execution_state)
 
-                    # Send complete event
-                    self.__invoker.services.events.emit_invocation_complete(
-                        graph_execution_state_id=graph_execution_state.id,
-                        node=invocation.dict(),
-                        source_node_id=source_node_id,
-                        result=outputs.dict(),
-                    )
+                        # Send complete event
+                        self.__invoker.services.events.emit_invocation_complete(
+                            graph_execution_state_id=graph_execution_state.id,
+                            node=invocation.dict(),
+                            source_node_id=source_node_id,
+                            result=outputs.dict(),
+                        )
+                    statistics.log_stats()
 
                 except KeyboardInterrupt:
                     pass
@@ -161,3 +165,4 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
             pass  # Log something? KeyboardInterrupt is probably not going to be seen by the processor
         finally:
             self.__threadLimit.release()
+
