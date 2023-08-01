@@ -767,9 +767,7 @@ def main():
         invoke_args.extend(["--root", opt.root])
     if opt.full_precision:
         invoke_args.extend(["--precision", "float32"])
-    print(f"DEBUG: {invoke_args}")
     config.parse_args(invoke_args)
-    print(f"DEBUG: {config.root} {config.root_path}")
     logger = InvokeAILogger().getLogger(config=config)
 
     if not config.model_conf_path.exists():
