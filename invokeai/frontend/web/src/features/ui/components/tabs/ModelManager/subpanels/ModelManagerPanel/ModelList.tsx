@@ -99,6 +99,13 @@ const ModelList = (props: ModelListProps) => {
           </IAIButton>
           <IAIButton
             size="sm"
+            onClick={() => setModelFormatFilter('checkpoint')}
+            isChecked={modelFormatFilter === 'checkpoint'}
+          >
+            {t('modelManager.checkpointModels')}
+          </IAIButton>
+          <IAIButton
+            size="sm"
             onClick={() => setModelFormatFilter('onnx')}
             isChecked={modelFormatFilter === 'onnx'}
           >
