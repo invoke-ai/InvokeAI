@@ -339,6 +339,12 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
+        # TODO: use DML_DEVICE?
+        if self.device.type == "privateuseone":
+            self.enable_attention_slicing(slice_size="max")
+            #self.unet.set_default_attn_processor()
+            return
+
         config = InvokeAIAppConfig.get_config()
         if torch.cuda.is_available() and is_xformers_available() and not config.disable_xformers:
             self.enable_xformers_memory_efficient_attention()
