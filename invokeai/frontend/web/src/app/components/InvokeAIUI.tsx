@@ -1,3 +1,4 @@
+import { store } from 'app/store/store';
 import React, {
   lazy,
   memo,
@@ -6,18 +7,17 @@ import React, {
   useEffect,
 } from 'react';
 import { Provider } from 'react-redux';
-import { store } from 'app/store/store';
 
-import Loading from '../../common/components/Loading/Loading';
-import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import { PartialAppConfig } from 'app/types/invokeai';
+import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
+import Loading from '../../common/components/Loading/Loading';
 
-import '../../i18n';
-import { socketMiddleware } from 'services/events/middleware';
 import { Middleware } from '@reduxjs/toolkit';
-import ImageDndContext from './ImageDnd/ImageDndContext';
-import { AddImageToBoardContextProvider } from '../contexts/AddImageToBoardContext';
 import { $authToken, $baseUrl } from 'services/api/client';
+import { socketMiddleware } from 'services/events/middleware';
+import '../../i18n';
+import { AddImageToBoardContextProvider } from '../contexts/AddImageToBoardContext';
+import ImageDndContext from './ImageDnd/ImageDndContext';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -28,6 +28,7 @@ interface Props extends PropsWithChildren {
   config?: PartialAppConfig;
   headerComponent?: ReactNode;
   middleware?: Middleware[];
+  projectId?: string;
 }
 
 const InvokeAIUI = ({
