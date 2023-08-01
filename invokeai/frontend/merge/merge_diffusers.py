@@ -320,7 +320,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
 
     def get_model_names(self, base_model: BaseModelType = None) -> List[str]:
         model_names = [
-            info["name"]
+            info["model_name"]
             for info in self.model_manager.list_models(model_type=ModelType.Main, base_model=base_model)
             if info["model_format"] == "diffusers"
         ]
