@@ -419,25 +419,15 @@ def calc_sizes_by_dtype(tensors: dict[Any, torch.Tensor]) -> dict[torch.dtype, i
     """Sum the sizes of all the tensors, grouped by dtype."""
     sizes = defaultdict(int)
     for key, tensor in tensors.items():
-        if isinstance(tensor, dict):
-            for dtype, size in calc_sizes_by_dtype(tensor).items():
-                sizes[dtype] += size
-        elif isinstance(tensor, torch.Tensor):
+        if isinstance(tensor, torch.Tensor):
             size = tensor.element_size() * tensor.numel()
             sizes[tensor.dtype] += size
+        elif isinstance(tensor, dict):
+            for dtype, size in calc_sizes_by_dtype(tensor).items():
+                sizes[dtype] += size
         else:
             pass  # some other object, hopefully it's not the majority of the file
     return sizes
-
-
-def calc_safetensor_dtype(safetensor: Path) -> torch.dtype:
-    """Find the predominant tensor data type.
-
-    If the file contains multiple types of tensors, return the type with the largest
-    number of bytes allocated to it.
-    """
-    tensors = _fast_safetensors_reader(safetensor)
-    return _predominant_dtype(tensors)
 
 
 def _predominant_dtype(tensors: dict[Any, torch.Tensor]) -> torch.dtype:
@@ -446,12 +436,21 @@ def _predominant_dtype(tensors: dict[Any, torch.Tensor]) -> torch.dtype:
     return sizes[0][0]
 
 
-def calc_pickle_dtype(path: Path) -> torch.dtype:
-    scan_result = scan_file_path(path)
-    if scan_result.infected_files != 0:
-        raise Exception(f'The model file "{path}" is potentially infected by malware. Aborting import.')
-    tensors = torch.load(path, map_location=torch.device("meta"), weights_only=True)
-    return _predominant_dtype(tensors)
+def calc_file_format_and_dtype(path: Path) -> (str, torch.dtype):
+    """Find the predominant tensor data type.
+
+    If the file contains multiple types of tensors, return the type with the largest
+    number of bytes allocated to it.
+    """
+    if path.suffix == ".safetensors":
+        file_format = "safetensors"
+    else:
+        file_format = "pickle"
+
+    tensors = read_checkpoint_meta(path)
+    dtype = _predominant_dtype(tensors)
+
+    return file_format, dtype
 
 
 def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
