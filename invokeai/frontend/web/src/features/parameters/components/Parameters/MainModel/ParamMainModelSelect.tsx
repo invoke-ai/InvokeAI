@@ -15,11 +15,8 @@ import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainM
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { forEach } from 'lodash-es';
-import {
-  useGetMainModelsQuery,
-  useGetOnnxModelsQuery,
-} from 'services/api/endpoints/models';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
+import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const selector = createSelector(
@@ -36,9 +33,6 @@ const ParamMainModelSelect = () => {
 
   const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
   const { data: mainModels, isLoading } = useGetMainModelsQuery(
-    NON_REFINER_BASE_MODELS
-  );
-  const { data: onnxModels, isLoading: onnxLoading } = useGetOnnxModelsQuery(
     NON_REFINER_BASE_MODELS
   );
 
@@ -65,35 +59,17 @@ const ParamMainModelSelect = () => {
         group: MODEL_TYPE_MAP[model.base_model],
       });
     });
-    forEach(onnxModels?.entities, (model, id) => {
-      if (
-        !model ||
-        activeTabName === 'unifiedCanvas' ||
-        activeTabName === 'img2img'
-      ) {
-        return;
-      }
-
-      data.push({
-        value: id,
-        label: model.model_name,
-        group: MODEL_TYPE_MAP[model.base_model],
-      });
-    });
 
     return data;
-  }, [mainModels, onnxModels, activeTabName]);
+  }, [mainModels, activeTabName]);
 
   // grab the full model entity from the RTK Query cache
   // TODO: maybe we should just store the full model entity in state?
   const selectedModel = useMemo(
     () =>
-      (mainModels?.entities[`${model?.base_model}/main/${model?.model_name}`] ||
-        onnxModels?.entities[
-          `${model?.base_model}/onnx/${model?.model_name}`
-        ]) ??
+      mainModels?.entities[`${model?.base_model}/main/${model?.model_name}`] ??
       null,
-    [mainModels?.entities, model, onnxModels?.entities]
+    [mainModels?.entities, model]
   );
 
   const handleChangeModel = useCallback(
@@ -113,7 +89,7 @@ const ParamMainModelSelect = () => {
     [dispatch]
   );
 
-  return isLoading || onnxLoading ? (
+  return isLoading ? (
     <IAIMantineSearchableSelect
       label={t('modelManager.model')}
       placeholder="Loading..."

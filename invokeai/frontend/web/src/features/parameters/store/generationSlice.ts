@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
-import { ImageDTO, MainModelField, OnnxModelField } from 'services/api/types';
+import { ImageDTO, MainModelField } from 'services/api/types';
 import { clipSkipMap } from '../types/constants';
 import {
   CfgScaleParam,
@@ -50,7 +50,7 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: MainModelField | OnnxModelField | null;
+  model: MainModelField | null;
   vae: VaeModelParam | null;
   vaePrecision: PrecisionParam;
   seamlessXAxis: boolean;
@@ -272,12 +272,11 @@ export const generationSlice = createSlice({
       const defaultModel = action.payload.sd?.defaultModel;
 
       if (defaultModel && !state.model) {
-        const [base_model, model_type, model_name] = defaultModel.split('/');
+        const [base_model, _model_type, model_name] = defaultModel.split('/');
 
         const result = zMainModel.safeParse({
           model_name,
           base_model,
-          model_type,
         });
 
         if (result.success) {

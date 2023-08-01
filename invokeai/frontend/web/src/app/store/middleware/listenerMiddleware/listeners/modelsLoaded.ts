@@ -36,8 +36,7 @@ export const addModelsLoadedListener = () => {
         action.payload.entities,
         (m) =>
           m?.model_name === currentModel?.model_name &&
-          m?.base_model === currentModel?.base_model &&
-          m?.model_type === currentModel?.model_type
+          m?.base_model === currentModel?.base_model
       );
 
       if (isCurrentModelAvailable) {
@@ -84,8 +83,7 @@ export const addModelsLoadedListener = () => {
         action.payload.entities,
         (m) =>
           m?.model_name === currentModel?.model_name &&
-          m?.base_model === currentModel?.base_model &&
-          m?.model_type === currentModel?.model_type
+          m?.base_model === currentModel?.base_model
       );
 
       if (isCurrentModelAvailable) {

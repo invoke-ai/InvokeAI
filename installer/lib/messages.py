@@ -167,10 +167,6 @@ def graphical_accelerator():
         "an [gold1 b]NVIDIA[/] GPU (using CUDA™)",
         "cuda",
     )
-    nvidia_with_dml = (
-        "an [gold1 b]NVIDIA[/] GPU (using CUDA™, and DirectML™ for ONNX) -- ALPHA",
-        "cuda_and_dml",
-    )
     amd = (
         "an [gold1 b]AMD[/] GPU (using ROCm™)",
         "rocm",
@@ -185,7 +181,7 @@ def graphical_accelerator():
     )
 
     if OS == "Windows":
-        options = [nvidia, nvidia_with_dml, cpu]
+        options = [nvidia, cpu]
     if OS == "Linux":
         options = [nvidia, amd, cpu]
     elif OS == "Darwin":

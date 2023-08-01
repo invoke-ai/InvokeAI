@@ -12,7 +12,6 @@ import {
   CLIP_SKIP,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
-  ONNX_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
@@ -53,8 +52,7 @@ export const buildCanvasTextToImageGraph = (
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
-  const onnx_model_type = model.model_type.includes('onnx');
-  const model_loader = onnx_model_type ? ONNX_MODEL_LOADER : MAIN_MODEL_LOADER;
+
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -65,18 +63,17 @@ export const buildCanvasTextToImageGraph = (
    */
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
-  // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
       [POSITIVE_CONDITIONING]: {
-        type: onnx_model_type ? 'prompt_onnx' : 'compel',
+        type: 'compel',
         id: POSITIVE_CONDITIONING,
         is_intermediate: true,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: onnx_model_type ? 'prompt_onnx' : 'compel',
+        type: 'compel',
         id: NEGATIVE_CONDITIONING,
         is_intermediate: true,
         prompt: negativePrompt,
@@ -90,16 +87,16 @@ export const buildCanvasTextToImageGraph = (
         use_cpu,
       },
       [TEXT_TO_LATENTS]: {
-        type: onnx_model_type ? 't2l_onnx' : 't2l',
+        type: 't2l',
         id: TEXT_TO_LATENTS,
         is_intermediate: true,
         cfg_scale,
         scheduler,
         steps,
       },
-      [model_loader]: {
-        type: model_loader,
-        id: model_loader,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         is_intermediate: true,
         model,
       },
@@ -110,7 +107,7 @@ export const buildCanvasTextToImageGraph = (
         skipped_layers: clipSkip,
       },
       [LATENTS_TO_IMAGE]: {
-        type: onnx_model_type ? 'l2i_onnx' : 'l2i',
+        type: 'l2i',
         id: LATENTS_TO_IMAGE,
         is_intermediate: !shouldAutoSave,
       },
@@ -138,7 +135,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: model_loader,
+          node_id: MAIN_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -168,7 +165,7 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: model_loader,
+          node_id: MAIN_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
@@ -232,10 +229,10 @@ export const buildCanvasTextToImageGraph = (
   });
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS, model_loader);
+  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS);
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, model_loader);
+  addVAEToGraph(state, graph);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

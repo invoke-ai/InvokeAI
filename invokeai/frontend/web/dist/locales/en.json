@@ -342,8 +342,6 @@
         "diffusersModels": "Diffusers",
         "loraModels": "LoRAs",
         "safetensorModels": "SafeTensors",
-        "onnxModels": "Onnx",
-        "oliveModels": "Olives",
         "modelAdded": "Model Added",
         "modelUpdated": "Model Updated",
         "modelUpdateFailed": "Model Update Failed",
