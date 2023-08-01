@@ -43,14 +43,15 @@ from ..invocations.baseinvocation import BaseInvocation
 
 import invokeai.backend.util.logging as logger
 
-class InvocationStats():
+
+class InvocationStats:
     """Accumulate performance information about a running graph. Collects time spent in each node,
     as well as the maximum and current VRAM utilisation for CUDA systems"""
 
     def __init__(self):
         self._stats: Dict[str, int] = {}
-        
-    class StatsContext():
+
+    class StatsContext:
         def __init__(self, invocation: BaseInvocation, collector):
             self.invocation = invocation
             self.collector = collector
@@ -61,17 +62,18 @@ class InvocationStats():
 
         def __exit__(self, *args):
             self.collector.log_time(self.invocation.type, time.time() - self.start_time)
-    
-    def collect_stats(self,
-                      invocation: BaseInvocation,
-                      graph_execution_state: GraphExecutionState,
-                      ) -> StatsContext:
+
+    def collect_stats(
+        self,
+        invocation: BaseInvocation,
+        graph_execution_state: GraphExecutionState,
+    ) -> StatsContext:
         """
         Return a context object that will capture the statistics.
         :param invocation: BaseInvocation object from the current graph.
         :param graph_execution_state: GraphExecutionState object from the current session.
         """
-        if len(graph_execution_state.executed)==0:  # new graph is starting
+        if len(graph_execution_state.executed) == 0:  # new graph is starting
             self.reset_stats()
         self._current_graph_state = graph_execution_state
         sc = self.StatsContext(invocation, self)
@@ -82,7 +84,6 @@ class InvocationStats():
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
         self._stats: Dict[str, List[int, float]] = {}
-
 
     def log_time(self, invocation_type: str, time_used: float):
         """
@@ -95,7 +96,7 @@ class InvocationStats():
             self._stats[invocation_type] = [0, 0.0]
         self._stats[invocation_type][0] += 1
         self._stats[invocation_type][1] += time_used
-    
+
     def log_stats(self):
         """
         Send the statistics to the system logger at the info level.
@@ -103,13 +104,12 @@ class InvocationStats():
         is complete.
         """
         if self._current_graph_state.is_complete():
-            logger.info('Node                 Calls   Seconds')
+            logger.info("Node                 Calls   Seconds")
             for node_type, (calls, time_used) in self._stats.items():
-                logger.info(f'{node_type:<20} {calls:>5}   {time_used:4.3f}s')
-                
-            total_time = sum([ticks for _,ticks in self._stats.values()])
-            logger.info(f'TOTAL: {total_time:4.3f}s')
+                logger.info(f"{node_type:<20} {calls:>5}   {time_used:4.3f}s")
+
+            total_time = sum([ticks for _, ticks in self._stats.values()])
+            logger.info(f"TOTAL: {total_time:4.3f}s")
             if torch.cuda.is_available():
-                logger.info('Max VRAM used for execution: '+'%4.2fG' % (torch.cuda.max_memory_allocated() / 1e9))
-                logger.info('Current VRAM utilization '+'%4.2fG' % (torch.cuda.memory_allocated() / 1e9))
-                
+                logger.info("Max VRAM used for execution: " + "%4.2fG" % (torch.cuda.max_memory_allocated() / 1e9))
+                logger.info("Current VRAM utilization " + "%4.2fG" % (torch.cuda.memory_allocated() / 1e9))

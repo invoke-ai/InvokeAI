@@ -116,6 +116,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     pass
 
                 except CanceledException:
+                    statistics.reset_stats()
                     pass
 
                 except Exception as e:
@@ -137,7 +138,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         error_type=e.__class__.__name__,
                         error=error,
                     )
-
+                    statistics.reset_stats()
                     pass
 
                 # Check queue to see if this is canceled, and skip if so
@@ -165,4 +166,3 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
             pass  # Log something? KeyboardInterrupt is probably not going to be seen by the processor
         finally:
             self.__threadLimit.release()
-
