@@ -13,7 +13,8 @@ import { socketSubscribed, socketUnsubscribed } from './actions';
 export const socketMiddleware = () => {
   let areListenersSet = false;
 
-  let socketUrl = `ws://${window.location.host}`;
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  let socketUrl = `${wsProtocol}://${window.location.host}`;
 
   const socketOptions: Parameters<typeof io>[0] = {
     timeout: 60000,
