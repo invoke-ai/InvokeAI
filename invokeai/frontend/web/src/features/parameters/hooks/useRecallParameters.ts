@@ -35,6 +35,7 @@ import {
   isValidSDXLNegativeStylePrompt,
   isValidSDXLPositiveStylePrompt,
   isValidSDXLRefinerAestheticScore,
+  isValidSDXLRefinerModel,
   isValidSDXLRefinerStart,
   isValidScheduler,
   isValidSeed,
@@ -381,7 +382,7 @@ export const useRecallParameters = () => {
         dispatch(setNegativeStylePromptSDXL(negative_style_prompt));
       }
 
-      if (isValidMainModel(refiner_model)) {
+      if (isValidSDXLRefinerModel(refiner_model)) {
         dispatch(refinerModelChanged(refiner_model));
       }
 

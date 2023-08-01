@@ -455,7 +455,7 @@ def get_torch_source() -> (Union[str, None], str):
     device = graphical_accelerator()
 
     url = None
-    optional_modules = None
+    optional_modules = "[onnx]"
     if OS == "Linux":
         if device == "rocm":
             url = "https://download.pytorch.org/whl/rocm5.4.2"
@@ -464,7 +464,10 @@ def get_torch_source() -> (Union[str, None], str):
 
     if device == "cuda":
         url = "https://download.pytorch.org/whl/cu117"
-        optional_modules = "[xformers]"
+        optional_modules = "[xformers,onnx-cuda]"
+    if device == "cuda_and_dml":
+        url = "https://download.pytorch.org/whl/cu117"
+        optional_modules = "[xformers,onnx-directml]"
 
     # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13
 

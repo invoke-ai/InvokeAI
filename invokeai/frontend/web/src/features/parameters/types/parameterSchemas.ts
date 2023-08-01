@@ -215,23 +215,65 @@ const zBaseModel = z.enum(['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
 export type BaseModelParam = z.infer<typeof zBaseModel>;
 
 /**
- * Zod schema for model parameter
+ * Zod schema for main model parameter
  * TODO: Make this a dynamically generated enum?
  */
 export const zMainModel = z.object({
   model_name: z.string().min(1),
   base_model: zBaseModel,
+  model_type: z.literal('main'),
 });
-
 /**
- * Type alias for model parameter, inferred from its zod schema
+ * Type alias for main model parameter, inferred from its zod schema
  */
 export type MainModelParam = z.infer<typeof zMainModel>;
 /**
- * Validates/type-guards a value as a model parameter
+ * Validates/type-guards a value as a main model parameter
  */
 export const isValidMainModel = (val: unknown): val is MainModelParam =>
   zMainModel.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL refiner model parameter
+ * TODO: Make this a dynamically generated enum?
+ */
+export const zSDXLRefinerModel = z.object({
+  model_name: z.string().min(1),
+  base_model: z.literal('sdxl-refiner'),
+  model_type: z.literal('main'),
+});
+/**
+ * Type alias for SDXL refiner model parameter, inferred from its zod schema
+ */
+export type SDXLRefinerModelParam = z.infer<typeof zSDXLRefinerModel>;
+/**
+ * Validates/type-guards a value as a SDXL refiner model parameter
+ */
+export const isValidSDXLRefinerModel = (
+  val: unknown
+): val is SDXLRefinerModelParam => zSDXLRefinerModel.safeParse(val).success;
+
+/**
+ * Zod schema for Onnx model parameter
+ * TODO: Make this a dynamically generated enum?
+ */
+export const zOnnxModel = z.object({
+  model_name: z.string().min(1),
+  base_model: zBaseModel,
+  model_type: z.literal('onnx'),
+});
+/**
+ * Type alias for Onnx model parameter, inferred from its zod schema
+ */
+export type OnnxModelParam = z.infer<typeof zOnnxModel>;
+/**
+ * Validates/type-guards a value as a Onnx model parameter
+ */
+export const isValidOnnxModel = (val: unknown): val is OnnxModelParam =>
+  zOnnxModel.safeParse(val).success;
+
+export const zMainOrOnnxModel = z.union([zMainModel, zOnnxModel]);
+
 /**
  * Zod schema for VAE parameter
  */

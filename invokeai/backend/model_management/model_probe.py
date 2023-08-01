@@ -27,7 +27,7 @@ class ModelProbeInfo(object):
     variant_type: ModelVariantType
     prediction_type: SchedulerPredictionType
     upcast_attention: bool
-    format: Literal["diffusers", "checkpoint", "lycoris"]
+    format: Literal["diffusers", "checkpoint", "lycoris", "olive", "onnx"]
     image_size: int
 
 
@@ -41,6 +41,7 @@ class ModelProbe(object):
     PROBES = {
         "diffusers": {},
         "checkpoint": {},
+        "onnx": {},
     }
 
     CLASS2TYPE = {
@@ -53,7 +54,9 @@ class ModelProbe(object):
     }
 
     @classmethod
-    def register_probe(cls, format: Literal["diffusers", "checkpoint"], model_type: ModelType, probe_class: ProbeBase):
+    def register_probe(
+        cls, format: Literal["diffusers", "checkpoint", "onnx"], model_type: ModelType, probe_class: ProbeBase
+    ):
         cls.PROBES[format][model_type] = probe_class
 
     @classmethod
@@ -95,6 +98,7 @@ class ModelProbe(object):
                 if format_type == "diffusers"
                 else cls.get_model_type_from_checkpoint(model_path, model)
             )
+            format_type = "onnx" if model_type == ModelType.ONNX else format_type
             probe_class = cls.PROBES[format_type].get(model_type)
             if not probe_class:
                 return None
@@ -168,6 +172,8 @@ class ModelProbe(object):
         if model:
             class_name = model.__class__.__name__
         else:
+            if (folder_path / "unet/model.onnx").exists():
+                return ModelType.ONNX
             if (folder_path / "learned_embeds.bin").exists():
                 return ModelType.TextualInversion
 
@@ -460,6 +466,17 @@ class TextualInversionFolderProbe(FolderProbeBase):
         return TextualInversionCheckpointProbe(None, checkpoint=checkpoint).get_base_type()
 
 
+class ONNXFolderProbe(FolderProbeBase):
+    def get_format(self) -> str:
+        return "onnx"
+
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.StableDiffusion1
+
+    def get_variant_type(self) -> ModelVariantType:
+        return ModelVariantType.Normal
+
+
 class ControlNetFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
         config_file = self.folder_path / "config.json"
@@ -497,3 +514,4 @@ ModelProbe.register_probe("checkpoint", ModelType.Vae, VaeCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Lora, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
+ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)
