@@ -62,6 +62,7 @@ dependencies = [
   "npyscreen",
   "omegaconf",
   "onnx",
+  "onnxruntime",
   "opencv-python",
   "pydantic==1.*",
   "picklescan",
