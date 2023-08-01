@@ -47,9 +47,9 @@ export const addTabChangedListener = () => {
         }
 
         // only store the model name and base model in redux
-        const { base_model, model_name } = firstValidCanvasModel;
+        const { base_model, model_name, model_type } = firstValidCanvasModel;
 
-        dispatch(modelChanged({ base_model, model_name }));
+        dispatch(modelChanged({ base_model, model_name, model_type }));
       }
     },
   });

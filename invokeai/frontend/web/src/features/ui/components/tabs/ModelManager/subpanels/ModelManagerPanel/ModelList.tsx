@@ -8,7 +8,9 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   MainModelConfigEntity,
+  OnnxModelConfigEntity,
   useGetMainModelsQuery,
+  useGetOnnxModelsQuery,
   useGetLoRAModelsQuery,
   LoRAModelConfigEntity,
 } from 'services/api/endpoints/models';
@@ -20,9 +22,9 @@ type ModelListProps = {
   setSelectedModelId: (name: string | undefined) => void;
 };
 
-type ModelFormat = 'images' | 'checkpoint' | 'diffusers';
+type ModelFormat = 'images' | 'checkpoint' | 'diffusers' | 'olive' | 'onnx';
 
-type ModelType = 'main' | 'lora';
+type ModelType = 'main' | 'lora' | 'onnx';
 
 type CombinedModelFormat = ModelFormat | 'lora';
 
@@ -61,6 +63,18 @@ const ModelList = (props: ModelListProps) => {
     }),
   });
 
+  const { filteredOnnxModels } = useGetOnnxModelsQuery(ALL_BASE_MODELS, {
+    selectFromResult: ({ data }) => ({
+      filteredOnnxModels: modelsFilter(data, 'onnx', 'onnx', nameFilter),
+    }),
+  });
+
+  const { filteredOliveModels } = useGetOnnxModelsQuery(ALL_BASE_MODELS, {
+    selectFromResult: ({ data }) => ({
+      filteredOliveModels: modelsFilter(data, 'onnx', 'olive', nameFilter),
+    }),
+  });
+
   const handleSearchFilter = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setNameFilter(e.target.value);
   }, []);
@@ -85,10 +99,17 @@ const ModelList = (props: ModelListProps) => {
           </IAIButton>
           <IAIButton
             size="sm"
-            onClick={() => setModelFormatFilter('checkpoint')}
-            isChecked={modelFormatFilter === 'checkpoint'}
+            onClick={() => setModelFormatFilter('onnx')}
+            isChecked={modelFormatFilter === 'onnx'}
           >
-            {t('modelManager.checkpointModels')}
+            {t('modelManager.onnxModels')}
+          </IAIButton>
+          <IAIButton
+            size="sm"
+            onClick={() => setModelFormatFilter('olive')}
+            isChecked={modelFormatFilter === 'olive'}
+          >
+            {t('modelManager.oliveModels')}
           </IAIButton>
           <IAIButton
             size="sm"
@@ -147,6 +168,42 @@ const ModelList = (props: ModelListProps) => {
                 </Flex>
               </StyledModelContainer>
             )}
+          {['images', 'olive'].includes(modelFormatFilter) &&
+            filteredOliveModels.length > 0 && (
+              <StyledModelContainer>
+                <Flex sx={{ gap: 2, flexDir: 'column' }}>
+                  <Text variant="subtext" fontSize="sm">
+                    Olives
+                  </Text>
+                  {filteredOliveModels.map((model) => (
+                    <ModelListItem
+                      key={model.id}
+                      model={model}
+                      isSelected={selectedModelId === model.id}
+                      setSelectedModelId={setSelectedModelId}
+                    />
+                  ))}
+                </Flex>
+              </StyledModelContainer>
+            )}
+          {['images', 'onnx'].includes(modelFormatFilter) &&
+            filteredOnnxModels.length > 0 && (
+              <StyledModelContainer>
+                <Flex sx={{ gap: 2, flexDir: 'column' }}>
+                  <Text variant="subtext" fontSize="sm">
+                    Onnx
+                  </Text>
+                  {filteredOnnxModels.map((model) => (
+                    <ModelListItem
+                      key={model.id}
+                      model={model}
+                      isSelected={selectedModelId === model.id}
+                      setSelectedModelId={setSelectedModelId}
+                    />
+                  ))}
+                </Flex>
+              </StyledModelContainer>
+            )}
           {['images', 'lora'].includes(modelFormatFilter) &&
             filteredLoraModels.length > 0 && (
               <StyledModelContainer>
@@ -173,7 +230,12 @@ const ModelList = (props: ModelListProps) => {
 
 export default ModelList;
 
-const modelsFilter = <T extends MainModelConfigEntity | LoRAModelConfigEntity>(
+const modelsFilter = <
+  T extends
+    | MainModelConfigEntity
+    | LoRAModelConfigEntity
+    | OnnxModelConfigEntity
+>(
   data: EntityState<T> | undefined,
   model_type: ModelType,
   model_format: ModelFormat | undefined,

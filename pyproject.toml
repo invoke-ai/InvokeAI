@@ -61,6 +61,7 @@ dependencies = [
   "numpy",
   "npyscreen",
   "omegaconf",
+  "onnx",
   "opencv-python",
   "pydantic==1.*",
   "picklescan",
@@ -102,6 +103,15 @@ dependencies = [
 "xformers" = [
 	   "xformers~=0.0.19; sys_platform!='darwin'",
 	   "triton; sys_platform=='linux'",
+]
+"onnx" = [
+  "onnxruntime",
+]
+"onnx-cuda" = [
+  "onnxruntime-gpu",
+]
+"onnx-directml" = [
+  "onnxruntime-directml",
 ]
 
 [project.scripts]

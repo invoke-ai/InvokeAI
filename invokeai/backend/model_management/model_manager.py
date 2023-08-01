@@ -276,7 +276,7 @@ class ModelInfo:
     hash: str
     location: Union[Path, str]
     precision: torch.dtype
-    _cache: ModelCache = None
+    _cache: Optional[ModelCache] = None
 
     def __enter__(self):
         return self.context.__enter__()
