@@ -19,7 +19,7 @@ export const addLoRAsToGraph = (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string,
-  modelLoader: string = MAIN_MODEL_LOADER
+  modelLoaderNodeId: string = MAIN_MODEL_LOADER
 ): void => {
   /**
    * LoRA nodes get the UNet and CLIP models from the main model loader and apply the LoRA to them.
@@ -85,7 +85,7 @@ export const addLoRAsToGraph = (
       // first lora = start the lora chain, attach directly to model loader
       graph.edges.push({
         source: {
-          node_id: modelLoader,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {

@@ -59,9 +59,9 @@ export type DiffusersModelConfig =
 export type CheckpointModelConfig =
   | components['schemas']['StableDiffusion1ModelCheckpointConfig']
   | components['schemas']['StableDiffusion2ModelCheckpointConfig']
-  | components['schemas']['StableDiffusion2ModelDiffusersConfig'];
-export type OnnxModelConfig = components['schemas']['ONNXStableDiffusion1ModelConfig']
   | components['schemas']['StableDiffusionXLModelCheckpointConfig'];
+export type OnnxModelConfig =
+  components['schemas']['ONNXStableDiffusion1ModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig
@@ -115,6 +115,9 @@ export type DynamicPromptInvocation = TypeReq<
 export type NoiseInvocation = TypeReq<components['schemas']['NoiseInvocation']>;
 export type TextToLatentsInvocation = TypeReq<
   components['schemas']['TextToLatentsInvocation']
+>;
+export type ONNXTextToLatentsInvocation = TypeReq<
+  components['schemas']['ONNXTextToLatentsInvocation']
 >;
 export type LatentsToLatentsInvocation = TypeReq<
   components['schemas']['LatentsToLatentsInvocation']
