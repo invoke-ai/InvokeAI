@@ -15,31 +15,31 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 interface Props {
   isSelected: boolean;
 }
 
 const selector = createSelector(
   stateSelector,
-  ({ gallery }) => {
+  ({ gallery, system }) => {
     const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
-    return { autoAddBoardId, autoAssignBoardOnClick };
+    const { isProcessing } = system;
+    return { autoAddBoardId, autoAssignBoardOnClick, isProcessing };
   },
   defaultSelectorOptions
 );
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const { autoAddBoardId, autoAssignBoardOnClick } = useAppSelector(selector);
+  const { autoAddBoardId, autoAssignBoardOnClick, isProcessing } =
+    useAppSelector(selector);
   const boardName = useBoardName(undefined);
-  const isReady = useIsReadyToInvoke();
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected(undefined));
-    if (autoAssignBoardOnClick && isReady) {
+    if (autoAssignBoardOnClick && !isProcessing) {
       dispatch(autoAddBoardIdChanged(undefined));
     }
-  }, [dispatch, autoAssignBoardOnClick, isReady]);
+  }, [dispatch, autoAssignBoardOnClick, isProcessing]);
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(() => {
     setIsHovered(true);
