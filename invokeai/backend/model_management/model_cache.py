@@ -188,7 +188,7 @@ class ModelCache(object):
         cache_entry = self._cached_models.get(key, None)
         if cache_entry is None:
             self.logger.info(
-                f"Loading model {model_path}, type {base_model.value}:{model_type.value}:{submodel.value if submodel else ''}"
+                f"Loading model {model_path}, type {base_model.value}:{model_type.value}{':'+submodel.value if submodel else ''}"
             )
 
             # this will remove older cached models until

@@ -640,7 +640,10 @@ class TextualInversionModel:
             file_path = Path(file_path)
 
         result = cls()  # TODO:
-        result.name = file_path.stem  # TODO:
+        if file_path.name == "learned_embeds.bin":
+            result.name = file_path.parent.name
+        else:
+            result.name = file_path.stem
 
         if file_path.suffix == ".safetensors":
             state_dict = load_file(file_path.absolute().as_posix(), device="cpu")
