@@ -210,6 +210,14 @@ export type HeightParam = z.infer<typeof zHeight>;
 export const isValidHeight = (val: unknown): val is HeightParam =>
   zHeight.safeParse(val).success;
 
+const zModelType = z.enum([
+  'vae',
+  'lora',
+  'onnx',
+  'main',
+  'controlnet',
+  'embedding',
+]);
 const zBaseModel = z.enum(['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
 
 export type BaseModelParam = z.infer<typeof zBaseModel>;
@@ -221,12 +229,18 @@ export type BaseModelParam = z.infer<typeof zBaseModel>;
 export const zMainModel = z.object({
   model_name: z.string().min(1),
   base_model: zBaseModel,
+  model_type: zModelType,
 });
 
 /**
  * Type alias for model parameter, inferred from its zod schema
  */
 export type MainModelParam = z.infer<typeof zMainModel>;
+
+/**
+ * Type alias for model parameter, inferred from its zod schema
+ */
+export type OnnxModelParam = z.infer<typeof zMainModel>;
 /**
  * Validates/type-guards a value as a model parameter
  */
@@ -309,6 +323,39 @@ export type PrecisionParam = z.infer<typeof zPrecision>;
  */
 export const isValidPrecision = (val: unknown): val is PrecisionParam =>
   zPrecision.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL refiner aesthetic score parameter
+ */
+export const zSDXLRefinerAestheticScore = z.number().min(1).max(10);
+/**
+ * Type alias for SDXL refiner aesthetic score parameter, inferred from its zod schema
+ */
+export type SDXLRefinerAestheticScoreParam = z.infer<
+  typeof zSDXLRefinerAestheticScore
+>;
+/**
+ * Validates/type-guards a value as a SDXL refiner aesthetic score parameter
+ */
+export const isValidSDXLRefinerAestheticScore = (
+  val: unknown
+): val is SDXLRefinerAestheticScoreParam =>
+  zSDXLRefinerAestheticScore.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL start parameter
+ */
+export const zSDXLRefinerstart = z.number().min(0).max(1);
+/**
+ * Type alias for SDXL start, inferred from its zod schema
+ */
+export type SDXLRefinerStartParam = z.infer<typeof zSDXLRefinerstart>;
+/**
+ * Validates/type-guards a value as a SDXL refiner aesthetic score parameter
+ */
+export const isValidSDXLRefinerStart = (
+  val: unknown
+): val is SDXLRefinerStartParam => zSDXLRefinerstart.safeParse(val).success;
 
 // /**
 //  * Zod schema for BaseModelType

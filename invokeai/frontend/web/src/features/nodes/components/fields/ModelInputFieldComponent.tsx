@@ -14,8 +14,11 @@ import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  useGetMainModelsQuery,
+  useGetOnnxModelsQuery,
+} from 'services/api/endpoints/models';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 import { FieldComponentProps } from './types';
 import { useFeatureStatus } from '../../../system/hooks/useFeatureStatus';
 
@@ -28,6 +31,7 @@ const ModelInputFieldComponent = (
   const { t } = useTranslation();
   const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
 
+  const { data: onnxModels } = useGetOnnxModelsQuery(NON_REFINER_BASE_MODELS);
   const { data: mainModels, isLoading } = useGetMainModelsQuery(
     NON_REFINER_BASE_MODELS
   );
@@ -51,17 +55,39 @@ const ModelInputFieldComponent = (
       });
     });
 
+    if (onnxModels) {
+      forEach(onnxModels.entities, (model, id) => {
+        if (!model) {
+          return;
+        }
+
+        data.push({
+          value: id,
+          label: model.model_name,
+          group: MODEL_TYPE_MAP[model.base_model],
+        });
+      });
+    }
     return data;
-  }, [mainModels]);
+  }, [mainModels, onnxModels]);
 
   // grab the full model entity from the RTK Query cache
   // TODO: maybe we should just store the full model entity in state?
   const selectedModel = useMemo(
     () =>
-      mainModels?.entities[
+      (mainModels?.entities[
         `${field.value?.base_model}/main/${field.value?.model_name}`
-      ] ?? null,
-    [field.value?.base_model, field.value?.model_name, mainModels?.entities]
+      ] ||
+        onnxModels?.entities[
+          `${field.value?.base_model}/onnx/${field.value?.model_name}`
+        ]) ??
+      null,
+    [
+      field.value?.base_model,
+      field.value?.model_name,
+      mainModels?.entities,
+      onnxModels?.entities,
+    ]
   );
 
   const handleChangeModel = useCallback(
