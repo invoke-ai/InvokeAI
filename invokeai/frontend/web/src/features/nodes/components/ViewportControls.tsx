@@ -2,18 +2,16 @@ import { ButtonGroup, Tooltip } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { memo, useCallback } from 'react';
-import {
-  FaCode,
-  FaExpand,
-  FaMinus,
-  FaPlus,
-  FaInfo,
-  FaMapMarkerAlt,
-} from 'react-icons/fa';
-import { useReactFlow } from 'reactflow';
 import { useTranslation } from 'react-i18next';
 import {
-  shouldShowGraphOverlayChanged,
+  FaExpand,
+  FaInfo,
+  FaMapMarkerAlt,
+  FaMinus,
+  FaPlus,
+} from 'react-icons/fa';
+import { useReactFlow } from 'reactflow';
+import {
   shouldShowFieldTypeLegendChanged,
   shouldShowMinimapPanelChanged,
 } from '../store/nodesSlice';
@@ -22,9 +20,6 @@ const ViewportControls = () => {
   const { t } = useTranslation();
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
-  const shouldShowGraphOverlay = useAppSelector(
-    (state) => state.nodes.shouldShowGraphOverlay
-  );
   const shouldShowFieldTypeLegend = useAppSelector(
     (state) => state.nodes.shouldShowFieldTypeLegend
   );
@@ -43,10 +38,6 @@ const ViewportControls = () => {
   const handleClickedFitView = useCallback(() => {
     fitView();
   }, [fitView]);
-
-  const handleClickedToggleGraphOverlay = useCallback(() => {
-    dispatch(shouldShowGraphOverlayChanged(!shouldShowGraphOverlay));
-  }, [shouldShowGraphOverlay, dispatch]);
 
   const handleClickedToggleFieldTypeLegend = useCallback(() => {
     dispatch(shouldShowFieldTypeLegendChanged(!shouldShowFieldTypeLegend));
@@ -77,20 +68,6 @@ const ViewportControls = () => {
           aria-label="Fit viewport"
           onClick={handleClickedFitView}
           icon={<FaExpand />}
-        />
-      </Tooltip>
-      <Tooltip
-        label={
-          shouldShowGraphOverlay
-            ? t('nodes.hideGraphNodes')
-            : t('nodes.showGraphNodes')
-        }
-      >
-        <IAIIconButton
-          aria-label="Toggle nodes graph overlay"
-          isChecked={shouldShowGraphOverlay}
-          onClick={handleClickedToggleGraphOverlay}
-          icon={<FaCode />}
         />
       </Tooltip>
       <Tooltip

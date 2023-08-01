@@ -1,8 +1,12 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
+import {
+  ctrlKeyPressed,
+  metaKeyPressed,
+  shiftKeyPressed,
+} from 'features/ui/store/hotkeysSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
   setActiveTab,
@@ -16,11 +20,11 @@ import React, { memo } from 'react';
 import { isHotkeyPressed, useHotkeys } from 'react-hotkeys-hook';
 
 const globalHotkeysSelector = createSelector(
-  [(state: RootState) => state.hotkeys, (state: RootState) => state.ui],
-  (hotkeys, ui) => {
-    const { shift } = hotkeys;
+  [stateSelector],
+  ({ hotkeys, ui }) => {
+    const { shift, ctrl, meta } = hotkeys;
     const { shouldPinParametersPanel, shouldPinGallery } = ui;
-    return { shift, shouldPinGallery, shouldPinParametersPanel };
+    return { shift, ctrl, meta, shouldPinGallery, shouldPinParametersPanel };
   },
   {
     memoizeOptions: {
@@ -37,9 +41,8 @@ const globalHotkeysSelector = createSelector(
  */
 const GlobalHotkeys: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { shift, shouldPinParametersPanel, shouldPinGallery } = useAppSelector(
-    globalHotkeysSelector
-  );
+  const { shift, ctrl, meta, shouldPinParametersPanel, shouldPinGallery } =
+    useAppSelector(globalHotkeysSelector);
   const activeTabName = useAppSelector(activeTabNameSelector);
 
   useHotkeys(
@@ -50,9 +53,19 @@ const GlobalHotkeys: React.FC = () => {
       } else {
         shift && dispatch(shiftKeyPressed(false));
       }
+      if (isHotkeyPressed('ctrl')) {
+        !ctrl && dispatch(ctrlKeyPressed(true));
+      } else {
+        ctrl && dispatch(ctrlKeyPressed(false));
+      }
+      if (isHotkeyPressed('meta')) {
+        !meta && dispatch(metaKeyPressed(true));
+      } else {
+        meta && dispatch(metaKeyPressed(false));
+      }
     },
     { keyup: true, keydown: true },
-    [shift]
+    [shift, ctrl, meta]
   );
 
   useHotkeys('o', () => {

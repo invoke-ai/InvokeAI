@@ -21,6 +21,7 @@ import { tabsTheme } from './components/tabs';
 import { textTheme } from './components/text';
 import { textareaTheme } from './components/textarea';
 import { tooltipTheme } from './components/tooltip';
+import { reactflowStyles } from './custom/reactflow';
 
 export const theme: ThemeOverride = {
   config: {
@@ -44,11 +45,27 @@ export const theme: ThemeOverride = {
       color: 'base.900',
       '.chakra-ui-dark &': { bg: 'base.800', color: 'base.100' },
     },
+    nodeBody: {
+      bg: 'base.100',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.800', color: 'base.100' },
+    },
+    nodeHeader: {
+      bg: 'base.200',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.700', color: 'base.100' },
+    },
+    nodeFooter: {
+      bg: 'base.200',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.700', color: 'base.100' },
+    },
   },
   styles: {
     global: () => ({
       layerStyle: 'body',
       '*': { ...no_scrollbar },
+      ...reactflowStyles,
     }),
   },
   direction: 'ltr',
@@ -85,7 +102,10 @@ export const theme: ThemeOverride = {
         '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 3px var(--invokeai-colors-accent-500)',
       dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 3px var(--invokeai-colors-accent-400)',
     },
-    nodeSelectedOutline: `0 0 0 2px var(--invokeai-colors-accent-450)`,
+    nodeSelectedOutline: {
+      light: `0 0 0 2px var(--invokeai-colors-accent-400)`,
+      dark: `0 0 0 2px var(--invokeai-colors-accent-500)`,
+    },
   },
   colors: InvokeAIColors,
   components: {
