@@ -55,7 +55,7 @@ logger = InvokeAILogger.getLogger()
 class ApiDependencies:
     """Contains and initializes all dependencies for the API"""
 
-    invoker: Optional[Invoker] = None
+    invoker: Invoker
 
     @staticmethod
     def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger):
