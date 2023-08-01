@@ -93,9 +93,10 @@ def test_root_resists_cwd():
     conf.parse_args([])
     assert conf.root_path == cwd
 
-    os.chdir(previous)
+    os.chdir("..")
     assert conf.root_path == cwd
     os.environ["INVOKEAI_ROOT"] = previous
+    os.chdir(cwd)
 
 
 def test_type_coercion():
