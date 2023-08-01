@@ -289,9 +289,10 @@ class ImageService(ImageServiceABC):
     def get_metadata(self, image_name: str) -> Optional[ImageMetadata]:
         try:
             image_record = self._services.image_records.get(image_name)
+            metadata = self._services.image_records.get_metadata(image_name)
 
             if not image_record.session_id:
-                return ImageMetadata()
+                return ImageMetadata(metadata=metadata)
 
             session_raw = self._services.graph_execution_manager.get_raw(image_record.session_id)
             graph = None
@@ -303,7 +304,6 @@ class ImageService(ImageServiceABC):
                     self._services.logger.warn(f"Failed to parse session graph: {e}")
                     graph = None
 
-            metadata = self._services.image_records.get_metadata(image_name)
             return ImageMetadata(graph=graph, metadata=metadata)
         except ImageRecordNotFoundException:
             self._services.logger.error("Image record not found")
