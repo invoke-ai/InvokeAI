@@ -355,7 +355,7 @@ class InvokeAISettings(BaseSettings):
 def _find_root() -> Path:
     venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
-        root = Path(os.environ.get("INVOKEAI_ROOT")).resolve()
+        root = Path(os.environ["INVOKEAI_ROOT"])
     elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]]):
         root = (venv.parent).resolve()
     else:
@@ -473,7 +473,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         if self.root:
             root = Path(self.root).expanduser().absolute()
         else:
-            root = self.find_root()
+            root = self.find_root().expanduser().absolute()
         self.root = root  # insulate ourselves from relative paths that may change
         return root
 
