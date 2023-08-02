@@ -164,7 +164,7 @@ class FloatSlider(npyscreen.Slider):
 
 
 class FloatTitleSlider(npyscreen.TitleText):
-    _entry_type = FloatSlider
+    _entry_type = npyscreen.Slider
 
 
 class SelectColumnBase:

@@ -12,10 +12,12 @@ import io
 import os
 import shutil
 import textwrap
+import torch
 import traceback
 import yaml
 import warnings
 from argparse import Namespace
+from enum import Enum
 from pathlib import Path
 from shutil import get_terminal_size
 from typing import get_type_hints
@@ -49,6 +51,7 @@ from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
     FileBox,
     IntTitleSlider,
+    FloatTitleSlider,
     set_min_terminal_size,
     CyclingForm,
     MIN_COLS,
@@ -76,6 +79,9 @@ Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
 
 PRECISION_CHOICES = ["auto", "float16", "float32"]
+HAS_CUDA = torch.cuda.is_available()
+_, MAX_VRAM = torch.cuda.mem_get_info() if HAS_CUDA else (0, 0)
+MAX_VRAM /= 1073741824  # GB in bytes
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -84,6 +90,12 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 """
 
 logger = InvokeAILogger.getLogger()
+
+
+class DummyWidgetValue(Enum):
+    zero = 0
+    true = True
+    false = False
 
 
 # --------------------------------------------
@@ -378,13 +390,36 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.max_cache_size = self.add_widget_intelligent(
             IntTitleSlider,
-            name="Size of the RAM cache used for fast model switching (GB)",
+            name="RAM cache size. The larger this is, the more models can be kept in memory rather than loading from disk each time (GB)",
             value=old_opts.max_cache_size,
             out_of=20,
             lowest=3,
             begin_entry_at=6,
             scroll_exit=True,
         )
+        if HAS_CUDA:
+            self.nextrely += 1
+            self.add_widget_intelligent(
+                npyscreen.TitleFixedText,
+                name="VRAM cache size. Make this large enough to hold an entire model, but not more than half your available VRAM (GB)",
+                begin_entry_at=0,
+                editable=False,
+                color="CONTROL",
+                scroll_exit=True,
+            )
+            self.nextrely -= 1
+            self.max_vram_cache_size = self.add_widget_intelligent(
+                npyscreen.Slider,
+                value=old_opts.max_vram_cache_size,
+                out_of=round(MAX_VRAM * 2) / 2,
+                lowest=0.0,
+                relx=8,
+                step=0.25,
+                begin_entry_at=MAX_VRAM * 0.55,
+                scroll_exit=True,
+            )
+        else:
+            self.max_vram_cache_size = DummyWidgetValue.zero
         self.nextrely += 1
         self.outdir = self.add_widget_intelligent(
             FileBox,
@@ -476,6 +511,7 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
             "outdir",
             "free_gpu_mem",
             "max_cache_size",
+            "max_vram_cache_size",
             "xformers_enabled",
             "always_use_cpu",
         ]:
