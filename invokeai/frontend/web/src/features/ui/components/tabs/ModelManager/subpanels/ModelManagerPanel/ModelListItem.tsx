@@ -15,10 +15,11 @@ import {
   LoRAModelConfigEntity,
   useDeleteMainModelsMutation,
   useDeleteLoRAModelsMutation,
+  OnnxModelConfigEntity,
 } from 'services/api/endpoints/models';
 
 type ModelListItemProps = {
-  model: MainModelConfigEntity | LoRAModelConfigEntity;
+  model: MainModelConfigEntity | OnnxModelConfigEntity | LoRAModelConfigEntity;
   isSelected: boolean;
   setSelectedModelId: (v: string | undefined) => void;
 };
@@ -37,9 +38,12 @@ export default function ModelListItem(props: ModelListItemProps) {
   }, [model.id, setSelectedModelId]);
 
   const handleModelDelete = useCallback(() => {
-    const method = { main: deleteMainModel, lora: deleteLoRAModel }[
-      model.model_type
-    ];
+    const method = {
+      main: deleteMainModel,
+      lora: deleteLoRAModel,
+      onnx: deleteMainModel,
+    }[model.model_type];
+
     method(model)
       .unwrap()
       .then((_) => {

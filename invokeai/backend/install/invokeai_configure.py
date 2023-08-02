@@ -181,7 +181,7 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
 
 
 def download_conversion_models():
-    target_dir = config.root_path / "models/core/convert"
+    target_dir = config.models_path / "core/convert"
     kwargs = dict()  # for future use
     try:
         logger.info("Downloading core tokenizers and text encoders")
