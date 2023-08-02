@@ -82,6 +82,7 @@ PRECISION_CHOICES = ["auto", "float16", "float32"]
 HAS_CUDA = torch.cuda.is_available()
 _, MAX_VRAM = torch.cuda.mem_get_info() if HAS_CUDA else (0, 0)
 MAX_VRAM /= 1073741824  # GB in bytes
+MAX_VRAM_CACHE_RATIO = 0.55   # first guess of optimal vram cache based on total available
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -568,8 +569,10 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
+    # dynamically adust vram for memory size
+    if not init_file.exists():
+        opts.max_vram_cache_size = round((MAX_VRAM * MAX_VRAM_CACHE_RATIO)*4) / 4
     return opts
-
 
 def default_user_selections(program_opts: Namespace) -> InstallSelections:
     try:
@@ -628,7 +631,6 @@ def maybe_create_models_yaml(root: Path):
 
 # -------------------------------------
 def run_console_ui(program_opts: Namespace, initfile: Path = None) -> (Namespace, Namespace):
-    # parse_args() will read from init file if present
     invokeai_opts = default_startup_options(initfile)
     invokeai_opts.root = program_opts.root
 
@@ -711,7 +713,6 @@ def migrate_init_file(legacy_format: Path):
 # -------------------------------------
 def migrate_models(root: Path):
     from invokeai.backend.install.migrate_to_3 import do_migrate
-
     do_migrate(root, root)
 
 
@@ -813,6 +814,7 @@ def main():
 
         models_to_download = default_user_selections(opt)
         new_init_file = config.root_path / "invokeai.yaml"
+
         if opt.yes_to_all:
             write_default_options(opt, new_init_file)
             init_options = Namespace(precision="float32" if opt.full_precision else "float16")

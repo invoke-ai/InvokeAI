@@ -173,7 +173,7 @@ from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_ty
 INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
-
+DEFAULT_MAX_VRAM = 2.75
 
 class InvokeAISettings(BaseSettings):
     """
@@ -395,7 +395,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
     max_loaded_models   : int = Field(default=3, gt=0, description="(DEPRECATED: use max_cache_size) Maximum number of models to keep in memory for rapid switching", category='DEPRECATED')
     max_cache_size      : float = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching", category='Memory/Performance')
-    max_vram_cache_size : float = Field(default=2.75, ge=0, description="Amount of VRAM reserved for model storage", category='Memory/Performance')
+    max_vram_cache_size : float = Field(default=DEFAULT_MAX_VRAM, ge=0, description="Amount of VRAM reserved for model storage", category='Memory/Performance')
     gpu_mem_reserved    : float = Field(default=2.75, ge=0, description="DEPRECATED: use max_vram_cache_size. Amount of VRAM reserved for model storage", category='DEPRECATED')
     nsfw_checker        : bool = Field(default=True, description="DEPRECATED: use Web settings to enable/disable", category='DEPRECATED')
     precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='auto',description='Floating point precision', category='Memory/Performance')
