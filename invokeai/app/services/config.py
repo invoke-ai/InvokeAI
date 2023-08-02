@@ -175,6 +175,7 @@ DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_MAX_VRAM = 2.75
 
+
 class InvokeAISettings(BaseSettings):
     """
     Runtime configuration settings in which default values are

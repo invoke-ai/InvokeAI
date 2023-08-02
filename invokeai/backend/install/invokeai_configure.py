@@ -82,7 +82,7 @@ PRECISION_CHOICES = ["auto", "float16", "float32"]
 HAS_CUDA = torch.cuda.is_available()
 _, MAX_VRAM = torch.cuda.mem_get_info() if HAS_CUDA else (0, 0)
 MAX_VRAM /= 1073741824  # GB in bytes
-MAX_VRAM_CACHE_RATIO = 0.55   # first guess of optimal vram cache based on total available
+MAX_VRAM_CACHE_RATIO = 0.55  # first guess of optimal vram cache based on total available
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -571,8 +571,9 @@ def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
     # dynamically adust vram for memory size
     if not init_file.exists():
-        opts.max_vram_cache_size = round((MAX_VRAM * MAX_VRAM_CACHE_RATIO)*4) / 4
+        opts.max_vram_cache_size = round((MAX_VRAM * MAX_VRAM_CACHE_RATIO) * 4) / 4
     return opts
+
 
 def default_user_selections(program_opts: Namespace) -> InstallSelections:
     try:
@@ -713,6 +714,7 @@ def migrate_init_file(legacy_format: Path):
 # -------------------------------------
 def migrate_models(root: Path):
     from invokeai.backend.install.migrate_to_3 import do_migrate
+
     do_migrate(root, root)
 
 
