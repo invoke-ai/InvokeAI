@@ -86,7 +86,7 @@ _, MAX_VRAM = torch.cuda.mem_get_info() if HAS_CUDA else (0, 0)
 
 
 MAX_VRAM /= GB
-MAX_RAM = psutil.virtual_memory().total / GB 
+MAX_RAM = psutil.virtual_memory().total / GB
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
