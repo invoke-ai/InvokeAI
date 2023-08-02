@@ -355,7 +355,7 @@ class InvokeAISettings(BaseSettings):
 def _find_root() -> Path:
     venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
-        root = Path(os.environ.get("INVOKEAI_ROOT")).resolve()
+        root = Path(os.environ["INVOKEAI_ROOT"])
     elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]]):
         root = (venv.parent).resolve()
     else:
@@ -402,7 +402,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
     tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
 
-    root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
+    root                : Path = Field(default=None, description='InvokeAI runtime root directory', category='Paths')
     autoimport_dir      : Path = Field(default='autoimport', description='Path to a directory of models files to be imported on startup.', category='Paths')
     lora_dir            : Path = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', category='Paths')
     embedding_dir       : Path = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', category='Paths')
@@ -471,9 +471,11 @@ class InvokeAIAppConfig(InvokeAISettings):
         Path to the runtime root directory
         """
         if self.root:
-            return Path(self.root).expanduser().absolute()
+            root = Path(self.root).expanduser().absolute()
         else:
-            return self.find_root()
+            root = self.find_root().expanduser().absolute()
+        self.root = root  # insulate ourselves from relative paths that may change
+        return root
 
     @property
     def root_dir(self) -> Path:

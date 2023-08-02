@@ -16,7 +16,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
-import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import {
+  autoAddBoardIdChanged,
+  boardIdSelected,
+} from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { FaUser } from 'react-icons/fa';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
@@ -38,18 +41,25 @@ const GalleryBoard = memo(
       () =>
         createSelector(
           stateSelector,
-          ({ gallery }) => {
+          ({ gallery, system }) => {
             const isSelectedForAutoAdd =
               board.board_id === gallery.autoAddBoardId;
+            const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
+            const isProcessing = system.isProcessing;
 
-            return { isSelectedForAutoAdd };
+            return {
+              isSelectedForAutoAdd,
+              autoAssignBoardOnClick,
+              isProcessing,
+            };
           },
           defaultSelectorOptions
         ),
       [board.board_id]
     );
 
-    const { isSelectedForAutoAdd } = useAppSelector(selector);
+    const { isSelectedForAutoAdd, autoAssignBoardOnClick, isProcessing } =
+      useAppSelector(selector);
     const [isHovered, setIsHovered] = useState(false);
     const handleMouseOver = useCallback(() => {
       setIsHovered(true);
@@ -66,7 +76,10 @@ const GalleryBoard = memo(
 
     const handleSelectBoard = useCallback(() => {
       dispatch(boardIdSelected(board_id));
-    }, [board_id, dispatch]);
+      if (autoAssignBoardOnClick && !isProcessing) {
+        dispatch(autoAddBoardIdChanged(board_id));
+      }
+    }, [board_id, autoAssignBoardOnClick, isProcessing, dispatch]);
 
     const [updateBoard, { isLoading: isUpdateBoardLoading }] =
       useUpdateBoardMutation();

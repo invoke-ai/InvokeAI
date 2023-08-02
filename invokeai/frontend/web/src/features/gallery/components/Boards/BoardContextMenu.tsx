@@ -25,14 +25,17 @@ const BoardContextMenu = memo(
 
     const selector = useMemo(
       () =>
-        createSelector(stateSelector, ({ gallery }) => {
+        createSelector(stateSelector, ({ gallery, system }) => {
           const isAutoAdd = gallery.autoAddBoardId === board_id;
-          return { isAutoAdd };
+          const isProcessing = system.isProcessing;
+          const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
+          return { isAutoAdd, isProcessing, autoAssignBoardOnClick };
         }),
       [board_id]
     );
 
-    const { isAutoAdd } = useAppSelector(selector);
+    const { isAutoAdd, isProcessing, autoAssignBoardOnClick } =
+      useAppSelector(selector);
     const boardName = useBoardName(board_id);
 
     const handleSetAutoAdd = useCallback(() => {
@@ -59,7 +62,7 @@ const BoardContextMenu = memo(
             <MenuGroup title={boardName}>
               <MenuItem
                 icon={<FaPlus />}
-                isDisabled={isAutoAdd}
+                isDisabled={isAutoAdd || isProcessing || autoAssignBoardOnClick}
                 onClick={handleSetAutoAdd}
               >
                 Auto-add to this Board
