@@ -21,8 +21,8 @@ export default function ParamSDXLConcatButton() {
 
   return (
     <IAIIconButton
-      aria-label="Concat"
-      tooltip="Concatenates Basic Prompt with Style (Recommended)"
+      aria-label="Concatenate Prompt & Style"
+      tooltip="Concatenate Prompt & Style"
       variant="outline"
       isChecked={shouldConcatSDXLStylePrompt}
       onClick={handleShouldConcatPromptChange}

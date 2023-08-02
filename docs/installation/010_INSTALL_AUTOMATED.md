@@ -394,7 +394,7 @@ rm .\.venv -r -force
 python -mvenv .venv
 .\.venv\Scripts\activate
 pip install invokeai
-invokeai-configure --root .
+invokeai-configure --yes --root .
 ```
 
 If you see anything marked as an error during this process please stop

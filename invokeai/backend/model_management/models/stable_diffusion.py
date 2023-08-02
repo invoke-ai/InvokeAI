@@ -123,6 +123,7 @@ class StableDiffusion1Model(DiffusersModel):
             return _convert_ckpt_and_cache(
                 version=BaseModelType.StableDiffusion1,
                 model_config=config,
+                load_safety_checker=False,
                 output_path=output_path,
             )
         else:
@@ -259,7 +260,7 @@ def _convert_ckpt_and_cache(
     """
     app_config = InvokeAIAppConfig.get_config()
 
-    weights = app_config.root_path / model_config.path
+    weights = app_config.models_path / model_config.path
     config_file = app_config.root_path / model_config.config
     output_path = Path(output_path)
 

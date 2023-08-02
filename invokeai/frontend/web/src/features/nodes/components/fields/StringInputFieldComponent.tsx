@@ -1,4 +1,4 @@
-import { Input } from '@chakra-ui/react';
+import { Input, Textarea } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import {
@@ -12,10 +12,11 @@ const StringInputFieldComponent = (
   props: FieldComponentProps<StringInputFieldValue, StringInputFieldTemplate>
 ) => {
   const { nodeId, field } = props;
-
   const dispatch = useAppDispatch();
 
-  const handleValueChanged = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleValueChanged = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     dispatch(
       fieldValueChanged({
         nodeId,
@@ -25,7 +26,11 @@ const StringInputFieldComponent = (
     );
   };
 
-  return <Input onChange={handleValueChanged} value={field.value}></Input>;
+  return ['prompt', 'style'].includes(field.name.toLowerCase()) ? (
+    <Textarea onChange={handleValueChanged} value={field.value} rows={2} />
+  ) : (
+    <Input onChange={handleValueChanged} value={field.value} />
+  );
 };
 
 export default memo(StringInputFieldComponent);

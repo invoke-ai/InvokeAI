@@ -187,7 +187,9 @@ class ModelCache(object):
         # TODO: lock for no copies on simultaneous calls?
         cache_entry = self._cached_models.get(key, None)
         if cache_entry is None:
-            self.logger.info(f"Loading model {model_path}, type {base_model}:{model_type}:{submodel}")
+            self.logger.info(
+                f"Loading model {model_path}, type {base_model.value}:{model_type.value}:{submodel.value if submodel else ''}"
+            )
 
             # this will remove older cached models until
             # there is sufficient room to load the requested model
@@ -358,7 +360,8 @@ class ModelCache(object):
             # 2 refs:
             # 1 from cache_entry
             # 1 from getrefcount function
-            if not cache_entry.locked and refs <= 2:
+            # 1 from onnx runtime object
+            if not cache_entry.locked and refs <= 3 if "onnx" in model_key else 2:
                 self.logger.debug(
                     f"Unloading model {model_key} to free {(model_size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
                 )
