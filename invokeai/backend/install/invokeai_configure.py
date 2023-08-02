@@ -10,6 +10,7 @@ import sys
 import argparse
 import io
 import os
+import psutil
 import shutil
 import textwrap
 import torch
@@ -79,10 +80,13 @@ Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
 
 PRECISION_CHOICES = ["auto", "float16", "float32"]
+GB = 1073741824  # GB in bytes
 HAS_CUDA = torch.cuda.is_available()
 _, MAX_VRAM = torch.cuda.mem_get_info() if HAS_CUDA else (0, 0)
-MAX_VRAM /= 1073741824  # GB in bytes
-MAX_VRAM_CACHE_RATIO = 0.55  # first guess of optimal vram cache based on total available
+
+
+MAX_VRAM /= GB
+MAX_RAM = psutil.virtual_memory().total / GB 
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -391,9 +395,9 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.max_cache_size = self.add_widget_intelligent(
             IntTitleSlider,
-            name="RAM cache size. The larger this is, the more models can be kept in memory rather than loading from disk each time (GB)",
+            name="RAM cache size (GB). Make this at least large enough to hold a single model. Larger sizes will allow you to switch between models quickly without reading from disk.",
             value=old_opts.max_cache_size,
-            out_of=20,
+            out_of=MAX_RAM,
             lowest=3,
             begin_entry_at=6,
             scroll_exit=True,
@@ -402,7 +406,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             self.nextrely += 1
             self.add_widget_intelligent(
                 npyscreen.TitleFixedText,
-                name="VRAM cache size. Make this large enough to hold an entire model, but not more than half your available VRAM (GB)",
+                name="VRAM cache size (GB). Reserving a small amount of VRAM will modestly speed up the start of image generation.",
                 begin_entry_at=0,
                 editable=False,
                 color="CONTROL",
@@ -416,7 +420,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
                 lowest=0.0,
                 relx=8,
                 step=0.25,
-                begin_entry_at=MAX_VRAM * 0.55,
                 scroll_exit=True,
             )
         else:
@@ -569,9 +572,6 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
 
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
-    # dynamically adust vram for memory size
-    if not init_file.exists():
-        opts.max_vram_cache_size = round((MAX_VRAM * MAX_VRAM_CACHE_RATIO) * 4) / 4
     return opts
 
 
