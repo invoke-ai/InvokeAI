@@ -1,14 +1,14 @@
 import time
 import traceback
-from threading import Event, Thread, BoundedSemaphore
-
-from ..invocations.baseinvocation import InvocationContext
-from .invocation_queue import InvocationQueueItem
-from .invoker import InvocationProcessorABC, Invoker
-from .invocation_stats import InvocationStats
-from ..models.exceptions import CanceledException
+from threading import BoundedSemaphore, Event, Thread
 
 import invokeai.backend.util.logging as logger
+
+from ..invocations.baseinvocation import InvocationContext
+from ..models.exceptions import CanceledException
+from .invocation_queue import InvocationQueueItem
+from .invocation_stats import InvocationStatsServiceBase
+from .invoker import InvocationProcessorABC, Invoker
 
 
 class DefaultInvocationProcessor(InvocationProcessorABC):
@@ -36,7 +36,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
     def __process(self, stop_event: Event):
         try:
             self.__threadLimit.acquire()
-            statistics = InvocationStats()  # keep track of performance metrics
+            statistics: InvocationStatsServiceBase = self.__invoker.services.performance_statistics
+
             while not stop_event.is_set():
                 try:
                     queue_item: InvocationQueueItem = self.__invoker.services.queue.get()
@@ -85,7 +86,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
                 # Invoke
                 try:
-                    with statistics.collect_stats(invocation, graph_execution_state):
+                    with statistics.collect_stats(invocation, graph_execution_state.id):
                         outputs = invocation.invoke(
                             InvocationContext(
                                 services=self.__invoker.services,
@@ -116,7 +117,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     pass
 
                 except CanceledException:
-                    statistics.reset_stats()
+                    statistics.reset_stats(graph_execution_state.id)
                     pass
 
                 except Exception as e:
@@ -138,7 +139,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         error_type=e.__class__.__name__,
                         error=error,
                     )
-                    statistics.reset_stats()
+                    statistics.reset_stats(graph_execution_state.id)
                     pass
 
                 # Check queue to see if this is canceled, and skip if so
