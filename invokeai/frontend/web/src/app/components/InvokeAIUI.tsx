@@ -13,7 +13,7 @@ import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import Loading from '../../common/components/Loading/Loading';
 
 import { Middleware } from '@reduxjs/toolkit';
-import { $authToken, $baseUrl } from 'services/api/client';
+import { $authToken, $baseUrl, $projectId } from 'services/api/client';
 import { socketMiddleware } from 'services/events/middleware';
 import '../../i18n';
 import { AddImageToBoardContextProvider } from '../contexts/AddImageToBoardContext';
@@ -37,6 +37,7 @@ const InvokeAIUI = ({
   config,
   headerComponent,
   middleware,
+  projectId,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -47,6 +48,11 @@ const InvokeAIUI = ({
     // configure API client base url
     if (apiUrl) {
       $baseUrl.set(apiUrl);
+    }
+
+    // configure API client project header
+    if (apiUrl) {
+      $projectId.set(projectId);
     }
 
     // reset dynamically added middlewares
@@ -68,8 +74,9 @@ const InvokeAIUI = ({
       // Reset the API client token and base url on unmount
       $baseUrl.set(undefined);
       $authToken.set(undefined);
+      $projectId.set(undefined);
     };
-  }, [apiUrl, token, middleware]);
+  }, [apiUrl, token, middleware, projectId]);
 
   return (
     <React.StrictMode>
