@@ -51,7 +51,7 @@ const InvokeAIUI = ({
     }
 
     // configure API client project header
-    if (apiUrl) {
+    if (projectId) {
       $projectId.set(projectId);
     }
 
