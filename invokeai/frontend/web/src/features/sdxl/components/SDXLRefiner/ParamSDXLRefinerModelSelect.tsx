@@ -6,7 +6,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
-import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
+import { modelIdToSDXLRefinerModelParam } from 'features/parameters/util/modelIdToSDXLRefinerModelParam';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
@@ -68,7 +68,7 @@ const ParamSDXLRefinerModelSelect = () => {
         return;
       }
 
-      const newModel = modelIdToMainModelParam(v);
+      const newModel = modelIdToSDXLRefinerModelParam(v);
 
       if (!newModel) {
         return;

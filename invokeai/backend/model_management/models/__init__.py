@@ -23,8 +23,11 @@ from .lora import LoRAModel
 from .controlnet import ControlNetModel  # TODO:
 from .textual_inversion import TextualInversionModel
 
+from .stable_diffusion_onnx import ONNXStableDiffusion1Model, ONNXStableDiffusion2Model
+
 MODEL_CLASSES = {
     BaseModelType.StableDiffusion1: {
+        ModelType.ONNX: ONNXStableDiffusion1Model,
         ModelType.Main: StableDiffusion1Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
@@ -32,6 +35,7 @@ MODEL_CLASSES = {
         ModelType.TextualInversion: TextualInversionModel,
     },
     BaseModelType.StableDiffusion2: {
+        ModelType.ONNX: ONNXStableDiffusion2Model,
         ModelType.Main: StableDiffusion2Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
@@ -45,6 +49,7 @@ MODEL_CLASSES = {
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
+        ModelType.ONNX: ONNXStableDiffusion2Model,
     },
     BaseModelType.StableDiffusionXLRefiner: {
         ModelType.Main: StableDiffusionXLModel,
@@ -53,6 +58,7 @@ MODEL_CLASSES = {
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
+        ModelType.ONNX: ONNXStableDiffusion2Model,
     },
     # BaseModelType.Kandinsky2_1: {
     #    ModelType.Main: Kandinsky2_1Model,

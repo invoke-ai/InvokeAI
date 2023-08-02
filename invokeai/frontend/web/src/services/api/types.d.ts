@@ -32,6 +32,7 @@ export type ModelType = components['schemas']['ModelType'];
 export type SubModelType = components['schemas']['SubModelType'];
 export type BaseModelType = components['schemas']['BaseModelType'];
 export type MainModelField = components['schemas']['MainModelField'];
+export type OnnxModelField = components['schemas']['OnnxModelField'];
 export type VAEModelField = components['schemas']['VAEModelField'];
 export type LoRAModelField = components['schemas']['LoRAModelField'];
 export type ControlNetModelField =
@@ -59,13 +60,16 @@ export type CheckpointModelConfig =
   | components['schemas']['StableDiffusion1ModelCheckpointConfig']
   | components['schemas']['StableDiffusion2ModelCheckpointConfig']
   | components['schemas']['StableDiffusionXLModelCheckpointConfig'];
+export type OnnxModelConfig =
+  components['schemas']['ONNXStableDiffusion1ModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig
   | VaeModelConfig
   | ControlNetModelConfig
   | TextualInversionModelConfig
-  | MainModelConfig;
+  | MainModelConfig
+  | OnnxModelConfig;
 
 export type MergeModelConfig = components['schemas']['Body_merge_models'];
 export type ConvertModelConfig = components['schemas']['Body_convert_model'];
@@ -112,6 +116,9 @@ export type NoiseInvocation = TypeReq<components['schemas']['NoiseInvocation']>;
 export type TextToLatentsInvocation = TypeReq<
   components['schemas']['TextToLatentsInvocation']
 >;
+export type ONNXTextToLatentsInvocation = TypeReq<
+  components['schemas']['ONNXTextToLatentsInvocation']
+>;
 export type LatentsToLatentsInvocation = TypeReq<
   components['schemas']['LatentsToLatentsInvocation']
 >;
@@ -126,6 +133,9 @@ export type ImageCollectionInvocation = TypeReq<
 >;
 export type MainModelLoaderInvocation = TypeReq<
   components['schemas']['MainModelLoaderInvocation']
+>;
+export type OnnxModelLoaderInvocation = TypeReq<
+  components['schemas']['OnnxModelLoaderInvocation']
 >;
 export type LoraLoaderInvocation = TypeReq<
   components['schemas']['LoraLoaderInvocation']

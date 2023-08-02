@@ -7,7 +7,10 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import InvokeAILogoImage from 'assets/images/logo.png';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
-import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import {
+  boardIdSelected,
+  autoAddBoardIdChanged,
+} from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import AutoAddIcon from '../AutoAddIcon';
@@ -18,20 +21,25 @@ interface Props {
 
 const selector = createSelector(
   stateSelector,
-  ({ gallery }) => {
-    const { autoAddBoardId } = gallery;
-    return { autoAddBoardId };
+  ({ gallery, system }) => {
+    const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
+    const { isProcessing } = system;
+    return { autoAddBoardId, autoAssignBoardOnClick, isProcessing };
   },
   defaultSelectorOptions
 );
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const { autoAddBoardId } = useAppSelector(selector);
+  const { autoAddBoardId, autoAssignBoardOnClick, isProcessing } =
+    useAppSelector(selector);
   const boardName = useBoardName(undefined);
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected(undefined));
-  }, [dispatch]);
+    if (autoAssignBoardOnClick && !isProcessing) {
+      dispatch(autoAddBoardIdChanged(undefined));
+    }
+  }, [dispatch, autoAssignBoardOnClick, isProcessing]);
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(() => {
     setIsHovered(true);
