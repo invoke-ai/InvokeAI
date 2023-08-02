@@ -34,6 +34,10 @@
             cudaPackages.cudnn
             cudaPackages.cuda_nvrtc
             cudatoolkit
+            pkgconfig
+            libconfig
+            cmake
+            blas
             freeglut
             glib
             gperf
@@ -42,6 +46,12 @@
             libGLU
             linuxPackages.nvidia_x11
             python
+            (opencv4.override {
+              enableGtk3 = true;
+              enableFfmpeg = true;
+              enableCuda = true;
+              enableUnfree = true;
+            })
             stdenv.cc
             stdenv.cc.cc.lib
             xorg.libX11
