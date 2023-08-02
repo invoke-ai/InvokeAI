@@ -303,7 +303,7 @@ class ModelInstall(object):
 
         with TemporaryDirectory(dir=self.config.models_path) as staging:
             staging = Path(staging)
-            if "model_index.json" in files and "unet/model.onnx" not in files:
+            if "model_index.json" in files:
                 location = self._download_hf_pipeline(repo_id, staging)  # pipeline
             elif "unet/model.onnx" in files:
                 location = self._download_hf_model(repo_id, files, staging)
