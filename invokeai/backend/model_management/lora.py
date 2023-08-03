@@ -6,10 +6,21 @@ from typing import Optional, Dict, Tuple, Any, Union, List
 from pathlib import Path
 
 import torch
+from safetensors.torch import load_file
+from torch.utils.hooks import RemovableHandle
+
+from diffusers.models import UNet2DConditionModel
+from transformers import CLIPTextModel
+from onnx import numpy_helper
+from onnxruntime import OrtValue
+import numpy as np
+
 from compel.embeddings_provider import BaseTextualInversionManager
 from diffusers.models import UNet2DConditionModel
 from safetensors.torch import load_file
 from transformers import CLIPTextModel, CLIPTokenizer
+
+# TODO: rename and split this file
 
 
 class LoRALayerBase:
@@ -698,3 +709,186 @@ class TextualInversionManager(BaseTextualInversionManager):
                 new_token_ids.extend(self.pad_tokens[token_id])
 
         return new_token_ids
+
+
+class ONNXModelPatcher:
+    from .models.base import IAIOnnxRuntimeModel, OnnxRuntimeModel
+
+    @classmethod
+    @contextmanager
+    def apply_lora_unet(
+        cls,
+        unet: OnnxRuntimeModel,
+        loras: List[Tuple[LoRAModel, float]],
+    ):
+        with cls.apply_lora(unet, loras, "lora_unet_"):
+            yield
+
+    @classmethod
+    @contextmanager
+    def apply_lora_text_encoder(
+        cls,
+        text_encoder: OnnxRuntimeModel,
+        loras: List[Tuple[LoRAModel, float]],
+    ):
+        with cls.apply_lora(text_encoder, loras, "lora_te_"):
+            yield
+
+    # based on
+    # https://github.com/ssube/onnx-web/blob/ca2e436f0623e18b4cfe8a0363fcfcf10508acf7/api/onnx_web/convert/diffusion/lora.py#L323
+    @classmethod
+    @contextmanager
+    def apply_lora(
+        cls,
+        model: IAIOnnxRuntimeModel,
+        loras: List[Tuple[LoraModel, float]],
+        prefix: str,
+    ):
+        from .models.base import IAIOnnxRuntimeModel
+
+        if not isinstance(model, IAIOnnxRuntimeModel):
+            raise Exception("Only IAIOnnxRuntimeModel models supported")
+
+        orig_weights = dict()
+
+        try:
+            blended_loras = dict()
+
+            for lora, lora_weight in loras:
+                for layer_key, layer in lora.layers.items():
+                    if not layer_key.startswith(prefix):
+                        continue
+
+                    layer.to(dtype=torch.float32)
+                    layer_key = layer_key.replace(prefix, "")
+                    layer_weight = layer.get_weight().detach().cpu().numpy() * lora_weight
+                    if layer_key is blended_loras:
+                        blended_loras[layer_key] += layer_weight
+                    else:
+                        blended_loras[layer_key] = layer_weight
+
+            node_names = dict()
+            for node in model.nodes.values():
+                node_names[node.name.replace("/", "_").replace(".", "_").lstrip("_")] = node.name
+
+            for layer_key, lora_weight in blended_loras.items():
+                conv_key = layer_key + "_Conv"
+                gemm_key = layer_key + "_Gemm"
+                matmul_key = layer_key + "_MatMul"
+
+                if conv_key in node_names or gemm_key in node_names:
+                    if conv_key in node_names:
+                        conv_node = model.nodes[node_names[conv_key]]
+                    else:
+                        conv_node = model.nodes[node_names[gemm_key]]
+
+                    weight_name = [n for n in conv_node.input if ".weight" in n][0]
+                    orig_weight = model.tensors[weight_name]
+
+                    if orig_weight.shape[-2:] == (1, 1):
+                        if lora_weight.shape[-2:] == (1, 1):
+                            new_weight = orig_weight.squeeze((3, 2)) + lora_weight.squeeze((3, 2))
+                        else:
+                            new_weight = orig_weight.squeeze((3, 2)) + lora_weight
+
+                        new_weight = np.expand_dims(new_weight, (2, 3))
+                    else:
+                        if orig_weight.shape != lora_weight.shape:
+                            new_weight = orig_weight + lora_weight.reshape(orig_weight.shape)
+                        else:
+                            new_weight = orig_weight + lora_weight
+
+                    orig_weights[weight_name] = orig_weight
+                    model.tensors[weight_name] = new_weight.astype(orig_weight.dtype)
+
+                elif matmul_key in node_names:
+                    weight_node = model.nodes[node_names[matmul_key]]
+                    matmul_name = [n for n in weight_node.input if "MatMul" in n][0]
+
+                    orig_weight = model.tensors[matmul_name]
+                    new_weight = orig_weight + lora_weight.transpose()
+
+                    orig_weights[matmul_name] = orig_weight
+                    model.tensors[matmul_name] = new_weight.astype(orig_weight.dtype)
+
+                else:
+                    # warn? err?
+                    pass
+
+            yield
+
+        finally:
+            # restore original weights
+            for name, orig_weight in orig_weights.items():
+                model.tensors[name] = orig_weight
+
+    @classmethod
+    @contextmanager
+    def apply_ti(
+        cls,
+        tokenizer: CLIPTokenizer,
+        text_encoder: IAIOnnxRuntimeModel,
+        ti_list: List[Any],
+    ) -> Tuple[CLIPTokenizer, TextualInversionManager]:
+        from .models.base import IAIOnnxRuntimeModel
+
+        if not isinstance(text_encoder, IAIOnnxRuntimeModel):
+            raise Exception("Only IAIOnnxRuntimeModel models supported")
+
+        orig_embeddings = None
+
+        try:
+            ti_tokenizer = copy.deepcopy(tokenizer)
+            ti_manager = TextualInversionManager(ti_tokenizer)
+
+            def _get_trigger(ti, index):
+                trigger = ti.name
+                if index > 0:
+                    trigger += f"-!pad-{i}"
+                return f"<{trigger}>"
+
+            # modify tokenizer
+            new_tokens_added = 0
+            for ti in ti_list:
+                for i in range(ti.embedding.shape[0]):
+                    new_tokens_added += ti_tokenizer.add_tokens(_get_trigger(ti, i))
+
+            # modify text_encoder
+            orig_embeddings = text_encoder.tensors["text_model.embeddings.token_embedding.weight"]
+
+            embeddings = np.concatenate(
+                (np.copy(orig_embeddings), np.zeros((new_tokens_added, orig_embeddings.shape[1]))),
+                axis=0,
+            )
+
+            for ti in ti_list:
+                ti_tokens = []
+                for i in range(ti.embedding.shape[0]):
+                    embedding = ti.embedding[i].detach().numpy()
+                    trigger = _get_trigger(ti, i)
+
+                    token_id = ti_tokenizer.convert_tokens_to_ids(trigger)
+                    if token_id == ti_tokenizer.unk_token_id:
+                        raise RuntimeError(f"Unable to find token id for token '{trigger}'")
+
+                    if embeddings[token_id].shape != embedding.shape:
+                        raise ValueError(
+                            f"Cannot load embedding for {trigger}. It was trained on a model with token dimension {embedding.shape[0]}, but the current model has token dimension {embeddings[token_id].shape[0]}."
+                        )
+
+                    embeddings[token_id] = embedding
+                    ti_tokens.append(token_id)
+
+                if len(ti_tokens) > 1:
+                    ti_manager.pad_tokens[ti_tokens[0]] = ti_tokens[1:]
+
+            text_encoder.tensors["text_model.embeddings.token_embedding.weight"] = embeddings.astype(
+                orig_embeddings.dtype
+            )
+
+            yield ti_tokenizer, ti_manager
+
+        finally:
+            # restore
+            if orig_embeddings is not None:
+                text_encoder.tensors["text_model.embeddings.token_embedding.weight"] = orig_embeddings
