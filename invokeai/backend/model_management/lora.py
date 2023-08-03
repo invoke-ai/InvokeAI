@@ -359,7 +359,7 @@ class FullLayer(LoRALayerBase):
     ):
         super().to(device=device, dtype=dtype)
 
-        self.weight = self.weight.to(device=device, dtype=dtype)    
+        self.weight = self.weight.to(device=device, dtype=dtype)
 
 
 class LoRAModel:  # (torch.nn.Module):
