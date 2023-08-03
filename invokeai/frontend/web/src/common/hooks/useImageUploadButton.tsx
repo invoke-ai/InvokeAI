@@ -49,7 +49,7 @@ export const useImageUploadButton = ({
         image_category: 'user',
         is_intermediate: false,
         postUploadAction: postUploadAction ?? { type: 'TOAST' },
-        board_id: autoAddBoardId,
+        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
       });
     },
     [autoAddBoardId, postUploadAction, uploadImage]

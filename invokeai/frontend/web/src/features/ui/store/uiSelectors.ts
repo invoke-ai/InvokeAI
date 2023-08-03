@@ -2,12 +2,12 @@ import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { isEqual } from 'lodash-es';
 
-import { tabMap } from './tabMap';
+import { InvokeTabName, tabMap } from './tabMap';
 import { UIState } from './uiTypes';
 
 export const activeTabNameSelector = createSelector(
   (state: RootState) => state.ui,
-  (ui: UIState) => tabMap[ui.activeTab],
+  (ui: UIState) => tabMap[ui.activeTab] as InvokeTabName,
   {
     memoizeOptions: {
       equalityCheck: isEqual,

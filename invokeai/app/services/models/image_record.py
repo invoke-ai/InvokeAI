@@ -1,13 +1,14 @@
 import datetime
 from typing import Optional, Union
 
-from pydantic import BaseModel, Extra, Field, StrictBool, StrictStr
+from pydantic import Extra, Field, StrictBool, StrictStr
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 
-class ImageRecord(BaseModel):
+class ImageRecord(BaseModelExcludeNull):
     """Deserialized image record without metadata."""
 
     image_name: str = Field(description="The unique name of the image.")
@@ -40,7 +41,7 @@ class ImageRecord(BaseModel):
     """The node ID that generated this image, if it is a generated image."""
 
 
-class ImageRecordChanges(BaseModel, extra=Extra.forbid):
+class ImageRecordChanges(BaseModelExcludeNull, extra=Extra.forbid):
     """A set of changes to apply to an image record.
 
     Only limited changes are valid:
@@ -60,7 +61,7 @@ class ImageRecordChanges(BaseModel, extra=Extra.forbid):
     """The image's new `is_intermediate` flag."""
 
 
-class ImageUrlsDTO(BaseModel):
+class ImageUrlsDTO(BaseModelExcludeNull):
     """The URLs for an image and its thumbnail."""
 
     image_name: str = Field(description="The unique name of the image.")
@@ -76,11 +77,15 @@ class ImageDTO(ImageRecord, ImageUrlsDTO):
 
     board_id: Optional[str] = Field(description="The id of the board the image belongs to, if one exists.")
     """The id of the board the image belongs to, if one exists."""
+
     pass
 
 
 def image_record_to_dto(
-    image_record: ImageRecord, image_url: str, thumbnail_url: str, board_id: Optional[str]
+    image_record: ImageRecord,
+    image_url: str,
+    thumbnail_url: str,
+    board_id: Optional[str],
 ) -> ImageDTO:
     """Converts an image record to an image DTO."""
     return ImageDTO(

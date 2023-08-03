@@ -1,7 +1,6 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 
 import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect, {
   IAISelectDataType,
@@ -9,13 +8,16 @@ import IAIMantineSearchableSelect, {
 import { configSelector } from 'features/system/store/configSelectors';
 import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { map } from 'lodash-es';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { CONTROLNET_PROCESSORS } from '../../store/constants';
-import { controlNetProcessorTypeChanged } from '../../store/controlNetSlice';
+import {
+  ControlNetConfig,
+  controlNetProcessorTypeChanged,
+} from '../../store/controlNetSlice';
 import { ControlNetProcessorType } from '../../store/types';
 
 type ParamControlNetProcessorSelectProps = {
-  controlNetId: string;
+  controlNet: ControlNetConfig;
 };
 
 const selector = createSelector(
@@ -52,23 +54,9 @@ const ParamControlNetProcessorSelect = (
   props: ParamControlNetProcessorSelectProps
 ) => {
   const dispatch = useAppDispatch();
-  const { controlNetId } = props;
-  const processorNodeSelector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ controlNet }) => {
-          const { isEnabled, processorNode } =
-            controlNet.controlNets[controlNetId];
-          return { isEnabled, processorNode };
-        },
-        defaultSelectorOptions
-      ),
-    [controlNetId]
-  );
+  const { controlNetId, isEnabled, processorNode } = props.controlNet;
   const isBusy = useAppSelector(selectIsBusy);
   const controlNetProcessors = useAppSelector(selector);
-  const { isEnabled, processorNode } = useAppSelector(processorNodeSelector);
 
   const handleProcessorTypeChanged = useCallback(
     (v: string | null) => {

@@ -31,7 +31,6 @@ class BoardImagesServiceABC(ABC):
     @abstractmethod
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
         """Removes an image from a board."""
@@ -93,10 +92,9 @@ class BoardImagesService(BoardImagesServiceABC):
 
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
-        self._services.board_image_records.remove_image_from_board(board_id, image_name)
+        self._services.board_image_records.remove_image_from_board(image_name)
 
     def get_all_board_image_names_for_board(
         self,
