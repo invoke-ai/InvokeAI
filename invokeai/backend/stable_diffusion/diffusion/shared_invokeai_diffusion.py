@@ -78,10 +78,9 @@ class InvokeAIDiffuserComponent:
         self.cross_attention_control_context = None
         self.sequential_guidance = config.sequential_guidance
 
-    @classmethod
     @contextmanager
     def custom_attention_context(
-        cls,
+        self,
         unet: UNet2DConditionModel,  # note: also may futz with the text encoder depending on requested LoRAs
         extra_conditioning_info: Optional[ExtraConditioningInfo],
         step_count: int,
@@ -91,18 +90,19 @@ class InvokeAIDiffuserComponent:
             old_attn_processors = unet.attn_processors
             # Load lora conditions into the model
             if extra_conditioning_info.wants_cross_attention_control:
-                cross_attention_control_context = Context(
+                self.cross_attention_control_context = Context(
                     arguments=extra_conditioning_info.cross_attention_control_args,
                     step_count=step_count,
                 )
                 setup_cross_attention_control_attention_processors(
                     unet,
-                    cross_attention_control_context,
+                    self.cross_attention_control_context,
                 )
 
         try:
             yield None
         finally:
+            self.cross_attention_control_context = None
             if old_attn_processors is not None:
                 unet.set_attn_processor(old_attn_processors)
             # TODO resuscitate attention map saving
