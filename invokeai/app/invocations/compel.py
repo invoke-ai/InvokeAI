@@ -108,15 +108,17 @@ class CompelInvocation(BaseInvocation):
         for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
             name = trigger[1:-1]
             try:
-                ti_list.append((
-                    name,
-                    context.services.model_manager.get_model(
-                        model_name=name,
-                        base_model=self.clip.text_encoder.base_model,
-                        model_type=ModelType.TextualInversion,
-                        context=context,
-                    ).context.model
-                ))
+                ti_list.append(
+                    (
+                        name,
+                        context.services.model_manager.get_model(
+                            model_name=name,
+                            base_model=self.clip.text_encoder.base_model,
+                            model_type=ModelType.TextualInversion,
+                            context=context,
+                        ).context.model,
+                    )
+                )
             except ModelNotFoundException:
                 # print(e)
                 # import traceback
@@ -197,15 +199,17 @@ class SDXLPromptInvocationBase:
         for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", prompt):
             name = trigger[1:-1]
             try:
-                ti_list.append((
-                    name,
-                    context.services.model_manager.get_model(
-                        model_name=name,
-                        base_model=clip_field.text_encoder.base_model,
-                        model_type=ModelType.TextualInversion,
-                        context=context,
-                    ).context.model
-                ))
+                ti_list.append(
+                    (
+                        name,
+                        context.services.model_manager.get_model(
+                            model_name=name,
+                            base_model=clip_field.text_encoder.base_model,
+                            model_type=ModelType.TextualInversion,
+                            context=context,
+                        ).context.model,
+                    )
+                )
             except ModelNotFoundException:
                 # print(e)
                 # import traceback
@@ -272,15 +276,17 @@ class SDXLPromptInvocationBase:
         for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", prompt):
             name = trigger[1:-1]
             try:
-                ti_list.append((
-                    name,
-                    context.services.model_manager.get_model(
-                        model_name=name,
-                        base_model=clip_field.text_encoder.base_model,
-                        model_type=ModelType.TextualInversion,
-                        context=context,
-                    ).context.model
-                ))
+                ti_list.append(
+                    (
+                        name,
+                        context.services.model_manager.get_model(
+                            model_name=name,
+                            base_model=clip_field.text_encoder.base_model,
+                            model_type=ModelType.TextualInversion,
+                            context=context,
+                        ).context.model,
+                    )
+                )
             except ModelNotFoundException:
                 # print(e)
                 # import traceback
