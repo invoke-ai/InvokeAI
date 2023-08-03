@@ -11,10 +11,11 @@ import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
+import { BoardId } from 'features/gallery/store/types';
 
 type Props = {
   board?: BoardDTO;
-  board_id?: string;
+  board_id: BoardId;
   children: ContextMenuProps<HTMLDivElement>['children'];
   setBoardToDelete?: (board?: BoardDTO) => void;
 };
