@@ -208,12 +208,12 @@ class InvocationStatsService(InvocationStatsServiceBase):
 
             total_time = 0
             logger.info(f"Graph stats: {graph_id}")
-            logger.info("Node                 Calls  Seconds  VRAM Used")
+            logger.info("Node                 Calls    Seconds VRAM Used")
             for node_type, stats in self._stats[graph_id].nodes.items():
-                logger.info(f"{node_type:<20} {stats.calls:>5}   {stats.time_used:4.3f}s     {stats.max_vram:4.2f}G")
+                logger.info(f"{node_type:<20} {stats.calls:>5}   {stats.time_used:7.3f}s     {stats.max_vram:4.2f}G")
                 total_time += stats.time_used
 
-            logger.info(f"TOTAL GRAPH EXECUTION TIME:  {total_time:4.3f}s")
+            logger.info(f"TOTAL GRAPH EXECUTION TIME:  {total_time:7.3f}s")
             if torch.cuda.is_available():
                 logger.info("Current VRAM utilization " + "%4.2fG" % (torch.cuda.memory_allocated() / 1e9))
 
