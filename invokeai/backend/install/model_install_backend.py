@@ -419,7 +419,7 @@ class ModelInstall(object):
         """
         _, name = repo_id.split("/")
         precision = torch_dtype(choose_torch_device())
-        variants = ["fp16",None] if precision == torch.float16 else [None,"fp16"]
+        variants = ["fp16", None] if precision == torch.float16 else [None, "fp16"]
 
         model = None
         for variant in variants:
@@ -428,7 +428,7 @@ class ModelInstall(object):
                     repo_id,
                     variant=variant,
                     torch_dtype=precision,
-                    safety_checker=None, 
+                    safety_checker=None,
                 )
             except Exception as e:  # most errors are due to fp16 not being present. Fix this to catch other errors
                 if "fp16" not in str(e):
@@ -436,7 +436,7 @@ class ModelInstall(object):
 
             if model:
                 break
-            
+
         if not model:
             logger.error(f"Diffusers model {repo_id} could not be downloaded. Skipping.")
             return None
