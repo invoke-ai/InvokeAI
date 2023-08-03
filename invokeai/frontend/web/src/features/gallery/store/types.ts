@@ -18,6 +18,7 @@ export type GalleryState = {
   selection: string[];
   shouldAutoSwitch: boolean;
   autoAddBoardId: string | undefined;
+  autoAssignBoardOnClick: boolean;
   galleryImageMinimumWidth: number;
   selectedBoardId: BoardId;
   galleryView: GalleryView;
