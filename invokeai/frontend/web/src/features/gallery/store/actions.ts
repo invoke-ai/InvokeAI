@@ -1,5 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
-import { ImageUsage } from 'app/contexts/AddImageToBoardContext';
+import { ImageUsage } from 'features/deleteImageModal/store/types';
 import { BoardDTO } from 'services/api/types';
 
 export type RequestedBoardImagesDeletionArg = {

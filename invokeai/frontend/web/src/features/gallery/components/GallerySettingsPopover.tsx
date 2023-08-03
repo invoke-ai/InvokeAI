@@ -5,17 +5,19 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAISlider from 'common/components/IAISlider';
+import IAISwitch from 'common/components/IAISwitch';
 import {
   autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
   shouldAutoSwitchChanged,
+  shouldShowDeleteButtonChanged,
 } from 'features/gallery/store/gallerySlice';
-import { ChangeEvent } from 'react';
+import { ChangeEvent, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 
 const selector = createSelector(
   [stateSelector],
@@ -24,12 +26,14 @@ const selector = createSelector(
       galleryImageMinimumWidth,
       shouldAutoSwitch,
       autoAssignBoardOnClick,
+      shouldShowDeleteButton,
     } = state.gallery;
 
     return {
       galleryImageMinimumWidth,
       shouldAutoSwitch,
       autoAssignBoardOnClick,
+      shouldShowDeleteButton,
     };
   },
   defaultSelectorOptions
@@ -39,12 +43,37 @@ const GallerySettingsPopover = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const { galleryImageMinimumWidth, shouldAutoSwitch, autoAssignBoardOnClick } =
-    useAppSelector(selector);
+  const {
+    galleryImageMinimumWidth,
+    shouldAutoSwitch,
+    autoAssignBoardOnClick,
+    shouldShowDeleteButton,
+  } = useAppSelector(selector);
 
-  const handleChangeGalleryImageMinimumWidth = (v: number) => {
-    dispatch(setGalleryImageMinimumWidth(v));
-  };
+  const handleChangeGalleryImageMinimumWidth = useCallback(
+    (v: number) => {
+      dispatch(setGalleryImageMinimumWidth(v));
+    },
+    [dispatch]
+  );
+
+  const handleResetGalleryImageMinimumWidth = useCallback(() => {
+    dispatch(setGalleryImageMinimumWidth(64));
+  }, [dispatch]);
+
+  const handleChangeAutoSwitch = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldAutoSwitchChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+
+  const handleChangeShowDeleteButton = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldShowDeleteButtonChanged(e.target.checked));
+    },
+    [dispatch]
+  );
 
   return (
     <IAIPopover
@@ -57,7 +86,7 @@ const GallerySettingsPopover = () => {
         />
       }
     >
-      <Flex direction="column" gap={4}>
+      <Flex direction="column" gap={2}>
         <IAISlider
           value={galleryImageMinimumWidth}
           onChange={handleChangeGalleryImageMinimumWidth}
@@ -66,14 +95,17 @@ const GallerySettingsPopover = () => {
           hideTooltip={true}
           label={t('gallery.galleryImageSize')}
           withReset
-          handleReset={() => dispatch(setGalleryImageMinimumWidth(64))}
+          handleReset={handleResetGalleryImageMinimumWidth}
         />
-        <IAISimpleCheckbox
+        <IAISwitch
           label={t('gallery.autoSwitchNewImages')}
           isChecked={shouldAutoSwitch}
-          onChange={(e: ChangeEvent<HTMLInputElement>) =>
-            dispatch(shouldAutoSwitchChanged(e.target.checked))
-          }
+          onChange={handleChangeAutoSwitch}
+        />
+        <IAISwitch
+          label="Show Delete Button"
+          isChecked={shouldShowDeleteButton}
+          onChange={handleChangeShowDeleteButton}
         />
         <IAISimpleCheckbox
           label={t('gallery.autoAssignBoardOnClick')}

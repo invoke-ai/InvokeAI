@@ -56,7 +56,7 @@ const BoardAutoAddSelect = () => {
         return;
       }
 
-      dispatch(autoAddBoardIdChanged(v === 'none' ? undefined : v));
+      dispatch(autoAddBoardIdChanged(v));
     },
     [dispatch]
   );

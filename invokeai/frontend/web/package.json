@@ -23,7 +23,7 @@
     "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
     "dev:host": "concurrently \"vite dev --host\" \"yarn run theme:watch\"",
     "build": "yarn run lint && vite build",
-    "typegen": "npx ts-node scripts/typegen.ts",
+    "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
     "lint:madge": "madge --circular src/main.tsx",
     "lint:eslint": "eslint --max-warnings=0 .",

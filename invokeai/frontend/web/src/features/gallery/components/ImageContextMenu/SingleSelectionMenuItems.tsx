@@ -1,22 +1,22 @@
 import { MenuItem } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
-import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useAppDispatch } from 'app/store/storeHooks';
 import {
   resizeAndScaleCanvas,
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
-import { imagesAddedToBatch } from 'features/gallery/store/gallerySlice';
-import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
+import {
+  imagesToChangeSelected,
+  isModalOpenChanged,
+} from 'features/changeBoardModal/store/slice';
+import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 import { setActiveTab } from 'features/ui/store/uiSlice';
-import { memo, useCallback, useContext, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FaAsterisk,
@@ -29,13 +29,9 @@ import {
   FaShare,
   FaTrash,
 } from 'react-icons/fa';
-import {
-  useGetImageMetadataQuery,
-  useRemoveImageFromBoardMutation,
-} from 'services/api/endpoints/images';
+import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
-import { AddImageToBoardContext } from '../../../../app/contexts/AddImageToBoardContext';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
 
 type SingleSelectionMenuItemsProps = {
@@ -45,32 +41,12 @@ type SingleSelectionMenuItemsProps = {
 const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { imageDTO } = props;
 
-  const selector = useMemo(
-    () =>
-      createSelector(
-        [stateSelector],
-        ({ gallery }) => {
-          const isInBatch = gallery.batchImageNames.includes(
-            imageDTO.image_name
-          );
-
-          return { isInBatch };
-        },
-        defaultSelectorOptions
-      ),
-    [imageDTO.image_name]
-  );
-
-  const { isInBatch } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const toaster = useAppToaster();
 
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
-  const isBatchEnabled = useFeatureStatus('batches').isFeatureEnabled;
-
-  const { onClickAddToBoard } = useContext(AddImageToBoardContext);
 
   const [debouncedMetadataQueryArg, debounceState] = useDebounce(
     imageDTO.image_name,
@@ -92,13 +68,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     if (!imageDTO) {
       return;
     }
-    dispatch(imageToDeleteSelected(imageDTO));
+    dispatch(imagesToDeleteSelected([imageDTO]));
   }, [dispatch, imageDTO]);
 
   const { recallBothPrompts, recallSeed, recallAllParameters } =
     useRecallParameters();
-
-  const [removeFromBoard] = useRemoveImageFromBoardMutation();
 
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
@@ -144,20 +118,10 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     recallAllParameters(metadata);
   }, [metadata, recallAllParameters]);
 
-  const handleAddToBoard = useCallback(() => {
-    onClickAddToBoard(imageDTO);
-  }, [imageDTO, onClickAddToBoard]);
-
-  const handleRemoveFromBoard = useCallback(() => {
-    if (!imageDTO.board_id) {
-      return;
-    }
-    removeFromBoard({ imageDTO });
-  }, [imageDTO, removeFromBoard]);
-
-  const handleAddToBatch = useCallback(() => {
-    dispatch(imagesAddedToBatch([imageDTO.image_name]));
-  }, [dispatch, imageDTO.image_name]);
+  const handleChangeBoard = useCallback(() => {
+    dispatch(imagesToChangeSelected([imageDTO]));
+    dispatch(isModalOpenChanged(true));
+  }, [dispatch, imageDTO]);
 
   const handleCopyImage = useCallback(() => {
     copyImageToClipboard(imageDTO.image_url);
@@ -229,23 +193,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           {t('parameters.sendToUnifiedCanvas')}
         </MenuItem>
       )}
-      {isBatchEnabled && (
-        <MenuItem
-          icon={<FaFolder />}
-          isDisabled={isInBatch}
-          onClickCapture={handleAddToBatch}
-        >
-          Add to Batch
-        </MenuItem>
-      )}
-      <MenuItem icon={<FaFolder />} onClickCapture={handleAddToBoard}>
-        {imageDTO.board_id ? 'Change Board' : 'Add to Board'}
+      <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
+        Change Board
       </MenuItem>
-      {imageDTO.board_id && (
-        <MenuItem icon={<FaFolder />} onClickCapture={handleRemoveFromBoard}>
-          Remove from Board
-        </MenuItem>
-      )}
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
         icon={<FaTrash />}

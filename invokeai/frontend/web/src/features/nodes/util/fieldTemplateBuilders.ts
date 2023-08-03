@@ -29,6 +29,8 @@ import {
   VaeInputFieldTemplate,
   VaeModelInputFieldTemplate,
 } from '../types/types';
+import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
 
@@ -50,7 +52,13 @@ export type BuildInputFieldArg = {
  */
 export const refObjectToFieldType = (
   refObject: OpenAPIV3.ReferenceObject
-): keyof typeof FIELD_TYPE_MAP => refObject.$ref.split('/').slice(-1)[0];
+): keyof typeof FIELD_TYPE_MAP => {
+  const name = refObject.$ref.split('/').slice(-1)[0];
+  if (!name) {
+    return 'UNKNOWN FIELD TYPE';
+  }
+  return name;
+};
 
 const buildIntegerInputFieldTemplate = ({
   schemaObject,
@@ -428,7 +436,7 @@ export const getFieldType = (
   let rawFieldType = '';
 
   if (typeHints && name in typeHints) {
-    rawFieldType = typeHints[name];
+    rawFieldType = typeHints[name] ?? 'UNKNOWN FIELD TYPE';
   } else if (!schemaObject.type) {
     // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
     if (schemaObject.allOf) {
@@ -568,9 +576,22 @@ export const buildOutputFieldTemplates = (
   // extract output schema name from ref
   const outputSchemaName = refObject.$ref.split('/').slice(-1)[0];
 
+  if (!outputSchemaName) {
+    logger('nodes').error(
+      { refObject: parseify(refObject) },
+      'No output schema name found in ref object'
+    );
+    throw 'No output schema name found in ref object';
+  }
+
   // get the output schema itself
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const outputSchema = openAPI.components!.schemas![outputSchemaName];
+
+  if (!outputSchema) {
+    logger('nodes').error({ outputSchemaName }, 'Output schema not found');
+    throw 'Output schema not found';
+  }
 
   if (isSchemaObject(outputSchema)) {
     const outputFields = reduce(
