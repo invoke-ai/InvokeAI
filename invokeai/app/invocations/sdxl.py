@@ -306,9 +306,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
         unet_info = context.services.model_manager.get_model(**self.unet.unet.dict(), context=context)
         do_classifier_free_guidance = True
         cross_attention_kwargs = None
-        with ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),\
-            unet_info as unet:
-
+        with ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()), unet_info as unet:
             scheduler.set_timesteps(num_inference_steps, device=unet.device)
             timesteps = scheduler.timesteps
 

@@ -101,7 +101,6 @@ class ModelPatcher:
         with cls.apply_lora(text_encoder, loras, "lora_te_"):
             yield
 
-
     @classmethod
     @contextmanager
     def apply_sdxl_lora_text_encoder(
