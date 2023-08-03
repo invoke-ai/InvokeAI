@@ -58,7 +58,7 @@ const DragPreview = (props: OverlayDragImageProps) => {
     );
   }
 
-  if (props.dragData.payloadType === 'IMAGE_NAMES') {
+  if (props.dragData.payloadType === 'IMAGE_DTOS') {
     return (
       <Flex
         sx={{
@@ -71,7 +71,7 @@ const DragPreview = (props: OverlayDragImageProps) => {
           ...STYLES,
         }}
       >
-        <Heading>{props.dragData.payload.image_names.length}</Heading>
+        <Heading>{props.dragData.payload.imageDTOs.length}</Heading>
         <Heading size="sm">Images</Heading>
       </Flex>
     );

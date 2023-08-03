@@ -39,17 +39,17 @@ export const getImageUsage = (state: RootState, image_name: string) => {
 export const selectImageUsage = createSelector(
   [(state: RootState) => state],
   (state) => {
-    const { imageToDelete } = state.imageDeletion;
+    const { imagesToDelete } = state.deleteImageModal;
 
-    if (!imageToDelete) {
-      return;
+    if (!imagesToDelete.length) {
+      return [];
     }
 
-    const { image_name } = imageToDelete;
+    const imagesUsage = imagesToDelete.map((i) =>
+      getImageUsage(state, i.image_name)
+    );
 
-    const imageUsage = getImageUsage(state, image_name);
-
-    return imageUsage;
+    return imagesUsage;
   },
   defaultSelectorOptions
 );

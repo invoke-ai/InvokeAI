@@ -6,10 +6,7 @@ import {
 import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
-import {
-  imageSelected,
-  imagesAddedToBatch,
-} from 'features/gallery/store/gallerySlice';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -27,19 +24,32 @@ export const addImageDroppedListener = () => {
       const log = logger('images');
       const { activeData, overData } = action.payload;
 
-      log.debug({ activeData, overData }, 'Image or selection dropped');
+      if (activeData.payloadType === 'IMAGE_DTO') {
+        log.debug({ activeData, overData }, 'Image dropped');
+      } else if (activeData.payloadType === 'IMAGE_DTOS') {
+        log.debug(
+          { activeData, overData },
+          `Images (${activeData.payload.imageDTOs.length}) dropped`
+        );
+      } else {
+        log.debug({ activeData, overData }, `Unknown payload dropped`);
+      }
 
-      // set current image
+      /**
+       * Image dropped on current image
+       */
       if (
         overData.actionType === 'SET_CURRENT_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        dispatch(imageSelected(activeData.payload.imageDTO.image_name));
+        dispatch(imageSelected(activeData.payload.imageDTO));
         return;
       }
 
-      // set initial image
+      /**
+       * Image dropped on initial image
+       */
       if (
         overData.actionType === 'SET_INITIAL_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
@@ -49,27 +59,9 @@ export const addImageDroppedListener = () => {
         return;
       }
 
-      // add image to batch
-      if (
-        overData.actionType === 'ADD_TO_BATCH' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO
-      ) {
-        dispatch(imagesAddedToBatch([activeData.payload.imageDTO.image_name]));
-        return;
-      }
-
-      // add multiple images to batch
-      if (
-        overData.actionType === 'ADD_TO_BATCH' &&
-        activeData.payloadType === 'IMAGE_NAMES'
-      ) {
-        dispatch(imagesAddedToBatch(activeData.payload.image_names));
-
-        return;
-      }
-
-      // set control image
+      /**
+       * Image dropped on ControlNet
+       */
       if (
         overData.actionType === 'SET_CONTROLNET_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
@@ -85,7 +77,9 @@ export const addImageDroppedListener = () => {
         return;
       }
 
-      // set canvas image
+      /**
+       * Image dropped on Canvas
+       */
       if (
         overData.actionType === 'SET_CANVAS_INITIAL_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
@@ -95,7 +89,9 @@ export const addImageDroppedListener = () => {
         return;
       }
 
-      // set nodes image
+      /**
+       * Image dropped on node image field
+       */
       if (
         overData.actionType === 'SET_NODES_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
@@ -112,61 +108,36 @@ export const addImageDroppedListener = () => {
         return;
       }
 
-      // set multiple nodes images (single image handler)
-      if (
-        overData.actionType === 'SET_MULTI_NODES_IMAGE' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO
-      ) {
-        const { fieldName, nodeId } = overData.context;
-        dispatch(
-          fieldValueChanged({
-            nodeId,
-            fieldName,
-            value: [activeData.payload.imageDTO],
-          })
-        );
-        return;
-      }
-
-      // // set multiple nodes images (multiple images handler)
+      /**
+       * TODO
+       * Image selection dropped on node image collection field
+       */
       // if (
       //   overData.actionType === 'SET_MULTI_NODES_IMAGE' &&
-      //   activeData.payloadType === 'IMAGE_NAMES'
+      //   activeData.payloadType === 'IMAGE_DTO' &&
+      //   activeData.payload.imageDTO
       // ) {
       //   const { fieldName, nodeId } = overData.context;
       //   dispatch(
-      //     imageCollectionFieldValueChanged({
+      //     fieldValueChanged({
       //       nodeId,
       //       fieldName,
-      //       value: activeData.payload.image_names.map((image_name) => ({
-      //         image_name,
-      //       })),
+      //       value: [activeData.payload.imageDTO],
       //     })
       //   );
       //   return;
       // }
 
-      // add image to board
+      /**
+       * Image dropped on user board
+       */
       if (
-        overData.actionType === 'MOVE_BOARD' &&
+        overData.actionType === 'ADD_TO_BOARD' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
         const { imageDTO } = activeData.payload;
         const { boardId } = overData.context;
-
-        // image was droppe on the "NoBoardBoard"
-        if (!boardId) {
-          dispatch(
-            imagesApi.endpoints.removeImageFromBoard.initiate({
-              imageDTO,
-            })
-          );
-          return;
-        }
-
-        // image was dropped on a user board
         dispatch(
           imagesApi.endpoints.addImageToBoard.initiate({
             imageDTO,
@@ -176,67 +147,58 @@ export const addImageDroppedListener = () => {
         return;
       }
 
-      // // add gallery selection to board
-      // if (
-      //   overData.actionType === 'MOVE_BOARD' &&
-      //   activeData.payloadType === 'IMAGE_NAMES' &&
-      //   overData.context.boardId
-      // ) {
-      //   console.log('adding gallery selection to board');
-      //   const board_id = overData.context.boardId;
-      //   dispatch(
-      //     boardImagesApi.endpoints.addManyBoardImages.initiate({
-      //       board_id,
-      //       image_names: activeData.payload.image_names,
-      //     })
-      //   );
-      //   return;
-      // }
+      /**
+       * Image dropped on 'none' board
+       */
+      if (
+        overData.actionType === 'REMOVE_FROM_BOARD' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const { imageDTO } = activeData.payload;
+        dispatch(
+          imagesApi.endpoints.removeImageFromBoard.initiate({
+            imageDTO,
+          })
+        );
+        return;
+      }
 
-      // // remove gallery selection from board
-      // if (
-      //   overData.actionType === 'MOVE_BOARD' &&
-      //   activeData.payloadType === 'IMAGE_NAMES' &&
-      //   overData.context.boardId === null
-      // ) {
-      //   console.log('removing gallery selection to board');
-      //   dispatch(
-      //     boardImagesApi.endpoints.deleteManyBoardImages.initiate({
-      //       image_names: activeData.payload.image_names,
-      //     })
-      //   );
-      //   return;
-      // }
+      /**
+       * Multiple images dropped on user board
+       */
+      if (
+        overData.actionType === 'ADD_TO_BOARD' &&
+        activeData.payloadType === 'IMAGE_DTOS' &&
+        activeData.payload.imageDTOs
+      ) {
+        const { imageDTOs } = activeData.payload;
+        const { boardId } = overData.context;
+        dispatch(
+          imagesApi.endpoints.addImagesToBoard.initiate({
+            imageDTOs,
+            board_id: boardId,
+          })
+        );
+        return;
+      }
 
-      // // add batch selection to board
-      // if (
-      //   overData.actionType === 'MOVE_BOARD' &&
-      //   activeData.payloadType === 'IMAGE_NAMES' &&
-      //   overData.context.boardId
-      // ) {
-      //   const board_id = overData.context.boardId;
-      //   dispatch(
-      //     boardImagesApi.endpoints.addManyBoardImages.initiate({
-      //       board_id,
-      //       image_names: activeData.payload.image_names,
-      //     })
-      //   );
-      //   return;
-      // }
-
-      // // remove batch selection from board
-      // if (
-      //   overData.actionType === 'MOVE_BOARD' &&
-      //   activeData.payloadType === 'IMAGE_NAMES' &&
-      //   overData.context.boardId === null
-      // ) {
-      //   dispatch(
-      //     boardImagesApi.endpoints.deleteManyBoardImages.initiate({
-      //       image_names: activeData.payload.image_names,
-      //     })
-      //   );
-      //   return;
-      // }
+      /**
+       * Multiple images dropped on 'none' board
+       */
+      if (
+        overData.actionType === 'REMOVE_FROM_BOARD' &&
+        activeData.payloadType === 'IMAGE_DTOS' &&
+        activeData.payload.imageDTOs
+      ) {
+        const { imageDTOs } = activeData.payload;
+        dispatch(
+          imagesApi.endpoints.removeImagesFromBoard.initiate({
+            imageDTOs,
+          })
+        );
+        return;
+      }
     },
   });
 };

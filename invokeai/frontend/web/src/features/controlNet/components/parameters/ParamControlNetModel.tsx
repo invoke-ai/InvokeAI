@@ -5,7 +5,10 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
-import { controlNetModelChanged } from 'features/controlNet/store/controlNetSlice';
+import {
+  ControlNetConfig,
+  controlNetModelChanged,
+} from 'features/controlNet/store/controlNetSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToControlNetModelParam } from 'features/parameters/util/modelIdToControlNetModelParam';
 import { selectIsBusy } from 'features/system/store/systemSelectors';
@@ -14,30 +17,24 @@ import { memo, useCallback, useMemo } from 'react';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 
 type ParamControlNetModelProps = {
-  controlNetId: string;
+  controlNet: ControlNetConfig;
 };
 
+const selector = createSelector(
+  stateSelector,
+  ({ generation }) => {
+    const { model } = generation;
+    return { mainModel: model };
+  },
+  defaultSelectorOptions
+);
+
 const ParamControlNetModel = (props: ParamControlNetModelProps) => {
-  const { controlNetId } = props;
+  const { controlNetId, model: controlNetModel, isEnabled } = props.controlNet;
   const dispatch = useAppDispatch();
   const isBusy = useAppSelector(selectIsBusy);
 
-  const selector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ generation, controlNet }) => {
-          const { model } = generation;
-          const controlNetModel = controlNet.controlNets[controlNetId]?.model;
-          const isEnabled = controlNet.controlNets[controlNetId]?.isEnabled;
-          return { mainModel: model, controlNetModel, isEnabled };
-        },
-        defaultSelectorOptions
-      ),
-    [controlNetId]
-  );
-
-  const { mainModel, controlNetModel, isEnabled } = useAppSelector(selector);
+  const { mainModel } = useAppSelector(selector);
 
   const { data: controlNetModels } = useGetControlNetModelsQuery();
 
