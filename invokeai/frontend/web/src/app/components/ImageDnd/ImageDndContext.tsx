@@ -18,27 +18,32 @@ import {
   DragStartEvent,
   TypesafeDraggableData,
 } from './typesafeDnd';
+import { logger } from 'app/logging/logger';
 
 type ImageDndContextProps = PropsWithChildren;
 
 const ImageDndContext = (props: ImageDndContextProps) => {
   const [activeDragData, setActiveDragData] =
     useState<TypesafeDraggableData | null>(null);
+  const log = logger('images');
 
   const dispatch = useAppDispatch();
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    console.log('dragStart', event.active.data.current);
-    const activeData = event.active.data.current;
-    if (!activeData) {
-      return;
-    }
-    setActiveDragData(activeData);
-  }, []);
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      log.trace({ dragData: event.active.data.current }, 'Drag started');
+      const activeData = event.active.data.current;
+      if (!activeData) {
+        return;
+      }
+      setActiveDragData(activeData);
+    },
+    [log]
+  );
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      console.log('dragEnd', event.active.data.current);
+      log.trace({ dragData: event.active.data.current }, 'Drag ended');
       const overData = event.over?.data.current;
       if (!activeDragData || !overData) {
         return;
@@ -46,7 +51,7 @@ const ImageDndContext = (props: ImageDndContextProps) => {
       dispatch(dndDropped({ overData, activeData: activeDragData }));
       setActiveDragData(null);
     },
-    [activeDragData, dispatch]
+    [activeDragData, dispatch, log]
   );
 
   const mouseSensor = useSensor(MouseSensor, {

@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { FaCopy, FaTrash } from 'react-icons/fa';
 import {
+  ControlNetConfig,
   controlNetDuplicated,
   controlNetRemoved,
   controlNetToggled,
@@ -27,18 +28,27 @@ import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcesso
 import ParamControlNetResizeMode from './parameters/ParamControlNetResizeMode';
 
 type ControlNetProps = {
-  controlNetId: string;
+  controlNet: ControlNetConfig;
 };
 
 const ControlNet = (props: ControlNetProps) => {
-  const { controlNetId } = props;
+  const { controlNet } = props;
+  const { controlNetId } = controlNet;
   const dispatch = useAppDispatch();
 
   const selector = createSelector(
     stateSelector,
     ({ controlNet }) => {
-      const { isEnabled, shouldAutoConfig } =
-        controlNet.controlNets[controlNetId];
+      const cn = controlNet.controlNets[controlNetId];
+
+      if (!cn) {
+        return {
+          isEnabled: false,
+          shouldAutoConfig: false,
+        };
+      }
+
+      const { isEnabled, shouldAutoConfig } = cn;
 
       return { isEnabled, shouldAutoConfig };
     },
@@ -96,7 +106,7 @@ const ControlNet = (props: ControlNetProps) => {
             transitionDuration: '0.1s',
           }}
         >
-          <ParamControlNetModel controlNetId={controlNetId} />
+          <ParamControlNetModel controlNet={controlNet} />
         </Box>
         <IAIIconButton
           size="sm"
@@ -171,8 +181,8 @@ const ControlNet = (props: ControlNetProps) => {
               justifyContent: 'space-between',
             }}
           >
-            <ParamControlNetWeight controlNetId={controlNetId} />
-            <ParamControlNetBeginEnd controlNetId={controlNetId} />
+            <ParamControlNetWeight controlNet={controlNet} />
+            <ParamControlNetBeginEnd controlNet={controlNet} />
           </Flex>
           {!isExpanded && (
             <Flex
@@ -184,22 +194,22 @@ const ControlNet = (props: ControlNetProps) => {
                 aspectRatio: '1/1',
               }}
             >
-              <ControlNetImagePreview controlNetId={controlNetId} height={28} />
+              <ControlNetImagePreview controlNet={controlNet} height={28} />
             </Flex>
           )}
         </Flex>
         <Flex sx={{ gap: 2 }}>
-          <ParamControlNetControlMode controlNetId={controlNetId} />
-          <ParamControlNetResizeMode controlNetId={controlNetId} />
+          <ParamControlNetControlMode controlNet={controlNet} />
+          <ParamControlNetResizeMode controlNet={controlNet} />
         </Flex>
-        <ParamControlNetProcessorSelect controlNetId={controlNetId} />
+        <ParamControlNetProcessorSelect controlNet={controlNet} />
       </Flex>
 
       {isExpanded && (
         <>
-          <ControlNetImagePreview controlNetId={controlNetId} height="392px" />
-          <ParamControlNetShouldAutoConfig controlNetId={controlNetId} />
-          <ControlNetProcessorComponent controlNetId={controlNetId} />
+          <ControlNetImagePreview controlNet={controlNet} height="392px" />
+          <ParamControlNetShouldAutoConfig controlNet={controlNet} />
+          <ControlNetProcessorComponent controlNet={controlNet} />
         </>
       )}
     </Flex>

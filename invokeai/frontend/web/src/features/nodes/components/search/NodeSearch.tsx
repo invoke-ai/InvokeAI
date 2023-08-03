@@ -170,15 +170,17 @@ const NodeSearch = () => {
     // }
 
     if (key === 'Enter') {
-      let selectedNodeType: AnyInvocationType;
+      let selectedNodeType: AnyInvocationType | undefined;
 
       if (searchText.length > 0) {
-        selectedNodeType = filteredNodes[focusedIndex].item.type;
+        selectedNodeType = filteredNodes[focusedIndex]?.item.type;
       } else {
-        selectedNodeType = nodes[focusedIndex].type;
+        selectedNodeType = nodes[focusedIndex]?.type;
       }
 
-      addNode(selectedNodeType);
+      if (selectedNodeType) {
+        addNode(selectedNodeType);
+      }
       setShowNodeList(false);
     }
 
