@@ -5,7 +5,7 @@ from typing import List, Literal, Optional, Union
 
 from pydantic import Field, validator
 
-from ...backend.model_management import ModelType, SubModelType
+from ...backend.model_management import ModelType, SubModelType, ModelPatcher
 from invokeai.app.util.step_callback import stable_diffusion_xl_step_callback
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
 
@@ -293,10 +293,20 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
 
         num_inference_steps = self.steps
 
+        def _lora_loader():
+            for lora in self.unet.loras:
+                lora_info = context.services.model_manager.get_model(
+                    **lora.dict(exclude={"weight"}),
+                    context=context,
+                )
+                yield (lora_info.context.model, lora.weight)
+                del lora_info
+            return
+
         unet_info = context.services.model_manager.get_model(**self.unet.unet.dict(), context=context)
         do_classifier_free_guidance = True
         cross_attention_kwargs = None
-        with unet_info as unet:
+        with ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()), unet_info as unet:
             scheduler.set_timesteps(num_inference_steps, device=unet.device)
             timesteps = scheduler.timesteps
 
@@ -543,9 +553,19 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
             context=context,
         )
 
+        def _lora_loader():
+            for lora in self.unet.loras:
+                lora_info = context.services.model_manager.get_model(
+                    **lora.dict(exclude={"weight"}),
+                    context=context,
+                )
+                yield (lora_info.context.model, lora.weight)
+                del lora_info
+            return
+
         do_classifier_free_guidance = True
         cross_attention_kwargs = None
-        with unet_info as unet:
+        with ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()), unet_info as unet:
             # apply denoising_start
             num_inference_steps = self.steps
             scheduler.set_timesteps(num_inference_steps, device=unet.device)

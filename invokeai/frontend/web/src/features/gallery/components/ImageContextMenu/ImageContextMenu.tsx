@@ -4,28 +4,29 @@ import { MouseEvent, memo, useCallback } from 'react';
 import { ImageDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import SingleSelectionMenuItems from './SingleSelectionMenuItems';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useAppSelector } from 'app/store/storeHooks';
+import MultipleSelectionMenuItems from './MultipleSelectionMenuItems';
 
 type Props = {
   imageDTO: ImageDTO | undefined;
   children: ContextMenuProps<HTMLDivElement>['children'];
 };
 
+const selector = createSelector(
+  [stateSelector],
+  ({ gallery }) => {
+    const selectionCount = gallery.selection.length;
+
+    return { selectionCount };
+  },
+  defaultSelectorOptions
+);
+
 const ImageContextMenu = ({ imageDTO, children }: Props) => {
-  // const selector = useMemo(
-  //   () =>
-  //     createSelector(
-  //       [stateSelector],
-  //       ({ gallery }) => {
-  //         const selectionCount = gallery.selection.length;
-
-  //         return { selectionCount };
-  //       },
-  //       defaultSelectorOptions
-  //     ),
-  //   []
-  // );
-
-  // const { selectionCount } = useAppSelector(selector);
+  const { selectionCount } = useAppSelector(selector);
 
   const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -38,8 +39,24 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
         bg: 'transparent',
         _hover: { bg: 'transparent' },
       }}
-      renderMenu={() =>
-        imageDTO ? (
+      renderMenu={() => {
+        if (!imageDTO) {
+          return null;
+        }
+
+        if (selectionCount > 1) {
+          return (
+            <MenuList
+              sx={{ visibility: 'visible !important' }}
+              motionProps={menuListMotionProps}
+              onContextMenu={skipEvent}
+            >
+              <MultipleSelectionMenuItems />
+            </MenuList>
+          );
+        }
+
+        return (
           <MenuList
             sx={{ visibility: 'visible !important' }}
             motionProps={menuListMotionProps}
@@ -47,8 +64,8 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
           >
             <SingleSelectionMenuItems imageDTO={imageDTO} />
           </MenuList>
-        ) : null
-      }
+        );
+      }}
     >
       {children}
     </ContextMenu>

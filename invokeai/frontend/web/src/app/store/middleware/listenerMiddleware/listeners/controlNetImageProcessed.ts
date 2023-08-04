@@ -17,7 +17,7 @@ export const addControlNetImageProcessedListener = () => {
       const { controlNetId } = action.payload;
       const controlNet = getState().controlNet.controlNets[controlNetId];
 
-      if (!controlNet.controlImage) {
+      if (!controlNet?.controlImage) {
         log.error('Unable to process ControlNet image');
         return;
       }

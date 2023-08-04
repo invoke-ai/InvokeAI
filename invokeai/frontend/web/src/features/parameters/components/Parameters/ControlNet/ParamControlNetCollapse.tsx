@@ -16,7 +16,10 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { map } from 'lodash-es';
 import { Fragment, memo, useCallback } from 'react';
 import { FaPlus } from 'react-icons/fa';
-import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
+import {
+  controlNetModelsAdapter,
+  useGetControlNetModelsQuery,
+} from 'services/api/endpoints/models';
 import { v4 as uuidv4 } from 'uuid';
 
 const selector = createSelector(
@@ -42,7 +45,9 @@ const ParamControlNetCollapse = () => {
   const dispatch = useAppDispatch();
   const { firstModel } = useGetControlNetModelsQuery(undefined, {
     selectFromResult: (result) => {
-      const firstModel = result.data?.entities[result.data?.ids[0]];
+      const firstModel = result.data
+        ? controlNetModelsAdapter.getSelectors().selectAll(result.data)[0]
+        : undefined;
       return {
         firstModel,
       };
@@ -95,7 +100,7 @@ const ParamControlNetCollapse = () => {
         {controlNetsArray.map((c, i) => (
           <Fragment key={c.controlNetId}>
             {i > 0 && <Divider />}
-            <ControlNet controlNetId={c.controlNetId} />
+            <ControlNet controlNet={c} />
           </Fragment>
         ))}
       </Flex>

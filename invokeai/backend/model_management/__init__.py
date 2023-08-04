@@ -13,3 +13,4 @@ from .models import (
     DuplicateModelException,
 )
 from .model_merge import ModelMerger, MergeInterpolationMethod
+from .lora import ModelPatcher
