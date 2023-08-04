@@ -33,8 +33,10 @@ def check_invokeai_root(config: InvokeAIAppConfig):
         print(
             '** From the command line, activate the virtual environment and run "invokeai-configure --yes --skip-sd-weights" **'
         )
-        print('** (To skip this check completely, add "--ignore_missing_core_models" to your CLI args. Not installing '
-              'these core models will prevent the loading of some or all .safetensors and .ckpt files. Howeer, you can '
-              'always come back and install these core models in the future.)')
+        print(
+            '** (To skip this check completely, add "--ignore_missing_core_models" to your CLI args. Not installing '
+            "these core models will prevent the loading of some or all .safetensors and .ckpt files. However, you can "
+            "always come back and install these core models in the future.)"
+        )
         input("Press any key to continue...")
         sys.exit(0)
