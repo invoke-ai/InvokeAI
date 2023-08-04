@@ -307,7 +307,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
             model_name=lora_name,
             model_type=ModelType.Lora,
         ):
-            raise Exception(f"Unkown lora name: {lora_name}!")
+            raise Exception(f"Unknown lora name: {lora_name}!")
 
         if self.unet is not None and any(lora.model_name == lora_name for lora in self.unet.loras):
             raise Exception(f'Lora "{lora_name}" already applied to unet')
