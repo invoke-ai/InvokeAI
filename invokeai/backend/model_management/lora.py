@@ -20,9 +20,6 @@ from diffusers.models import UNet2DConditionModel
 from safetensors.torch import load_file
 from transformers import CLIPTextModel, CLIPTokenizer
 
-# TODO: rename and split this file
-
-
 """
 loras = [
     (lora_model1, 0.7),
