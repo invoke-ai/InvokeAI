@@ -28,8 +28,6 @@ import torch
 
 import logging
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
-from .lora import LoRAModel, TextualInversionModel
 from .models import BaseModelType, ModelType, SubModelType, ModelBase
 
 # Maximum size of the cache, in gigs

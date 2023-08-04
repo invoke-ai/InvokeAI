@@ -9,8 +9,10 @@ parser = argparse.ArgumentParser(description="Probe model type")
 parser.add_argument(
     "model_path",
     type=Path,
+    nargs="+",
 )
 args = parser.parse_args()
 
-info = ModelProbe().probe(args.model_path)
-print(info)
+for path in args.model_path:
+    info = ModelProbe().probe(path)
+    print(f"{path}: {info}")
