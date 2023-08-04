@@ -23,6 +23,6 @@ const serializationDenylist: {
 };
 
 export const serialize: SerializeFunction = (data, key) => {
-  const result = omit(data, serializationDenylist[key]);
+  const result = omit(data, serializationDenylist[key] ?? []);
   return JSON.stringify(result);
 };

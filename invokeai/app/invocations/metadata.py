@@ -1,6 +1,6 @@
 from typing import Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -10,16 +10,17 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 
-class LoRAMetadataField(BaseModel):
+class LoRAMetadataField(BaseModelExcludeNull):
     """LoRA metadata for an image generated in InvokeAI."""
 
     lora: LoRAModelField = Field(description="The LoRA model")
     weight: float = Field(description="The weight of the LoRA model")
 
 
-class CoreMetadata(BaseModel):
+class CoreMetadata(BaseModelExcludeNull):
     """Core generation metadata for an image generated in InvokeAI."""
 
     generation_mode: str = Field(
@@ -70,7 +71,7 @@ class CoreMetadata(BaseModel):
     refiner_start: Union[float, None] = Field(default=None, description="The start value used for refiner denoising")
 
 
-class ImageMetadata(BaseModel):
+class ImageMetadata(BaseModelExcludeNull):
     """An image's generation metadata"""
 
     metadata: Optional[dict] = Field(

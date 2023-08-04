@@ -15,30 +15,42 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIButton from 'common/components/IAIButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
-
 import { stateSelector } from 'app/store/store';
+import { some } from 'lodash-es';
 import { ChangeEvent, memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { imageDeletionConfirmed } from '../store/actions';
-import { selectImageUsage } from '../store/imageDeletionSelectors';
-import {
-  imageToDeleteCleared,
-  isModalOpenChanged,
-} from '../store/imageDeletionSlice';
+import { getImageUsage, selectImageUsage } from '../store/selectors';
+import { imageDeletionCanceled, isModalOpenChanged } from '../store/slice';
 import ImageUsageMessage from './ImageUsageMessage';
+import { ImageUsage } from '../store/types';
 
 const selector = createSelector(
   [stateSelector, selectImageUsage],
-  ({ system, config, imageDeletion }, imageUsage) => {
+  (state, imagesUsage) => {
+    const { system, config, deleteImageModal } = state;
     const { shouldConfirmOnDelete } = system;
     const { canRestoreDeletedImagesFromBin } = config;
-    const { imageToDelete, isModalOpen } = imageDeletion;
+    const { imagesToDelete, isModalOpen } = deleteImageModal;
+
+    const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) =>
+      getImageUsage(state, image_name)
+    );
+
+    const imageUsageSummary: ImageUsage = {
+      isInitialImage: some(allImageUsage, (i) => i.isInitialImage),
+      isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
+      isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
+      isControlNetImage: some(allImageUsage, (i) => i.isControlNetImage),
+    };
+
     return {
       shouldConfirmOnDelete,
       canRestoreDeletedImagesFromBin,
-      imageToDelete,
-      imageUsage,
+      imagesToDelete,
+      imagesUsage,
       isModalOpen,
+      imageUsageSummary,
     };
   },
   defaultSelectorOptions
@@ -51,9 +63,10 @@ const DeleteImageModal = () => {
   const {
     shouldConfirmOnDelete,
     canRestoreDeletedImagesFromBin,
-    imageToDelete,
-    imageUsage,
+    imagesToDelete,
+    imagesUsage,
     isModalOpen,
+    imageUsageSummary,
   } = useAppSelector(selector);
 
   const handleChangeShouldConfirmOnDelete = useCallback(
@@ -63,17 +76,19 @@ const DeleteImageModal = () => {
   );
 
   const handleClose = useCallback(() => {
-    dispatch(imageToDeleteCleared());
+    dispatch(imageDeletionCanceled());
     dispatch(isModalOpenChanged(false));
   }, [dispatch]);
 
   const handleDelete = useCallback(() => {
-    if (!imageToDelete || !imageUsage) {
+    if (!imagesToDelete.length || !imagesUsage.length) {
       return;
     }
-    dispatch(imageToDeleteCleared());
-    dispatch(imageDeletionConfirmed({ imageDTO: imageToDelete, imageUsage }));
-  }, [dispatch, imageToDelete, imageUsage]);
+    dispatch(imageDeletionCanceled());
+    dispatch(
+      imageDeletionConfirmed({ imageDTOs: imagesToDelete, imagesUsage })
+    );
+  }, [dispatch, imagesToDelete, imagesUsage]);
 
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -92,7 +107,7 @@ const DeleteImageModal = () => {
 
           <AlertDialogBody>
             <Flex direction="column" gap={3}>
-              <ImageUsageMessage imageUsage={imageUsage} />
+              <ImageUsageMessage imageUsage={imageUsageSummary} />
               <Divider />
               <Text>
                 {canRestoreDeletedImagesFromBin
