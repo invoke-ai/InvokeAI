@@ -35,7 +35,7 @@ The nodes linked below have been developed and contributed by members of the Inv
 **Node Link:** https://github.com/JPPhoto/ideal-size-node
 
 --------------------------------
-### Super Cool Node Template
+### Example Node Template
 
 **Description:** This node allows you to do super cool things with InvokeAI.
 
@@ -45,7 +45,9 @@ The nodes linked below have been developed and contributed by members of the Inv
 
 **Output Examples** 
 
-![Invoke AI](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png)
+![Example Image](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png){: style="height:115px;width:240px"}
 
 ## Help
 If you run into any issues with a node, please post in the [InvokeAI Discord](https://discord.gg/ZmtBAhwWhy). 
+
+

@@ -53,7 +53,9 @@ const IAIMantineSearchableSelect = (props: IAISelectProps) => {
   // wrap onChange to clear search value on select
   const handleChange = useCallback(
     (v: string | null) => {
-      setSearchValue('');
+      // cannot figure out why we were doing this, but it was causing an issue where if you
+      // select the currently-selected item, it reset the search value to empty
+      // setSearchValue('');
 
       if (!onChange) {
         return;

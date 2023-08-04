@@ -1,16 +1,14 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   ControlModes,
+  ControlNetConfig,
   controlNetControlModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
 type ParamControlNetControlModeProps = {
-  controlNetId: string;
+  controlNet: ControlNetConfig;
 };
 
 const CONTROL_MODE_DATA = [
@@ -23,23 +21,8 @@ const CONTROL_MODE_DATA = [
 export default function ParamControlNetControlMode(
   props: ParamControlNetControlModeProps
 ) {
-  const { controlNetId } = props;
+  const { controlMode, isEnabled, controlNetId } = props.controlNet;
   const dispatch = useAppDispatch();
-  const selector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ controlNet }) => {
-          const { controlMode, isEnabled } =
-            controlNet.controlNets[controlNetId];
-          return { controlMode, isEnabled };
-        },
-        defaultSelectorOptions
-      ),
-    [controlNetId]
-  );
-
-  const { controlMode, isEnabled } = useAppSelector(selector);
 
   const handleControlModeChange = useCallback(
     (controlMode: ControlModes) => {

@@ -23,7 +23,7 @@
     "dev": "concurrently \"vite dev\" \"yarn run theme:watch\"",
     "dev:host": "concurrently \"vite dev --host\" \"yarn run theme:watch\"",
     "build": "yarn run lint && vite build",
-    "typegen": "npx ts-node scripts/typegen.ts",
+    "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
     "lint:madge": "madge --circular src/main.tsx",
     "lint:eslint": "eslint --max-warnings=0 .",
@@ -116,6 +116,7 @@
   },
   "peerDependencies": {
     "@chakra-ui/cli": "^2.4.0",
+    "@chakra-ui/react": "^2.8.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "ts-toolbelt": "^9.6.0"

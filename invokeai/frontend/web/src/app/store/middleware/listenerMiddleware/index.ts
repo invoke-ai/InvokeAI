@@ -27,7 +27,8 @@ import {
   addImageDeletedFulfilledListener,
   addImageDeletedPendingListener,
   addImageDeletedRejectedListener,
-  addRequestedImageDeletionListener,
+  addRequestedSingleImageDeletionListener,
+  addRequestedMultipleImageDeletionListener,
 } from './listeners/imageDeleted';
 import { addImageDroppedListener } from './listeners/imageDropped';
 import {
@@ -111,7 +112,8 @@ addImageUploadedRejectedListener();
 addInitialImageSelectedListener();
 
 // Image deleted
-addRequestedImageDeletionListener();
+addRequestedSingleImageDeletionListener();
+addRequestedMultipleImageDeletionListener();
 addImageDeletedPendingListener();
 addImageDeletedFulfilledListener();
 addImageDeletedRejectedListener();

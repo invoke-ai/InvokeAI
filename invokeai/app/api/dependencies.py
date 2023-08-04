@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from typing import Optional
 from logging import Logger
-import os
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
 )
@@ -29,6 +29,7 @@ from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.model_manager_service import ModelManagerService
+from ..services.invocation_stats import InvocationStatsService
 from .events import FastAPIEventService
 
 
@@ -54,7 +55,7 @@ logger = InvokeAILogger.getLogger()
 class ApiDependencies:
     """Contains and initializes all dependencies for the API"""
 
-    invoker: Invoker = None
+    invoker: Optional[Invoker] = None
 
     @staticmethod
     def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger):
@@ -127,6 +128,7 @@ class ApiDependencies:
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
             configuration=config,
+            performance_statistics=InvocationStatsService(graph_execution_manager),
             logger=logger,
         )
 

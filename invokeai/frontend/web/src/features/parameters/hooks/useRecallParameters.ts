@@ -12,7 +12,7 @@ import {
 } from 'features/sdxl/store/sdxlSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { UnsafeImageMetadata } from 'services/api/endpoints/images';
+import { UnsafeImageMetadata } from 'services/api/types';
 import { ImageDTO } from 'services/api/types';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
@@ -35,6 +35,7 @@ import {
   isValidSDXLNegativeStylePrompt,
   isValidSDXLPositiveStylePrompt,
   isValidSDXLRefinerAestheticScore,
+  isValidSDXLRefinerModel,
   isValidSDXLRefinerStart,
   isValidScheduler,
   isValidSeed,
@@ -381,7 +382,7 @@ export const useRecallParameters = () => {
         dispatch(setNegativeStylePromptSDXL(negative_style_prompt));
       }
 
-      if (isValidMainModel(refiner_model)) {
+      if (isValidSDXLRefinerModel(refiner_model)) {
         dispatch(refinerModelChanged(refiner_model));
       }
 
