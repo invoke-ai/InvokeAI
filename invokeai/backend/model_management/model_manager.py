@@ -533,7 +533,7 @@ class ModelManager(object):
         model_path = self.resolve_model_path(model_path)
         return model_path, is_submodel_override
 
-    def _get_model_config(self, base_model, model_name, model_type) -> ModelConfigBase:
+    def _get_model_config(self, base_model: BaseModelType, model_name: str, model_type: ModelType) -> ModelConfigBase:
         """Get a model's config object."""
         model_key = self.create_key(model_name, base_model, model_type)
         try:
