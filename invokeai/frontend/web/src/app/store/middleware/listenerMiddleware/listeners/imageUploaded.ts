@@ -1,16 +1,14 @@
 import { UseToastOptions } from '@chakra-ui/react';
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { imagesAddedToBatch } from 'features/gallery/store/gallerySlice';
 import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
 import { imagesApi } from '../../../../../services/api/endpoints/images';
-
-const moduleLog = log.child({ namespace: 'image' });
 
 const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
   title: 'Image Uploaded',
@@ -21,11 +19,12 @@ export const addImageUploadedFulfilledListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
+      const log = logger('images');
       const imageDTO = action.payload;
       const state = getState();
-      const { selectedBoardId, autoAddBoardId } = state.gallery;
+      const { autoAddBoardId } = state.gallery;
 
-      moduleLog.debug({ arg: '<Blob>', imageDTO }, 'Image uploaded');
+      log.debug({ imageDTO }, 'Image uploaded');
 
       const { postUploadAction } = action.meta.arg.originalArgs;
 
@@ -41,7 +40,7 @@ export const addImageUploadedFulfilledListener = () => {
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {
         const { toastOptions } = postUploadAction;
-        if (!autoAddBoardId) {
+        if (!autoAddBoardId || autoAddBoardId === 'none') {
           dispatch(addToast({ ...DEFAULT_UPLOADED_TOAST, ...toastOptions }));
         } else {
           // Add this image to the board
@@ -121,17 +120,6 @@ export const addImageUploadedFulfilledListener = () => {
         );
         return;
       }
-
-      if (postUploadAction?.type === 'ADD_TO_BATCH') {
-        dispatch(imagesAddedToBatch([imageDTO.image_name]));
-        dispatch(
-          addToast({
-            ...DEFAULT_UPLOADED_TOAST,
-            description: 'Added to batch',
-          })
-        );
-        return;
-      }
     },
   });
 };
@@ -140,9 +128,14 @@ export const addImageUploadedRejectedListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchRejected,
     effect: (action, { dispatch }) => {
-      const { file, postUploadAction, ...rest } = action.meta.arg.originalArgs;
-      const sanitizedData = { arg: { ...rest, file: '<Blob>' } };
-      moduleLog.error({ data: sanitizedData }, 'Image upload failed');
+      const log = logger('images');
+      const sanitizedData = {
+        arg: {
+          ...omit(action.meta.arg.originalArgs, ['file', 'postUploadAction']),
+          file: '<Blob>',
+        },
+      };
+      log.error({ ...sanitizedData }, 'Image upload failed');
       dispatch(
         addToast({
           title: 'Image Upload Failed',

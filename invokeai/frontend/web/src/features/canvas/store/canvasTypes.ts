@@ -1,7 +1,5 @@
-import * as InvokeAI from 'app/types/invokeai';
 import { IRect, Vector2d } from 'konva/lib/types';
 import { RgbaColor } from 'react-colorful';
-import { ImageDTO } from 'services/api/types';
 
 export const LAYER_NAMES_DICT = [
   { label: 'Base', value: 'base' },
@@ -133,7 +131,6 @@ export interface CanvasState {
   cursorPosition: Vector2d | null;
   doesCanvasNeedScaling: boolean;
   futureLayerStates: CanvasLayerState[];
-  intermediateImage?: InvokeAI.Image;
   isCanvasInitialized: boolean;
   isDrawing: boolean;
   isMaskEnabled: boolean;
@@ -171,4 +168,7 @@ export interface CanvasState {
   stageDimensions: Dimensions;
   stageScale: number;
   tool: CanvasTool;
+  generationMode?: GenerationMode;
 }
+
+export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';

@@ -8,17 +8,17 @@ import {
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { AnimatePresence, motion } from 'framer-motion';
 import { isEqual } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import ImageMetadataViewer from '../ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from '../NextPrevImageButtons';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { FaImage } from 'react-icons/fa';
 
 export const imagesSelector = createSelector(
   [stateSelector, selectLastSelectedImage],
@@ -32,7 +32,7 @@ export const imagesSelector = createSelector(
     return {
       shouldShowImageDetails,
       shouldHidePreview,
-      imageName: lastSelectedImage,
+      imageName: lastSelectedImage?.image_name,
       progressImage,
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
@@ -57,8 +57,6 @@ const CurrentImagePreview = () => {
   const {
     handlePrevImage,
     handleNextImage,
-    prevImageId,
-    nextImageId,
     isOnLastImage,
     handleLoadMoreImages,
     areMoreImagesAvailable,
@@ -70,7 +68,7 @@ const CurrentImagePreview = () => {
     () => {
       handlePrevImage();
     },
-    [prevImageId]
+    [handlePrevImage]
   );
 
   useHotkeys(
@@ -85,20 +83,15 @@ const CurrentImagePreview = () => {
       }
     },
     [
-      nextImageId,
       isOnLastImage,
       areMoreImagesAvailable,
       handleLoadMoreImages,
       isFetching,
+      handleNextImage,
     ]
   );
 
-  const {
-    currentData: imageDTO,
-    isLoading,
-    isError,
-    isSuccess,
-  } = useGetImageDTOQuery(imageName ?? skipToken);
+  const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
     if (imageDTO) {

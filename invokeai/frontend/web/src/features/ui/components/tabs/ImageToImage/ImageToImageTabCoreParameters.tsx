@@ -19,18 +19,17 @@ const selector = createSelector(
   [uiSelector, generationSelector],
   (ui, generation) => {
     const { shouldUseSliders } = ui;
-    const { shouldFitToWidthHeight, shouldRandomizeSeed } = generation;
+    const { shouldRandomizeSeed } = generation;
 
     const activeLabel = !shouldRandomizeSeed ? 'Manual Seed' : undefined;
 
-    return { shouldUseSliders, shouldFitToWidthHeight, activeLabel };
+    return { shouldUseSliders, activeLabel };
   },
   defaultSelectorOptions
 );
 
 const ImageToImageTabCoreParameters = () => {
-  const { shouldUseSliders, shouldFitToWidthHeight, activeLabel } =
-    useAppSelector(selector);
+  const { shouldUseSliders, activeLabel } = useAppSelector(selector);
 
   return (
     <IAICollapse

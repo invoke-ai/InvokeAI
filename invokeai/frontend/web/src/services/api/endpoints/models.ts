@@ -5,14 +5,15 @@ import {
   BaseModelType,
   CheckpointModelConfig,
   ControlNetModelConfig,
-  ConvertModelConfig,
   DiffusersModelConfig,
   ImportModelConfig,
   LoRAModelConfig,
   MainModelConfig,
+  OnnxModelConfig,
   MergeModelConfig,
   TextualInversionModelConfig,
   VaeModelConfig,
+  ModelType,
 } from 'services/api/types';
 
 import queryString from 'query-string';
@@ -26,6 +27,8 @@ export type CheckpointModelConfigEntity = CheckpointModelConfig & {
 export type MainModelConfigEntity =
   | DiffusersModelConfigEntity
   | CheckpointModelConfigEntity;
+
+export type OnnxModelConfigEntity = OnnxModelConfig & { id: string };
 
 export type LoRAModelConfigEntity = LoRAModelConfig & { id: string };
 
@@ -41,6 +44,7 @@ export type VaeModelConfigEntity = VaeModelConfig & { id: string };
 
 type AnyModelConfigEntity =
   | MainModelConfigEntity
+  | OnnxModelConfigEntity
   | LoRAModelConfigEntity
   | ControlNetModelConfigEntity
   | TextualInversionModelConfigEntity
@@ -52,20 +56,33 @@ type UpdateMainModelArg = {
   body: MainModelConfig;
 };
 
+type UpdateLoRAModelArg = {
+  base_model: BaseModelType;
+  model_name: string;
+  body: LoRAModelConfig;
+};
+
 type UpdateMainModelResponse =
   paths['/api/v1/models/{base_model}/{model_type}/{model_name}']['patch']['responses']['200']['content']['application/json'];
+
+type UpdateLoRAModelResponse = UpdateMainModelResponse;
 
 type DeleteMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
+  model_type: ModelType;
 };
 
 type DeleteMainModelResponse = void;
 
+type DeleteLoRAModelArg = DeleteMainModelArg;
+
+type DeleteLoRAModelResponse = void;
+
 type ConvertMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
-  params: ConvertModelConfig;
+  convert_dest_directory?: string;
 };
 
 type ConvertMainModelResponse =
@@ -104,21 +121,25 @@ type CheckpointConfigsResponse =
 
 type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 
-const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
+export const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
+  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+});
+
+const onnxModelsAdapter = createEntityAdapter<OnnxModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
 const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
-const controlNetModelsAdapter =
+export const controlNetModelsAdapter =
   createEntityAdapter<ControlNetModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
-const textualInversionModelsAdapter =
+export const textualInversionModelsAdapter =
   createEntityAdapter<TextualInversionModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
-const vaeModelsAdapter = createEntityAdapter<VaeModelConfigEntity>({
+export const vaeModelsAdapter = createEntityAdapter<VaeModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
 
@@ -144,8 +165,62 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getMainModels: build.query<EntityState<MainModelConfigEntity>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'main' } }),
+    getOnnxModels: build.query<
+      EntityState<OnnxModelConfigEntity>,
+      BaseModelType[]
+    >({
+      query: (base_models) => {
+        const params = {
+          model_type: 'onnx',
+          base_models,
+        };
+
+        const query = queryString.stringify(params, { arrayFormat: 'none' });
+        return `models/?${query}`;
+      },
+      providesTags: (result, error, arg) => {
+        const tags: ApiFullTagDescription[] = [
+          { type: 'OnnxModel', id: LIST_TAG },
+        ];
+
+        if (result) {
+          tags.push(
+            ...result.ids.map((id) => ({
+              type: 'OnnxModel' as const,
+              id,
+            }))
+          );
+        }
+
+        return tags;
+      },
+      transformResponse: (
+        response: { models: OnnxModelConfig[] },
+        meta,
+        arg
+      ) => {
+        const entities = createModelEntities<OnnxModelConfigEntity>(
+          response.models
+        );
+        return onnxModelsAdapter.setAll(
+          onnxModelsAdapter.getInitialState(),
+          entities
+        );
+      },
+    }),
+    getMainModels: build.query<
+      EntityState<MainModelConfigEntity>,
+      BaseModelType[]
+    >({
+      query: (base_models) => {
+        const params = {
+          model_type: 'main',
+          base_models,
+        };
+
+        const query = queryString.stringify(params, { arrayFormat: 'none' });
+        return `models/?${query}`;
+      },
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
           { type: 'MainModel', id: LIST_TAG },
@@ -187,7 +262,11 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
+      ],
     }),
     importMainModels: build.mutation<
       ImportMainModelResponse,
@@ -200,7 +279,11 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
+      ],
     }),
     addMainModels: build.mutation<AddMainModelResponse, AddMainModelArg>({
       query: ({ body }) => {
@@ -210,32 +293,44 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
+      ],
     }),
     deleteMainModels: build.mutation<
       DeleteMainModelResponse,
       DeleteMainModelArg
     >({
-      query: ({ base_model, model_name }) => {
+      query: ({ base_model, model_name, model_type }) => {
         return {
-          url: `models/${base_model}/main/${model_name}`,
+          url: `models/${base_model}/${model_type}/${model_name}`,
           method: 'DELETE',
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
+      ],
     }),
     convertMainModels: build.mutation<
       ConvertMainModelResponse,
       ConvertMainModelArg
     >({
-      query: ({ base_model, model_name, params }) => {
+      query: ({ base_model, model_name, convert_dest_directory }) => {
         return {
           url: `models/convert/${base_model}/main/${model_name}`,
           method: 'PUT',
-          params: params,
+          params: { convert_dest_directory },
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
+      ],
     }),
     mergeMainModels: build.mutation<MergeMainModelResponse, MergeMainModelArg>({
       query: ({ base_model, body }) => {
@@ -245,7 +340,11 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
+      ],
     }),
     syncModels: build.mutation<SyncModelsResponse, void>({
       query: () => {
@@ -254,7 +353,11 @@ export const modelsApi = api.injectEndpoints({
           method: 'POST',
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
+      ],
     }),
     getLoRAModels: build.query<EntityState<LoRAModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
@@ -287,6 +390,31 @@ export const modelsApi = api.injectEndpoints({
           entities
         );
       },
+    }),
+    updateLoRAModels: build.mutation<
+      UpdateLoRAModelResponse,
+      UpdateLoRAModelArg
+    >({
+      query: ({ base_model, model_name, body }) => {
+        return {
+          url: `models/${base_model}/lora/${model_name}`,
+          method: 'PATCH',
+          body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
+    }),
+    deleteLoRAModels: build.mutation<
+      DeleteLoRAModelResponse,
+      DeleteLoRAModelArg
+    >({
+      query: ({ base_model, model_name }) => {
+        return {
+          url: `models/${base_model}/lora/${model_name}`,
+          method: 'DELETE',
+        };
+      },
+      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
     }),
     getControlNetModels: build.query<
       EntityState<ControlNetModelConfigEntity>,
@@ -425,6 +553,7 @@ export const modelsApi = api.injectEndpoints({
 
 export const {
   useGetMainModelsQuery,
+  useGetOnnxModelsQuery,
   useGetControlNetModelsQuery,
   useGetLoRAModelsQuery,
   useGetTextualInversionModelsQuery,
@@ -435,6 +564,8 @@ export const {
   useAddMainModelsMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
+  useDeleteLoRAModelsMutation,
+  useUpdateLoRAModelsMutation,
   useSyncModelsMutation,
   useGetModelsInFolderQuery,
   useGetCheckpointConfigsQuery,

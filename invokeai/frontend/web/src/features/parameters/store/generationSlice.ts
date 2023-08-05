@@ -1,21 +1,18 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { DEFAULT_SCHEDULER_NAME } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { configChanged } from 'features/system/store/configSlice';
-import {
-  setAspectRatio,
-  setShouldShowAdvancedOptions,
-} from 'features/ui/store/uiSlice';
 import { clamp } from 'lodash-es';
-import { ImageDTO, MainModelField } from 'services/api/types';
-import { clipSkipMap } from '../components/Parameters/Advanced/ParamClipSkip';
+import { ImageDTO } from 'services/api/types';
+import { clipSkipMap } from '../types/constants';
 import {
   CfgScaleParam,
   HeightParam,
   MainModelParam,
   NegativePromptParam,
+  OnnxModelParam,
   PositivePromptParam,
+  PrecisionParam,
   SchedulerParam,
   SeedParam,
   StepsParam,
@@ -54,12 +51,15 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: MainModelField | null;
+  model: MainModelParam | OnnxModelParam | null;
   vae: VaeModelParam | null;
+  vaePrecision: PrecisionParam;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
   clipSkip: number;
   shouldUseCpuNoise: boolean;
+  shouldShowAdvancedOptions: boolean;
+  aspectRatio: number | null;
 }
 
 export const initialGenerationState: GenerationState = {
@@ -71,7 +71,7 @@ export const initialGenerationState: GenerationState = {
   perlin: 0,
   positivePrompt: '',
   negativePrompt: '',
-  scheduler: DEFAULT_SCHEDULER_NAME,
+  scheduler: 'euler',
   seamBlur: 16,
   seamSize: 96,
   seamSteps: 30,
@@ -92,10 +92,13 @@ export const initialGenerationState: GenerationState = {
   verticalSymmetrySteps: 0,
   model: null,
   vae: null,
+  vaePrecision: 'fp32',
   seamlessXAxis: false,
   seamlessYAxis: false,
   clipSkip: 0,
   shouldUseCpuNoise: true,
+  shouldShowAdvancedOptions: false,
+  aspectRatio: null,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -227,7 +230,10 @@ export const generationSlice = createSlice({
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelChanged: (state, action: PayloadAction<MainModelParam | null>) => {
+    modelChanged: (
+      state,
+      action: PayloadAction<MainModelParam | OnnxModelParam | null>
+    ) => {
       state.model = action.payload;
 
       if (state.model === null) {
@@ -242,11 +248,27 @@ export const generationSlice = createSlice({
       // null is a valid VAE!
       state.vae = action.payload;
     },
+    vaePrecisionChanged: (state, action: PayloadAction<PrecisionParam>) => {
+      state.vaePrecision = action.payload;
+    },
     setClipSkip: (state, action: PayloadAction<number>) => {
       state.clipSkip = action.payload;
     },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
+    },
+    setShouldShowAdvancedOptions: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowAdvancedOptions = action.payload;
+      if (!action.payload) {
+        state.clipSkip = 0;
+      }
+    },
+    setAspectRatio: (state, action: PayloadAction<number | null>) => {
+      const newAspectRatio = action.payload;
+      state.aspectRatio = newAspectRatio;
+      if (newAspectRatio) {
+        state.height = roundToMultiple(state.width / newAspectRatio, 8);
+      }
     },
   },
   extraReducers: (builder) => {
@@ -259,6 +281,7 @@ export const generationSlice = createSlice({
         const result = zMainModel.safeParse({
           model_name,
           base_model,
+          model_type,
         });
 
         if (result.success) {
@@ -269,12 +292,6 @@ export const generationSlice = createSlice({
     builder.addCase(setShouldShowAdvancedOptions, (state, action) => {
       const advancedOptionsStatus = action.payload;
       if (!advancedOptionsStatus) state.clipSkip = 0;
-    });
-    builder.addCase(setAspectRatio, (state, action) => {
-      const ratio = action.payload;
-      if (ratio) {
-        state.height = roundToMultiple(state.width / ratio, 8);
-      }
     });
   },
 });
@@ -319,6 +336,9 @@ export const {
   setSeamlessYAxis,
   setClipSkip,
   shouldUseCpuNoiseChanged,
+  setShouldShowAdvancedOptions,
+  setAspectRatio,
+  vaePrecisionChanged,
 } = generationSlice.actions;
 
 export default generationSlice.reducer;

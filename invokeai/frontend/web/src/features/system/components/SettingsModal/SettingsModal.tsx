@@ -10,35 +10,34 @@ import {
   ModalOverlay,
   Text,
   useDisclosure,
+  useColorMode,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { VALID_LOG_LEVELS } from 'app/logging/useLogger';
+import { VALID_LOG_LEVELS } from 'app/logging/logger';
 import { LOCALSTORAGE_KEYS, LOCALSTORAGE_PREFIX } from 'app/store/constants';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { systemSelector } from 'features/system/store/systemSelectors';
+import { setShouldShowAdvancedOptions } from 'features/parameters/store/generationSlice';
 import {
-  SystemState,
   consoleLogLevelChanged,
   setEnableImageDebugging,
   setIsNodesEnabled,
   setShouldConfirmOnDelete,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
+  shouldUseNSFWCheckerChanged,
+  shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
-import { uiSelector } from 'features/ui/store/uiSelectors';
 import {
-  setShouldShowAdvancedOptions,
   setShouldShowProgressInViewer,
   setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
-import { UIState } from 'features/ui/store/uiTypes';
 import { isEqual } from 'lodash-es';
 import {
   ChangeEvent,
-  PropsWithChildren,
   ReactElement,
   cloneElement,
   useCallback,
@@ -46,13 +45,19 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
+import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
+import StyledFlex from './StyledFlex';
+import { useFeatureStatus } from '../../hooks/useFeatureStatus';
+import { LANGUAGES } from '../../store/constants';
+import { languageChanged } from '../../store/systemSlice';
+import { languageSelector } from '../../store/systemSelectors';
 
 const selector = createSelector(
-  [systemSelector, uiSelector],
-  (system: SystemState, ui: UIState) => {
+  [stateSelector],
+  ({ system, ui, generation }) => {
     const {
       shouldConfirmOnDelete,
       enableImageDebugging,
@@ -60,14 +65,17 @@ const selector = createSelector(
       shouldLogToConsole,
       shouldAntialiasProgressImage,
       isNodesEnabled,
+      shouldUseNSFWChecker,
+      shouldUseWatermarker,
     } = system;
 
     const {
       shouldUseCanvasBetaLayout,
       shouldUseSliders,
       shouldShowProgressInViewer,
-      shouldShowAdvancedOptions,
     } = ui;
+
+    const { shouldShowAdvancedOptions } = generation;
 
     return {
       shouldConfirmOnDelete,
@@ -80,6 +88,8 @@ const selector = createSelector(
       shouldAntialiasProgressImage,
       shouldShowAdvancedOptions,
       isNodesEnabled,
+      shouldUseNSFWChecker,
+      shouldUseWatermarker,
     };
   },
   {
@@ -94,6 +104,7 @@ type ConfigOptions = {
   shouldShowAdvancedOptionsSettings: boolean;
   shouldShowClearIntermediates: boolean;
   shouldShowNodesToggle: boolean;
+  shouldShowLocalizationToggle: boolean;
 };
 
 type SettingsModalProps = {
@@ -115,12 +126,24 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowClearIntermediates =
     config?.shouldShowClearIntermediates ?? true;
   const shouldShowNodesToggle = config?.shouldShowNodesToggle ?? true;
+  const shouldShowLocalizationToggle =
+    config?.shouldShowLocalizationToggle ?? true;
 
   useEffect(() => {
     if (!shouldShowDeveloperSettings) {
       dispatch(shouldLogToConsoleChanged(false));
     }
   }, [shouldShowDeveloperSettings, dispatch]);
+
+  const { isNSFWCheckerAvailable, isWatermarkerAvailable } =
+    useGetAppConfigQuery(undefined, {
+      selectFromResult: ({ data }) => ({
+        isNSFWCheckerAvailable:
+          data?.nsfw_methods.includes('nsfw_checker') ?? false,
+        isWatermarkerAvailable:
+          data?.watermarking_methods.includes('invisible_watermark') ?? false,
+      }),
+    });
 
   const {
     isOpen: isSettingsModalOpen,
@@ -145,6 +168,8 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     shouldAntialiasProgressImage,
     shouldShowAdvancedOptions,
     isNodesEnabled,
+    shouldUseNSFWChecker,
+    shouldUseWatermarker,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -168,6 +193,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     [dispatch]
   );
 
+  const handleLanguageChanged = useCallback(
+    (l: string) => {
+      dispatch(languageChanged(l as keyof typeof LANGUAGES));
+    },
+    [dispatch]
+  );
+
   const handleLogToConsoleChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldLogToConsoleChanged(e.target.checked));
@@ -181,6 +213,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     },
     [dispatch]
   );
+
+  const { colorMode, toggleColorMode } = useColorMode();
+
+  const isLocalizationEnabled =
+    useFeatureStatus('localization').isFeatureEnabled;
+  const language = useAppSelector(languageSelector);
 
   return (
     <>
@@ -223,10 +261,31 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
               <StyledFlex>
                 <Heading size="sm">{t('settings.generation')}</Heading>
                 <SettingsSchedulers />
+                <SettingSwitch
+                  label="Enable NSFW Checker"
+                  isDisabled={!isNSFWCheckerAvailable}
+                  isChecked={shouldUseNSFWChecker}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(shouldUseNSFWCheckerChanged(e.target.checked))
+                  }
+                />
+                <SettingSwitch
+                  label="Enable Invisible Watermark"
+                  isDisabled={!isWatermarkerAvailable}
+                  isChecked={shouldUseWatermarker}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(shouldUseWatermarkerChanged(e.target.checked))
+                  }
+                />
               </StyledFlex>
 
               <StyledFlex>
                 <Heading size="sm">{t('settings.ui')}</Heading>
+                <SettingSwitch
+                  label={t('common.darkMode')}
+                  isChecked={colorMode === 'dark'}
+                  onChange={toggleColorMode}
+                />
                 <SettingSwitch
                   label={t('settings.useSlidersForAll')}
                   isChecked={shouldUseSliders}
@@ -267,6 +326,18 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     useBadge
                     isChecked={isNodesEnabled}
                     onChange={handleToggleNodes}
+                  />
+                )}
+                {shouldShowLocalizationToggle && (
+                  <IAIMantineSelect
+                    disabled={!isLocalizationEnabled}
+                    label={t('common.languagePickerLabel')}
+                    value={language}
+                    data={Object.entries(LANGUAGES).map(([value, label]) => ({
+                      value,
+                      label,
+                    }))}
+                    onChange={handleLanguageChanged}
                   />
                 )}
               </StyledFlex>
@@ -349,22 +420,3 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 };
 
 export default SettingsModal;
-
-export const StyledFlex = (props: PropsWithChildren) => {
-  return (
-    <Flex
-      sx={{
-        flexDirection: 'column',
-        gap: 2,
-        p: 4,
-        borderRadius: 'base',
-        bg: 'base.100',
-        _dark: {
-          bg: 'base.900',
-        },
-      }}
-    >
-      {props.children}
-    </Flex>
-  );
-};

@@ -1,16 +1,16 @@
-import { log } from 'app/logging/useLogger';
+import { isAnyOf } from '@reduxjs/toolkit';
 import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
   boardIdSelected,
   galleryViewChanged,
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
+import {
+  ASSETS_CATEGORIES,
+  IMAGE_CATEGORIES,
+} from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
-import { isAnyOf } from '@reduxjs/toolkit';
-
-const moduleLog = log.child({ namespace: 'boards' });
+import { imagesSelectors } from 'services/api/util';
 
 export const addBoardIdSelectedListener = () => {
   startAppListening({
@@ -53,8 +53,9 @@ export const addBoardIdSelectedListener = () => {
           queryArgs
         )(getState());
 
-        if (boardImagesData?.ids.length) {
-          dispatch(imageSelected((boardImagesData.ids[0] as string) ?? null));
+        if (boardImagesData) {
+          const firstImage = imagesSelectors.selectAll(boardImagesData)[0];
+          dispatch(imageSelected(firstImage ?? null));
         } else {
           // board has no images - deselect
           dispatch(imageSelected(null));

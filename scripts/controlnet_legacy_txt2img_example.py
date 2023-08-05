@@ -28,11 +28,12 @@ canny_image.show()
 print("loading base model stable-diffusion-1.5")
 model_config_path = os.getcwd() + "/../configs/models.yaml"
 model_manager = ModelManager(model_config_path)
-model = model_manager.get_model('stable-diffusion-1.5')
+model = model_manager.get_model("stable-diffusion-1.5")
 
 print("loading control model lllyasviel/sd-controlnet-canny")
-canny_controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny",
-                                                   torch_dtype=torch.float16).to("cuda")
+canny_controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny", torch_dtype=torch.float16).to(
+    "cuda"
+)
 
 print("testing Txt2Img() constructor with control_model arg")
 txt2img_canny = Txt2Img(model, control_model=canny_controlnet)
@@ -49,6 +50,3 @@ outputs = txt2img_canny.generate(
 generate_output = next(outputs)
 out_image = generate_output.image
 out_image.show()
-
-
-

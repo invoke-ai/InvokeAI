@@ -1,4 +1,4 @@
-import { NUMPY_RAND_MAX, SCHEDULER_NAMES_AS_CONST } from 'app/constants';
+import { NUMPY_RAND_MAX } from 'app/constants';
 import { z } from 'zod';
 
 /**
@@ -43,6 +43,42 @@ export const isValidNegativePrompt = (
 ): val is NegativePromptParam => zNegativePrompt.safeParse(val).success;
 
 /**
+ * Zod schema for SDXL positive style prompt parameter
+ */
+export const zPositiveStylePromptSDXL = z.string();
+/**
+ * Type alias for SDXL positive style prompt parameter, inferred from its zod schema
+ */
+export type PositiveStylePromptSDXLParam = z.infer<
+  typeof zPositiveStylePromptSDXL
+>;
+/**
+ * Validates/type-guards a value as a SDXL positive style prompt parameter
+ */
+export const isValidSDXLPositiveStylePrompt = (
+  val: unknown
+): val is PositiveStylePromptSDXLParam =>
+  zPositiveStylePromptSDXL.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL negative style prompt parameter
+ */
+export const zNegativeStylePromptSDXL = z.string();
+/**
+ * Type alias for SDXL negative style prompt parameter, inferred from its zod schema
+ */
+export type NegativeStylePromptSDXLParam = z.infer<
+  typeof zNegativeStylePromptSDXL
+>;
+/**
+ * Validates/type-guards a value as a SDXL negative style prompt parameter
+ */
+export const isValidSDXLNegativeStylePrompt = (
+  val: unknown
+): val is NegativeStylePromptSDXLParam =>
+  zNegativeStylePromptSDXL.safeParse(val).success;
+
+/**
  * Zod schema for steps parameter
  */
 export const zSteps = z.number().int().min(1);
@@ -73,7 +109,30 @@ export const isValidCfgScale = (val: unknown): val is CfgScaleParam =>
 /**
  * Zod schema for scheduler parameter
  */
-export const zScheduler = z.enum(SCHEDULER_NAMES_AS_CONST);
+export const zScheduler = z.enum([
+  'euler',
+  'deis',
+  'ddim',
+  'ddpm',
+  'dpmpp_2s',
+  'dpmpp_2m',
+  'dpmpp_2m_sde',
+  'dpmpp_sde',
+  'heun',
+  'kdpm_2',
+  'lms',
+  'pndm',
+  'unipc',
+  'euler_k',
+  'dpmpp_2s_k',
+  'dpmpp_2m_k',
+  'dpmpp_2m_sde_k',
+  'dpmpp_sde_k',
+  'heun_k',
+  'lms_k',
+  'euler_a',
+  'kdpm_2_a',
+]);
 /**
  * Type alias for scheduler parameter, inferred from its zod schema
  */
@@ -83,6 +142,31 @@ export type SchedulerParam = z.infer<typeof zScheduler>;
  */
 export const isValidScheduler = (val: unknown): val is SchedulerParam =>
   zScheduler.safeParse(val).success;
+
+export const SCHEDULER_LABEL_MAP: Record<SchedulerParam, string> = {
+  euler: 'Euler',
+  deis: 'DEIS',
+  ddim: 'DDIM',
+  ddpm: 'DDPM',
+  dpmpp_sde: 'DPM++ SDE',
+  dpmpp_2s: 'DPM++ 2S',
+  dpmpp_2m: 'DPM++ 2M',
+  dpmpp_2m_sde: 'DPM++ 2M SDE',
+  heun: 'Heun',
+  kdpm_2: 'KDPM 2',
+  lms: 'LMS',
+  pndm: 'PNDM',
+  unipc: 'UniPC',
+  euler_k: 'Euler Karras',
+  dpmpp_sde_k: 'DPM++ SDE Karras',
+  dpmpp_2s_k: 'DPM++ 2S Karras',
+  dpmpp_2m_k: 'DPM++ 2M Karras',
+  dpmpp_2m_sde_k: 'DPM++ 2M SDE Karras',
+  heun_k: 'Heun Karras',
+  lms_k: 'LMS Karras',
+  euler_a: 'Euler Ancestral',
+  kdpm_2_a: 'KDPM 2 Ancestral',
+};
 
 /**
  * Zod schema for seed parameter
@@ -131,23 +215,65 @@ const zBaseModel = z.enum(['sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
 export type BaseModelParam = z.infer<typeof zBaseModel>;
 
 /**
- * Zod schema for model parameter
+ * Zod schema for main model parameter
  * TODO: Make this a dynamically generated enum?
  */
 export const zMainModel = z.object({
   model_name: z.string().min(1),
   base_model: zBaseModel,
+  model_type: z.literal('main'),
 });
-
 /**
- * Type alias for model parameter, inferred from its zod schema
+ * Type alias for main model parameter, inferred from its zod schema
  */
 export type MainModelParam = z.infer<typeof zMainModel>;
 /**
- * Validates/type-guards a value as a model parameter
+ * Validates/type-guards a value as a main model parameter
  */
 export const isValidMainModel = (val: unknown): val is MainModelParam =>
   zMainModel.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL refiner model parameter
+ * TODO: Make this a dynamically generated enum?
+ */
+export const zSDXLRefinerModel = z.object({
+  model_name: z.string().min(1),
+  base_model: z.literal('sdxl-refiner'),
+  model_type: z.literal('main'),
+});
+/**
+ * Type alias for SDXL refiner model parameter, inferred from its zod schema
+ */
+export type SDXLRefinerModelParam = z.infer<typeof zSDXLRefinerModel>;
+/**
+ * Validates/type-guards a value as a SDXL refiner model parameter
+ */
+export const isValidSDXLRefinerModel = (
+  val: unknown
+): val is SDXLRefinerModelParam => zSDXLRefinerModel.safeParse(val).success;
+
+/**
+ * Zod schema for Onnx model parameter
+ * TODO: Make this a dynamically generated enum?
+ */
+export const zOnnxModel = z.object({
+  model_name: z.string().min(1),
+  base_model: zBaseModel,
+  model_type: z.literal('onnx'),
+});
+/**
+ * Type alias for Onnx model parameter, inferred from its zod schema
+ */
+export type OnnxModelParam = z.infer<typeof zOnnxModel>;
+/**
+ * Validates/type-guards a value as a Onnx model parameter
+ */
+export const isValidOnnxModel = (val: unknown): val is OnnxModelParam =>
+  zOnnxModel.safeParse(val).success;
+
+export const zMainOrOnnxModel = z.union([zMainModel, zOnnxModel]);
+
 /**
  * Zod schema for VAE parameter
  */
@@ -211,6 +337,53 @@ export type StrengthParam = z.infer<typeof zStrength>;
  */
 export const isValidStrength = (val: unknown): val is StrengthParam =>
   zStrength.safeParse(val).success;
+
+/**
+ * Zod schema for a precision parameter
+ */
+export const zPrecision = z.enum(['fp16', 'fp32']);
+/**
+ * Type alias for precision parameter, inferred from its zod schema
+ */
+export type PrecisionParam = z.infer<typeof zPrecision>;
+/**
+ * Validates/type-guards a value as a precision parameter
+ */
+export const isValidPrecision = (val: unknown): val is PrecisionParam =>
+  zPrecision.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL refiner aesthetic score parameter
+ */
+export const zSDXLRefinerAestheticScore = z.number().min(1).max(10);
+/**
+ * Type alias for SDXL refiner aesthetic score parameter, inferred from its zod schema
+ */
+export type SDXLRefinerAestheticScoreParam = z.infer<
+  typeof zSDXLRefinerAestheticScore
+>;
+/**
+ * Validates/type-guards a value as a SDXL refiner aesthetic score parameter
+ */
+export const isValidSDXLRefinerAestheticScore = (
+  val: unknown
+): val is SDXLRefinerAestheticScoreParam =>
+  zSDXLRefinerAestheticScore.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL start parameter
+ */
+export const zSDXLRefinerstart = z.number().min(0).max(1);
+/**
+ * Type alias for SDXL start, inferred from its zod schema
+ */
+export type SDXLRefinerStartParam = z.infer<typeof zSDXLRefinerstart>;
+/**
+ * Validates/type-guards a value as a SDXL refiner aesthetic score parameter
+ */
+export const isValidSDXLRefinerStart = (
+  val: unknown
+): val is SDXLRefinerStartParam => zSDXLRefinerstart.safeParse(val).success;
 
 // /**
 //  * Zod schema for BaseModelType

@@ -1,5 +1,4 @@
 import { Flex, Radio, RadioGroup, Text, Tooltip } from '@chakra-ui/react';
-import { makeToast } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIInput from 'common/components/IAIInput';
@@ -8,9 +7,11 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAISlider from 'common/components/IAISlider';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { pickBy } from 'lodash-es';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ALL_BASE_MODELS } from 'services/api/constants';
 import {
   useGetMainModelsQuery,
   useMergeMainModelsMutation,
@@ -32,7 +33,7 @@ export default function MergeModelsPanel() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const { data } = useGetMainModelsQuery();
+  const { data } = useGetMainModelsQuery(ALL_BASE_MODELS);
 
   const [mergeModels, { isLoading }] = useMergeMainModelsMutation();
 
@@ -58,10 +59,10 @@ export default function MergeModelsPanel() {
   }, [sd1DiffusersModels, sd2DiffusersModels]);
 
   const [modelOne, setModelOne] = useState<string | null>(
-    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])[0]
+    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])?.[0] ?? null
   );
   const [modelTwo, setModelTwo] = useState<string | null>(
-    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])[1]
+    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])?.[1] ?? null
   );
 
   const [modelThree, setModelThree] = useState<string | null>(null);
@@ -105,8 +106,9 @@ export default function MergeModelsPanel() {
     let modelsToMerge: (string | null)[] = [modelOne, modelTwo, modelThree];
     modelsToMerge = modelsToMerge.filter((model) => model !== null);
     modelsToMerge.forEach((model) => {
-      if (model) {
-        models_names.push(model?.split('/')[2]);
+      const n = model?.split('/')?.[2];
+      if (n) {
+        models_names.push(n);
       }
     });
 

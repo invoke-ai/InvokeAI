@@ -1,7 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { log } from 'app/logging/useLogger';
-
-const schemaLog = log.child({ namespace: 'schema' });
+import { logger } from 'app/logging/logger';
 
 function getCircularReplacer() {
   const ancestors: Record<string, any>[] = [];
@@ -26,11 +24,12 @@ function getCircularReplacer() {
 export const receivedOpenAPISchema = createAsyncThunk(
   'nodes/receivedOpenAPISchema',
   async (_, { dispatch, rejectWithValue }) => {
+    const log = logger('system');
     try {
       const response = await fetch(`openapi.json`);
       const openAPISchema = await response.json();
 
-      schemaLog.info({ openAPISchema }, 'Received OpenAPI schema');
+      log.info({ openAPISchema }, 'Received OpenAPI schema');
 
       const schemaJSON = JSON.parse(
         JSON.stringify(openAPISchema, getCircularReplacer())

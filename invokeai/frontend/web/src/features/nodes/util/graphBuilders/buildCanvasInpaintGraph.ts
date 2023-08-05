@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
@@ -8,7 +8,9 @@ import {
   RangeOfSizeInvocation,
 } from 'services/api/types';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   INPAINT,
@@ -21,8 +23,6 @@ import {
   RANGE_OF_SIZE,
 } from './constants';
 
-const moduleLog = log.child({ namespace: 'nodes' });
-
 /**
  * Builds the Canvas tab's Inpaint graph.
  */
@@ -31,6 +31,7 @@ export const buildCanvasInpaintGraph = (
   canvasInitImage: ImageDTO,
   canvasMaskImage: ImageDTO
 ): NonNullableGraph => {
+  const log = logger('nodes');
   const {
     positivePrompt,
     negativePrompt,
@@ -53,7 +54,7 @@ export const buildCanvasInpaintGraph = (
   } = state.generation;
 
   if (!model) {
-    moduleLog.error('No model found in state');
+    log.error('No model found in state');
     throw new Error('No model found in state');
   }
 
@@ -248,6 +249,17 @@ export const buildCanvasInpaintGraph = (
   } else {
     // User specified seed, so set the start of the range of size to the seed
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
+  }
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph, INPAINT);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph, INPAINT);
   }
 
   return graph;

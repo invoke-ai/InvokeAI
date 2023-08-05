@@ -41,7 +41,7 @@ IF /I "%choice%" == "1" (
     python .venv\Scripts\invokeai-configure.exe --skip-sd-weight --skip-support-models
 ) ELSE IF /I "%choice%" == "7" (
     echo Running invokeai-configure...
-    python .venv\Scripts\invokeai-configure.exe --yes --default_only
+    python .venv\Scripts\invokeai-configure.exe --yes --skip-sd-weight
 ) ELSE IF /I "%choice%" == "8" (
     echo Developer Console
     echo Python command is:

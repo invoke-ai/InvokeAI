@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { $logger } from 'app/logging/logger';
 import { canvasMerged } from 'features/canvas/store/actions';
 import { setMergedCanvas } from 'features/canvas/store/canvasSlice';
 import { getFullBaseLayerBlob } from 'features/canvas/util/getFullBaseLayerBlob';
@@ -7,12 +7,13 @@ import { addToast } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
 
-const moduleLog = log.child({ namespace: 'canvasCopiedToClipboardListener' });
-
 export const addCanvasMergedListener = () => {
   startAppListening({
     actionCreator: canvasMerged,
-    effect: async (action, { dispatch, getState, take }) => {
+    effect: async (action, { dispatch }) => {
+      const moduleLog = $logger
+        .get()
+        .child({ namespace: 'canvasCopiedToClipboardListener' });
       const blob = await getFullBaseLayerBlob();
 
       if (!blob) {

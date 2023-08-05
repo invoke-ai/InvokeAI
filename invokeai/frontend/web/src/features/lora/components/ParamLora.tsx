@@ -48,6 +48,7 @@ const ParamLora = (props: Props) => {
         handleReset={handleReset}
         withSliderMarks
         sliderMarks={[-1, 0, 1, 2]}
+        sliderNumberInputProps={{ min: -50, max: 50 }}
       />
       <IAIIconButton
         size="sm"

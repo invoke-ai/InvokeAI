@@ -10,7 +10,10 @@ interface ItemProps extends React.ComponentPropsWithoutRef<'div'> {
 }
 
 const IAIMantineSelectItemWithTooltip = forwardRef<HTMLDivElement, ItemProps>(
-  ({ label, tooltip, description, disabled, ...others }: ItemProps, ref) => (
+  (
+    { label, tooltip, description, disabled: _disabled, ...others }: ItemProps,
+    ref
+  ) => (
     <Tooltip label={tooltip} placement="top" hasArrow openDelay={500}>
       <Box ref={ref} {...others}>
         <Box>

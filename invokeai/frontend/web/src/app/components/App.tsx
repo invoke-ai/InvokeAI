@@ -4,8 +4,9 @@ import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/ap
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploader from 'common/components/ImageUploader';
+import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
+import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import GalleryDrawer from 'features/gallery/components/GalleryPanel';
-import DeleteImageModal from 'features/imageDeletion/components/DeleteImageModal';
 import SiteHeader from 'features/system/components/SiteHeader';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
@@ -14,8 +15,8 @@ import FloatingParametersPanelButtons from 'features/ui/components/FloatingParam
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 import ParametersDrawer from 'features/ui/components/ParametersDrawer';
 import i18n from 'i18n';
+import { size } from 'lodash-es';
 import { ReactNode, memo, useEffect } from 'react';
-import UpdateImageBoardModal from '../../features/gallery/components/Boards/UpdateImageBoardModal';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
 
@@ -29,8 +30,7 @@ interface Props {
 const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   const language = useAppSelector(languageSelector);
 
-  const log = useLogger();
-
+  const logger = useLogger();
   const dispatch = useAppDispatch();
 
   useEffect(() => {
@@ -38,9 +38,11 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   }, [language]);
 
   useEffect(() => {
-    log.info({ namespace: 'App', data: config }, 'Received config');
-    dispatch(configChanged(config));
-  }, [dispatch, config, log]);
+    if (size(config)) {
+      logger.info({ namespace: 'App', config }, 'Received config');
+      dispatch(configChanged(config));
+    }
+  }, [dispatch, config, logger]);
 
   useEffect(() => {
     dispatch(appStarted());
@@ -82,7 +84,7 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
         </Portal>
       </Grid>
       <DeleteImageModal />
-      <UpdateImageBoardModal />
+      <ChangeBoardModal />
       <Toaster />
       <GlobalHotkeys />
     </>

@@ -9,16 +9,14 @@ import {
   MenuButton,
   MenuList,
 } from '@chakra-ui/react';
-// import { runESRGAN, runFacetool } from 'app/socketio/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { stateSelector } from 'app/store/store';
-import { DeleteImageButton } from 'features/imageDeletion/components/DeleteImageButton';
-import { imageToDeleteSelected } from 'features/imageDeletion/store/imageDeletionSlice';
+import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
+import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
@@ -108,14 +106,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     500
   );
 
-  const { currentData: imageDTO, isFetching } = useGetImageDTOQuery(
-    lastSelectedImage ?? skipToken
+  const { currentData: imageDTO } = useGetImageDTOQuery(
+    lastSelectedImage?.image_name ?? skipToken
   );
 
   const { currentData: metadataData } = useGetImageMetadataQuery(
     debounceState.isPending()
       ? skipToken
-      : debouncedMetadataQueryArg ?? skipToken
+      : debouncedMetadataQueryArg?.image_name ?? skipToken
   );
 
   const metadata = metadataData?.metadata;
@@ -139,8 +137,19 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   useHotkeys('s', handleUseSeed, [imageDTO]);
 
   const handleUsePrompt = useCallback(() => {
-    recallBothPrompts(metadata?.positive_prompt, metadata?.negative_prompt);
-  }, [metadata?.negative_prompt, metadata?.positive_prompt, recallBothPrompts]);
+    recallBothPrompts(
+      metadata?.positive_prompt,
+      metadata?.negative_prompt,
+      metadata?.positive_style_prompt,
+      metadata?.negative_style_prompt
+    );
+  }, [
+    metadata?.negative_prompt,
+    metadata?.positive_prompt,
+    metadata?.positive_style_prompt,
+    metadata?.negative_style_prompt,
+    recallBothPrompts,
+  ]);
 
   useHotkeys('p', handleUsePrompt, [imageDTO]);
 
@@ -162,7 +171,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     if (!imageDTO) {
       return;
     }
-    dispatch(imageToDeleteSelected(imageDTO));
+    dispatch(imagesToDeleteSelected([imageDTO]));
   }, [dispatch, imageDTO]);
 
   useHotkeys(
@@ -208,6 +217,14 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
       }
     },
     [imageDTO, shouldShowImageDetails, toaster]
+  );
+
+  useHotkeys(
+    'delete',
+    () => {
+      handleDelete();
+    },
+    [dispatch, imageDTO]
   );
 
   const handleClickProgressImagesToggle = useCallback(() => {

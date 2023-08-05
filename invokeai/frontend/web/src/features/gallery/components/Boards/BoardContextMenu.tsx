@@ -1,23 +1,21 @@
 import { MenuGroup, MenuItem, MenuList } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
-import {
-  autoAddBoardIdChanged,
-  boardIdSelected,
-} from 'features/gallery/store/gallerySlice';
+import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
-import { FaFolder, FaPlus } from 'react-icons/fa';
+import { FaPlus } from 'react-icons/fa';
+import { useBoardName } from 'services/api/hooks/useBoardName';
 import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
-import { useBoardName } from 'services/api/hooks/useBoardName';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { BoardId } from 'features/gallery/store/types';
 
 type Props = {
   board?: BoardDTO;
-  board_id?: string;
+  board_id: BoardId;
   children: ContextMenuProps<HTMLDivElement>['children'];
   setBoardToDelete?: (board?: BoardDTO) => void;
 };
@@ -28,20 +26,18 @@ const BoardContextMenu = memo(
 
     const selector = useMemo(
       () =>
-        createSelector(stateSelector, ({ gallery }) => {
-          const isSelected = gallery.selectedBoardId === board_id;
+        createSelector(stateSelector, ({ gallery, system }) => {
           const isAutoAdd = gallery.autoAddBoardId === board_id;
-          return { isSelected, isAutoAdd };
+          const isProcessing = system.isProcessing;
+          const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
+          return { isAutoAdd, isProcessing, autoAssignBoardOnClick };
         }),
       [board_id]
     );
 
-    const { isSelected, isAutoAdd } = useAppSelector(selector);
+    const { isAutoAdd, isProcessing, autoAssignBoardOnClick } =
+      useAppSelector(selector);
     const boardName = useBoardName(board_id);
-
-    const handleSelectBoard = useCallback(() => {
-      dispatch(boardIdSelected(board_id));
-    }, [board_id, dispatch]);
 
     const handleSetAutoAdd = useCallback(() => {
       dispatch(autoAddBoardIdChanged(board_id));
@@ -67,7 +63,7 @@ const BoardContextMenu = memo(
             <MenuGroup title={boardName}>
               <MenuItem
                 icon={<FaPlus />}
-                isDisabled={isAutoAdd}
+                isDisabled={isAutoAdd || isProcessing || autoAssignBoardOnClick}
                 onClick={handleSetAutoAdd}
               >
                 Auto-add to this Board

@@ -7,7 +7,7 @@ import {
   Tooltip,
   UnorderedList,
 } from '@chakra-ui/react';
-import { makeToast } from 'app/components/Toaster';
+import { makeToast } from 'features/system/util/makeToast';
 // import { convertToDiffusers } from 'app/socketio/actions';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
@@ -47,13 +47,11 @@ export default function ModelConvert(props: ModelConvertProps) {
   };
 
   const modelConvertHandler = () => {
-    const responseBody = {
+    const queryArg = {
       base_model: model.base_model,
       model_name: model.model_name,
-      params: {
-        convert_dest_directory:
-          saveLocation === 'Custom' ? customSaveLocation : undefined,
-      },
+      convert_dest_directory:
+        saveLocation === 'Custom' ? customSaveLocation : undefined,
     };
 
     if (saveLocation === 'Custom' && customSaveLocation === '') {
@@ -74,14 +72,14 @@ export default function ModelConvert(props: ModelConvertProps) {
           title: `${t('modelManager.convertingModelBegin')}: ${
             model.model_name
           }`,
-          status: 'success',
+          status: 'info',
         })
       )
     );
 
-    convertModel(responseBody)
+    convertModel(queryArg)
       .unwrap()
-      .then((_) => {
+      .then(() => {
         dispatch(
           addToast(
             makeToast({
@@ -91,7 +89,7 @@ export default function ModelConvert(props: ModelConvertProps) {
           )
         );
       })
-      .catch((_) => {
+      .catch(() => {
         dispatch(
           addToast(
             makeToast({

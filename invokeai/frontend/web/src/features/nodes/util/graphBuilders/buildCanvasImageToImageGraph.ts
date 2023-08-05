@@ -1,4 +1,4 @@
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
@@ -10,7 +10,9 @@ import {
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   IMAGE_TO_IMAGE_GRAPH,
@@ -25,8 +27,6 @@ import {
   RESIZE,
 } from './constants';
 
-const moduleLog = log.child({ namespace: 'nodes' });
-
 /**
  * Builds the Canvas tab's Image to Image graph.
  */
@@ -34,6 +34,7 @@ export const buildCanvasImageToImageGraph = (
   state: RootState,
   initialImage: ImageDTO
 ): NonNullableGraph => {
+  const log = logger('nodes');
   const {
     positivePrompt,
     negativePrompt,
@@ -53,7 +54,7 @@ export const buildCanvasImageToImageGraph = (
   const { shouldAutoSave } = state.canvas;
 
   if (!model) {
-    moduleLog.error('No model found in state');
+    log.error('No model found in state');
     throw new Error('No model found in state');
   }
 
@@ -104,11 +105,6 @@ export const buildCanvasImageToImageGraph = (
         is_intermediate: true,
         skipped_layers: clipSkip,
       },
-      [LATENTS_TO_IMAGE]: {
-        is_intermediate: !shouldAutoSave,
-        type: 'l2i',
-        id: LATENTS_TO_IMAGE,
-      },
       [LATENTS_TO_LATENTS]: {
         type: 'l2l',
         id: LATENTS_TO_LATENTS,
@@ -126,6 +122,11 @@ export const buildCanvasImageToImageGraph = (
         // image: {
         //   image_name: initialImage.image_name,
         // },
+      },
+      [LATENTS_TO_IMAGE]: {
+        type: 'l2i',
+        id: LATENTS_TO_IMAGE,
+        is_intermediate: !shouldAutoSave,
       },
     },
     edges: [
@@ -333,6 +334,17 @@ export const buildCanvasImageToImageGraph = (
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, LATENTS_TO_LATENTS);
+
+  // NSFW & watermark - must be last thing added to graph
+  if (state.system.shouldUseNSFWChecker) {
+    // must add before watermarker!
+    addNSFWCheckerToGraph(state, graph);
+  }
+
+  if (state.system.shouldUseWatermarker) {
+    // must add after nsfw checker!
+    addWatermarkerToGraph(state, graph);
+  }
 
   return graph;
 };

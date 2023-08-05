@@ -1,5 +1,5 @@
 import { Flex, Text } from '@chakra-ui/react';
-import { makeToast } from 'app/components/Toaster';
+import { makeToast } from 'features/system/util/makeToast';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
@@ -16,6 +16,7 @@ import {
   useImportMainModelsMutation,
 } from 'services/api/endpoints/models';
 import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
+import { ALL_BASE_MODELS } from 'services/api/constants';
 
 export default function FoundModelsList() {
   const searchFolder = useAppSelector(
@@ -24,7 +25,7 @@ export default function FoundModelsList() {
   const [nameFilter, setNameFilter] = useState<string>('');
 
   // Get paths of models that are already installed
-  const { data: installedModels } = useGetMainModelsQuery();
+  const { data: installedModels } = useGetMainModelsQuery(ALL_BASE_MODELS);
 
   // Get all model paths from a given directory
   const { foundModels, alreadyInstalled, filteredModels } =
@@ -168,7 +169,9 @@ export default function FoundModelsList() {
   };
 
   const renderFoundModels = () => {
-    if (!searchFolder) return;
+    if (!searchFolder) {
+      return null;
+    }
 
     if (!foundModels || foundModels.length === 0) {
       return (
@@ -242,7 +245,7 @@ const foundModelsFilter = (
   const filteredModels: SearchFolderResponse = [];
   forEach(data, (model) => {
     if (!model) {
-      return;
+      return null;
     }
 
     if (model.includes(nameFilter)) {

@@ -1,5 +1,4 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
 import {
   ControlNetModelParam,
   LoRAModelParam,
@@ -7,7 +6,6 @@ import {
   VaeModelParam,
 } from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, uniqBy } from 'lodash-es';
-import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import {
   addEdge,
@@ -19,24 +17,11 @@ import {
   Node,
   NodeChange,
   OnConnectStartParams,
-  ReactFlowInstance,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { ImageField } from 'services/api/types';
 import { InvocationTemplate, InvocationValue } from '../types/types';
-
-export type NodesState = {
-  nodes: Node<InvocationValue>[];
-  edges: Edge[];
-  schema: OpenAPIV3.Document | null;
-  invocationTemplates: Record<string, InvocationTemplate>;
-  connectionStartParams: OnConnectStartParams | null;
-  shouldShowGraphOverlay: boolean;
-  shouldShowFieldTypeLegend: boolean;
-  shouldShowMinimapPanel: boolean;
-  editorInstance: ReactFlowInstance | undefined;
-  progressNodeSize: { width: number; height: number };
-};
+import { NodesState } from './types';
 
 export const initialNodesState: NodesState = {
   nodes: [],
@@ -94,9 +79,12 @@ const nodesSlice = createSlice({
     ) => {
       const { nodeId, fieldName, value } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
-
+      const input = state.nodes?.[nodeIndex]?.data?.inputs[fieldName];
+      if (!input) {
+        return;
+      }
       if (nodeIndex > -1) {
-        state.nodes[nodeIndex].data.inputs[fieldName].value = value;
+        input.value = value;
       }
     },
     imageCollectionFieldValueChanged: (
@@ -114,16 +102,19 @@ const nodesSlice = createSlice({
         return;
       }
 
-      const currentValue = cloneDeep(
-        state.nodes[nodeIndex].data.inputs[fieldName].value
-      );
-
-      if (!currentValue) {
-        state.nodes[nodeIndex].data.inputs[fieldName].value = value;
+      const input = state.nodes?.[nodeIndex]?.data?.inputs[fieldName];
+      if (!input) {
         return;
       }
 
-      state.nodes[nodeIndex].data.inputs[fieldName].value = uniqBy(
+      const currentValue = cloneDeep(input.value);
+
+      if (!currentValue) {
+        input.value = value;
+        return;
+      }
+
+      input.value = uniqBy(
         (currentValue as ImageField[]).concat(value),
         'image_name'
       );
@@ -194,5 +185,3 @@ export const {
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
-
-export const nodesSelector = (state: RootState) => state.nodes;

@@ -123,7 +123,7 @@ and go to http://localhost:9090.
 
 ### Command-Line Installation (for developers and users familiar with Terminals)
 
-You must have Python 3.9 or 3.10 installed on your machine. Earlier or
+You must have Python 3.9 through 3.11 installed on your machine. Earlier or
 later versions are not supported.
 Node.js also needs to be installed along with yarn (can be installed with
 the command `npm install -g yarn` if needed)
@@ -184,8 +184,9 @@ the command `npm install -g yarn` if needed)
 6. Configure InvokeAI and install a starting set of image generation models (you only need to do this once):
 
     ```terminal
-    invokeai-configure
+    invokeai-configure --root .
     ```
+	Don't miss the dot at the end!
 
 7. Launch the web server (do it every time you run InvokeAI):
 
@@ -193,15 +194,9 @@ the command `npm install -g yarn` if needed)
     invokeai-web
     ```
 
-8. Build Node.js assets
+8. Point your browser to http://localhost:9090 to bring up the web interface.
 
-  ```terminal
-  cd invokeai/frontend/web/
-  yarn vite build
-  ```
-
-9. Point your browser to http://localhost:9090 to bring up the web interface.
-10. Type `banana sushi` in the box on the top left and click `Invoke`.
+9. Type `banana sushi` in the box on the top left and click `Invoke`.
 
 Be sure to activate the virtual environment each time before re-launching InvokeAI,
 using `source .venv/bin/activate` or `.venv\Scripts\activate`.

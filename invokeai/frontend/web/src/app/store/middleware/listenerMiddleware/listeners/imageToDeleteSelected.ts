@@ -1,40 +1,32 @@
-import { startAppListening } from '..';
-import { log } from 'app/logging/useLogger';
+import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
+import { selectImageUsage } from 'features/deleteImageModal/store/selectors';
 import {
-  imageDeletionConfirmed,
-  imageToDeleteSelected,
+  imagesToDeleteSelected,
   isModalOpenChanged,
-  selectImageUsage,
-} from 'features/imageDeletion/store/imageDeletionSlice';
-
-const moduleLog = log.child({ namespace: 'image' });
+} from 'features/deleteImageModal/store/slice';
+import { startAppListening } from '..';
 
 export const addImageToDeleteSelectedListener = () => {
   startAppListening({
-    actionCreator: imageToDeleteSelected,
-    effect: async (action, { dispatch, getState, condition }) => {
-      const imageDTO = action.payload;
+    actionCreator: imagesToDeleteSelected,
+    effect: async (action, { dispatch, getState }) => {
+      const imageDTOs = action.payload;
       const state = getState();
       const { shouldConfirmOnDelete } = state.system;
-      const imageUsage = selectImageUsage(getState());
-
-      if (!imageUsage) {
-        // should never happen
-        return;
-      }
+      const imagesUsage = selectImageUsage(getState());
 
       const isImageInUse =
-        imageUsage.isCanvasImage ||
-        imageUsage.isInitialImage ||
-        imageUsage.isControlNetImage ||
-        imageUsage.isNodesImage;
+        imagesUsage.some((i) => i.isCanvasImage) ||
+        imagesUsage.some((i) => i.isInitialImage) ||
+        imagesUsage.some((i) => i.isControlNetImage) ||
+        imagesUsage.some((i) => i.isNodesImage);
 
       if (shouldConfirmOnDelete || isImageInUse) {
         dispatch(isModalOpenChanged(true));
         return;
       }
 
-      dispatch(imageDeletionConfirmed({ imageDTO, imageUsage }));
+      dispatch(imageDeletionConfirmed({ imageDTOs, imagesUsage }));
     },
   });
 };

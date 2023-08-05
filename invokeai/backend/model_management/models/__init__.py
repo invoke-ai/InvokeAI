@@ -3,19 +3,31 @@ from enum import Enum
 from pydantic import BaseModel
 from typing import Literal, get_origin
 from .base import (
-    BaseModelType, ModelType, SubModelType, ModelBase, ModelConfigBase,
-    ModelVariantType, SchedulerPredictionType, ModelError, SilenceWarnings,
-    ModelNotFoundException, InvalidModelException, DuplicateModelException
-    )
+    BaseModelType,
+    ModelType,
+    SubModelType,
+    ModelBase,
+    ModelConfigBase,
+    ModelVariantType,
+    SchedulerPredictionType,
+    ModelError,
+    SilenceWarnings,
+    ModelNotFoundException,
+    InvalidModelException,
+    DuplicateModelException,
+)
 from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
 from .sdxl import StableDiffusionXLModel
 from .vae import VaeModel
 from .lora import LoRAModel
-from .controlnet import ControlNetModel # TODO:
+from .controlnet import ControlNetModel  # TODO:
 from .textual_inversion import TextualInversionModel
+
+from .stable_diffusion_onnx import ONNXStableDiffusion1Model, ONNXStableDiffusion2Model
 
 MODEL_CLASSES = {
     BaseModelType.StableDiffusion1: {
+        ModelType.ONNX: ONNXStableDiffusion1Model,
         ModelType.Main: StableDiffusion1Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
@@ -23,6 +35,7 @@ MODEL_CLASSES = {
         ModelType.TextualInversion: TextualInversionModel,
     },
     BaseModelType.StableDiffusion2: {
+        ModelType.ONNX: ONNXStableDiffusion2Model,
         ModelType.Main: StableDiffusion2Model,
         ModelType.Vae: VaeModel,
         ModelType.Lora: LoRAModel,
@@ -36,6 +49,7 @@ MODEL_CLASSES = {
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
+        ModelType.ONNX: ONNXStableDiffusion2Model,
     },
     BaseModelType.StableDiffusionXLRefiner: {
         ModelType.Main: StableDiffusionXLModel,
@@ -44,18 +58,20 @@ MODEL_CLASSES = {
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
+        ModelType.ONNX: ONNXStableDiffusion2Model,
     },
-    #BaseModelType.Kandinsky2_1: {
+    # BaseModelType.Kandinsky2_1: {
     #    ModelType.Main: Kandinsky2_1Model,
     #    ModelType.MoVQ: MoVQModel,
     #    ModelType.Lora: LoRAModel,
     #    ModelType.ControlNet: ControlNetModel,
     #    ModelType.TextualInversion: TextualInversionModel,
-    #},
+    # },
 }
 
 MODEL_CONFIGS = list()
 OPENAPI_MODEL_CONFIGS = list()
+
 
 class OpenAPIModelInfoBase(BaseModel):
     model_name: str
@@ -72,27 +88,31 @@ for base_model, models in MODEL_CLASSES.items():
         # LS: sort to get the checkpoint configs first, which makes
         # for a better template in the Swagger docs
         for cfg in sorted(model_configs, key=lambda x: str(x)):
-            model_name, cfg_name = cfg.__qualname__.split('.')[-2:]
+            model_name, cfg_name = cfg.__qualname__.split(".")[-2:]
             openapi_cfg_name = model_name + cfg_name
             if openapi_cfg_name in vars():
                 continue
 
-            api_wrapper = type(openapi_cfg_name, (cfg, OpenAPIModelInfoBase), dict(
-                __annotations__ = dict(
-                    model_type=Literal[model_type.value],
+            api_wrapper = type(
+                openapi_cfg_name,
+                (cfg, OpenAPIModelInfoBase),
+                dict(
+                    __annotations__=dict(
+                        model_type=Literal[model_type.value],
+                    ),
                 ),
-            ))
+            )
 
-            #globals()[openapi_cfg_name] = api_wrapper
+            # globals()[openapi_cfg_name] = api_wrapper
             vars()[openapi_cfg_name] = api_wrapper
             OPENAPI_MODEL_CONFIGS.append(api_wrapper)
+
 
 def get_model_config_enums():
     enums = list()
 
     for model_config in MODEL_CONFIGS:
-
-        if hasattr(inspect,'get_annotations'):
+        if hasattr(inspect, "get_annotations"):
             fields = inspect.get_annotations(model_config)
         else:
             fields = model_config.__annotations__
@@ -109,7 +129,9 @@ def get_model_config_enums():
         if isinstance(field, type) and issubclass(field, str) and issubclass(field, Enum):
             enums.append(field)
 
-        elif get_origin(field) is Literal and all(isinstance(arg, str) and isinstance(arg, Enum) for arg in field.__args__):
+        elif get_origin(field) is Literal and all(
+            isinstance(arg, str) and isinstance(arg, Enum) for arg in field.__args__
+        ):
             enums.append(type(field.__args__[0]))
 
         elif field is None:
@@ -119,4 +141,3 @@ def get_model_config_enums():
             raise Exception(f"Unsupported format definition in {model_configs.__qualname__}")
 
     return enums
-

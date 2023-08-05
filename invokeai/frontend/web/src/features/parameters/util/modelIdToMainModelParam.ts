@@ -1,23 +1,24 @@
+import { logger } from 'app/logging/logger';
 import {
   MainModelParam,
-  zMainModel,
+  OnnxModelParam,
+  zMainOrOnnxModel,
 } from 'features/parameters/types/parameterSchemas';
-import { log } from 'app/logging/useLogger';
-
-const moduleLog = log.child({ module: 'models' });
 
 export const modelIdToMainModelParam = (
   mainModelId: string
-): MainModelParam | undefined => {
+): OnnxModelParam | MainModelParam | undefined => {
+  const log = logger('models');
   const [base_model, model_type, model_name] = mainModelId.split('/');
 
-  const result = zMainModel.safeParse({
+  const result = zMainOrOnnxModel.safeParse({
     base_model,
     model_name,
+    model_type,
   });
 
   if (!result.success) {
-    moduleLog.error(
+    log.error(
       {
         mainModelId,
         errors: result.error.format(),

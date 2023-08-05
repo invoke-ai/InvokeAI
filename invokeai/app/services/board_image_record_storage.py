@@ -25,7 +25,6 @@ class BoardImageRecordStorageBase(ABC):
     @abstractmethod
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
         """Removes an image from a board."""
@@ -154,7 +153,6 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
 
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
         try:
@@ -162,9 +160,9 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             self._cursor.execute(
                 """--sql
                 DELETE FROM board_images
-                WHERE board_id = ? AND image_name = ?;
+                WHERE image_name = ?;
                 """,
-                (board_id, image_name),
+                (image_name,),
             )
             self._conn.commit()
         except sqlite3.Error as e:
@@ -207,9 +205,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             raise e
         finally:
             self._lock.release()
-        return OffsetPaginatedResults(
-            items=images, offset=offset, limit=limit, total=count
-        )
+        return OffsetPaginatedResults(items=images, offset=offset, limit=limit, total=count)
 
     def get_all_board_image_names_for_board(self, board_id: str) -> list[str]:
         try:

@@ -216,16 +216,9 @@ class ImageService(ImageServiceABC):
                 metadata=metadata,
                 session_id=session_id,
             )
-
             if board_id is not None:
-                self._services.board_image_records.add_image_to_board(
-                    board_id=board_id, image_name=image_name
-                )
-
-            self._services.image_files.save(
-                image_name=image_name, image=image, metadata=metadata, graph=graph
-            )
-
+                self._services.board_image_records.add_image_to_board(board_id=board_id, image_name=image_name)
+            self._services.image_files.save(image_name=image_name, image=image, metadata=metadata, graph=graph)
             image_dto = self.get_dto(image_name)
 
             return image_dto
@@ -236,7 +229,7 @@ class ImageService(ImageServiceABC):
             self._services.logger.error("Failed to save image file")
             raise
         except Exception as e:
-            self._services.logger.error("Problem saving image record and file")
+            self._services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
 
     def update(
@@ -296,13 +289,12 @@ class ImageService(ImageServiceABC):
     def get_metadata(self, image_name: str) -> Optional[ImageMetadata]:
         try:
             image_record = self._services.image_records.get(image_name)
+            metadata = self._services.image_records.get_metadata(image_name)
 
             if not image_record.session_id:
-                return ImageMetadata()
+                return ImageMetadata(metadata=metadata)
 
-            session_raw = self._services.graph_execution_manager.get_raw(
-                image_record.session_id
-            )
+            session_raw = self._services.graph_execution_manager.get_raw(image_record.session_id)
             graph = None
 
             if session_raw:
@@ -312,7 +304,6 @@ class ImageService(ImageServiceABC):
                     self._services.logger.warn(f"Failed to parse session graph: {e}")
                     graph = None
 
-            metadata = self._services.image_records.get_metadata(image_name)
             return ImageMetadata(graph=graph, metadata=metadata)
         except ImageRecordNotFoundException:
             self._services.logger.error("Image record not found")
@@ -367,9 +358,7 @@ class ImageService(ImageServiceABC):
                         r,
                         self._services.urls.get_image_url(r.image_name),
                         self._services.urls.get_image_url(r.image_name, True),
-                        self._services.board_image_records.get_board_for_image(
-                            r.image_name
-                        ),
+                        self._services.board_image_records.get_board_for_image(r.image_name),
                     ),
                     results.items,
                 )
@@ -401,11 +390,7 @@ class ImageService(ImageServiceABC):
 
     def delete_images_on_board(self, board_id: str):
         try:
-            image_names = (
-                self._services.board_image_records.get_all_board_image_names_for_board(
-                    board_id
-                )
-            )
+            image_names = self._services.board_image_records.get_all_board_image_names_for_board(board_id)
             for image_name in image_names:
                 self._services.image_files.delete(image_name)
             self._services.image_records.delete_many(image_names)

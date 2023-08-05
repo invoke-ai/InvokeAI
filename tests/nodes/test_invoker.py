@@ -11,6 +11,7 @@ from invokeai.app.services.processor import DefaultInvocationProcessor
 from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.invocation_services import InvocationServices
+from invokeai.app.services.invocation_stats import InvocationStatsService
 from invokeai.app.services.graph import (
     Graph,
     GraphExecutionState,
@@ -34,21 +35,23 @@ def simple_graph():
 @pytest.fixture
 def mock_services() -> InvocationServices:
     # NOTE: none of these are actually called by the test invocations
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
+        filename=sqlite_memory, table_name="graph_executions"
+    )
     return InvocationServices(
-        model_manager = None, # type: ignore
-        events = TestEventService(),
-        logger = None, # type: ignore
-        images = None, # type: ignore
-        latents = None, # type: ignore
-        boards = None, # type: ignore
-        board_images = None, # type: ignore
-        queue = MemoryInvocationQueue(),
-        graph_library=SqliteItemStorage[LibraryGraph](
-            filename=sqlite_memory, table_name="graphs"
-        ),
-        graph_execution_manager = SqliteItemStorage[GraphExecutionState](filename = sqlite_memory, table_name = 'graph_executions'),
-        processor = DefaultInvocationProcessor(),
-        configuration = None, # type: ignore
+        model_manager=None,  # type: ignore
+        events=TestEventService(),
+        logger=None,  # type: ignore
+        images=None,  # type: ignore
+        latents=None,  # type: ignore
+        boards=None,  # type: ignore
+        board_images=None,  # type: ignore
+        queue=MemoryInvocationQueue(),
+        graph_library=SqliteItemStorage[LibraryGraph](filename=sqlite_memory, table_name="graphs"),
+        graph_execution_manager=graph_execution_manager,
+        processor=DefaultInvocationProcessor(),
+        performance_statistics=InvocationStatsService(graph_execution_manager),
+        configuration=None,  # type: ignore
     )
 
 

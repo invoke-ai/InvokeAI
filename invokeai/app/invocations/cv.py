@@ -37,10 +37,7 @@ class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "OpenCV Inpaint",
-                "tags": ["opencv", "inpaint"]
-            },
+            "ui": {"title": "OpenCV Inpaint", "tags": ["opencv", "inpaint"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:

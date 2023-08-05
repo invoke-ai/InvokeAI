@@ -5,6 +5,7 @@ from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadF
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
+from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.metadata import ImageMetadata
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
@@ -25,7 +26,7 @@ IMAGE_MAX_AGE = 31536000
 
 
 @images_router.post(
-    "/",
+    "/upload",
     operation_id="upload_image",
     responses={
         201: {"description": "The image was uploaded successfully"},
@@ -40,15 +41,9 @@ async def upload_image(
     response: Response,
     image_category: ImageCategory = Query(description="The category of the image"),
     is_intermediate: bool = Query(description="Whether this is an intermediate image"),
-    board_id: Optional[str] = Query(
-        default=None, description="The board to add this image to, if any"
-    ),
-    session_id: Optional[str] = Query(
-        default=None, description="The session ID associated with this upload, if any"
-    ),
-    crop_visible: Optional[bool] = Query(
-        default=False, description="Whether to crop the image"
-    ),
+    board_id: Optional[str] = Query(default=None, description="The board to add this image to, if any"),
+    session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
+    crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
 ) -> ImageDTO:
     """Uploads an image"""
     if not file.content_type.startswith("image"):
@@ -83,7 +78,7 @@ async def upload_image(
         raise HTTPException(status_code=500, detail="Failed to create image")
 
 
-@images_router.delete("/{image_name}", operation_id="delete_image")
+@images_router.delete("/i/{image_name}", operation_id="delete_image")
 async def delete_image(
     image_name: str = Path(description="The name of the image to delete"),
 ) -> None:
@@ -109,15 +104,13 @@ async def clear_intermediates() -> int:
 
 
 @images_router.patch(
-    "/{image_name}",
+    "/i/{image_name}",
     operation_id="update_image",
     response_model=ImageDTO,
 )
 async def update_image(
     image_name: str = Path(description="The name of the image to update"),
-    image_changes: ImageRecordChanges = Body(
-        description="The changes to apply to the image"
-    ),
+    image_changes: ImageRecordChanges = Body(description="The changes to apply to the image"),
 ) -> ImageDTO:
     """Updates an image"""
 
@@ -128,7 +121,7 @@ async def update_image(
 
 
 @images_router.get(
-    "/{image_name}",
+    "/i/{image_name}",
     operation_id="get_image_dto",
     response_model=ImageDTO,
 )
@@ -144,7 +137,7 @@ async def get_image_dto(
 
 
 @images_router.get(
-    "/{image_name}/metadata",
+    "/i/{image_name}/metadata",
     operation_id="get_image_metadata",
     response_model=ImageMetadata,
 )
@@ -160,7 +153,7 @@ async def get_image_metadata(
 
 
 @images_router.get(
-    "/{image_name}/full",
+    "/i/{image_name}/full",
     operation_id="get_image_full",
     response_class=Response,
     responses={
@@ -195,7 +188,7 @@ async def get_image_full(
 
 
 @images_router.get(
-    "/{image_name}/thumbnail",
+    "/i/{image_name}/thumbnail",
     operation_id="get_image_thumbnail",
     response_class=Response,
     responses={
@@ -212,15 +205,11 @@ async def get_image_thumbnail(
     """Gets a thumbnail image file"""
 
     try:
-        path = ApiDependencies.invoker.services.images.get_path(
-            image_name, thumbnail=True
-        )
+        path = ApiDependencies.invoker.services.images.get_path(image_name, thumbnail=True)
         if not ApiDependencies.invoker.services.images.validate_path(path):
             raise HTTPException(status_code=404)
 
-        response = FileResponse(
-            path, media_type="image/webp", content_disposition_type="inline"
-        )
+        response = FileResponse(path, media_type="image/webp", content_disposition_type="inline")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         return response
     except Exception as e:
@@ -228,7 +217,7 @@ async def get_image_thumbnail(
 
 
 @images_router.get(
-    "/{image_name}/urls",
+    "/i/{image_name}/urls",
     operation_id="get_image_urls",
     response_model=ImageUrlsDTO,
 )
@@ -239,9 +228,7 @@ async def get_image_urls(
 
     try:
         image_url = ApiDependencies.invoker.services.images.get_url(image_name)
-        thumbnail_url = ApiDependencies.invoker.services.images.get_url(
-            image_name, thumbnail=True
-        )
+        thumbnail_url = ApiDependencies.invoker.services.images.get_url(image_name, thumbnail=True)
         return ImageUrlsDTO(
             image_name=image_name,
             image_url=image_url,
@@ -257,15 +244,9 @@ async def get_image_urls(
     response_model=OffsetPaginatedResults[ImageDTO],
 )
 async def list_image_dtos(
-    image_origin: Optional[ResourceOrigin] = Query(
-        default=None, description="The origin of images to list."
-    ),
-    categories: Optional[list[ImageCategory]] = Query(
-        default=None, description="The categories of image to include."
-    ),
-    is_intermediate: Optional[bool] = Query(
-        default=None, description="Whether to list intermediate images."
-    ),
+    image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
+    categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
+    is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
     board_id: Optional[str] = Query(
         default=None,
         description="The board id to filter by. Use 'none' to find images without a board.",
@@ -285,3 +266,24 @@ async def list_image_dtos(
     )
 
     return image_dtos
+
+
+class DeleteImagesFromListResult(BaseModel):
+    deleted_images: list[str]
+
+
+@images_router.post("/delete", operation_id="delete_images_from_list", response_model=DeleteImagesFromListResult)
+async def delete_images_from_list(
+    image_names: list[str] = Body(description="The list of names of images to delete", embed=True),
+) -> DeleteImagesFromListResult:
+    try:
+        deleted_images: list[str] = []
+        for image_name in image_names:
+            try:
+                ApiDependencies.invoker.services.images.delete(image_name)
+                deleted_images.append(image_name)
+            except:
+                pass
+        return DeleteImagesFromListResult(deleted_images=deleted_images)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete images")

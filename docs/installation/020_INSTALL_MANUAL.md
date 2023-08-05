@@ -32,7 +32,7 @@ gaming):
 
 * **Python**
 
-    version 3.9 or 3.10 (3.11 is not recommended).
+    version 3.9 through 3.11
 
 * **CUDA Tools**
 
@@ -65,7 +65,7 @@ gaming):
 To install InvokeAI with virtual environments and the PIP package
 manager, please follow these steps:
 
-1.  Please make sure you are using Python 3.9 or 3.10. The rest of the install
+1.  Please make sure you are using Python 3.9 through 3.11. The rest of the install
     procedure depends on this and will not work with other versions:
 
     ```bash
@@ -192,8 +192,10 @@ manager, please follow these steps:
     your outputs.
 
     ```terminal
-    invokeai-configure
+    invokeai-configure --root .
     ```
+	
+	Don't miss the dot at the end of the command!
 
     The script `invokeai-configure` will interactively guide you through the
     process of downloading and installing the weights files needed for InvokeAI.
@@ -225,12 +227,6 @@ manager, please follow these steps:
 
         !!! warning "Make sure that the virtual environment is activated, which should create `(.venv)` in front of your prompt!"
 
-        === "CLI"
-
-            ```bash
-            invokeai
-            ```
-
         === "local Webserver"
 
             ```bash
@@ -241,6 +237,12 @@ manager, please follow these steps:
 
             ```bash
             invokeai --web --host 0.0.0.0
+            ```
+
+        === "CLI"
+
+            ```bash
+            invokeai
             ```
 
         If you choose the run the web interface, point your browser at

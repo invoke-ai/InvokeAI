@@ -36,13 +36,15 @@ else:
 
 
 def welcome():
-
     @group()
     def text():
         if (platform_specific := _platform_specific_help()) != "":
             yield platform_specific
             yield ""
-        yield Text.from_markup("Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with [i]Control-C[/] and retry.", justify="center")
+        yield Text.from_markup(
+            "Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with [i]Control-C[/] and retry.",
+            justify="center",
+        )
 
     console.rule()
     print(
@@ -57,6 +59,7 @@ def welcome():
         )
     )
     console.line()
+
 
 def confirm_install(dest: Path) -> bool:
     if dest.exists():
@@ -92,7 +95,6 @@ def dest_path(dest=None) -> Path:
     dest_confirmed = confirm_install(dest)
 
     while not dest_confirmed:
-
         # if the given destination already exists, the starting point for browsing is its parent directory.
         # the user may have made a typo, or otherwise wants to place the root dir next to an existing one.
         # if the destination dir does NOT exist, then the user must have changed their mind about the selection.
@@ -165,6 +167,10 @@ def graphical_accelerator():
         "an [gold1 b]NVIDIA[/] GPU (using CUDA™)",
         "cuda",
     )
+    nvidia_with_dml = (
+        "an [gold1 b]NVIDIA[/] GPU (using CUDA™, and DirectML™ for ONNX) -- ALPHA",
+        "cuda_and_dml",
+    )
     amd = (
         "an [gold1 b]AMD[/] GPU (using ROCm™)",
         "rocm",
@@ -179,7 +185,7 @@ def graphical_accelerator():
     )
 
     if OS == "Windows":
-        options = [nvidia, cpu]
+        options = [nvidia, nvidia_with_dml, cpu]
     if OS == "Linux":
         options = [nvidia, amd, cpu]
     elif OS == "Darwin":
@@ -300,15 +306,20 @@ def introduction() -> None:
     )
     console.line(2)
 
-def _platform_specific_help()->str:
+
+def _platform_specific_help() -> str:
     if OS == "Darwin":
-        text = Text.from_markup("""[b wheat1]macOS Users![/]\n\nPlease be sure you have the [b wheat1]Xcode command-line tools[/] installed before continuing.\nIf not, cancel with [i]Control-C[/] and follow the Xcode install instructions at [deep_sky_blue1]https://www.freecodecamp.org/news/install-xcode-command-line-tools/[/].""")
+        text = Text.from_markup(
+            """[b wheat1]macOS Users![/]\n\nPlease be sure you have the [b wheat1]Xcode command-line tools[/] installed before continuing.\nIf not, cancel with [i]Control-C[/] and follow the Xcode install instructions at [deep_sky_blue1]https://www.freecodecamp.org/news/install-xcode-command-line-tools/[/]."""
+        )
     elif OS == "Windows":
-        text = Text.from_markup("""[b wheat1]Windows Users![/]\n\nBefore you start, please do the following:
+        text = Text.from_markup(
+            """[b wheat1]Windows Users![/]\n\nBefore you start, please do the following:
   1. Double-click on the file [b wheat1]WinLongPathsEnabled.reg[/] in order to
      enable long path support on your system.
   2. Make sure you have the [b wheat1]Visual C++ core libraries[/] installed. If not, install from
-     [deep_sky_blue1]https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170[/]""")
+     [deep_sky_blue1]https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170[/]"""
+        )
     else:
         text = ""
     return text

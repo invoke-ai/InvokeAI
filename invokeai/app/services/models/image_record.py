@@ -1,13 +1,14 @@
 import datetime
 from typing import Optional, Union
 
-from pydantic import BaseModel, Extra, Field, StrictBool, StrictStr
+from pydantic import Extra, Field, StrictBool, StrictStr
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 
-class ImageRecord(BaseModel):
+class ImageRecord(BaseModelExcludeNull):
     """Deserialized image record without metadata."""
 
     image_name: str = Field(description="The unique name of the image.")
@@ -20,17 +21,11 @@ class ImageRecord(BaseModel):
     """The actual width of the image in px. This may be different from the width in metadata."""
     height: int = Field(description="The height of the image in px.")
     """The actual height of the image in px. This may be different from the height in metadata."""
-    created_at: Union[datetime.datetime, str] = Field(
-        description="The created timestamp of the image."
-    )
+    created_at: Union[datetime.datetime, str] = Field(description="The created timestamp of the image.")
     """The created timestamp of the image."""
-    updated_at: Union[datetime.datetime, str] = Field(
-        description="The updated timestamp of the image."
-    )
+    updated_at: Union[datetime.datetime, str] = Field(description="The updated timestamp of the image.")
     """The updated timestamp of the image."""
-    deleted_at: Union[datetime.datetime, str, None] = Field(
-        description="The deleted timestamp of the image."
-    )
+    deleted_at: Union[datetime.datetime, str, None] = Field(description="The deleted timestamp of the image.")
     """The deleted timestamp of the image."""
     is_intermediate: bool = Field(description="Whether this is an intermediate image.")
     """Whether this is an intermediate image."""
@@ -46,7 +41,7 @@ class ImageRecord(BaseModel):
     """The node ID that generated this image, if it is a generated image."""
 
 
-class ImageRecordChanges(BaseModel, extra=Extra.forbid):
+class ImageRecordChanges(BaseModelExcludeNull, extra=Extra.forbid):
     """A set of changes to apply to an image record.
 
     Only limited changes are valid:
@@ -55,22 +50,18 @@ class ImageRecordChanges(BaseModel, extra=Extra.forbid):
       - `is_intermediate`: change the image's `is_intermediate` flag
     """
 
-    image_category: Optional[ImageCategory] = Field(
-        description="The image's new category."
-    )
+    image_category: Optional[ImageCategory] = Field(description="The image's new category.")
     """The image's new category."""
     session_id: Optional[StrictStr] = Field(
         default=None,
         description="The image's new session ID.",
     )
     """The image's new session ID."""
-    is_intermediate: Optional[StrictBool] = Field(
-        default=None, description="The image's new `is_intermediate` flag."
-    )
+    is_intermediate: Optional[StrictBool] = Field(default=None, description="The image's new `is_intermediate` flag.")
     """The image's new `is_intermediate` flag."""
 
 
-class ImageUrlsDTO(BaseModel):
+class ImageUrlsDTO(BaseModelExcludeNull):
     """The URLs for an image and its thumbnail."""
 
     image_name: str = Field(description="The unique name of the image.")
@@ -84,15 +75,17 @@ class ImageUrlsDTO(BaseModel):
 class ImageDTO(ImageRecord, ImageUrlsDTO):
     """Deserialized image record, enriched for the frontend."""
 
-    board_id: Optional[str] = Field(
-        description="The id of the board the image belongs to, if one exists."
-    )
+    board_id: Optional[str] = Field(description="The id of the board the image belongs to, if one exists.")
     """The id of the board the image belongs to, if one exists."""
+
     pass
 
 
 def image_record_to_dto(
-    image_record: ImageRecord, image_url: str, thumbnail_url: str, board_id: Optional[str]
+    image_record: ImageRecord,
+    image_url: str,
+    thumbnail_url: str,
+    board_id: Optional[str],
 ) -> ImageDTO:
     """Converts an image record to an image DTO."""
     return ImageDTO(
@@ -110,12 +103,8 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
 
     # TODO: do we really need to handle default values here? ideally the data is the correct shape...
     image_name = image_dict.get("image_name", "unknown")
-    image_origin = ResourceOrigin(
-        image_dict.get("image_origin", ResourceOrigin.INTERNAL.value)
-    )
-    image_category = ImageCategory(
-        image_dict.get("image_category", ImageCategory.GENERAL.value)
-    )
+    image_origin = ResourceOrigin(image_dict.get("image_origin", ResourceOrigin.INTERNAL.value))
+    image_category = ImageCategory(image_dict.get("image_category", ImageCategory.GENERAL.value))
     width = image_dict.get("width", 0)
     height = image_dict.get("height", 0)
     session_id = image_dict.get("session_id", None)

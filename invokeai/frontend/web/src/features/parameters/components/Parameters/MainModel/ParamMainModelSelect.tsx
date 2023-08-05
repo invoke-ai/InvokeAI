@@ -13,8 +13,14 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { forEach } from 'lodash-es';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import {
+  useGetMainModelsQuery,
+  useGetOnnxModelsQuery,
+} from 'services/api/endpoints/models';
+import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
+import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   stateSelector,
@@ -28,7 +34,15 @@ const ParamMainModelSelect = () => {
 
   const { model } = useAppSelector(selector);
 
-  const { data: mainModels, isLoading } = useGetMainModelsQuery();
+  const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
+  const { data: mainModels, isLoading } = useGetMainModelsQuery(
+    NON_REFINER_BASE_MODELS
+  );
+  const { data: onnxModels, isLoading: onnxLoading } = useGetOnnxModelsQuery(
+    NON_REFINER_BASE_MODELS
+  );
+
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
   const data = useMemo(() => {
     if (!mainModels) {
@@ -38,7 +52,25 @@ const ParamMainModelSelect = () => {
     const data: SelectItem[] = [];
 
     forEach(mainModels.entities, (model, id) => {
-      if (!model || ['sdxl', 'sdxl-refiner'].includes(model.base_model)) {
+      if (
+        !model ||
+        (activeTabName === 'unifiedCanvas' && model.base_model === 'sdxl')
+      ) {
+        return;
+      }
+
+      data.push({
+        value: id,
+        label: model.model_name,
+        group: MODEL_TYPE_MAP[model.base_model],
+      });
+    });
+    forEach(onnxModels?.entities, (model, id) => {
+      if (
+        !model ||
+        activeTabName === 'unifiedCanvas' ||
+        activeTabName === 'img2img'
+      ) {
         return;
       }
 
@@ -50,15 +82,18 @@ const ParamMainModelSelect = () => {
     });
 
     return data;
-  }, [mainModels]);
+  }, [mainModels, onnxModels, activeTabName]);
 
   // grab the full model entity from the RTK Query cache
   // TODO: maybe we should just store the full model entity in state?
   const selectedModel = useMemo(
     () =>
-      mainModels?.entities[`${model?.base_model}/main/${model?.model_name}`] ??
+      (mainModels?.entities[`${model?.base_model}/main/${model?.model_name}`] ||
+        onnxModels?.entities[
+          `${model?.base_model}/onnx/${model?.model_name}`
+        ]) ??
       null,
-    [mainModels?.entities, model]
+    [mainModels?.entities, model, onnxModels?.entities]
   );
 
   const handleChangeModel = useCallback(
@@ -78,7 +113,7 @@ const ParamMainModelSelect = () => {
     [dispatch]
   );
 
-  return isLoading ? (
+  return isLoading || onnxLoading ? (
     <IAIMantineSearchableSelect
       label={t('modelManager.model')}
       placeholder="Loading..."
@@ -86,7 +121,7 @@ const ParamMainModelSelect = () => {
       data={[]}
     />
   ) : (
-    <Flex w="100%" alignItems="center" gap={2}>
+    <Flex w="100%" alignItems="center" gap={3}>
       <IAIMantineSearchableSelect
         tooltip={selectedModel?.description}
         label={t('modelManager.model')}
@@ -98,9 +133,11 @@ const ParamMainModelSelect = () => {
         onChange={handleChangeModel}
         w="100%"
       />
-      <Box mt={7}>
-        <SyncModelsButton iconMode />
-      </Box>
+      {isSyncModelEnabled && (
+        <Box mt={7}>
+          <SyncModelsButton iconMode />
+        </Box>
+      )}
     </Flex>
   );
 };

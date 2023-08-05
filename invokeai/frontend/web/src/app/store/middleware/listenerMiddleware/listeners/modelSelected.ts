@@ -1,28 +1,28 @@
-import { makeToast } from 'app/components/Toaster';
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
+import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
   modelChanged,
   vaeSelected,
 } from 'features/parameters/store/generationSlice';
-import { zMainModel } from 'features/parameters/types/parameterSchemas';
+import { zMainOrOnnxModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { forEach } from 'lodash-es';
 import { startAppListening } from '..';
-import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
-
-const moduleLog = log.child({ module: 'models' });
 
 export const addModelSelectedListener = () => {
   startAppListening({
     actionCreator: modelSelected,
     effect: (action, { getState, dispatch }) => {
+      const log = logger('models');
+
       const state = getState();
-      const result = zMainModel.safeParse(action.payload);
+      const result = zMainOrOnnxModel.safeParse(action.payload);
 
       if (!result.success) {
-        moduleLog.error(
+        log.error(
           { error: result.error.format() },
           'Failed to parse main model'
         );

@@ -1,6 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
-import { makeToast } from 'app/components/Toaster';
+import { makeToast } from 'features/system/util/makeToast';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
@@ -25,7 +25,7 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
 
   const advancedAddDiffusersForm = useForm<DiffusersModelConfig>({
     initialValues: {
-      model_name: model_path ? model_path.split('\\').splice(-1)[0] : '',
+      model_name: model_path?.split('\\').splice(-1)[0] ?? '',
       base_model: 'sd-1',
       model_type: 'main',
       path: model_path ? model_path : '',

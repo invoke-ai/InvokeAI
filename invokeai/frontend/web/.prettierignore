@@ -5,6 +5,10 @@ patches/
 stats.html
 index.html
 .yarn/
+.yalc/
 *.scss
 src/services/api/
 src/services/fixtures/*
+docs/
+static/
+src/theme/css/overlayscrollbars.css

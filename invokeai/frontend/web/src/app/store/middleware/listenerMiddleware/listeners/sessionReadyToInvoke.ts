@@ -1,20 +1,16 @@
-import { startAppListening } from '..';
-import { sessionInvoked } from 'services/api/thunks/session';
-import { log } from 'app/logging/useLogger';
+import { logger } from 'app/logging/logger';
 import { sessionReadyToInvoke } from 'features/system/store/actions';
-
-const moduleLog = log.child({ namespace: 'session' });
+import { sessionInvoked } from 'services/api/thunks/session';
+import { startAppListening } from '..';
 
 export const addSessionReadyToInvokeListener = () => {
   startAppListening({
     actionCreator: sessionReadyToInvoke,
     effect: (action, { getState, dispatch }) => {
+      const log = logger('session');
       const { sessionId: session_id } = getState().system;
       if (session_id) {
-        moduleLog.debug(
-          { session_id },
-          `Session ready to invoke (${session_id})})`
-        );
+        log.debug({ session_id }, `Session ready to invoke (${session_id})})`);
         dispatch(sessionInvoked({ session_id }));
       }
     },

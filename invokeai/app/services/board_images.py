@@ -31,7 +31,6 @@ class BoardImagesServiceABC(ABC):
     @abstractmethod
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
         """Removes an image from a board."""
@@ -93,18 +92,15 @@ class BoardImagesService(BoardImagesServiceABC):
 
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
-        self._services.board_image_records.remove_image_from_board(board_id, image_name)
+        self._services.board_image_records.remove_image_from_board(image_name)
 
     def get_all_board_image_names_for_board(
         self,
         board_id: str,
     ) -> list[str]:
-        return self._services.board_image_records.get_all_board_image_names_for_board(
-            board_id
-        )
+        return self._services.board_image_records.get_all_board_image_names_for_board(board_id)
 
     def get_board_for_image(
         self,
@@ -114,9 +110,7 @@ class BoardImagesService(BoardImagesServiceABC):
         return board_id
 
 
-def board_record_to_dto(
-    board_record: BoardRecord, cover_image_name: Optional[str], image_count: int
-) -> BoardDTO:
+def board_record_to_dto(board_record: BoardRecord, cover_image_name: Optional[str], image_count: int) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
         **board_record.dict(exclude={"cover_image_name"}),

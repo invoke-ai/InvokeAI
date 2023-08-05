@@ -3,7 +3,13 @@
 from typing import Any, Optional
 from invokeai.app.models.image import ProgressImage
 from invokeai.app.util.misc import get_timestamp
-from invokeai.app.services.model_manager_service import BaseModelType, ModelType, SubModelType, ModelInfo
+from invokeai.app.services.model_manager_service import (
+    BaseModelType,
+    ModelType,
+    SubModelType,
+    ModelInfo,
+)
+
 
 class EventServiceBase:
     session_event: str = "session_event"
@@ -67,6 +73,7 @@ class EventServiceBase:
         graph_execution_state_id: str,
         node: dict,
         source_node_id: str,
+        error_type: str,
         error: str,
     ) -> None:
         """Emitted when an invocation has completed"""
@@ -76,13 +83,12 @@ class EventServiceBase:
                 graph_execution_state_id=graph_execution_state_id,
                 node=node,
                 source_node_id=source_node_id,
+                error_type=error_type,
                 error=error,
             ),
         )
 
-    def emit_invocation_started(
-        self, graph_execution_state_id: str, node: dict, source_node_id: str
-    ) -> None:
+    def emit_invocation_started(self, graph_execution_state_id: str, node: dict, source_node_id: str) -> None:
         """Emitted when an invocation has started"""
         self.__emit_session_event(
             event_name="invocation_started",
@@ -102,13 +108,13 @@ class EventServiceBase:
             ),
         )
 
-    def emit_model_load_started (
-            self,
-            graph_execution_state_id: str,
-            model_name: str,
-            base_model: BaseModelType,
-            model_type: ModelType,
-            submodel: SubModelType,
+    def emit_model_load_started(
+        self,
+        graph_execution_state_id: str,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel: SubModelType,
     ) -> None:
         """Emitted when a model is requested"""
         self.__emit_session_event(
@@ -123,13 +129,13 @@ class EventServiceBase:
         )
 
     def emit_model_load_completed(
-            self,
-            graph_execution_state_id: str,
-            model_name: str,
-            base_model: BaseModelType,
-            model_type: ModelType,
-            submodel: SubModelType,
-            model_info: ModelInfo,
+        self,
+        graph_execution_state_id: str,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel: SubModelType,
+        model_info: ModelInfo,
     ) -> None:
         """Emitted when a model is correctly loaded (returns model info)"""
         self.__emit_session_event(
@@ -143,5 +149,39 @@ class EventServiceBase:
                 hash=model_info.hash,
                 location=str(model_info.location),
                 precision=str(model_info.precision),
+            ),
+        )
+
+    def emit_session_retrieval_error(
+        self,
+        graph_execution_state_id: str,
+        error_type: str,
+        error: str,
+    ) -> None:
+        """Emitted when session retrieval fails"""
+        self.__emit_session_event(
+            event_name="session_retrieval_error",
+            payload=dict(
+                graph_execution_state_id=graph_execution_state_id,
+                error_type=error_type,
+                error=error,
+            ),
+        )
+
+    def emit_invocation_retrieval_error(
+        self,
+        graph_execution_state_id: str,
+        node_id: str,
+        error_type: str,
+        error: str,
+    ) -> None:
+        """Emitted when invocation retrieval fails"""
+        self.__emit_session_event(
+            event_name="invocation_retrieval_error",
+            payload=dict(
+                graph_execution_state_id=graph_execution_state_id,
+                node_id=node_id,
+                error_type=error_type,
+                error=error,
             ),
         )

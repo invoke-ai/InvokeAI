@@ -1,25 +1,20 @@
 import { Middleware, MiddlewareAPI } from '@reduxjs/toolkit';
-import { Socket, io } from 'socket.io-client';
-
 import { AppThunkDispatch, RootState } from 'app/store/store';
-import { getTimestamp } from 'common/util/getTimestamp';
+import { $authToken, $baseUrl } from 'services/api/client';
 import { sessionCreated } from 'services/api/thunks/session';
 import {
   ClientToServerEvents,
   ServerToClientEvents,
 } from 'services/events/types';
-import { socketSubscribed, socketUnsubscribed } from './actions';
-// import { OpenAPI } from 'services/api/types';
-import { log } from 'app/logging/useLogger';
-import { $authToken, $baseUrl } from 'services/api/client';
 import { setEventListeners } from 'services/events/util/setEventListeners';
-
-const socketioLog = log.child({ namespace: 'socketio' });
+import { Socket, io } from 'socket.io-client';
+import { socketSubscribed, socketUnsubscribed } from './actions';
 
 export const socketMiddleware = () => {
   let areListenersSet = false;
 
-  let socketUrl = `ws://${window.location.host}`;
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  let socketUrl = `${wsProtocol}://${window.location.host}`;
 
   const socketOptions: Parameters<typeof io>[0] = {
     timeout: 60000,
@@ -58,7 +53,7 @@ export const socketMiddleware = () => {
       // Set listeners for `connect` and `disconnect` events once
       // Must happen in middleware to get access to `dispatch`
       if (!areListenersSet) {
-        setEventListeners({ storeApi, socket, log: socketioLog });
+        setEventListeners({ storeApi, socket });
 
         areListenersSet = true;
 
@@ -77,7 +72,6 @@ export const socketMiddleware = () => {
           dispatch(
             socketUnsubscribed({
               sessionId: oldSessionId,
-              timestamp: getTimestamp(),
             })
           );
         }
@@ -87,8 +81,6 @@ export const socketMiddleware = () => {
         dispatch(
           socketSubscribed({
             sessionId: sessionId,
-            timestamp: getTimestamp(),
-            boardId: getState().gallery.selectedBoardId,
           })
         );
       }

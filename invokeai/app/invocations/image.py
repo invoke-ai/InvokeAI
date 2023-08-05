@@ -4,60 +4,25 @@ from typing import Literal, Optional
 
 import numpy
 from PIL import Image, ImageFilter, ImageOps, ImageChops
-from pydantic import BaseModel, Field
+from pydantic import Field
+from pathlib import Path
 from typing import Union
-
-from ..models.image import ImageCategory, ImageField, ResourceOrigin
+from invokeai.app.invocations.metadata import CoreMetadata
+from ..models.image import (
+    ImageCategory,
+    ImageField,
+    ResourceOrigin,
+    PILInvocationConfig,
+    ImageOutput,
+    MaskOutput,
+)
 from .baseinvocation import (
     BaseInvocation,
-    BaseInvocationOutput,
     InvocationContext,
     InvocationConfig,
 )
-
-
-class PILInvocationConfig(BaseModel):
-    """Helper class to provide all PIL invocations with additional config"""
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "tags": ["PIL", "image"],
-            },
-        }
-
-
-class ImageOutput(BaseInvocationOutput):
-    """Base class for invocations that output an image"""
-
-    # fmt: off
-    type: Literal["image_output"] = "image_output"
-    image:      ImageField = Field(default=None, description="The output image")
-    width:             int = Field(description="The width of the image in pixels")
-    height:            int = Field(description="The height of the image in pixels")
-    # fmt: on
-
-    class Config:
-        schema_extra = {"required": ["type", "image", "width", "height"]}
-
-
-class MaskOutput(BaseInvocationOutput):
-    """Base class for invocations that output a mask"""
-
-    # fmt: off
-    type: Literal["mask"] = "mask"
-    mask:      ImageField = Field(default=None, description="The output mask")
-    width:            int = Field(description="The width of the mask in pixels")
-    height:           int = Field(description="The height of the mask in pixels")
-    # fmt: on
-
-    class Config:
-        schema_extra = {
-            "required": [
-                "type",
-                "mask",
-            ]
-        }
+from invokeai.backend.image_util.safety_checker import SafetyChecker
+from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 
 
 class LoadImageInvocation(BaseInvocation):
@@ -74,10 +39,7 @@ class LoadImageInvocation(BaseInvocation):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Load Image",
-                "tags": ["image", "load"]
-            },
+            "ui": {"title": "Load Image", "tags": ["image", "load"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -96,16 +58,11 @@ class ShowImageInvocation(BaseInvocation):
     type: Literal["show_image"] = "show_image"
 
     # Inputs
-    image: Optional[ImageField] = Field(
-        default=None, description="The image to show"
-    )
+    image: Optional[ImageField] = Field(default=None, description="The image to show")
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Show Image",
-                "tags": ["image", "show"]
-            },
+            "ui": {"title": "Show Image", "tags": ["image", "show"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -138,18 +95,13 @@ class ImageCropInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Crop Image",
-                "tags": ["image", "crop"]
-            },
+            "ui": {"title": "Crop Image", "tags": ["image", "crop"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
-        image_crop = Image.new(
-            mode="RGBA", size=(self.width, self.height), color=(0, 0, 0, 0)
-        )
+        image_crop = Image.new(mode="RGBA", size=(self.width, self.height), color=(0, 0, 0, 0))
         image_crop.paste(image, (-self.x, -self.y))
 
         image_dto = context.services.images.create(
@@ -184,21 +136,14 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Paste Image",
-                "tags": ["image", "paste"]
-            },
+            "ui": {"title": "Paste Image", "tags": ["image", "paste"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         base_image = context.services.images.get_pil_image(self.base_image.image_name)
         image = context.services.images.get_pil_image(self.image.image_name)
         mask = (
-            None
-            if self.mask is None
-            else ImageOps.invert(
-                context.services.images.get_pil_image(self.mask.image_name)
-            )
+            None if self.mask is None else ImageOps.invert(context.services.images.get_pil_image(self.mask.image_name))
         )
         # TODO: probably shouldn't invert mask here... should user be required to do it?
 
@@ -207,9 +152,7 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
         max_x = max(base_image.width, image.width + self.x)
         max_y = max(base_image.height, image.height + self.y)
 
-        new_image = Image.new(
-            mode="RGBA", size=(max_x - min_x, max_y - min_y), color=(0, 0, 0, 0)
-        )
+        new_image = Image.new(mode="RGBA", size=(max_x - min_x, max_y - min_y), color=(0, 0, 0, 0))
         new_image.paste(base_image, (abs(min_x), abs(min_y)))
         new_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
 
@@ -242,10 +185,7 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Mask From Alpha",
-                "tags": ["image", "mask", "alpha"]
-            },
+            "ui": {"title": "Mask From Alpha", "tags": ["image", "mask", "alpha"]},
         }
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
@@ -284,10 +224,7 @@ class ImageMultiplyInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Multiply Images",
-                "tags": ["image", "multiply"]
-            },
+            "ui": {"title": "Multiply Images", "tags": ["image", "multiply"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -328,10 +265,7 @@ class ImageChannelInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Image Channel",
-                "tags": ["image", "channel"]
-            },
+            "ui": {"title": "Image Channel", "tags": ["image", "channel"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -371,10 +305,7 @@ class ImageConvertInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Convert Image",
-                "tags": ["image", "convert"]
-            },
+            "ui": {"title": "Convert Image", "tags": ["image", "convert"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -412,19 +343,14 @@ class ImageBlurInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Blur Image",
-                "tags": ["image", "blur"]
-            },
+            "ui": {"title": "Blur Image", "tags": ["image", "blur"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
         blur = (
-            ImageFilter.GaussianBlur(self.radius)
-            if self.blur_type == "gaussian"
-            else ImageFilter.BoxBlur(self.radius)
+            ImageFilter.GaussianBlur(self.radius) if self.blur_type == "gaussian" else ImageFilter.BoxBlur(self.radius)
         )
         blur_image = image.filter(blur)
 
@@ -479,10 +405,7 @@ class ImageResizeInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Resize Image",
-                "tags": ["image", "resize"]
-            },
+            "ui": {"title": "Resize Image", "tags": ["image", "resize"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -525,10 +448,7 @@ class ImageScaleInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Scale Image",
-                "tags": ["image", "scale"]
-            },
+            "ui": {"title": "Scale Image", "tags": ["image", "scale"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -573,10 +493,7 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Image Linear Interpolation",
-                "tags": ["image", "linear", "interpolation", "lerp"]
-            },
+            "ui": {"title": "Image Linear Interpolation", "tags": ["image", "linear", "interpolation", "lerp"]},
         }
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -619,7 +536,7 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
         schema_extra = {
             "ui": {
                 "title": "Image Inverse Linear Interpolation",
-                "tags": ["image", "linear", "interpolation", "inverse"]
+                "tags": ["image", "linear", "interpolation", "inverse"],
             },
         }
 
@@ -627,12 +544,7 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
         image = context.services.images.get_pil_image(self.image.image_name)
 
         image_arr = numpy.asarray(image, dtype=numpy.float32)
-        image_arr = (
-            numpy.minimum(
-                numpy.maximum(image_arr - self.min, 0) / float(self.max - self.min), 1
-            )
-            * 255
-        )
+        image_arr = numpy.minimum(numpy.maximum(image_arr - self.min, 0) / float(self.max - self.min), 1) * 255
 
         ilerp_image = Image.fromarray(numpy.uint8(image_arr))
 
@@ -643,6 +555,94 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
+    """Add blur to NSFW-flagged images"""
+
+    # fmt: off
+    type: Literal["img_nsfw"] = "img_nsfw"
+
+    # Inputs
+    image: Optional[ImageField]  = Field(default=None, description="The image to check")
+    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")    
+    # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {"title": "Blur NSFW Images", "tags": ["image", "nsfw", "checker"]},
+        }
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get_pil_image(self.image.image_name)
+
+        logger = context.services.logger
+        logger.debug("Running NSFW checker")
+        if SafetyChecker.has_nsfw_concept(image):
+            logger.info("A potentially NSFW image has been detected. Image will be blurred.")
+            blurry_image = image.filter(filter=ImageFilter.GaussianBlur(radius=32))
+            caution = self._get_caution_img()
+            blurry_image.paste(caution, (0, 0), caution)
+            image = blurry_image
+
+        image_dto = context.services.images.create(
+            image=image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+            metadata=self.metadata.dict() if self.metadata else None,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+    def _get_caution_img(self) -> Image:
+        import invokeai.app.assets.images as image_assets
+
+        caution = Image.open(Path(image_assets.__path__[0]) / "caution.png")
+        return caution.resize((caution.width // 2, caution.height // 2))
+
+
+class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
+    """Add an invisible watermark to an image"""
+
+    # fmt: off
+    type: Literal["img_watermark"] = "img_watermark"
+
+    # Inputs
+    image: Optional[ImageField]  = Field(default=None, description="The image to check")
+    text: str = Field(default='InvokeAI', description="Watermark text")
+    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")    
+    # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {"title": "Add Invisible Watermark", "tags": ["image", "watermark", "invisible"]},
+        }
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.services.images.get_pil_image(self.image.image_name)
+        new_image = InvisibleWatermark.add_watermark(image, self.text)
+        image_dto = context.services.images.create(
+            image=new_image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+            metadata=self.metadata.dict() if self.metadata else None,
         )
 
         return ImageOutput(

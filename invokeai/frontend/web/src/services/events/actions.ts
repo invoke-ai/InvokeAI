@@ -4,15 +4,12 @@ import {
   GraphExecutionStateCompleteEvent,
   InvocationCompleteEvent,
   InvocationErrorEvent,
+  InvocationRetrievalErrorEvent,
   InvocationStartedEvent,
   ModelLoadCompletedEvent,
   ModelLoadStartedEvent,
+  SessionRetrievalErrorEvent,
 } from 'services/events/types';
-
-// Common socket action payload data
-type BaseSocketPayload = {
-  timestamp: string;
-};
 
 // Create actions for each socket
 // Middleware and redux can then respond to them as needed
@@ -22,30 +19,24 @@ type BaseSocketPayload = {
  *
  * Do not use. Only for use in middleware.
  */
-export const socketConnected = createAction<BaseSocketPayload>(
-  'socket/socketConnected'
-);
+export const socketConnected = createAction('socket/socketConnected');
 
 /**
  * App-level Socket.IO Connected
  */
-export const appSocketConnected = createAction<BaseSocketPayload>(
-  'socket/appSocketConnected'
-);
+export const appSocketConnected = createAction('socket/appSocketConnected');
 
 /**
  * Socket.IO Disconnect
  *
  * Do not use. Only for use in middleware.
  */
-export const socketDisconnected = createAction<BaseSocketPayload>(
-  'socket/socketDisconnected'
-);
+export const socketDisconnected = createAction('socket/socketDisconnected');
 
 /**
  * App-level Socket.IO Disconnected
  */
-export const appSocketDisconnected = createAction<BaseSocketPayload>(
+export const appSocketDisconnected = createAction(
   'socket/appSocketDisconnected'
 );
 
@@ -54,145 +45,173 @@ export const appSocketDisconnected = createAction<BaseSocketPayload>(
  *
  * Do not use. Only for use in middleware.
  */
-export const socketSubscribed = createAction<
-  BaseSocketPayload & { sessionId: string; boardId: string | undefined }
->('socket/socketSubscribed');
+export const socketSubscribed = createAction<{
+  sessionId: string;
+}>('socket/socketSubscribed');
 
 /**
  * App-level Socket.IO Subscribed
  */
-export const appSocketSubscribed = createAction<
-  BaseSocketPayload & { sessionId: string; boardId: string | undefined }
->('socket/appSocketSubscribed');
+export const appSocketSubscribed = createAction<{
+  sessionId: string;
+}>('socket/appSocketSubscribed');
 
 /**
  * Socket.IO Unsubscribed
  *
  * Do not use. Only for use in middleware.
  */
-export const socketUnsubscribed = createAction<
-  BaseSocketPayload & { sessionId: string }
->('socket/socketUnsubscribed');
+export const socketUnsubscribed = createAction<{ sessionId: string }>(
+  'socket/socketUnsubscribed'
+);
 
 /**
  * App-level Socket.IO Unsubscribed
  */
-export const appSocketUnsubscribed = createAction<
-  BaseSocketPayload & { sessionId: string }
->('socket/appSocketUnsubscribed');
+export const appSocketUnsubscribed = createAction<{ sessionId: string }>(
+  'socket/appSocketUnsubscribed'
+);
 
 /**
  * Socket.IO Invocation Started
  *
  * Do not use. Only for use in middleware.
  */
-export const socketInvocationStarted = createAction<
-  BaseSocketPayload & { data: InvocationStartedEvent }
->('socket/socketInvocationStarted');
+export const socketInvocationStarted = createAction<{
+  data: InvocationStartedEvent;
+}>('socket/socketInvocationStarted');
 
 /**
  * App-level Socket.IO Invocation Started
  */
-export const appSocketInvocationStarted = createAction<
-  BaseSocketPayload & { data: InvocationStartedEvent }
->('socket/appSocketInvocationStarted');
+export const appSocketInvocationStarted = createAction<{
+  data: InvocationStartedEvent;
+}>('socket/appSocketInvocationStarted');
 
 /**
  * Socket.IO Invocation Complete
  *
  * Do not use. Only for use in middleware.
  */
-export const socketInvocationComplete = createAction<
-  BaseSocketPayload & {
-    data: InvocationCompleteEvent;
-  }
->('socket/socketInvocationComplete');
+export const socketInvocationComplete = createAction<{
+  data: InvocationCompleteEvent;
+}>('socket/socketInvocationComplete');
 
 /**
  * App-level Socket.IO Invocation Complete
  */
-export const appSocketInvocationComplete = createAction<
-  BaseSocketPayload & {
-    data: InvocationCompleteEvent;
-  }
->('socket/appSocketInvocationComplete');
+export const appSocketInvocationComplete = createAction<{
+  data: InvocationCompleteEvent;
+}>('socket/appSocketInvocationComplete');
 
 /**
  * Socket.IO Invocation Error
  *
  * Do not use. Only for use in middleware.
  */
-export const socketInvocationError = createAction<
-  BaseSocketPayload & { data: InvocationErrorEvent }
->('socket/socketInvocationError');
+export const socketInvocationError = createAction<{
+  data: InvocationErrorEvent;
+}>('socket/socketInvocationError');
 
 /**
  * App-level Socket.IO Invocation Error
  */
-export const appSocketInvocationError = createAction<
-  BaseSocketPayload & { data: InvocationErrorEvent }
->('socket/appSocketInvocationError');
+export const appSocketInvocationError = createAction<{
+  data: InvocationErrorEvent;
+}>('socket/appSocketInvocationError');
 
 /**
  * Socket.IO Graph Execution State Complete
  *
  * Do not use. Only for use in middleware.
  */
-export const socketGraphExecutionStateComplete = createAction<
-  BaseSocketPayload & { data: GraphExecutionStateCompleteEvent }
->('socket/socketGraphExecutionStateComplete');
+export const socketGraphExecutionStateComplete = createAction<{
+  data: GraphExecutionStateCompleteEvent;
+}>('socket/socketGraphExecutionStateComplete');
 
 /**
  * App-level Socket.IO Graph Execution State Complete
  */
-export const appSocketGraphExecutionStateComplete = createAction<
-  BaseSocketPayload & { data: GraphExecutionStateCompleteEvent }
->('socket/appSocketGraphExecutionStateComplete');
+export const appSocketGraphExecutionStateComplete = createAction<{
+  data: GraphExecutionStateCompleteEvent;
+}>('socket/appSocketGraphExecutionStateComplete');
 
 /**
  * Socket.IO Generator Progress
  *
  * Do not use. Only for use in middleware.
  */
-export const socketGeneratorProgress = createAction<
-  BaseSocketPayload & { data: GeneratorProgressEvent }
->('socket/socketGeneratorProgress');
+export const socketGeneratorProgress = createAction<{
+  data: GeneratorProgressEvent;
+}>('socket/socketGeneratorProgress');
 
 /**
  * App-level Socket.IO Generator Progress
  */
-export const appSocketGeneratorProgress = createAction<
-  BaseSocketPayload & { data: GeneratorProgressEvent }
->('socket/appSocketGeneratorProgress');
+export const appSocketGeneratorProgress = createAction<{
+  data: GeneratorProgressEvent;
+}>('socket/appSocketGeneratorProgress');
 
 /**
  * Socket.IO Model Load Started
  *
  * Do not use. Only for use in middleware.
  */
-export const socketModelLoadStarted = createAction<
-  BaseSocketPayload & { data: ModelLoadStartedEvent }
->('socket/socketModelLoadStarted');
+export const socketModelLoadStarted = createAction<{
+  data: ModelLoadStartedEvent;
+}>('socket/socketModelLoadStarted');
 
 /**
  * App-level Model Load Started
  */
-export const appSocketModelLoadStarted = createAction<
-  BaseSocketPayload & { data: ModelLoadStartedEvent }
->('socket/appSocketModelLoadStarted');
+export const appSocketModelLoadStarted = createAction<{
+  data: ModelLoadStartedEvent;
+}>('socket/appSocketModelLoadStarted');
 
 /**
  * Socket.IO Model Load Started
  *
  * Do not use. Only for use in middleware.
  */
-export const socketModelLoadCompleted = createAction<
-  BaseSocketPayload & { data: ModelLoadCompletedEvent }
->('socket/socketModelLoadCompleted');
+export const socketModelLoadCompleted = createAction<{
+  data: ModelLoadCompletedEvent;
+}>('socket/socketModelLoadCompleted');
 
 /**
  * App-level Model Load Completed
  */
-export const appSocketModelLoadCompleted = createAction<
-  BaseSocketPayload & { data: ModelLoadCompletedEvent }
->('socket/appSocketModelLoadCompleted');
+export const appSocketModelLoadCompleted = createAction<{
+  data: ModelLoadCompletedEvent;
+}>('socket/appSocketModelLoadCompleted');
+
+/**
+ * Socket.IO Session Retrieval Error
+ *
+ * Do not use. Only for use in middleware.
+ */
+export const socketSessionRetrievalError = createAction<{
+  data: SessionRetrievalErrorEvent;
+}>('socket/socketSessionRetrievalError');
+
+/**
+ * App-level Session Retrieval Error
+ */
+export const appSocketSessionRetrievalError = createAction<{
+  data: SessionRetrievalErrorEvent;
+}>('socket/appSocketSessionRetrievalError');
+
+/**
+ * Socket.IO Invocation Retrieval Error
+ *
+ * Do not use. Only for use in middleware.
+ */
+export const socketInvocationRetrievalError = createAction<{
+  data: InvocationRetrievalErrorEvent;
+}>('socket/socketInvocationRetrievalError');
+
+/**
+ * App-level Invocation Retrieval Error
+ */
+export const appSocketInvocationRetrievalError = createAction<{
+  data: InvocationRetrievalErrorEvent;
+}>('socket/appSocketInvocationRetrievalError');

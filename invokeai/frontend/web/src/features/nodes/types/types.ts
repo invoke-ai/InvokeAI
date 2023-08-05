@@ -70,6 +70,7 @@ export type FieldType =
   | 'vae'
   | 'control'
   | 'model'
+  | 'refiner_model'
   | 'vae_model'
   | 'lora_model'
   | 'controlnet_model'
@@ -100,6 +101,7 @@ export type InputFieldValue =
   | ControlInputFieldValue
   | EnumInputFieldValue
   | MainModelInputFieldValue
+  | RefinerModelInputFieldValue
   | VaeModelInputFieldValue
   | LoRAModelInputFieldValue
   | ControlNetModelInputFieldValue
@@ -128,6 +130,7 @@ export type InputFieldTemplate =
   | ControlInputFieldTemplate
   | EnumInputFieldTemplate
   | ModelInputFieldTemplate
+  | RefinerModelInputFieldTemplate
   | VaeModelInputFieldTemplate
   | LoRAModelInputFieldTemplate
   | ControlNetModelInputFieldTemplate
@@ -240,6 +243,11 @@ export type ImageCollectionInputFieldValue = FieldValueBase & {
 
 export type MainModelInputFieldValue = FieldValueBase & {
   type: 'model';
+  value?: MainModelParam;
+};
+
+export type RefinerModelInputFieldValue = FieldValueBase & {
+  type: 'refiner_model';
   value?: MainModelParam;
 };
 
@@ -365,6 +373,11 @@ export type EnumInputFieldTemplate = InputFieldTemplateBase & {
 export type ModelInputFieldTemplate = InputFieldTemplateBase & {
   default: string;
   type: 'model';
+};
+
+export type RefinerModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
+  type: 'refiner_model';
 };
 
 export type VaeModelInputFieldTemplate = InputFieldTemplateBase & {

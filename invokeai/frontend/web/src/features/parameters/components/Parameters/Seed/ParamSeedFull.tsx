@@ -6,7 +6,7 @@ import ParamSeedRandomize from './ParamSeedRandomize';
 
 const ParamSeedFull = () => {
   return (
-    <Flex sx={{ gap: 4, alignItems: 'center' }}>
+    <Flex sx={{ gap: 3, alignItems: 'flex-end' }}>
       <ParamSeed />
       <ParamSeedShuffle />
       <ParamSeedRandomize />

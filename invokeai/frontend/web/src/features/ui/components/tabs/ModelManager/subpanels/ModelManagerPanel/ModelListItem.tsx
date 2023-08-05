@@ -1,6 +1,6 @@
 import { DeleteIcon } from '@chakra-ui/icons';
 import { Badge, Flex, Text, Tooltip } from '@chakra-ui/react';
-import { makeToast } from 'app/components/Toaster';
+import { makeToast } from 'features/system/util/makeToast';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIAlertDialog from 'common/components/IAIAlertDialog';
 import IAIButton from 'common/components/IAIButton';
@@ -9,22 +9,19 @@ import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import {
   MainModelConfigEntity,
+  LoRAModelConfigEntity,
   useDeleteMainModelsMutation,
+  useDeleteLoRAModelsMutation,
+  OnnxModelConfigEntity,
 } from 'services/api/endpoints/models';
 
 type ModelListItemProps = {
-  model: MainModelConfigEntity;
+  model: MainModelConfigEntity | OnnxModelConfigEntity | LoRAModelConfigEntity;
   isSelected: boolean;
   setSelectedModelId: (v: string | undefined) => void;
-};
-
-const modelBaseTypeMap = {
-  'sd-1': 'SD1',
-  'sd-2': 'SD2',
-  sdxl: 'SDXL',
-  'sdxl-refiner': 'SDXLR',
 };
 
 export default function ModelListItem(props: ModelListItemProps) {
@@ -32,6 +29,7 @@ export default function ModelListItem(props: ModelListItemProps) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [deleteMainModel] = useDeleteMainModelsMutation();
+  const [deleteLoRAModel] = useDeleteLoRAModelsMutation();
 
   const { model, isSelected, setSelectedModelId } = props;
 
@@ -40,7 +38,13 @@ export default function ModelListItem(props: ModelListItemProps) {
   }, [model.id, setSelectedModelId]);
 
   const handleModelDelete = useCallback(() => {
-    deleteMainModel(model)
+    const method = {
+      main: deleteMainModel,
+      lora: deleteLoRAModel,
+      onnx: deleteMainModel,
+    }[model.model_type];
+
+    method(model)
       .unwrap()
       .then((_) => {
         dispatch(
@@ -60,14 +64,21 @@ export default function ModelListItem(props: ModelListItemProps) {
                 title: `${t('modelManager.modelDeleteFailed')}: ${
                   model.model_name
                 }`,
-                status: 'success',
+                status: 'error',
               })
             )
           );
         }
       });
     setSelectedModelId(undefined);
-  }, [deleteMainModel, model, setSelectedModelId, dispatch, t]);
+  }, [
+    deleteMainModel,
+    deleteLoRAModel,
+    model,
+    setSelectedModelId,
+    dispatch,
+    t,
+  ]);
 
   return (
     <Flex sx={{ gap: 2, alignItems: 'center', w: 'full' }}>
@@ -100,8 +111,8 @@ export default function ModelListItem(props: ModelListItemProps) {
         <Flex gap={4} alignItems="center">
           <Badge minWidth={14} p={0.5} fontSize="sm" variant="solid">
             {
-              modelBaseTypeMap[
-                model.base_model as keyof typeof modelBaseTypeMap
+              MODEL_TYPE_SHORT_MAP[
+                model.base_model as keyof typeof MODEL_TYPE_SHORT_MAP
               ]
             }
           </Badge>

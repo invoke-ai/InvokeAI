@@ -1,9 +1,7 @@
 import {
   Box,
-  Button,
   ButtonGroup,
   Flex,
-  Spacer,
   Tab,
   TabList,
   Tabs,
@@ -14,24 +12,22 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIButton from 'common/components/IAIButton';
 import { memo, useCallback, useRef } from 'react';
+import { FaImages, FaServer } from 'react-icons/fa';
+import { galleryViewChanged } from '../store/gallerySlice';
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
 import GalleryPinButton from './GalleryPinButton';
 import GallerySettingsPopover from './GallerySettingsPopover';
-import BatchImageGrid from './ImageGrid/BatchImageGrid';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
-import IAIButton from 'common/components/IAIButton';
-import { FaImages, FaServer } from 'react-icons/fa';
-import { galleryViewChanged } from '../store/gallerySlice';
 
 const selector = createSelector(
   [stateSelector],
   (state) => {
-    const { selectedBoardId, galleryView } = state.gallery;
+    const { galleryView } = state.gallery;
 
     return {
-      selectedBoardId,
       galleryView,
     };
   },
@@ -41,7 +37,7 @@ const selector = createSelector(
 const ImageGalleryContent = () => {
   const resizeObserverRef = useRef<HTMLDivElement>(null);
   const galleryGridRef = useRef<HTMLDivElement>(null);
-  const { selectedBoardId, galleryView } = useAppSelector(selector);
+  const { galleryView } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } =
     useDisclosure();
@@ -132,12 +128,7 @@ const ImageGalleryContent = () => {
             </TabList>
           </Tabs>
         </Flex>
-
-        {selectedBoardId === 'batch' ? (
-          <BatchImageGrid />
-        ) : (
-          <GalleryImageGrid />
-        )}
+        <GalleryImageGrid />
       </Flex>
     </VStack>
   );

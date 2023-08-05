@@ -2,19 +2,19 @@ import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import { setAspectRatio } from 'features/ui/store/uiSlice';
+import { setAspectRatio } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
 
 const aspectRatios = [
   { name: 'Free', value: null },
-  { name: 'Portrait', value: 0.67 / 1 },
-  { name: 'Wide', value: 16 / 9 },
-  { name: 'Square', value: 1 / 1 },
+  { name: '2:3', value: 2 / 3 },
+  { name: '16:9', value: 16 / 9 },
+  { name: '1:1', value: 1 / 1 },
 ];
 
 export default function ParamAspectRatio() {
   const aspectRatio = useAppSelector(
-    (state: RootState) => state.ui.aspectRatio
+    (state: RootState) => state.generation.aspectRatio
   );
 
   const dispatch = useAppDispatch();
