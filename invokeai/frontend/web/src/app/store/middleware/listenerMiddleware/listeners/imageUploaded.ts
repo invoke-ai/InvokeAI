@@ -40,7 +40,7 @@ export const addImageUploadedFulfilledListener = () => {
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {
         const { toastOptions } = postUploadAction;
-        if (!autoAddBoardId) {
+        if (!autoAddBoardId || autoAddBoardId === 'none') {
           dispatch(addToast({ ...DEFAULT_UPLOADED_TOAST, ...toastOptions }));
         } else {
           // Add this image to the board

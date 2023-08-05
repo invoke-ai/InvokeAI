@@ -16,6 +16,7 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
 from invokeai.app.services.invocation_services import InvocationServices
+from invokeai.app.services.invocation_stats import InvocationStatsService
 from invokeai.app.services.graph import (
     Graph,
     CollectInvocation,
@@ -41,6 +42,9 @@ def simple_graph():
 @pytest.fixture
 def mock_services() -> InvocationServices:
     # NOTE: none of these are actually called by the test invocations
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
+        filename=sqlite_memory, table_name="graph_executions"
+    )
     return InvocationServices(
         model_manager=None,  # type: ignore
         events=TestEventService(),
@@ -51,9 +55,8 @@ def mock_services() -> InvocationServices:
         board_images=None,  # type: ignore
         queue=MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](filename=sqlite_memory, table_name="graphs"),
-        graph_execution_manager=SqliteItemStorage[GraphExecutionState](
-            filename=sqlite_memory, table_name="graph_executions"
-        ),
+        graph_execution_manager=graph_execution_manager,
+        performance_statistics=InvocationStatsService(graph_execution_manager),
         processor=DefaultInvocationProcessor(),
         configuration=None,  # type: ignore
     )

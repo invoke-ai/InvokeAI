@@ -28,8 +28,6 @@ import torch
 
 import logging
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import get_invokeai_config
-from .lora import LoRAModel, TextualInversionModel
 from .models import BaseModelType, ModelType, SubModelType, ModelBase
 
 # Maximum size of the cache, in gigs
@@ -188,7 +186,7 @@ class ModelCache(object):
         cache_entry = self._cached_models.get(key, None)
         if cache_entry is None:
             self.logger.info(
-                f"Loading model {model_path}, type {base_model.value}:{model_type.value}:{submodel.value if submodel else ''}"
+                f"Loading model {model_path}, type {base_model.value}:{model_type.value}{':'+submodel.value if submodel else ''}"
             )
 
             # this will remove older cached models until
