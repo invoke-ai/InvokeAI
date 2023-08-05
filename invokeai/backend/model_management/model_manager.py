@@ -533,7 +533,7 @@ class ModelManager(object):
         model_path = self.resolve_model_path(model_path)
         return model_path, is_submodel_override
 
-    def _get_model_config(self, base_model, model_name, model_type) -> ModelConfigBase:
+    def _get_model_config(self, base_model: BaseModelType, model_name: str, model_type: ModelType) -> ModelConfigBase:
         """Get a model's config object."""
         model_key = self.create_key(model_name, base_model, model_type)
         try:
@@ -719,7 +719,7 @@ class ModelManager(object):
             # TODO: if path changed and old_model.path inside models folder should we delete this too?
 
             # remove conversion cache as config changed
-            old_model_path = self.app_config.root_path / old_model.path
+            old_model_path = self.resolve_model_path(old_model.path)
             old_model_cache = self._get_model_cache_path(old_model_path)
             if old_model_cache.exists():
                 if old_model_cache.is_dir():
@@ -829,7 +829,7 @@ class ModelManager(object):
             model_type,
             **submodel,
         )
-        checkpoint_path = self.app_config.root_path / info["path"]
+        checkpoint_path = self.resolve_model_path(info["path"])
         old_diffusers_path = self.resolve_model_path(model.location)
         new_diffusers_path = (
             dest_directory or self.app_config.models_path / base_model.value / model_type.value
@@ -1041,7 +1041,7 @@ class ModelManager(object):
             model_manager=self,
             prediction_type_helper=ask_user_for_prediction_type,
         )
-        known_paths = {config.root_path / x["path"] for x in self.list_models()}
+        known_paths = {self.resolve_model_path(x["path"]) for x in self.list_models()}
         directories = {
             config.root_path / x
             for x in [

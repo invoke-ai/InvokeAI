@@ -727,10 +727,13 @@ export const canvasSlice = createSlice({
         state.pastLayerStates.shift();
       }
 
-      state.layerState.objects.push({
-        ...images[selectedImageIndex],
-      });
+      const imageToCommit = images[selectedImageIndex];
 
+      if (imageToCommit) {
+        state.layerState.objects.push({
+          ...imageToCommit,
+        });
+      }
       state.layerState.stagingArea = {
         ...initialLayerState.stagingArea,
       };

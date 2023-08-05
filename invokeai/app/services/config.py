@@ -274,7 +274,7 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def _excluded(self) -> List[str]:
         # internal fields that shouldn't be exposed as command line options
-        return ["type", "initconf", "cached_root"]
+        return ["type", "initconf"]
 
     @classmethod
     def _excluded_from_yaml(self) -> List[str]:
@@ -290,7 +290,6 @@ class InvokeAISettings(BaseSettings):
             "restore",
             "root",
             "nsfw_checker",
-            "cached_root",
         ]
 
     class Config:
@@ -356,7 +355,7 @@ class InvokeAISettings(BaseSettings):
 def _find_root() -> Path:
     venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
     if os.environ.get("INVOKEAI_ROOT"):
-        root = Path(os.environ.get("INVOKEAI_ROOT")).resolve()
+        root = Path(os.environ["INVOKEAI_ROOT"])
     elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]]):
         root = (venv.parent).resolve()
     else:
@@ -403,7 +402,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
     tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
 
-    root                : Path = Field(default=_find_root(), description='InvokeAI runtime root directory', category='Paths')
+    root                : Path = Field(default=None, description='InvokeAI runtime root directory', category='Paths')
     autoimport_dir      : Path = Field(default='autoimport', description='Path to a directory of models files to be imported on startup.', category='Paths')
     lora_dir            : Path = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', category='Paths')
     embedding_dir       : Path = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', category='Paths')
@@ -415,6 +414,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
+    ignore_missing_core_models : bool = Field(default=False, description='Ignore missing models in models/core/convert')
 
     model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
 
@@ -424,7 +424,6 @@ class InvokeAIAppConfig(InvokeAISettings):
     log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
-    cached_root         : Path = Field(default=None,  description="internal use only", category="DEPRECATED")
     # fmt: on
 
     def parse_args(self, argv: List[str] = None, conf: DictConfig = None, clobber=False):
@@ -472,15 +471,12 @@ class InvokeAIAppConfig(InvokeAISettings):
         """
         Path to the runtime root directory
         """
-        # we cache value of root to protect against it being '.' and the cwd changing
-        if self.cached_root:
-            root = self.cached_root
-        elif self.root:
+        if self.root:
             root = Path(self.root).expanduser().absolute()
         else:
-            root = self.find_root()
-        self.cached_root = root
-        return self.cached_root
+            root = self.find_root().expanduser().absolute()
+        self.root = root  # insulate ourselves from relative paths that may change
+        return root
 
     @property
     def root_dir(self) -> Path:

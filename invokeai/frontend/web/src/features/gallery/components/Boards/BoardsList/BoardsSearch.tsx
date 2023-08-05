@@ -9,7 +9,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { setBoardSearchText } from 'features/gallery/store/boardSlice';
+import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import {
   ChangeEvent,
   KeyboardEvent,
@@ -21,27 +21,27 @@ import {
 
 const selector = createSelector(
   [stateSelector],
-  ({ boards }) => {
-    const { searchText } = boards;
-    return { searchText };
+  ({ gallery }) => {
+    const { boardSearchText } = gallery;
+    return { boardSearchText };
   },
   defaultSelectorOptions
 );
 
 const BoardsSearch = () => {
   const dispatch = useAppDispatch();
-  const { searchText } = useAppSelector(selector);
+  const { boardSearchText } = useAppSelector(selector);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleBoardSearch = useCallback(
     (searchTerm: string) => {
-      dispatch(setBoardSearchText(searchTerm));
+      dispatch(boardSearchTextChanged(searchTerm));
     },
     [dispatch]
   );
 
   const clearBoardSearch = useCallback(() => {
-    dispatch(setBoardSearchText(''));
+    dispatch(boardSearchTextChanged(''));
   }, [dispatch]);
 
   const handleKeydown = useCallback(
@@ -74,11 +74,11 @@ const BoardsSearch = () => {
       <Input
         ref={inputRef}
         placeholder="Search Boards..."
-        value={searchText}
+        value={boardSearchText}
         onKeyDown={handleKeydown}
         onChange={handleChange}
       />
-      {searchText && searchText.length && (
+      {boardSearchText && boardSearchText.length && (
         <InputRightElement>
           <IconButton
             onClick={clearBoardSearch}

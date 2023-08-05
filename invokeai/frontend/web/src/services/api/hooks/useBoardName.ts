@@ -1,7 +1,7 @@
 import { BoardId } from 'features/gallery/store/types';
 import { useListAllBoardsQuery } from '../endpoints/boards';
 
-export const useBoardName = (board_id: BoardId | null | undefined) => {
+export const useBoardName = (board_id: BoardId) => {
   const { boardName } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
       const selectedBoard = data?.find((b) => b.board_id === board_id);

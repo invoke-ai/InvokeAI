@@ -2,7 +2,6 @@
 
 from typing import Optional
 from logging import Logger
-import os
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
 )
@@ -30,6 +29,7 @@ from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.model_manager_service import ModelManagerService
+from ..services.invocation_stats import InvocationStatsService
 from .events import FastAPIEventService
 
 
@@ -128,6 +128,7 @@ class ApiDependencies:
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
             configuration=config,
+            performance_statistics=InvocationStatsService(graph_execution_manager),
             logger=logger,
         )
 

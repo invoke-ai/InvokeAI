@@ -79,9 +79,12 @@ const nodesSlice = createSlice({
     ) => {
       const { nodeId, fieldName, value } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
-
+      const input = state.nodes?.[nodeIndex]?.data?.inputs[fieldName];
+      if (!input) {
+        return;
+      }
       if (nodeIndex > -1) {
-        state.nodes[nodeIndex].data.inputs[fieldName].value = value;
+        input.value = value;
       }
     },
     imageCollectionFieldValueChanged: (
@@ -99,16 +102,19 @@ const nodesSlice = createSlice({
         return;
       }
 
-      const currentValue = cloneDeep(
-        state.nodes[nodeIndex].data.inputs[fieldName].value
-      );
-
-      if (!currentValue) {
-        state.nodes[nodeIndex].data.inputs[fieldName].value = value;
+      const input = state.nodes?.[nodeIndex]?.data?.inputs[fieldName];
+      if (!input) {
         return;
       }
 
-      state.nodes[nodeIndex].data.inputs[fieldName].value = uniqBy(
+      const currentValue = cloneDeep(input.value);
+
+      if (!currentValue) {
+        input.value = value;
+        return;
+      }
+
+      input.value = uniqBy(
         (currentValue as ImageField[]).concat(value),
         'image_name'
       );
