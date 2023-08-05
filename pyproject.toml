@@ -139,6 +139,7 @@ dependencies = [
 "invokeai-metadata" = "invokeai.frontend.CLI.sd_metadata:print_metadata"
 "invokeai-node-cli" = "invokeai.app.cli_app:invoke_cli"
 "invokeai-node-web" = "invokeai.app.api_app:invoke_api"
+"invokeai-import-images" = "invokeai.frontend.install.import_images:main"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
