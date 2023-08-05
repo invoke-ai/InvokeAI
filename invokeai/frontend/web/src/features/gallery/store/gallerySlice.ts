@@ -41,6 +41,10 @@ export const gallerySlice = createSlice({
       state.galleryView = 'images';
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
+      if (!action.payload) {
+        state.autoAddBoardId = 'none';
+        return;
+      }
       state.autoAddBoardId = action.payload;
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
