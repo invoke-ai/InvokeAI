@@ -414,6 +414,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
+    ignore_missing_core_models : bool = Field(default=False, description='Ignore missing models in models/core/convert')
 
     model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
 
