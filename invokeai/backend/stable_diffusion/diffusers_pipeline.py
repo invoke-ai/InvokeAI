@@ -212,8 +212,8 @@ class ControlNetData:
 
 @dataclass
 class ConditioningData:
-    unconditioned_embeddings: torch.Tensor
-    text_embeddings: torch.Tensor
+    unconditioned_embeddings: Any # TODO: type
+    text_embeddings: Any # TODO: type
     guidance_scale: Union[float, List[float]]
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
@@ -392,48 +392,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 submodels.append(value)
         return submodels
 
-    def image_from_embeddings(
-        self,
-        latents: torch.Tensor,
-        num_inference_steps: int,
-        conditioning_data: ConditioningData,
-        *,
-        noise: torch.Tensor,
-        callback: Callable[[PipelineIntermediateState], None] = None,
-        run_id=None,
-    ) -> InvokeAIStableDiffusionPipelineOutput:
-        r"""
-        Function invoked when calling the pipeline for generation.
-
-        :param conditioning_data:
-        :param latents: Pre-generated un-noised latents, to be used as inputs for
-            image generation. Can be used to tweak the same generation with different prompts.
-        :param num_inference_steps: The number of denoising steps. More denoising steps usually lead to a higher quality
-            image at the expense of slower inference.
-        :param noise: Noise to add to the latents, sampled from a Gaussian distribution.
-        :param callback:
-        :param run_id:
-        """
-        result_latents, result_attention_map_saver = self.latents_from_embeddings(
-            latents,
-            num_inference_steps,
-            conditioning_data,
-            noise=noise,
-            run_id=run_id,
-            callback=callback,
-        )
-        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        torch.cuda.empty_cache()
-
-        with torch.inference_mode():
-            image = self.decode_latents(result_latents)
-            output = InvokeAIStableDiffusionPipelineOutput(
-                images=image,
-                nsfw_content_detected=[],
-                attention_map_saver=result_attention_map_saver,
-            )
-            return self.check_for_safety(output, dtype=conditioning_data.dtype)
-
     def latents_from_embeddings(
         self,
         latents: torch.Tensor,
@@ -492,13 +450,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             extra_conditioning_info=extra_conditioning_info,
             step_count=len(self.scheduler.timesteps),
         ):
-            yield PipelineIntermediateState(
-                run_id=run_id,
-                step=-1,
-                timestep=self.scheduler.config.num_train_timesteps,
-                latents=latents,
-            )
-
             batch_size = latents.shape[0]
             batched_t = torch.full(
                 (batch_size,),
@@ -506,7 +457,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 dtype=timesteps.dtype,
                 device=self._model_group.device_for(self.unet),
             )
+            #latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
             latents = self.scheduler.add_noise(latents, noise, batched_t)
+
+            yield PipelineIntermediateState(
+                run_id=run_id,
+                step=-1,
+                timestep=self.scheduler.config.num_train_timesteps,
+                latents=latents,
+            )
 
             attention_map_saver: Optional[AttentionMapSaver] = None
             # print("timesteps:", timesteps)
@@ -569,95 +528,40 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
-        unet_latent_input = self.scheduler.scale_model_input(latents, timestep)
+        latent_model_input = self.scheduler.scale_model_input(latents, timestep)
 
         # default is no controlnet, so set controlnet processing output to None
-        down_block_res_samples, mid_block_res_sample = None, None
-
+        controlnet_down_block_samples, controlnet_mid_block_sample = None, None
         if control_data is not None:
-            # control_data should be type List[ControlNetData]
-            # this loop covers both ControlNet (one ControlNetData in list)
-            #      and MultiControlNet (multiple ControlNetData in list)
-            for i, control_datum in enumerate(control_data):
-                control_mode = control_datum.control_mode
-                # soft_injection and cfg_injection are the two ControlNet control_mode booleans
-                #     that are combined at higher level to make control_mode enum
-                #  soft_injection determines whether to do per-layer re-weighting adjustment (if True)
-                #     or default weighting (if False)
-                soft_injection = control_mode == "more_prompt" or control_mode == "more_control"
-                #  cfg_injection = determines whether to apply ControlNet to only the conditional (if True)
-                #      or the default both conditional and unconditional (if False)
-                cfg_injection = control_mode == "more_control" or control_mode == "unbalanced"
+            controlnet_down_block_samples, controlnet_mid_block_sample = self.invokeai_diffuser.do_controlnet_step(
+                control_data=control_data,
+                sample=latent_model_input,
+                timestep=timestep,
+                step_index=step_index,
+                total_step_count=total_step_count,
+                conditioning_data=conditioning_data,
+            )
 
-                first_control_step = math.floor(control_datum.begin_step_percent * total_step_count)
-                last_control_step = math.ceil(control_datum.end_step_percent * total_step_count)
-                # only apply controlnet if current step is within the controlnet's begin/end step range
-                if step_index >= first_control_step and step_index <= last_control_step:
-                    if cfg_injection:
-                        control_latent_input = unet_latent_input
-                    else:
-                        # expand the latents input to control model if doing classifier free guidance
-                        #    (which I think for now is always true, there is conditional elsewhere that stops execution if
-                        #     classifier_free_guidance is <= 1.0 ?)
-                        control_latent_input = torch.cat([unet_latent_input] * 2)
-
-                    if cfg_injection:  # only applying ControlNet to conditional instead of in unconditioned
-                        encoder_hidden_states = conditioning_data.text_embeddings
-                        encoder_attention_mask = None
-                    else:
-                        (
-                            encoder_hidden_states,
-                            encoder_attention_mask,
-                        ) = self.invokeai_diffuser._concat_conditionings_for_batch(
-                            conditioning_data.unconditioned_embeddings,
-                            conditioning_data.text_embeddings,
-                        )
-                    if isinstance(control_datum.weight, list):
-                        # if controlnet has multiple weights, use the weight for the current step
-                        controlnet_weight = control_datum.weight[step_index]
-                    else:
-                        # if controlnet has a single weight, use it for all steps
-                        controlnet_weight = control_datum.weight
-
-                    # controlnet(s) inference
-                    down_samples, mid_sample = control_datum.model(
-                        sample=control_latent_input,
-                        timestep=timestep,
-                        encoder_hidden_states=encoder_hidden_states,
-                        controlnet_cond=control_datum.image_tensor,
-                        conditioning_scale=controlnet_weight,  # controlnet specific, NOT the guidance scale
-                        encoder_attention_mask=encoder_attention_mask,
-                        guess_mode=soft_injection,  # this is still called guess_mode in diffusers ControlNetModel
-                        return_dict=False,
-                    )
-                    if cfg_injection:
-                        # Inferred ControlNet only for the conditional batch.
-                        # To apply the output of ControlNet to both the unconditional and conditional batches,
-                        #    prepend zeros for unconditional batch
-                        down_samples = [torch.cat([torch.zeros_like(d), d]) for d in down_samples]
-                        mid_sample = torch.cat([torch.zeros_like(mid_sample), mid_sample])
-
-                    if down_block_res_samples is None and mid_block_res_sample is None:
-                        down_block_res_samples, mid_block_res_sample = down_samples, mid_sample
-                    else:
-                        # add controlnet outputs together if have multiple controlnets
-                        down_block_res_samples = [
-                            samples_prev + samples_curr
-                            for samples_prev, samples_curr in zip(down_block_res_samples, down_samples)
-                        ]
-                        mid_block_res_sample += mid_sample
-
-        # predict the noise residual
-        noise_pred = self.invokeai_diffuser.do_diffusion_step(
-            x=unet_latent_input,
-            sigma=t,
-            unconditioning=conditioning_data.unconditioned_embeddings,
-            conditioning=conditioning_data.text_embeddings,
-            unconditional_guidance_scale=conditioning_data.guidance_scale,
+        uc_noise_pred, c_noise_pred = self.invokeai_diffuser.do_unet_step(
+            sample=latent_model_input,
+            timestep=t, # TODO: debug how handled batched and non batched timesteps
             step_index=step_index,
             total_step_count=total_step_count,
-            down_block_additional_residuals=down_block_res_samples,  # from controlnet(s)
-            mid_block_additional_residual=mid_block_res_sample,  # from controlnet(s)
+            conditioning_data=conditioning_data,
+
+            # extra:
+            down_block_additional_residuals=controlnet_down_block_samples,  # from controlnet(s)
+            mid_block_additional_residual=controlnet_mid_block_sample,  # from controlnet(s)
+        )
+
+        guidance_scale = conditioning_data.guidance_scale
+        if isinstance(guidance_scale, list):
+            guidance_scale = guidance_scale[step_index]
+
+        noise_pred = self.invokeai_diffuser._combine(
+            uc_noise_pred,
+            c_noise_pred,
+            guidance_scale,
         )
 
         # compute the previous noisy sample x_t -> x_t-1
@@ -737,41 +641,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             run_id,
             callback,
         )
-
-    def img2img_from_latents_and_embeddings(
-        self,
-        initial_latents,
-        num_inference_steps,
-        conditioning_data: ConditioningData,
-        strength,
-        noise: torch.Tensor,
-        run_id=None,
-        callback=None,
-    ) -> InvokeAIStableDiffusionPipelineOutput:
-        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength)
-        result_latents, result_attention_maps = self.latents_from_embeddings(
-            latents=initial_latents
-            if strength < 1.0
-            else torch.zeros_like(initial_latents, device=initial_latents.device, dtype=initial_latents.dtype),
-            num_inference_steps=num_inference_steps,
-            conditioning_data=conditioning_data,
-            timesteps=timesteps,
-            noise=noise,
-            run_id=run_id,
-            callback=callback,
-        )
-
-        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        torch.cuda.empty_cache()
-
-        with torch.inference_mode():
-            image = self.decode_latents(result_latents)
-            output = InvokeAIStableDiffusionPipelineOutput(
-                images=image,
-                nsfw_content_detected=[],
-                attention_map_saver=result_attention_maps,
-            )
-            return self.check_for_safety(output, dtype=conditioning_data.dtype)
 
     def get_img2img_timesteps(self, num_inference_steps: int, strength: float, device=None) -> (torch.Tensor, int):
         img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
@@ -877,7 +746,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 nsfw_content_detected=[],
                 attention_map_saver=result_attention_maps,
             )
-            return self.check_for_safety(output, dtype=conditioning_data.dtype)
+            return self.check_for_safety(output, dtype=self.unet.dtype)
 
     def non_noised_latents_from_image(self, init_image, *, device: torch.device, dtype):
         init_image = init_image.to(device=device, dtype=dtype)

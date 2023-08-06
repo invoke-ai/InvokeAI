@@ -174,11 +174,11 @@ class TextToLatentsInvocation(BaseInvocation):
         unet,
     ) -> ConditioningData:
         positive_cond_data = context.services.latents.get(self.positive_conditioning.conditioning_name)
-        c = positive_cond_data.conditionings[0].embeds.to(device=unet.device, dtype=unet.dtype)
-        extra_conditioning_info = positive_cond_data.conditionings[0].extra_conditioning
+        c = positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
+        extra_conditioning_info = c.extra_conditioning
 
         negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
-        uc = negative_cond_data.conditionings[0].embeds.to(device=unet.device, dtype=unet.dtype)
+        uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
 
         conditioning_data = ConditioningData(
             unconditioned_embeddings=uc,

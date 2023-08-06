@@ -37,12 +37,21 @@ class BasicConditioningInfo:
     # weight: float
     # mode: ConditioningAlgo
 
+    def to(self, device, dtype=None):
+        self.embeds = self.embeds.to(device=device, dtype=dtype)
+        return self
+
 
 @dataclass
 class SDXLConditioningInfo(BasicConditioningInfo):
     # type: Literal["sdxl_conditioning"] = "sdxl_conditioning"
     pooled_embeds: torch.Tensor
     add_time_ids: torch.Tensor
+
+    def to(self, device, dtype=None):
+        self.pooled_embeds = self.pooled_embeds.to(device=device, dtype=dtype)
+        self.add_time_ids = self.add_time_ids.to(device=device, dtype=dtype)
+        return super().to(device=device, dtype=dtype)
 
 
 ConditioningInfoType = Annotated[Union[BasicConditioningInfo, SDXLConditioningInfo], Field(discriminator="type")]
