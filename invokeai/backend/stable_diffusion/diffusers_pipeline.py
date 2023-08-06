@@ -7,22 +7,19 @@ import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generic, List, Optional, Type, TypeVar, Union
-from pydantic import Field
 
-import einops
 import PIL.Image
-import numpy as np
-from accelerate.utils import set_seed
+import einops
 import psutil
 import torch
 import torchvision.transforms as T
+from accelerate.utils import set_seed
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.controlnet import ControlNetModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
     StableDiffusionPipeline,
 )
-
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import (
     StableDiffusionImg2ImgPipeline,
 )
@@ -31,21 +28,21 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
 )
 from diffusers.schedulers import KarrasDiffusionSchedulers
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
-from diffusers.utils import PIL_INTERPOLATION
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.outputs import BaseOutput
+from pydantic import Field
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from typing_extensions import ParamSpec
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from ..util import CPU_DEVICE, normalize_device
 from .diffusion import (
     AttentionMapSaver,
     InvokeAIDiffuserComponent,
     PostprocessingSettings,
 )
 from .offloading import FullyLoadedModelGroup, ModelGroup
+from ..util import normalize_device
 
 
 @dataclass
