@@ -190,7 +190,6 @@ class InpaintInvocation(BaseInvocation):
                 safety_checker=None,
                 feature_extractor=None,
                 requires_safety_checker=False,
-                execution_device=device,
             )
 
             yield OldModelInfo(

@@ -4,7 +4,6 @@ import dataclasses
 import inspect
 import math
 import secrets
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generic, List, Optional, Type, TypeVar, Union
 
@@ -41,7 +40,6 @@ from .diffusion import (
     InvokeAIDiffuserComponent,
     PostprocessingSettings,
 )
-from .offloading import FullyLoadedModelGroup, ModelGroup
 from ..util import normalize_device
 
 
@@ -286,8 +284,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
-    _model_group: ModelGroup
-
     ID_LENGTH = 8
 
     def __init__(
@@ -301,7 +297,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         feature_extractor: Optional[CLIPFeatureExtractor],
         requires_safety_checker: bool = False,
         control_model: ControlNetModel = None,
-        execution_device: Optional[torch.device] = None,
     ):
         super().__init__(
             vae,
@@ -326,9 +321,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             # control_model=control_model,
         )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
-
-        self._model_group = FullyLoadedModelGroup(execution_device or self.unet.device)
-        self._model_group.install(*self._submodels)
         self.control_model = control_model
 
     def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
@@ -364,30 +356,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             else:
                 self.disable_attention_slicing()
 
-    def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
-        # overridden method; types match the superclass.
-        if torch_device is None:
-            return self
-        self._model_group.set_device(torch.device(torch_device))
-        self._model_group.ready()
-
-    @property
-    def device(self) -> torch.device:
-        return self._model_group.execution_device
-
-    @property
-    def _submodels(self) -> Sequence[torch.nn.Module]:
-        module_names, _, _ = self.extract_init_dict(dict(self.config))
-        submodels = []
-        for name in module_names.keys():
-            if hasattr(self, name):
-                value = getattr(self, name)
-            else:
-                value = getattr(self.config, name)
-            if isinstance(value, torch.nn.Module):
-                submodels.append(value)
-        return submodels
-
     def latents_from_embeddings(
         self,
         latents: torch.Tensor,
@@ -404,7 +372,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if self.scheduler.config.get("cpu_only", False):
             scheduler_device = torch.device("cpu")
         else:
-            scheduler_device = self._model_group.device_for(self.unet)
+            scheduler_device = self.unet.device
 
         if timesteps is None:
             self.scheduler.set_timesteps(num_inference_steps, device=scheduler_device)
@@ -458,7 +426,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 (batch_size,),
                 timesteps[0],
                 dtype=timesteps.dtype,
-                device=self._model_group.device_for(self.unet),
+                device=self.unet.device,
             )
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
@@ -675,7 +643,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         # 6. Prepare latent variables
         initial_latents = self.non_noised_latents_from_image(
             init_image,
-            device=self._model_group.device_for(self.unet),
+            device=self.unet.device,
             dtype=self.unet.dtype,
         )
         if seed is not None:
@@ -725,7 +693,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 nsfw_content_detected=[],
                 attention_map_saver=result_attention_maps,
             )
-            return self.check_for_safety(output, dtype=conditioning_data.dtype)
+            return output
 
     def get_img2img_timesteps(self, num_inference_steps: int, strength: float, device=None) -> (torch.Tensor, int):
         img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
@@ -734,7 +702,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if self.scheduler.config.get("cpu_only", False):
             scheduler_device = torch.device("cpu")
         else:
-            scheduler_device = self._model_group.device_for(self.unet)
+            scheduler_device = self.unet.device
 
         img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=scheduler_device)
         timesteps, adjusted_steps = img2img_pipeline.get_timesteps(
@@ -760,7 +728,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise_func=None,
         seed=None,
     ) -> InvokeAIStableDiffusionPipelineOutput:
-        device = self._model_group.device_for(self.unet)
+        device = self.unet.device
         latents_dtype = self.unet.dtype
 
         if isinstance(init_image, PIL.Image.Image):
@@ -831,41 +799,16 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 nsfw_content_detected=[],
                 attention_map_saver=result_attention_maps,
             )
-            return self.check_for_safety(output, dtype=conditioning_data.dtype)
+            return output
 
     def non_noised_latents_from_image(self, init_image, *, device: torch.device, dtype):
         init_image = init_image.to(device=device, dtype=dtype)
         with torch.inference_mode():
-            self._model_group.load(self.vae)
             init_latent_dist = self.vae.encode(init_image).latent_dist
             init_latents = init_latent_dist.sample().to(dtype=dtype)  # FIXME: uses torch.randn. make reproducible!
 
         init_latents = 0.18215 * init_latents
         return init_latents
-
-    def check_for_safety(self, output, dtype):
-        with torch.inference_mode():
-            screened_images, has_nsfw_concept = self.run_safety_checker(output.images, dtype=dtype)
-        screened_attention_map_saver = None
-        if has_nsfw_concept is None or not has_nsfw_concept:
-            screened_attention_map_saver = output.attention_map_saver
-        return InvokeAIStableDiffusionPipelineOutput(
-            screened_images,
-            has_nsfw_concept,
-            # block the attention maps if NSFW content is detected
-            attention_map_saver=screened_attention_map_saver,
-        )
-
-    def run_safety_checker(self, image, device=None, dtype=None):
-        # overriding to use the model group for device info instead of requiring the caller to know.
-        if self.safety_checker is not None:
-            device = self._model_group.device_for(self.safety_checker)
-        return super().run_safety_checker(image, device, dtype)
-
-    def decode_latents(self, latents):
-        # Explicit call to get the vae loaded, since `decode` isn't the forward method.
-        self._model_group.load(self.vae)
-        return super().decode_latents(latents)
 
     def debug_latents(self, latents, msg):
         from invokeai.backend.image_util import debug_image
