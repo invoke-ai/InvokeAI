@@ -300,7 +300,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         safety_checker: Optional[StableDiffusionSafetyChecker],
         feature_extractor: Optional[CLIPFeatureExtractor],
         requires_safety_checker: bool = False,
-        precision: str = "float32",
         control_model: ControlNetModel = None,
         execution_device: Optional[torch.device] = None,
     ):
