@@ -18,5 +18,5 @@ SEED_MAX = np.iinfo(np.uint32).max
 
 
 def get_random_seed():
-    rng = np.random.default_rng(seed=0)
+    rng = np.random.default_rng(seed=None)
     return int(rng.integers(0, SEED_MAX))
