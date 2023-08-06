@@ -345,6 +345,8 @@ class LoRACheckpointProbe(CheckpointProbeBase):
             return BaseModelType.StableDiffusion1
         elif lora_token_vector_length == 1024:
             return BaseModelType.StableDiffusion2
+        elif lora_token_vector_length is None:  # variant w/o the text encoder!
+            return BaseModelType.StableDiffusion1
         else:
             raise InvalidModelException(f"Unknown LoRA type")
 
