@@ -667,9 +667,8 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_image = context.services.images.get_pil_image(self.image.image_name)
 
-        # Convert PIL image to OpenCV format (numpy array), note color channel
-        # ordering is changed from RGB to BGR
-        image = numpy.array(pil_image.convert("RGB"))[:, :, ::-1]
+        # Convert PIL image to OpenCV format (numpy array)
+        image = numpy.array(pil_image.convert("RGB"))
 
         # Convert image to HSV color space
         hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -681,7 +680,7 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
         image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
 
         # Convert back to PIL format and to original color mode
-        pil_image = Image.fromarray(image[:, :, ::-1], "RGB").convert("RGBA")
+        pil_image = Image.fromarray(image, "RGB").convert("RGBA")
 
         image_dto = context.services.images.create(
             image=pil_image,
