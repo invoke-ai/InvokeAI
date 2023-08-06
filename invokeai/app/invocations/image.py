@@ -661,7 +661,7 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
 
     # Inputs
     image: ImageField = Field(default=None, description="The image to adjust")
-    hue: int = Field(default=0, description="The degrees by which to rotate the hue")
+    hue: int = Field(default=0, description="The degrees by which to rotate the hue, 0-360")
     # fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
