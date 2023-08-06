@@ -260,6 +260,7 @@ from .models import (
     InvalidModelException,
     DuplicateModelException,
 )
+from .model_hash import FastModelHash
 
 # We are only starting to number the config file with release 3.
 # The config file version doesn't have to start at release version, but it will help
@@ -364,6 +365,8 @@ class ModelManager(object):
             model_class = MODEL_CLASSES[base_model][model_type]
             # alias for config file
             model_config["model_format"] = model_config.pop("format")
+            if not model_config.get("hash"):
+                model_config["hash"] = FastModelHash.hash(self.resolve_model_path(model_config["path"]))
             self.models[model_key] = model_class.create_config(**model_config)
 
         # check config version number and update on disk/RAM if necessary
@@ -430,6 +433,28 @@ class ModelManager(object):
         """Create empty config file"""
         with open(config_path, "w") as yaml_file:
             yaml_file.write(yaml.dump({"__metadata__": {"version": "3.0.0"}}))
+
+    def get_model_by_hash(
+        self,
+        model_hash: str,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> ModelInfo:
+        """
+        Given a model's unique hash, return its ModelInfo.
+
+        :param model_hash: Unique hash for this model.
+        """
+        info = self.list_models()
+        keys = [x for x in info if x["hash"] == model_hash]
+        if len(keys) == 0:
+            raise InvalidModelException(f"No model with hash {model_hash} found")
+        if len(keys) > 1:
+            raise DuplicateModelException(f"Duplicate models detected: {keys}")
+        return self.get_model(
+            keys[0]["model_name"],
+            base_model=keys[0]["base_model"],
+            model_type=keys[0]["model_type"],
+        )
 
     def get_model(
         self,
@@ -500,14 +525,12 @@ class ModelManager(object):
             self.cache_keys[model_key] = set()
         self.cache_keys[model_key].add(model_context.key)
 
-        model_hash = "<NO_HASH>"  # TODO:
-
         return ModelInfo(
             context=model_context,
             name=model_name,
             base_model=base_model,
             type=submodel_type or model_type,
-            hash=model_hash,
+            hash=model_config.hash,
             location=model_path,  # TODO:
             precision=self.cache.precision,
             _cache=self.cache,
@@ -660,12 +683,22 @@ class ModelManager(object):
         if path := model_attributes.get("path"):
             model_attributes["path"] = str(self.relative_model_path(Path(path)))
 
+        if not model_attributes.get("hash"):
+            hash = FastModelHash.hash(self.resolve_model_path(model_attributes["path"]))
+            model_attributes["hash"] = hash
+
         model_class = MODEL_CLASSES[base_model][model_type]
         model_config = model_class.create_config(**model_attributes)
         model_key = self.create_key(model_name, base_model, model_type)
 
-        if model_key in self.models and not clobber:
-            raise Exception(f'Attempt to overwrite existing model definition "{model_key}"')
+        if not clobber:
+            if model_key in self.models:
+                raise Exception(f'Attempt to overwrite existing model definition "{model_key}"')
+            try:
+                i = self.get_model_by_hash(model_attributes["hash"])
+                raise DuplicateModelException(f"There is already a model with hash {hash}: {i['name']}")
+            except:
+                pass
 
         old_model = self.models.pop(model_key, None)
         if old_model is not None:
@@ -941,7 +974,11 @@ class ModelManager(object):
                                     raise DuplicateModelException(f"Model with key {model_key} added twice")
 
                                 model_path = self.relative_model_path(model_path)
-                                model_config: ModelConfigBase = model_class.probe_config(str(model_path))
+                                model_config: ModelConfigBase = model_class.probe_config(
+                                    str(model_path),
+                                    hash=FastModelHash.hash(model_path),
+                                    model_base=cur_base_model,
+                                )
                                 self.models[model_key] = model_config
                                 new_models_found = True
                             except DuplicateModelException as e:

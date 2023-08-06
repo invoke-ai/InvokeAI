@@ -89,6 +89,7 @@ class ModelConfigBase(BaseModel):
     path: str  # or Path
     description: Optional[str] = Field(None)
     model_format: Optional[str] = Field(None)
+    hash: Optional[str] = Field(None)
     error: Optional[ModelError] = Field(None)
 
     class Config:
@@ -197,15 +198,16 @@ class ModelBase(metaclass=ABCMeta):
     def create_config(cls, **kwargs) -> ModelConfigBase:
         if "model_format" not in kwargs:
             raise Exception("Field 'model_format' not found in model config")
-
         configs = cls._get_configs()
-        return configs[kwargs["model_format"]](**kwargs)
+        config = configs[kwargs["model_format"]](**kwargs)
+        return config
 
     @classmethod
     def probe_config(cls, path: str, **kwargs) -> ModelConfigBase:
         return cls.create_config(
             path=path,
             model_format=cls.detect_format(path),
+            hash=kwargs["hash"],
         )
 
     @classmethod

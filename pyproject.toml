@@ -55,6 +55,7 @@ dependencies = [
   "flask_socketio==5.3.0",
   "flaskwebgui==1.0.3",
   "huggingface-hub>=0.11.1",
+  "imohash~=1.0.0",
   "invisible-watermark~=0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "matplotlib",                 # needed for plotting of Penner easing functions
   "mediapipe",                  # needed for "mediapipeface" controlnet model

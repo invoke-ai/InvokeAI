@@ -13,7 +13,10 @@ from .base import (
     read_checkpoint_meta,
     classproperty,
 )
+from invokeai.app.services.config import InvokeAIAppConfig
 from omegaconf import OmegaConf
+
+app_config = InvokeAIAppConfig.get_config()
 
 
 class StableDiffusionXLModelFormat(str, Enum):
@@ -22,7 +25,7 @@ class StableDiffusionXLModelFormat(str, Enum):
 
 
 class StableDiffusionXLModel(DiffusersModel):
-    # TODO: check that configs overwriten properly
+    # TODO: check that configs overwritten properly
     class DiffusersConfig(ModelConfigBase):
         model_format: Literal[StableDiffusionXLModelFormat.Diffusers]
         vae: Optional[str] = Field(None)
@@ -79,14 +82,19 @@ class StableDiffusionXLModel(DiffusersModel):
         else:
             raise Exception("Unkown stable diffusion 2.* model format")
 
-        if ckpt_config_path is None:
-            # TO DO: implement picking
-            pass
+        if ckpt_config_path is None and "model_base" in kwargs:
+            ckpt_config_path = (
+                app_config.legacy_conf_path / "sd_xl_base.yaml"
+                if kwargs["model_base"] == BaseModelType.StableDiffusionXL
+                else app_config.legacy_conf_path / "sd_xl_refiner.yaml"
+                if kwargs["model_base"] == BaseModelType.StableDiffusionXLRefiner
+                else None
+            )
 
         return cls.create_config(
             path=path,
             model_format=model_format,
-            config=ckpt_config_path,
+            config=str(ckpt_config_path),
             variant=variant,
         )
 
