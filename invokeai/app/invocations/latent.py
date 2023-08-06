@@ -180,6 +180,10 @@ class TextToLatentsInvocation(BaseInvocation):
         negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
         uc = negative_cond_data.conditionings[0].embeds.to(device=unet.device, dtype=unet.dtype)
 
+        # for ancestral and sde schedulers
+        generator = torch.Generator(device=unet.device)
+        generator.seed()
+
         conditioning_data = ConditioningData(
             unconditioned_embeddings=uc,
             text_embeddings=c,
@@ -198,7 +202,7 @@ class TextToLatentsInvocation(BaseInvocation):
             # for ddim scheduler
             eta=0.0,  # ddim_eta
             # for ancestral and sde schedulers
-            generator=torch.Generator(device=unet.device).manual_seed(0),
+            generator=generator,
         )
         return conditioning_data
 
