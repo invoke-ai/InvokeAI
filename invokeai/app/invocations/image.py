@@ -661,27 +661,23 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
 
     # Inputs
     image: ImageField = Field(default=None, description="The image to adjust")
-    hue: int = Field(default=0, description="The degrees by which to rotate the hue")
+    hue: int = Field(default=0, description="The degrees by which to rotate the hue, 0-360")
     # fmt: on
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_image = context.services.images.get_pil_image(self.image.image_name)
 
-        # Convert PIL image to OpenCV format (numpy array), note color channel
-        # ordering is changed from RGB to BGR
-        image = numpy.array(pil_image.convert("RGB"))[:, :, ::-1]
-
         # Convert image to HSV color space
-        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        hsv_image = numpy.array(pil_image.convert("HSV"))
 
-        # Adjust the hue
-        hsv_image[:, :, 0] = (hsv_image[:, :, 0] + self.hue) % 180
+        # Convert hue from 0..360 to 0..256
+        hue = int(256 * ((self.hue % 360) / 360))
 
-        # Convert image back to BGR color space
-        image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+        # Increment each hue and wrap around at 255
+        hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue) % 256
 
         # Convert back to PIL format and to original color mode
-        pil_image = Image.fromarray(image[:, :, ::-1], "RGB").convert("RGBA")
+        pil_image = Image.fromarray(hsv_image, mode="HSV").convert("RGBA")
 
         image_dto = context.services.images.create(
             image=pil_image,
