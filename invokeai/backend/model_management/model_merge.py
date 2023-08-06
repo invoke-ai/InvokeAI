@@ -33,7 +33,7 @@ class ModelMerger(object):
         self,
         model_paths: List[Path],
         alpha: float = 0.5,
-        interp: MergeInterpolationMethod = None,
+        interp: Optional[MergeInterpolationMethod] = None,
         force: bool = False,
         **kwargs,
     ) -> DiffusionPipeline:
@@ -73,7 +73,7 @@ class ModelMerger(object):
         base_model: Union[BaseModelType, str],
         merged_model_name: str,
         alpha: float = 0.5,
-        interp: MergeInterpolationMethod = None,
+        interp: Optional[MergeInterpolationMethod] = None,
         force: bool = False,
         merge_dest_directory: Optional[Path] = None,
         **kwargs,
@@ -122,7 +122,7 @@ class ModelMerger(object):
         dump_path.mkdir(parents=True, exist_ok=True)
         dump_path = dump_path / merged_model_name
 
-        merged_pipe.save_pretrained(dump_path, safe_serialization=1)
+        merged_pipe.save_pretrained(dump_path, safe_serialization=True)
         attributes = dict(
             path=str(dump_path),
             description=f"Merge of models {', '.join(model_names)}",
