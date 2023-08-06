@@ -6,6 +6,7 @@
 """Script to import images into the new database system for 3.0.0"""
 
 import os
+import platform
 import datetime
 import shutil
 import locale
@@ -21,21 +22,14 @@ import PIL.PngImagePlugin
 
 from pathlib import Path
 from prompt_toolkit import prompt
-from prompt_toolkit.shortcuts import yes_no_dialog, message_dialog, input_dialog, button_dialog
+from prompt_toolkit.shortcuts import  message_dialog
 from prompt_toolkit.completion import PathCompleter
-from prompt_toolkit.key_binding import KeyBindings
 
 from invokeai.app.services.config import InvokeAIAppConfig
 
 app_config = InvokeAIAppConfig.get_config()
-
-bindings = KeyBindings()
-
-
-@bindings.add("c-c")
-def _(event):
-    raise KeyboardInterrupt
-
+path_delimiter = '\\' if platform.uname().system=='Windows' else '/'
+print(path_delimiter)
 
 # release notes
 # "Use All" with size dimensions not selectable in the UI will not load dimensions
@@ -122,7 +116,7 @@ class Config:
             )
             if database_path.endswith(".db") and os.path.isabs(database_path) and os.path.exists(database_path):
                 break
-            default = database_path + "/" if Path(database_path).is_dir() else database_path
+            default = database_path + path_delimiter if Path(database_path).is_dir() else database_path
 
         default = ""
         while True:
@@ -136,7 +130,7 @@ class Config:
 
             if outputs_path.endswith("images") and os.path.isabs(outputs_path) and os.path.exists(outputs_path):
                 break
-            default = outputs_path + "/" if Path(outputs_path).is_dir() else outputs_path
+            default = outputs_path + path_delimiter if Path(outputs_path).is_dir() else outputs_path
 
         self.database_path = database_path
         self.outputs_path = outputs_path
