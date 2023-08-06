@@ -501,7 +501,7 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
         image = context.services.images.get_pil_image(self.image.image_name)
 
         image_arr = numpy.asarray(image, dtype=numpy.float32) / 255
-        image_arr = image_arr * (self.max - self.min) + self.max
+        image_arr = image_arr * (self.max - self.min) + self.min
 
         lerp_image = Image.fromarray(numpy.uint8(image_arr))
 
