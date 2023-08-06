@@ -389,48 +389,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 submodels.append(value)
         return submodels
 
-    def image_from_embeddings(
-        self,
-        latents: torch.Tensor,
-        num_inference_steps: int,
-        conditioning_data: ConditioningData,
-        *,
-        noise: torch.Tensor,
-        callback: Callable[[PipelineIntermediateState], None] = None,
-        run_id=None,
-    ) -> InvokeAIStableDiffusionPipelineOutput:
-        r"""
-        Function invoked when calling the pipeline for generation.
-
-        :param conditioning_data:
-        :param latents: Pre-generated un-noised latents, to be used as inputs for
-            image generation. Can be used to tweak the same generation with different prompts.
-        :param num_inference_steps: The number of denoising steps. More denoising steps usually lead to a higher quality
-            image at the expense of slower inference.
-        :param noise: Noise to add to the latents, sampled from a Gaussian distribution.
-        :param callback:
-        :param run_id:
-        """
-        result_latents, result_attention_map_saver = self.latents_from_embeddings(
-            latents,
-            num_inference_steps,
-            conditioning_data,
-            noise=noise,
-            run_id=run_id,
-            callback=callback,
-        )
-        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        torch.cuda.empty_cache()
-
-        with torch.inference_mode():
-            image = self.decode_latents(result_latents)
-            output = InvokeAIStableDiffusionPipelineOutput(
-                images=image,
-                nsfw_content_detected=[],
-                attention_map_saver=result_attention_map_saver,
-            )
-            return self.check_for_safety(output, dtype=conditioning_data.dtype)
-
     def latents_from_embeddings(
         self,
         latents: torch.Tensor,
