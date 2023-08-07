@@ -386,8 +386,7 @@ class InvokeAIDiffuserComponent:
         self,
         x: torch.Tensor,
         sigma,
-        unconditioning: torch.Tensor,
-        conditioning: torch.Tensor,
+        conditioning_data,
         **kwargs,
     ):
         # low-memory sequential path
@@ -444,8 +443,7 @@ class InvokeAIDiffuserComponent:
         self,
         x: torch.Tensor,
         sigma,
-        unconditioning,
-        conditioning,
+        conditioning_data,
         cross_attention_control_types_to_do,
         **kwargs,
     ):
