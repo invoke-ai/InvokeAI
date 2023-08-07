@@ -663,7 +663,7 @@ def migrate_init_file(legacy_format: Path):
             try:
                 setattr(new, attr, getattr(old, attr))
             except ValidationError as e:
-                print(f'* Ignoring incompatible value for field {attr}:\n  {str(e)}')
+                print(f"* Ignoring incompatible value for field {attr}:\n  {str(e)}")
 
     # a few places where the field names have changed and we have to
     # manually add in the new names/values
