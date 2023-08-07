@@ -28,10 +28,10 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
     # Inputs
     image: Optional[ImageField] = Field(description="The image to upscale")
     vae: VaeField = Field(default=None, description="VAE submodel")
-    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")
-    tiled: bool = Field(
-        default=False,
-        description="Decode latents by overlapping tiles(less memory consumption)")
+    metadata: Optional[CoreMetadata] = Field(
+        default=None, description="Optional core metadata to be written to the image"
+    )
+    tiled: bool = Field(default=False, description="Decode latents by overlapping tiles(less memory consumption)")
     # TODO: fp32: bool = Field(DEFAULT_PRECISION=='float32', description="Decode in full precision")
     # FIXME: We inherited the `control` field from the superclass, but don't support it.
 
@@ -43,7 +43,7 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
                 "type_hints": {
                     "model": "model",
                     "cfg_scale": "number",
-                }
+                },
             }
         }
 
@@ -76,7 +76,7 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
                 tokenizer=None,
                 unet=unet,
                 low_res_scheduler=low_res_scheduler,
-                scheduler=scheduler
+                scheduler=scheduler,
             )
 
             if self.tiled or context.services.configuration.tiled_decode:
@@ -87,14 +87,14 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
             output = pipeline(
                 image=image,
                 # latents=noise,
-                num_inference_steps = self.steps,
-                guidance_scale = self.cfg_scale,
+                num_inference_steps=self.steps,
+                guidance_scale=self.cfg_scale,
                 # noise_level =
                 # generator =
                 prompt_embeds=conditioning_data.text_embeddings,
                 negative_prompt_embeds=conditioning_data.unconditioned_embeddings,
                 output_type="pil",
-                callback = lambda *args: self.dispatch_upscale_progress(context, *args)
+                callback=lambda *args: self.dispatch_upscale_progress(context, *args),
             )
             result_image = output.images[0]
 
@@ -115,9 +115,7 @@ class UpscaleLatentsInvocation(TextToLatentsInvocation):
         )
 
     def dispatch_upscale_progress(self, context, step, timestep, latents):
-        graph_execution_state = context.services.graph_execution_manager.get(
-            context.graph_execution_state_id
-        )
+        graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
         source_node_id = graph_execution_state.prepared_source_mapping[self.id]
         intermediate_state = PipelineIntermediateState(None, step, timestep, latents)
         stable_diffusion_step_callback(
