@@ -340,33 +340,39 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if xformers is available, use it, otherwise use sliced attention.
         """
         config = InvokeAIAppConfig.get_config()
-        if torch.cuda.is_available() and is_xformers_available() and not config.disable_xformers:
-            self.enable_xformers_memory_efficient_attention()
+        if self.unet.device.type == "cuda":
+            if is_xformers_available() and not config.disable_xformers:
+                self.enable_xformers_memory_efficient_attention()
+                return
+            elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
+                # diffusers enable sdp automatically
+                return
+
+
+        if self.device.type == "cpu" or self.device.type == "mps":
+            mem_free = psutil.virtual_memory().free
+        elif self.device.type == "cuda":
+            mem_free, _ = torch.cuda.mem_get_info(normalize_device(self.device))
         else:
-            if self.device.type == "cpu" or self.device.type == "mps":
-                mem_free = psutil.virtual_memory().free
-            elif self.device.type == "cuda":
-                mem_free, _ = torch.cuda.mem_get_info(normalize_device(self.device))
-            else:
-                raise ValueError(f"unrecognized device {self.device}")
-            # input tensor of [1, 4, h/8, w/8]
-            # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
-            bytes_per_element_needed_for_baddbmm_duplication = latents.element_size() + 4
-            max_size_required_for_baddbmm = (
-                16
-                * latents.size(dim=2)
-                * latents.size(dim=3)
-                * latents.size(dim=2)
-                * latents.size(dim=3)
-                * bytes_per_element_needed_for_baddbmm_duplication
-            )
-            if max_size_required_for_baddbmm > (mem_free * 3.0 / 4.0):  # 3.3 / 4.0 is from old Invoke code
-                self.enable_attention_slicing(slice_size="max")
-            elif torch.backends.mps.is_available():
-                # diffusers recommends always enabling for mps
-                self.enable_attention_slicing(slice_size="max")
-            else:
-                self.disable_attention_slicing()
+            raise ValueError(f"unrecognized device {self.device}")
+        # input tensor of [1, 4, h/8, w/8]
+        # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
+        bytes_per_element_needed_for_baddbmm_duplication = latents.element_size() + 4
+        max_size_required_for_baddbmm = (
+            16
+            * latents.size(dim=2)
+            * latents.size(dim=3)
+            * latents.size(dim=2)
+            * latents.size(dim=3)
+            * bytes_per_element_needed_for_baddbmm_duplication
+        )
+        if max_size_required_for_baddbmm > (mem_free * 3.0 / 4.0):  # 3.3 / 4.0 is from old Invoke code
+            self.enable_attention_slicing(slice_size="max")
+        elif torch.backends.mps.is_available():
+            # diffusers recommends always enabling for mps
+            self.enable_attention_slicing(slice_size="max")
+        else:
+            self.disable_attention_slicing()
 
     def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
         # overridden method; types match the superclass.
@@ -398,7 +404,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         num_inference_steps: int,
         conditioning_data: ConditioningData,
         *,
-        noise: torch.Tensor,
+        noise: Optional[torch.Tensor],
         timesteps=None,
         additional_guidance: List[Callable] = None,
         run_id=None,
@@ -434,7 +440,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         timesteps,
         conditioning_data: ConditioningData,
         *,
-        noise: torch.Tensor,
+        noise: Optional[torch.Tensor],
         run_id: str = None,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
@@ -457,8 +463,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 dtype=timesteps.dtype,
                 device=self._model_group.device_for(self.unet),
             )
-            #latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
-            latents = self.scheduler.add_noise(latents, noise, batched_t)
+            if noise is not None:
+                #latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
+                latents = self.scheduler.add_noise(latents, noise, batched_t)
 
             yield PipelineIntermediateState(
                 run_id=run_id,

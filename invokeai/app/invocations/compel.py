@@ -320,8 +320,6 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
         else:
             c2, c2_pooled, ec2 = self.run_clip_compel(context, self.clip2, self.style, True, "lora_te2_", zero_on_empty=True)
 
-        print(f"{c1.shape=} {c2.shape=} {c2_pooled.shape=} {self.prompt=}")
-
         original_size = (self.original_height, self.original_width)
         crop_coords = (self.crop_top, self.crop_left)
         target_size = (self.target_height, self.target_width)
