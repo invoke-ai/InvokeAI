@@ -116,7 +116,11 @@ class Config:
             )
             if database_path.endswith(".db") and os.path.isabs(database_path) and os.path.exists(database_path):
                 break
-            default = database_path + path_delimiter if Path(database_path).is_dir() and not database_path.endswith(('\\','/')) else database_path
+            default = (
+                database_path + path_delimiter
+                if Path(database_path).is_dir() and not database_path.endswith(("\\", "/"))
+                else database_path
+            )
 
         default = ""
         while True:
@@ -130,7 +134,11 @@ class Config:
 
             if outputs_path.endswith("images") and os.path.isabs(outputs_path) and os.path.exists(outputs_path):
                 break
-            default = outputs_path + path_delimiter if Path(outputs_path).is_dir() and not database_path.endswith(('\\','/')) else outputs_path
+            default = (
+                outputs_path + path_delimiter
+                if Path(outputs_path).is_dir() and not database_path.endswith(("\\", "/"))
+                else outputs_path
+            )
 
         self.database_path = database_path
         self.outputs_path = outputs_path
