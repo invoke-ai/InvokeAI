@@ -63,6 +63,7 @@ from invokeai.backend.install.model_install_backend import (
     ModelInstall,
 )
 from invokeai.backend.model_management.model_probe import ModelType, BaseModelType
+from pydantic.error_wrappers import ValidationError
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -659,7 +660,10 @@ def migrate_init_file(legacy_format: Path):
     fields = [x for x, y in InvokeAIAppConfig.__fields__.items() if y.field_info.extra.get("category") != "DEPRECATED"]
     for attr in fields:
         if hasattr(old, attr):
-            setattr(new, attr, getattr(old, attr))
+            try:
+                setattr(new, attr, getattr(old, attr))
+            except ValidationError as e:
+                print(f'* Ignoring incompatible value for field {attr}:\n  {str(e)}')
 
     # a few places where the field names have changed and we have to
     # manually add in the new names/values
