@@ -4,7 +4,7 @@ import {
 } from './types';
 
 type ControlNetProcessorsDict = Record<
-  string,
+  ControlNetProcessorType,
   {
     type: ControlNetProcessorType | 'none';
     label: string;

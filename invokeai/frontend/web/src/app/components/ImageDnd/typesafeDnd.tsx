@@ -11,7 +11,6 @@ import {
   useDraggable as useOriginalDraggable,
   useDroppable as useOriginalDroppable,
 } from '@dnd-kit/core';
-import { BoardId } from 'features/gallery/store/types';
 import { ImageDTO } from 'services/api/types';
 
 type BaseDropData = {
@@ -54,9 +53,13 @@ export type AddToBatchDropData = BaseDropData & {
   actionType: 'ADD_TO_BATCH';
 };
 
-export type MoveBoardDropData = BaseDropData & {
-  actionType: 'MOVE_BOARD';
-  context: { boardId: BoardId };
+export type AddToBoardDropData = BaseDropData & {
+  actionType: 'ADD_TO_BOARD';
+  context: { boardId: string };
+};
+
+export type RemoveFromBoardDropData = BaseDropData & {
+  actionType: 'REMOVE_FROM_BOARD';
 };
 
 export type TypesafeDroppableData =
@@ -67,7 +70,8 @@ export type TypesafeDroppableData =
   | NodesImageDropData
   | AddToBatchDropData
   | NodesMultiImageDropData
-  | MoveBoardDropData;
+  | AddToBoardDropData
+  | RemoveFromBoardDropData;
 
 type BaseDragData = {
   id: string;
@@ -78,14 +82,12 @@ export type ImageDraggableData = BaseDragData & {
   payload: { imageDTO: ImageDTO };
 };
 
-export type ImageNamesDraggableData = BaseDragData & {
-  payloadType: 'IMAGE_NAMES';
-  payload: { image_names: string[] };
+export type ImageDTOsDraggableData = BaseDragData & {
+  payloadType: 'IMAGE_DTOS';
+  payload: { imageDTOs: ImageDTO[] };
 };
 
-export type TypesafeDraggableData =
-  | ImageDraggableData
-  | ImageNamesDraggableData;
+export type TypesafeDraggableData = ImageDraggableData | ImageDTOsDraggableData;
 
 interface UseDroppableTypesafeArguments
   extends Omit<UseDroppableArguments, 'data'> {
@@ -156,14 +158,39 @@ export const isValidDrop = (
     case 'SET_NODES_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_MULTI_NODES_IMAGE':
-      return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
+      return payloadType === 'IMAGE_DTO' || 'IMAGE_DTOS';
     case 'ADD_TO_BATCH':
-      return payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
-    case 'MOVE_BOARD': {
+      return payloadType === 'IMAGE_DTO' || 'IMAGE_DTOS';
+    case 'ADD_TO_BOARD': {
       // If the board is the same, don't allow the drop
 
       // Check the payload types
-      const isPayloadValid = payloadType === 'IMAGE_DTO' || 'IMAGE_NAMES';
+      const isPayloadValid = payloadType === 'IMAGE_DTO' || 'IMAGE_DTOS';
+      if (!isPayloadValid) {
+        return false;
+      }
+
+      // Check if the image's board is the board we are dragging onto
+      if (payloadType === 'IMAGE_DTO') {
+        const { imageDTO } = active.data.current.payload;
+        const currentBoard = imageDTO.board_id ?? 'none';
+        const destinationBoard = overData.context.boardId;
+
+        return currentBoard !== destinationBoard;
+      }
+
+      if (payloadType === 'IMAGE_DTOS') {
+        // TODO (multi-select)
+        return true;
+      }
+
+      return false;
+    }
+    case 'REMOVE_FROM_BOARD': {
+      // If the board is the same, don't allow the drop
+
+      // Check the payload types
+      const isPayloadValid = payloadType === 'IMAGE_DTO' || 'IMAGE_DTOS';
       if (!isPayloadValid) {
         return false;
       }
@@ -172,20 +199,16 @@ export const isValidDrop = (
       if (payloadType === 'IMAGE_DTO') {
         const { imageDTO } = active.data.current.payload;
         const currentBoard = imageDTO.board_id;
-        const destinationBoard = overData.context.boardId;
 
-        const isSameBoard = currentBoard === destinationBoard;
-        const isDestinationValid = !currentBoard ? destinationBoard : true;
-
-        return !isSameBoard && isDestinationValid;
+        return currentBoard !== 'none';
       }
 
-      if (payloadType === 'IMAGE_NAMES') {
+      if (payloadType === 'IMAGE_DTOS') {
         // TODO (multi-select)
-        return false;
+        return true;
       }
 
-      return true;
+      return false;
     }
     default:
       return false;

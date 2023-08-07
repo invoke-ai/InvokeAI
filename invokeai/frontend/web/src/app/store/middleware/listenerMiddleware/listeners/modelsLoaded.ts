@@ -15,7 +15,7 @@ import {
   setShouldUseSDXLRefiner,
 } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
-import { modelsApi } from 'services/api/endpoints/models';
+import { modelsApi, vaeModelsAdapter } from 'services/api/endpoints/models';
 import { startAppListening } from '..';
 
 export const addModelsLoadedListener = () => {
@@ -144,8 +144,9 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const firstModelId = action.payload.ids[0];
-      const firstModel = action.payload.entities[firstModelId];
+      const firstModel = vaeModelsAdapter
+        .getSelectors()
+        .selectAll(action.payload)[0];
 
       if (!firstModel) {
         // No custom VAEs loaded at all; use the default

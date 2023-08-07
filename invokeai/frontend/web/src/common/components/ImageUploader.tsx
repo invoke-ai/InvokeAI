@@ -78,7 +78,7 @@ const ImageUploader = (props: ImageUploaderProps) => {
         image_category: 'user',
         is_intermediate: false,
         postUploadAction,
-        board_id: autoAddBoardId,
+        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
       });
     },
     [autoAddBoardId, postUploadAction, uploadImage]

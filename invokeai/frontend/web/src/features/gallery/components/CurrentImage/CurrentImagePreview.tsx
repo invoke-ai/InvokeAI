@@ -32,7 +32,7 @@ export const imagesSelector = createSelector(
     return {
       shouldShowImageDetails,
       shouldHidePreview,
-      imageName: lastSelectedImage,
+      imageName: lastSelectedImage?.image_name,
       progressImage,
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
@@ -57,8 +57,6 @@ const CurrentImagePreview = () => {
   const {
     handlePrevImage,
     handleNextImage,
-    prevImageId,
-    nextImageId,
     isOnLastImage,
     handleLoadMoreImages,
     areMoreImagesAvailable,
@@ -70,7 +68,7 @@ const CurrentImagePreview = () => {
     () => {
       handlePrevImage();
     },
-    [prevImageId]
+    [handlePrevImage]
   );
 
   useHotkeys(
@@ -85,11 +83,11 @@ const CurrentImagePreview = () => {
       }
     },
     [
-      nextImageId,
       isOnLastImage,
       areMoreImagesAvailable,
       handleLoadMoreImages,
       isFetching,
+      handleNextImage,
     ]
   );
 

@@ -135,19 +135,14 @@ export type paths = {
      */
     put: operations["merge_models"];
   };
-  "/api/v1/images/": {
-    /**
-     * List Image Dtos 
-     * @description Gets a list of image DTOs
-     */
-    get: operations["list_image_dtos"];
+  "/api/v1/images/upload": {
     /**
      * Upload Image 
      * @description Uploads an image
      */
     post: operations["upload_image"];
   };
-  "/api/v1/images/{image_name}": {
+  "/api/v1/images/i/{image_name}": {
     /**
      * Get Image Dto 
      * @description Gets an image's DTO
@@ -171,33 +166,44 @@ export type paths = {
      */
     post: operations["clear_intermediates"];
   };
-  "/api/v1/images/{image_name}/metadata": {
+  "/api/v1/images/i/{image_name}/metadata": {
     /**
      * Get Image Metadata 
      * @description Gets an image's metadata
      */
     get: operations["get_image_metadata"];
   };
-  "/api/v1/images/{image_name}/full": {
+  "/api/v1/images/i/{image_name}/full": {
     /**
      * Get Image Full 
      * @description Gets a full-resolution image file
      */
     get: operations["get_image_full"];
   };
-  "/api/v1/images/{image_name}/thumbnail": {
+  "/api/v1/images/i/{image_name}/thumbnail": {
     /**
      * Get Image Thumbnail 
      * @description Gets a thumbnail image file
      */
     get: operations["get_image_thumbnail"];
   };
-  "/api/v1/images/{image_name}/urls": {
+  "/api/v1/images/i/{image_name}/urls": {
     /**
      * Get Image Urls 
      * @description Gets an image and thumbnail URL
      */
     get: operations["get_image_urls"];
+  };
+  "/api/v1/images/": {
+    /**
+     * List Image Dtos 
+     * @description Gets a list of image DTOs
+     */
+    get: operations["list_image_dtos"];
+  };
+  "/api/v1/images/delete": {
+    /** Delete Images From List */
+    post: operations["delete_images_from_list"];
   };
   "/api/v1/boards/": {
     /**
@@ -237,15 +243,29 @@ export type paths = {
   };
   "/api/v1/board_images/": {
     /**
-     * Create Board Image 
+     * Add Image To Board 
      * @description Creates a board_image
      */
-    post: operations["create_board_image"];
+    post: operations["add_image_to_board"];
     /**
-     * Remove Board Image 
-     * @description Deletes a board_image
+     * Remove Image From Board 
+     * @description Removes an image from its board, if it had one
      */
-    delete: operations["remove_board_image"];
+    delete: operations["remove_image_from_board"];
+  };
+  "/api/v1/board_images/batch": {
+    /**
+     * Add Images To Board 
+     * @description Adds a list of images to a board
+     */
+    post: operations["add_images_to_board"];
+  };
+  "/api/v1/board_images/batch/delete": {
+    /**
+     * Remove Images From Board 
+     * @description Removes a list of images from their board, if they had one
+     */
+    post: operations["remove_images_from_board"];
   };
   "/api/v1/app/version": {
     /** Get Version */
@@ -273,6 +293,19 @@ export type webhooks = Record<string, never>;
 
 export type components = {
   schemas: {
+    /** AddImagesToBoardResult */
+    AddImagesToBoardResult: {
+      /**
+       * Board Id 
+       * @description The id of the board the images were added to
+       */
+      board_id: string;
+      /**
+       * Added Image Names 
+       * @description The image names that were added to the board
+       */
+      added_image_names: (string)[];
+    };
     /**
      * AddInvocation 
      * @description Adds two numbers
@@ -405,8 +438,8 @@ export type components = {
        */
       image_count: number;
     };
-    /** Body_create_board_image */
-    Body_create_board_image: {
+    /** Body_add_image_to_board */
+    Body_add_image_to_board: {
       /**
        * Board Id 
        * @description The id of the board to add to
@@ -417,6 +450,27 @@ export type components = {
        * @description The name of the image to add
        */
       image_name: string;
+    };
+    /** Body_add_images_to_board */
+    Body_add_images_to_board: {
+      /**
+       * Board Id 
+       * @description The id of the board to add to
+       */
+      board_id: string;
+      /**
+       * Image Names 
+       * @description The names of the images to add
+       */
+      image_names: (string)[];
+    };
+    /** Body_delete_images_from_list */
+    Body_delete_images_from_list: {
+      /**
+       * Image Names 
+       * @description The list of names of images to delete
+       */
+      image_names: (string)[];
     };
     /** Body_import_model */
     Body_import_model: {
@@ -465,18 +519,21 @@ export type components = {
        */
       merge_dest_directory?: string;
     };
-    /** Body_remove_board_image */
-    Body_remove_board_image: {
-      /**
-       * Board Id 
-       * @description The id of the board
-       */
-      board_id: string;
+    /** Body_remove_image_from_board */
+    Body_remove_image_from_board: {
       /**
        * Image Name 
        * @description The name of the image to remove
        */
       image_name: string;
+    };
+    /** Body_remove_images_from_board */
+    Body_remove_images_from_board: {
+      /**
+       * Image Names 
+       * @description The names of the images to remove
+       */
+      image_names: (string)[];
     };
     /** Body_upload_image */
     Body_upload_image: {
@@ -1155,6 +1212,11 @@ export type components = {
        * Deleted Images 
        * @description The names of the images that were deleted.
        */
+      deleted_images: (string)[];
+    };
+    /** DeleteImagesFromListResult */
+    DeleteImagesFromListResult: {
+      /** Deleted Images */
       deleted_images: (string)[];
     };
     /**
@@ -4627,6 +4689,14 @@ export type components = {
        */
       step?: number;
     };
+    /** RemoveImagesFromBoardResult */
+    RemoveImagesFromBoardResult: {
+      /**
+       * Removed Image Names 
+       * @description The image names that were removed from their board
+       */
+      removed_image_names: (string)[];
+    };
     /**
      * ResizeLatentsInvocation 
      * @description Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8.
@@ -5892,18 +5962,6 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * ControlNetModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionXLModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionOnnxModelFormat 
      * @description An enumeration. 
      * @enum {string}
@@ -5921,6 +5979,18 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionXLModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * ControlNetModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -6548,42 +6618,6 @@ export type operations = {
     };
   };
   /**
-   * List Image Dtos 
-   * @description Gets a list of image DTOs
-   */
-  list_image_dtos: {
-    parameters: {
-      query?: {
-        /** @description The origin of images to list. */
-        image_origin?: components["schemas"]["ResourceOrigin"];
-        /** @description The categories of image to include. */
-        categories?: (components["schemas"]["ImageCategory"])[];
-        /** @description Whether to list intermediate images. */
-        is_intermediate?: boolean;
-        /** @description The board id to filter by. Use 'none' to find images without a board. */
-        board_id?: string;
-        /** @description The page offset */
-        offset?: number;
-        /** @description The number of images per page */
-        limit?: number;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
    * Upload Image 
    * @description Uploads an image
    */
@@ -6830,6 +6864,64 @@ export type operations = {
     };
   };
   /**
+   * List Image Dtos 
+   * @description Gets a list of image DTOs
+   */
+  list_image_dtos: {
+    parameters: {
+      query?: {
+        /** @description The origin of images to list. */
+        image_origin?: components["schemas"]["ResourceOrigin"];
+        /** @description The categories of image to include. */
+        categories?: (components["schemas"]["ImageCategory"])[];
+        /** @description Whether to list intermediate images. */
+        is_intermediate?: boolean;
+        /** @description The board id to filter by. Use 'none' to find images without a board. */
+        board_id?: string;
+        /** @description The page offset */
+        offset?: number;
+        /** @description The number of images per page */
+        limit?: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Delete Images From List */
+  delete_images_from_list: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Body_delete_images_from_list"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["DeleteImagesFromListResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
    * List Boards 
    * @description Gets a list of boards
    */
@@ -6999,13 +7091,13 @@ export type operations = {
     };
   };
   /**
-   * Create Board Image 
+   * Add Image To Board 
    * @description Creates a board_image
    */
-  create_board_image: {
+  add_image_to_board: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_create_board_image"];
+        "application/json": components["schemas"]["Body_add_image_to_board"];
       };
     };
     responses: {
@@ -7024,13 +7116,13 @@ export type operations = {
     };
   };
   /**
-   * Remove Board Image 
-   * @description Deletes a board_image
+   * Remove Image From Board 
+   * @description Removes an image from its board, if it had one
    */
-  remove_board_image: {
+  remove_image_from_board: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_remove_board_image"];
+        "application/json": components["schemas"]["Body_remove_image_from_board"];
       };
     };
     responses: {
@@ -7038,6 +7130,56 @@ export type operations = {
       201: {
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Add Images To Board 
+   * @description Adds a list of images to a board
+   */
+  add_images_to_board: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Body_add_images_to_board"];
+      };
+    };
+    responses: {
+      /** @description Images were added to board successfully */
+      201: {
+        content: {
+          "application/json": components["schemas"]["AddImagesToBoardResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Remove Images From Board 
+   * @description Removes a list of images from their board, if they had one
+   */
+  remove_images_from_board: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Body_remove_images_from_board"];
+      };
+    };
+    responses: {
+      /** @description Images were removed from board successfully */
+      201: {
+        content: {
+          "application/json": components["schemas"]["RemoveImagesFromBoardResult"];
         };
       };
       /** @description Validation Error */

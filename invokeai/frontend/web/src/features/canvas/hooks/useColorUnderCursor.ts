@@ -33,6 +33,10 @@ const useColorPicker = () => {
           1
         ).data;
 
+      if (!(a && r && g && b)) {
+        return;
+      }
+
       dispatch(setColorPickerColor({ r, g, b, a }));
     },
     commitColorUnderCursor: () => {
