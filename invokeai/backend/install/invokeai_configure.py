@@ -44,6 +44,8 @@ from invokeai.app.services.config import (
 )
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
+
+# TO DO - Move all the frontend code into invokeai.frontend.install
 from invokeai.frontend.install.widgets import (
     SingleSelectColumns,
     CenteredButtonPress,
@@ -654,7 +656,7 @@ def migrate_init_file(legacy_format: Path):
     old = legacy_parser.parse_args([f"@{str(legacy_format)}"])
     new = InvokeAIAppConfig.get_config()
 
-    fields = list(get_type_hints(InvokeAIAppConfig).keys())
+    fields = [x for x, y in InvokeAIAppConfig.__fields__.items() if y.field_info.extra.get("category") != "DEPRECATED"]
     for attr in fields:
         if hasattr(old, attr):
             setattr(new, attr, getattr(old, attr))
