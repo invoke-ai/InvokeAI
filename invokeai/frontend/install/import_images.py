@@ -1,12 +1,12 @@
 # Copyright (c) 2023 - The InvokeAI Team
-# Author: techjedi
+# Primary Author: David Lovell (github @f412design, discord @techedi)
+# co-author, minor tweaks - Lincoln Stein
 
 # pylint: disable=line-too-long
 # pylint: disable=broad-exception-caught
 """Script to import images into the new database system for 3.0.0"""
 
 import os
-import platform
 import datetime
 import shutil
 import locale
@@ -24,12 +24,19 @@ from pathlib import Path
 from prompt_toolkit import prompt
 from prompt_toolkit.shortcuts import message_dialog
 from prompt_toolkit.completion import PathCompleter
+from prompt_toolkit.key_binding import KeyBindings
 
 from invokeai.app.services.config import InvokeAIAppConfig
 
 app_config = InvokeAIAppConfig.get_config()
-path_delimiter = "\\" if platform.uname().system == "Windows" else "/"
-print(path_delimiter)
+
+bindings = KeyBindings()
+
+
+@bindings.add("c-c")
+def _(event):
+    raise KeyboardInterrupt
+
 
 # release notes
 # "Use All" with size dimensions not selectable in the UI will not load dimensions
@@ -116,11 +123,7 @@ class Config:
             )
             if database_path.endswith(".db") and os.path.isabs(database_path) and os.path.exists(database_path):
                 break
-            default = (
-                database_path + path_delimiter
-                if Path(database_path).is_dir() and not database_path.endswith(("\\", "/"))
-                else database_path
-            )
+            default = database_path + "/" if Path(database_path).is_dir() else database_path
 
         default = ""
         while True:
@@ -134,11 +137,7 @@ class Config:
 
             if outputs_path.endswith("images") and os.path.isabs(outputs_path) and os.path.exists(outputs_path):
                 break
-            default = (
-                outputs_path + path_delimiter
-                if Path(outputs_path).is_dir() and not database_path.endswith(("\\", "/"))
-                else outputs_path
-            )
+            default = outputs_path + "/" if Path(outputs_path).is_dir() else outputs_path
 
         self.database_path = database_path
         self.outputs_path = outputs_path
@@ -217,11 +216,17 @@ class InvokeAIMetadata:
         """Convert the active instance to json format."""
         prop_dict = {}
         prop_dict["generation_mode"] = self.generation_mode
-        prop_dict["positive_prompt"] = self.positive_prompt
-        prop_dict["negative_prompt"] = self.negative_prompt
+        # dont render prompt nodes if neither are set to avoid the ui thinking it can set them
+        # if at least one exists, render them both, but use empty string instead of None if one of them is empty
+        # this allows the field that is empty to actually be cleared byt he UI instead of leaving the previous value
+        if self.positive_prompt or self.negative_prompt:
+            prop_dict["positive_prompt"] = "" if self.positive_prompt is None else self.positive_prompt
+            prop_dict["negative_prompt"] = "" if self.negative_prompt is None else self.negative_prompt
         prop_dict["width"] = self.width
         prop_dict["height"] = self.height
-        prop_dict["seed"] = self.seed
+        # only render seed if it has a value to avoid ui thinking it can set this and then error
+        if self.seed:
+            prop_dict["seed"] = self.seed
         prop_dict["rand_device"] = self.rand_device
         prop_dict["cfg_scale"] = self.cfg_scale
         prop_dict["steps"] = self.steps
