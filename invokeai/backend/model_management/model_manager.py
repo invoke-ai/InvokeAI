@@ -472,7 +472,7 @@ class ModelManager(object):
         if submodel_type is not None and hasattr(model_config, submodel_type):
             override_path = getattr(model_config, submodel_type)
             if override_path:
-                model_path = self.resolve_path(override_path)
+                model_path = self.resolve_model_path(override_path)
                 model_type = submodel_type
                 submodel_type = None
                 model_class = MODEL_CLASSES[base_model][model_type]
