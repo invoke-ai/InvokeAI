@@ -24,7 +24,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 )
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from ...backend.model_management import ModelPatcher
+from ...backend.model_management import ModelPatcher, BaseModelType
 from ...backend.util.devices import choose_torch_device, torch_dtype, choose_precision
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
@@ -160,12 +160,14 @@ class TextToLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         source_node_id: str,
         intermediate_state: PipelineIntermediateState,
+        base_model: BaseModelType,
     ) -> None:
         stable_diffusion_step_callback(
             context=context,
             intermediate_state=intermediate_state,
             node=self.dict(),
             source_node_id=source_node_id,
+            base_model=base_model,
         )
 
     def get_conditioning_data(
@@ -340,7 +342,7 @@ class TextToLatentsInvocation(BaseInvocation):
             source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
             def step_callback(state: PipelineIntermediateState):
-                self.dispatch_progress(context, source_node_id, state)
+                self.dispatch_progress(context, source_node_id, state, self.unet.unet.base_model)
 
             def _lora_loader():
                 for lora in self.unet.loras:
@@ -379,7 +381,7 @@ class TextToLatentsInvocation(BaseInvocation):
                     do_classifier_free_guidance=True,
                     exit_stack=exit_stack,
                 )
-                
+
                 num_inference_steps, timesteps = self.init_scheduler(
                     scheduler,
                     device=unet.device,
@@ -448,7 +450,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
             def step_callback(state: PipelineIntermediateState):
-                self.dispatch_progress(context, source_node_id, state)
+                self.dispatch_progress(context, source_node_id, state, self.unet.unet.base_model)
 
             def _lora_loader():
                 for lora in self.unet.loras:

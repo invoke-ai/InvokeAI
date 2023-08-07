@@ -50,7 +50,6 @@ from .offloading import FullyLoadedModelGroup, ModelGroup
 
 @dataclass
 class PipelineIntermediateState:
-    run_id: str
     step: int
     timestep: int
     latents: torch.Tensor
@@ -407,7 +406,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         noise: Optional[torch.Tensor],
         timesteps=None,
         additional_guidance: List[Callable] = None,
-        run_id=None,
         callback: Callable[[PipelineIntermediateState], None] = None,
         control_data: List[ControlNetData] = None,
     ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
@@ -427,7 +425,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             timesteps,
             conditioning_data,
             noise=noise,
-            run_id=run_id,
             additional_guidance=additional_guidance,
             control_data=control_data,
             callback=callback,
@@ -441,13 +438,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         conditioning_data: ConditioningData,
         *,
         noise: Optional[torch.Tensor],
-        run_id: str = None,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
     ):
         self._adjust_memory_efficient_attention(latents)
-        if run_id is None:
-            run_id = secrets.token_urlsafe(self.ID_LENGTH)
         if additional_guidance is None:
             additional_guidance = []
         extra_conditioning_info = conditioning_data.extra
@@ -468,7 +462,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 latents = self.scheduler.add_noise(latents, noise, batched_t)
 
             yield PipelineIntermediateState(
-                run_id=run_id,
                 step=-1,
                 timestep=self.scheduler.config.num_train_timesteps,
                 latents=latents,
@@ -507,7 +500,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 #    self.invokeai_diffuser.setup_attention_map_saving(attention_map_saver)
 
                 yield PipelineIntermediateState(
-                    run_id=run_id,
                     step=i,
                     timestep=int(t),
                     latents=latents,
@@ -619,7 +611,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         conditioning_data: ConditioningData,
         *,
         callback: Callable[[PipelineIntermediateState], None] = None,
-        run_id=None,
         noise_func=None,
         seed=None,
     ) -> InvokeAIStableDiffusionPipelineOutput:
@@ -645,7 +636,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             conditioning_data,
             strength,
             noise,
-            run_id,
             callback,
         )
 
@@ -678,7 +668,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         conditioning_data: ConditioningData,
         *,
         callback: Callable[[PipelineIntermediateState], None] = None,
-        run_id=None,
         noise_func=None,
         seed=None,
     ) -> InvokeAIStableDiffusionPipelineOutput:
@@ -737,7 +726,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 noise=noise,
                 timesteps=timesteps,
                 additional_guidance=guidance,
-                run_id=run_id,
                 callback=callback,
             )
         finally:

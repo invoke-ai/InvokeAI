@@ -16,7 +16,7 @@ from ..util.step_callback import stable_diffusion_step_callback
 from .baseinvocation import BaseInvocation, InvocationConfig, InvocationContext
 from .image import ImageOutput
 
-from ...backend.model_management.lora import ModelPatcher
+from ...backend.model_management import ModelPatcher, BaseModelType
 from ...backend.stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
 from .model import UNetField, VaeField
 from .compel import ConditioningField
@@ -140,6 +140,7 @@ class InpaintInvocation(BaseInvocation):
         self,
         context: InvocationContext,
         source_node_id: str,
+        base_model: BaseModelType,
         intermediate_state: PipelineIntermediateState,
     ) -> None:
         stable_diffusion_step_callback(
@@ -147,15 +148,16 @@ class InpaintInvocation(BaseInvocation):
             intermediate_state=intermediate_state,
             node=self.dict(),
             source_node_id=source_node_id,
+            base_model=base_model,
         )
 
     def get_conditioning(self, context, unet):
         positive_cond_data = context.services.latents.get(self.positive_conditioning.conditioning_name)
-        c = positive_cond_data.conditionings[0].embeds.to(device=unet.device, dtype=unet.dtype)
-        extra_conditioning_info = positive_cond_data.conditionings[0].extra_conditioning
+        c = positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
+        extra_conditioning_info = c.extra_conditioning
 
         negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
-        uc = negative_cond_data.conditionings[0].embeds.to(device=unet.device, dtype=unet.dtype)
+        uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
 
         return (uc, c, extra_conditioning_info)
 
@@ -225,7 +227,7 @@ class InpaintInvocation(BaseInvocation):
                 scheduler=scheduler,
                 init_image=image,
                 mask_image=mask,
-                step_callback=partial(self.dispatch_progress, context, source_node_id),
+                step_callback=partial(self.dispatch_progress, context, source_node_id, self.unet.unet.base_model),
                 **self.dict(
                     exclude={"positive_conditioning", "negative_conditioning", "scheduler", "image", "mask"}
                 ),  # Shorthand for passing all of the parameters above manually
