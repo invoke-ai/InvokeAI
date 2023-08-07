@@ -28,7 +28,6 @@ InvokeAI:
     always_use_cpu: false
     free_gpu_mem: false
   Features:
-    restore: true
     esrgan: true
     patchmatch: true
     internet_available: true
@@ -165,7 +164,7 @@ import pydoc
 import os
 import sys
 from argparse import ArgumentParser
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import OmegaConf, DictConfig, ListConfig
 from pathlib import Path
 from pydantic import BaseSettings, Field, parse_obj_as
 from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_type_hints, get_args
@@ -189,7 +188,12 @@ class InvokeAISettings(BaseSettings):
         opt = parser.parse_args(argv)
         for name in self.__fields__:
             if name not in self._excluded():
-                setattr(self, name, getattr(opt, name))
+                value = getattr(opt, name)
+                if isinstance(value, ListConfig):
+                    value = list(value)
+                elif isinstance(value, DictConfig):
+                    value = dict(value)
+                setattr(self, name, value)
 
     def to_yaml(self) -> str:
         """
@@ -425,6 +429,9 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
     # fmt: on
+
+    class Config:
+        validate_assignment = True
 
     def parse_args(self, argv: List[str] = None, conf: DictConfig = None, clobber=False):
         """
