@@ -235,7 +235,7 @@ import types
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import rmtree, move
-from typing import Optional, List, Tuple, Union, Dict, Set, Callable
+from typing import Optional, List, Literal, Tuple, Union, Dict, Set, Callable
 
 import torch
 import yaml
@@ -567,7 +567,7 @@ class ModelManager(object):
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-    ) -> dict:
+    ) -> Union[dict, None]:
         """
         Given a model name returns the OmegaConf (dict-like) object describing it.
         """
@@ -589,13 +589,15 @@ class ModelManager(object):
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-    ) -> dict:
+    ) -> Union[dict, None]:
         """
         Returns a dict describing one installed model, using
         the combined format of the list_models() method.
         """
         models = self.list_models(base_model, model_type, model_name)
-        return models[0] if models else None
+        if len(models) > 1:
+            return models[0]
+        return None
 
     def list_models(
         self,
@@ -609,7 +611,7 @@ class ModelManager(object):
 
         model_keys = (
             [self.create_key(model_name, base_model, model_type)]
-            if model_name
+            if model_name and base_model and model_type
             else sorted(self.models, key=str.casefold)
         )
         models = []
@@ -645,7 +647,7 @@ class ModelManager(object):
         Print a table of models and their descriptions. This needs to be redone
         """
         # TODO: redo
-        for model_type, model_dict in self.list_models().items():
+        for model_dict in self.list_models():
             for model_name, model_info in model_dict.items():
                 line = f'{model_info["name"]:25s} {model_info["type"]:10s} {model_info["description"]}'
                 print(line)
@@ -748,8 +750,8 @@ class ModelManager(object):
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-        new_name: str = None,
-        new_base: BaseModelType = None,
+        new_name: Optional[str] = None,
+        new_base: Optional[BaseModelType] = None,
     ):
         """
         Rename or rebase a model.
@@ -802,7 +804,7 @@ class ModelManager(object):
         self,
         model_name: str,
         base_model: BaseModelType,
-        model_type: Union[ModelType.Main, ModelType.Vae],
+        model_type: Literal[ModelType.Main, ModelType.Vae],
         dest_directory: Optional[Path] = None,
     ) -> AddModelResult:
         """
@@ -816,6 +818,10 @@ class ModelManager(object):
         This will raise a ValueError unless the model is a checkpoint.
         """
         info = self.model_info(model_name, base_model, model_type)
+
+        if info is None:
+            raise FileNotFoundError(f"model not found: {model_name}")
+
         if info["model_format"] != "checkpoint":
             raise ValueError(f"not a checkpoint format model: {model_name}")
 
@@ -885,7 +891,7 @@ class ModelManager(object):
 
         return search_folder, found_models
 
-    def commit(self, conf_file: Path = None) -> None:
+    def commit(self, conf_file: Optional[Path] = None) -> None:
         """
         Write current configuration out to the indicated file.
         """
@@ -1032,7 +1038,7 @@ class ModelManager(object):
         # LS: hacky
         # Patch in the SD VAE from core so that it is available for use by the UI
         try:
-            self.heuristic_import({self.resolve_model_path("core/convert/sd-vae-ft-mse")})
+            self.heuristic_import({str(self.resolve_model_path("core/convert/sd-vae-ft-mse"))})
         except:
             pass
 
@@ -1060,7 +1066,7 @@ class ModelManager(object):
     def heuristic_import(
         self,
         items_to_import: Set[str],
-        prediction_type_helper: Callable[[Path], SchedulerPredictionType] = None,
+        prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
     ) -> Dict[str, AddModelResult]:
         """Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.
