@@ -41,6 +41,9 @@ from diffusers.models.attention_processor import (
     XFormersAttnProcessor,
 )
 
+import torchvision.transforms as T
+from torchvision.transforms.functional import resize as tv_resize
+
 
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
@@ -397,6 +400,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
                     latents=torch.zeros_like(noise, dtype=torch_dtype(unet.device)),
                     noise=noise,
+                    seed=seed,
                     timesteps=timesteps,
                     num_inference_steps=num_inference_steps,
                     conditioning_data=conditioning_data,
@@ -424,7 +428,11 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
     denoising_start: float = Field(default=0.0, ge=0, le=1, description="")
     #denoising_end: float = Field(default=1.0, ge=0, le=1, description="")
 
-    latents: Optional[LatentsField] = Field(description="The latents to use as a base image")    
+    latents: Optional[LatentsField] = Field(description="The latents to use as a base image")
+
+    mask: Optional[ImageField] = Field(
+        None, description="Mask",
+    )
 
     # Schema customisation
     class Config(InvocationConfig):
@@ -440,6 +448,22 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             },
         }
 
+    def prep_mask_tensor(self, mask, context, lantents):
+        if mask is None:
+            return None
+
+        mask_image = context.services.images.get_pil_image(mask.image_name)
+        if mask_image.mode != "L":
+            # FIXME: why do we get passed an RGB image here? We can only use single-channel.
+            mask_image = mask_image.convert("L")
+        mask_tensor = image_resized_to_grid_as_tensor(mask_image, normalize=False)
+        if mask_tensor.dim() == 3:
+            mask_tensor = mask_tensor.unsqueeze(0)
+        mask_tensor = tv_resize(
+            mask_tensor, lantents.shape[-2:], T.InterpolationMode.BILINEAR
+        )
+        return mask_tensor
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         with SilenceWarnings():  # this quenches NSFW nag from diffusers
@@ -451,6 +475,8 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 noise = context.services.latents.get(self.noise.latents_name)
                 if self.noise.seed is not None:
                     seed = self.noise.seed
+
+            mask = self.prep_mask_tensor(self.mask, context, latent)
 
             # Get the source node id (we are invoking the prepared node)
             graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
@@ -479,6 +505,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 if noise is not None:
                     noise = noise.to(device=unet.device, dtype=unet.dtype)
                 latent = latent.to(device=unet.device, dtype=unet.dtype)
+                mask = mask.to(device=unet.device, dtype=unet.dtype)
 
                 scheduler = get_scheduler(
                     context=context,
@@ -516,6 +543,8 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                     latents=initial_latents,
                     timesteps=timesteps,
                     noise=noise,
+                    seed=seed,
+                    mask=mask,
                     num_inference_steps=num_inference_steps,
                     conditioning_data=conditioning_data,
                     control_data=control_data,  # list[ControlNetData]

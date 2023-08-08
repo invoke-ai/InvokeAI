@@ -100,7 +100,7 @@ class AddsMaskGuidance:
     mask: torch.FloatTensor
     mask_latents: torch.FloatTensor
     scheduler: SchedulerMixin
-    noise: torch.Tensor
+    noise: Optional[torch.Tensor] = None
     _debug: Optional[Callable] = None
 
     def __call__(self, step_output: Union[BaseOutput, SchedulerOutput], t: torch.Tensor, conditioning) -> BaseOutput:
@@ -131,11 +131,10 @@ class AddsMaskGuidance:
             # some schedulers expect t to be one-dimensional.
             # TODO: file diffusers bug about inconsistency?
             t = einops.repeat(t, "-> batch", batch=batch_size)
-        # Noise shouldn't be re-randomized between steps here. The multistep schedulers
-        # get very confused about what is happening from step to step when we do that.
-        mask_latents = self.scheduler.add_noise(self.mask_latents, self.noise, t)
-        # TODO: Do we need to also apply scheduler.scale_model_input? Or is add_noise appropriately scaled already?
-        # mask_latents = self.scheduler.scale_model_input(mask_latents, t)
+
+        if self.noise is not None:
+            mask_latents = self.scheduler.add_noise(self.mask_latents, self.noise, t)
+
         mask_latents = einops.repeat(mask_latents, "b c h w -> (repeat b) c h w", repeat=batch_size)
         masked_input = torch.lerp(mask_latents.to(dtype=latents.dtype), latents, mask.to(dtype=latents.dtype))
         if self._debug:
@@ -408,7 +407,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         additional_guidance: List[Callable] = None,
         callback: Callable[[PipelineIntermediateState], None] = None,
         control_data: List[ControlNetData] = None,
+        mask: Optional[torch.Tensor] = None,
+        seed: Optional[int] = None,
     ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
+        # TODO:
         if self.scheduler.config.get("cpu_only", False):
             scheduler_device = torch.device("cpu")
         else:
@@ -417,19 +419,74 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if timesteps is None:
             self.scheduler.set_timesteps(num_inference_steps, device=scheduler_device)
             timesteps = self.scheduler.timesteps
+
         infer_latents_from_embeddings = GeneratorToCallbackinator(
             self.generate_latents_from_embeddings, PipelineIntermediateState
         )
-        result: PipelineIntermediateState = infer_latents_from_embeddings(
-            latents,
-            timesteps,
-            conditioning_data,
-            noise=noise,
-            additional_guidance=additional_guidance,
-            control_data=control_data,
-            callback=callback,
+
+        if additional_guidance is None:
+            additional_guidance = []
+
+        orig_latents = latents.clone()
+
+        batch_size = latents.shape[0]
+        batched_t = torch.full(
+            (batch_size,),
+            timesteps[0],
+            dtype=timesteps.dtype,
+            device=self.unet.device,
         )
-        return result.latents, result.attention_map_saver
+
+        if noise is not None:
+            #latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
+            latents = self.scheduler.add_noise(latents, noise, batched_t)
+
+        else:
+            # if no noise provided, noisify unmasked area based on seed(or 0 as fallback)
+            if mask is not None:
+                noise = torch.randn(
+                    orig_latents.shape,
+                    dtype=torch.float32,
+                    device="cpu",
+                    generator=torch.Generator(device="cpu").manual_seed(seed or 0),
+                ).to(device=orig_latents.device, dtype=orig_latents.dtype)
+
+                latents = self.scheduler.add_noise(latents, noise, batched_t)
+                latents = torch.lerp(orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype))
+
+
+        if mask is not None:
+            if is_inpainting_model(self.unet):
+                # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
+                # (that's why there's a mask!) but it seems to really want that blanked out.
+                #masked_latents = latents * torch.where(mask < 0.5, 1, 0) TODO: inpaint/outpaint/infill
+
+                # TODO: we should probably pass this in so we don't have to try/finally around setting it.
+                self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(
+                    self._unet_forward, mask, orig_latents
+                )
+            else:
+                additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise))
+
+        try:
+            result: PipelineIntermediateState = infer_latents_from_embeddings(
+                latents,
+                timesteps,
+                conditioning_data,
+                additional_guidance=additional_guidance,
+                control_data=control_data,
+                callback=callback,
+            )
+        finally:
+            self.invokeai_diffuser.model_forward_callback = self._unet_forward
+
+        latents = result.latents
+
+        # restore unmasked part
+        if mask is not None:
+            latents = torch.lerp(orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype))
+
+        return latents, result.attention_map_saver
 
     def generate_latents_from_embeddings(
         self,
@@ -437,7 +494,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         timesteps,
         conditioning_data: ConditioningData,
         *,
-        noise: Optional[torch.Tensor],
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
     ):
@@ -457,9 +513,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 dtype=timesteps.dtype,
                 device=self._model_group.device_for(self.unet),
             )
-            if noise is not None:
-                #latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
-                latents = self.scheduler.add_noise(latents, noise, batched_t)
 
             yield PipelineIntermediateState(
                 step=-1,
