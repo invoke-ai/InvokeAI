@@ -595,7 +595,7 @@ class ModelManager(object):
         the combined format of the list_models() method.
         """
         models = self.list_models(base_model, model_type, model_name)
-        if len(models) > 1:
+        if len(models) > 0:
             return models[0]
         return None
 
