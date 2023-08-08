@@ -31,7 +31,7 @@ const ParamLoraCollapse = () => {
   }
 
   return (
-    <IAICollapse label={'LoRA'} activeLabel={activeLabel}>
+    <IAICollapse label="LoRA" activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ParamLoRASelect />
         <ParamLoraList />

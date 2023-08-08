@@ -4,6 +4,7 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -245,6 +246,8 @@ export const buildLinearSDXLTextToImageGraph = (
       field: 'metadata',
     },
   });
+
+  addSDXLLoRAsToGraph(state, graph, SDXL_TEXT_TO_LATENTS, SDXL_MODEL_LOADER);
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
