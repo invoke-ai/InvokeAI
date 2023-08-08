@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 import dataclasses
-import inspect
-import math
-import secrets
-from collections.abc import Sequence
 from dataclasses import dataclass, field
+import inspect
 from typing import Any, Callable, Generic, List, Optional, Type, TypeVar, Union
 from pydantic import Field
 
 import einops
 import PIL.Image
 import numpy as np
-from accelerate.utils import set_seed
 import psutil
 import torch
 import torchvision.transforms as T
@@ -23,15 +19,11 @@ from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
     StableDiffusionPipeline,
 )
 
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import (
-    StableDiffusionImg2ImgPipeline,
-)
 from diffusers.pipelines.stable_diffusion.safety_checker import (
     StableDiffusionSafetyChecker,
 )
 from diffusers.schedulers import KarrasDiffusionSchedulers
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
-from diffusers.utils import PIL_INTERPOLATION
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.outputs import BaseOutput
 from torchvision.transforms.functional import resize as tv_resize
@@ -45,7 +37,6 @@ from .diffusion import (
     InvokeAIDiffuserComponent,
     PostprocessingSettings,
 )
-from .offloading import FullyLoadedModelGroup, ModelGroup
 
 
 @dataclass
@@ -287,9 +278,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
-    _model_group: ModelGroup
-
-    ID_LENGTH = 8
 
     def __init__(
         self,
@@ -328,9 +316,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             # control_model=control_model,
         )
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
-
-        self._model_group = FullyLoadedModelGroup(execution_device or self.unet.device)
-        self._model_group.install(*self._submodels)
         self.control_model = control_model
 
     def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
@@ -373,28 +358,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             self.disable_attention_slicing()
 
     def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
-        # overridden method; types match the superclass.
-        if torch_device is None:
-            return self
-        self._model_group.set_device(torch.device(torch_device))
-        self._model_group.ready()
+        raise Exception("Should not be called")
 
     @property
     def device(self) -> torch.device:
-        return self._model_group.execution_device
-
-    @property
-    def _submodels(self) -> Sequence[torch.nn.Module]:
-        module_names, _, _ = self.extract_init_dict(dict(self.config))
-        submodels = []
-        for name in module_names.keys():
-            if hasattr(self, name):
-                value = getattr(self, name)
-            else:
-                value = getattr(self.config, name)
-            if isinstance(value, torch.nn.Module):
-                submodels.append(value)
-        return submodels
+        return self.unet.device
 
     def latents_from_embeddings(
         self,
@@ -414,7 +382,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if self.scheduler.config.get("cpu_only", False):
             scheduler_device = torch.device("cpu")
         else:
-            scheduler_device = self._model_group.device_for(self.unet)
+            scheduler_device = self.unet.device
 
         if timesteps is None:
             self.scheduler.set_timesteps(num_inference_steps, device=scheduler_device)
@@ -511,7 +479,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 (batch_size,),
                 timesteps[0],
                 dtype=timesteps.dtype,
-                device=self._model_group.device_for(self.unet),
+                device=self.unet.device,
             )
 
             yield PipelineIntermediateState(
@@ -655,185 +623,3 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             cross_attention_kwargs=cross_attention_kwargs,
             **kwargs,
         ).sample
-
-    def img2img_from_embeddings(
-        self,
-        init_image: Union[torch.FloatTensor, PIL.Image.Image],
-        strength: float,
-        num_inference_steps: int,
-        conditioning_data: ConditioningData,
-        *,
-        callback: Callable[[PipelineIntermediateState], None] = None,
-        noise_func=None,
-        seed=None,
-    ) -> InvokeAIStableDiffusionPipelineOutput:
-        if isinstance(init_image, PIL.Image.Image):
-            init_image = image_resized_to_grid_as_tensor(init_image.convert("RGB"))
-
-        if init_image.dim() == 3:
-            init_image = einops.rearrange(init_image, "c h w -> 1 c h w")
-
-        # 6. Prepare latent variables
-        initial_latents = self.non_noised_latents_from_image(
-            init_image,
-            device=self._model_group.device_for(self.unet),
-            dtype=self.unet.dtype,
-        )
-        if seed is not None:
-            set_seed(seed)
-        noise = noise_func(initial_latents)
-
-        return self.img2img_from_latents_and_embeddings(
-            initial_latents,
-            num_inference_steps,
-            conditioning_data,
-            strength,
-            noise,
-            callback,
-        )
-
-    def get_img2img_timesteps(self, num_inference_steps: int, strength: float, device=None) -> (torch.Tensor, int):
-        img2img_pipeline = StableDiffusionImg2ImgPipeline(**self.components)
-        assert img2img_pipeline.scheduler is self.scheduler
-
-        if self.scheduler.config.get("cpu_only", False):
-            scheduler_device = torch.device("cpu")
-        else:
-            scheduler_device = self._model_group.device_for(self.unet)
-
-        img2img_pipeline.scheduler.set_timesteps(num_inference_steps, device=scheduler_device)
-        timesteps, adjusted_steps = img2img_pipeline.get_timesteps(
-            num_inference_steps, strength, device=scheduler_device
-        )
-        # Workaround for low strength resulting in zero timesteps.
-        # TODO: submit upstream fix for zero-step img2img
-        if timesteps.numel() == 0:
-            timesteps = self.scheduler.timesteps[-1:]
-            adjusted_steps = timesteps.numel()
-        return timesteps, adjusted_steps
-
-    def inpaint_from_embeddings(
-        self,
-        init_image: torch.FloatTensor,
-        mask: torch.FloatTensor,
-        strength: float,
-        num_inference_steps: int,
-        conditioning_data: ConditioningData,
-        *,
-        callback: Callable[[PipelineIntermediateState], None] = None,
-        noise_func=None,
-        seed=None,
-    ) -> InvokeAIStableDiffusionPipelineOutput:
-        device = self._model_group.device_for(self.unet)
-        latents_dtype = self.unet.dtype
-
-        if isinstance(init_image, PIL.Image.Image):
-            init_image = image_resized_to_grid_as_tensor(init_image.convert("RGB"))
-
-        init_image = init_image.to(device=device, dtype=latents_dtype)
-        mask = mask.to(device=device, dtype=latents_dtype)
-
-        if init_image.dim() == 3:
-            init_image = init_image.unsqueeze(0)
-
-        timesteps, _ = self.get_img2img_timesteps(num_inference_steps, strength)
-
-        # 6. Prepare latent variables
-        # can't quite use upstream StableDiffusionImg2ImgPipeline.prepare_latents
-        # because we have our own noise function
-        init_image_latents = self.non_noised_latents_from_image(init_image, device=device, dtype=latents_dtype)
-        if seed is not None:
-            set_seed(seed)
-        noise = noise_func(init_image_latents)
-
-        if mask.dim() == 3:
-            mask = mask.unsqueeze(0)
-        latent_mask = tv_resize(mask, init_image_latents.shape[-2:], T.InterpolationMode.BILINEAR).to(
-            device=device, dtype=latents_dtype
-        )
-
-        guidance: List[Callable] = []
-
-        if is_inpainting_model(self.unet):
-            # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
-            # (that's why there's a mask!) but it seems to really want that blanked out.
-            masked_init_image = init_image * torch.where(mask < 0.5, 1, 0)
-            masked_latents = self.non_noised_latents_from_image(masked_init_image, device=device, dtype=latents_dtype)
-
-            # TODO: we should probably pass this in so we don't have to try/finally around setting it.
-            self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(
-                self._unet_forward, latent_mask, masked_latents
-            )
-        else:
-            guidance.append(AddsMaskGuidance(latent_mask, init_image_latents, self.scheduler, noise))
-
-        try:
-            result_latents, result_attention_maps = self.latents_from_embeddings(
-                latents=init_image_latents
-                if strength < 1.0
-                else torch.zeros_like(
-                    init_image_latents, device=init_image_latents.device, dtype=init_image_latents.dtype
-                ),
-                num_inference_steps=num_inference_steps,
-                conditioning_data=conditioning_data,
-                noise=noise,
-                timesteps=timesteps,
-                additional_guidance=guidance,
-                callback=callback,
-            )
-        finally:
-            self.invokeai_diffuser.model_forward_callback = self._unet_forward
-
-        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        torch.cuda.empty_cache()
-
-        with torch.inference_mode():
-            image = self.decode_latents(result_latents)
-            output = InvokeAIStableDiffusionPipelineOutput(
-                images=image,
-                nsfw_content_detected=[],
-                attention_map_saver=result_attention_maps,
-            )
-            return self.check_for_safety(output, dtype=self.unet.dtype)
-
-    def non_noised_latents_from_image(self, init_image, *, device: torch.device, dtype):
-        init_image = init_image.to(device=device, dtype=dtype)
-        with torch.inference_mode():
-            self._model_group.load(self.vae)
-            init_latent_dist = self.vae.encode(init_image).latent_dist
-            init_latents = init_latent_dist.sample().to(dtype=dtype)  # FIXME: uses torch.randn. make reproducible!
-
-        init_latents = 0.18215 * init_latents
-        return init_latents
-
-    def check_for_safety(self, output, dtype):
-        with torch.inference_mode():
-            screened_images, has_nsfw_concept = self.run_safety_checker(output.images, dtype=dtype)
-        screened_attention_map_saver = None
-        if has_nsfw_concept is None or not has_nsfw_concept:
-            screened_attention_map_saver = output.attention_map_saver
-        return InvokeAIStableDiffusionPipelineOutput(
-            screened_images,
-            has_nsfw_concept,
-            # block the attention maps if NSFW content is detected
-            attention_map_saver=screened_attention_map_saver,
-        )
-
-    def run_safety_checker(self, image, device=None, dtype=None):
-        # overriding to use the model group for device info instead of requiring the caller to know.
-        if self.safety_checker is not None:
-            device = self._model_group.device_for(self.safety_checker)
-        return super().run_safety_checker(image, device, dtype)
-
-    def decode_latents(self, latents):
-        # Explicit call to get the vae loaded, since `decode` isn't the forward method.
-        self._model_group.load(self.vae)
-        return super().decode_latents(latents)
-
-    def debug_latents(self, latents, msg):
-        from invokeai.backend.image_util import debug_image
-
-        with torch.inference_mode():
-            decoded = self.numpy_to_pil(self.decode_latents(latents))
-        for i, img in enumerate(decoded):
-            debug_image(img, f"latents {msg} {i+1}/{len(decoded)}", debug_status=True)

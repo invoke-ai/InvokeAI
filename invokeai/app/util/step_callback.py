@@ -4,7 +4,6 @@ from invokeai.app.models.exceptions import CanceledException
 from invokeai.app.models.image import ProgressImage
 from ..invocations.baseinvocation import InvocationContext
 from ...backend.util.util import image_to_dataURL
-from ...backend.generator.base import Generator
 from ...backend.stable_diffusion import PipelineIntermediateState
 from invokeai.app.services.config import InvokeAIAppConfig
 from ...backend.model_management.models import BaseModelType
@@ -117,58 +116,4 @@ def stable_diffusion_step_callback(
         progress_image=ProgressImage(width=width, height=height, dataURL=dataURL),
         step=intermediate_state.step,
         total_steps=node["steps"],
-    )
-
-
-def stable_diffusion_xl_step_callback(
-    context: InvocationContext,
-    node: dict,
-    source_node_id: str,
-    sample,
-    step,
-    total_steps,
-):
-    if context.services.queue.is_canceled(context.graph_execution_state_id):
-        raise CanceledException
-
-    sdxl_latent_rgb_factors = torch.tensor(
-        [
-            #   R        G        B
-            [0.3816, 0.4930, 0.5320],
-            [-0.3753, 0.1631, 0.1739],
-            [0.1770, 0.3588, -0.2048],
-            [-0.4350, -0.2644, -0.4289],
-        ],
-        dtype=sample.dtype,
-        device=sample.device,
-    )
-
-    sdxl_smooth_matrix = torch.tensor(
-        [
-            # [ 0.0478,  0.1285,  0.0478],
-            # [ 0.1285,  0.2948,  0.1285],
-            # [ 0.0478,  0.1285,  0.0478],
-            [0.0358, 0.0964, 0.0358],
-            [0.0964, 0.4711, 0.0964],
-            [0.0358, 0.0964, 0.0358],
-        ],
-        dtype=sample.dtype,
-        device=sample.device,
-    )
-
-    image = sample_to_lowres_estimated_image(sample, sdxl_latent_rgb_factors, sdxl_smooth_matrix)
-
-    (width, height) = image.size
-    width *= 8
-    height *= 8
-
-    dataURL = image_to_dataURL(image, image_format="JPEG")
-
-    context.services.events.emit_generator_progress(
-        graph_execution_state_id=context.graph_execution_state_id,
-        node=node,
-        source_node_id=source_node_id,
-        progress_image=ProgressImage(width=width, height=height, dataURL=dataURL),
-        step=step,
-        total_steps=total_steps,
     )

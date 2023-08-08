@@ -295,7 +295,6 @@ class InvokeAIDiffuserComponent:
     ) -> torch.Tensor:
         if postprocessing_settings is not None:
             percent_through = step_index / total_step_count
-            latents = self.apply_threshold(postprocessing_settings, latents, percent_through)
             latents = self.apply_symmetry(postprocessing_settings, latents, percent_through)
         return latents
 
@@ -516,63 +515,6 @@ class InvokeAIDiffuserComponent:
         combined_next_x = unconditioned_next_x + scaled_delta
         return combined_next_x
 
-    def apply_threshold(
-        self,
-        postprocessing_settings: PostprocessingSettings,
-        latents: torch.Tensor,
-        percent_through: float,
-    ) -> torch.Tensor:
-        if postprocessing_settings.threshold is None or postprocessing_settings.threshold == 0.0:
-            return latents
-
-        threshold = postprocessing_settings.threshold
-        warmup = postprocessing_settings.warmup
-
-        if percent_through < warmup:
-            current_threshold = threshold + threshold * 5 * (1 - (percent_through / warmup))
-        else:
-            current_threshold = threshold
-
-        if current_threshold <= 0:
-            return latents
-
-        maxval = latents.max().item()
-        minval = latents.min().item()
-
-        scale = 0.7  # default value from #395
-
-        if self.debug_thresholding:
-            std, mean = [i.item() for i in torch.std_mean(latents)]
-            outside = torch.count_nonzero((latents < -current_threshold) | (latents > current_threshold))
-            logger.info(f"Threshold: %={percent_through} threshold={current_threshold:.3f} (of {threshold:.3f})")
-            logger.debug(f"min, mean, max = {minval:.3f}, {mean:.3f}, {maxval:.3f}\tstd={std}")
-            logger.debug(f"{outside / latents.numel() * 100:.2f}% values outside threshold")
-
-        if maxval < current_threshold and minval > -current_threshold:
-            return latents
-
-        num_altered = 0
-
-        # MPS torch.rand_like is fine because torch.rand_like is wrapped in generate.py!
-
-        if maxval > current_threshold:
-            latents = torch.clone(latents)
-            maxval = np.clip(maxval * scale, 1, current_threshold)
-            num_altered += torch.count_nonzero(latents > maxval)
-            latents[latents > maxval] = torch.rand_like(latents[latents > maxval]) * maxval
-
-        if minval < -current_threshold:
-            latents = torch.clone(latents)
-            minval = np.clip(minval * scale, -current_threshold, -1)
-            num_altered += torch.count_nonzero(latents < minval)
-            latents[latents < minval] = torch.rand_like(latents[latents < minval]) * minval
-
-        if self.debug_thresholding:
-            logger.debug(f"min,     , max = {minval:.3f},        , {maxval:.3f}\t(scaled by {scale})")
-            logger.debug(f"{num_altered / latents.numel() * 100:.2f}% values altered")
-
-        return latents
-
     def apply_symmetry(
         self,
         postprocessing_settings: PostprocessingSettings,
@@ -633,18 +575,6 @@ class InvokeAIDiffuserComponent:
 
         self.last_percent_through = percent_through
         return latents.to(device=dev)
-
-    def estimate_percent_through(self, step_index, sigma):
-        if step_index is not None and self.cross_attention_control_context is not None:
-            # percent_through will never reach 1.0 (but this is intended)
-            return float(step_index) / float(self.cross_attention_control_context.step_count)
-        # find the best possible index of the current sigma in the sigma sequence
-        smaller_sigmas = torch.nonzero(self.model.sigmas <= sigma)
-        sigma_index = smaller_sigmas[-1].item() if smaller_sigmas.shape[0] > 0 else 0
-        # flip because sigmas[0] is for the fully denoised image
-        # percent_through must be <1
-        return 1.0 - float(sigma_index + 1) / float(self.model.sigmas.shape[0])
-        # print('estimated percent_through', percent_through, 'from sigma', sigma.item())
 
     # todo: make this work
     @classmethod
