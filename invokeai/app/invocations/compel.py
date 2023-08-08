@@ -16,7 +16,7 @@ from ...backend.util.devices import torch_dtype
 from ...backend.model_management import ModelType
 from ...backend.model_management.models import ModelNotFoundException
 from ...backend.model_management.lora import ModelPatcher
-from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
+from ...backend.stable_diffusion import InvokeAIDiffuserComponent, BasicConditioningInfo, SDXLConditioningInfo
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
 from .model import ClipField
 from dataclasses import dataclass
@@ -30,36 +30,8 @@ class ConditioningField(BaseModel):
 
 
 @dataclass
-class BasicConditioningInfo:
-    # type: Literal["basic_conditioning"] = "basic_conditioning"
-    embeds: torch.Tensor
-    extra_conditioning: Optional[InvokeAIDiffuserComponent.ExtraConditioningInfo]
-    # weight: float
-    # mode: ConditioningAlgo
-
-    def to(self, device, dtype=None):
-        self.embeds = self.embeds.to(device=device, dtype=dtype)
-        return self
-
-
-@dataclass
-class SDXLConditioningInfo(BasicConditioningInfo):
-    # type: Literal["sdxl_conditioning"] = "sdxl_conditioning"
-    pooled_embeds: torch.Tensor
-    add_time_ids: torch.Tensor
-
-    def to(self, device, dtype=None):
-        self.pooled_embeds = self.pooled_embeds.to(device=device, dtype=dtype)
-        self.add_time_ids = self.add_time_ids.to(device=device, dtype=dtype)
-        return super().to(device=device, dtype=dtype)
-
-
-ConditioningInfoType = Annotated[Union[BasicConditioningInfo, SDXLConditioningInfo], Field(discriminator="type")]
-
-
-@dataclass
 class ConditioningFieldData:
-    conditionings: List[Union[BasicConditioningInfo, SDXLConditioningInfo]]
+    conditionings: List[BasicConditioningInfo]
     # unconditioned: Optional[torch.Tensor]
 
 
