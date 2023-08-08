@@ -170,11 +170,11 @@ export const imagesApi = api.injectEndpoints({
       },
       invalidatesTags: (result, error, { imageDTOs }) => {
         // for now, assume bulk delete is all on one board
-        const boardId = imageDTOs[0]?.board_id
+        const boardId = imageDTOs[0]?.board_id;
         return [
           { type: 'BoardImagesTotal', id: boardId ?? 'none' },
           { type: 'BoardAssetsTotal', id: boardId ?? 'none' },
-        ]
+        ];
       },
       async onQueryStarted({ imageDTOs }, { dispatch, queryFulfilled }) {
         /**
@@ -296,11 +296,11 @@ export const imagesApi = api.injectEndpoints({
             imageDTO.image_category
           )
             ? boardsApi.endpoints.getBoardImagesTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState())
+                imageDTO.board_id ?? 'none'
+              )(getState())
             : boardsApi.endpoints.getBoardAssetsTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState());
+                imageDTO.board_id ?? 'none'
+              )(getState());
 
           // IF it eligible for insertion into existing $cache
           // "eligible" means either:
@@ -726,11 +726,11 @@ export const imagesApi = api.injectEndpoints({
             imageDTO.image_category
           )
             ? boardsApi.endpoints.getBoardImagesTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState())
+                imageDTO.board_id ?? 'none'
+              )(getState())
             : boardsApi.endpoints.getBoardAssetsTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState());
+                imageDTO.board_id ?? 'none'
+              )(getState());
 
           const isCacheFullyPopulated =
             currentCache.data && currentCache.data.ids.length >= (total ?? 0);
@@ -846,11 +846,11 @@ export const imagesApi = api.injectEndpoints({
           imageDTO.image_category
         )
           ? boardsApi.endpoints.getBoardImagesTotal.select(
-            imageDTO.board_id ?? 'none'
-          )(getState())
+              imageDTO.board_id ?? 'none'
+            )(getState())
           : boardsApi.endpoints.getBoardAssetsTotal.select(
-            imageDTO.board_id ?? 'none'
-          )(getState());
+              imageDTO.board_id ?? 'none'
+            )(getState());
 
         const isCacheFullyPopulated =
           currentCache.data && currentCache.data.ids.length >= (total ?? 0);
@@ -912,7 +912,7 @@ export const imagesApi = api.injectEndpoints({
           // update the no_board totals
           { type: 'BoardImagesTotal', id: 'none' },
           { type: 'BoardAssetsTotal', id: 'none' },
-        ]
+        ];
       },
       async onQueryStarted(
         { board_id: new_board_id, imageDTOs },
@@ -969,27 +969,26 @@ export const imagesApi = api.injectEndpoints({
               queryArgs
             )(getState());
 
-
             const { data: previousTotal } = IMAGE_CATEGORIES.includes(
               imageDTO.image_category
             )
               ? boardsApi.endpoints.getBoardImagesTotal.select(
-                new_board_id ?? 'none'
-              )(getState())
+                  new_board_id ?? 'none'
+                )(getState())
               : boardsApi.endpoints.getBoardAssetsTotal.select(
-                new_board_id ?? 'none'
-              )(getState());
+                  new_board_id ?? 'none'
+                )(getState());
 
             const isCacheFullyPopulated =
-              currentCache.data && currentCache.data.ids.length >= (previousTotal ?? 0);
+              currentCache.data &&
+              currentCache.data.ids.length >= (previousTotal ?? 0);
 
-            const isInDateRange = (previousTotal || 0) >= IMAGE_LIMIT ? getIsImageInDateRange(
-              currentCache.data,
-              imageDTO
-            ) : true;
+            const isInDateRange =
+              (previousTotal || 0) >= IMAGE_LIMIT
+                ? getIsImageInDateRange(currentCache.data, imageDTO)
+                : true;
 
             if (isCacheFullyPopulated || isInDateRange) {
-              console.log("upserting")
               // *upsert* to $cache
               dispatch(
                 imagesApi.util.updateQueryData(
@@ -1105,19 +1104,19 @@ export const imagesApi = api.injectEndpoints({
               imageDTO.image_category
             )
               ? boardsApi.endpoints.getBoardImagesTotal.select(
-                imageDTO.board_id ?? 'none'
-              )(getState())
+                  imageDTO.board_id ?? 'none'
+                )(getState())
               : boardsApi.endpoints.getBoardAssetsTotal.select(
-                imageDTO.board_id ?? 'none'
-              )(getState());
+                  imageDTO.board_id ?? 'none'
+                )(getState());
 
             const isCacheFullyPopulated =
               currentCache.data && currentCache.data.ids.length >= (total ?? 0);
 
-            const isInDateRange = (total || 0) >= IMAGE_LIMIT ? getIsImageInDateRange(
-              currentCache.data,
-              imageDTO
-            ) : true;
+            const isInDateRange =
+              (total || 0) >= IMAGE_LIMIT
+                ? getIsImageInDateRange(currentCache.data, imageDTO)
+                : true;
 
             if (isCacheFullyPopulated || isInDateRange) {
               // *upsert* to $cache
@@ -1128,7 +1127,7 @@ export const imagesApi = api.injectEndpoints({
                   (draft) => {
                     imagesAdapter.upsertOne(draft, {
                       ...imageDTO,
-                      board_id: "none",
+                      board_id: 'none',
                     });
                   }
                 )
