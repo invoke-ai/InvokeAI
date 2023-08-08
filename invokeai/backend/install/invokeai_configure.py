@@ -52,11 +52,11 @@ from invokeai.frontend.install.widgets import (
     CenteredButtonPress,
     FileBox,
     IntTitleSlider,
-    FloatTitleSlider,
     set_min_terminal_size,
     CyclingForm,
     MIN_COLS,
     MIN_LINES,
+    WindowTooSmallException,
 )
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
@@ -395,7 +395,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.max_cache_size = self.add_widget_intelligent(
             IntTitleSlider,
-            name="RAM cache size (GB). Make this at least large enough to hold a single model. Larger sizes will allow you to switch between models quickly without reading from disk.",
+            name="RAM cache size (GB). Make this at least large enough to hold a single full model.",
             value=old_opts.max_cache_size,
             out_of=MAX_RAM,
             lowest=3,
@@ -440,7 +440,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.autoimport_dirs = {}
         self.autoimport_dirs["autoimport_dir"] = self.add_widget_intelligent(
             FileBox,
-            name=f"Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models",
+            name="Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models",
             value=str(config.root_path / config.autoimport_dir),
             select_dir=True,
             must_exist=False,
@@ -635,9 +635,10 @@ def run_console_ui(program_opts: Namespace, initfile: Path = None) -> (Namespace
     invokeai_opts = default_startup_options(initfile)
     invokeai_opts.root = program_opts.root
 
-    # The third argument is needed in the Windows 11 environment to
-    # launch a console window running this program.
-    set_min_terminal_size(MIN_COLS, MIN_LINES)
+    if not set_min_terminal_size(MIN_COLS, MIN_LINES):
+        raise WindowTooSmallException(
+            "Could not increase terminal size. Try running again with a larger window or smaller font size."
+        )
 
     # the install-models application spawns a subprocess to install
     # models, and will crash unless this is set before running.
@@ -842,6 +843,8 @@ def main():
         postscript(errors=errors)
         if not opt.yes_to_all:
             input("Press any key to continue...")
+    except WindowTooSmallException as e:
+        logger.error(str(e))
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
 
