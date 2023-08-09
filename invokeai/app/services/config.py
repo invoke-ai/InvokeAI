@@ -24,7 +24,7 @@ InvokeAI:
     sequential_guidance: false
     precision: float16
     max_cache_size: 6
-    max_vram_cache_size: 2.7
+    max_vram_cache_size: 0.5
     always_use_cpu: false
     free_gpu_mem: false
   Features:
@@ -172,6 +172,7 @@ from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_ty
 INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
+DEFAULT_MAX_VRAM = 0.5
 
 
 class InvokeAISettings(BaseSettings):

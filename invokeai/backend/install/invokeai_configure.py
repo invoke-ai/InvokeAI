@@ -10,12 +10,15 @@ import sys
 import argparse
 import io
 import os
+import psutil
 import shutil
 import textwrap
+import torch
 import traceback
 import yaml
 import warnings
 from argparse import Namespace
+from enum import Enum
 from pathlib import Path
 from shutil import get_terminal_size
 from typing import get_type_hints
@@ -55,6 +58,7 @@ from invokeai.frontend.install.widgets import (
     CyclingForm,
     MIN_COLS,
     MIN_LINES,
+    WindowTooSmallException,
 )
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
@@ -79,6 +83,13 @@ Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
 
 PRECISION_CHOICES = ["auto", "float16", "float32"]
+GB = 1073741824  # GB in bytes
+HAS_CUDA = torch.cuda.is_available()
+_, MAX_VRAM = torch.cuda.mem_get_info() if HAS_CUDA else (0, 0)
+
+
+MAX_VRAM /= GB
+MAX_RAM = psutil.virtual_memory().total / GB
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -87,6 +98,12 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 """
 
 logger = InvokeAILogger.getLogger()
+
+
+class DummyWidgetValue(Enum):
+    zero = 0
+    true = True
+    false = False
 
 
 # --------------------------------------------
@@ -381,13 +398,35 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.max_cache_size = self.add_widget_intelligent(
             IntTitleSlider,
-            name="Size of the RAM cache used for fast model switching (GB)",
+            name="RAM cache size (GB). Make this at least large enough to hold a single full model.",
             value=old_opts.max_cache_size,
-            out_of=20,
+            out_of=MAX_RAM,
             lowest=3,
             begin_entry_at=6,
             scroll_exit=True,
         )
+        if HAS_CUDA:
+            self.nextrely += 1
+            self.add_widget_intelligent(
+                npyscreen.TitleFixedText,
+                name="VRAM cache size (GB). Reserving a small amount of VRAM will modestly speed up the start of image generation.",
+                begin_entry_at=0,
+                editable=False,
+                color="CONTROL",
+                scroll_exit=True,
+            )
+            self.nextrely -= 1
+            self.max_vram_cache_size = self.add_widget_intelligent(
+                npyscreen.Slider,
+                value=old_opts.max_vram_cache_size,
+                out_of=round(MAX_VRAM * 2) / 2,
+                lowest=0.0,
+                relx=8,
+                step=0.25,
+                scroll_exit=True,
+            )
+        else:
+            self.max_vram_cache_size = DummyWidgetValue.zero
         self.nextrely += 1
         self.outdir = self.add_widget_intelligent(
             FileBox,
@@ -404,7 +443,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.autoimport_dirs = {}
         self.autoimport_dirs["autoimport_dir"] = self.add_widget_intelligent(
             FileBox,
-            name=f"Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models",
+            name="Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models",
             value=str(config.root_path / config.autoimport_dir),
             select_dir=True,
             must_exist=False,
@@ -479,6 +518,7 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
             "outdir",
             "free_gpu_mem",
             "max_cache_size",
+            "max_vram_cache_size",
             "xformers_enabled",
             "always_use_cpu",
         ]:
@@ -595,13 +635,13 @@ def maybe_create_models_yaml(root: Path):
 
 # -------------------------------------
 def run_console_ui(program_opts: Namespace, initfile: Path = None) -> (Namespace, Namespace):
-    # parse_args() will read from init file if present
     invokeai_opts = default_startup_options(initfile)
     invokeai_opts.root = program_opts.root
 
-    # The third argument is needed in the Windows 11 environment to
-    # launch a console window running this program.
-    set_min_terminal_size(MIN_COLS, MIN_LINES)
+    if not set_min_terminal_size(MIN_COLS, MIN_LINES):
+        raise WindowTooSmallException(
+            "Could not increase terminal size. Try running again with a larger window or smaller font size."
+        )
 
     # the install-models application spawns a subprocess to install
     # models, and will crash unless this is set before running.
@@ -783,6 +823,7 @@ def main():
 
         models_to_download = default_user_selections(opt)
         new_init_file = config.root_path / "invokeai.yaml"
+
         if opt.yes_to_all:
             write_default_options(opt, new_init_file)
             init_options = Namespace(precision="float32" if opt.full_precision else "float16")
@@ -808,6 +849,8 @@ def main():
         postscript(errors=errors)
         if not opt.yes_to_all:
             input("Press any key to continue...")
+    except WindowTooSmallException as e:
+        logger.error(str(e))
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
 
