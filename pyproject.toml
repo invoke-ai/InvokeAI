@@ -77,7 +77,7 @@ dependencies = [
   "realesrgan",
   "requests~=2.28.2",
   "rich~=13.3",
-  "safetensors~=0.3.0",
+  "safetensors==0.3.1",
   "scikit-image~=0.21.0",
   "send2trash",
   "test-tube~=0.7.5",
