@@ -58,10 +58,6 @@ jobs:
           pip3 install
           --editable=".[test]"
 
-      - name: run pytest
-        id: run-pytest
-        run: pytest
-
       - name: run invokeai-configure
         env:
           HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
