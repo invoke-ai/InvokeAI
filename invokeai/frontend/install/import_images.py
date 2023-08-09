@@ -1,5 +1,5 @@
 # Copyright (c) 2023 - The InvokeAI Team
-# Primary Author: David Lovell (github @f412design, discord @techedi)
+# Primary Author: David Lovell (github @f412design, discord @techjedi)
 # co-author, minor tweaks - Lincoln Stein
 
 # pylint: disable=line-too-long
