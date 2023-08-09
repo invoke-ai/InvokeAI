@@ -51,6 +51,14 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
+      - name: Free up more disk space on the runner
+        # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo swapoff /mnt/swapfile
+          sudo rm -rf /mnt/swapfile
+
       - name: install invokeai
         env:
           PIP_EXTRA_INDEX_URL: ${{ matrix.extra-index-url }}
