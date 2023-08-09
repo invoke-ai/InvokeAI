@@ -395,13 +395,23 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             max_width=80,
             scroll_exit=True,
         )
-        self.max_cache_size = self.add_widget_intelligent(
-            IntTitleSlider,
+        self.nextrely += 1
+        self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
             name="RAM cache size (GB). Make this at least large enough to hold a single full model.",
-            value=clip(old_opts.max_cache_size, range=(3.0, MAX_RAM)),
-            out_of=MAX_RAM,
-            lowest=3,
-            begin_entry_at=6,
+            begin_entry_at=0,
+            editable=False,
+            color="CONTROL",
+            scroll_exit=True,
+        )
+        self.nextrely -= 1
+        self.max_cache_size = self.add_widget_intelligent(
+            npyscreen.Slider,
+            value=clip(old_opts.max_cache_size, range=(3.0, MAX_RAM), step=0.5),
+            out_of=round(MAX_RAM),
+            lowest=0.0,
+            step=0.5,
+            relx=8,
             scroll_exit=True,
         )
         if HAS_CUDA:
@@ -417,7 +427,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             self.nextrely -= 1
             self.max_vram_cache_size = self.add_widget_intelligent(
                 npyscreen.Slider,
-                value=clip(old_opts.max_vram_cache_size, range=(0, MAX_VRAM)),
+                value=clip(old_opts.max_vram_cache_size, range=(0, MAX_VRAM), step=0.25),
                 out_of=round(MAX_VRAM * 2) / 2,
                 lowest=0.0,
                 relx=8,
@@ -596,13 +606,13 @@ def default_user_selections(program_opts: Namespace) -> InstallSelections:
 
 
 # -------------------------------------
-def clip(value: float, range: tuple[float, float]) -> float:
+def clip(value: float, range: tuple[float, float], step: float) -> float:
     minimum, maximum = range
     if value < minimum:
         value = minimum
     if value > maximum:
         value = maximum
-    return value
+    return round(value / step) * step
 
 
 # -------------------------------------
