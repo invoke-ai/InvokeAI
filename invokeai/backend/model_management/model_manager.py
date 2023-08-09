@@ -526,7 +526,7 @@ class ModelManager(object):
         # Does the config explicitly override the submodel?
         if submodel_type is not None and hasattr(model_config, submodel_type):
             submodel_path = getattr(model_config, submodel_type)
-            if submodel_path is not None:
+            if submodel_path is not None and len(submodel_path) > 0:
                 model_path = getattr(model_config, submodel_type)
                 is_submodel_override = True
 
