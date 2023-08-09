@@ -471,7 +471,7 @@ Then type the following commands:
 
 === "NVIDIA System"
     ```bash
-    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu117
+    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu118
     pip install xformers
     ```
 

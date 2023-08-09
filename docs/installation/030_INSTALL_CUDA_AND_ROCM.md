@@ -34,11 +34,11 @@ directly from NVIDIA. **Do not try to install Ubuntu's
 nvidia-cuda-toolkit package. It is out of date and will cause
 conflicts among the NVIDIA driver and binaries.**
 
-Go to [CUDA Toolkit 11.7
-Downloads](https://developer.nvidia.com/cuda-11-7-0-download-archive),
-and use the target selection wizard to choose your operating system,
-hardware platform, and preferred installation method (e.g. "local"
-versus "network").
+Go to [CUDA Toolkit
+Downloads](https://developer.nvidia.com/cuda-downloads), and use the
+target selection wizard to choose your operating system, hardware
+platform, and preferred installation method (e.g. "local" versus
+"network").
 
 This will provide you with a downloadable install file or, depending
 on your choices, a recipe for downloading and running a install shell
@@ -61,7 +61,7 @@ Runtime Site](https://developer.nvidia.com/nvidia-container-runtime)
 
 When installing torch and torchvision manually with `pip`, remember to provide
 the argument `--extra-index-url
-https://download.pytorch.org/whl/cu117` as described in the [Manual
+https://download.pytorch.org/whl/cu118` as described in the [Manual
 Installation Guide](020_INSTALL_MANUAL.md).
 
 ## :simple-amd: ROCm
