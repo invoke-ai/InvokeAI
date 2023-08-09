@@ -115,5 +115,6 @@ def stable_diffusion_step_callback(
         source_node_id=source_node_id,
         progress_image=ProgressImage(width=width, height=height, dataURL=dataURL),
         step=intermediate_state.step,
-        total_steps=node["steps"],
+        order=intermediate_state.order,
+        total_steps=intermediate_state.total_steps,
     )
