@@ -28,7 +28,6 @@ from npyscreen import widget
 from invokeai.backend.util.logging import InvokeAILogger
 
 from invokeai.backend.install.model_install_backend import (
-    ModelInstallList,
     InstallSelections,
     ModelInstall,
     SchedulerPredictionType,
@@ -41,12 +40,12 @@ from invokeai.frontend.install.widgets import (
     SingleSelectColumns,
     TextBox,
     BufferBox,
-    FileBox,
     set_min_terminal_size,
     select_stable_diffusion_config_file,
     CyclingForm,
     MIN_COLS,
     MIN_LINES,
+    WindowTooSmallException,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
 
@@ -156,7 +155,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             BufferBox,
             name="Log Messages",
             editable=False,
-            max_height=15,
+            max_height=6,
         )
 
         self.nextrely += 1
@@ -693,7 +692,11 @@ def select_and_download_models(opt: Namespace):
         # needed to support the probe() method running under a subprocess
         torch.multiprocessing.set_start_method("spawn")
 
-        set_min_terminal_size(MIN_COLS, MIN_LINES)
+        if not set_min_terminal_size(MIN_COLS, MIN_LINES):
+            raise WindowTooSmallException(
+                "Could not increase terminal size. Try running again with a larger window or smaller font size."
+            )
+
         installApp = AddModelApplication(opt)
         try:
             installApp.run()
@@ -787,6 +790,8 @@ def main():
         curses.echo()
         curses.endwin()
         logger.info("Goodbye! Come back soon.")
+    except WindowTooSmallException as e:
+        logger.error(str(e))
     except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
             logger.error("Insufficient vertical space for the interface. Please make your window taller and try again")

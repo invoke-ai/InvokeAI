@@ -22,6 +22,7 @@ import {
   SDXL_LATENTS_TO_LATENTS,
   SDXL_MODEL_LOADER,
 } from './constants';
+import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 
 /**
  * Builds the Image to Image tab graph.
@@ -363,6 +364,8 @@ export const buildLinearSDXLImageToImageGraph = (
       field: 'metadata',
     },
   });
+
+  addSDXLLoRAsToGraph(state, graph, SDXL_LATENTS_TO_LATENTS, SDXL_MODEL_LOADER);
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {

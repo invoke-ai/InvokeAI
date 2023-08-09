@@ -595,9 +595,10 @@ class ModelManager(object):
         the combined format of the list_models() method.
         """
         models = self.list_models(base_model, model_type, model_name)
-        if len(models) > 1:
+        if len(models) >= 1:
             return models[0]
-        return None
+        else:
+            return None
 
     def list_models(
         self,
@@ -990,7 +991,9 @@ class ModelManager(object):
                                     raise DuplicateModelException(f"Model with key {model_key} added twice")
 
                                 model_path = self.relative_model_path(model_path)
-                                model_config: ModelConfigBase = model_class.probe_config(str(model_path))
+                                model_config: ModelConfigBase = model_class.probe_config(
+                                    str(model_path), model_base=cur_base_model
+                                )
                                 self.models[model_key] = model_config
                                 new_models_found = True
                             except DuplicateModelException as e:
