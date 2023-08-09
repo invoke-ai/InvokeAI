@@ -2,23 +2,22 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { forEach, size } from 'lodash-es';
 import {
-  LoraLoaderInvocation,
   MetadataAccumulatorInvocation,
+  SDXLLoraLoaderInvocation,
 } from 'services/api/types';
 import {
-  CLIP_SKIP,
   LORA_LOADER,
-  MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
+  SDXL_MODEL_LOADER,
 } from './constants';
 
-export const addLoRAsToGraph = (
+export const addSDXLLoRAsToGraph = (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string,
-  modelLoaderNodeId: string = MAIN_MODEL_LOADER
+  modelLoaderNodeId: string = SDXL_MODEL_LOADER
 ): void => {
   /**
    * LoRA nodes get the UNet and CLIP models from the main model loader and apply the LoRA to them.
@@ -35,18 +34,21 @@ export const addLoRAsToGraph = (
     | undefined;
 
   if (loraCount > 0) {
-    // Remove modelLoaderNodeId unet connection to feed it to LoRAs
+    // Remove modelLoaderNodeId unet/clip/clip2 connections to feed it to LoRAs
     graph.edges = graph.edges.filter(
       (e) =>
         !(
           e.source.node_id === modelLoaderNodeId &&
           ['unet'].includes(e.source.field)
+        ) &&
+        !(
+          e.source.node_id === modelLoaderNodeId &&
+          ['clip'].includes(e.source.field)
+        ) &&
+        !(
+          e.source.node_id === modelLoaderNodeId &&
+          ['clip2'].includes(e.source.field)
         )
-    );
-    // Remove CLIP_SKIP connections to conditionings to feed it through LoRAs
-    graph.edges = graph.edges.filter(
-      (e) =>
-        !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field))
     );
   }
 
@@ -58,8 +60,8 @@ export const addLoRAsToGraph = (
     const { model_name, base_model, weight } = lora;
     const currentLoraNodeId = `${LORA_LOADER}_${model_name.replace('.', '_')}`;
 
-    const loraLoaderNode: LoraLoaderInvocation = {
-      type: 'lora_loader',
+    const loraLoaderNode: SDXLLoraLoaderInvocation = {
+      type: 'sdxl_lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,
       lora: { model_name, base_model },
@@ -91,12 +93,23 @@ export const addLoRAsToGraph = (
 
       graph.edges.push({
         source: {
-          node_id: CLIP_SKIP,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
           node_id: currentLoraNodeId,
           field: 'clip',
+        },
+      });
+
+      graph.edges.push({
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: currentLoraNodeId,
+          field: 'clip2',
         },
       });
     } else {
@@ -119,6 +132,17 @@ export const addLoRAsToGraph = (
         destination: {
           node_id: currentLoraNodeId,
           field: 'clip',
+        },
+      });
+
+      graph.edges.push({
+        source: {
+          node_id: lastLoraNodeId,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: currentLoraNodeId,
+          field: 'clip2',
         },
       });
     }
@@ -155,6 +179,28 @@ export const addLoRAsToGraph = (
         destination: {
           node_id: NEGATIVE_CONDITIONING,
           field: 'clip',
+        },
+      });
+
+      graph.edges.push({
+        source: {
+          node_id: currentLoraNodeId,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      });
+
+      graph.edges.push({
+        source: {
+          node_id: currentLoraNodeId,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip2',
         },
       });
     }

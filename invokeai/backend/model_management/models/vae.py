@@ -1,9 +1,14 @@
 import os
-import torch
-import safetensors
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Union, Literal
+from typing import Optional
+
+import safetensors
+import torch
+from diffusers.utils import is_safetensors_available
+from omegaconf import OmegaConf
+
+from invokeai.app.services.config import InvokeAIAppConfig
 from .base import (
     ModelBase,
     ModelConfigBase,
@@ -18,9 +23,6 @@ from .base import (
     InvalidModelException,
     ModelNotFoundException,
 )
-from invokeai.app.services.config import InvokeAIAppConfig
-from diffusers.utils import is_safetensors_available
-from omegaconf import OmegaConf
 
 
 class VaeModelFormat(str, Enum):
@@ -80,7 +82,7 @@ class VaeModel(ModelBase):
     @classmethod
     def detect_format(cls, path: str):
         if not os.path.exists(path):
-            raise ModelNotFoundException()
+            raise ModelNotFoundException(f"Does not exist as local file: {path}")
 
         if os.path.isdir(path):
             if os.path.exists(os.path.join(path, "config.json")):

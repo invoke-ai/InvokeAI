@@ -80,8 +80,10 @@ class StableDiffusionXLModel(DiffusersModel):
             raise Exception("Unkown stable diffusion 2.* model format")
 
         if ckpt_config_path is None:
-            # TO DO: implement picking
-            pass
+            # avoid circular import
+            from .stable_diffusion import _select_ckpt_config
+
+            ckpt_config_path = _select_ckpt_config(kwargs.get("model_base", BaseModelType.StableDiffusionXL), variant)
 
         return cls.create_config(
             path=path,
