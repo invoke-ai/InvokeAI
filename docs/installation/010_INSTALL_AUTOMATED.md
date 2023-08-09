@@ -264,7 +264,7 @@ experimental versions later.
 	  you can create several levels of subfolders and drop your models into
       whichever ones you want.
 	
-    - ***Autoimport FolderLICENSE***     
+    - ***LICENSE***     
 
     At the bottom of the screen you will see a checkbox for accepting
     the CreativeML Responsible AI Licenses. You need to accept the license

@@ -306,13 +306,30 @@ InvokeAI. The second will prepare the 2.3 directory for use with 3.0.
 You may now launch the WebUI in the usual way, by selecting option [1]
 from the launcher script
 
-#### Migration Caveats
+#### Migrating Images
 
 The migration script will migrate your invokeai settings and models,
 including textual inversion models, LoRAs and merges that you may have
 installed previously. However it does **not** migrate the generated
-images stored in your 2.3-format outputs directory. You will need to
-manually import selected images into the 3.0 gallery via drag-and-drop.
+images stored in your 2.3-format outputs directory. To do this, you 
+need to run an additional step:
+
+1. From a working InvokeAI 3.0 root directory, start the launcher and
+enter menu option [8] to open the "developer's console".
+
+2. At the developer's console command line, type the command:
+
+```bash
+invokeai-import-images
+```
+
+3. This will lead you through the process of confirming the desired
+   source and destination for the imported images. The images will
+   appear in the gallery board of your choice, and contain the
+   original prompt, model name, and other parameters used to generate
+   the image.
+   
+(Many kudos to **techjedi** for contributing this script.)
 
 ## Hardware Requirements
 
