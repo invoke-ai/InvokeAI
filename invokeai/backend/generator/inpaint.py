@@ -377,3 +377,11 @@ class Inpaint(Img2Img):
         )
 
         return corrected_result
+
+    def get_noise_like(self, like: torch.Tensor):
+        device = like.device
+        x = torch.randn_like(like, device=device)
+        if self.perlin > 0.0:
+            shape = like.shape
+            x = (1 - self.perlin) * x + self.perlin * self.get_perlin_noise(shape[3], shape[2])
+        return x
