@@ -336,7 +336,9 @@ class TextToLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         with SilenceWarnings():
             noise = context.services.latents.get(self.noise.latents_name)
-            seed = self.noise.seed or 0
+            seed = self.noise.seed
+            if seed is None:
+                seed = 0
 
             # Get the source node id (we are invoking the prepared node)
             graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
@@ -420,6 +422,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
     # Inputs
     noise: Optional[LatentsField] = Field(description="The noise to use (test override for future optional)")
 
+    # denoising_start = 1 - strength
     denoising_start: float = Field(default=0.0, ge=0, le=1, description="")
     #denoising_end: float = Field(default=1.0, ge=0, le=1, description="")
 
@@ -462,16 +465,23 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         with SilenceWarnings():  # this quenches NSFW nag from diffusers
-            latent = context.services.latents.get(self.latents.latents_name)
-            seed = self.latents.seed or 0
-
+            seed = None
             noise = None
             if self.noise is not None:
                 noise = context.services.latents.get(self.noise.latents_name)
-                if self.noise.seed is not None:
-                    seed = self.noise.seed
+                seed = self.noise.seed
 
-            mask = self.prep_mask_tensor(self.mask, context, latent)
+            if self.latents is not None:
+                latents = context.services.latents.get(self.latents.latents_name)
+                if seed is None:
+                    seed = self.latents.seed
+            else:
+                latents = torch.zeros_like(noise)
+
+            if seed is None:
+                seed = 0
+
+            mask = self.prep_mask_tensor(self.mask, context, latents)
 
             # Get the source node id (we are invoking the prepared node)
             graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
@@ -497,7 +507,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
             with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
                 unet_info.context.model, _lora_loader()
             ), unet_info as unet:
-                latent = latent.to(device=unet.device, dtype=unet.dtype)
+                latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
                     noise = noise.to(device=unet.device, dtype=unet.dtype)
                 if mask is not None:
@@ -516,7 +526,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                     model=pipeline,
                     context=context,
                     control_input=self.control,
-                    latents_shape=latent.shape,
+                    latents_shape=latents.shape,
                     # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
                     do_classifier_free_guidance=True,
                     exit_stack=exit_stack,
@@ -531,7 +541,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 )
 
                 result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
-                    latents=latent,
+                    latents=latents,
                     timesteps=timesteps,
                     noise=noise,
                     seed=seed,

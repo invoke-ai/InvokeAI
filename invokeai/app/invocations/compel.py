@@ -157,7 +157,15 @@ class CompelInvocation(BaseInvocation):
 
 
 class SDXLPromptInvocationBase:
-    def run_clip_compel(self, context, clip_field, prompt, get_pooled, lora_prefix, zero_on_empty):
+    def run_clip_compel(
+        self,
+        context: InvocationContext,
+        clip_field: ClipField,
+        prompt: str,
+        get_pooled: bool,
+        lora_prefix: str,
+        zero_on_empty: bool,
+    ):
         tokenizer_info = context.services.model_manager.get_model(
             **clip_field.tokenizer.dict(),
             context=context,

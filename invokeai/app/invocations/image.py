@@ -705,12 +705,16 @@ class MaskEdgeInvocation(BaseInvocation, PILInvocationConfig):
 
 
 class ColorCorrectInvocation(BaseInvocation, PILInvocationConfig):
+    """
+    Shifts the colors of a target image to match the reference image, optionally 
+    using a mask to only color-correct certain regions of the target image.
+    """
 
     type: Literal["color_correct"] = "color_correct"
 
-    init: Optional[ImageField] = Field(default=None, description="Initial image")
-    result: Optional[ImageField] = Field(default=None, description="Resulted image")
-    mask: Optional[ImageField] = Field(default=None, description="Mask image")
+    image: Optional[ImageField] = Field(default=None, description="The image to color-correct")
+    reference: Optional[ImageField] = Field(default=None, description="Reference image for color-correction")
+    mask: Optional[ImageField] = Field(default=None, description="Mask to use when applying color-correction")
     mask_blur_radius: float = Field(default=8, description="Mask blur radius")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -721,11 +725,11 @@ class ColorCorrectInvocation(BaseInvocation, PILInvocationConfig):
             ).convert("L")
 
         init_image = context.services.images.get_pil_image(
-            self.init.image_name
+            self.reference.image_name
         )
 
         result = context.services.images.get_pil_image(
-            self.result.image_name
+            self.image.image_name
         ).convert("RGBA")
 
 
