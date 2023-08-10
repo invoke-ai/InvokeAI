@@ -1,6 +1,9 @@
 import {
+  Box,
+  Flex,
   Icon,
   Spacer,
+  Spinner,
   Tab,
   TabList,
   TabPanel,
@@ -8,6 +11,7 @@ import {
   Tabs,
   Tooltip,
   VisuallyHidden,
+  useBoolean,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
@@ -18,6 +22,7 @@ import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent
 import { configSelector } from 'features/system/store/configSelectors';
 import { InvokeTabName, tabMap } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ResourceKey } from 'i18next';
 import { isEqual } from 'lodash-es';
 import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
@@ -26,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { FaCube, FaFont, FaImage } from 'react-icons/fa';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
+import { systemSelector } from '../../system/store/systemSelectors';
 import { useMinimumPanelSize } from '../hooks/useMinimumPanelSize';
 import {
   activeTabIndexSelector,
@@ -37,7 +43,6 @@ import NodesTab from './tabs/Nodes/NodesTab';
 import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
-import { systemSelector } from '../../system/store/systemSelectors';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -121,6 +126,8 @@ const InvokeTabs = () => {
 
   const dispatch = useAppDispatch();
 
+  const [isTabLoading, setIsTabLoading] = useBoolean();
+
   useHotkeys(
     'f',
     () => {
@@ -165,7 +172,32 @@ const InvokeTabs = () => {
 
   const tabPanels = useMemo(
     () =>
-      enabledTabs.map((tab) => <TabPanel key={tab.id}>{tab.content}</TabPanel>),
+      enabledTabs.map((tab) => (
+        <TabPanel key={tab.id}>
+          <AnimatePresence>
+            <Box
+              w="100%"
+              h="100%"
+              as={motion.div}
+              initial={{
+                opacity: 0,
+              }}
+              animate={{
+                opacity: 1,
+
+                transition: { duration: 0.2 },
+              }}
+              exit={{
+                opacity: 0,
+
+                transition: { duration: 0.2 },
+              }}
+            >
+              {tab.content}
+            </Box>
+          </AnimatePresence>
+        </TabPanel>
+      )),
     [enabledTabs]
   );
 
@@ -174,13 +206,17 @@ const InvokeTabs = () => {
 
   const handleTabChange = useCallback(
     (index: number) => {
+      setIsTabLoading.on();
       const activeTabName = tabMap[index];
       if (!activeTabName) {
         return;
       }
       dispatch(setActiveTab(activeTabName));
+      setTimeout(() => {
+        setIsTabLoading.off();
+      }, 0);
     },
-    [dispatch]
+    [dispatch, setIsTabLoading]
   );
 
   return (
@@ -213,7 +249,20 @@ const InvokeTabs = () => {
       >
         <Panel id="main">
           <TabPanels style={{ height: '100%', width: '100%' }}>
-            {tabPanels}
+            {isTabLoading ? (
+              <Flex
+                style={{
+                  height: '100%',
+                  width: '100%',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Spinner />
+              </Flex>
+            ) : (
+              tabPanels
+            )}
           </TabPanels>
         </Panel>
         {shouldPinGallery &&
