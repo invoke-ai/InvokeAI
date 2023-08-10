@@ -12,6 +12,7 @@ from invokeai.app.services.graph import Graph, GraphExecutionState
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.batch_manager_storage import (
     BatchProcessStorageBase,
+    BatchSessionNotFoundException,
     Batch,
     BatchProcess,
     BatchSession,
@@ -98,7 +99,10 @@ class BatchManager(BatchManagerBase):
         return GraphExecutionState(graph=graph)
 
     def run_batch_process(self, batch_id: str):
-        created_session = self.__batch_process_storage.get_created_session(batch_id)
+        try: 
+            created_session = self.__batch_process_storage.get_created_session(batch_id)
+        except BatchSessionNotFoundException:
+            return
         ges = self.__invoker.services.graph_execution_manager.get(created_session.session_id)
         self.__invoker.invoke(ges, invoke_all=True)
     

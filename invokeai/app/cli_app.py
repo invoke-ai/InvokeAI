@@ -38,6 +38,7 @@ from invokeai.app.services.images import ImageService, ImageServiceDependencies
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.app.services.batch_manager import BatchManager
+from invokeai.app.services.batch_manager_storage import SqliteBatchProcessStorage
 from .services.default_graphs import default_text_to_image_graph_id, create_system_graphs
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
@@ -301,13 +302,16 @@ def invoke_cli():
         )
     )
 
+    batch_manager_storage = SqliteBatchProcessStorage(db_location)
+    batch_manager = BatchManager(batch_manager_storage)
+
     services = InvocationServices(
         model_manager=model_manager,
         events=events,
         latents=ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents")),
         images=images,
         boards=boards,
-        batch_manager=BatchManager(),
+        batch_manager=batch_manager,
         board_images=board_images,
         queue=MemoryInvocationQueue(),
         graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs"),

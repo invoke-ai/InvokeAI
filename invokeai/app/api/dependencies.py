@@ -2,6 +2,7 @@
 
 from typing import Optional
 from logging import Logger
+import threading
 import os
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
@@ -65,6 +66,8 @@ class ApiDependencies:
         logger.info(f"Root directory = {str(config.root_path)}")
         logger.debug(f"Internet connectivity is {config.internet_available}")
 
+        lock = threading.Lock()
+
         events = FastAPIEventService(event_handler_id)
 
         output_folder = config.output_path
@@ -74,17 +77,17 @@ class ApiDependencies:
         db_location.parent.mkdir(parents=True, exist_ok=True)
 
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-            filename=db_location, table_name="graph_executions"
+            filename=db_location, table_name="graph_executions", lock=lock
         )
 
         urls = LocalUrlService()
-        image_record_storage = SqliteImageRecordStorage(db_location)
+        image_record_storage = SqliteImageRecordStorage(db_location, lock=lock)
         image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
         names = SimpleNameService()
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
 
-        board_record_storage = SqliteBoardRecordStorage(db_location)
-        board_image_record_storage = SqliteBoardImageRecordStorage(db_location)
+        board_record_storage = SqliteBoardRecordStorage(db_location, lock=lock)
+        board_image_record_storage = SqliteBoardImageRecordStorage(db_location, lock=lock)
 
         boards = BoardService(
             services=BoardServiceDependencies(
@@ -118,7 +121,7 @@ class ApiDependencies:
             )
         )
 
-        batch_manager_storage = SqliteBatchProcessStorage(db_location)
+        batch_manager_storage = SqliteBatchProcessStorage(db_location, lock=lock)
         batch_manager = BatchManager(batch_manager_storage)
 
         services = InvocationServices(
@@ -130,7 +133,7 @@ class ApiDependencies:
             boards=boards,
             board_images=board_images,
             queue=MemoryInvocationQueue(),
-            graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs"),
+            graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs", lock=lock),
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
             configuration=config,

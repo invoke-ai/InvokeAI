@@ -20,16 +20,16 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     _id_field: str
     _lock: Lock
 
-    def __init__(self, filename: str, table_name: str, id_field: str = "id"):
+    def __init__(self, filename: str, table_name: str, id_field: str = "id", lock: Lock = Lock()):
         super().__init__()
         self._filename = filename
         self._table_name = table_name
         self._id_field = id_field  # TODO: validate that T has this field
-        self._lock = Lock()
+        self._lock = lock
         self._conn = sqlite3.connect(
             self._filename, check_same_thread=False
         )  # TODO: figure out a better threading solution
-        self._conn.set_trace_callback(print)
+        self._conn.execute('pragma journal_mode=wal')
         self._cursor = self._conn.cursor()
 
         self._create_table()
@@ -55,21 +55,12 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     def set(self, item: T):
         try:
             self._lock.acquire()
-            json = item.json()
-            print('-----------------locking db-----------------')
-            traceback.print_stack(limit=2)
 
             self._cursor.execute(
                 f"""INSERT OR REPLACE INTO {self._table_name} (item) VALUES (?);""",
-                (json,),
+                (item.json(),),
             )
             self._conn.commit()
-            self._cursor.close()
-            self._cursor = self._conn.cursor()
-            print('-----------------unlocking db-----------------')
-        except Exception as e:
-            print("Exception!")
-            print(e)
         finally:
             self._lock.release()
         self._on_changed(item)
@@ -77,12 +68,8 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     def get(self, id: str) -> Optional[T]:
         try:
             self._lock.acquire()
-            print('-----------------locking db-----------------')
             self._cursor.execute(f"""SELECT item FROM {self._table_name} WHERE id = ?;""", (str(id),))
             result = self._cursor.fetchone()
-            self._cursor.close()
-            self._cursor = self._conn.cursor()
-            print('-----------------unlocking db-----------------')
         finally:
             self._lock.release()
 
