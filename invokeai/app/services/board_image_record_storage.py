@@ -62,14 +62,14 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
     _cursor: sqlite3.Cursor
     _lock: threading.Lock
 
-    def __init__(self, filename: str, lock: threading.Lock = threading.Lock()) -> None:
+    def __init__(self, filename: str) -> None:
         super().__init__()
         self._filename = filename
         self._conn = sqlite3.connect(filename, check_same_thread=False)
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
         self._conn.row_factory = sqlite3.Row
         self._cursor = self._conn.cursor()
-        self._lock = lock
+        self._lock = threading.Lock()
 
         try:
             self._lock.acquire()

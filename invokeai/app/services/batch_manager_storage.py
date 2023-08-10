@@ -38,8 +38,12 @@ class BatchSession(BaseModel):
     )
 
 
+def uuid_string():
+    res = uuid.uuid4()
+    return str(res)
+
 class BatchProcess(BaseModel):
-    batch_id: Optional[str] = Field(default_factory=uuid.uuid4().__str__, description="Identifier for this batch")
+    batch_id: Optional[str] = Field(default_factory=uuid_string, description="Identifier for this batch")
     batches: List[Batch] = Field(
         description="List of batch configs to apply to this session",
         default_factory=list,
@@ -168,14 +172,14 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
     _cursor: sqlite3.Cursor
     _lock: threading.Lock
 
-    def __init__(self, filename: str, lock: threading.Lock = threading.Lock()) -> None:
+    def __init__(self, filename: str) -> None:
         super().__init__()
         self._filename = filename
         self._conn = sqlite3.connect(filename, check_same_thread=False)
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
         self._conn.row_factory = sqlite3.Row
         self._cursor = self._conn.cursor()
-        self._lock = lock
+        self._lock = threading.Lock()
 
         try:
             self._lock.acquire()

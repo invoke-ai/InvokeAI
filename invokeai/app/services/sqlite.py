@@ -9,7 +9,6 @@ from .item_storage import ItemStorageABC, PaginatedResults
 T = TypeVar("T", bound=BaseModel)
 
 sqlite_memory = ":memory:"
-import traceback
 
 
 class SqliteItemStorage(ItemStorageABC, Generic[T]):
@@ -20,12 +19,12 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     _id_field: str
     _lock: Lock
 
-    def __init__(self, filename: str, table_name: str, id_field: str = "id", lock: Lock = Lock()):
+    def __init__(self, filename: str, table_name: str, id_field: str = "id"):
         super().__init__()
         self._filename = filename
         self._table_name = table_name
         self._id_field = id_field  # TODO: validate that T has this field
-        self._lock = lock
+        self._lock = Lock()
         self._conn = sqlite3.connect(
             self._filename, check_same_thread=False
         )  # TODO: figure out a better threading solution
