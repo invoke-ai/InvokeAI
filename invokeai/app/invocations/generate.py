@@ -181,6 +181,8 @@ class InpaintInvocation(BaseInvocation):
             device = context.services.model_manager.mgr.cache.execution_device
             dtype = context.services.model_manager.mgr.cache.precision
 
+            vae.to(dtype=unet.dtype)
+
             pipeline = StableDiffusionGeneratorPipeline(
                 vae=vae,
                 text_encoder=None,
