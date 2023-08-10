@@ -2,7 +2,6 @@
 
 from typing import Literal, Optional
 
-import cv2
 import numpy
 import cv2
 from PIL import Image, ImageFilter, ImageOps, ImageChops

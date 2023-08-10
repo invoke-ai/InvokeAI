@@ -25,7 +25,7 @@ from .controlnet_image_processors import ControlField
 from .image import ImageOutput
 from .model import ModelInfo, UNetField, VaeField
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
-from ...backend.model_management import ModelPatcher
+from ...backend.model_management import ModelPatcher, BaseModelType
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ConditioningData,
@@ -35,22 +35,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 )
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from ...backend.model_management import ModelPatcher, BaseModelType
 from ...backend.util.devices import choose_torch_device, torch_dtype, choose_precision
-from ..models.image import ImageCategory, ImageField, ResourceOrigin
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
-from .compel import ConditioningField
-from .controlnet_image_processors import ControlField
-from .image import ImageOutput
-from .model import ModelInfo, UNetField, VaeField
-from invokeai.app.util.controlnet_utils import prepare_control_image
-
-from diffusers.models.attention_processor import (
-    AttnProcessor2_0,
-    LoRAAttnProcessor2_0,
-    LoRAXFormersAttnProcessor,
-    XFormersAttnProcessor,
-)
 
 import torchvision.transforms as T
 from torchvision.transforms.functional import resize as tv_resize
