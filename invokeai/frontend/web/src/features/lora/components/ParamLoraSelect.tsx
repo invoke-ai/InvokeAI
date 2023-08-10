@@ -59,7 +59,7 @@ const ParamLoRASelect = () => {
       a.label && b.label ? (a.label?.localeCompare(b.label) ? 1 : -1) : -1
     );
 
-    return data.sort((a, b) => (a.disabled && !b.disabled ? -1 : 1));
+    return data.sort((a, b) => (a.disabled && !b.disabled ? 1 : -1));
   }, [loras, loraModels, currentMainModel?.base_model]);
 
   const handleChange = useCallback(
