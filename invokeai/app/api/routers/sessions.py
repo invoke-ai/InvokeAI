@@ -51,8 +51,9 @@ async def create_batch(
     batches: list[Batch] = Body(description="Batch config to apply to the given graph"),
 ) -> BatchProcess:
     """Creates and starts a new new batch process"""
-    session = ApiDependencies.invoker.services.batch_manager.run_batch_process(batches, graph)
-    return session
+    batch_id = ApiDependencies.invoker.services.batch_manager.create_batch_process(batches, graph)
+    ApiDependencies.invoker.services.batch_manager.run_batch_process(batch_id)
+    return {"batch_id":batch_id}
 
 
 @session_router.delete(

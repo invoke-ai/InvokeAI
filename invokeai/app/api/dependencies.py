@@ -31,6 +31,7 @@ from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.model_manager_service import ModelManagerService
 from ..services.batch_manager import BatchManager
+from ..services.batch_manager_storage import SqliteBatchProcessStorage
 from .events import FastAPIEventService
 
 
@@ -117,7 +118,8 @@ class ApiDependencies:
             )
         )
 
-        batch_manager = BatchManager()
+        batch_manager_storage = SqliteBatchProcessStorage(db_location)
+        batch_manager = BatchManager(batch_manager_storage)
 
         services = InvocationServices(
             model_manager=ModelManagerService(config, logger),

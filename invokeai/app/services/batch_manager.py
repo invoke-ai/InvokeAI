@@ -1,45 +1,22 @@
 import networkx as nx
-import uuid
 import copy
 
 from abc import ABC, abstractmethod
+from itertools import product
 from pydantic import BaseModel, Field
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event
-from typing import (
-    Optional,
-    Union,
-)
 
-from invokeai.app.invocations.baseinvocation import (
-    BaseInvocation,
-)
 from invokeai.app.services.events import EventServiceBase
 from invokeai.app.services.graph import Graph, GraphExecutionState
 from invokeai.app.services.invoker import Invoker
-
-
-InvocationsUnion = Union[BaseInvocation.get_invocations()]  # type: ignore
-
-
-class Batch(BaseModel):
-    data: list[InvocationsUnion] = Field(description="Mapping of ")
-    node_id: str = Field(description="ID of the node to batch")
-
-
-class BatchProcess(BaseModel):
-    batch_id: Optional[str] = Field(default_factory=uuid.uuid4().__str__, description="Identifier for this batch")
-    sessions: list[str] = Field(
-        description="Tracker for which batch is currently being processed", default_factory=list
-    )
-    batches: list[Batch] = Field(
-        description="List of batch configs to apply to this session",
-        default_factory=list,
-    )
-    batch_indices: list[int] = Field(
-        description="Tracker for which batch is currently being processed", default_factory=list
-    )
-    graph: Graph = Field(description="The graph being executed")
+from invokeai.app.services.batch_manager_storage import (
+    BatchProcessStorageBase,
+    Batch,
+    BatchProcess,
+    BatchSession,
+    BatchSessionChanges,
+)
 
 
 class BatchManagerBase(ABC):
@@ -48,7 +25,11 @@ class BatchManagerBase(ABC):
         pass
 
     @abstractmethod
-    def run_batch_process(self, batches: list[Batch], graph: Graph) -> BatchProcess:
+    def create_batch_process(self, batches: list[Batch], graph: Graph) -> str:
+        pass
+
+    @abstractmethod
+    def run_batch_process(self, batch_id: str):
         pass
 
     @abstractmethod
@@ -61,8 +42,13 @@ class BatchManager(BatchManagerBase):
 
     __invoker: Invoker
     __batches: list[BatchProcess]
+    __batch_process_storage: BatchProcessStorageBase
 
-    def start(self, invoker) -> None:
+    def __init__(self, batch_process_storage: BatchProcessStorageBase) -> None:
+        super().__init__()
+        self.__batch_process_storage = batch_process_storage
+
+    def start(self, invoker: Invoker) -> None:
         # if we do want multithreading at some point, we could make this configurable
         self.__invoker = invoker
         self.__batches = list()
@@ -73,34 +59,28 @@ class BatchManager(BatchManagerBase):
 
         match event_name:
             case "graph_execution_state_complete":
-                await self.process(event)
+                await self.process(event, False)
             case "invocation_error":
-                await self.process(event)
+                await self.process(event, True)
 
         return event
 
-    async def process(self, event: Event):
+    async def process(self, event: Event, err: bool):
         data = event[1]["data"]
-        batchTarget = None
-        for batch in self.__batches:
-            if data["graph_execution_state_id"] in batch.sessions:
-                batchTarget = batch
-                break
-
-        if batchTarget == None:
+        batch_session = self.__batch_process_storage.get_session(data["graph_execution_state_id"])
+        if not batch_session:
             return
+        updateSession = BatchSessionChanges(
+            state='error' if err else 'completed'
+        )
+        batch_session = self.__batch_process_storage.update_session_state(
+            batch_session.batch_id,
+            batch_session.session_id,
+            updateSession,
+        )
+        self.run_batch_process(batch_session.batch_id)
 
-        if sum(batchTarget.batch_indices) == 0:
-            self.__batches = [batch for batch in self.__batches if batch != batchTarget]
-            return
-
-        batchTarget.batch_indices = self._next_batch_index(batchTarget)
-        ges = self._next_batch_session(batchTarget)
-        batchTarget.sessions.append(ges.id)
-        self.__invoker.services.graph_execution_manager.set(ges)
-        self.__invoker.invoke(ges, invoke_all=True)
-
-    def _next_batch_session(self, batch_process: BatchProcess) -> GraphExecutionState:
+    def _create_batch_session(self, batch_process: BatchProcess, batch_indices: list[int]) -> GraphExecutionState:
         graph = copy.deepcopy(batch_process.graph)
         batches = batch_process.batches
         g = graph.nx_graph_flat()
@@ -109,36 +89,47 @@ class BatchManager(BatchManagerBase):
             node = graph.get_node(npath)
             (index, batch) = next(((i, b) for i, b in enumerate(batches) if b.node_id in node.id), (None, None))
             if batch:
-                batch_index = batch_process.batch_indices[index]
+                batch_index = batch_indices[index]
                 datum = batch.data[batch_index]
-                datum.id = node.id
-                graph.update_node(npath, datum)
+                for key in datum:
+                    node.__dict__[key] = datum[key]
+                graph.update_node(npath, node)
 
         return GraphExecutionState(graph=graph)
 
-    def _next_batch_index(self, batch_process: BatchProcess):
-        batch_indicies = batch_process.batch_indices.copy()
-        for index in range(len(batch_indicies)):
-            if batch_indicies[index] > 0:
-                batch_indicies[index] -= 1
-                break
-        return batch_indicies
-
-    def run_batch_process(self, batches: list[Batch], graph: Graph) -> BatchProcess:
-        batch_indices = list()
-        for batch in batches:
-            batch_indices.append(len(batch.data) - 1)
+    def run_batch_process(self, batch_id: str):
+        created_session = self.__batch_process_storage.get_created_session(batch_id)
+        ges = self.__invoker.services.graph_execution_manager.get(created_session.session_id)
+        self.__invoker.invoke(ges, invoke_all=True)
+    
+    def _valid_batch_config(self, batch_process: BatchProcess) -> bool:
+        return True
+    
+    def create_batch_process(self, batches: list[Batch], graph: Graph) -> str:
         batch_process = BatchProcess(
             batches=batches,
-            batch_indices=batch_indices,
             graph=graph,
         )
-        ges = self._next_batch_session(batch_process)
-        batch_process.sessions.append(ges.id)
-        self.__batches.append(batch_process)
-        self.__invoker.services.graph_execution_manager.set(ges)
-        self.__invoker.invoke(ges, invoke_all=True)
-        return batch_process
+        if not self._valid_batch_config(batch_process):
+            return None
+        batch_process = self.__batch_process_storage.save(batch_process)
+        self._create_sessions(batch_process)
+        return batch_process.batch_id
+    
+    def _create_sessions(self, batch_process: BatchProcess):
+        batch_indices = list()
+        for batch in batch_process.batches:
+            batch_indices.append(list(range(len(batch.data))))
+        all_batch_indices = product(*batch_indices)
+        for bi in all_batch_indices:
+            ges = self._create_batch_session(batch_process, bi)
+            self.__invoker.services.graph_execution_manager.set(ges)
+            batch_session = BatchSession(
+                batch_id=batch_process.batch_id,
+                session_id=ges.id,
+                state="created"
+            )
+            self.__batch_process_storage.create_session(batch_session)
 
     def cancel_batch_process(self, batch_process_id: str):
         self.__batches = [batch for batch in self.__batches if batch.id != batch_process_id]
