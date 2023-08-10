@@ -12,7 +12,7 @@ from pathlib import Path
 
 from invokeai.backend.model_management.models.base import read_checkpoint_meta
 
-parser = argparse.ArgumentParser(description="Create a .json template from checkpoint/safetensors model")
+parser = argparse.ArgumentParser(description="Compare a checkpoint/safetensors file to a JSON metadata template.")
 parser.add_argument("--checkpoint", "--in", type=Path, help="Path to the input checkpoint/safetensors file")
 parser.add_argument("--template", "--out", type=Path, help="Path to the template .json file to match against")
 
