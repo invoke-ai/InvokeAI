@@ -21,6 +21,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
 
     def __init__(self, filename: str, table_name: str, id_field: str = "id"):
         super().__init__()
+
         self._filename = filename
         self._table_name = table_name
         self._id_field = id_field  # TODO: validate that T has this field
@@ -54,7 +55,6 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     def set(self, item: T):
         try:
             self._lock.acquire()
-
             self._cursor.execute(
                 f"""INSERT OR REPLACE INTO {self._table_name} (item) VALUES (?);""",
                 (item.json(),),

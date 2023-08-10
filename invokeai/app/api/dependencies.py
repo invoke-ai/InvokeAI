@@ -2,7 +2,6 @@
 
 from typing import Optional
 from logging import Logger
-import threading
 import os
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
@@ -65,8 +64,6 @@ class ApiDependencies:
         logger.info(f"InvokeAI version {__version__}")
         logger.info(f"Root directory = {str(config.root_path)}")
         logger.debug(f"Internet connectivity is {config.internet_available}")
-
-        lock = threading.Lock()
 
         events = FastAPIEventService(event_handler_id)
 
