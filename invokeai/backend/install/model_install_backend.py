@@ -101,9 +101,9 @@ class ModelInstall(object):
     def __init__(
         self,
         config: InvokeAIAppConfig,
-        prediction_type_helper: Callable[[Path], SchedulerPredictionType] = None,
-        model_manager: ModelManager = None,
-        access_token: str = None,
+        prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
+        model_manager: Optional[ModelManager] = None,
+        access_token: Optional[str] = None,
     ):
         self.config = config
         self.mgr = model_manager or ModelManager(config.model_conf_path)

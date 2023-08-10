@@ -9,6 +9,7 @@ import { useListImagesQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { selectionChanged } from '../store/gallerySlice';
 import { imagesSelectors } from 'services/api/util';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   [stateSelector, selectListImagesBaseQueryArgs],
@@ -33,11 +34,18 @@ export const useMultiselect = (imageDTO?: ImageDTO) => {
     }),
   });
 
+  const isMultiSelectEnabled = useFeatureStatus('multiselect').isFeatureEnabled;
+
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       if (!imageDTO) {
         return;
       }
+      if (!isMultiSelectEnabled) {
+        dispatch(selectionChanged([imageDTO]));
+        return;
+      }
+
       if (e.shiftKey) {
         const rangeEndImageName = imageDTO.image_name;
         const lastSelectedImage = selection[selection.length - 1]?.image_name;
@@ -71,7 +79,7 @@ export const useMultiselect = (imageDTO?: ImageDTO) => {
         dispatch(selectionChanged([imageDTO]));
       }
     },
-    [dispatch, imageDTO, imageDTOs, selection]
+    [dispatch, imageDTO, imageDTOs, selection, isMultiSelectEnabled]
   );
 
   const isSelected = useMemo(

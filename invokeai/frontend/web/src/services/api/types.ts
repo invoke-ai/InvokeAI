@@ -166,6 +166,9 @@ export type OnnxModelLoaderInvocation = TypeReq<
 export type LoraLoaderInvocation = TypeReq<
   components['schemas']['LoraLoaderInvocation']
 >;
+export type SDXLLoraLoaderInvocation = TypeReq<
+  components['schemas']['SDXLLoraLoaderInvocation']
+>;
 export type MetadataAccumulatorInvocation = TypeReq<
   components['schemas']['MetadataAccumulatorInvocation']
 >;

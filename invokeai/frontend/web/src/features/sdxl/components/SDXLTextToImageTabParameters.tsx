@@ -4,6 +4,7 @@ import ProcessButtons from 'features/parameters/components/ProcessButtons/Proces
 import TextToImageTabCoreParameters from 'features/ui/components/tabs/TextToImage/TextToImageTabCoreParameters';
 import ParamSDXLPromptArea from './ParamSDXLPromptArea';
 import ParamSDXLRefinerCollapse from './ParamSDXLRefinerCollapse';
+import ParamLoraCollapse from 'features/lora/components/ParamLoraCollapse';
 
 const SDXLTextToImageTabParameters = () => {
   return (
@@ -12,6 +13,7 @@ const SDXLTextToImageTabParameters = () => {
       <ProcessButtons />
       <TextToImageTabCoreParameters />
       <ParamSDXLRefinerCollapse />
+      <ParamLoraCollapse />
       <ParamDynamicPromptsCollapse />
       <ParamNoiseCollapse />
     </>
