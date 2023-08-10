@@ -989,7 +989,6 @@ export const imagesApi = api.injectEndpoints({
                 : true;
 
             if (isCacheFullyPopulated || isInDateRange) {
-              console.log('upserting');
               // *upsert* to $cache
               dispatch(
                 imagesApi.util.updateQueryData(
