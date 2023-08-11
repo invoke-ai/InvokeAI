@@ -2,6 +2,10 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
+import {
+  DenoiseLatentsInvocation,
+  ONNXTextToLatentsInvocation,
+} from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
@@ -10,20 +14,16 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
+  DENOISE_LATENTS,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
-  ONNX_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
+  ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
   TEXT_TO_IMAGE_GRAPH,
-  TEXT_TO_LATENTS,
 } from './constants';
-import {
-  ONNXTextToLatentsInvocation,
-  TextToLatentsInvocation,
-} from 'services/api/types';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
@@ -64,23 +64,25 @@ export const buildCanvasTextToImageGraph = (
   const modelLoaderNodeType = isUsingOnnxModel
     ? 'onnx_model_loader'
     : 'main_model_loader';
-  const t2lNode: TextToLatentsInvocation | ONNXTextToLatentsInvocation =
+  const t2lNode: DenoiseLatentsInvocation | ONNXTextToLatentsInvocation =
     isUsingOnnxModel
       ? {
           type: 't2l_onnx',
-          id: TEXT_TO_LATENTS,
+          id: DENOISE_LATENTS,
           is_intermediate: true,
           cfg_scale,
           scheduler,
           steps,
         }
       : {
-          type: 't2l',
-          id: TEXT_TO_LATENTS,
+          type: 'denoise_latents',
+          id: DENOISE_LATENTS,
           is_intermediate: true,
           cfg_scale,
           scheduler,
           steps,
+          denoising_start: 0,
+          denoising_end: 1,
         };
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -142,7 +144,7 @@ export const buildCanvasTextToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -152,7 +154,7 @@ export const buildCanvasTextToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -192,13 +194,13 @@ export const buildCanvasTextToImageGraph = (
           field: 'unet',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'unet',
         },
       },
       {
         source: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -212,7 +214,7 @@ export const buildCanvasTextToImageGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -252,7 +254,7 @@ export const buildCanvasTextToImageGraph = (
   });
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS, modelLoaderNodeId);
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // optionally add custom VAE
   addVAEToGraph(state, graph, modelLoaderNodeId);
@@ -261,7 +263,7 @@ export const buildCanvasTextToImageGraph = (
   addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, TEXT_TO_LATENTS);
+  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

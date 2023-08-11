@@ -120,9 +120,6 @@ export type RandomRangeInvocation = TypeReq<
 export type RangeOfSizeInvocation = TypeReq<
   components['schemas']['RangeOfSizeInvocation']
 >;
-export type InpaintInvocation = TypeReq<
-  components['schemas']['InpaintInvocation']
->;
 export type ImageResizeInvocation = TypeReq<
   components['schemas']['ImageResizeInvocation']
 >;
@@ -139,14 +136,11 @@ export type DynamicPromptInvocation = TypeReq<
   components['schemas']['DynamicPromptInvocation']
 >;
 export type NoiseInvocation = TypeReq<components['schemas']['NoiseInvocation']>;
-export type TextToLatentsInvocation = TypeReq<
-  components['schemas']['TextToLatentsInvocation']
->;
 export type ONNXTextToLatentsInvocation = TypeReq<
   components['schemas']['ONNXTextToLatentsInvocation']
 >;
-export type LatentsToLatentsInvocation = TypeReq<
-  components['schemas']['LatentsToLatentsInvocation']
+export type DenoiseLatentsInvocation = TypeReq<
+  components['schemas']['DenoiseLatentsInvocation']
 >;
 export type ImageToLatentsInvocation = TypeReq<
   components['schemas']['ImageToLatentsInvocation']

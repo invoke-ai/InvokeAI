@@ -14,10 +14,10 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
+  DENOISE_LATENTS,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
-  LATENTS_TO_LATENTS,
   MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
@@ -118,13 +118,14 @@ export const buildLinearImageToImageGraph = (
         id: LATENTS_TO_IMAGE,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
-      [LATENTS_TO_LATENTS]: {
-        type: 'l2l',
-        id: LATENTS_TO_LATENTS,
+      [DENOISE_LATENTS]: {
+        type: 'denoise_latents',
+        id: DENOISE_LATENTS,
         cfg_scale,
         scheduler,
         steps,
-        strength,
+        denoising_start: 1 - strength,
+        denoising_end: 1,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -143,7 +144,7 @@ export const buildLinearImageToImageGraph = (
           field: 'unet',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'unet',
         },
       },
@@ -179,7 +180,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -193,7 +194,7 @@ export const buildLinearImageToImageGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'latents',
         },
       },
@@ -203,7 +204,7 @@ export const buildLinearImageToImageGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -213,7 +214,7 @@ export const buildLinearImageToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -223,7 +224,7 @@ export const buildLinearImageToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -334,7 +335,7 @@ export const buildLinearImageToImageGraph = (
   });
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS);
 
   // optionally add custom VAE
   addVAEToGraph(state, graph);
@@ -343,7 +344,7 @@ export const buildLinearImageToImageGraph = (
   addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, LATENTS_TO_LATENTS);
+  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

@@ -1,7 +1,7 @@
 // friendly node ids
 export const POSITIVE_CONDITIONING = 'positive_conditioning';
 export const NEGATIVE_CONDITIONING = 'negative_conditioning';
-export const TEXT_TO_LATENTS = 'text_to_latents';
+export const DENOISE_LATENTS = 'denoise_latents';
 export const LATENTS_TO_IMAGE = 'latents_to_image';
 export const NSFW_CHECKER = 'nsfw_checker';
 export const WATERMARKER = 'invisible_watermark';

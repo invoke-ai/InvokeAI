@@ -2,12 +2,12 @@ import { RootState } from 'app/store/store';
 import { MetadataAccumulatorInvocation } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
 import {
+  DENOISE_LATENTS,
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
   SDXL_LATENTS_TO_LATENTS,
   SDXL_MODEL_LOADER,
-  SDXL_REFINER_LATENTS_TO_LATENTS,
   SDXL_REFINER_MODEL_LOADER,
   SDXL_REFINER_NEGATIVE_CONDITIONING,
   SDXL_REFINER_POSITIVE_CONDITIONING,
@@ -91,9 +91,9 @@ export const addSDXLRefinerToGraph = (
     style: `${negativePrompt} ${negativeStylePrompt}`,
     aesthetic_score: refinerAestheticScore,
   };
-  graph.nodes[SDXL_REFINER_LATENTS_TO_LATENTS] = {
-    type: 'l2l_sdxl',
-    id: SDXL_REFINER_LATENTS_TO_LATENTS,
+  graph.nodes[DENOISE_LATENTS] = {
+    type: 'denoise_latents',
+    id: DENOISE_LATENTS,
     cfg_scale: refinerCFGScale,
     steps: refinerSteps / (1 - Math.min(refinerStart, 0.99)),
     scheduler: refinerScheduler,
@@ -108,7 +108,7 @@ export const addSDXLRefinerToGraph = (
         field: 'unet',
       },
       destination: {
-        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        node_id: DENOISE_LATENTS,
         field: 'unet',
       },
     },
@@ -148,7 +148,7 @@ export const addSDXLRefinerToGraph = (
         field: 'conditioning',
       },
       destination: {
-        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        node_id: DENOISE_LATENTS,
         field: 'positive_conditioning',
       },
     },
@@ -158,7 +158,7 @@ export const addSDXLRefinerToGraph = (
         field: 'conditioning',
       },
       destination: {
-        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        node_id: DENOISE_LATENTS,
         field: 'negative_conditioning',
       },
     },
@@ -168,13 +168,13 @@ export const addSDXLRefinerToGraph = (
         field: 'latents',
       },
       destination: {
-        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        node_id: DENOISE_LATENTS,
         field: 'latents',
       },
     },
     {
       source: {
-        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        node_id: DENOISE_LATENTS,
         field: 'latents',
       },
       destination: {

@@ -8,6 +8,7 @@ import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  DENOISE_LATENTS,
   LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
@@ -15,7 +16,6 @@ import {
   POSITIVE_CONDITIONING,
   SDXL_MODEL_LOADER,
   SDXL_TEXT_TO_IMAGE_GRAPH,
-  SDXL_TEXT_TO_LATENTS,
 } from './constants';
 
 export const buildLinearSDXLTextToImageGraph = (
@@ -95,12 +95,13 @@ export const buildLinearSDXLTextToImageGraph = (
         height,
         use_cpu,
       },
-      [SDXL_TEXT_TO_LATENTS]: {
-        type: 't2l_sdxl',
-        id: SDXL_TEXT_TO_LATENTS,
+      [DENOISE_LATENTS]: {
+        type: 'denoise_latents',
+        id: DENOISE_LATENTS,
         cfg_scale,
         scheduler,
         steps,
+        denoising_start: 0,
         denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
       [LATENTS_TO_IMAGE]: {
@@ -116,7 +117,7 @@ export const buildLinearSDXLTextToImageGraph = (
           field: 'unet',
         },
         destination: {
-          node_id: SDXL_TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'unet',
         },
       },
@@ -176,7 +177,7 @@ export const buildLinearSDXLTextToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: SDXL_TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -186,7 +187,7 @@ export const buildLinearSDXLTextToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: SDXL_TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -196,13 +197,13 @@ export const buildLinearSDXLTextToImageGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: SDXL_TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'noise',
         },
       },
       {
         source: {
-          node_id: SDXL_TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -247,11 +248,11 @@ export const buildLinearSDXLTextToImageGraph = (
     },
   });
 
-  addSDXLLoRAsToGraph(state, graph, SDXL_TEXT_TO_LATENTS, SDXL_MODEL_LOADER);
+  addSDXLLoRAsToGraph(state, graph, DENOISE_LATENTS, SDXL_MODEL_LOADER);
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, SDXL_TEXT_TO_LATENTS);
+    addSDXLRefinerToGraph(state, graph, DENOISE_LATENTS);
   }
 
   // add dynamic prompts - also sets up core iteration and seed
