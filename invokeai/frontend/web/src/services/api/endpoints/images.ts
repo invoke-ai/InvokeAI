@@ -399,15 +399,18 @@ export const imagesApi = api.injectEndpoints({
         method: 'PATCH',
         body: { pinned },
       }),
-      invalidatesTags: (result, error, { imageDTO }) => [
-        {
-          type: 'ImageList',
-          id: getListImagesUrl({
-            board_id: imageDTO.board_id,
-            categories: IMAGE_CATEGORIES,
-          }),
-        },
-      ],
+      invalidatesTags: (result, error, { imageDTO }) => {
+        const categories = getCategories(imageDTO);
+        return [
+          {
+            type: 'ImageList',
+            id: getListImagesUrl({
+              board_id: imageDTO.board_id,
+              categories,
+            }),
+          },
+        ]
+      },
       async onQueryStarted(
         { imageDTO, pinned },
         { dispatch, queryFulfilled, getState }
@@ -465,27 +468,14 @@ export const imagesApi = api.injectEndpoints({
         const isCacheFullyPopulated =
           currentCache.data && currentCache.data.ids.length >= (total ?? 0);
 
-        const isInDateRangeForPinnedState = getIsImageInDateRange(
+        const isInDateRange = getIsImageInDateRange(
           currentCache.data,
           updatedImage
         );
 
-        if (!isInDateRangeForPinnedState) {
-          // if newly pinned or unpinned image is not in date range for its new state, remove from cache
-          patches.push(
-            dispatch(
-              imagesApi.util.updateQueryData(
-                'listImages',
-                queryArgs,
-                (draft) => {
-                  imagesAdapter.removeOne(draft, updatedImage.image_name);
-                }
-              )
-            )
-          );
-        }
+        // should we remove images from cache if _not_ in date range? ie you are showing 100 of 101 pinned images and you unpin one. technically it should disappear from list.
 
-        if (isCacheFullyPopulated || isInDateRangeForPinnedState) {
+        if (isCacheFullyPopulated || isInDateRange) {
           // *upsert* to $cache
           patches.push(
             dispatch(

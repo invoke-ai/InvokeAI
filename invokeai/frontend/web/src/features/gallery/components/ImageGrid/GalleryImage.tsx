@@ -2,16 +2,19 @@ import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
-import { useMultiselect } from 'features/gallery/hooks/useMultiselect.ts';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import { MouseEvent, memo, useCallback, useMemo } from 'react';
-import { FaTrash } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import {
   ImageDTOsDraggableData,
   ImageDraggableData,
   TypesafeDraggableData,
 } from 'features/dnd/types';
+import { useMultiselect } from 'features/gallery/hooks/useMultiselect.ts';
+import { MouseEvent, memo, useCallback, useMemo } from 'react';
+import { BsBookmarkStar, BsFillBookmarkStarFill } from 'react-icons/bs';
+import {
+  useChangeImagePinnedMutation,
+  useGetImageDTOQuery,
+} from 'services/api/endpoints/images';
 
 interface HoverableImageProps {
   imageName: string;
@@ -59,6 +62,14 @@ const GalleryImage = (props: HoverableImageProps) => {
     }
   }, [imageDTO, selection, selectionCount]);
 
+  const [togglePin] = useChangeImagePinnedMutation();
+
+  const togglePinnedState = useCallback(() => {
+    if (imageDTO) {
+      togglePin({ imageDTO, pinned: !imageDTO.pinned });
+    }
+  }, [togglePin, imageDTO]);
+
   if (!imageDTO) {
     return <IAIFillSkeleton />;
   }
@@ -80,15 +91,17 @@ const GalleryImage = (props: HoverableImageProps) => {
           draggableData={draggableData}
           isSelected={isSelected}
           minSize={0}
-          onClickReset={handleDelete}
+          onClickReset={togglePinnedState}
           imageSx={{ w: 'full', h: 'full' }}
           isDropDisabled={true}
           isUploadDisabled={true}
           thumbnail={true}
           withHoverOverlay
-          resetIcon={<FaTrash />}
-          resetTooltip="Delete image"
-          withResetIcon={shouldShowDeleteButton} // removed bc it's too easy to accidentally delete images
+          resetIcon={
+            imageDTO.pinned ? <BsFillBookmarkStarFill /> : <BsBookmarkStar />
+          }
+          resetTooltip="Pin image"
+          withResetIcon={true}
         />
       </Flex>
     </Box>
