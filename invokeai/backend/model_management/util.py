@@ -13,7 +13,7 @@ def lora_token_vector_length(checkpoint: dict) -> int:
         lora_token_vector_length = None
 
         if "." not in key:
-            return lora_token_vector_length # wrong key format
+            return lora_token_vector_length  # wrong key format
         model_key, lora_key = key.split(".", 1)
 
         # check lora/locon

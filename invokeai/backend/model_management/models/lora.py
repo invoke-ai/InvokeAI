@@ -393,6 +393,7 @@ class FullLayer(LoRALayerBase):
 
         self.weight = self.weight.to(device=device, dtype=dtype)
 
+
 class IA3Layer(LoRALayerBase):
     # weight: torch.Tensor
     # on_input: torch.Tensor
