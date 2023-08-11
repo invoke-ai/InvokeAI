@@ -25,6 +25,8 @@ import {
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   MASK_BLUR,
+  MASK_COMBINE,
+  MASK_FROM_ALPHA,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -62,8 +64,6 @@ export const buildCanvasInpaintGraph = (
     infillMethod,
     clipSkip,
   } = state.generation;
-
-  const { generationMode } = state.canvas;
 
   if (!model) {
     log.error('No model found in state');
@@ -115,6 +115,25 @@ export const buildCanvasInpaintGraph = (
         denoising_end: 1,
       },
       [infillNode.id]: infillNode,
+      [MASK_FROM_ALPHA]: {
+        type: 'tomask',
+        id: MASK_FROM_ALPHA,
+        is_intermediate: true,
+        image: canvasInitImage,
+      },
+      [MASK_COMBINE]: {
+        type: 'mask_combine',
+        id: MASK_COMBINE,
+        is_intermediate: true,
+        mask2: canvasMaskImage,
+      },
+      [MASK_BLUR]: {
+        type: 'img_blur',
+        id: MASK_BLUR,
+        is_intermediate: true,
+        radius: maskBlur,
+        blur_type: maskBlurMethod,
+      },
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
@@ -163,22 +182,11 @@ export const buildCanvasInpaintGraph = (
         type: 'color_correct',
         id: COLOR_CORRECT,
         is_intermediate: true,
-        reference: canvasInitImage,
-        mask: canvasMaskImage,
-      },
-      [MASK_BLUR]: {
-        type: 'img_blur',
-        id: MASK_BLUR,
-        is_intermediate: true,
-        image: canvasMaskImage,
-        radius: maskBlur,
-        blur_type: maskBlurMethod,
       },
       [INPAINT_FINAL_IMAGE]: {
         type: 'img_paste',
         id: INPAINT_FINAL_IMAGE,
         is_intermediate: true,
-        base_image: canvasInitImage,
       },
       [RANGE_OF_SIZE]: {
         type: 'range_of_size',
@@ -288,6 +296,26 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
+          node_id: MASK_FROM_ALPHA,
+          field: 'mask',
+        },
+        destination: {
+          node_id: MASK_COMBINE,
+          field: 'mask1',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_COMBINE,
+          field: 'image',
+        },
+        destination: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+      },
+      {
+        source: {
           node_id: MASK_BLUR,
           field: 'image',
         },
@@ -328,12 +356,42 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'reference',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'mask',
+        },
+      },
+      {
+        source: {
           node_id: LATENTS_TO_IMAGE,
           field: 'image',
         },
         destination: {
           node_id: COLOR_CORRECT,
           field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_FINAL_IMAGE,
+          field: 'base_image',
         },
       },
       {

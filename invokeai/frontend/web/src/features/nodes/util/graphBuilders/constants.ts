@@ -25,6 +25,7 @@ export const INPAINT_FINAL_IMAGE = 'inpaint_final_image';
 export const MASK_FROM_ALPHA = 'tomask';
 export const MASK_EDGE = 'mask_edge';
 export const MASK_BLUR = 'mask_blur';
+export const MASK_COMBINE = 'mask_combine';
 export const COLOR_CORRECT = 'color_correct';
 export const PASTE_IMAGE = 'img_paste';
 export const CONTROL_NET_COLLECT = 'control_net_collect';

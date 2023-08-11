@@ -1,29 +1,19 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Literal, Optional
-
-import numpy
-import cv2
-from PIL import Image, ImageFilter, ImageOps, ImageChops
-from pydantic import Field
 from pathlib import Path
-from typing import Union
+from typing import Literal, Optional, Union
+
+import cv2
+import numpy
+from PIL import Image, ImageChops, ImageFilter, ImageOps
+from pydantic import Field
+
 from invokeai.app.invocations.metadata import CoreMetadata
-from ..models.image import (
-    ImageCategory,
-    ImageField,
-    ResourceOrigin,
-    PILInvocationConfig,
-    ImageOutput,
-    MaskOutput,
-)
-from .baseinvocation import (
-    BaseInvocation,
-    InvocationContext,
-    InvocationConfig,
-)
-from invokeai.backend.image_util.safety_checker import SafetyChecker
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
+from invokeai.backend.image_util.safety_checker import SafetyChecker
+
+from ..models.image import ImageCategory, ImageField, ImageOutput, MaskOutput, PILInvocationConfig, ResourceOrigin
+from .baseinvocation import BaseInvocation, InvocationConfig, InvocationContext
 
 
 class LoadImageInvocation(BaseInvocation):
@@ -672,14 +662,10 @@ class MaskEdgeInvocation(BaseInvocation, PILInvocationConfig):
         mask = context.services.images.get_pil_image(self.image.image_name)
 
         npimg = numpy.asarray(mask, dtype=numpy.uint8)
-        npgradient = numpy.uint8(
-            255 * (1.0 - numpy.floor(numpy.abs(0.5 - numpy.float32(npimg) / 255.0) * 2.0))
-        )
+        npgradient = numpy.uint8(255 * (1.0 - numpy.floor(numpy.abs(0.5 - numpy.float32(npimg) / 255.0) * 2.0)))
         npedge = cv2.Canny(npimg, threshold1=self.low_threshold, threshold2=self.high_threshold)
         npmask = npgradient + npedge
-        npmask = cv2.dilate(
-            npmask, numpy.ones((3, 3), numpy.uint8), iterations=int(self.edge_size / 2)
-        )
+        npmask = cv2.dilate(npmask, numpy.ones((3, 3), numpy.uint8), iterations=int(self.edge_size / 2))
 
         new_mask = Image.fromarray(npmask)
 
@@ -704,9 +690,47 @@ class MaskEdgeInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
+class MaskCombineInvocation(BaseInvocation, PILInvocationConfig):
+    """Combine two masks together by multiplying them using `PIL.ImageChops.multiply()`."""
+
+    # fmt: off
+    type: Literal["mask_combine"] = "mask_combine"
+
+    # Inputs
+    mask1: Optional[ImageField]  = Field(default=None, description="The first mask to combine")
+    mask2: Optional[ImageField]  = Field(default=None, description="The second image to combine")
+    # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {"title": "Mask Combine", "tags": ["mask", "combine"]},
+        }
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        mask1 = context.services.images.get_pil_image(self.mask1.image_name).convert("L")
+        mask2 = context.services.images.get_pil_image(self.mask2.image_name).convert("L")
+
+        combined_mask = ImageChops.multiply(mask1, mask2)
+
+        image_dto = context.services.images.create(
+            image=combined_mask,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
 class ColorCorrectInvocation(BaseInvocation, PILInvocationConfig):
     """
-    Shifts the colors of a target image to match the reference image, optionally 
+    Shifts the colors of a target image to match the reference image, optionally
     using a mask to only color-correct certain regions of the target image.
     """
 
@@ -720,32 +744,23 @@ class ColorCorrectInvocation(BaseInvocation, PILInvocationConfig):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_init_mask = None
         if self.mask is not None:
-            pil_init_mask = context.services.images.get_pil_image(
-                self.mask.image_name
-            ).convert("L")
+            pil_init_mask = context.services.images.get_pil_image(self.mask.image_name).convert("L")
 
-        init_image = context.services.images.get_pil_image(
-            self.reference.image_name
-        )
+        init_image = context.services.images.get_pil_image(self.reference.image_name)
 
-        result = context.services.images.get_pil_image(
-            self.image.image_name
-        ).convert("RGBA")
+        result = context.services.images.get_pil_image(self.image.image_name).convert("RGBA")
 
-
-        #if init_image is None or init_mask is None:
+        # if init_image is None or init_mask is None:
         #    return result
 
         # Get the original alpha channel of the mask if there is one.
         # Otherwise it is some other black/white image format ('1', 'L' or 'RGB')
-        #pil_init_mask = (
+        # pil_init_mask = (
         #    init_mask.getchannel("A")
         #    if init_mask.mode == "RGBA"
         #    else init_mask.convert("L")
-        #)
-        pil_init_image = init_image.convert(
-            "RGBA"
-        )  # Add an alpha channel if one doesn't exist
+        # )
+        pil_init_image = init_image.convert("RGBA")  # Add an alpha channel if one doesn't exist
 
         # Build an image with only visible pixels from source to use as reference for color-matching.
         init_rgb_pixels = numpy.asarray(init_image.convert("RGB"), dtype=numpy.uint8)
@@ -771,10 +786,7 @@ class ColorCorrectInvocation(BaseInvocation, PILInvocationConfig):
             np_matched_result[:, :, :] = (
                 (
                     (
-                        (
-                            np_matched_result[:, :, :].astype(numpy.float32)
-                            - gen_means[None, None, :]
-                        )
+                        (np_matched_result[:, :, :].astype(numpy.float32) - gen_means[None, None, :])
                         / gen_std[None, None, :]
                     )
                     * init_std[None, None, :]
@@ -800,10 +812,7 @@ class ColorCorrectInvocation(BaseInvocation, PILInvocationConfig):
         else:
             blurred_init_mask = pil_init_mask
 
-
-        multiplied_blurred_init_mask = ImageChops.multiply(
-            blurred_init_mask, result.split()[-1]
-        )
+        multiplied_blurred_init_mask = ImageChops.multiply(blurred_init_mask, result.split()[-1])
 
         # Paste original on color-corrected generation (using blurred mask)
         matched_result.paste(init_image, (0, 0), mask=multiplied_blurred_init_mask)
