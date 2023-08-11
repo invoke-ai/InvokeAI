@@ -12,36 +12,42 @@ def lora_token_vector_length(checkpoint: dict) -> int:
     def _get_shape_1(key, tensor, checkpoint):
         lora_token_vector_length = None
 
+        if "." not in key:
+            return lora_token_vector_length  # wrong key format
+        model_key, lora_key = key.split(".", 1)
+
         # check lora/locon
-        if ".lora_down.weight" in key:
+        if lora_key == "lora_down.weight":
             lora_token_vector_length = tensor.shape[1]
 
         # check loha (don't worry about hada_t1/hada_t2 as it used only in 4d shapes)
-        elif ".hada_w1_b" in key or ".hada_w2_b" in key:
+        elif lora_key in ["hada_w1_b", "hada_w2_b"]:
             lora_token_vector_length = tensor.shape[1]
 
         # check lokr (don't worry about lokr_t2 as it used only in 4d shapes)
-        elif ".lokr_" in key:
-            _lokr_key = key.split(".")[0]
-
-            if _lokr_key + ".lokr_w1" in checkpoint:
-                _lokr_w1 = checkpoint[_lokr_key + ".lokr_w1"]
-            elif _lokr_key + "lokr_w1_b" in checkpoint:
-                _lokr_w1 = checkpoint[_lokr_key + ".lokr_w1_b"]
+        elif "lokr_" in lora_key:
+            if model_key + ".lokr_w1" in checkpoint:
+                _lokr_w1 = checkpoint[model_key + ".lokr_w1"]
+            elif model_key + "lokr_w1_b" in checkpoint:
+                _lokr_w1 = checkpoint[model_key + ".lokr_w1_b"]
             else:
                 return lora_token_vector_length  # unknown format
 
-            if _lokr_key + ".lokr_w2" in checkpoint:
-                _lokr_w2 = checkpoint[_lokr_key + ".lokr_w2"]
-            elif _lokr_key + "lokr_w2_b" in checkpoint:
-                _lokr_w2 = checkpoint[_lokr_key + ".lokr_w2_b"]
+            if model_key + ".lokr_w2" in checkpoint:
+                _lokr_w2 = checkpoint[model_key + ".lokr_w2"]
+            elif model_key + "lokr_w2_b" in checkpoint:
+                _lokr_w2 = checkpoint[model_key + ".lokr_w2_b"]
             else:
                 return lora_token_vector_length  # unknown format
 
             lora_token_vector_length = _lokr_w1.shape[1] * _lokr_w2.shape[1]
 
-        elif ".diff" in key:
+        elif lora_key == "diff":
             lora_token_vector_length = tensor.shape[1]
+
+        # ia3 can be detected only by shape[0] in text encoder
+        elif lora_key == "weight" and "lora_unet_" not in model_key:
+            lora_token_vector_length = tensor.shape[0]
 
         return lora_token_vector_length
 

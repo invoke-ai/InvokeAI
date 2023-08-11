@@ -143,7 +143,7 @@ class ModelPatcher:
                         # with torch.autocast(device_type="cpu"):
                         layer.to(dtype=torch.float32)
                         layer_scale = layer.alpha / layer.rank if (layer.alpha and layer.rank) else 1.0
-                        layer_weight = layer.get_weight() * lora_weight * layer_scale
+                        layer_weight = layer.get_weight(original_weights[module_key]) * lora_weight * layer_scale
 
                         if module.weight.shape != layer_weight.shape:
                             # TODO: debug on lycoris
@@ -361,7 +361,8 @@ class ONNXModelPatcher:
 
                     layer.to(dtype=torch.float32)
                     layer_key = layer_key.replace(prefix, "")
-                    layer_weight = layer.get_weight().detach().cpu().numpy() * lora_weight
+                    # TODO: rewrite to pass original tensor weight(required by ia3)
+                    layer_weight = layer.get_weight(None).detach().cpu().numpy() * lora_weight
                     if layer_key is blended_loras:
                         blended_loras[layer_key] += layer_weight
                     else:
