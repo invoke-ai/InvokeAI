@@ -317,6 +317,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return control_data
 
     def init_scheduler(self, scheduler, device, steps, denoising_start, denoising_end):
+        if scheduler.config.get("cpu_only", False):
+            device = torch.device("cpu")
+
         # apply denoising_start
         num_inference_steps = steps
         scheduler.set_timesteps(num_inference_steps, device=device)
@@ -325,6 +328,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
         timesteps = scheduler.timesteps[t_start * scheduler.order :]
         num_inference_steps = num_inference_steps - t_start
 
+        init_timestep = timesteps[:1]
+
         # apply denoising_end
         num_warmup_steps = max(len(timesteps) - num_inference_steps * scheduler.order, 0)
 
@@ -332,7 +337,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         num_inference_steps = num_inference_steps - skipped_final_steps
         timesteps = timesteps[: num_warmup_steps + scheduler.order * num_inference_steps]
 
-        return num_inference_steps, timesteps
+        return num_inference_steps, timesteps, init_timestep
 
     def prep_mask_tensor(self, mask, context, lantents):
         if mask is None:
@@ -418,7 +423,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     exit_stack=exit_stack,
                 )
 
-                num_inference_steps, timesteps = self.init_scheduler(
+                num_inference_steps, timesteps, init_timestep = self.init_scheduler(
                     scheduler,
                     device=unet.device,
                     steps=self.steps,
@@ -429,6 +434,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
                     latents=latents,
                     timesteps=timesteps,
+                    init_timestep=init_timestep,
                     noise=noise,
                     seed=seed,
                     mask=mask,
