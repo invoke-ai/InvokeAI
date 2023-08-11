@@ -3,10 +3,10 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   ImageDTO,
-  InpaintInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
 } from 'services/api/types';
+import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
@@ -15,9 +15,12 @@ import {
   CLIP_SKIP,
   INPAINT,
   INPAINT_GRAPH,
+  INPAINT_IMAGE,
   ITERATE,
+  LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
+  NOISE,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
@@ -44,6 +47,9 @@ export const buildCanvasInpaintGraph = (
     iterations,
     seed,
     shouldRandomizeSeed,
+    vaePrecision,
+    shouldUseNoiseSettings,
+    shouldUseCpuNoise,
     seamSize,
     seamBlur,
     seamSteps,
@@ -68,40 +74,38 @@ export const buildCanvasInpaintGraph = (
     shouldAutoSave,
   } = state.canvas;
 
+  const use_cpu = shouldUseNoiseSettings
+    ? shouldUseCpuNoise
+    : shouldUseCpuNoise;
+
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
     nodes: {
       [INPAINT]: {
-        is_intermediate: !shouldAutoSave,
-        type: 'inpaint',
+        type: 'denoise_latents',
         id: INPAINT,
-        steps,
+        is_intermediate: true,
+        steps: steps,
+        cfg_scale: cfg_scale,
+        scheduler: scheduler,
+        denoising_start: 1 - strength,
+        denoising_end: 1,
+        mask: canvasMaskImage,
+      },
+      [INPAINT_IMAGE]: {
+        type: 'i2l',
+        id: INPAINT_IMAGE,
+        is_intermediate: true,
+        image: canvasInitImage,
+        fp32: vaePrecision === 'fp32' ? true : false,
+      },
+      [NOISE]: {
+        type: 'noise',
+        id: NOISE,
         width,
         height,
-        cfg_scale,
-        scheduler,
-        image: {
-          image_name: canvasInitImage.image_name,
-        },
-        strength,
-        fit: shouldFitToWidthHeight,
-        mask: {
-          image_name: canvasMaskImage.image_name,
-        },
-        seam_size: seamSize,
-        seam_blur: seamBlur,
-        seam_strength: seamStrength,
-        seam_steps: seamSteps,
-        tile_size: infillMethod === 'tile' ? tileSize : undefined,
-        infill_method: infillMethod as InpaintInvocation['infill_method'],
-        inpaint_width:
-          boundingBoxScaleMethod !== 'none'
-            ? scaledBoundingBoxDimensions.width
-            : undefined,
-        inpaint_height:
-          boundingBoxScaleMethod !== 'none'
-            ? scaledBoundingBoxDimensions.height
-            : undefined,
+        use_cpu,
+        is_intermediate: true,
       },
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
@@ -121,12 +125,19 @@ export const buildCanvasInpaintGraph = (
         is_intermediate: true,
         model,
       },
+      [LATENTS_TO_IMAGE]: {
+        type: 'l2i',
+        id: LATENTS_TO_IMAGE,
+        is_intermediate: true,
+        fp32: vaePrecision === 'fp32' ? true : false,
+      },
       [CLIP_SKIP]: {
         type: 'clip_skip',
         id: CLIP_SKIP,
         is_intermediate: true,
         skipped_layers: clipSkip,
       },
+
       [RANGE_OF_SIZE]: {
         type: 'range_of_size',
         id: RANGE_OF_SIZE,
@@ -205,6 +216,26 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
+          node_id: NOISE,
+          field: 'noise',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_IMAGE,
+          field: 'latents',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'latents',
+        },
+      },
+      {
+        source: {
           node_id: RANGE_OF_SIZE,
           field: 'collection',
         },
@@ -219,17 +250,25 @@ export const buildCanvasInpaintGraph = (
           field: 'item',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: NOISE,
           field: 'seed',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
         },
       },
     ],
   };
 
-  addLoRAsToGraph(state, graph, INPAINT);
-
   // Add VAE
-  addVAEToGraph(state, graph);
+  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
 
   // handle seed
   if (shouldRandomizeSeed) {
@@ -250,6 +289,12 @@ export const buildCanvasInpaintGraph = (
     // User specified seed, so set the start of the range of size to the seed
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
   }
+
+  // add LoRA support
+  addLoRAsToGraph(state, graph, INPAINT, MAIN_MODEL_LOADER);
+
+  // add controlnet, mutating `graph`
+  addControlNetToLinearGraph(state, graph, INPAINT);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

@@ -4,8 +4,8 @@ import { MetadataAccumulatorInvocation } from 'services/api/types';
 import {
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
-  INPAINT,
   INPAINT_GRAPH,
+  INPAINT_IMAGE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
@@ -35,7 +35,11 @@ export const addVAEToGraph = (
     };
   }
   const isOnnxModel = modelLoaderNodeId == ONNX_MODEL_LOADER;
-  if (graph.id === TEXT_TO_IMAGE_GRAPH || graph.id === IMAGE_TO_IMAGE_GRAPH) {
+  if (
+    graph.id === TEXT_TO_IMAGE_GRAPH ||
+    graph.id === IMAGE_TO_IMAGE_GRAPH ||
+    graph.id === INPAINT_GRAPH
+  ) {
     graph.edges.push({
       source: {
         node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
@@ -68,7 +72,7 @@ export const addVAEToGraph = (
         field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
       },
       destination: {
-        node_id: INPAINT,
+        node_id: INPAINT_IMAGE,
         field: 'vae',
       },
     });
