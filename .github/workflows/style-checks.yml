@@ -20,7 +20,7 @@ jobs:
 
       - name: Install dependencies with pip
         run: |
-          pip install black flake8
+          pip install black flake8 Flake8-pyproject
 
       # - run: isort --check-only .
       - run: black --check .
