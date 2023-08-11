@@ -39,6 +39,8 @@ class ImageRecord(BaseModelExcludeNull):
         description="The node ID that generated this image, if it is a generated image.",
     )
     """The node ID that generated this image, if it is a generated image."""
+    pinned: bool = Field(description="Whether this image is pinned.")
+    """Whether this image is pinned."""
 
 
 class ImageRecordChanges(BaseModelExcludeNull, extra=Extra.forbid):
@@ -48,6 +50,7 @@ class ImageRecordChanges(BaseModelExcludeNull, extra=Extra.forbid):
       - `image_category`: change the category of an image
       - `session_id`: change the session associated with an image
       - `is_intermediate`: change the image's `is_intermediate` flag
+      - `pinned`: change whether the image is pinned
     """
 
     image_category: Optional[ImageCategory] = Field(description="The image's new category.")
@@ -59,6 +62,8 @@ class ImageRecordChanges(BaseModelExcludeNull, extra=Extra.forbid):
     """The image's new session ID."""
     is_intermediate: Optional[StrictBool] = Field(default=None, description="The image's new `is_intermediate` flag.")
     """The image's new `is_intermediate` flag."""
+    pinned: Optional[StrictBool] = Field(default=None, description="The image's new `pinned` state")
+    """The image's new `pinned` state."""
 
 
 class ImageUrlsDTO(BaseModelExcludeNull):
@@ -113,6 +118,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     updated_at = image_dict.get("updated_at", get_iso_timestamp())
     deleted_at = image_dict.get("deleted_at", get_iso_timestamp())
     is_intermediate = image_dict.get("is_intermediate", False)
+    pinned = image_dict.get("pinned", False)
 
     return ImageRecord(
         image_name=image_name,
@@ -126,4 +132,5 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         updated_at=updated_at,
         deleted_at=deleted_at,
         is_intermediate=is_intermediate,
+        pinned=pinned
     )
