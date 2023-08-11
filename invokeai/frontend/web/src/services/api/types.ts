@@ -172,6 +172,12 @@ export type ESRGANInvocation = TypeReq<
 export type DivideInvocation = TypeReq<
   components['schemas']['DivideInvocation']
 >;
+export type InfillTileInvocation = TypeReq<
+  components['schemas']['InfillTileInvocation']
+>;
+export type InfillPatchmatchInvocation = TypeReq<
+  components['schemas']['InfillPatchMatchInvocation']
+>;
 export type ImageNSFWBlurInvocation = TypeReq<
   components['schemas']['ImageNSFWBlurInvocation']
 >;

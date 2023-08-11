@@ -3,6 +3,8 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   ImageDTO,
+  InfillPatchmatchInvocation,
+  InfillTileInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
 } from 'services/api/types';
@@ -18,6 +20,7 @@ import {
   INPAINT_FINAL_IMAGE,
   INPAINT_GRAPH,
   INPAINT_IMAGE,
+  INPAINT_INFILL,
   ITERATE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
@@ -60,6 +63,8 @@ export const buildCanvasInpaintGraph = (
     clipSkip,
   } = state.generation;
 
+  const { generationMode } = state.canvas;
+
   if (!model) {
     log.error('No model found in state');
     throw new Error('No model found in state');
@@ -79,6 +84,23 @@ export const buildCanvasInpaintGraph = (
     ? shouldUseCpuNoise
     : shouldUseCpuNoise;
 
+  let infillNode: InfillTileInvocation | InfillPatchmatchInvocation = {
+    type: 'infill_tile',
+    id: INPAINT_INFILL,
+    is_intermediate: true,
+    image: canvasInitImage,
+    tile_size: tileSize,
+  };
+
+  if (infillMethod === 'patchmatch') {
+    infillNode = {
+      type: 'infill_patchmatch',
+      id: INPAINT_INFILL,
+      is_intermediate: true,
+      image: canvasInitImage,
+    };
+  }
+
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
     nodes: {
@@ -92,11 +114,11 @@ export const buildCanvasInpaintGraph = (
         denoising_start: 1 - strength,
         denoising_end: 1,
       },
+      [infillNode.id]: infillNode,
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
         is_intermediate: true,
-        image: canvasInitImage,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
       [NOISE]: {
@@ -242,6 +264,16 @@ export const buildCanvasInpaintGraph = (
         destination: {
           node_id: INPAINT,
           field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_IMAGE,
+          field: 'image',
         },
       },
       {
