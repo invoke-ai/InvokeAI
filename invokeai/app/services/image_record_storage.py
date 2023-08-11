@@ -67,6 +67,7 @@ IMAGE_DTO_COLS = ", ".join(
                 "created_at",
                 "updated_at",
                 "deleted_at",
+                "pinned"
             ],
         )
     )
@@ -139,6 +140,7 @@ class ImageRecordStorageBase(ABC):
         node_id: Optional[str],
         metadata: Optional[dict],
         is_intermediate: bool = False,
+        pinned: bool = False
     ) -> datetime:
         """Saves an image record."""
         pass
@@ -200,6 +202,16 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             """
         )
 
+        self._cursor.execute("PRAGMA table_info(images)")
+        columns = [column[1] for column in self._cursor.fetchall()]
+        
+        if "pinned" not in columns:
+            self._cursor.execute(
+                """--sql
+                ALTER TABLE images ADD COLUMN pinned BOOLEAN DEFAULT FALSE;
+                """
+            )
+
         # Create the `images` table indices.
         self._cursor.execute(
             """--sql
@@ -219,6 +231,12 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self._cursor.execute(
             """--sql
             CREATE INDEX IF NOT EXISTS idx_images_created_at ON images(created_at);
+            """
+        )
+
+        self._cursor.execute(
+            """--sql
+            CREATE INDEX IF NOT EXISTS idx_images_pinned ON images(pinned);
             """
         )
 
@@ -319,6 +337,17 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     WHERE image_name = ?;
                     """,
                     (changes.is_intermediate, image_name),
+                )
+
+            # Change the image's `pinned`` state
+            if changes.pinned is not None:
+                self._cursor.execute(
+                    f"""--sql
+                    UPDATE images
+                    SET pinned = ?
+                    WHERE image_name = ?;
+                    """,
+                    (changes.pinned, image_name),
                 )
 
             self._conn.commit()
@@ -500,6 +529,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         node_id: Optional[str],
         metadata: Optional[dict],
         is_intermediate: bool = False,
+        pinned: bool = False
     ) -> datetime:
         try:
             metadata_json = None if metadata is None else json.dumps(metadata)
@@ -515,9 +545,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     node_id,
                     session_id,
                     metadata,
-                    is_intermediate
+                    is_intermediate,
+                    pinned
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     image_name,
@@ -529,6 +560,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     session_id,
                     metadata_json,
                     is_intermediate,
+                    pinned,
                 ),
             )
             self._conn.commit()
