@@ -13,12 +13,15 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
+  COLOR_CORRECT,
   INPAINT,
+  INPAINT_FINAL_IMAGE,
   INPAINT_GRAPH,
   INPAINT_IMAGE,
   ITERATE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
+  MASK_BLUR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -50,10 +53,8 @@ export const buildCanvasInpaintGraph = (
     vaePrecision,
     shouldUseNoiseSettings,
     shouldUseCpuNoise,
-    seamSize,
-    seamBlur,
-    seamSteps,
-    seamStrength,
+    maskBlur,
+    maskBlurMethod,
     tileSize,
     infillMethod,
     clipSkip,
@@ -90,7 +91,6 @@ export const buildCanvasInpaintGraph = (
         scheduler: scheduler,
         denoising_start: 1 - strength,
         denoising_end: 1,
-        mask: canvasMaskImage,
       },
       [INPAINT_IMAGE]: {
         type: 'i2l',
@@ -137,7 +137,27 @@ export const buildCanvasInpaintGraph = (
         is_intermediate: true,
         skipped_layers: clipSkip,
       },
-
+      [COLOR_CORRECT]: {
+        type: 'color_correct',
+        id: COLOR_CORRECT,
+        is_intermediate: true,
+        reference: canvasInitImage,
+        mask: canvasMaskImage,
+      },
+      [MASK_BLUR]: {
+        type: 'img_blur',
+        id: MASK_BLUR,
+        is_intermediate: true,
+        image: canvasMaskImage,
+        radius: maskBlur,
+        blur_type: maskBlurMethod,
+      },
+      [INPAINT_FINAL_IMAGE]: {
+        type: 'img_paste',
+        id: INPAINT_FINAL_IMAGE,
+        is_intermediate: true,
+        base_image: canvasInitImage,
+      },
       [RANGE_OF_SIZE]: {
         type: 'range_of_size',
         id: RANGE_OF_SIZE,
@@ -236,6 +256,16 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'mask',
+        },
+      },
+      {
+        source: {
           node_id: RANGE_OF_SIZE,
           field: 'collection',
         },
@@ -262,6 +292,36 @@ export const buildCanvasInpaintGraph = (
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'latents',
+        },
+      },
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_FINAL_IMAGE,
+          field: 'mask',
+        },
+      },
+      {
+        source: {
+          node_id: COLOR_CORRECT,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_FINAL_IMAGE,
+          field: 'image',
         },
       },
     ],
