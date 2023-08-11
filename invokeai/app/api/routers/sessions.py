@@ -57,7 +57,7 @@ async def create_batch(
 
 
 @session_router.delete(
-    "{batch_process_id}/batch",
+    "/batch/{batch_process_id}",
     operation_id="cancel_batch",
     responses={202: {"description": "The batch is canceled"}},
 )

@@ -83,7 +83,9 @@ class BatchManager(BatchManagerBase):
             batch_session.session_id,
             updateSession,
         )
-        self.run_batch_process(batch_session.batch_id)
+        batch_process = self.__batch_process_storage.get(batch_session.batch_id)
+        if not batch_process.canceled:
+            self.run_batch_process(batch_process.batch_id)
 
     def _create_batch_session(self, batch_process: BatchProcess, batch_indices: list[int]) -> GraphExecutionState:
         graph = copy.deepcopy(batch_process.graph)
@@ -147,4 +149,4 @@ class BatchManager(BatchManagerBase):
         return sessions
 
     def cancel_batch_process(self, batch_process_id: str):
-        self.__batches = [batch for batch in self.__batches if batch.id != batch_process_id]
+        self.__batch_process_storage.cancel(batch_process_id)
