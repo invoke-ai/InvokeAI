@@ -392,23 +392,28 @@ export const imagesApi = api.injectEndpoints({
      */
     changeImagePinned: build.mutation<
       ImageDTO,
-      { imageName: string; pinned: boolean }
+      { imageDTO: ImageDTO; pinned: boolean }
     >({
-      query: ({ imageName, pinned }) => ({
-        url: `images/i/${imageName}`,
+      query: ({ imageDTO, pinned }) => ({
+        url: `images/i/${imageDTO.image_name}`,
         method: 'PATCH',
         body: { pinned },
       }),
-      // invalidatesTags: (result, error, { imageDTO }) => [
-      //   { type: 'BoardImagesTotal', id: imageDTO.board_id ?? 'none' },
-      //   { type: 'BoardAssetsTotal', id: imageDTO.board_id ?? 'none' },
-      // ],
+      invalidatesTags: (result, error, { imageDTO }) => [
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: imageDTO.board_id,
+            categories: IMAGE_CATEGORIES,
+          }),
+        },
+      ],
       async onQueryStarted(
-        { imageName, pinned },
+        { imageDTO, pinned },
         { dispatch, queryFulfilled, getState }
       ) {
         /**
-         * Cache changes for `changeImageSessionId`:
+         * Cache changes for `changeImagePinned`:
          * - *update* getImageDTO
          */
 
@@ -420,13 +425,80 @@ export const imagesApi = api.injectEndpoints({
           dispatch(
             imagesApi.util.updateQueryData(
               'getImageDTO',
-              imageName,
+              imageDTO.image_name,
               (draft) => {
                 Object.assign(draft, { pinned });
               }
             )
           )
         );
+
+        const categories = getCategories(imageDTO);
+
+        const queryArgs = {
+          board_id: imageDTO.board_id ?? 'none',
+          categories,
+        };
+
+        const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(
+          getState()
+        );
+
+        const { data: total } = IMAGE_CATEGORIES.includes(
+          imageDTO.image_category
+        )
+          ? boardsApi.endpoints.getBoardImagesTotal.select(
+            imageDTO.board_id ?? 'none'
+          )(getState())
+          : boardsApi.endpoints.getBoardAssetsTotal.select(
+            imageDTO.board_id ?? 'none'
+          )(getState());
+
+        // IF it eligible for insertion into existing $cache
+        // "eligible" means either:
+        // - The cache is fully populated, with all images in the db cached
+        //    OR
+        // - The image's `created_at` is within the range of the cached images within that pinned state
+
+        const updatedImage: ImageDTO = { ...imageDTO, pinned }
+
+        const isCacheFullyPopulated =
+          currentCache.data && currentCache.data.ids.length >= (total ?? 0);
+
+        const isInDateRangeForPinnedState = getIsImageInDateRange(
+          currentCache.data,
+          updatedImage
+        );
+
+        if (!isInDateRangeForPinnedState) {
+          // if newly pinned or unpinned image is not in date range for its new state, remove from cache
+          patches.push(
+            dispatch(
+              imagesApi.util.updateQueryData(
+                'listImages',
+                queryArgs,
+                (draft) => {
+                  imagesAdapter.removeOne(draft, updatedImage.image_name);
+                }
+              )
+            )
+          );
+        }
+
+        if (isCacheFullyPopulated || isInDateRangeForPinnedState) {
+          // *upsert* to $cache
+          patches.push(
+            dispatch(
+              imagesApi.util.updateQueryData(
+                'listImages',
+                queryArgs,
+                (draft) => {
+                  imagesAdapter.upsertOne(draft, updatedImage);
+                }
+              )
+            )
+          );
+        }
 
         try {
           await queryFulfilled;
