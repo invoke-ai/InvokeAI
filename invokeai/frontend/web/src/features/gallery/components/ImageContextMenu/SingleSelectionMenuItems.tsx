@@ -134,12 +134,12 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   }, [copyImageToClipboard, imageDTO.image_url]);
 
   const handlePinImage = useCallback(() => {
-    togglePin({ imageName: imageDTO.image_name, pinned: true });
-  }, [togglePin, imageDTO.image_name]);
+    togglePin({ imageDTO, pinned: true });
+  }, [togglePin, imageDTO]);
 
   const handleUnpinImage = useCallback(() => {
-    togglePin({ imageName: imageDTO.image_name, pinned: false });
-  }, [togglePin, imageDTO.image_name]);
+    togglePin({ imageDTO, pinned: false });
+  }, [togglePin, imageDTO]);
 
   return (
     <>
