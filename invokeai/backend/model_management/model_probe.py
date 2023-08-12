@@ -17,6 +17,7 @@ from .models import (
     SilenceWarnings,
     InvalidModelException,
 )
+from .util import lora_token_vector_length
 from .models.base import read_checkpoint_meta
 
 
@@ -315,38 +316,16 @@ class LoRACheckpointProbe(CheckpointProbeBase):
 
     def get_base_type(self) -> BaseModelType:
         checkpoint = self.checkpoint
+        token_vector_length = lora_token_vector_length(checkpoint)
 
-        # SD-2 models are very hard to probe. These probes are brittle and likely to fail in the future
-        # There are also some "SD-2 LoRAs" that have identical keys and shapes to SD-1 and will be
-        # misclassified as SD-1
-        key = "lora_te_text_model_encoder_layers_0_mlp_fc1.lora_down.weight"
-        if key in checkpoint and checkpoint[key].shape[0] == 320:
-            return BaseModelType.StableDiffusion2
-
-        key = "lora_unet_output_blocks_5_1_transformer_blocks_1_ff_net_2.lora_up.weight"
-        if key in checkpoint:
-            return BaseModelType.StableDiffusionXL
-
-        key1 = "lora_te_text_model_encoder_layers_0_mlp_fc1.lora_down.weight"
-        key2 = "lora_te_text_model_encoder_layers_0_self_attn_k_proj.lora_down.weight"
-        key3 = "lora_te_text_model_encoder_layers_0_self_attn_k_proj.hada_w1_a"
-
-        lora_token_vector_length = (
-            checkpoint[key1].shape[1]
-            if key1 in checkpoint
-            else checkpoint[key2].shape[1]
-            if key2 in checkpoint
-            else checkpoint[key3].shape[0]
-            if key3 in checkpoint
-            else None
-        )
-
-        if lora_token_vector_length == 768:
+        if token_vector_length == 768:
             return BaseModelType.StableDiffusion1
-        elif lora_token_vector_length == 1024:
+        elif token_vector_length == 1024:
             return BaseModelType.StableDiffusion2
+        elif token_vector_length == 2048:
+            return BaseModelType.StableDiffusionXL
         else:
-            raise InvalidModelException(f"Unknown LoRA type")
+            raise InvalidModelException(f"Unknown LoRA type: {self.checkpoint_path}")
 
 
 class TextualInversionCheckpointProbe(CheckpointProbeBase):

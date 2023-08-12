@@ -60,6 +60,9 @@ type InvokedSessionThunkConfig = {
 const isErrorWithStatus = (error: unknown): error is { status: number } =>
   isObject(error) && 'status' in error;
 
+const isErrorWithDetail = (error: unknown): error is { detail: string } =>
+  isObject(error) && 'detail' in error;
+
 /**
  * `SessionsService.invokeSession()` thunk
  */
@@ -85,7 +88,15 @@ export const sessionInvoked = createAsyncThunk<
         error: (error as any).body.detail,
       });
     }
-    return rejectWithValue({ arg, status: response.status, error });
+    if (isErrorWithDetail(error) && response.status === 403) {
+      return rejectWithValue({
+        arg,
+        status: response.status,
+        error: error.detail
+      });
+    }
+    if (error)
+      return rejectWithValue({ arg, status: response.status, error });
   }
 });
 
