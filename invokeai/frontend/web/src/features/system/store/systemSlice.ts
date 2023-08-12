@@ -365,12 +365,19 @@ export const systemSlice = createSlice({
       state.statusTranslationKey = 'common.statusConnected';
       state.progressImage = null;
 
+      let errorDescription = undefined;
+
+      if (action.payload?.status === 422) {
+        errorDescription = 'Validation Error';
+      } else if (action.payload?.error) {
+        errorDescription = action.payload?.error as string;
+      }
+
       state.toastQueue.push(
         makeToast({
           title: t('toast.serverError'),
           status: 'error',
-          description:
-            action.payload?.status === 422 ? 'Validation Error' : undefined,
+          description: errorDescription,
         })
       );
     });

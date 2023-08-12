@@ -148,7 +148,7 @@ manager, please follow these steps:
     === "CUDA (NVidia)"
 
         ```bash
-        pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+        pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
         ```
 
     === "ROCm (AMD)"
@@ -312,7 +312,7 @@ installation protocol (important!)
 
     === "CUDA (NVidia)"
         ```bash
-        pip install -e .[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+        pip install -e .[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
         ```
 
     === "ROCm (AMD)"
@@ -356,7 +356,7 @@ you can do so using this unsupported recipe:
 mkdir ~/invokeai
 conda create -n invokeai python=3.10
 conda activate invokeai
-pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
 invokeai-configure --root ~/invokeai
 invokeai --root ~/invokeai --web
 ```
