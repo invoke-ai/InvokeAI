@@ -9,8 +9,8 @@ import {
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
-import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -348,7 +348,7 @@ export const buildCanvasSDXLImageToImageGraph = (
   });
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS);
+  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
