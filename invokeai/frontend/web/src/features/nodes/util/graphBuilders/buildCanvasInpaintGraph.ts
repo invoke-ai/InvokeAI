@@ -3,8 +3,6 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
   ImageDTO,
-  InfillPatchmatchInvocation,
-  InfillTileInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
 } from 'services/api/types';
@@ -20,13 +18,10 @@ import {
   INPAINT_FINAL_IMAGE,
   INPAINT_GRAPH,
   INPAINT_IMAGE,
-  INPAINT_INFILL,
   ITERATE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   MASK_BLUR,
-  MASK_COMBINE,
-  MASK_FROM_ALPHA,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -60,8 +55,6 @@ export const buildCanvasInpaintGraph = (
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
-    tileSize,
-    infillMethod,
     clipSkip,
   } = state.generation;
 
@@ -84,23 +77,6 @@ export const buildCanvasInpaintGraph = (
     ? shouldUseCpuNoise
     : shouldUseCpuNoise;
 
-  let infillNode: InfillTileInvocation | InfillPatchmatchInvocation = {
-    type: 'infill_tile',
-    id: INPAINT_INFILL,
-    is_intermediate: true,
-    image: canvasInitImage,
-    tile_size: tileSize,
-  };
-
-  if (infillMethod === 'patchmatch') {
-    infillNode = {
-      type: 'infill_patchmatch',
-      id: INPAINT_INFILL,
-      is_intermediate: true,
-      image: canvasInitImage,
-    };
-  }
-
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
     nodes: {
@@ -114,31 +90,20 @@ export const buildCanvasInpaintGraph = (
         denoising_start: 1 - strength,
         denoising_end: 1,
       },
-      [infillNode.id]: infillNode,
-      [MASK_FROM_ALPHA]: {
-        type: 'tomask',
-        id: MASK_FROM_ALPHA,
-        is_intermediate: true,
-        image: canvasInitImage,
-      },
-      [MASK_COMBINE]: {
-        type: 'mask_combine',
-        id: MASK_COMBINE,
-        is_intermediate: true,
-        mask2: canvasMaskImage,
-      },
       [MASK_BLUR]: {
-        type: 'img_blur',
+        type: 'mask_blur',
         id: MASK_BLUR,
         is_intermediate: true,
         radius: maskBlur,
         blur_type: maskBlurMethod,
+        mask: canvasMaskImage,
       },
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
+        image: canvasInitImage,
       },
       [NOISE]: {
         type: 'noise',
@@ -182,11 +147,14 @@ export const buildCanvasInpaintGraph = (
         type: 'color_correct',
         id: COLOR_CORRECT,
         is_intermediate: true,
+        reference: canvasInitImage,
+        mask: canvasMaskImage,
       },
       [INPAINT_FINAL_IMAGE]: {
         type: 'img_paste',
         id: INPAINT_FINAL_IMAGE,
         is_intermediate: true,
+        base_image: canvasInitImage,
       },
       [RANGE_OF_SIZE]: {
         type: 'range_of_size',
@@ -276,16 +244,6 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: INPAINT_IMAGE,
-          field: 'image',
-        },
-      },
-      {
-        source: {
           node_id: INPAINT_IMAGE,
           field: 'latents',
         },
@@ -296,28 +254,8 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: MASK_FROM_ALPHA,
+          node_id: MASK_BLUR,
           field: 'mask',
-        },
-        destination: {
-          node_id: MASK_COMBINE,
-          field: 'mask1',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_COMBINE,
-          field: 'image',
-        },
-        destination: {
-          node_id: MASK_BLUR,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_BLUR,
-          field: 'image',
         },
         destination: {
           node_id: INPAINT,
@@ -356,26 +294,6 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'reference',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_BLUR,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      {
-        source: {
           node_id: LATENTS_TO_IMAGE,
           field: 'image',
         },
@@ -386,18 +304,8 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: INPAINT_FINAL_IMAGE,
-          field: 'base_image',
-        },
-      },
-      {
-        source: {
           node_id: MASK_BLUR,
-          field: 'image',
+          field: 'mask',
         },
         destination: {
           node_id: INPAINT_FINAL_IMAGE,
