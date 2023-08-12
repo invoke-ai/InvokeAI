@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, Extra
 from typing import Optional, Literal, Union
 from pydantic.error_wrappers import ValidationError
 
+
 class InvalidModelConfigException(Exception):
     """
     Exception raised when the config parser doesn't recognize the passed
@@ -100,13 +101,12 @@ class ModelConfigBase(BaseModel):
         extra = Extra.forbid
         validate_assignment = True
 
+
 class CheckpointConfig(ModelConfigBase):
     """Model config for checkpoint-style models."""
 
     model_format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
-    config: Path = Field(
-        description="path to the checkpoint model config file"
-    )
+    config: Path = Field(description="path to the checkpoint model config file")
 
 
 class DiffusersConfig(ModelConfigBase):
@@ -124,10 +124,7 @@ class LoRAConfig(ModelConfigBase):
 class TextualInversionConfig(ModelConfigBase):
     """Model config for textual inversion embeddings."""
 
-    model_format: Literal[
-        ModelFormat.EmbeddingFile,
-        ModelFormat.EmbeddingFolder
-    ]
+    model_format: Literal[ModelFormat.EmbeddingFile, ModelFormat.EmbeddingFolder]
 
 
 class MainConfig(ModelConfigBase):
@@ -154,6 +151,7 @@ class ONNXSD1Config(MainConfig):
 
     model_format: Literal[ModelFormat.Onnx, ModelFormat.Olive]
 
+
 class ONNXSD2Config(MainConfig):
     """Model config for ONNX format models based on sd-2."""
 
@@ -161,6 +159,7 @@ class ONNXSD2Config(MainConfig):
     # No yaml config file for ONNX, so these are part of config
     prediction_type: SchedulerPredictionType
     upcast_attention: bool
+
 
 class ModelConfig(object):
     """Class for parsing config dicts into StableDiffusion*Config obects."""
@@ -197,21 +196,23 @@ class ModelConfig(object):
     }
 
     @classmethod
-    def parse_obj(cls, raw_data: dict) -> Union[
-            MainCheckpointConfig,
-            MainDiffusersConfig,
-            LoRAConfig,
-            TextualInversionConfig,
-            ONNXSD1Config,
-            ONNXSD2Config,
+    def parse_obj(
+        cls, raw_data: dict
+    ) -> Union[
+        MainCheckpointConfig,
+        MainDiffusersConfig,
+        LoRAConfig,
+        TextualInversionConfig,
+        ONNXSD1Config,
+        ONNXSD2Config,
     ]:
         """Return the appropriate config object from raw dict values."""
         try:
-            model_format = raw_data.get('model_format')
-            model_type = raw_data.get('model_type')
-            model_base = raw_data.get('base_model')
+            model_format = raw_data.get("model_format")
+            model_type = raw_data.get("model_type")
+            model_base = raw_data.get("base_model")
             class_to_return = cls._class_map[model_format][model_type]
-            if isinstance(class_to_return,dict): # additional level allowed
+            if isinstance(class_to_return, dict):  # additional level allowed
                 class_to_return = class_to_return[model_base]
             return class_to_return.parse_obj(raw_data)
         except KeyError:
@@ -219,6 +220,4 @@ class ModelConfig(object):
                 f"Unknown combination of model_format '{model_format}' and model_type '{model_type}'"
             )
         except ValidationError as e:
-            raise InvalidModelConfigException(
-                f"Invalid model configuration passed: {str(e)}"
-            ) from e
+            raise InvalidModelConfigException(f"Invalid model configuration passed: {str(e)}") from e
