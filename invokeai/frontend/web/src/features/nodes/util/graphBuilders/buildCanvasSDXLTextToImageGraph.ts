@@ -39,6 +39,7 @@ export const buildCanvasSDXLTextToImageGraph = (
     cfgScale: cfg_scale,
     scheduler,
     steps,
+    vaePrecision,
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
@@ -147,6 +148,7 @@ export const buildCanvasSDXLTextToImageGraph = (
         type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
         id: CANVAS_OUTPUT,
         is_intermediate: !shouldAutoSave,
+        fp32: vaePrecision === 'fp32' ? true : false,
       },
     },
     edges: [
