@@ -5,7 +5,7 @@ Test the refactored model config classes.
 from pathlib import Path
 
 from invokeai.backend.model_management2.model_config import (
-    ModelConfig,
+    ModelConfigFactory,
     InvalidModelConfigException,
     MainCheckpointConfig,
     MainDiffusersConfig,
@@ -27,7 +27,7 @@ def test_checkpoints():
         model_variant="normal",
         model_format="checkpoint",
     )
-    config = ModelConfig.parse_obj(raw)
+    config = ModelConfigFactory.make_config(raw)
     assert isinstance(config, MainCheckpointConfig)
     assert config.model_format == "checkpoint"
     assert config.base_model == "sd-1"
@@ -44,7 +44,7 @@ def test_diffusers():
         model_format="diffusers",
         vae="/tmp/foobar/vae.pt",
     )
-    config = ModelConfig.parse_obj(raw)
+    config = ModelConfigFactory.make_config(raw)
     assert isinstance(config, MainDiffusersConfig)
     assert config.model_format == "diffusers"
     assert config.base_model == "sd-2"
@@ -66,7 +66,7 @@ def test_invalid_diffusers():
     # This is expected to fail with a validation error, because
     # diffusers format does not have a `config` field
     try:
-        ModelConfig.parse_obj(raw)
+        ModelConfigFactory.make_config(raw)
         assert False, "Validation should have failed"
     except InvalidModelConfigException:
         assert True
@@ -80,11 +80,11 @@ def test_lora():
         model_type="lora",
         model_format="lycoris",
     )
-    config = ModelConfig.parse_obj(raw)
+    config = ModelConfigFactory.make_config(raw)
     assert isinstance(config, LoRAConfig)
     assert config.model_format == "lycoris"
     raw["model_format"] = "diffusers"
-    config = ModelConfig.parse_obj(raw)
+    config = ModelConfigFactory.make_config(raw)
     assert isinstance(config, LoRAConfig)
     assert config.model_format == "diffusers"
 
@@ -97,7 +97,7 @@ def test_embedding():
         model_type="embedding",
         model_format="embedding_file",
     )
-    config = ModelConfig.parse_obj(raw)
+    config = ModelConfigFactory.make_config(raw)
     assert isinstance(config, TextualInversionConfig)
     assert config.model_format == "embedding_file"
 
@@ -111,21 +111,21 @@ def test_onnx():
         model_variant="normal",
         model_format="onnx",
     )
-    config = ModelConfig.parse_obj(raw)
+    config = ModelConfigFactory.make_config(raw)
     assert isinstance(config, ONNXSD1Config)
     assert config.model_format == "onnx"
 
     raw["base_model"] = "sd-2"
     # this should not validate without the upcast_attention field
     try:
-        ModelConfig.parse_obj(raw)
+        ModelConfigFactory.make_config(raw)
         assert False, "Config should not have validated without upcast_attention"
     except InvalidModelConfigException:
         assert True
 
     raw["upcast_attention"] = True
     raw["prediction_type"] = "epsilon"
-    config = ModelConfig.parse_obj(raw)
+    config = ModelConfigFactory.make_config(raw)
     assert isinstance(config, ONNXSD2Config)
     assert config.upcast_attention
 
@@ -141,7 +141,7 @@ def test_assignment():
         upcast_attention=True,
         prediction_type="epsilon",
     )
-    config = ModelConfig.parse_obj(raw)
+    config = ModelConfigFactory.make_config(raw)
     config.upcast_attention = False
     assert not config.upcast_attention
     try:
@@ -163,7 +163,7 @@ def test_invalid_combination():
         prediction_type="epsilon",
     )
     try:
-        ModelConfig.parse_obj(raw)
+        ModelConfigFactory.make_config(raw)
         assert False, "This should have raised an InvalidModelConfigException"
     except InvalidModelConfigException:
         assert True

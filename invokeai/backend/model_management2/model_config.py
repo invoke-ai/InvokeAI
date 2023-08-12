@@ -4,7 +4,7 @@ Configuration definitions for image generation models.
 
 Typical usage:
 
-  from invokeai.backend.model_management2.model_config import ModelConfig
+  from invokeai.backend.model_management2.model_config import ModelConfigFactory
   raw = dict(path='models/sd-1/main/foo.ckpt',
              name='foo',
              base_model='sd-1',
@@ -13,7 +13,8 @@ Typical usage:
              model_variant='normal',
              model_format='checkpoint'
             )
-  config = ModelConfig.parse_obj(raw)
+  config = ModelConfigFactory.make_config(raw)
+  print(config.name)
 
 Validation errors will raise an InvalidModelConfigException error.
 
@@ -177,7 +178,7 @@ class ONNXSD2Config(MainConfig):
     upcast_attention: bool
 
 
-class ModelConfig(object):
+class ModelConfigFactory(object):
     """Class for parsing config dicts into StableDiffusion*Config obects."""
 
     _class_map: dict = {
@@ -212,8 +213,8 @@ class ModelConfig(object):
     }
 
     @classmethod
-    def parse_obj(
-        cls, raw_data: dict
+    def make_config(
+        cls, model_data: Union[dict, ModelConfigBase]
     ) -> Union[
         MainCheckpointConfig,
         MainDiffusersConfig,
@@ -223,14 +224,16 @@ class ModelConfig(object):
         ONNXSD2Config,
     ]:
         """Return the appropriate config object from raw dict values."""
+        if isinstance(model_data, ModelConfigBase):
+            return model_data
         try:
-            model_format = raw_data.get("model_format")
-            model_type = raw_data.get("model_type")
-            model_base = raw_data.get("base_model")
+            model_format = model_data.get("model_format")
+            model_type = model_data.get("model_type")
+            model_base = model_data.get("base_model")
             class_to_return = cls._class_map[model_format][model_type]
             if isinstance(class_to_return, dict):  # additional level allowed
                 class_to_return = class_to_return[model_base]
-            return class_to_return.parse_obj(raw_data)
+            return class_to_return.parse_obj(model_data)
         except KeyError:
             raise InvalidModelConfigException(
                 f"Unknown combination of model_format '{model_format}' and model_type '{model_type}'"
