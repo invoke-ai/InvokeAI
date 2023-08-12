@@ -17,6 +17,7 @@ export const CLIP_SKIP = 'clip_skip';
 export const IMAGE_TO_LATENTS = 'image_to_latents';
 export const LATENTS_TO_LATENTS = 'latents_to_latents';
 export const RESIZE = 'resize_image';
+export const CANVAS_OUTPUT = 'canvas_output';
 export const INPAINT = 'inpaint';
 export const INPAINT_SEAM_FIX = 'inpaint_seam_fix';
 export const INPAINT_IMAGE = 'inpaint_image';

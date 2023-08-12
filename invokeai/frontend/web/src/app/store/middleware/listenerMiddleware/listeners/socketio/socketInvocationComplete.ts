@@ -7,7 +7,7 @@ import {
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import { INPAINT_FINAL_IMAGE } from 'features/nodes/util/graphBuilders/constants';
+import { CANVAS_OUTPUT } from 'features/nodes/util/graphBuilders/constants';
 import { progressImageSet } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
@@ -55,7 +55,7 @@ export const addInvocationCompleteEventListener = () => {
         if (
           graph_execution_state_id ===
             canvas.layerState.stagingArea.sessionId &&
-          data.source_node_id === INPAINT_FINAL_IMAGE
+          [CANVAS_OUTPUT].includes(data.source_node_id)
         ) {
           dispatch(addImageToStagingArea(imageDTO));
         }

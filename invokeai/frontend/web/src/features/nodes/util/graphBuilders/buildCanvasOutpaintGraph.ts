@@ -14,10 +14,10 @@ import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_OUTPUT,
   CLIP_SKIP,
   COLOR_CORRECT,
   INPAINT,
-  INPAINT_FINAL_IMAGE,
   INPAINT_GRAPH,
   INPAINT_IMAGE,
   INPAINT_INFILL,
@@ -183,9 +183,9 @@ export const buildCanvasOutpaintGraph = (
         id: COLOR_CORRECT,
         is_intermediate: true,
       },
-      [INPAINT_FINAL_IMAGE]: {
+      [CANVAS_OUTPUT]: {
         type: 'img_paste',
-        id: INPAINT_FINAL_IMAGE,
+        id: CANVAS_OUTPUT,
         is_intermediate: true,
       },
       [RANGE_OF_SIZE]: {
@@ -399,7 +399,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: INPAINT_FINAL_IMAGE,
+          node_id: CANVAS_OUTPUT,
           field: 'base_image',
         },
       },
@@ -409,7 +409,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: INPAINT_FINAL_IMAGE,
+          node_id: CANVAS_OUTPUT,
           field: 'image',
         },
       },
@@ -419,7 +419,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: INPAINT_FINAL_IMAGE,
+          node_id: CANVAS_OUTPUT,
           field: 'mask',
         },
       },

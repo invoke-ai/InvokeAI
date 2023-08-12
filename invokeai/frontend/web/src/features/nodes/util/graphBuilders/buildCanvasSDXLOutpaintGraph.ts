@@ -15,9 +15,9 @@ import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_OUTPUT,
   COLOR_CORRECT,
   INPAINT,
-  INPAINT_FINAL_IMAGE,
   INPAINT_GRAPH,
   INPAINT_IMAGE,
   INPAINT_INFILL,
@@ -187,9 +187,9 @@ export const buildCanvasSDXLOutpaintGraph = (
         id: COLOR_CORRECT,
         is_intermediate: true,
       },
-      [INPAINT_FINAL_IMAGE]: {
+      [CANVAS_OUTPUT]: {
         type: 'img_paste',
-        id: INPAINT_FINAL_IMAGE,
+        id: CANVAS_OUTPUT,
         is_intermediate: true,
       },
       [RANGE_OF_SIZE]: {
@@ -412,7 +412,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: INPAINT_FINAL_IMAGE,
+          node_id: CANVAS_OUTPUT,
           field: 'base_image',
         },
       },
@@ -422,7 +422,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: INPAINT_FINAL_IMAGE,
+          node_id: CANVAS_OUTPUT,
           field: 'image',
         },
       },
@@ -432,7 +432,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: INPAINT_FINAL_IMAGE,
+          node_id: CANVAS_OUTPUT,
           field: 'mask',
         },
       },

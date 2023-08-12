@@ -15,6 +15,7 @@ import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_OUTPUT,
   DENOISE_LATENTS,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
@@ -136,6 +137,10 @@ export const buildCanvasSDXLImageToImageGraph = (
         id: LATENTS_TO_IMAGE,
         is_intermediate: !shouldAutoSave,
       },
+      [CANVAS_OUTPUT]: {
+        type: 'load_image',
+        id: CANVAS_OUTPUT,
+      },
     },
     edges: [
       // Connect Model Loader To UNet & CLIP
@@ -239,6 +244,17 @@ export const buildCanvasSDXLImageToImageGraph = (
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'latents',
+        },
+      },
+      // Canvas Output
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'image',
         },
       },
     ],
