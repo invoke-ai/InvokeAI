@@ -1,26 +1,23 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from contextlib import contextmanager, ContextDecorator
 from functools import partial
 from typing import Literal, Optional, get_args
 
-import torch
 from pydantic import Field
 
 from invokeai.app.models.image import ColorField, ImageCategory, ImageField, ResourceOrigin
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.generator.inpaint import infill_methods
-
-from ...backend.generator import Inpaint, InvokeAIGenerator
-from ...backend.stable_diffusion import PipelineIntermediateState
-from ..util.step_callback import stable_diffusion_step_callback
 from .baseinvocation import BaseInvocation, InvocationConfig, InvocationContext
-from .image import ImageOutput
-
-from ...backend.model_management.lora import ModelPatcher
-from ...backend.stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
-from .model import UNetField, VaeField
 from .compel import ConditioningField
-from contextlib import contextmanager, ExitStack, ContextDecorator
+from .image import ImageOutput
+from .model import UNetField, VaeField
+from ..util.step_callback import stable_diffusion_step_callback
+from ...backend.generator import Inpaint, InvokeAIGenerator
+from ...backend.model_management.lora import ModelPatcher
+from ...backend.stable_diffusion import PipelineIntermediateState
+from ...backend.stable_diffusion.diffusers_pipeline import StableDiffusionGeneratorPipeline
 
 SAMPLER_NAME_VALUES = Literal[tuple(InvokeAIGenerator.schedulers())]
 INFILL_METHODS = Literal[tuple(infill_methods())]
@@ -184,6 +181,8 @@ class InpaintInvocation(BaseInvocation):
             device = context.services.model_manager.mgr.cache.execution_device
             dtype = context.services.model_manager.mgr.cache.precision
 
+            vae.to(dtype=unet.dtype)
+
             pipeline = StableDiffusionGeneratorPipeline(
                 vae=vae,
                 text_encoder=None,
@@ -193,8 +192,6 @@ class InpaintInvocation(BaseInvocation):
                 safety_checker=None,
                 feature_extractor=None,
                 requires_safety_checker=False,
-                precision="float16" if dtype == torch.float16 else "float32",
-                execution_device=device,
             )
 
             yield OldModelInfo(

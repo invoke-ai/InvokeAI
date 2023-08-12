@@ -5,15 +5,26 @@ from typing import List, Literal, Optional, Union
 
 import einops
 import torch
-from diffusers import ControlNetModel
 from diffusers.image_processor import VaeImageProcessor
+from diffusers.models.attention_processor import (
+    AttnProcessor2_0,
+    LoRAAttnProcessor2_0,
+    LoRAXFormersAttnProcessor,
+    XFormersAttnProcessor,
+)
 from diffusers.schedulers import SchedulerMixin as Scheduler
 from pydantic import BaseModel, Field, validator
 
 from invokeai.app.invocations.metadata import CoreMetadata
+from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
-
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
+from .compel import ConditioningField
+from .controlnet_image_processors import ControlField
+from .image import ImageOutput
+from .model import ModelInfo, UNetField, VaeField
+from ..models.image import ImageCategory, ImageField, ResourceOrigin
 from ...backend.model_management import ModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
@@ -24,23 +35,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 )
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from ...backend.model_management import ModelPatcher
 from ...backend.util.devices import choose_torch_device, torch_dtype, choose_precision
-from ..models.image import ImageCategory, ImageField, ResourceOrigin
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
-from .compel import ConditioningField
-from .controlnet_image_processors import ControlField
-from .image import ImageOutput
-from .model import ModelInfo, UNetField, VaeField
-from invokeai.app.util.controlnet_utils import prepare_control_image
-
-from diffusers.models.attention_processor import (
-    AttnProcessor2_0,
-    LoRAAttnProcessor2_0,
-    LoRAXFormersAttnProcessor,
-    XFormersAttnProcessor,
-)
-
 
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
@@ -231,7 +226,6 @@ class TextToLatentsInvocation(BaseInvocation):
             safety_checker=None,
             feature_extractor=None,
             requires_safety_checker=False,
-            precision="float16" if unet.dtype == torch.float16 else "float32",
         )
 
     def prep_control_data(

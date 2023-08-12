@@ -591,7 +591,6 @@ script, which will perform a full upgrade in place.""",
     # TODO: revisit - don't rely on invokeai.yaml to exist yet!
     dest_is_setup = (dest_root / "models/core").exists() and (dest_root / "databases").exists()
     if not dest_is_setup:
-        import invokeai.frontend.install.invokeai_configure
         from invokeai.backend.install.invokeai_configure import initialize_rootdir
 
         initialize_rootdir(dest_root, True)

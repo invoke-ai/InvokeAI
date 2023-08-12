@@ -382,7 +382,8 @@ def run_cli(args: Namespace):
 
 def main():
     args = _parse_args()
-    config.parse_args(["--root", str(args.root_dir)])
+    if args.root_dir:
+        config.parse_args(["--root", str(args.root_dir)])
 
     try:
         if args.front_end:

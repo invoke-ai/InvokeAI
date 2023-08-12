@@ -96,7 +96,8 @@ export type AppFeature =
   | 'consoleLogging'
   | 'dynamicPrompting'
   | 'batches'
-  | 'syncModels';
+  | 'syncModels'
+  | 'multiselect';
 
 /**
  * A disable-able Stable Diffusion feature

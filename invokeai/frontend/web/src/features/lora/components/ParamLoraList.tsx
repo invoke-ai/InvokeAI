@@ -1,3 +1,4 @@
+import { Divider } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -8,20 +9,21 @@ import ParamLora from './ParamLora';
 const selector = createSelector(
   stateSelector,
   ({ lora }) => {
-    const { loras } = lora;
-
-    return { loras };
+    return { lorasArray: map(lora.loras) };
   },
   defaultSelectorOptions
 );
 
 const ParamLoraList = () => {
-  const { loras } = useAppSelector(selector);
+  const { lorasArray } = useAppSelector(selector);
 
   return (
     <>
-      {map(loras, (lora) => (
-        <ParamLora key={lora.model_name} lora={lora} />
+      {lorasArray.map((lora, i) => (
+        <>
+          {i > 0 && <Divider key={`${lora.model_name}-divider`} pt={1} />}
+          <ParamLora key={lora.model_name} lora={lora} />
+        </>
       ))}
     </>
   );

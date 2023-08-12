@@ -2,6 +2,7 @@ from typing import Literal, Optional, Union
 
 from pydantic import Field
 
+from ...version import __version__
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -23,6 +24,7 @@ class LoRAMetadataField(BaseModelExcludeNull):
 class CoreMetadata(BaseModelExcludeNull):
     """Core generation metadata for an image generated in InvokeAI."""
 
+    app_version: str = Field(default=__version__, description="The version of InvokeAI used to generate this image")
     generation_mode: str = Field(
         description="The generation mode that output this image",
     )
