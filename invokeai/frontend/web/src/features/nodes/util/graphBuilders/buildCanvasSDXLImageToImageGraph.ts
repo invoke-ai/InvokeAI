@@ -115,6 +115,7 @@ export const buildCanvasSDXLImageToImageGraph = (
         type: 'i2l',
         id: IMAGE_TO_LATENTS,
         is_intermediate: true,
+        fp32: vaePrecision === 'fp32' ? true : false,
         // must be set manually later, bc `fit` parameter may require a resize node inserted
         // image: {
         //   image_name: initialImage.image_name,
