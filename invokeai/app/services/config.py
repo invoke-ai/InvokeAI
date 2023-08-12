@@ -166,7 +166,8 @@ import sys
 from argparse import ArgumentParser
 from omegaconf import OmegaConf, DictConfig, ListConfig
 from pathlib import Path
-from pydantic import BaseSettings, Field, parse_obj_as
+from pydantic import Field, parse_obj_as
+from pydantic_settings import BaseSettings
 from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path("invokeai.yaml")
@@ -187,7 +188,7 @@ class InvokeAISettings(BaseSettings):
     def parse_args(self, argv: list = sys.argv[1:]):
         parser = self.get_parser()
         opt = parser.parse_args(argv)
-        for name in self.__fields__:
+        for name in self.model_fields:
             if name not in self._excluded():
                 value = getattr(opt, name)
                 if isinstance(value, ListConfig):
@@ -204,7 +205,7 @@ class InvokeAISettings(BaseSettings):
         cls = self.__class__
         type = get_args(get_type_hints(cls)["type"])[0]
         field_dict = dict({type: dict()})
-        for name, field in self.__fields__.items():
+        for name, field in self.model_fields.items():
             if name in cls._excluded_from_yaml():
                 continue
             category = field.field_info.extra.get("category") or "Uncategorized"
@@ -238,7 +239,7 @@ class InvokeAISettings(BaseSettings):
         for key, value in os.environ.items():
             upcase_environ[key.upper()] = value
 
-        fields = cls.__fields__
+        fields = cls.model_fields
         cls.argparse_groups = {}
 
         for name, field in fields.items():

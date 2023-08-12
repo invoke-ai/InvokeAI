@@ -15,7 +15,7 @@ class ImageField(BaseModel):
     image_name: Optional[str] = Field(default=None, description="The name of the image")
 
     class Config:
-        schema_extra = {"required": ["image_name"]}
+        json_schema_extra = {"required": ["image_name"]}
 
 
 class ColorField(BaseModel):
@@ -40,7 +40,7 @@ class PILInvocationConfig(BaseModel):
     """Helper class to provide all PIL invocations with additional config"""
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "tags": ["PIL", "image"],
             },
@@ -58,7 +58,7 @@ class ImageOutput(BaseInvocationOutput):
     # fmt: on
 
     class Config:
-        schema_extra = {"required": ["type", "image", "width", "height"]}
+        json_schema_extra = {"required": ["type", "image", "width", "height"]}
 
 
 class MaskOutput(BaseInvocationOutput):
@@ -72,7 +72,7 @@ class MaskOutput(BaseInvocationOutput):
     # fmt: on
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "required": [
                 "type",
                 "mask",

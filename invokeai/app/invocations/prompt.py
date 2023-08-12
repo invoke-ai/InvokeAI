@@ -2,7 +2,7 @@ from os.path import exists
 from typing import Literal, Optional
 
 import numpy as np
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
 from dynamicprompts.generators import RandomPromptGenerator, CombinatorialPromptGenerator
@@ -18,7 +18,7 @@ class PromptOutput(BaseInvocationOutput):
     # fmt: on
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "required": [
                 "type",
                 "prompt",
@@ -37,7 +37,7 @@ class PromptCollectionOutput(BaseInvocationOutput):
     # fmt: on
 
     class Config:
-        schema_extra = {"required": ["type", "prompt_collection", "count"]}
+        json_schema_extra = {"required": ["type", "prompt_collection", "count"]}
 
 
 class DynamicPromptInvocation(BaseInvocation):
@@ -49,7 +49,7 @@ class DynamicPromptInvocation(BaseInvocation):
     combinatorial: bool = Field(default=False, description="Whether to use the combinatorial generator")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Dynamic Prompt", "tags": ["prompt", "dynamic"]},
         }
 
@@ -79,11 +79,11 @@ class PromptsFromFileInvocation(BaseInvocation):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Prompts From File", "tags": ["prompt", "file"]},
         }
 
-    @validator("file_path")
+    @field_validator("file_path")
     def file_path_exists(cls, v):
         if not exists(v):
             raise ValueError(FileNotFoundError)

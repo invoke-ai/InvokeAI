@@ -125,7 +125,7 @@ class InfillColorInvocation(BaseInvocation):
     )
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Color Infill", "tags": ["image", "inpaint", "color", "infill"]},
         }
 
@@ -168,7 +168,7 @@ class InfillTileInvocation(BaseInvocation):
     )
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Tile Infill", "tags": ["image", "inpaint", "tile", "infill"]},
         }
 
@@ -202,7 +202,7 @@ class InfillPatchMatchInvocation(BaseInvocation):
     image: Optional[ImageField] = Field(default=None, description="The image to infill")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Patch Match Infill", "tags": ["image", "inpaint", "patchmatch", "infill"]},
         }
 

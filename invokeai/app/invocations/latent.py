@@ -13,7 +13,7 @@ from diffusers.models.attention_processor import (
     XFormersAttnProcessor,
 )
 from diffusers.schedulers import SchedulerMixin as Scheduler
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.app.util.controlnet_utils import prepare_control_image
@@ -46,7 +46,7 @@ class LatentsField(BaseModel):
     latents_name: Optional[str] = Field(default=None, description="The name of the latents")
 
     class Config:
-        schema_extra = {"required": ["latents_name"]}
+        json_schema_extra = {"required": ["latents_name"]}
 
 
 class LatentsOutput(BaseInvocationOutput):
@@ -80,7 +80,7 @@ def get_scheduler(
 ) -> Scheduler:
     scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
     orig_scheduler_info = context.services.model_manager.get_model(
-        **scheduler_info.dict(),
+        **scheduler_info.model_dump(),
         context=context,
     )
     with orig_scheduler_info as orig_scheduler:
@@ -121,7 +121,7 @@ class TextToLatentsInvocation(BaseInvocation):
     # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
 
-    @validator("cfg_scale")
+    @field_validator("cfg_scale")
     def ge_one(cls, v):
         """validate that all cfg_scale values are >= 1"""
         if isinstance(v, list):
@@ -135,7 +135,7 @@ class TextToLatentsInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Text To Latents",
                 "tags": ["latents"],
@@ -158,7 +158,7 @@ class TextToLatentsInvocation(BaseInvocation):
         stable_diffusion_step_callback(
             context=context,
             intermediate_state=intermediate_state,
-            node=self.dict(),
+            node=self.model_dump(),
             source_node_id=source_node_id,
         )
 
@@ -327,7 +327,7 @@ class TextToLatentsInvocation(BaseInvocation):
                 return
 
             unet_info = context.services.model_manager.get_model(
-                **self.unet.unet.dict(),
+                **self.unet.unet.model_dump(),
                 context=context,
             )
             with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
@@ -384,7 +384,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Latent To Latents",
                 "tags": ["latents"],
@@ -420,7 +420,7 @@ class LatentsToLatentsInvocation(TextToLatentsInvocation):
                 return
 
             unet_info = context.services.model_manager.get_model(
-                **self.unet.unet.dict(),
+                **self.unet.unet.model_dump(),
                 context=context,
             )
             with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
@@ -495,7 +495,7 @@ class LatentsToImageInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Latents To Image",
                 "tags": ["latents", "image"],
@@ -507,7 +507,7 @@ class LatentsToImageInvocation(BaseInvocation):
         latents = context.services.latents.get(self.latents.latents_name)
 
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(),
+            **self.vae.vae.model_dump(),
             context=context,
         )
 
@@ -565,7 +565,7 @@ class LatentsToImageInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            metadata=self.metadata.dict() if self.metadata else None,
+            metadata=self.metadata.model_dump() if self.metadata else None,
         )
 
         return ImageOutput(
@@ -593,7 +593,7 @@ class ResizeLatentsInvocation(BaseInvocation):
     )
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Resize Latents", "tags": ["latents", "resize"]},
         }
 
@@ -634,7 +634,7 @@ class ScaleLatentsInvocation(BaseInvocation):
     )
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Scale Latents", "tags": ["latents", "scale"]},
         }
 
@@ -675,7 +675,7 @@ class ImageToLatentsInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Image To Latents", "tags": ["latents", "image"]},
         }
 
@@ -686,9 +686,9 @@ class ImageToLatentsInvocation(BaseInvocation):
         # )
         image = context.services.images.get_pil_image(self.image.image_name)
 
-        # vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
+        # vae_info = context.services.model_manager.get_model(**self.vae.vae.model_dump())
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(),
+            **self.vae.vae.model_dump(),
             context=context,
         )
 

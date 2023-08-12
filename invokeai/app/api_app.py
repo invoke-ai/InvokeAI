@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pathlib import Path
-from pydantic.schema import schema
+#from pydantic.schema import schema
 
 # This should come early so that modules can log their initialization properly
 from .services.config import InvokeAIAppConfig
@@ -126,13 +126,13 @@ def custom_openapi():
         output_type = signature(invoker.invoke).return_annotation
         output_types.add(output_type)
 
-    output_schemas = schema(output_types, ref_prefix="#/components/schemas/")
-    for schema_key, output_schema in output_schemas["definitions"].items():
-        openapi_schema["components"]["schemas"][schema_key] = output_schema
+    # output_schemas = schema(output_types, ref_prefix="#/components/schemas/")
+    # for schema_key, output_schema in output_schemas["definitions"].items():
+    #     openapi_schema["components"]["schemas"][schema_key] = output_schema
 
-        # TODO: note that we assume the schema_key here is the TYPE.__name__
-        # This could break in some cases, figure out a better way to do it
-        output_type_titles[schema_key] = output_schema["title"]
+    #     # TODO: note that we assume the schema_key here is the TYPE.__name__
+    #     # This could break in some cases, figure out a better way to do it
+    #     output_type_titles[schema_key] = output_schema["title"]
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:

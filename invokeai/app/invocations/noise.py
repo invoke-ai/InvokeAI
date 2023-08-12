@@ -3,7 +3,7 @@
 import math
 from typing import Literal
 
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 import torch
 from invokeai.app.invocations.latent import LatentsField
 
@@ -110,14 +110,14 @@ class NoiseInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Noise",
                 "tags": ["latents", "noise"],
             },
         }
 
-    @validator("seed", pre=True)
+    @field_validator("seed", pre=True)
     def modulo_seed(cls, v):
         """Returns the seed modulo (SEED_MAX + 1) to ensure it is within the valid range."""
         return v % (SEED_MAX + 1)

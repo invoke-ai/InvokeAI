@@ -129,7 +129,7 @@ class InpaintInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"tags": ["stable-diffusion", "image"], "title": "Inpaint"},
         }
 
@@ -142,7 +142,7 @@ class InpaintInvocation(BaseInvocation):
         stable_diffusion_step_callback(
             context=context,
             intermediate_state=intermediate_state,
-            node=self.dict(),
+            node=self.model_dump(),
             source_node_id=source_node_id,
         )
 
@@ -169,11 +169,11 @@ class InpaintInvocation(BaseInvocation):
             return
 
         unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict(),
+            **self.unet.unet.model_dump(),
             context=context,
         )
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(),
+            **self.vae.vae.model_dump(),
             context=context,
         )
 

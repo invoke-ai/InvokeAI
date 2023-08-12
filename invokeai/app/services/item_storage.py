@@ -2,12 +2,11 @@ from abc import ABC, abstractmethod
 from typing import Callable, Generic, Optional, TypeVar
 
 from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
 
 T = TypeVar("T", bound=BaseModel)
 
 
-class PaginatedResults(GenericModel, Generic[T]):
+class PaginatedResults(BaseModel, Generic[T]):
     """Paginated results"""
 
     # fmt: off

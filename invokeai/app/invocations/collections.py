@@ -3,7 +3,7 @@
 from typing import Literal
 
 import numpy as np
-from pydantic import Field, validator
+from pydantic import Field, field_field_validator
 
 from invokeai.app.models.image import ImageField
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
@@ -38,7 +38,7 @@ class ImageCollectionOutput(BaseInvocationOutput):
     collection: list[ImageField] = Field(default=[], description="The output images")
 
     class Config:
-        schema_extra = {"required": ["type", "collection"]}
+        json_schema_extra = {"required": ["type", "collection"]}
 
 
 class RangeInvocation(BaseInvocation):
@@ -52,11 +52,11 @@ class RangeInvocation(BaseInvocation):
     step: int = Field(default=1, description="The step of the range")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Range", "tags": ["range", "integer", "collection"]},
         }
 
-    @validator("stop")
+    @field_validator("stop")
     def stop_gt_start(cls, v, values):
         if "start" in values and v <= values["start"]:
             raise ValueError("stop must be greater than start")
@@ -77,7 +77,7 @@ class RangeOfSizeInvocation(BaseInvocation):
     step: int = Field(default=1, description="The step of the range")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Sized Range", "tags": ["range", "integer", "size", "collection"]},
         }
 
@@ -102,7 +102,7 @@ class RandomRangeInvocation(BaseInvocation):
     )
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Random Range", "tags": ["range", "integer", "random", "collection"]},
         }
 
@@ -127,7 +127,7 @@ class ImageCollectionInvocation(BaseInvocation):
         return ImageCollectionOutput(collection=self.images)
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "type_hints": {
                     "title": "Image Collection",

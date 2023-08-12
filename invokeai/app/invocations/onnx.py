@@ -6,7 +6,7 @@ from typing import List, Literal, Optional, Union
 import re
 import inspect
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import torch
 import numpy as np
 from diffusers import ControlNetModel, DPMSolverMultistepScheduler
@@ -59,10 +59,10 @@ class ONNXPromptInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> CompelOutput:
         tokenizer_info = context.services.model_manager.get_model(
-            **self.clip.tokenizer.dict(),
+            **self.clip.tokenizer.model_dump(),
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **self.clip.text_encoder.dict(),
+            **self.clip.text_encoder.model_dump(),
         )
         with tokenizer_info as orig_tokenizer, text_encoder_info as text_encoder, ExitStack() as stack:
             loras = [
@@ -154,7 +154,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
 
-    @validator("cfg_scale")
+    @field_validator("cfg_scale")
     def ge_one(cls, v):
         """validate that all cfg_scale values are >= 1"""
         if isinstance(v, list):
@@ -168,7 +168,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "tags": ["latents"],
                 "type_hints": {
@@ -226,7 +226,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
             stable_diffusion_step_callback(
                 context=context,
                 intermediate_state=intermediate_state,
-                node=self.dict(),
+                node=self.model_dump(),
                 source_node_id=source_node_id,
             )
 
@@ -239,7 +239,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
                 eta=0.0,
             )
 
-        unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
+        unet_info = context.services.model_manager.get_model(**self.unet.unet.model_dump())
 
         with unet_info as unet, ExitStack() as stack:
             # loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
@@ -314,7 +314,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "tags": ["latents", "image"],
             },
@@ -327,7 +327,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
             raise Exception(f"Expected vae_decoder, found: {self.vae.vae.model_type}")
 
         vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(),
+            **self.vae.vae.model_dump(),
         )
 
         # clear memory as vae decode can request a lot
@@ -356,7 +356,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            metadata=self.metadata.dict() if self.metadata else None,
+            metadata=self.metadata.model_dump() if self.metadata else None,
         )
 
         return ImageOutput(
@@ -389,7 +389,7 @@ class ONNXSD1ModelLoaderInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"tags": ["model", "loader"], "type_hints": {"model_name": "model"}},  # TODO: rename to model_name?
         }
 
@@ -472,7 +472,7 @@ class OnnxModelLoaderInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Onnx Model Loader",
                 "tags": ["model", "loader"],

@@ -21,7 +21,7 @@ class ParamIntInvocation(BaseInvocation):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"tags": ["param", "integer"], "title": "Integer Parameter"},
         }
 
@@ -38,7 +38,7 @@ class ParamFloatInvocation(BaseInvocation):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"tags": ["param", "float"], "title": "Float Parameter"},
         }
 
@@ -60,7 +60,7 @@ class ParamStringInvocation(BaseInvocation):
     text: str = Field(default="", description="The string value")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"tags": ["param", "string"], "title": "String Parameter"},
         }
 
@@ -75,7 +75,7 @@ class ParamPromptInvocation(BaseInvocation):
     prompt: str = Field(default="", description="The prompt value")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"tags": ["param", "prompt"], "title": "Prompt"},
         }
 

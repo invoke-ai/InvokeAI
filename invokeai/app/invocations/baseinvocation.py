@@ -118,7 +118,7 @@ class CustomisedSchemaExtra(TypedDict):
 class InvocationConfig(BaseConfig):
     """Customizes pydantic's BaseModel.Config class for use by Invocations.
 
-    Provide `schema_extra` a `ui` dict to add hints for generated UIs.
+    Provide `json_schema_extra` a `ui` dict to add hints for generated UIs.
 
     `tags`
     - A list of strings, used to categorise invocations.
@@ -131,7 +131,7 @@ class InvocationConfig(BaseConfig):
 
     ```python
     class Config(InvocationConfig):
-      schema_extra = {
+      json_schema_extra = {
           "ui": {
               "tags": ["stable-diffusion", "image"],
               "type_hints": {
@@ -142,4 +142,4 @@ class InvocationConfig(BaseConfig):
     ```
     """
 
-    schema_extra: CustomisedSchemaExtra
+    json_schema_extra: CustomisedSchemaExtra

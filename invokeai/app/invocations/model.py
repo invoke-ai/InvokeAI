@@ -73,7 +73,7 @@ class MainModelLoaderInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Model Loader",
                 "tags": ["model", "loader"],
@@ -205,7 +205,7 @@ class LoraLoaderInvocation(BaseInvocation):
     clip: Optional[ClipField] = Field(description="Clip model for applying lora")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Lora Loader",
                 "tags": ["lora", "loader"],
@@ -287,7 +287,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
     clip2: Optional[ClipField] = Field(description="Clip2 model for applying lora")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "SDXL Lora Loader",
                 "tags": ["lora", "loader"],
@@ -385,7 +385,7 @@ class VaeLoaderInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "VAE Loader",
                 "tags": ["vae", "loader"],

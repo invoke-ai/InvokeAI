@@ -15,7 +15,7 @@ from typing import (
 )
 
 import networkx as nx
-from pydantic import BaseModel, root_validator, validator
+from pydantic import BaseModel, model_validator, field_validator
 from pydantic.fields import Field
 
 from ..invocations import *
@@ -156,7 +156,7 @@ class GraphInvocationOutput(BaseInvocationOutput):
     type: Literal["graph_output"] = "graph_output"
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "required": [
                 "type",
                 "image",
@@ -186,7 +186,7 @@ class IterateInvocationOutput(BaseInvocationOutput):
     item: Any = Field(description="The item being iterated over")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "required": [
                 "type",
                 "item",
@@ -214,7 +214,7 @@ class CollectInvocationOutput(BaseInvocationOutput):
     collection: list[Any] = Field(description="The collection of input items")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "required": [
                 "type",
                 "collection",
@@ -755,7 +755,7 @@ class GraphExecutionState(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "required": [
                 "id",
                 "graph",
@@ -1110,13 +1110,13 @@ class LibraryGraph(BaseModel):
         description="The outputs exposed by this graph", default_factory=list
     )
 
-    @validator("exposed_inputs", "exposed_outputs")
+    @field_validator("exposed_inputs", "exposed_outputs")
     def validate_exposed_aliases(cls, v):
         if len(v) != len(set(i.alias for i in v)):
             raise ValueError("Duplicate exposed alias")
         return v
 
-    @root_validator
+    @model_validator
     def validate_exposed_nodes(cls, values):
         graph = values["graph"]
 

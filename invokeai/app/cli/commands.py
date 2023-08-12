@@ -67,7 +67,7 @@ def add_parsers(
             add_arguments(command_parser)
 
         # Convert all fields to arguments
-        fields = command.__fields__  # type: ignore
+        fields = command.model_fields  # type: ignore
         for name, field in fields.items():
             if name in exclude_fields:
                 continue
@@ -87,7 +87,7 @@ def add_graph_parsers(
         # Add arguments for inputs
         for exposed_input in graph.exposed_inputs:
             node = graph.graph.get_node(exposed_input.node_path)
-            field = node.__fields__[exposed_input.field]
+            field = node.model_fields[exposed_input.field]
             default_override = getattr(node, exposed_input.field)
             add_field_argument(command_parser, exposed_input.alias, field, default_override)
 
@@ -194,7 +194,7 @@ def get_graph_execution_history(
 
 
 def get_invocation_command(invocation) -> str:
-    fields = invocation.__fields__.items()
+    fields = invocation.model_fields.items()
     type_hints = get_type_hints(type(invocation))
     command = [invocation.type]
     for name, field in fields:

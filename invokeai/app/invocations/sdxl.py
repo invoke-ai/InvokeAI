@@ -3,7 +3,7 @@ import inspect
 from tqdm import tqdm
 from typing import List, Literal, Optional, Union
 
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 
 from ...backend.model_management import ModelType, SubModelType, ModelPatcher
 from invokeai.app.util.step_callback import stable_diffusion_xl_step_callback
@@ -49,7 +49,7 @@ class SDXLModelLoaderInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "SDXL Model Loader",
                 "tags": ["model", "loader", "sdxl"],
@@ -139,7 +139,7 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "SDXL Refiner Model Loader",
                 "tags": ["model", "loader", "sdxl_refiner"],
@@ -224,7 +224,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
     # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
 
-    @validator("cfg_scale")
+    @field_validator("cfg_scale")
     def ge_one(cls, v):
         """validate that all cfg_scale values are >= 1"""
         if isinstance(v, list):
@@ -238,7 +238,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "SDXL Text To Latents",
                 "tags": ["latents"],
@@ -260,7 +260,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
     ) -> None:
         stable_diffusion_xl_step_callback(
             context=context,
-            node=self.dict(),
+            node=self.model_dump(),
             source_node_id=source_node_id,
             sample=sample,
             step=step,
@@ -303,7 +303,7 @@ class SDXLTextToLatentsInvocation(BaseInvocation):
                 del lora_info
             return
 
-        unet_info = context.services.model_manager.get_model(**self.unet.unet.dict(), context=context)
+        unet_info = context.services.model_manager.get_model(**self.unet.unet.model_dump(), context=context)
         do_classifier_free_guidance = True
         cross_attention_kwargs = None
         with ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()), unet_info as unet:
@@ -481,7 +481,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
     # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
     # fmt: on
 
-    @validator("cfg_scale")
+    @field_validator("cfg_scale")
     def ge_one(cls, v):
         """validate that all cfg_scale values are >= 1"""
         if isinstance(v, list):
@@ -495,7 +495,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "SDXL Latents to Latents",
                 "tags": ["latents"],
@@ -517,7 +517,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
     ) -> None:
         stable_diffusion_xl_step_callback(
             context=context,
-            node=self.dict(),
+            node=self.model_dump(),
             source_node_id=source_node_id,
             sample=sample,
             step=step,
@@ -549,7 +549,7 @@ class SDXLLatentsToLatentsInvocation(BaseInvocation):
         )
 
         unet_info = context.services.model_manager.get_model(
-            **self.unet.unet.dict(),
+            **self.unet.unet.model_dump(),
             context=context,
         )
 

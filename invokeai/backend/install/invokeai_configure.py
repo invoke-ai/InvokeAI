@@ -716,7 +716,7 @@ def migrate_init_file(legacy_format: Path):
     old = legacy_parser.parse_args([f"@{str(legacy_format)}"])
     new = InvokeAIAppConfig.get_config()
 
-    fields = [x for x, y in InvokeAIAppConfig.__fields__.items() if y.field_info.extra.get("category") != "DEPRECATED"]
+    fields = [x for x, y in InvokeAIAppConfig.model_fields.items() if y.field_info.extra.get("category") != "DEPRECATED"]
     for attr in fields:
         if hasattr(old, attr):
             try:

@@ -17,7 +17,7 @@ class CvInvocationConfig(BaseModel):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "tags": ["cv", "image"],
             },
@@ -36,7 +36,7 @@ class CvInpaintInvocation(BaseInvocation, CvInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "OpenCV Inpaint", "tags": ["opencv", "inpaint"]},
         }
 

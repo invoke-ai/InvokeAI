@@ -39,7 +39,7 @@ class LoadImageInvocation(BaseInvocation):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Load Image", "tags": ["image", "load"]},
         }
 
@@ -62,7 +62,7 @@ class ShowImageInvocation(BaseInvocation):
     image: Optional[ImageField] = Field(default=None, description="The image to show")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Show Image", "tags": ["image", "show"]},
         }
 
@@ -95,7 +95,7 @@ class ImageCropInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Crop Image", "tags": ["image", "crop"]},
         }
 
@@ -136,7 +136,7 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Paste Image", "tags": ["image", "paste"]},
         }
 
@@ -185,7 +185,7 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Mask From Alpha", "tags": ["image", "mask", "alpha"]},
         }
 
@@ -224,7 +224,7 @@ class ImageMultiplyInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Multiply Images", "tags": ["image", "multiply"]},
         }
 
@@ -265,7 +265,7 @@ class ImageChannelInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Image Channel", "tags": ["image", "channel"]},
         }
 
@@ -305,7 +305,7 @@ class ImageConvertInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Convert Image", "tags": ["image", "convert"]},
         }
 
@@ -343,7 +343,7 @@ class ImageBlurInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Blur Image", "tags": ["image", "blur"]},
         }
 
@@ -405,7 +405,7 @@ class ImageResizeInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Resize Image", "tags": ["image", "resize"]},
         }
 
@@ -448,7 +448,7 @@ class ImageScaleInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Scale Image", "tags": ["image", "scale"]},
         }
 
@@ -493,7 +493,7 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Image Linear Interpolation", "tags": ["image", "linear", "interpolation", "lerp"]},
         }
 
@@ -534,7 +534,7 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Image Inverse Linear Interpolation",
                 "tags": ["image", "linear", "interpolation", "inverse"],
@@ -577,7 +577,7 @@ class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Blur NSFW Images", "tags": ["image", "nsfw", "checker"]},
         }
 
@@ -600,7 +600,7 @@ class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            metadata=self.metadata.dict() if self.metadata else None,
+            metadata=self.metadata.model_dump() if self.metadata else None,
         )
 
         return ImageOutput(
@@ -629,7 +629,7 @@ class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Add Invisible Watermark", "tags": ["image", "watermark", "invisible"]},
         }
 
@@ -643,7 +643,7 @@ class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            metadata=self.metadata.dict() if self.metadata else None,
+            metadata=self.metadata.model_dump() if self.metadata else None,
         )
 
         return ImageOutput(

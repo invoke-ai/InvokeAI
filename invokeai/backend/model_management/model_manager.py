@@ -897,7 +897,7 @@ class ModelManager(object):
         Write current configuration out to the indicated file.
         """
         data_to_save = dict()
-        data_to_save["__metadata__"] = self.config_meta.dict()
+        data_to_save["__metadata__"] = self.config_meta.model_dump()
 
         for model_key, model_config in self.models.items():
             model_name, base_model, model_type = self.parse_key(model_key)

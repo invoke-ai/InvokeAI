@@ -584,7 +584,7 @@ def test_graph_can_serialize():
     g.add_edge(e)
 
     # Not throwing on this line is sufficient
-    json = g.json()
+    json = g.model_dump_json()
 
 
 def test_graph_can_deserialize():
@@ -596,8 +596,8 @@ def test_graph_can_deserialize():
     e = create_edge(n1.id, "image", n2.id, "image")
     g.add_edge(e)
 
-    json = g.json()
-    g2 = Graph.parse_raw(json)
+    json = g.model_dump_json()
+    g2 = Graph.model_validate_json(json)
 
     assert g2 is not None
     assert g2.nodes["1"] is not None

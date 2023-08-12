@@ -80,7 +80,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 # Send starting event
                 self.__invoker.services.events.emit_invocation_started(
                     graph_execution_state_id=graph_execution_state.id,
-                    node=invocation.dict(),
+                    node=invocation.model_dump(),
                     source_node_id=source_node_id,
                 )
 
@@ -107,9 +107,9 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         # Send complete event
                         self.__invoker.services.events.emit_invocation_complete(
                             graph_execution_state_id=graph_execution_state.id,
-                            node=invocation.dict(),
+                            node=invocation.model_dump(),
                             source_node_id=source_node_id,
-                            result=outputs.dict(),
+                            result=outputs.model_dump(),
                         )
                     statistics.log_stats()
 
@@ -134,7 +134,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     # Send error event
                     self.__invoker.services.events.emit_invocation_error(
                         graph_execution_state_id=graph_execution_state.id,
-                        node=invocation.dict(),
+                        node=invocation.model_dump(),
                         source_node_id=source_node_id,
                         error_type=e.__class__.__name__,
                         error=error,
@@ -155,7 +155,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         self.__invoker.services.logger.error("Error while invoking:\n%s" % e)
                         self.__invoker.services.events.emit_invocation_error(
                             graph_execution_state_id=graph_execution_state.id,
-                            node=invocation.dict(),
+                            node=invocation.model_dump(),
                             source_node_id=source_node_id,
                             error_type=e.__class__.__name__,
                             error=traceback.format_exc(),

@@ -26,7 +26,7 @@ class ConditioningField(BaseModel):
     conditioning_name: Optional[str] = Field(default=None, description="The name of conditioning data")
 
     class Config:
-        schema_extra = {"required": ["conditioning_name"]}
+        json_schema_extra = {"required": ["conditioning_name"]}
 
 
 @dataclass
@@ -80,18 +80,18 @@ class CompelInvocation(BaseInvocation):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Prompt (Compel)", "tags": ["prompt", "compel"], "type_hints": {"model": "model"}},
         }
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CompelOutput:
         tokenizer_info = context.services.model_manager.get_model(
-            **self.clip.tokenizer.dict(),
+            **self.clip.tokenizer.model_dump(),
             context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **self.clip.text_encoder.dict(),
+            **self.clip.text_encoder.model_dump(),
             context=context,
         )
 
@@ -178,11 +178,11 @@ class CompelInvocation(BaseInvocation):
 class SDXLPromptInvocationBase:
     def run_clip_raw(self, context, clip_field, prompt, get_pooled, lora_prefix):
         tokenizer_info = context.services.model_manager.get_model(
-            **clip_field.tokenizer.dict(),
+            **clip_field.tokenizer.model_dump(),
             context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **clip_field.text_encoder.dict(),
+            **clip_field.text_encoder.model_dump(),
             context=context,
         )
 
@@ -255,11 +255,11 @@ class SDXLPromptInvocationBase:
 
     def run_clip_compel(self, context, clip_field, prompt, get_pooled, lora_prefix):
         tokenizer_info = context.services.model_manager.get_model(
-            **clip_field.tokenizer.dict(),
+            **clip_field.tokenizer.model_dump(),
             context=context,
         )
         text_encoder_info = context.services.model_manager.get_model(
-            **clip_field.text_encoder.dict(),
+            **clip_field.text_encoder.model_dump(),
             context=context,
         )
 
@@ -360,7 +360,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "SDXL Prompt (Compel)", "tags": ["prompt", "compel"], "type_hints": {"model": "model"}},
         }
 
@@ -414,7 +414,7 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "SDXL Refiner Prompt (Compel)",
                 "tags": ["prompt", "compel"],
@@ -471,7 +471,7 @@ class SDXLRawPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "SDXL Prompt (Raw)", "tags": ["prompt", "compel"], "type_hints": {"model": "model"}},
         }
 
@@ -525,7 +525,7 @@ class SDXLRefinerRawPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "SDXL Refiner Prompt (Raw)",
                 "tags": ["prompt", "compel"],
@@ -580,7 +580,7 @@ class ClipSkipInvocation(BaseInvocation):
     skipped_layers: int = Field(0, description="Number of layers to skip in text_encoder")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "CLIP Skip", "tags": ["clip", "skip"]},
         }
 

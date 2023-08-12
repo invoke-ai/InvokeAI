@@ -44,7 +44,7 @@ class EventServiceBase:
                 graph_execution_state_id=graph_execution_state_id,
                 node=node,
                 source_node_id=source_node_id,
-                progress_image=progress_image.dict() if progress_image is not None else None,
+                progress_image=progress_image.model_dump() if progress_image is not None else None,
                 step=step,
                 total_steps=total_steps,
             ),

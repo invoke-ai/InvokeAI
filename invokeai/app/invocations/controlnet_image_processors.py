@@ -24,7 +24,7 @@ from controlnet_aux import (
 )
 from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from ...backend.model_management import BaseModelType, ModelType
 from ..models.image import ImageCategory, ImageField, ResourceOrigin
@@ -123,7 +123,7 @@ class ControlField(BaseModel):
     control_mode: CONTROLNET_MODE_VALUES = Field(default="balanced", description="The control mode to use")
     resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode to use")
 
-    @validator("control_weight")
+    @field_validator("control_weight")
     def validate_control_weight(cls, v):
         """Validate that all control weights in the valid range"""
         if isinstance(v, list):
@@ -136,7 +136,7 @@ class ControlField(BaseModel):
         return v
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "required": ["image", "control_model", "control_weight", "begin_step_percent", "end_step_percent"],
             "ui": {
                 "type_hints": {
@@ -176,7 +176,7 @@ class ControlNetInvocation(BaseInvocation):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "ControlNet",
                 "tags": ["controlnet", "latents"],
@@ -214,7 +214,7 @@ class ImageProcessorInvocation(BaseInvocation, PILInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Image Processor", "tags": ["image", "processor"]},
         }
 
@@ -266,7 +266,7 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfi
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Canny Processor", "tags": ["controlnet", "canny", "image", "processor"]},
         }
 
@@ -290,7 +290,7 @@ class HedImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig)
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Softedge(HED) Processor", "tags": ["controlnet", "softedge", "hed", "image", "processor"]},
         }
 
@@ -319,7 +319,7 @@ class LineartImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCon
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Lineart Processor", "tags": ["controlnet", "lineart", "image", "processor"]},
         }
 
@@ -342,7 +342,7 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation, PILInvocati
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Lineart Anime Processor",
                 "tags": ["controlnet", "lineart", "anime", "image", "processor"],
@@ -371,7 +371,7 @@ class OpenposeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Openpose Processor", "tags": ["controlnet", "openpose", "image", "processor"]},
         }
 
@@ -399,7 +399,7 @@ class MidasDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocation
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Midas (Depth) Processor", "tags": ["controlnet", "midas", "depth", "image", "processor"]},
         }
 
@@ -426,7 +426,7 @@ class NormalbaeImageProcessorInvocation(ImageProcessorInvocation, PILInvocationC
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Normal BAE Processor", "tags": ["controlnet", "normal", "bae", "image", "processor"]},
         }
 
@@ -451,7 +451,7 @@ class MlsdImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "MLSD Processor", "tags": ["controlnet", "mlsd", "image", "processor"]},
         }
 
@@ -480,7 +480,7 @@ class PidiImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfig
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "PIDI Processor", "tags": ["controlnet", "pidi", "image", "processor"]},
         }
 
@@ -510,7 +510,7 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation, PILInvoca
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Content Shuffle Processor",
                 "tags": ["controlnet", "contentshuffle", "image", "processor"],
@@ -539,7 +539,7 @@ class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Zoe (Depth) Processor", "tags": ["controlnet", "zoe", "depth", "image", "processor"]},
         }
 
@@ -560,7 +560,7 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Mediapipe Processor", "tags": ["controlnet", "mediapipe", "image", "processor"]},
         }
 
@@ -588,7 +588,7 @@ class LeresImageProcessorInvocation(ImageProcessorInvocation, PILInvocationConfi
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Leres (Depth) Processor", "tags": ["controlnet", "leres", "depth", "image", "processor"]},
         }
 
@@ -614,7 +614,7 @@ class TileResamplerProcessorInvocation(ImageProcessorInvocation, PILInvocationCo
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Tile Resample Processor",
                 "tags": ["controlnet", "tile", "resample", "image", "processor"],
@@ -656,7 +656,7 @@ class SegmentAnythingProcessorInvocation(ImageProcessorInvocation, PILInvocation
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Segment Anything Processor",
                 "tags": ["controlnet", "segment", "anything", "sam", "image", "processor"],

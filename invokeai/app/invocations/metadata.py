@@ -142,7 +142,7 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     refiner_start: Union[float, None] = Field(default=None, description="The start value used for refiner denoising")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "title": "Metadata Accumulator",
                 "tags": ["image", "metadata", "generation"],
@@ -152,4 +152,4 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> MetadataAccumulatorOutput:
         """Collects and outputs a CoreMetadata object"""
 
-        return MetadataAccumulatorOutput(metadata=CoreMetadata(**self.dict()))
+        return MetadataAccumulatorOutput(metadata=CoreMetadata(**self.model_dump()))

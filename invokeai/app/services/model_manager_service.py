@@ -238,7 +238,7 @@ class ModelManagerServiceBase(ABC):
     def merge_models(
         self,
         model_names: List[str] = Field(
-            default=None, min_items=2, max_items=3, description="List of model names to merge"
+            default=None, min_length=2, max_length=3, description="List of model names to merge"
         ),
         base_model: Union[BaseModelType, str] = Field(
             default=None, description="Base model shared by all models to be merged"
@@ -568,7 +568,7 @@ class ModelManagerService(ModelManagerServiceBase):
     def merge_models(
         self,
         model_names: List[str] = Field(
-            default=None, min_items=2, max_items=3, description="List of model names to merge"
+            default=None, min_length=2, max_length=3, description="List of model names to merge"
         ),
         base_model: Union[BaseModelType, str] = Field(
             default=None, description="Base model shared by all models to be merged"

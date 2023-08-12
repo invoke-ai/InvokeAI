@@ -105,7 +105,7 @@ async def update_model(
                 info.path = new_info.get("path")
 
         # replace empty string values with None/null to avoid phenomenon of vae: ''
-        info_dict = info.dict()
+        info_dict = info.model_dump()
         info_dict = {x: info_dict[x] if info_dict[x] else None for x in info_dict.keys()}
 
         ApiDependencies.invoker.services.model_manager.update_model(
@@ -203,7 +203,7 @@ async def add_model(
 
     try:
         ApiDependencies.invoker.services.model_manager.add_model(
-            info.model_name, info.base_model, info.model_type, model_attributes=info.dict()
+            info.model_name, info.base_model, info.model_type, model_attributes=info.model_dump()
         )
         logger.info(f"Successfully added {info.model_name}")
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
@@ -348,7 +348,7 @@ async def sync_to_config() -> bool:
 )
 async def merge_models(
     base_model: BaseModelType = Path(description="Base model"),
-    model_names: List[str] = Body(description="model name", min_items=2, max_items=3),
+    model_names: List[str] = Body(description="model name", min_length=2, max_length=3),
     merged_model_name: Optional[str] = Body(description="Name of destination model"),
     alpha: Optional[float] = Body(description="Alpha weighting strength to apply to 2d and 3d models", default=0.5),
     interp: Optional[MergeInterpolationMethod] = Body(description="Interpolation method"),

@@ -65,7 +65,7 @@ class FloatLinearRangeInvocation(BaseInvocation):
     steps: int = Field(default=30, description="number of values to interpolate over (including start and stop)")
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Linear Range (Float)", "tags": ["math", "float", "linear", "range"]},
         }
 
@@ -136,7 +136,7 @@ class StepParamEasingInvocation(BaseInvocation):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Param Easing By Step", "tags": ["param", "step", "easing"]},
         }
 

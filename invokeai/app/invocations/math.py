@@ -18,7 +18,7 @@ class MathInvocationConfig(BaseModel):
 
     # Schema customisation
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {
                 "tags": ["math"],
             }
@@ -53,7 +53,7 @@ class AddInvocation(BaseInvocation, MathInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Add", "tags": ["math", "add"]},
         }
 
@@ -71,7 +71,7 @@ class SubtractInvocation(BaseInvocation, MathInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Subtract", "tags": ["math", "subtract"]},
         }
 
@@ -89,7 +89,7 @@ class MultiplyInvocation(BaseInvocation, MathInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Multiply", "tags": ["math", "multiply"]},
         }
 
@@ -107,7 +107,7 @@ class DivideInvocation(BaseInvocation, MathInvocationConfig):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Divide", "tags": ["math", "divide"]},
         }
 
@@ -127,7 +127,7 @@ class RandomIntInvocation(BaseInvocation):
     # fmt: on
 
     class Config(InvocationConfig):
-        schema_extra = {
+        json_schema_extra = {
             "ui": {"title": "Random Integer", "tags": ["math", "random", "integer"]},
         }
 
