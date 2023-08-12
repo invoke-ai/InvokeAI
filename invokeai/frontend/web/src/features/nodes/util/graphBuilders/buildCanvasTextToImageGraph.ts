@@ -14,6 +14,7 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_OUTPUT,
+  CANVAS_TEXT_TO_IMAGE_GRAPH,
   CLIP_SKIP,
   DENOISE_LATENTS,
   MAIN_MODEL_LOADER,
@@ -22,7 +23,6 @@ import {
   NOISE,
   ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
-  TEXT_TO_IMAGE_GRAPH,
 } from './constants';
 
 /**
@@ -101,7 +101,7 @@ export const buildCanvasTextToImageGraph = (
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
-    id: TEXT_TO_IMAGE_GRAPH,
+    id: CANVAS_TEXT_TO_IMAGE_GRAPH,
     nodes: {
       [modelLoaderNodeId]: {
         type: modelLoaderNodeType,

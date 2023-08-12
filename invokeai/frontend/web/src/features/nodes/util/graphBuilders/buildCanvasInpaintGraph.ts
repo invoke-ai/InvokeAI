@@ -12,11 +12,11 @@ import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPUT,
   CLIP_SKIP,
   COLOR_CORRECT,
   INPAINT,
-  INPAINT_GRAPH,
   INPAINT_IMAGE,
   ITERATE,
   LATENTS_TO_IMAGE,
@@ -78,7 +78,7 @@ export const buildCanvasInpaintGraph = (
     : shouldUseCpuNoise;
 
   const graph: NonNullableGraph = {
-    id: INPAINT_GRAPH,
+    id: CANVAS_INPAINT_GRAPH,
     nodes: {
       [MAIN_MODEL_LOADER]: {
         type: 'main_model_loader',

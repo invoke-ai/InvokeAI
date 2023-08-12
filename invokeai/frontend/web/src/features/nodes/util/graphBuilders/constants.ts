@@ -49,7 +49,10 @@ export const SDXL_REFINER_LATENTS_TO_LATENTS = 'l2l_sdxl_refiner';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';
+export const IMAGE_TO_IMAGE_GRAPH = 'image_to_image_graph';
+export const CANVAS_TEXT_TO_IMAGE_GRAPH = 'canvas_text_to_image_graph';
+export const CANVAS_IMAGE_TO_IMAGE_GRAPH = 'canvas_image_to_image_graph';
+export const CANVAS_INPAINT_GRAPH = 'canvas_inpaint_graph';
+export const CANVAS_OUTPAINT_GRAPH = 'canvas_outpaint_graph';
 export const SDXL_TEXT_TO_IMAGE_GRAPH = 'sdxl_text_to_image_graph';
 export const SDXL_IMAGE_TO_IMAGE_GRAPH = 'sxdl_image_to_image_graph';
-export const IMAGE_TO_IMAGE_GRAPH = 'image_to_image_graph';
-export const INPAINT_GRAPH = 'inpaint_graph';

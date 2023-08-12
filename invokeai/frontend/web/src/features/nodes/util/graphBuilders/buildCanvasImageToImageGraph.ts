@@ -14,10 +14,10 @@ import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_IMAGE_TO_IMAGE_GRAPH,
   CANVAS_OUTPUT,
   CLIP_SKIP,
   DENOISE_LATENTS,
-  IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
@@ -73,7 +73,7 @@ export const buildCanvasImageToImageGraph = (
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    id: IMAGE_TO_IMAGE_GRAPH,
+    id: CANVAS_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
       [MAIN_MODEL_LOADER]: {
         type: 'main_model_loader',

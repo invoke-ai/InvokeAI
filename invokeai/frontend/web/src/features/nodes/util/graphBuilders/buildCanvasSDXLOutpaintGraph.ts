@@ -15,10 +15,10 @@ import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_OUTPAINT_GRAPH,
   CANVAS_OUTPUT,
   COLOR_CORRECT,
   INPAINT,
-  INPAINT_GRAPH,
   INPAINT_IMAGE,
   INPAINT_INFILL,
   ITERATE,
@@ -109,7 +109,7 @@ export const buildCanvasSDXLOutpaintGraph = (
   }
 
   const graph: NonNullableGraph = {
-    id: INPAINT_GRAPH,
+    id: CANVAS_OUTPAINT_GRAPH,
     nodes: {
       [SDXL_MODEL_LOADER]: {
         type: 'sdxl_model_loader',

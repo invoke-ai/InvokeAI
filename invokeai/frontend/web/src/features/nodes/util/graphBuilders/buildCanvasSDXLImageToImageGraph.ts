@@ -15,9 +15,9 @@ import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_IMAGE_TO_IMAGE_GRAPH,
   CANVAS_OUTPUT,
   DENOISE_LATENTS,
-  IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
@@ -81,7 +81,7 @@ export const buildCanvasSDXLImageToImageGraph = (
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    id: IMAGE_TO_IMAGE_GRAPH,
+    id: CANVAS_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
       [SDXL_MODEL_LOADER]: {
         type: 'sdxl_model_loader',
