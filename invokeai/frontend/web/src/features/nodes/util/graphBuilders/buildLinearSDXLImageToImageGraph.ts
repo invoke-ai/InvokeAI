@@ -6,6 +6,7 @@ import {
   ImageResizeInvocation,
   ImageToLatentsInvocation,
 } from 'services/api/types';
+import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
@@ -358,6 +359,9 @@ export const buildLinearSDXLImageToImageGraph = (
 
   // optionally add custom VAE
   addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
+
+  // add controlnet, mutating `graph`
+  addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
