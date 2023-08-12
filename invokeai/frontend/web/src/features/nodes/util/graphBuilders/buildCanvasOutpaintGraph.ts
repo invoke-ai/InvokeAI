@@ -141,7 +141,7 @@ export const buildCanvasOutpaintGraph = (
         mask2: canvasMaskImage,
       },
       [MASK_BLUR]: {
-        type: 'mask_blur',
+        type: 'img_blur',
         id: MASK_BLUR,
         is_intermediate: true,
         radius: maskBlur,
@@ -271,11 +271,11 @@ export const buildCanvasOutpaintGraph = (
       {
         source: {
           node_id: MASK_COMBINE,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
       },
       // Plug Everything Into Inpaint Node
@@ -322,7 +322,7 @@ export const buildCanvasOutpaintGraph = (
       {
         source: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: INPAINT,
@@ -385,7 +385,7 @@ export const buildCanvasOutpaintGraph = (
       {
         source: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: COLOR_CORRECT,
@@ -416,7 +416,7 @@ export const buildCanvasOutpaintGraph = (
       {
         source: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: INPAINT_FINAL_IMAGE,

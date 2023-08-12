@@ -105,12 +105,12 @@ export const buildCanvasInpaintGraph = (
         prompt: negativePrompt,
       },
       [MASK_BLUR]: {
-        type: 'mask_blur',
+        type: 'img_blur',
         id: MASK_BLUR,
         is_intermediate: true,
+        image: canvasMaskImage,
         radius: maskBlur,
         blur_type: maskBlurMethod,
-        mask: canvasMaskImage,
       },
       [INPAINT_IMAGE]: {
         type: 'i2l',
@@ -148,7 +148,6 @@ export const buildCanvasInpaintGraph = (
         id: COLOR_CORRECT,
         is_intermediate: true,
         reference: canvasInitImage,
-        mask: canvasMaskImage,
       },
       [INPAINT_FINAL_IMAGE]: {
         type: 'img_paste',
@@ -258,7 +257,7 @@ export const buildCanvasInpaintGraph = (
       {
         source: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: INPAINT,
@@ -308,6 +307,16 @@ export const buildCanvasInpaintGraph = (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'mask',
+        },
+      },
       // Paste Back Onto Original Image
       {
         source: {
@@ -322,7 +331,7 @@ export const buildCanvasInpaintGraph = (
       {
         source: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: INPAINT_FINAL_IMAGE,

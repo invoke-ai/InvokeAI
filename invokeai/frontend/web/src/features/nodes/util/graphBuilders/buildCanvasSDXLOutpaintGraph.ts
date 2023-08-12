@@ -152,7 +152,7 @@ export const buildCanvasSDXLOutpaintGraph = (
         mask2: canvasMaskImage,
       },
       [MASK_BLUR]: {
-        type: 'mask_blur',
+        type: 'img_blur',
         id: MASK_BLUR,
         is_intermediate: true,
         radius: maskBlur,
@@ -284,11 +284,11 @@ export const buildCanvasSDXLOutpaintGraph = (
       {
         source: {
           node_id: MASK_COMBINE,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
       },
       // Connect Everything To Inpaint
@@ -335,7 +335,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       {
         source: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: INPAINT,
@@ -398,7 +398,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       {
         source: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: COLOR_CORRECT,
@@ -429,7 +429,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       {
         source: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: INPAINT_FINAL_IMAGE,

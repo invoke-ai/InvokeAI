@@ -109,12 +109,12 @@ export const buildCanvasSDXLInpaintGraph = (
           : negativeStylePrompt,
       },
       [MASK_BLUR]: {
-        type: 'mask_blur',
+        type: 'img_blur',
         id: MASK_BLUR,
         is_intermediate: true,
         radius: maskBlur,
         blur_type: maskBlurMethod,
-        mask: canvasMaskImage,
+        image: canvasMaskImage,
       },
       [INPAINT_IMAGE]: {
         type: 'i2l',
@@ -152,7 +152,6 @@ export const buildCanvasSDXLInpaintGraph = (
         id: COLOR_CORRECT,
         is_intermediate: true,
         reference: canvasInitImage,
-        mask: canvasMaskImage,
       },
       [INPAINT_FINAL_IMAGE]: {
         type: 'img_paste',
@@ -271,7 +270,7 @@ export const buildCanvasSDXLInpaintGraph = (
       {
         source: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: INPAINT,
@@ -321,6 +320,16 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'mask',
+        },
+      },
       // Paste them back on original image
       {
         source: {
@@ -335,7 +344,7 @@ export const buildCanvasSDXLInpaintGraph = (
       {
         source: {
           node_id: MASK_BLUR,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: INPAINT_FINAL_IMAGE,
