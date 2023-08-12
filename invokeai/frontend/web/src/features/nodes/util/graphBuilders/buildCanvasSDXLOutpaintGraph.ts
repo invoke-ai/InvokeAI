@@ -476,12 +476,12 @@ export const buildCanvasSDXLOutpaintGraph = (
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph, INPAINT);
+    addNSFWCheckerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
   if (state.system.shouldUseWatermarker) {
     // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph, INPAINT);
+    addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
   return graph;

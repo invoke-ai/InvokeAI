@@ -2,6 +2,7 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { MetadataAccumulatorInvocation } from 'services/api/types';
 import {
+  CANVAS_OUTPUT,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   INPAINT_GRAPH,
@@ -35,11 +36,21 @@ export const addVAEToGraph = (
     };
   }
   const isOnnxModel = modelLoaderNodeId == ONNX_MODEL_LOADER;
-  if (
-    graph.id === TEXT_TO_IMAGE_GRAPH ||
-    graph.id === IMAGE_TO_IMAGE_GRAPH ||
-    graph.id === INPAINT_GRAPH
-  ) {
+
+  if (graph.id === TEXT_TO_IMAGE_GRAPH || graph.id === IMAGE_TO_IMAGE_GRAPH) {
+    graph.edges.push({
+      source: {
+        node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+        field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+      },
+      destination: {
+        node_id: CANVAS_OUTPUT,
+        field: 'vae',
+      },
+    });
+  }
+
+  if (graph.id === INPAINT_GRAPH) {
     graph.edges.push({
       source: {
         node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,

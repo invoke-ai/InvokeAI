@@ -19,7 +19,6 @@ import {
   DENOISE_LATENTS,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
-  LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
@@ -125,14 +124,10 @@ export const buildCanvasImageToImageGraph = (
         denoising_start: 1 - strength,
         denoising_end: 1,
       },
-      [LATENTS_TO_IMAGE]: {
-        type: 'l2i',
-        id: LATENTS_TO_IMAGE,
-        is_intermediate: !shouldAutoSave,
-      },
       [CANVAS_OUTPUT]: {
-        type: 'load_image',
+        type: 'l2i',
         id: CANVAS_OUTPUT,
+        is_intermediate: !shouldAutoSave,
       },
     },
     edges: [
@@ -226,19 +221,8 @@ export const buildCanvasImageToImageGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
-        },
-      },
-      // Canvas Output
-      {
-        source: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'image',
-        },
-        destination: {
           node_id: CANVAS_OUTPUT,
-          field: 'image',
+          field: 'latents',
         },
       },
     ],
@@ -339,7 +323,7 @@ export const buildCanvasImageToImageGraph = (
       field: 'metadata',
     },
     destination: {
-      node_id: LATENTS_TO_IMAGE,
+      node_id: CANVAS_OUTPUT,
       field: 'metadata',
     },
   });
@@ -359,12 +343,12 @@ export const buildCanvasImageToImageGraph = (
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph);
+    addNSFWCheckerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
   if (state.system.shouldUseWatermarker) {
     // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph);
+    addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
   return graph;
