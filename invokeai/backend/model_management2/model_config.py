@@ -1,5 +1,23 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
-"""Configuration definitions for image generation models."""
+"""
+Configuration definitions for image generation models.
+
+Typical usage:
+
+  from invokeai.backend.model_management2.model_config import ModelConfig
+  raw = dict(path='models/sd-1/main/foo.ckpt',
+             name='foo',
+             base_model='sd-1',
+             model_type='main',
+             config='configs/stable-diffusion/v1-inference.yaml',
+             model_variant='normal',
+             model_format='checkpoint'
+            )
+  config = ModelConfig.parse_obj(raw)
+
+Validation errors will raise an InvalidModelConfigException error.
+
+"""
 from enum import Enum
 from pathlib import Path
 from pydantic import BaseModel, Field, Extra
@@ -8,10 +26,8 @@ from pydantic.error_wrappers import ValidationError
 
 
 class InvalidModelConfigException(Exception):
-    """
-    Exception raised when the config parser doesn't recognize the passed
-    combo of model type and format.
-    """
+    """Exception raised when the config parser doesn't recognize the passed
+    combination of model type and format."""
 
     pass
 
