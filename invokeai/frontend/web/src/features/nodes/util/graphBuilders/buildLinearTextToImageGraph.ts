@@ -54,12 +54,15 @@ export const buildLinearTextToImageGraph = (
   }
 
   const isUsingOnnxModel = model.model_type === 'onnx';
+
   const modelLoaderNodeId = isUsingOnnxModel
     ? ONNX_MODEL_LOADER
     : MAIN_MODEL_LOADER;
+
   const modelLoaderNodeType = isUsingOnnxModel
     ? 'onnx_model_loader'
     : 'main_model_loader';
+
   const t2lNode: DenoiseLatentsInvocation | ONNXTextToLatentsInvocation =
     isUsingOnnxModel
       ? {
@@ -80,6 +83,7 @@ export const buildLinearTextToImageGraph = (
           denoising_start: 0,
           denoising_end: 1,
         };
+
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -95,6 +99,18 @@ export const buildLinearTextToImageGraph = (
   const graph: NonNullableGraph = {
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
+      [modelLoaderNodeId]: {
+        type: modelLoaderNodeType,
+        id: modelLoaderNodeId,
+        is_intermediate: true,
+        model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        skipped_layers: clipSkip,
+        is_intermediate: true,
+      },
       [POSITIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
         id: POSITIVE_CONDITIONING,
@@ -116,18 +132,6 @@ export const buildLinearTextToImageGraph = (
         is_intermediate: true,
       },
       [t2lNode.id]: t2lNode,
-      [modelLoaderNodeId]: {
-        type: modelLoaderNodeType,
-        id: modelLoaderNodeId,
-        is_intermediate: true,
-        model,
-      },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        skipped_layers: clipSkip,
-        is_intermediate: true,
-      },
       [LATENTS_TO_IMAGE]: {
         type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
         id: LATENTS_TO_IMAGE,
@@ -135,16 +139,7 @@ export const buildLinearTextToImageGraph = (
       },
     },
     edges: [
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip',
-        },
-        destination: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-      },
+      // Connect Model Loader to UNet and CLIP Skip
       {
         source: {
           node_id: modelLoaderNodeId,
@@ -155,6 +150,17 @@ export const buildLinearTextToImageGraph = (
           field: 'unet',
         },
       },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'clip',
+        },
+        destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      // Connect CLIP Skip to Conditioning
       {
         source: {
           node_id: CLIP_SKIP,
@@ -175,6 +181,7 @@ export const buildLinearTextToImageGraph = (
           field: 'clip',
         },
       },
+      // Connect everything to Denoise Latents
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
@@ -197,22 +204,23 @@ export const buildLinearTextToImageGraph = (
       },
       {
         source: {
-          node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
           node_id: NOISE,
           field: 'noise',
         },
         destination: {
           node_id: DENOISE_LATENTS,
           field: 'noise',
+        },
+      },
+      // Decode Denoised Latents To Image
+      {
+        source: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
         },
       },
     ],
@@ -250,11 +258,11 @@ export const buildLinearTextToImageGraph = (
     },
   });
 
-  // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
-
   // optionally add custom VAE
   addVAEToGraph(state, graph, modelLoaderNodeId);
+
+  // add LoRA support
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

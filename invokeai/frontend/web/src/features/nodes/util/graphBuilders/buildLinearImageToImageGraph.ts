@@ -138,6 +138,7 @@ export const buildLinearImageToImageGraph = (
       },
     },
     edges: [
+      // Connect Model Loader to UNet and CLIP Skip
       {
         source: {
           node_id: MAIN_MODEL_LOADER,
@@ -158,6 +159,7 @@ export const buildLinearImageToImageGraph = (
           field: 'clip',
         },
       },
+      // Connect CLIP Skip to Conditioning
       {
         source: {
           node_id: CLIP_SKIP,
@@ -178,34 +180,15 @@ export const buildLinearImageToImageGraph = (
           field: 'clip',
         },
       },
+      // Connect everything to Denoise Latents
       {
         source: {
-          node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'latents',
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
         },
         destination: {
           node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'noise',
+          field: 'positive_conditioning',
         },
       },
       {
@@ -220,12 +203,33 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
+          node_id: NOISE,
+          field: 'noise',
         },
         destination: {
           node_id: DENOISE_LATENTS,
-          field: 'positive_conditioning',
+          field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+      },
+      // Decode denoised latents to image
+      {
+        source: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
         },
       },
     ],
@@ -334,11 +338,11 @@ export const buildLinearImageToImageGraph = (
     },
   });
 
+  // optionally add custom VAE
+  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
+
   // add LoRA support
   addLoRAsToGraph(state, graph, DENOISE_LATENTS);
-
-  // optionally add custom VAE
-  addVAEToGraph(state, graph);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

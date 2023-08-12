@@ -75,6 +75,18 @@ export const buildCanvasImageToImageGraph = (
   const graph: NonNullableGraph = {
     id: IMAGE_TO_IMAGE_GRAPH,
     nodes: {
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
+        is_intermediate: true,
+        model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        is_intermediate: true,
+        skipped_layers: clipSkip,
+      },
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
@@ -93,17 +105,14 @@ export const buildCanvasImageToImageGraph = (
         is_intermediate: true,
         use_cpu,
       },
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+      [IMAGE_TO_LATENTS]: {
+        type: 'i2l',
+        id: IMAGE_TO_LATENTS,
         is_intermediate: true,
-        model,
-      },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        is_intermediate: true,
-        skipped_layers: clipSkip,
+        // must be set manually later, bc `fit` parameter may require a resize node inserted
+        // image: {
+        //   image_name: initialImage.image_name,
+        // },
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -115,15 +124,6 @@ export const buildCanvasImageToImageGraph = (
         denoising_start: 1 - strength,
         denoising_end: 1,
       },
-      [IMAGE_TO_LATENTS]: {
-        type: 'i2l',
-        id: IMAGE_TO_LATENTS,
-        is_intermediate: true,
-        // must be set manually later, bc `fit` parameter may require a resize node inserted
-        // image: {
-        //   image_name: initialImage.image_name,
-        // },
-      },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
@@ -131,6 +131,17 @@ export const buildCanvasImageToImageGraph = (
       },
     },
     edges: [
+      // Connect Model Loader to CLIP Skip and UNet
+      {
+        source: {
+          node_id: MAIN_MODEL_LOADER,
+          field: 'unet',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'unet',
+        },
+      },
       {
         source: {
           node_id: MAIN_MODEL_LOADER,
@@ -141,6 +152,7 @@ export const buildCanvasImageToImageGraph = (
           field: 'clip',
         },
       },
+      // Connect CLIP Skip To Conditioning
       {
         source: {
           node_id: CLIP_SKIP,
@@ -161,44 +173,15 @@ export const buildCanvasImageToImageGraph = (
           field: 'clip',
         },
       },
+      // Connect Everything To Denoise Latents
       {
         source: {
-          node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'latents',
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
         },
         destination: {
           node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'noise',
-        },
-      },
-      {
-        source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'unet',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'unet',
+          field: 'positive_conditioning',
         },
       },
       {
@@ -213,12 +196,33 @@ export const buildCanvasImageToImageGraph = (
       },
       {
         source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
+          node_id: NOISE,
+          field: 'noise',
         },
         destination: {
           node_id: DENOISE_LATENTS,
-          field: 'positive_conditioning',
+          field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+      },
+      // Decode the denoised latents to an image
+      {
+        source: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
         },
       },
     ],
@@ -328,7 +332,7 @@ export const buildCanvasImageToImageGraph = (
   addLoRAsToGraph(state, graph, DENOISE_LATENTS);
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph);
+  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

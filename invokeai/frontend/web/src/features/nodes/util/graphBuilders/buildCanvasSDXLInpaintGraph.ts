@@ -176,6 +176,7 @@ export const buildCanvasSDXLInpaintGraph = (
       },
     },
     edges: [
+      // Connect Model Loader to UNet and CLIP
       {
         source: {
           node_id: SDXL_MODEL_LOADER,
@@ -226,6 +227,7 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'clip2',
         },
       },
+      // Connect everything to Inpaint
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
@@ -276,6 +278,7 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'mask',
         },
       },
+      // Iterate
       {
         source: {
           node_id: RANGE_OF_SIZE,
@@ -296,6 +299,7 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'seed',
         },
       },
+      // Decode inpainted latents to image
       {
         source: {
           node_id: INPAINT,
@@ -306,6 +310,7 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'latents',
         },
       },
+      // Color Correct Inpainted Result
       {
         source: {
           node_id: LATENTS_TO_IMAGE,
@@ -316,6 +321,7 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'image',
         },
       },
+      // Paste them back on original image
       {
         source: {
           node_id: COLOR_CORRECT,

@@ -57,13 +57,17 @@ export const buildCanvasTextToImageGraph = (
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
+
   const isUsingOnnxModel = model.model_type === 'onnx';
+
   const modelLoaderNodeId = isUsingOnnxModel
     ? ONNX_MODEL_LOADER
     : MAIN_MODEL_LOADER;
+
   const modelLoaderNodeType = isUsingOnnxModel
     ? 'onnx_model_loader'
     : 'main_model_loader';
+
   const t2lNode: DenoiseLatentsInvocation | ONNXTextToLatentsInvocation =
     isUsingOnnxModel
       ? {
@@ -84,6 +88,7 @@ export const buildCanvasTextToImageGraph = (
           denoising_start: 0,
           denoising_end: 1,
         };
+
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -98,6 +103,18 @@ export const buildCanvasTextToImageGraph = (
   const graph: NonNullableGraph = {
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
+      [modelLoaderNodeId]: {
+        type: modelLoaderNodeType,
+        id: modelLoaderNodeId,
+        is_intermediate: true,
+        model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        is_intermediate: true,
+        skipped_layers: clipSkip,
+      },
       [POSITIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
         id: POSITIVE_CONDITIONING,
@@ -119,18 +136,6 @@ export const buildCanvasTextToImageGraph = (
         use_cpu,
       },
       [t2lNode.id]: t2lNode,
-      [modelLoaderNodeId]: {
-        type: modelLoaderNodeType,
-        id: modelLoaderNodeId,
-        is_intermediate: true,
-        model,
-      },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        is_intermediate: true,
-        skipped_layers: clipSkip,
-      },
       [LATENTS_TO_IMAGE]: {
         type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
         id: LATENTS_TO_IMAGE,
@@ -138,16 +143,49 @@ export const buildCanvasTextToImageGraph = (
       },
     },
     edges: [
+      // Connect Model Loader to UNet & CLIP Skip
       {
         source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
+          node_id: modelLoaderNodeId,
+          field: 'unet',
         },
         destination: {
           node_id: DENOISE_LATENTS,
-          field: 'negative_conditioning',
+          field: 'unet',
         },
       },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'clip',
+        },
+        destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      // Connect CLIP Skip to Conditioning
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      // Connect everything to Denoise Latents
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
@@ -160,52 +198,12 @@ export const buildCanvasTextToImageGraph = (
       },
       {
         source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip',
-        },
-        destination: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-        destination: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-        destination: {
           node_id: NEGATIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'unet',
+          field: 'conditioning',
         },
         destination: {
           node_id: DENOISE_LATENTS,
-          field: 'unet',
-        },
-      },
-      {
-        source: {
-          node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
+          field: 'negative_conditioning',
         },
       },
       {
@@ -216,6 +214,17 @@ export const buildCanvasTextToImageGraph = (
         destination: {
           node_id: DENOISE_LATENTS,
           field: 'noise',
+        },
+      },
+      // Decode denoised latents to image
+      {
+        source: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
         },
       },
     ],
@@ -253,11 +262,11 @@ export const buildCanvasTextToImageGraph = (
     },
   });
 
-  // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
-
   // optionally add custom VAE
   addVAEToGraph(state, graph, modelLoaderNodeId);
+
+  // add LoRA support
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

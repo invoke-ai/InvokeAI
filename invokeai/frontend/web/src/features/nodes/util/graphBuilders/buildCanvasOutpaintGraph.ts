@@ -104,17 +104,30 @@ export const buildCanvasOutpaintGraph = (
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
     nodes: {
-      [INPAINT]: {
-        type: 'denoise_latents',
-        id: INPAINT,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         is_intermediate: true,
-        steps: steps,
-        cfg_scale: cfg_scale,
-        scheduler: scheduler,
-        denoising_start: 1 - strength,
-        denoising_end: 1,
+        model,
       },
-      [infillNode.id]: infillNode,
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        is_intermediate: true,
+        skipped_layers: clipSkip,
+      },
+      [POSITIVE_CONDITIONING]: {
+        type: 'compel',
+        id: POSITIVE_CONDITIONING,
+        is_intermediate: true,
+        prompt: positivePrompt,
+      },
+      [NEGATIVE_CONDITIONING]: {
+        type: 'compel',
+        id: NEGATIVE_CONDITIONING,
+        is_intermediate: true,
+        prompt: negativePrompt,
+      },
       [MASK_FROM_ALPHA]: {
         type: 'tomask',
         id: MASK_FROM_ALPHA,
@@ -134,6 +147,7 @@ export const buildCanvasOutpaintGraph = (
         radius: maskBlur,
         blur_type: maskBlurMethod,
       },
+      [infillNode.id]: infillNode,
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
@@ -148,35 +162,21 @@ export const buildCanvasOutpaintGraph = (
         use_cpu,
         is_intermediate: true,
       },
-      [POSITIVE_CONDITIONING]: {
-        type: 'compel',
-        id: POSITIVE_CONDITIONING,
+      [INPAINT]: {
+        type: 'denoise_latents',
+        id: INPAINT,
         is_intermediate: true,
-        prompt: positivePrompt,
-      },
-      [NEGATIVE_CONDITIONING]: {
-        type: 'compel',
-        id: NEGATIVE_CONDITIONING,
-        is_intermediate: true,
-        prompt: negativePrompt,
-      },
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
-        is_intermediate: true,
-        model,
+        steps: steps,
+        cfg_scale: cfg_scale,
+        scheduler: scheduler,
+        denoising_start: 1 - strength,
+        denoising_end: 1,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
-      },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        is_intermediate: true,
-        skipped_layers: clipSkip,
       },
       [COLOR_CORRECT]: {
         type: 'color_correct',
@@ -204,6 +204,7 @@ export const buildCanvasOutpaintGraph = (
       },
     },
     edges: [
+      // Connect Model Loader To UNet & Clip Skip
       {
         source: {
           node_id: MAIN_MODEL_LOADER,
@@ -224,6 +225,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'clip',
         },
       },
+      // Connect CLIP Skip to Conditioning
       {
         source: {
           node_id: CLIP_SKIP,
@@ -244,36 +246,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'clip',
         },
       },
-      {
-        source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'negative_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'positive_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'noise',
-        },
-      },
+      // Connect Infill Result To Inpaint Image
       {
         source: {
           node_id: INPAINT_INFILL,
@@ -284,16 +257,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
       },
-      {
-        source: {
-          node_id: INPAINT_IMAGE,
-          field: 'latents',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'latents',
-        },
-      },
+      // Combine Mask from Init Image with User Painted Mask
       {
         source: {
           node_id: MASK_FROM_ALPHA,
@@ -314,6 +278,47 @@ export const buildCanvasOutpaintGraph = (
           field: 'mask',
         },
       },
+      // Plug Everything Into Inpaint Node
+      {
+        source: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'positive_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'negative_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: NOISE,
+          field: 'noise',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_IMAGE,
+          field: 'latents',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'latents',
+        },
+      },
       {
         source: {
           node_id: MASK_BLUR,
@@ -324,6 +329,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'mask',
         },
       },
+      // Iterate
       {
         source: {
           node_id: RANGE_OF_SIZE,
@@ -344,6 +350,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'seed',
         },
       },
+      // Decode the result from Inpaint
       {
         source: {
           node_id: INPAINT,
@@ -354,6 +361,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'latents',
         },
       },
+      // Color Correct The Inpainted Result
       {
         source: {
           node_id: INPAINT_INFILL,
@@ -366,16 +374,6 @@ export const buildCanvasOutpaintGraph = (
       },
       {
         source: {
-          node_id: MASK_BLUR,
-          field: 'mask',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      {
-        source: {
           node_id: LATENTS_TO_IMAGE,
           field: 'image',
         },
@@ -384,6 +382,17 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: MASK_BLUR,
+          field: 'mask',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'mask',
+        },
+      },
+      // Paste Everything Back
       {
         source: {
           node_id: INPAINT_INFILL,
@@ -396,16 +405,6 @@ export const buildCanvasOutpaintGraph = (
       },
       {
         source: {
-          node_id: MASK_BLUR,
-          field: 'mask',
-        },
-        destination: {
-          node_id: INPAINT_FINAL_IMAGE,
-          field: 'mask',
-        },
-      },
-      {
-        source: {
           node_id: COLOR_CORRECT,
           field: 'image',
         },
@@ -414,11 +413,18 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: MASK_BLUR,
+          field: 'mask',
+        },
+        destination: {
+          node_id: INPAINT_FINAL_IMAGE,
+          field: 'mask',
+        },
+      },
     ],
   };
-
-  // Add VAE
-  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
 
   // handle seed
   if (shouldRandomizeSeed) {
@@ -439,6 +445,9 @@ export const buildCanvasOutpaintGraph = (
     // User specified seed, so set the start of the range of size to the seed
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
   }
+
+  // Add VAE
+  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
 
   // add LoRA support
   addLoRAsToGraph(state, graph, INPAINT, MAIN_MODEL_LOADER);

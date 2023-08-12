@@ -111,17 +111,34 @@ export const buildCanvasSDXLOutpaintGraph = (
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
     nodes: {
-      [INPAINT]: {
-        type: 'denoise_latents',
-        id: INPAINT,
-        is_intermediate: true,
-        steps: steps,
-        cfg_scale: cfg_scale,
-        scheduler: scheduler,
-        denoising_start: 1 - strength,
-        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+      [SDXL_MODEL_LOADER]: {
+        type: 'sdxl_model_loader',
+        id: SDXL_MODEL_LOADER,
+        model,
+      },
+      [POSITIVE_CONDITIONING]: {
+        type: 'sdxl_compel_prompt',
+        id: POSITIVE_CONDITIONING,
+        prompt: positivePrompt,
+        style: shouldConcatSDXLStylePrompt
+          ? `${positivePrompt} ${positiveStylePrompt}`
+          : positiveStylePrompt,
+      },
+      [NEGATIVE_CONDITIONING]: {
+        type: 'sdxl_compel_prompt',
+        id: NEGATIVE_CONDITIONING,
+        prompt: negativePrompt,
+        style: shouldConcatSDXLStylePrompt
+          ? `${negativePrompt} ${negativeStylePrompt}`
+          : negativeStylePrompt,
       },
       [infillNode.id]: infillNode,
+      [INPAINT_IMAGE]: {
+        type: 'i2l',
+        id: INPAINT_IMAGE,
+        is_intermediate: true,
+        fp32: vaePrecision === 'fp32' ? true : false,
+      },
       [MASK_FROM_ALPHA]: {
         type: 'tomask',
         id: MASK_FROM_ALPHA,
@@ -141,12 +158,6 @@ export const buildCanvasSDXLOutpaintGraph = (
         radius: maskBlur,
         blur_type: maskBlurMethod,
       },
-      [INPAINT_IMAGE]: {
-        type: 'i2l',
-        id: INPAINT_IMAGE,
-        is_intermediate: true,
-        fp32: vaePrecision === 'fp32' ? true : false,
-      },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
@@ -155,26 +166,15 @@ export const buildCanvasSDXLOutpaintGraph = (
         use_cpu,
         is_intermediate: true,
       },
-      [POSITIVE_CONDITIONING]: {
-        type: 'sdxl_compel_prompt',
-        id: POSITIVE_CONDITIONING,
-        prompt: positivePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${positivePrompt} ${positiveStylePrompt}`
-          : positiveStylePrompt,
-      },
-      [NEGATIVE_CONDITIONING]: {
-        type: 'sdxl_compel_prompt',
-        id: NEGATIVE_CONDITIONING,
-        prompt: negativePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${negativePrompt} ${negativeStylePrompt}`
-          : negativeStylePrompt,
-      },
-      [SDXL_MODEL_LOADER]: {
-        type: 'sdxl_model_loader',
-        id: SDXL_MODEL_LOADER,
-        model,
+      [INPAINT]: {
+        type: 'denoise_latents',
+        id: INPAINT,
+        is_intermediate: true,
+        steps: steps,
+        cfg_scale: cfg_scale,
+        scheduler: scheduler,
+        denoising_start: 1 - strength,
+        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -208,6 +208,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
     },
     edges: [
+      // Connect Model Loader To UNet and CLIP
       {
         source: {
           node_id: SDXL_MODEL_LOADER,
@@ -258,36 +259,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'clip2',
         },
       },
-      {
-        source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'negative_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'positive_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'noise',
-        },
-      },
+      // Infill The Image
       {
         source: {
           node_id: INPAINT_INFILL,
@@ -298,16 +270,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
-      {
-        source: {
-          node_id: INPAINT_IMAGE,
-          field: 'latents',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'latents',
-        },
-      },
+      // Create mask from image alpha & merge with user painted mask
       {
         source: {
           node_id: MASK_FROM_ALPHA,
@@ -328,6 +291,47 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'mask',
         },
       },
+      // Connect Everything To Inpaint
+      {
+        source: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'positive_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'negative_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: NOISE,
+          field: 'noise',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_IMAGE,
+          field: 'latents',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'latents',
+        },
+      },
       {
         source: {
           node_id: MASK_BLUR,
@@ -338,6 +342,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'mask',
         },
       },
+      // Iterate
       {
         source: {
           node_id: RANGE_OF_SIZE,
@@ -358,6 +363,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'seed',
         },
       },
+      // Decode inpainted latents to image
       {
         source: {
           node_id: INPAINT,
@@ -368,6 +374,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'latents',
         },
       },
+      // Color Correct The Inpainted Result
       {
         source: {
           node_id: INPAINT_INFILL,
@@ -380,16 +387,6 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
       {
         source: {
-          node_id: MASK_BLUR,
-          field: 'mask',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      {
-        source: {
           node_id: LATENTS_TO_IMAGE,
           field: 'image',
         },
@@ -398,6 +395,17 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: MASK_BLUR,
+          field: 'mask',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'mask',
+        },
+      },
+      // Paste Back Outpainted Image on Original
       {
         source: {
           node_id: INPAINT_INFILL,
@@ -410,22 +418,22 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
       {
         source: {
-          node_id: MASK_BLUR,
-          field: 'mask',
-        },
-        destination: {
-          node_id: INPAINT_FINAL_IMAGE,
-          field: 'mask',
-        },
-      },
-      {
-        source: {
           node_id: COLOR_CORRECT,
           field: 'image',
         },
         destination: {
           node_id: INPAINT_FINAL_IMAGE,
           field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_BLUR,
+          field: 'mask',
+        },
+        destination: {
+          node_id: INPAINT_FINAL_IMAGE,
+          field: 'mask',
         },
       },
     ],

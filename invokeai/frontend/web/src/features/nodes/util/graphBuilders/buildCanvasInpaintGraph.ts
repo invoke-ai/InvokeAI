@@ -80,15 +80,29 @@ export const buildCanvasInpaintGraph = (
   const graph: NonNullableGraph = {
     id: INPAINT_GRAPH,
     nodes: {
-      [INPAINT]: {
-        type: 'denoise_latents',
-        id: INPAINT,
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
         is_intermediate: true,
-        steps: steps,
-        cfg_scale: cfg_scale,
-        scheduler: scheduler,
-        denoising_start: 1 - strength,
-        denoising_end: 1,
+        model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        is_intermediate: true,
+        skipped_layers: clipSkip,
+      },
+      [POSITIVE_CONDITIONING]: {
+        type: 'compel',
+        id: POSITIVE_CONDITIONING,
+        is_intermediate: true,
+        prompt: positivePrompt,
+      },
+      [NEGATIVE_CONDITIONING]: {
+        type: 'compel',
+        id: NEGATIVE_CONDITIONING,
+        is_intermediate: true,
+        prompt: negativePrompt,
       },
       [MASK_BLUR]: {
         type: 'mask_blur',
@@ -113,35 +127,21 @@ export const buildCanvasInpaintGraph = (
         use_cpu,
         is_intermediate: true,
       },
-      [POSITIVE_CONDITIONING]: {
-        type: 'compel',
-        id: POSITIVE_CONDITIONING,
+      [INPAINT]: {
+        type: 'denoise_latents',
+        id: INPAINT,
         is_intermediate: true,
-        prompt: positivePrompt,
-      },
-      [NEGATIVE_CONDITIONING]: {
-        type: 'compel',
-        id: NEGATIVE_CONDITIONING,
-        is_intermediate: true,
-        prompt: negativePrompt,
-      },
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
-        is_intermediate: true,
-        model,
+        steps: steps,
+        cfg_scale: cfg_scale,
+        scheduler: scheduler,
+        denoising_start: 1 - strength,
+        denoising_end: 1,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
-      },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        is_intermediate: true,
-        skipped_layers: clipSkip,
       },
       [COLOR_CORRECT]: {
         type: 'color_correct',
@@ -172,6 +172,7 @@ export const buildCanvasInpaintGraph = (
       },
     },
     edges: [
+      // Connect Model Loader to CLIP Skip and UNet
       {
         source: {
           node_id: MAIN_MODEL_LOADER,
@@ -192,6 +193,7 @@ export const buildCanvasInpaintGraph = (
           field: 'clip',
         },
       },
+      // Connect CLIP Skip to Conditioning
       {
         source: {
           node_id: CLIP_SKIP,
@@ -210,6 +212,17 @@ export const buildCanvasInpaintGraph = (
         destination: {
           node_id: NEGATIVE_CONDITIONING,
           field: 'clip',
+        },
+      },
+      // Connect Everything To Inpaint Node
+      {
+        source: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: INPAINT,
+          field: 'positive_conditioning',
         },
       },
       {
@@ -220,16 +233,6 @@ export const buildCanvasInpaintGraph = (
         destination: {
           node_id: INPAINT,
           field: 'negative_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: INPAINT,
-          field: 'positive_conditioning',
         },
       },
       {
@@ -262,6 +265,7 @@ export const buildCanvasInpaintGraph = (
           field: 'mask',
         },
       },
+      // Iterate
       {
         source: {
           node_id: RANGE_OF_SIZE,
@@ -282,6 +286,7 @@ export const buildCanvasInpaintGraph = (
           field: 'seed',
         },
       },
+      // Decode Inpainted Latents To Image
       {
         source: {
           node_id: INPAINT,
@@ -292,6 +297,7 @@ export const buildCanvasInpaintGraph = (
           field: 'latents',
         },
       },
+      // Color Correct The Inpainted Result
       {
         source: {
           node_id: LATENTS_TO_IMAGE,
@@ -299,6 +305,17 @@ export const buildCanvasInpaintGraph = (
         },
         destination: {
           node_id: COLOR_CORRECT,
+          field: 'image',
+        },
+      },
+      // Paste Back Onto Original Image
+      {
+        source: {
+          node_id: COLOR_CORRECT,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_FINAL_IMAGE,
           field: 'image',
         },
       },
@@ -312,21 +329,8 @@ export const buildCanvasInpaintGraph = (
           field: 'mask',
         },
       },
-      {
-        source: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-        destination: {
-          node_id: INPAINT_FINAL_IMAGE,
-          field: 'image',
-        },
-      },
     ],
   };
-
-  // Add VAE
-  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
 
   // handle seed
   if (shouldRandomizeSeed) {
@@ -347,6 +351,9 @@ export const buildCanvasInpaintGraph = (
     // User specified seed, so set the start of the range of size to the seed
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
   }
+
+  // Add VAE
+  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
 
   // add LoRA support
   addLoRAsToGraph(state, graph, INPAINT, MAIN_MODEL_LOADER);

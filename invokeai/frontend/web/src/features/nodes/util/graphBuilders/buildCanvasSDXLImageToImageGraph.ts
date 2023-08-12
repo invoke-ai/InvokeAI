@@ -110,6 +110,15 @@ export const buildCanvasSDXLImageToImageGraph = (
         is_intermediate: true,
         use_cpu,
       },
+      [IMAGE_TO_LATENTS]: {
+        type: 'i2l',
+        id: IMAGE_TO_LATENTS,
+        is_intermediate: true,
+        // must be set manually later, bc `fit` parameter may require a resize node inserted
+        // image: {
+        //   image_name: initialImage.image_name,
+        // },
+      },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: DENOISE_LATENTS,
@@ -122,15 +131,6 @@ export const buildCanvasSDXLImageToImageGraph = (
           : 1 - strength,
         denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
-      [IMAGE_TO_LATENTS]: {
-        type: 'i2l',
-        id: IMAGE_TO_LATENTS,
-        is_intermediate: true,
-        // must be set manually later, bc `fit` parameter may require a resize node inserted
-        // image: {
-        //   image_name: initialImage.image_name,
-        // },
-      },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
@@ -138,36 +138,7 @@ export const buildCanvasSDXLImageToImageGraph = (
       },
     },
     edges: [
-      {
-        source: {
-          node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'noise',
-        },
-      },
+      // Connect Model Loader To UNet & CLIP
       {
         source: {
           node_id: SDXL_MODEL_LOADER,
@@ -216,6 +187,17 @@ export const buildCanvasSDXLImageToImageGraph = (
         destination: {
           node_id: NEGATIVE_CONDITIONING,
           field: 'clip2',
+        },
+      },
+      // Connect Everything to Denoise Latents
+      {
+        source: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'positive_conditioning',
         },
       },
       {
@@ -230,12 +212,33 @@ export const buildCanvasSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
+          node_id: NOISE,
+          field: 'noise',
         },
         destination: {
           node_id: DENOISE_LATENTS,
-          field: 'positive_conditioning',
+          field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+      },
+      // Decode denoised latents to an image
+      {
+        source: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
         },
       },
     ],

@@ -111,6 +111,7 @@ export const buildLinearSDXLTextToImageGraph = (
       },
     },
     edges: [
+      // Connect Model Loader to UNet, VAE & CLIP
       {
         source: {
           node_id: SDXL_MODEL_LOADER,
@@ -171,6 +172,7 @@ export const buildLinearSDXLTextToImageGraph = (
           field: 'clip2',
         },
       },
+      // Connect everything to Denoise Latents
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
@@ -201,6 +203,7 @@ export const buildLinearSDXLTextToImageGraph = (
           field: 'noise',
         },
       },
+      // Decode Denoised Latents To Image
       {
         source: {
           node_id: DENOISE_LATENTS,

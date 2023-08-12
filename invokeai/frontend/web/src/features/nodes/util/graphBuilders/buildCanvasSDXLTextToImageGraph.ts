@@ -65,13 +65,17 @@ export const buildCanvasSDXLTextToImageGraph = (
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
+
   const isUsingOnnxModel = model.model_type === 'onnx';
+
   const modelLoaderNodeId = isUsingOnnxModel
     ? ONNX_MODEL_LOADER
     : SDXL_MODEL_LOADER;
+
   const modelLoaderNodeType = isUsingOnnxModel
     ? 'onnx_model_loader'
     : 'sdxl_model_loader';
+
   const t2lNode: DenoiseLatentsInvocation | ONNXTextToLatentsInvocation =
     isUsingOnnxModel
       ? {
@@ -106,6 +110,12 @@ export const buildCanvasSDXLTextToImageGraph = (
   const graph: NonNullableGraph = {
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
+      [modelLoaderNodeId]: {
+        type: modelLoaderNodeType,
+        id: modelLoaderNodeId,
+        is_intermediate: true,
+        model,
+      },
       [POSITIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
@@ -133,13 +143,6 @@ export const buildCanvasSDXLTextToImageGraph = (
         use_cpu,
       },
       [t2lNode.id]: t2lNode,
-      [modelLoaderNodeId]: {
-        type: modelLoaderNodeType,
-        id: modelLoaderNodeId,
-        is_intermediate: true,
-        model,
-      },
-
       [LATENTS_TO_IMAGE]: {
         type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
         id: LATENTS_TO_IMAGE,
@@ -147,6 +150,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       },
     },
     edges: [
+      // Connect Model Loader to UNet and CLIP
       {
         source: {
           node_id: modelLoaderNodeId,
@@ -195,6 +199,17 @@ export const buildCanvasSDXLTextToImageGraph = (
         destination: {
           node_id: NEGATIVE_CONDITIONING,
           field: 'clip2',
+        },
+      },
+      // Connect everything to Denoise Latents
+      {
+        source: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'positive_conditioning',
         },
       },
       {
@@ -209,14 +224,15 @@ export const buildCanvasSDXLTextToImageGraph = (
       },
       {
         source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
+          node_id: NOISE,
+          field: 'noise',
         },
         destination: {
           node_id: DENOISE_LATENTS,
-          field: 'positive_conditioning',
+          field: 'noise',
         },
       },
+      // Decode Denoised Latents To Image
       {
         source: {
           node_id: DENOISE_LATENTS,
@@ -225,16 +241,6 @@ export const buildCanvasSDXLTextToImageGraph = (
         destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'noise',
         },
       },
     ],

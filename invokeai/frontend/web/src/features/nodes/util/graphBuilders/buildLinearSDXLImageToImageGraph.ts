@@ -137,6 +137,7 @@ export const buildLinearSDXLImageToImageGraph = (
       },
     },
     edges: [
+      // Connect Model Loader to UNet, CLIP & VAE
       {
         source: {
           node_id: SDXL_MODEL_LOADER,
@@ -207,36 +208,7 @@ export const buildLinearSDXLImageToImageGraph = (
           field: 'clip2',
         },
       },
-      {
-        source: {
-          node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'noise',
-        },
-      },
+      // Connect everything to Denoise Latents
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
@@ -255,6 +227,37 @@ export const buildLinearSDXLImageToImageGraph = (
         destination: {
           node_id: DENOISE_LATENTS,
           field: 'negative_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: NOISE,
+          field: 'noise',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+      },
+      // Decode Denoised Latents To Image
+      {
+        source: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
         },
       },
     ],
