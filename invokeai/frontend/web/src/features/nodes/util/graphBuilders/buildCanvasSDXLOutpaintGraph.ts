@@ -15,10 +15,8 @@ import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
-  CANVAS_OUTPAINT_GRAPH,
   CANVAS_OUTPUT,
   COLOR_CORRECT,
-  INPAINT,
   INPAINT_IMAGE,
   INPAINT_INFILL,
   ITERATE,
@@ -31,6 +29,8 @@ import {
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
+  SDXL_CANVAS_OUTPAINT_GRAPH,
+  SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
 } from './constants';
 
@@ -109,7 +109,7 @@ export const buildCanvasSDXLOutpaintGraph = (
   }
 
   const graph: NonNullableGraph = {
-    id: CANVAS_OUTPAINT_GRAPH,
+    id: SDXL_CANVAS_OUTPAINT_GRAPH,
     nodes: {
       [SDXL_MODEL_LOADER]: {
         type: 'sdxl_model_loader',
@@ -166,9 +166,9 @@ export const buildCanvasSDXLOutpaintGraph = (
         use_cpu,
         is_intermediate: true,
       },
-      [INPAINT]: {
+      [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: INPAINT,
+        id: SDXL_DENOISE_LATENTS,
         is_intermediate: true,
         steps: steps,
         cfg_scale: cfg_scale,
@@ -215,7 +215,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'unet',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'unet',
         },
       },
@@ -298,7 +298,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -308,7 +308,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -318,7 +318,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -328,7 +328,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'latents',
         },
       },
@@ -338,7 +338,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'mask',
         },
       },
@@ -366,7 +366,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       // Decode inpainted latents to image
       {
         source: {
-          node_id: INPAINT,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -441,10 +441,10 @@ export const buildCanvasSDXLOutpaintGraph = (
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, INPAINT);
+    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
   }
 
-  // Add VAE
+  // optionally add custom VAE
   addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
 
   // handle seed
@@ -468,10 +468,10 @@ export const buildCanvasSDXLOutpaintGraph = (
   }
 
   // add LoRA support
-  addSDXLLoRAsToGraph(state, graph, INPAINT, SDXL_MODEL_LOADER);
+  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, INPAINT);
+  addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

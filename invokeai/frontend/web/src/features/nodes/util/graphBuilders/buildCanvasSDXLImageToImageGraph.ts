@@ -15,15 +15,15 @@ import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
-  CANVAS_IMAGE_TO_IMAGE_GRAPH,
   CANVAS_OUTPUT,
-  DENOISE_LATENTS,
   IMAGE_TO_LATENTS,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
+  SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
 } from './constants';
 
@@ -81,7 +81,7 @@ export const buildCanvasSDXLImageToImageGraph = (
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    id: CANVAS_IMAGE_TO_IMAGE_GRAPH,
+    id: SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
       [SDXL_MODEL_LOADER]: {
         type: 'sdxl_model_loader',
@@ -119,9 +119,9 @@ export const buildCanvasSDXLImageToImageGraph = (
         //   image_name: initialImage.image_name,
         // },
       },
-      [DENOISE_LATENTS]: {
+      [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: DENOISE_LATENTS,
+        id: SDXL_DENOISE_LATENTS,
         is_intermediate: true,
         cfg_scale,
         scheduler,
@@ -145,7 +145,7 @@ export const buildCanvasSDXLImageToImageGraph = (
           field: 'unet',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'unet',
         },
       },
@@ -196,7 +196,7 @@ export const buildCanvasSDXLImageToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -206,7 +206,7 @@ export const buildCanvasSDXLImageToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -216,7 +216,7 @@ export const buildCanvasSDXLImageToImageGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -226,30 +226,19 @@ export const buildCanvasSDXLImageToImageGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'latents',
         },
       },
       // Decode denoised latents to an image
       {
         source: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
           node_id: CANVAS_OUTPUT,
           field: 'latents',
-        },
-      },
-      // Canvas Output
-      {
-        source: {
-          node_id: CANVAS_OUTPUT,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'image',
         },
       },
     ],
@@ -356,11 +345,11 @@ export const buildCanvasSDXLImageToImageGraph = (
   });
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS);
+  addLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, DENOISE_LATENTS);
+    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
   }
 
   // optionally add custom VAE
@@ -370,7 +359,7 @@ export const buildCanvasSDXLImageToImageGraph = (
   addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+  addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

@@ -14,6 +14,12 @@ import {
   MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   ONNX_MODEL_LOADER,
+  SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
+  SDXL_CANVAS_INPAINT_GRAPH,
+  SDXL_CANVAS_OUTPAINT_GRAPH,
+  SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
+  SDXL_IMAGE_TO_IMAGE_GRAPH,
+  SDXL_TEXT_TO_IMAGE_GRAPH,
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
 } from './constants';
@@ -40,7 +46,12 @@ export const addVAEToGraph = (
   }
   const isOnnxModel = modelLoaderNodeId == ONNX_MODEL_LOADER;
 
-  if (graph.id === TEXT_TO_IMAGE_GRAPH || graph.id === IMAGE_TO_IMAGE_GRAPH) {
+  if (
+    graph.id === TEXT_TO_IMAGE_GRAPH ||
+    graph.id === IMAGE_TO_IMAGE_GRAPH ||
+    graph.id === SDXL_TEXT_TO_IMAGE_GRAPH ||
+    graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH
+  ) {
     graph.edges.push({
       source: {
         node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
@@ -55,7 +66,9 @@ export const addVAEToGraph = (
 
   if (
     graph.id === CANVAS_TEXT_TO_IMAGE_GRAPH ||
-    graph.id === CANVAS_IMAGE_TO_IMAGE_GRAPH
+    graph.id === CANVAS_IMAGE_TO_IMAGE_GRAPH ||
+    graph.id === SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH ||
+    graph.id == SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH
   ) {
     graph.edges.push({
       source: {
@@ -71,7 +84,9 @@ export const addVAEToGraph = (
 
   if (
     graph.id === IMAGE_TO_IMAGE_GRAPH ||
-    graph.id === CANVAS_IMAGE_TO_IMAGE_GRAPH
+    graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH ||
+    graph.id === CANVAS_IMAGE_TO_IMAGE_GRAPH ||
+    graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH
   ) {
     graph.edges.push({
       source: {
@@ -85,7 +100,12 @@ export const addVAEToGraph = (
     });
   }
 
-  if (graph.id === CANVAS_INPAINT_GRAPH || graph.id == CANVAS_OUTPAINT_GRAPH) {
+  if (
+    graph.id === CANVAS_INPAINT_GRAPH ||
+    graph.id === CANVAS_OUTPAINT_GRAPH ||
+    graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
+    graph.id === SDXL_CANVAS_OUTPAINT_GRAPH
+  ) {
     graph.edges.push(
       {
         source: {
