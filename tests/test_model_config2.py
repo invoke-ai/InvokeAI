@@ -49,8 +49,7 @@ def test_diffusers():
     assert config.model_format == "diffusers"
     assert config.base_model == "sd-2"
     assert config.model_variant == "inpaint"
-    assert config.vae == Path("/tmp/foobar/vae.pt")
-    assert isinstance(config.vae, Path)
+    assert config.vae == "/tmp/foobar/vae.pt"
 
 
 def test_invalid_diffusers():

@@ -148,7 +148,7 @@ class MainConfig(ModelConfigBase):
     """Model config for main models."""
 
     vae: Optional[str] = Field(None)
-    model_variant: ModelVariantType
+    model_variant: ModelVariantType = ModelVariantType.Normal
 
 
 class MainCheckpointConfig(CheckpointConfig, MainConfig):
