@@ -53,7 +53,6 @@ export const buildCanvasSDXLInpaintGraph = (
     scheduler,
     steps,
     img2imgStrength: strength,
-    shouldFitToWidthHeight,
     iterations,
     seed,
     shouldRandomizeSeed,
