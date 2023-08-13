@@ -20,9 +20,8 @@ Validation errors will raise an InvalidModelConfigException error.
 
 """
 from enum import Enum
-from pathlib import Path
 from pydantic import BaseModel, Field, Extra
-from typing import Optional, Literal, Union
+from typing import Optional, Literal, List, Union
 from pydantic.error_wrappers import ValidationError
 
 
@@ -100,7 +99,7 @@ class SchedulerPredictionType(str, Enum):
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
-    path: Path
+    path: str
     name: str
     base_model: BaseModelType
     model_type: ModelType
@@ -110,6 +109,7 @@ class ModelConfigBase(BaseModel):
     thumbnail_url: Optional[str] = Field(description="URL of thumbnail image")
     license_url: Optional[str] = Field(description="URL of license")
     source_url: Optional[str] = Field(description="Model download source")
+    tags: Optional[List[str]] = Field(description="Descriptive tags")
 
     class Config:
         """Pydantic configuration hint."""
@@ -123,7 +123,7 @@ class CheckpointConfig(ModelConfigBase):
     """Model config for checkpoint-style models."""
 
     model_format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
-    config: Path = Field(description="path to the checkpoint model config file")
+    config: str = Field(description="path to the checkpoint model config file")
 
 
 class DiffusersConfig(ModelConfigBase):
@@ -147,7 +147,7 @@ class TextualInversionConfig(ModelConfigBase):
 class MainConfig(ModelConfigBase):
     """Model config for main models."""
 
-    vae: Optional[Path] = Field(None)
+    vae: Optional[str] = Field(None)
     model_variant: ModelVariantType
 
 
