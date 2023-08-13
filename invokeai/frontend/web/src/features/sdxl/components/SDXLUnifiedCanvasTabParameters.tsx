@@ -5,16 +5,16 @@ import ParamMaskAdjustmentCollapse from 'features/parameters/components/Paramete
 import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
 import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/ParamNoiseCollapse';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
-import UnifiedCanvasCoreParameters from 'features/ui/components/tabs/UnifiedCanvas/UnifiedCanvasCoreParameters';
 import ParamSDXLPromptArea from './ParamSDXLPromptArea';
 import ParamSDXLRefinerCollapse from './ParamSDXLRefinerCollapse';
+import SDXLUnifiedCanvasTabCoreParameters from './SDXLUnifiedCanvasTabCoreParameters';
 
 export default function SDXLUnifiedCanvasTabParameters() {
   return (
     <>
       <ParamSDXLPromptArea />
       <ProcessButtons />
-      <UnifiedCanvasCoreParameters />
+      <SDXLUnifiedCanvasTabCoreParameters />
       <ParamSDXLRefinerCollapse />
       <ParamControlNetCollapse />
       <ParamLoraCollapse />
