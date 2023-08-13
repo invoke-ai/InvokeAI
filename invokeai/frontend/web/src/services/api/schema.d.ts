@@ -1209,10 +1209,15 @@ export type components = {
        */
       refiner_scheduler?: string;
       /**
-       * Refiner Aesthetic Store 
+       * Refiner Positive Aesthetic Store 
        * @description The aesthetic score used for the refiner
        */
-      refiner_aesthetic_store?: number;
+      refiner_positive_aesthetic_store?: number;
+      /**
+       * Refiner Negative Aesthetic Store 
+       * @description The aesthetic score used for the refiner
+       */
+      refiner_negative_aesthetic_store?: number;
       /**
        * Refiner Start 
        * @description The start value used for refiner denoising
@@ -3599,10 +3604,15 @@ export type components = {
        */
       refiner_scheduler?: string;
       /**
-       * Refiner Aesthetic Store 
+       * Refiner Positive Aesthetic Score 
        * @description The aesthetic score used for the refiner
        */
-      refiner_aesthetic_store?: number;
+      refiner_positive_aesthetic_score?: number;
+      /**
+       * Refiner Negative Aesthetic Score 
+       * @description The aesthetic score used for the refiner
+       */
+      refiner_negative_aesthetic_score?: number;
       /**
        * Refiner Start 
        * @description The start value used for refiner denoising
@@ -5781,11 +5791,11 @@ export type components = {
       image?: components["schemas"]["ImageField"];
     };
     /**
-     * StableDiffusionOnnxModelFormat 
+     * ControlNetModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion2ModelFormat 
      * @description An enumeration. 
@@ -5793,23 +5803,23 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
-     * ControlNetModelFormat 
+     * StableDiffusionXLModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionXLModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;

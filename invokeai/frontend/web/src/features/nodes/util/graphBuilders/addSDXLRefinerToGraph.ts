@@ -25,7 +25,8 @@ export const addSDXLRefinerToGraph = (
 ): void => {
   const {
     refinerModel,
-    refinerAestheticScore,
+    refinerPositiveAestheticScore,
+    refinerNegativeAestheticScore,
     refinerSteps,
     refinerScheduler,
     refinerCFGScale,
@@ -40,7 +41,10 @@ export const addSDXLRefinerToGraph = (
 
   if (metadataAccumulator) {
     metadataAccumulator.refiner_model = refinerModel;
-    metadataAccumulator.refiner_aesthetic_store = refinerAestheticScore;
+    metadataAccumulator.refiner_positive_aesthetic_score =
+      refinerPositiveAestheticScore;
+    metadataAccumulator.refiner_negative_aesthetic_score =
+      refinerNegativeAestheticScore;
     metadataAccumulator.refiner_cfg_scale = refinerCFGScale;
     metadataAccumulator.refiner_scheduler = refinerScheduler;
     metadataAccumulator.refiner_start = refinerStart;
@@ -74,13 +78,13 @@ export const addSDXLRefinerToGraph = (
     type: 'sdxl_refiner_compel_prompt',
     id: SDXL_REFINER_POSITIVE_CONDITIONING,
     style: craftedPositiveStylePrompt,
-    aesthetic_score: refinerAestheticScore,
+    aesthetic_score: refinerPositiveAestheticScore,
   };
   graph.nodes[SDXL_REFINER_NEGATIVE_CONDITIONING] = {
     type: 'sdxl_refiner_compel_prompt',
     id: SDXL_REFINER_NEGATIVE_CONDITIONING,
     style: craftedNegativeStylePrompt,
-    aesthetic_score: refinerAestheticScore,
+    aesthetic_score: refinerNegativeAestheticScore,
   };
   graph.nodes[SDXL_REFINER_DENOISE_LATENTS] = {
     type: 'denoise_latents',
