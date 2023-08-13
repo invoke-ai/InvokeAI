@@ -106,7 +106,7 @@ class ModelConfigBase(BaseModel):
     base_model: BaseModelType
     model_type: ModelType
     model_format: ModelFormat
-    hash: Optional[str] = Field(None)  # this may get added by the store
+    id: Optional[str] = Field(None)  # this may get added by the store
     description: Optional[str] = Field(None)
     author: Optional[str] = Field(description="Model author")
     thumbnail_url: Optional[str] = Field(description="URL of thumbnail image")

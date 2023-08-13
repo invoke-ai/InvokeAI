@@ -105,7 +105,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
         Can raise DuplicateModelException and InvalidModelConfig exceptions.
         """
         record = ModelConfigFactory.make_config(config)  # ensure it is a valid config obect
-        record.hash = key  # add the key used to store the object
+        record.id = key  # add the key used to store the object
         dict_fields = record.dict()  # and back to a dict with valid fields
         try:
             self._lock.acquire()

@@ -93,7 +93,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
         self._cursor.execute(
             """--sql
             CREATE TABLE IF NOT EXISTS model_config (
-                hash TEXT NOT NULL PRIMARY KEY,
+                id TEXT NOT NULL PRIMARY KEY,
                 -- These 4 fields are enums in python, unrestricted string here
                 base_model TEXT NOT NULL,
                 model_type TEXT NOT NULL,
@@ -113,11 +113,11 @@ class ModelConfigStoreSQL(ModelConfigStore):
         self._cursor.execute(
             """--sql
             CREATE TABLE IF NOT EXISTS model_tag (
-                hash TEXT NOT NULL,
+                id TEXT NOT NULL,
                 tag_id INTEGER NOT NULL,
-                FOREIGN KEY(hash) REFERENCES model_config(hash),
+                FOREIGN KEY(id) REFERENCES model_config(id),
                 FOREIGN KEY(tag_id) REFERENCES tags(tag_id),
-                UNIQUE(hash,tag_id)
+                UNIQUE(id,tag_id)
             );
             """
         )
@@ -140,7 +140,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
             ON model_config FOR EACH ROW
             BEGIN
                 UPDATE model_config SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                    WHERE hash = old.hash;
+                    WHERE id = old.id;
             END;
             """
         )
@@ -152,7 +152,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
             AFTER DELETE
             ON model_config
             BEGIN
-                DELETE from model_tag WHERE hash=old.hash;
+                DELETE from model_tag WHERE id=old.id;
             END;
             """
         )
@@ -168,14 +168,14 @@ class ModelConfigStoreSQL(ModelConfigStore):
         Can raise DuplicateModelException and InvalidModelConfig exceptions.
         """
         record = ModelConfigFactory.make_config(config)  # ensure it is a valid config obect.
-        record.hash = key  # add the unique storage key to object
+        record.id = key  # add the unique storage key to object
         json_serialized = json.dumps(record.dict())  # and turn it into a json string.
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
                 INSERT INTO model_config (
-                   hash,
+                   id,
                    base_model,
                    model_type,
                    model_name,
@@ -215,7 +215,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
         self._cursor.execute(
             """--sql
             DELETE FROM model_tag
-            WHERE hash=?;
+            WHERE id=?;
             """,
             (key,),
         )
@@ -245,7 +245,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
             self._cursor.execute(
                 """--sql
                 INSERT OR IGNORE INTO model_tag (
-                   hash,
+                   id,
                    tag_id
                   )
                 VALUES (?,?);
@@ -266,7 +266,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
             self._cursor.execute(
                 """--sql
                 DELETE FROM model_config
-                WHERE hash=?;
+                WHERE id=?;
                 """,
                 (key,),
             )
@@ -299,7 +299,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
                     model_name=?,
                     model_path=?,
                     config=?
-                WHERE hash=?;
+                WHERE id=?;
                 """,
                 (record.base_model, record.model_type, record.name, record.path, json_serialized, key),
             )
@@ -328,7 +328,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
             self._cursor.execute(
                 """--sql
                 SELECT config FROM model_config
-                WHERE hash=?;
+                WHERE id=?;
                 """,
                 (key,),
             )
@@ -352,7 +352,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
             self._cursor.execute(
                 """--sql
                 select count(*) FROM model_config
-                WHERE hash=?;
+                WHERE id=?;
                 """,
                 (key,),
             )
@@ -374,7 +374,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
             for tag in tags:
                 self._cursor.execute(
                     """--sql
-                    SELECT a.hash FROM model_tag AS a,
+                    SELECT a.id FROM model_tag AS a,
                                        tags AS b
                     WHERE a.tag_id=b.tag_id
                       AND b.tag_text=?;
@@ -387,7 +387,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
                 self._cursor.execute(
                     f"""--sql
                     SELECT config FROM model_config
-                    WHERE hash IN ({','.join('?' * len(matches))});
+                    WHERE id IN ({','.join('?' * len(matches))});
                     """,
                     tuple(matches),
                 )

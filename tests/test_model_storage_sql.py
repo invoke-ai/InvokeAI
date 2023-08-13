@@ -21,7 +21,7 @@ from invokeai.backend.model_management2.model_config import (
 @pytest.fixture
 def store(datadir) -> ModelConfigStore:
     InvokeAIAppConfig.get_config(root=datadir)
-    return ModelConfigStoreSQL(datadir / "configs" / "models.db")
+    return ModelConfigStoreSQL(datadir / "databases" / "models.db")
 
 
 def example_config() -> TextualInversionConfig:
@@ -120,7 +120,7 @@ def test_filter(store: ModelConfigStore):
     matches = store.search_by_type(model_type="vae")
     assert len(matches) == 1
     assert matches[0].name == "config3"
-    assert matches[0].hash == sha256("config3".encode("utf-8")).hexdigest()
+    assert matches[0].id == sha256("config3".encode("utf-8")).hexdigest()
 
     matches = store.search_by_tag(["sfw"])
     assert len(matches) == 3
