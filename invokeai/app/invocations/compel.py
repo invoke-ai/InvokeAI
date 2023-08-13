@@ -295,7 +295,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CompelOutput:
         c1, c1_pooled, ec1 = self.run_clip_compel(
-            context, self.clip, self.prompt, False, "lora_te1_", zero_on_empty=False
+            context, self.clip, self.prompt, False, "lora_te1_", zero_on_empty=True
         )
         if self.style.strip() == "":
             c2, c2_pooled, ec2 = self.run_clip_compel(
