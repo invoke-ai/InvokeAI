@@ -2,7 +2,10 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
+  ImageBlurInvocation,
   ImageDTO,
+  ImageToLatentsInvocation,
+  NoiseInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
 } from 'services/api/types';
@@ -16,9 +19,13 @@ import {
   CANVAS_OUTPUT,
   COLOR_CORRECT,
   INPAINT_IMAGE,
+  INPAINT_IMAGE_RESIZE_DOWN,
+  INPAINT_IMAGE_RESIZE_UP,
   ITERATE,
   LATENTS_TO_IMAGE,
   MASK_BLUR,
+  MASK_RESIZE_DOWN,
+  MASK_RESIZE_UP,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -114,20 +121,16 @@ export const buildCanvasSDXLInpaintGraph = (
         is_intermediate: true,
         radius: maskBlur,
         blur_type: maskBlurMethod,
-        image: canvasMaskImage,
       },
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
-        image: canvasInitImage,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
-        width,
-        height,
         use_cpu,
         is_intermediate: true,
       },
@@ -156,7 +159,7 @@ export const buildCanvasSDXLInpaintGraph = (
       [CANVAS_OUTPUT]: {
         type: 'img_paste',
         id: CANVAS_OUTPUT,
-        is_intermediate: true,
+        is_intermediate: !shouldAutoSave,
         base_image: canvasInitImage,
       },
       [RANGE_OF_SIZE]: {
@@ -309,7 +312,156 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'latents',
         },
       },
-      // Color Correct Inpainted Result
+    ],
+  };
+
+  // Handle Scale Before Processing
+  if (['auto', 'manual'].includes(boundingBoxScaleMethod)) {
+    const scaledWidth: number = scaledBoundingBoxDimensions.width;
+    const scaledHeight: number = scaledBoundingBoxDimensions.height;
+
+    // Add Scaling Nodes
+    graph.nodes[INPAINT_IMAGE_RESIZE_UP] = {
+      type: 'img_resize',
+      id: INPAINT_IMAGE_RESIZE_UP,
+      is_intermediate: true,
+      width: scaledWidth,
+      height: scaledHeight,
+      image: canvasInitImage,
+    };
+    graph.nodes[MASK_RESIZE_UP] = {
+      type: 'img_resize',
+      id: MASK_RESIZE_UP,
+      is_intermediate: true,
+      width: scaledWidth,
+      height: scaledHeight,
+      image: canvasMaskImage,
+    };
+    graph.nodes[INPAINT_IMAGE_RESIZE_DOWN] = {
+      type: 'img_resize',
+      id: INPAINT_IMAGE_RESIZE_DOWN,
+      is_intermediate: true,
+      width: width,
+      height: height,
+    };
+    graph.nodes[MASK_RESIZE_DOWN] = {
+      type: 'img_resize',
+      id: MASK_RESIZE_DOWN,
+      is_intermediate: true,
+      width: width,
+      height: height,
+    };
+
+    graph.nodes[NOISE] = {
+      ...(graph.nodes[NOISE] as NoiseInvocation),
+      width: scaledWidth,
+      height: scaledHeight,
+    };
+
+    // Connect Nodes
+    graph.edges.push(
+      // Scale Inpaint Image and Mask
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_IMAGE,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+      },
+      // Color Correct The Inpainted Result
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_IMAGE_RESIZE_DOWN,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_DOWN,
+          field: 'image',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+        destination: {
+          node_id: MASK_RESIZE_DOWN,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_RESIZE_DOWN,
+          field: 'image',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'mask',
+        },
+      },
+      // Paste Back Onto Original Image
+      {
+        source: {
+          node_id: COLOR_CORRECT,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_RESIZE_DOWN,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'mask',
+        },
+      }
+    );
+  } else {
+    // Add Images To Nodes
+    graph.nodes[NOISE] = {
+      ...(graph.nodes[NOISE] as NoiseInvocation),
+      width: width,
+      height: height,
+    };
+    graph.nodes[INPAINT_IMAGE] = {
+      ...(graph.nodes[INPAINT_IMAGE] as ImageToLatentsInvocation),
+      image: canvasInitImage,
+    };
+    graph.nodes[MASK_BLUR] = {
+      ...(graph.nodes[MASK_BLUR] as ImageBlurInvocation),
+      image: canvasMaskImage,
+    };
+
+    graph.edges.push(
+      // Color Correct The Inpainted Result
       {
         source: {
           node_id: LATENTS_TO_IMAGE,
@@ -330,7 +482,7 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'mask',
         },
       },
-      // Paste them back on original image
+      // Paste Back Onto Original Image
       {
         source: {
           node_id: COLOR_CORRECT,
@@ -350,19 +502,11 @@ export const buildCanvasSDXLInpaintGraph = (
           node_id: CANVAS_OUTPUT,
           field: 'mask',
         },
-      },
-    ],
-  };
-
-  // Add Refiner if enabled
-  if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
+      }
+    );
   }
 
-  // optionally add custom VAE
-  addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
-
-  // handle seed
+  // Handle Seed
   if (shouldRandomizeSeed) {
     // Random int node to generate the starting seed
     const randomIntNode: RandomIntInvocation = {
@@ -381,6 +525,14 @@ export const buildCanvasSDXLInpaintGraph = (
     // User specified seed, so set the start of the range of size to the seed
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
   }
+
+  // Add Refiner if enabled
+  if (shouldUseSDXLRefiner) {
+    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
+  }
+
+  // optionally add custom VAE
+  addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
 
   // add LoRA support
   addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);

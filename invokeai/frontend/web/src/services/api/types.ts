@@ -184,6 +184,15 @@ export type ImageNSFWBlurInvocation = TypeReq<
 export type ImageWatermarkInvocation = TypeReq<
   components['schemas']['ImageWatermarkInvocation']
 >;
+export type ImageBlurInvocation = TypeReq<
+  components['schemas']['ImageBlurInvocation']
+>;
+export type ColorCorrectInvocation = TypeReq<
+  components['schemas']['ColorCorrectInvocation']
+>;
+export type ImagePasteInvocation = TypeReq<
+  components['schemas']['ImagePasteInvocation']
+>;
 
 // ControlNet Nodes
 export type ControlNetInvocation = TypeReq<

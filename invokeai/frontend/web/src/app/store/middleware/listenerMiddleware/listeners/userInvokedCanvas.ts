@@ -123,7 +123,6 @@ export const addUserInvokedCanvasListener = () => {
       log.debug({ graph: parseify(graph) }, `Canvas graph built`);
 
       // currently this action is just listened to for logging
-      console.log(canvasGraphBuilt(graph));
       dispatch(canvasGraphBuilt(graph));
 
       // Create the session, store the request id

@@ -2,7 +2,10 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
+  ImageBlurInvocation,
   ImageDTO,
+  ImageToLatentsInvocation,
+  NoiseInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
 } from 'services/api/types';
@@ -16,12 +19,16 @@ import {
   CANVAS_OUTPUT,
   CLIP_SKIP,
   COLOR_CORRECT,
-  INPAINT,
+  DENOISE_LATENTS,
   INPAINT_IMAGE,
+  INPAINT_IMAGE_RESIZE_DOWN,
+  INPAINT_IMAGE_RESIZE_UP,
   ITERATE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   MASK_BLUR,
+  MASK_RESIZE_DOWN,
+  MASK_RESIZE_UP,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
@@ -108,7 +115,6 @@ export const buildCanvasInpaintGraph = (
         type: 'img_blur',
         id: MASK_BLUR,
         is_intermediate: true,
-        image: canvasMaskImage,
         radius: maskBlur,
         blur_type: maskBlurMethod,
       },
@@ -117,19 +123,16 @@ export const buildCanvasInpaintGraph = (
         id: INPAINT_IMAGE,
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
-        image: canvasInitImage,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
-        width,
-        height,
         use_cpu,
         is_intermediate: true,
       },
-      [INPAINT]: {
+      [DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: INPAINT,
+        id: DENOISE_LATENTS,
         is_intermediate: true,
         steps: steps,
         cfg_scale: cfg_scale,
@@ -152,7 +155,7 @@ export const buildCanvasInpaintGraph = (
       [CANVAS_OUTPUT]: {
         type: 'img_paste',
         id: CANVAS_OUTPUT,
-        is_intermediate: true,
+        is_intermediate: !shouldAutoSave,
         base_image: canvasInitImage,
       },
       [RANGE_OF_SIZE]: {
@@ -178,7 +181,7 @@ export const buildCanvasInpaintGraph = (
           field: 'unet',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: DENOISE_LATENTS,
           field: 'unet',
         },
       },
@@ -220,7 +223,7 @@ export const buildCanvasInpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -230,7 +233,7 @@ export const buildCanvasInpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -240,7 +243,7 @@ export const buildCanvasInpaintGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -250,7 +253,7 @@ export const buildCanvasInpaintGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: DENOISE_LATENTS,
           field: 'latents',
         },
       },
@@ -260,7 +263,7 @@ export const buildCanvasInpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: INPAINT,
+          node_id: DENOISE_LATENTS,
           field: 'mask',
         },
       },
@@ -288,7 +291,7 @@ export const buildCanvasInpaintGraph = (
       // Decode Inpainted Latents To Image
       {
         source: {
-          node_id: INPAINT,
+          node_id: DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -296,6 +299,155 @@ export const buildCanvasInpaintGraph = (
           field: 'latents',
         },
       },
+    ],
+  };
+
+  // Handle Scale Before Processing
+  if (['auto', 'manual'].includes(boundingBoxScaleMethod)) {
+    const scaledWidth: number = scaledBoundingBoxDimensions.width;
+    const scaledHeight: number = scaledBoundingBoxDimensions.height;
+
+    // Add Scaling Nodes
+    graph.nodes[INPAINT_IMAGE_RESIZE_UP] = {
+      type: 'img_resize',
+      id: INPAINT_IMAGE_RESIZE_UP,
+      is_intermediate: true,
+      width: scaledWidth,
+      height: scaledHeight,
+      image: canvasInitImage,
+    };
+    graph.nodes[MASK_RESIZE_UP] = {
+      type: 'img_resize',
+      id: MASK_RESIZE_UP,
+      is_intermediate: true,
+      width: scaledWidth,
+      height: scaledHeight,
+      image: canvasMaskImage,
+    };
+    graph.nodes[INPAINT_IMAGE_RESIZE_DOWN] = {
+      type: 'img_resize',
+      id: INPAINT_IMAGE_RESIZE_DOWN,
+      is_intermediate: true,
+      width: width,
+      height: height,
+    };
+    graph.nodes[MASK_RESIZE_DOWN] = {
+      type: 'img_resize',
+      id: MASK_RESIZE_DOWN,
+      is_intermediate: true,
+      width: width,
+      height: height,
+    };
+
+    graph.nodes[NOISE] = {
+      ...(graph.nodes[NOISE] as NoiseInvocation),
+      width: scaledWidth,
+      height: scaledHeight,
+    };
+
+    // Connect Nodes
+    graph.edges.push(
+      // Scale Inpaint Image and Mask
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_IMAGE,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+      },
+      // Color Correct The Inpainted Result
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_IMAGE_RESIZE_DOWN,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_DOWN,
+          field: 'image',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+        destination: {
+          node_id: MASK_RESIZE_DOWN,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_RESIZE_DOWN,
+          field: 'image',
+        },
+        destination: {
+          node_id: COLOR_CORRECT,
+          field: 'mask',
+        },
+      },
+      // Paste Back Onto Original Image
+      {
+        source: {
+          node_id: COLOR_CORRECT,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_RESIZE_DOWN,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'mask',
+        },
+      }
+    );
+  } else {
+    // Add Images To Nodes
+    graph.nodes[NOISE] = {
+      ...(graph.nodes[NOISE] as NoiseInvocation),
+      width: width,
+      height: height,
+    };
+    graph.nodes[INPAINT_IMAGE] = {
+      ...(graph.nodes[INPAINT_IMAGE] as ImageToLatentsInvocation),
+      image: canvasInitImage,
+    };
+    graph.nodes[MASK_BLUR] = {
+      ...(graph.nodes[MASK_BLUR] as ImageBlurInvocation),
+      image: canvasMaskImage,
+    };
+
+    graph.edges.push(
       // Color Correct The Inpainted Result
       {
         source: {
@@ -337,11 +489,11 @@ export const buildCanvasInpaintGraph = (
           node_id: CANVAS_OUTPUT,
           field: 'mask',
         },
-      },
-    ],
-  };
+      }
+    );
+  }
 
-  // handle seed
+  // Handle Seed
   if (shouldRandomizeSeed) {
     // Random int node to generate the starting seed
     const randomIntNode: RandomIntInvocation = {
@@ -365,10 +517,10 @@ export const buildCanvasInpaintGraph = (
   addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, INPAINT, MAIN_MODEL_LOADER);
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS, MAIN_MODEL_LOADER);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, INPAINT);
+  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
