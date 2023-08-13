@@ -35,6 +35,7 @@ stats.html
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+.vite
 
 # Yalc
 .yalc

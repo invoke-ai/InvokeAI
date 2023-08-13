@@ -34,7 +34,7 @@ class ModelConfigStore(ABC):
         :param config: Model configuration record, either a dict with the
          required fields or a ModelConfigBase instance.
 
-        Can raise a DuplicateModelException error.
+        Can raise DuplicateModelException and InvalidModelConfig exceptions.
         """
         pass
 
@@ -70,3 +70,13 @@ class ModelConfigStore(ABC):
         Exceptions: UnknownModelException
         """
         pass
+
+    @abstractmethod
+    def exists(self, key: str) -> bool:
+        """
+        Return True if a model with the indicated key exists in the databse.
+
+        :param key: Unique key for the model to be deleted
+        """
+        pass
+
