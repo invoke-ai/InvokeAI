@@ -775,7 +775,7 @@ def main():
 
     if not config.model_conf_path.exists():
         logger.info("Your InvokeAI root directory is not set up. Calling invokeai-configure.")
-        from invokeai.frontend.install import invokeai_configure
+        from invokeai.frontend.install.invokeai_configure import invokeai_configure
 
         invokeai_configure()
         sys.exit(0)
