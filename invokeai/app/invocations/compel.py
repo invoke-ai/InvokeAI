@@ -294,11 +294,17 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CompelOutput:
-        c1, c1_pooled, ec1 = self.run_clip_compel(context, self.clip, self.prompt, False, "lora_te1_", zero_on_empty=False)
+        c1, c1_pooled, ec1 = self.run_clip_compel(
+            context, self.clip, self.prompt, False, "lora_te1_", zero_on_empty=False
+        )
         if self.style.strip() == "":
-            c2, c2_pooled, ec2 = self.run_clip_compel(context, self.clip2, self.prompt, True, "lora_te2_", zero_on_empty=True)
+            c2, c2_pooled, ec2 = self.run_clip_compel(
+                context, self.clip2, self.prompt, True, "lora_te2_", zero_on_empty=True
+            )
         else:
-            c2, c2_pooled, ec2 = self.run_clip_compel(context, self.clip2, self.style, True, "lora_te2_", zero_on_empty=True)
+            c2, c2_pooled, ec2 = self.run_clip_compel(
+                context, self.clip2, self.style, True, "lora_te2_", zero_on_empty=True
+            )
 
         original_size = (self.original_height, self.original_width)
         crop_coords = (self.crop_top, self.crop_left)

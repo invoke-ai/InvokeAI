@@ -320,7 +320,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     def init_scheduler(self, scheduler, device, steps, denoising_start, denoising_end):
         if scheduler.config.get("cpu_only", False):
             device = torch.device("cpu")
-        
+
         num_inference_steps = steps
         scheduler.set_timesteps(num_inference_steps, device=device)
         timesteps = scheduler.timesteps
@@ -344,7 +344,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         # calculate step count based on scheduler order
         num_inference_steps = len(timesteps)
         if scheduler.order == 2:
-            num_inference_steps += (num_inference_steps % 2)
+            num_inference_steps += num_inference_steps % 2
             num_inference_steps = num_inference_steps // 2
 
         return num_inference_steps, timesteps, init_timestep

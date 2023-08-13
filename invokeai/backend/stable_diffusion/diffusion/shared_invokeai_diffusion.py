@@ -202,15 +202,21 @@ class InvokeAIDiffuserComponent:
                 else:
                     if type(conditioning_data.text_embeddings) is SDXLConditioningInfo:
                         added_cond_kwargs = {
-                            "text_embeds": torch.cat([
-                                # TODO: how to pad? just by zeros? or even truncate?
-                                conditioning_data.unconditioned_embeddings.pooled_embeds,
-                                conditioning_data.text_embeddings.pooled_embeds,
-                            ], dim=0),
-                            "time_ids": torch.cat([
-                                conditioning_data.unconditioned_embeddings.add_time_ids,
-                                conditioning_data.text_embeddings.add_time_ids,
-                            ], dim=0),
+                            "text_embeds": torch.cat(
+                                [
+                                    # TODO: how to pad? just by zeros? or even truncate?
+                                    conditioning_data.unconditioned_embeddings.pooled_embeds,
+                                    conditioning_data.text_embeddings.pooled_embeds,
+                                ],
+                                dim=0,
+                            ),
+                            "time_ids": torch.cat(
+                                [
+                                    conditioning_data.unconditioned_embeddings.add_time_ids,
+                                    conditioning_data.text_embeddings.add_time_ids,
+                                ],
+                                dim=0,
+                            ),
                         }
                     (
                         encoder_hidden_states,
@@ -260,7 +266,7 @@ class InvokeAIDiffuserComponent:
         self,
         sample: torch.Tensor,
         timestep: torch.Tensor,
-        conditioning_data, # TODO: type
+        conditioning_data,  # TODO: type
         step_index: int,
         total_step_count: int,
         **kwargs,
@@ -380,20 +386,25 @@ class InvokeAIDiffuserComponent:
         added_cond_kwargs = None
         if type(conditioning_data.text_embeddings) is SDXLConditioningInfo:
             added_cond_kwargs = {
-                "text_embeds": torch.cat([
-                    # TODO: how to pad? just by zeros? or even truncate?
-                    conditioning_data.unconditioned_embeddings.pooled_embeds,
-                    conditioning_data.text_embeddings.pooled_embeds,
-                ], dim=0),
-                "time_ids": torch.cat([
-                    conditioning_data.unconditioned_embeddings.add_time_ids,
-                    conditioning_data.text_embeddings.add_time_ids,
-                ], dim=0),
+                "text_embeds": torch.cat(
+                    [
+                        # TODO: how to pad? just by zeros? or even truncate?
+                        conditioning_data.unconditioned_embeddings.pooled_embeds,
+                        conditioning_data.text_embeddings.pooled_embeds,
+                    ],
+                    dim=0,
+                ),
+                "time_ids": torch.cat(
+                    [
+                        conditioning_data.unconditioned_embeddings.add_time_ids,
+                        conditioning_data.text_embeddings.add_time_ids,
+                    ],
+                    dim=0,
+                ),
             }
 
         both_conditionings, encoder_attention_mask = self._concat_conditionings_for_batch(
-            conditioning_data.unconditioned_embeddings.embeds,
-            conditioning_data.text_embeddings.embeds
+            conditioning_data.unconditioned_embeddings.embeds, conditioning_data.text_embeddings.embeds
         )
         both_results = self.model_forward_callback(
             x_twice,

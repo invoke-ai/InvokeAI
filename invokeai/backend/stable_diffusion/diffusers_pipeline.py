@@ -202,8 +202,8 @@ class ControlNetData:
 
 @dataclass
 class ConditioningData:
-    unconditioned_embeddings: Any # TODO: type
-    text_embeddings: Any # TODO: type
+    unconditioned_embeddings: Any  # TODO: type
+    text_embeddings: Any  # TODO: type
     guidance_scale: Union[float, List[float]]
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
@@ -389,19 +389,17 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         batched_t = init_timestep.repeat(batch_size)
 
         if noise is not None:
-            #latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
+            # latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
         if mask is not None:
             if is_inpainting_model(self.unet):
                 # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
                 # (that's why there's a mask!) but it seems to really want that blanked out.
-                #masked_latents = latents * torch.where(mask < 0.5, 1, 0) TODO: inpaint/outpaint/infill
+                # masked_latents = latents * torch.where(mask < 0.5, 1, 0) TODO: inpaint/outpaint/infill
 
                 # TODO: we should probably pass this in so we don't have to try/finally around setting it.
-                self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(
-                    self._unet_forward, mask, orig_latents
-                )
+                self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(self._unet_forward, mask, orig_latents)
             else:
                 # if no noise provided, noisify unmasked area based on seed(or 0 as fallback)
                 if noise is None:
@@ -413,7 +411,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     ).to(device=orig_latents.device, dtype=orig_latents.dtype)
 
                     latents = self.scheduler.add_noise(latents, noise, batched_t)
-                    latents = torch.lerp(orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype))
+                    latents = torch.lerp(
+                        orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
+                    )
 
                 additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise))
 
@@ -549,11 +549,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         uc_noise_pred, c_noise_pred = self.invokeai_diffuser.do_unet_step(
             sample=latent_model_input,
-            timestep=t, # TODO: debug how handled batched and non batched timesteps
+            timestep=t,  # TODO: debug how handled batched and non batched timesteps
             step_index=step_index,
             total_step_count=total_step_count,
             conditioning_data=conditioning_data,
-
             # extra:
             down_block_additional_residuals=controlnet_down_block_samples,  # from controlnet(s)
             mid_block_additional_residual=controlnet_mid_block_sample,  # from controlnet(s)
