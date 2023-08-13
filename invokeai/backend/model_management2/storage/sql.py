@@ -4,7 +4,7 @@ Implementation of ModelConfigStore using a SQLite3 database
 
 Typical usage:
 
-  from invokeai.backend.model_management2.storage.yaml import ModelConfigStoreYAML
+  from invokeai.backend.model_management2.storage.yaml import ModelConfigStoreSQL
   store = ModelConfigStoreYAML("./configs/models.yaml")
   config = dict(
         path='/tmp/pokemon.bin',
@@ -13,9 +13,10 @@ Typical usage:
         model_type='embedding',
         model_format='embedding_file',
         author='Anonymous',
+        tags=['sfw','cartoon']
      )
 
-   # adding
+   # adding - the key becomes the model's "id" field
    store.add_model('key1', config)
 
    # updating
@@ -29,9 +30,14 @@ Typical usage:
    # fetching config
    new_config = store.get_model('key1')
    print(new_config.name, new_config.base_model)
+   assert new_config.id == 'key1'
 
   # deleting
   store.del_model('key1')
+
+  # searching
+  configs = store.search_by_tag({'sfw','oss license'})
+  configs = store.search_by_type(base_model='sd-2', model_type='main')
 """
 
 import threading
