@@ -61,7 +61,7 @@ export const initialConfigState: AppConfig = {
     },
     img2imgStrength: {
       initial: 0.7,
-      min: 0.01,
+      min: 0,
       sliderMax: 1,
       inputMax: 1,
       fineStep: 0.01,
