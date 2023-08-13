@@ -35,6 +35,7 @@ import {
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
 } from './constants';
+import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -63,13 +64,8 @@ export const buildCanvasSDXLInpaintGraph = (
     maskBlurMethod,
   } = state.generation;
 
-  const {
-    positiveStylePrompt,
-    negativeStylePrompt,
-    shouldConcatSDXLStylePrompt,
-    shouldUseSDXLRefiner,
-    refinerStart,
-  } = state.sdxl;
+  const { shouldUseSDXLRefiner, refinerStart, shouldConcatSDXLStylePrompt } =
+    state.sdxl;
 
   if (!model) {
     log.error('No model found in state');
@@ -90,6 +86,10 @@ export const buildCanvasSDXLInpaintGraph = (
     ? shouldUseCpuNoise
     : shouldUseCpuNoise;
 
+  // Construct Style Prompt
+  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
+    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+
   const graph: NonNullableGraph = {
     id: SDXL_CANVAS_INPAINT_GRAPH,
     nodes: {
@@ -102,17 +102,13 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${positivePrompt} ${positiveStylePrompt}`
-          : positiveStylePrompt,
+        style: craftedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${negativePrompt} ${negativeStylePrompt}`
-          : negativeStylePrompt,
+        style: craftedNegativeStylePrompt,
       },
       [MASK_BLUR]: {
         type: 'img_blur',

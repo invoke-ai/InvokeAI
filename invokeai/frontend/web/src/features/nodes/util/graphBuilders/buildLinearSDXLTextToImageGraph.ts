@@ -19,6 +19,7 @@ import {
   SDXL_MODEL_LOADER,
   SDXL_TEXT_TO_IMAGE_GRAPH,
 } from './constants';
+import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
 export const buildLinearSDXLTextToImageGraph = (
   state: RootState
@@ -42,8 +43,8 @@ export const buildLinearSDXLTextToImageGraph = (
   const {
     positiveStylePrompt,
     negativeStylePrompt,
-    shouldConcatSDXLStylePrompt,
     shouldUseSDXLRefiner,
+    shouldConcatSDXLStylePrompt,
     refinerStart,
   } = state.sdxl;
 
@@ -55,6 +56,10 @@ export const buildLinearSDXLTextToImageGraph = (
     log.error('No model found in state');
     throw new Error('No model found in state');
   }
+
+  // Construct Style Prompt
+  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
+    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -78,17 +83,13 @@ export const buildLinearSDXLTextToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${positivePrompt} ${positiveStylePrompt}`
-          : positiveStylePrompt,
+        style: craftedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${negativePrompt} ${negativeStylePrompt}`
-          : negativeStylePrompt,
+        style: craftedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',

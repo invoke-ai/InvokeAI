@@ -24,6 +24,7 @@ import {
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
 } from './constants';
+import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
@@ -50,13 +51,8 @@ export const buildCanvasSDXLTextToImageGraph = (
 
   const { shouldAutoSave } = state.canvas;
 
-  const {
-    positiveStylePrompt,
-    negativeStylePrompt,
-    shouldConcatSDXLStylePrompt,
-    shouldUseSDXLRefiner,
-    refinerStart,
-  } = state.sdxl;
+  const { shouldUseSDXLRefiner, refinerStart, shouldConcatSDXLStylePrompt } =
+    state.sdxl;
 
   if (!model) {
     log.error('No model found in state');
@@ -97,6 +93,11 @@ export const buildCanvasSDXLTextToImageGraph = (
           denoising_start: 0,
           denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
         };
+
+  // Construct Style Prompt
+  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
+    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -122,18 +123,14 @@ export const buildCanvasSDXLTextToImageGraph = (
         id: POSITIVE_CONDITIONING,
         is_intermediate: true,
         prompt: positivePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${positivePrompt} ${positiveStylePrompt}`
-          : positiveStylePrompt,
+        style: craftedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: isUsingOnnxModel ? 'prompt_onnx' : 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         is_intermediate: true,
         prompt: negativePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${negativePrompt} ${negativeStylePrompt}`
-          : negativeStylePrompt,
+        style: craftedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',

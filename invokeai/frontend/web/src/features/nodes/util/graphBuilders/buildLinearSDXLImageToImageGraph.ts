@@ -25,6 +25,7 @@ import {
   SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_MODEL_LOADER,
 } from './constants';
+import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Image to Image tab graph.
@@ -82,6 +83,10 @@ export const buildLinearSDXLImageToImageGraph = (
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
 
+  // Construct Style Prompt
+  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
+    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
     id: SDXL_IMAGE_TO_IMAGE_GRAPH,
@@ -95,17 +100,13 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${positivePrompt} ${positiveStylePrompt}`
-          : positiveStylePrompt,
+        style: craftedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${negativePrompt} ${negativeStylePrompt}`
-          : negativeStylePrompt,
+        style: craftedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',

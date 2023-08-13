@@ -16,18 +16,16 @@ import {
   SDXL_REFINER_NEGATIVE_CONDITIONING,
   SDXL_REFINER_POSITIVE_CONDITIONING,
 } from './constants';
+import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
 export const addSDXLRefinerToGraph = (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string
 ): void => {
-  const { positivePrompt, negativePrompt } = state.generation;
   const {
     refinerModel,
     refinerAestheticScore,
-    positiveStylePrompt,
-    negativeStylePrompt,
     refinerSteps,
     refinerScheduler,
     refinerCFGScale,
@@ -48,6 +46,10 @@ export const addSDXLRefinerToGraph = (
     metadataAccumulator.refiner_start = refinerStart;
     metadataAccumulator.refiner_steps = refinerSteps;
   }
+
+  // Construct Style Prompt
+  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
+    craftSDXLStylePrompt(state, true);
 
   // Unplug SDXL Latents Generation To Latents To Image
   graph.edges = graph.edges.filter(
@@ -71,13 +73,13 @@ export const addSDXLRefinerToGraph = (
   graph.nodes[SDXL_REFINER_POSITIVE_CONDITIONING] = {
     type: 'sdxl_refiner_compel_prompt',
     id: SDXL_REFINER_POSITIVE_CONDITIONING,
-    style: `${positivePrompt} ${positiveStylePrompt}`,
+    style: craftedPositiveStylePrompt,
     aesthetic_score: refinerAestheticScore,
   };
   graph.nodes[SDXL_REFINER_NEGATIVE_CONDITIONING] = {
     type: 'sdxl_refiner_compel_prompt',
     id: SDXL_REFINER_NEGATIVE_CONDITIONING,
-    style: `${negativePrompt} ${negativeStylePrompt}`,
+    style: craftedNegativeStylePrompt,
     aesthetic_score: refinerAestheticScore,
   };
   graph.nodes[SDXL_REFINER_DENOISE_LATENTS] = {

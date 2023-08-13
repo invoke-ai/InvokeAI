@@ -26,6 +26,7 @@ import {
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
 } from './constants';
+import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Canvas tab's Image to Image graph.
@@ -49,12 +50,10 @@ export const buildCanvasSDXLImageToImageGraph = (
   } = state.generation;
 
   const {
-    positiveStylePrompt,
-    negativeStylePrompt,
-    shouldConcatSDXLStylePrompt,
     shouldUseSDXLRefiner,
     refinerStart,
     sdxlImg2ImgDenoisingStrength: strength,
+    shouldConcatSDXLStylePrompt,
   } = state.sdxl;
 
   // The bounding box determines width and height, not the width and height params
@@ -70,6 +69,10 @@ export const buildCanvasSDXLImageToImageGraph = (
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
+
+  // Construct Style Prompt
+  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
+    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -93,17 +96,13 @@ export const buildCanvasSDXLImageToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${positivePrompt} ${positiveStylePrompt}`
-          : positiveStylePrompt,
+        style: craftedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${negativePrompt} ${negativeStylePrompt}`
-          : negativeStylePrompt,
+        style: craftedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
