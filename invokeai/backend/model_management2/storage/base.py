@@ -79,4 +79,3 @@ class ModelConfigStore(ABC):
         :param key: Unique key for the model to be deleted
         """
         pass
-

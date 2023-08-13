@@ -1,5 +1,38 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
-"""Implementation of ModelConfigStore using a YAML file."""
+"""
+Implementation of ModelConfigStore using a YAML file.
+
+Typical usage:
+
+  from invokeai.backend.model_management2.storage.yaml import ModelConfigStoreYAML
+  store = ModelConfigStoreYAML("./configs/models.yaml")
+  config = dict(
+        path='/tmp/pokemon.bin',
+        name='old name',
+        base_model='sd-1',
+        model_type='embedding',
+        model_format='embedding_file',
+        author='Anonymous',
+     )
+
+   # adding
+   store.add_model('key1', config)
+
+   # updating
+   config.name='new name'
+   store.update_model('key1', config)
+
+   # checking for existence
+   if store.exists('key1'):
+      print("yes")
+
+   # fetching config
+   new_config = store.get_model('key1')
+   print(new_config.name, new_config.base_model)
+
+  # deleting
+  store.del_model('key1')
+"""
 
 import threading
 import yaml
@@ -33,7 +66,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
     def __init__(self, config_file: Path):
         """Initialize ModelConfigStore object with a .yaml file."""
         super().__init__()
-        self._filename = Path(config_file)
+        self._filename = Path(config_file).absolute()  # don't let chdir mess us up!
         self._lock = threading.RLock()
         if not self._filename.exists():
             self._initialize_yaml()
@@ -51,7 +84,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
     def _commit(self):
         try:
             self._lock.acquire()
-            newfile = Path(str(self._filename)+'.new')
+            newfile = Path(str(self._filename) + ".new")
             yaml_str = OmegaConf.to_yaml(self._config)
             with open(newfile, "w", encoding="utf-8") as outfile:
                 outfile.write(yaml_str)
