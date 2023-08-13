@@ -6,7 +6,7 @@ import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import { setMaskBlurMethod } from 'features/parameters/store/generationSlice';
 import { useTranslation } from 'react-i18next';
 
-export type MaskBlurMethods = 'box' | 'gaussian';
+type MaskBlurMethods = 'box' | 'gaussian';
 
 const maskBlurMethods: SelectItem[] = [
   { label: 'Box Blur', value: 'box' },

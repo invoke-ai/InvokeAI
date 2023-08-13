@@ -4,12 +4,13 @@ import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
-import { MaskBlurMethods } from '../components/Parameters/Canvas/MaskAdjustment/ParamMaskBlurMethod';
+
 import { clipSkipMap } from '../types/constants';
 import {
   CfgScaleParam,
   HeightParam,
   MainModelParam,
+  MaskBlurMethodParam,
   NegativePromptParam,
   OnnxModelParam,
   PositivePromptParam,
@@ -35,7 +36,7 @@ export interface GenerationState {
   negativePrompt: NegativePromptParam;
   scheduler: SchedulerParam;
   maskBlur: number;
-  maskBlurMethod: MaskBlurMethods;
+  maskBlurMethod: MaskBlurMethodParam;
   seed: SeedParam;
   seedWeights: string;
   shouldFitToWidthHeight: boolean;
@@ -196,7 +197,7 @@ export const generationSlice = createSlice({
     setMaskBlur: (state, action: PayloadAction<number>) => {
       state.maskBlur = action.payload;
     },
-    setMaskBlurMethod: (state, action: PayloadAction<MaskBlurMethods>) => {
+    setMaskBlurMethod: (state, action: PayloadAction<MaskBlurMethodParam>) => {
       state.maskBlurMethod = action.payload;
     },
     setTileSize: (state, action: PayloadAction<number>) => {

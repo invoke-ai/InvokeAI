@@ -385,6 +385,21 @@ export const isValidSDXLRefinerStart = (
   val: unknown
 ): val is SDXLRefinerStartParam => zSDXLRefinerstart.safeParse(val).success;
 
+/**
+ * Zod schema for a mask blur method parameter
+ */
+export const zMaskBlurMethod = z.enum(['box', 'gaussian']);
+/**
+ * Type alias for mask blur method parameter, inferred from its zod schema
+ */
+export type MaskBlurMethodParam = z.infer<typeof zMaskBlurMethod>;
+/**
+ * Validates/type-guards a value as a mask blur method parameter
+ */
+export const isValidMaskBlurMethod = (
+  val: unknown
+): val is MaskBlurMethodParam => zMaskBlurMethod.safeParse(val).success;
+
 // /**
 //  * Zod schema for BaseModelType
 //  */
