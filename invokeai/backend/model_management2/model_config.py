@@ -19,10 +19,12 @@ Typical usage:
 Validation errors will raise an InvalidModelConfigException error.
 
 """
+import pydantic
 from enum import Enum
 from pydantic import BaseModel, Field, Extra
 from typing import Optional, Literal, List, Union
 from pydantic.error_wrappers import ValidationError
+from omegaconf.listconfig import ListConfig  # to support the yaml backend
 
 
 class InvalidModelConfigException(Exception):
@@ -104,12 +106,13 @@ class ModelConfigBase(BaseModel):
     base_model: BaseModelType
     model_type: ModelType
     model_format: ModelFormat
+    hash: Optional[str] = Field(None)  # this may get added by the store
     description: Optional[str] = Field(None)
     author: Optional[str] = Field(description="Model author")
     thumbnail_url: Optional[str] = Field(description="URL of thumbnail image")
     license_url: Optional[str] = Field(description="URL of license")
     source_url: Optional[str] = Field(description="Model download source")
-    tags: Optional[List[str]] = Field(description="Descriptive tags")
+    tags: Optional[List[str]] = Field(description="Descriptive tags")  # Set would be better, but not JSON serializable
 
     class Config:
         """Pydantic configuration hint."""
@@ -117,6 +120,13 @@ class ModelConfigBase(BaseModel):
         use_enum_values = True
         extra = Extra.forbid
         validate_assignment = True
+
+    @pydantic.validator("tags", pre=True)
+    @classmethod
+    def _fix_tags(cls, v):
+        if isinstance(v, ListConfig):  # to support yaml backend
+            v = list(v)
+        return v
 
 
 class CheckpointConfig(ModelConfigBase):
@@ -136,6 +146,18 @@ class LoRAConfig(ModelConfigBase):
     """Model config for LoRA/Lycoris models."""
 
     model_format: Literal[ModelFormat.Lycoris, ModelFormat.Diffusers]
+
+
+class VaeCheckpointConfig(ModelConfigBase):
+    """Model config for standalone VAE models."""
+
+    model_format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
+
+
+class VaeDiffusersConfig(ModelConfigBase):
+    """Model config for standalone VAE models (diffusers version)."""
+
+    model_format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
 class TextualInversionConfig(ModelConfigBase):
@@ -184,10 +206,12 @@ class ModelConfigFactory(object):
     _class_map: dict = {
         ModelFormat.Checkpoint: {
             ModelType.Main: MainCheckpointConfig,
+            ModelType.Vae: VaeCheckpointConfig,
         },
         ModelFormat.Diffusers: {
             ModelType.Main: MainDiffusersConfig,
             ModelType.Lora: LoRAConfig,
+            ModelType.Vae: VaeDiffusersConfig,
         },
         ModelFormat.Lycoris: {
             ModelType.Lora: LoRAConfig,

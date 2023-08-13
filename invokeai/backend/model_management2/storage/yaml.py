@@ -37,13 +37,15 @@ Typical usage:
 import threading
 import yaml
 from pathlib import Path
-from typing import Union
+from typing import Union, Set, List, Optional
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
 from ..model_config import (
     ModelConfigBase,
     ModelConfigFactory,
+    BaseModelType,
+    ModelType,
 )
 
 from .base import (
@@ -103,6 +105,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
         Can raise DuplicateModelException and InvalidModelConfig exceptions.
         """
         record = ModelConfigFactory.make_config(config)  # ensure it is a valid config obect
+        record.hash = key  # add the key used to store the object
         dict_fields = record.dict()  # and back to a dict with valid fields
         try:
             self._lock.acquire()
@@ -170,3 +173,56 @@ class ModelConfigStoreYAML(ModelConfigStore):
         :param key: Unique key for the model to be deleted
         """
         return key in self._config
+
+    def search_by_tag(self, tags: Set[str]) -> List[ModelConfigBase]:
+        """
+        Return models containing all of the listed tags.
+
+        :param tags: Set of tags to search on.
+        """
+        results = []
+        tags = set(tags)
+        try:
+            self._lock.acquire()
+            for config in self.all_models():
+                config_tags = set(config.tags)
+                if tags.difference(config_tags):  #  not all tags in the model
+                    continue
+                results.append(config)
+        finally:
+            self._lock.release()
+        return results
+
+    def search_by_type(
+        self,
+        model_name: Optional[str] = None,
+        base_model: Optional[BaseModelType] = None,
+        model_type: Optional[ModelType] = None,
+    ) -> List[ModelConfigBase]:
+        """
+        Return models matching name, base and/or type.
+
+        :param model_name: Filter by name of model (optional)
+        :param base_model: Filter by base model (optional)
+        :param model_type: Filter by type of model (optional)
+
+        If none of the optional filters are passed, will return all
+        models in the database.
+        """
+        results = []
+        try:
+            self._lock.acquire()
+            for key, record in self._config.items():
+                if key == "__metadata__":
+                    continue
+                model = ModelConfigFactory.make_config(record)
+                if model_name and model.name != model_name:
+                    continue
+                if base_model and model.base_model != base_model:
+                    continue
+                if model_type and model.model_type != model_type:
+                    continue
+                results.append(model)
+        finally:
+            self._lock.release()
+        return results

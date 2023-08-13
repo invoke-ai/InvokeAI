@@ -6,8 +6,8 @@ import pytest
 
 from hashlib import sha256
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_management2.storage.yaml import (
-    ModelConfigStoreYAML,
+from invokeai.backend.model_management2.storage.sql import (
+    ModelConfigStoreSQL,
     ModelConfigStore,
     UnknownModelException,
 )
@@ -21,7 +21,7 @@ from invokeai.backend.model_management2.model_config import (
 @pytest.fixture
 def store(datadir) -> ModelConfigStore:
     InvokeAIAppConfig.get_config(root=datadir)
-    return ModelConfigStoreYAML(datadir / "configs" / "models.yaml")
+    return ModelConfigStoreSQL(datadir / "configs" / "models.db")
 
 
 def example_config() -> TextualInversionConfig:

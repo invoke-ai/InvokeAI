@@ -5,9 +5,9 @@ Abstract base class for storing and retrieving model configuration records.
 
 
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import Union, Set, List, Optional
 
-from ..model_config import ModelConfigBase
+from ..model_config import ModelConfigBase, BaseModelType, ModelType
 
 
 class DuplicateModelException(Exception):
@@ -79,3 +79,37 @@ class ModelConfigStore(ABC):
         :param key: Unique key for the model to be deleted
         """
         pass
+
+    @abstractmethod
+    def search_by_tag(self, tags: Set[str]) -> List[ModelConfigBase]:
+        """
+        Return models containing all of the listed tags.
+
+        :param tags: Set of tags to search on.
+        """
+        pass
+
+    @abstractmethod
+    def search_by_type(
+        self,
+        model_name: Optional[str] = None,
+        base_model: Optional[BaseModelType] = None,
+        model_type: Optional[ModelType] = None,
+    ) -> List[ModelConfigBase]:
+        """
+        Return models matching name, base and/or type.
+
+        :param model_name: Filter by name of model (optional)
+        :param base_model: Filter by base model (optional)
+        :param model_type: Filter by type of model (optional)
+
+        If none of the optional filters are passed, will return all
+        models in the database.
+        """
+        pass
+
+    def all_models(self) -> List[ModelConfigBase]:
+        """
+        Return all the model configs in the database.
+        """
+        return self.search_by_type()
