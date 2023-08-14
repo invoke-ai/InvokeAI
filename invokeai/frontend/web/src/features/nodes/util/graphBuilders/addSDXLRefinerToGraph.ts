@@ -90,7 +90,7 @@ export const addSDXLRefinerToGraph = (
     type: 'denoise_latents',
     id: SDXL_REFINER_DENOISE_LATENTS,
     cfg_scale: refinerCFGScale,
-    steps: Math.min(refinerSteps / (1 - Math.min(refinerStart, 0.99)), 1000),
+    steps: refinerSteps,
     scheduler: refinerScheduler,
     denoising_start: refinerStart,
     denoising_end: 1,
