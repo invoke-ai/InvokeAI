@@ -2,7 +2,6 @@
 
 from typing import Optional
 from logging import Logger
-import os
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
 )
@@ -32,6 +31,7 @@ from ..services.sqlite import SqliteItemStorage
 from ..services.model_manager_service import ModelManagerService
 from ..services.batch_manager import BatchManager
 from ..services.batch_manager_storage import SqliteBatchProcessStorage
+from ..services.invocation_stats import InvocationStatsService
 from .events import FastAPIEventService
 
 
@@ -57,7 +57,7 @@ logger = InvokeAILogger.getLogger()
 class ApiDependencies:
     """Contains and initializes all dependencies for the API"""
 
-    invoker: Optional[Invoker] = None
+    invoker: Invoker
 
     @staticmethod
     def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger):
@@ -70,8 +70,9 @@ class ApiDependencies:
         output_folder = config.output_path
 
         # TODO: build a file/path manager?
-        db_location = config.db_path
-        db_location.parent.mkdir(parents=True, exist_ok=True)
+        db_path = config.db_path
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        db_location = str(db_path)
 
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"
@@ -134,6 +135,7 @@ class ApiDependencies:
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
             configuration=config,
+            performance_statistics=InvocationStatsService(graph_execution_manager),
             logger=logger,
         )
 

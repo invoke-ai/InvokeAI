@@ -84,6 +84,21 @@ def test_env_override():
     assert conf.max_cache_size == 20
 
 
+def test_root_resists_cwd():
+    previous = os.environ["INVOKEAI_ROOT"]
+    cwd = Path(os.getcwd()).resolve()
+
+    os.environ["INVOKEAI_ROOT"] = "."
+    conf = InvokeAIAppConfig.get_config()
+    conf.parse_args([])
+    assert conf.root_path == cwd
+
+    os.chdir("..")
+    assert conf.root_path == cwd
+    os.environ["INVOKEAI_ROOT"] = previous
+    os.chdir(cwd)
+
+
 def test_type_coercion():
     conf = InvokeAIAppConfig().get_config()
     conf.parse_args(argv=["--root=/tmp/foobar"])

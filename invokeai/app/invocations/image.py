@@ -1,28 +1,19 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Literal, Optional
-
-import numpy
-from PIL import Image, ImageFilter, ImageOps, ImageChops
-from pydantic import Field
 from pathlib import Path
-from typing import Union
+from typing import Literal, Optional, Union
+
+import cv2
+import numpy
+from PIL import Image, ImageChops, ImageFilter, ImageOps
+from pydantic import Field
+
 from invokeai.app.invocations.metadata import CoreMetadata
-from ..models.image import (
-    ImageCategory,
-    ImageField,
-    ResourceOrigin,
-    PILInvocationConfig,
-    ImageOutput,
-    MaskOutput,
-)
-from .baseinvocation import (
-    BaseInvocation,
-    InvocationContext,
-    InvocationConfig,
-)
-from invokeai.backend.image_util.safety_checker import SafetyChecker
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
+from invokeai.backend.image_util.safety_checker import SafetyChecker
+
+from ..models.image import ImageCategory, ImageField, ImageOutput, MaskOutput, PILInvocationConfig, ResourceOrigin
+from .baseinvocation import BaseInvocation, InvocationConfig, InvocationContext
 
 
 class LoadImageInvocation(BaseInvocation):
@@ -142,9 +133,10 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         base_image = context.services.images.get_pil_image(self.base_image.image_name)
         image = context.services.images.get_pil_image(self.image.image_name)
-        mask = (
-            None if self.mask is None else ImageOps.invert(context.services.images.get_pil_image(self.mask.image_name))
-        )
+        mask = None
+        if self.mask is not None:
+            mask = context.services.images.get_pil_image(self.mask.image_name)
+            mask = ImageOps.invert(mask.convert("L"))
         # TODO: probably shouldn't invert mask here... should user be required to do it?
 
         min_x = min(0, self.x)
@@ -500,7 +492,7 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
         image = context.services.images.get_pil_image(self.image.image_name)
 
         image_arr = numpy.asarray(image, dtype=numpy.float32) / 255
-        image_arr = image_arr * (self.max - self.min) + self.max
+        image_arr = image_arr * (self.max - self.min) + self.min
 
         lerp_image = Image.fromarray(numpy.uint8(image_arr))
 
@@ -647,6 +639,335 @@ class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
 
         return ImageOutput(
             image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+class MaskEdgeInvocation(BaseInvocation, PILInvocationConfig):
+    """Applies an edge mask to an image"""
+
+    # fmt: off
+    type: Literal["mask_edge"] = "mask_edge"
+
+    # Inputs
+    image: Optional[ImageField] = Field(default=None, description="The image to apply the mask to")
+    edge_size: int = Field(description="The size of the edge")
+    edge_blur: int = Field(description="The amount of blur on the edge")
+    low_threshold: int = Field(description="First threshold for the hysteresis procedure in Canny edge detection")
+    high_threshold: int = Field(description="Second threshold for the hysteresis procedure in Canny edge detection")
+    # fmt: on
+
+    def invoke(self, context: InvocationContext) -> MaskOutput:
+        mask = context.services.images.get_pil_image(self.image.image_name)
+
+        npimg = numpy.asarray(mask, dtype=numpy.uint8)
+        npgradient = numpy.uint8(255 * (1.0 - numpy.floor(numpy.abs(0.5 - numpy.float32(npimg) / 255.0) * 2.0)))
+        npedge = cv2.Canny(npimg, threshold1=self.low_threshold, threshold2=self.high_threshold)
+        npmask = npgradient + npedge
+        npmask = cv2.dilate(npmask, numpy.ones((3, 3), numpy.uint8), iterations=int(self.edge_size / 2))
+
+        new_mask = Image.fromarray(npmask)
+
+        if self.edge_blur > 0:
+            new_mask = new_mask.filter(ImageFilter.BoxBlur(self.edge_blur))
+
+        new_mask = ImageOps.invert(new_mask)
+
+        image_dto = context.services.images.create(
+            image=new_mask,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.MASK,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+        )
+
+        return MaskOutput(
+            mask=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+class MaskCombineInvocation(BaseInvocation, PILInvocationConfig):
+    """Combine two masks together by multiplying them using `PIL.ImageChops.multiply()`."""
+
+    # fmt: off
+    type: Literal["mask_combine"] = "mask_combine"
+
+    # Inputs
+    mask1: ImageField  = Field(default=None, description="The first mask to combine")
+    mask2: ImageField  = Field(default=None, description="The second image to combine")
+    # fmt: on
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {"title": "Mask Combine", "tags": ["mask", "combine"]},
+        }
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        mask1 = context.services.images.get_pil_image(self.mask1.image_name).convert("L")
+        mask2 = context.services.images.get_pil_image(self.mask2.image_name).convert("L")
+
+        combined_mask = ImageChops.multiply(mask1, mask2)
+
+        image_dto = context.services.images.create(
+            image=combined_mask,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+class ColorCorrectInvocation(BaseInvocation, PILInvocationConfig):
+    """
+    Shifts the colors of a target image to match the reference image, optionally
+    using a mask to only color-correct certain regions of the target image.
+    """
+
+    type: Literal["color_correct"] = "color_correct"
+
+    image: Optional[ImageField] = Field(default=None, description="The image to color-correct")
+    reference: Optional[ImageField] = Field(default=None, description="Reference image for color-correction")
+    mask: Optional[ImageField] = Field(default=None, description="Mask to use when applying color-correction")
+    mask_blur_radius: float = Field(default=8, description="Mask blur radius")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        pil_init_mask = None
+        if self.mask is not None:
+            pil_init_mask = context.services.images.get_pil_image(self.mask.image_name).convert("L")
+
+        init_image = context.services.images.get_pil_image(self.reference.image_name)
+
+        result = context.services.images.get_pil_image(self.image.image_name).convert("RGBA")
+
+        # if init_image is None or init_mask is None:
+        #    return result
+
+        # Get the original alpha channel of the mask if there is one.
+        # Otherwise it is some other black/white image format ('1', 'L' or 'RGB')
+        # pil_init_mask = (
+        #    init_mask.getchannel("A")
+        #    if init_mask.mode == "RGBA"
+        #    else init_mask.convert("L")
+        # )
+        pil_init_image = init_image.convert("RGBA")  # Add an alpha channel if one doesn't exist
+
+        # Build an image with only visible pixels from source to use as reference for color-matching.
+        init_rgb_pixels = numpy.asarray(init_image.convert("RGB"), dtype=numpy.uint8)
+        init_a_pixels = numpy.asarray(pil_init_image.getchannel("A"), dtype=numpy.uint8)
+        init_mask_pixels = numpy.asarray(pil_init_mask, dtype=numpy.uint8)
+
+        # Get numpy version of result
+        np_image = numpy.asarray(result.convert("RGB"), dtype=numpy.uint8)
+
+        # Mask and calculate mean and standard deviation
+        mask_pixels = init_a_pixels * init_mask_pixels > 0
+        np_init_rgb_pixels_masked = init_rgb_pixels[mask_pixels, :]
+        np_image_masked = np_image[mask_pixels, :]
+
+        if np_init_rgb_pixels_masked.size > 0:
+            init_means = np_init_rgb_pixels_masked.mean(axis=0)
+            init_std = np_init_rgb_pixels_masked.std(axis=0)
+            gen_means = np_image_masked.mean(axis=0)
+            gen_std = np_image_masked.std(axis=0)
+
+            # Color correct
+            np_matched_result = np_image.copy()
+            np_matched_result[:, :, :] = (
+                (
+                    (
+                        (np_matched_result[:, :, :].astype(numpy.float32) - gen_means[None, None, :])
+                        / gen_std[None, None, :]
+                    )
+                    * init_std[None, None, :]
+                    + init_means[None, None, :]
+                )
+                .clip(0, 255)
+                .astype(numpy.uint8)
+            )
+            matched_result = Image.fromarray(np_matched_result, mode="RGB")
+        else:
+            matched_result = Image.fromarray(np_image, mode="RGB")
+
+        # Blur the mask out (into init image) by specified amount
+        if self.mask_blur_radius > 0:
+            nm = numpy.asarray(pil_init_mask, dtype=numpy.uint8)
+            nmd = cv2.erode(
+                nm,
+                kernel=numpy.ones((3, 3), dtype=numpy.uint8),
+                iterations=int(self.mask_blur_radius / 2),
+            )
+            pmd = Image.fromarray(nmd, mode="L")
+            blurred_init_mask = pmd.filter(ImageFilter.BoxBlur(self.mask_blur_radius))
+        else:
+            blurred_init_mask = pil_init_mask
+
+        multiplied_blurred_init_mask = ImageChops.multiply(blurred_init_mask, result.split()[-1])
+
+        # Paste original on color-corrected generation (using blurred mask)
+        matched_result.paste(init_image, (0, 0), mask=multiplied_blurred_init_mask)
+
+        image_dto = context.services.images.create(
+            image=matched_result,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+class ImageHueAdjustmentInvocation(BaseInvocation):
+    """Adjusts the Hue of an image."""
+
+    # fmt: off
+    type: Literal["img_hue_adjust"] = "img_hue_adjust"
+
+    # Inputs
+    image: ImageField = Field(default=None, description="The image to adjust")
+    hue: int = Field(default=0, description="The degrees by which to rotate the hue, 0-360")
+    # fmt: on
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        pil_image = context.services.images.get_pil_image(self.image.image_name)
+
+        # Convert image to HSV color space
+        hsv_image = numpy.array(pil_image.convert("HSV"))
+
+        # Convert hue from 0..360 to 0..256
+        hue = int(256 * ((self.hue % 360) / 360))
+
+        # Increment each hue and wrap around at 255
+        hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue) % 256
+
+        # Convert back to PIL format and to original color mode
+        pil_image = Image.fromarray(hsv_image, mode="HSV").convert("RGBA")
+
+        image_dto = context.services.images.create(
+            image=pil_image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            is_intermediate=self.is_intermediate,
+            session_id=context.graph_execution_state_id,
+        )
+
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+class ImageLuminosityAdjustmentInvocation(BaseInvocation):
+    """Adjusts the Luminosity (Value) of an image."""
+
+    # fmt: off
+    type: Literal["img_luminosity_adjust"] = "img_luminosity_adjust"
+
+    # Inputs
+    image: ImageField = Field(default=None, description="The image to adjust")
+    luminosity: float = Field(default=1.0, ge=0, le=1, description="The factor by which to adjust the luminosity (value)")
+    # fmt: on
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        pil_image = context.services.images.get_pil_image(self.image.image_name)
+
+        # Convert PIL image to OpenCV format (numpy array), note color channel
+        # ordering is changed from RGB to BGR
+        image = numpy.array(pil_image.convert("RGB"))[:, :, ::-1]
+
+        # Convert image to HSV color space
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+        # Adjust the luminosity (value)
+        hsv_image[:, :, 2] = numpy.clip(hsv_image[:, :, 2] * self.luminosity, 0, 255)
+
+        # Convert image back to BGR color space
+        image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+
+        # Convert back to PIL format and to original color mode
+        pil_image = Image.fromarray(image[:, :, ::-1], "RGB").convert("RGBA")
+
+        image_dto = context.services.images.create(
+            image=pil_image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            is_intermediate=self.is_intermediate,
+            session_id=context.graph_execution_state_id,
+        )
+
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+            ),
+            width=image_dto.width,
+            height=image_dto.height,
+        )
+
+
+class ImageSaturationAdjustmentInvocation(BaseInvocation):
+    """Adjusts the Saturation of an image."""
+
+    # fmt: off
+    type: Literal["img_saturation_adjust"] = "img_saturation_adjust"
+
+    # Inputs
+    image: ImageField = Field(default=None, description="The image to adjust")
+    saturation: float = Field(default=1.0, ge=0, le=1, description="The factor by which to adjust the saturation")
+    # fmt: on
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        pil_image = context.services.images.get_pil_image(self.image.image_name)
+
+        # Convert PIL image to OpenCV format (numpy array), note color channel
+        # ordering is changed from RGB to BGR
+        image = numpy.array(pil_image.convert("RGB"))[:, :, ::-1]
+
+        # Convert image to HSV color space
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+        # Adjust the saturation
+        hsv_image[:, :, 1] = numpy.clip(hsv_image[:, :, 1] * self.saturation, 0, 255)
+
+        # Convert image back to BGR color space
+        image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+
+        # Convert back to PIL format and to original color mode
+        pil_image = Image.fromarray(image[:, :, ::-1], "RGB").convert("RGBA")
+
+        image_dto = context.services.images.create(
+            image=pil_image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            is_intermediate=self.is_intermediate,
+            session_id=context.graph_execution_state_id,
+        )
+
+        return ImageOutput(
+            image=ImageField(
+                image_name=image_dto.image_name,
+            ),
             width=image_dto.width,
             height=image_dto.height,
         )

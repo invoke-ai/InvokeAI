@@ -1,4 +1,6 @@
+import { Middleware } from '@reduxjs/toolkit';
 import { store } from 'app/store/store';
+import { PartialAppConfig } from 'app/types/invokeai';
 import React, {
   lazy,
   memo,
@@ -7,16 +9,11 @@ import React, {
   useEffect,
 } from 'react';
 import { Provider } from 'react-redux';
-
-import { PartialAppConfig } from 'app/types/invokeai';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import Loading from '../../common/components/Loading/Loading';
-
-import { Middleware } from '@reduxjs/toolkit';
-import { $authToken, $baseUrl } from 'services/api/client';
+import { $authToken, $baseUrl, $projectId } from 'services/api/client';
 import { socketMiddleware } from 'services/events/middleware';
+import Loading from '../../common/components/Loading/Loading';
 import '../../i18n';
-import { AddImageToBoardContextProvider } from '../contexts/AddImageToBoardContext';
 import ImageDndContext from './ImageDnd/ImageDndContext';
 
 const App = lazy(() => import('./App'));
@@ -37,6 +34,7 @@ const InvokeAIUI = ({
   config,
   headerComponent,
   middleware,
+  projectId,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -47,6 +45,11 @@ const InvokeAIUI = ({
     // configure API client base url
     if (apiUrl) {
       $baseUrl.set(apiUrl);
+    }
+
+    // configure API client project header
+    if (projectId) {
+      $projectId.set(projectId);
     }
 
     // reset dynamically added middlewares
@@ -68,8 +71,9 @@ const InvokeAIUI = ({
       // Reset the API client token and base url on unmount
       $baseUrl.set(undefined);
       $authToken.set(undefined);
+      $projectId.set(undefined);
     };
-  }, [apiUrl, token, middleware]);
+  }, [apiUrl, token, middleware, projectId]);
 
   return (
     <React.StrictMode>
@@ -77,9 +81,7 @@ const InvokeAIUI = ({
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <ImageDndContext>
-              <AddImageToBoardContextProvider>
-                <App config={config} headerComponent={headerComponent} />
-              </AddImageToBoardContextProvider>
+              <App config={config} headerComponent={headerComponent} />
             </ImageDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>

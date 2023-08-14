@@ -34,6 +34,7 @@ class InvocationServices:
     logger: "Logger"
     model_manager: "ModelManagerServiceBase"
     processor: "InvocationProcessorABC"
+    performance_statistics: "InvocationStatsServiceBase"
     queue: "InvocationQueueABC"
 
     def __init__(
@@ -50,6 +51,7 @@ class InvocationServices:
         logger: "Logger",
         model_manager: "ModelManagerServiceBase",
         processor: "InvocationProcessorABC",
+        performance_statistics: "InvocationStatsServiceBase",
         queue: "InvocationQueueABC",
     ):
         self.batch_manager = batch_manager
@@ -65,4 +67,5 @@ class InvocationServices:
         self.logger = logger
         self.model_manager = model_manager
         self.processor = processor
+        self.performance_statistics = performance_statistics
         self.queue = queue

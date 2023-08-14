@@ -1,7 +1,8 @@
 from typing import Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
+from ...version import __version__
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -10,18 +11,20 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 
-class LoRAMetadataField(BaseModel):
+class LoRAMetadataField(BaseModelExcludeNull):
     """LoRA metadata for an image generated in InvokeAI."""
 
     lora: LoRAModelField = Field(description="The LoRA model")
     weight: float = Field(description="The weight of the LoRA model")
 
 
-class CoreMetadata(BaseModel):
+class CoreMetadata(BaseModelExcludeNull):
     """Core generation metadata for an image generated in InvokeAI."""
 
+    app_version: str = Field(default=__version__, description="The version of InvokeAI used to generate this image")
     generation_mode: str = Field(
         description="The generation mode that output this image",
     )
@@ -64,13 +67,16 @@ class CoreMetadata(BaseModel):
     )
     refiner_steps: Union[int, None] = Field(default=None, description="The number of steps used for the refiner")
     refiner_scheduler: Union[str, None] = Field(default=None, description="The scheduler used for the refiner")
-    refiner_aesthetic_store: Union[float, None] = Field(
+    refiner_positive_aesthetic_store: Union[float, None] = Field(
+        default=None, description="The aesthetic score used for the refiner"
+    )
+    refiner_negative_aesthetic_store: Union[float, None] = Field(
         default=None, description="The aesthetic score used for the refiner"
     )
     refiner_start: Union[float, None] = Field(default=None, description="The start value used for refiner denoising")
 
 
-class ImageMetadata(BaseModel):
+class ImageMetadata(BaseModelExcludeNull):
     """An image's generation metadata"""
 
     metadata: Optional[dict] = Field(
@@ -133,7 +139,10 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     )
     refiner_steps: Union[int, None] = Field(default=None, description="The number of steps used for the refiner")
     refiner_scheduler: Union[str, None] = Field(default=None, description="The scheduler used for the refiner")
-    refiner_aesthetic_store: Union[float, None] = Field(
+    refiner_positive_aesthetic_score: Union[float, None] = Field(
+        default=None, description="The aesthetic score used for the refiner"
+    )
+    refiner_negative_aesthetic_score: Union[float, None] = Field(
         default=None, description="The aesthetic score used for the refiner"
     )
     refiner_start: Union[float, None] = Field(default=None, description="The start value used for refiner denoising")

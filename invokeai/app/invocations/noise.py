@@ -71,9 +71,9 @@ class NoiseOutput(BaseInvocationOutput):
     # fmt: on
 
 
-def build_noise_output(latents_name: str, latents: torch.Tensor):
+def build_noise_output(latents_name: str, latents: torch.Tensor, seed: int):
     return NoiseOutput(
-        noise=LatentsField(latents_name=latents_name),
+        noise=LatentsField(latents_name=latents_name, seed=seed),
         width=latents.size()[3] * 8,
         height=latents.size()[2] * 8,
     )
@@ -132,4 +132,4 @@ class NoiseInvocation(BaseInvocation):
         )
         name = f"{context.graph_execution_state_id}__{self.id}"
         context.services.latents.save(name, noise)
-        return build_noise_output(latents_name=name, latents=noise)
+        return build_noise_output(latents_name=name, latents=noise, seed=self.seed)

@@ -21,31 +21,40 @@ MIN_COLS = 130
 MIN_LINES = 38
 
 
+class WindowTooSmallException(Exception):
+    pass
+
+
 # -------------------------------------
-def set_terminal_size(columns: int, lines: int):
-    ts = get_terminal_size()
-    width = max(columns, ts.columns)
-    height = max(lines, ts.lines)
-
+def set_terminal_size(columns: int, lines: int) -> bool:
     OS = platform.uname().system
-    if OS == "Windows":
-        pass
-        # not working reliably - ask user to adjust the window
-        # _set_terminal_size_powershell(width,height)
-    elif OS in ["Darwin", "Linux"]:
-        _set_terminal_size_unix(width, height)
+    screen_ok = False
+    while not screen_ok:
+        ts = get_terminal_size()
+        width = max(columns, ts.columns)
+        height = max(lines, ts.lines)
 
-    # check whether it worked....
-    ts = get_terminal_size()
-    pause = False
-    if ts.columns < columns:
-        print("\033[1mThis window is too narrow for the user interface.\033[0m")
-        pause = True
-    if ts.lines < lines:
-        print("\033[1mThis window is too short for the user interface.\033[0m")
-        pause = True
-    if pause:
-        input("Maximize the window then press any key to continue..")
+        if OS == "Windows":
+            pass
+            # not working reliably - ask user to adjust the window
+            # _set_terminal_size_powershell(width,height)
+        elif OS in ["Darwin", "Linux"]:
+            _set_terminal_size_unix(width, height)
+
+        # check whether it worked....
+        ts = get_terminal_size()
+        if ts.columns < columns or ts.lines < lines:
+            print(
+                f"\033[1mThis window is too small for the interface. InvokeAI requires {columns}x{lines} (w x h) characters, but window is {ts.columns}x{ts.lines}\033[0m"
+            )
+            resp = input(
+                "Maximize the window and/or decrease the font size then press any key to continue. Type [Q] to give up.."
+            )
+            if resp.upper().startswith("Q"):
+                break
+        else:
+            screen_ok = True
+    return screen_ok
 
 
 def _set_terminal_size_powershell(width: int, height: int):
@@ -80,14 +89,14 @@ def _set_terminal_size_unix(width: int, height: int):
     sys.stdout.flush()
 
 
-def set_min_terminal_size(min_cols: int, min_lines: int):
+def set_min_terminal_size(min_cols: int, min_lines: int) -> bool:
     # make sure there's enough room for the ui
     term_cols, term_lines = get_terminal_size()
     if term_cols >= min_cols and term_lines >= min_lines:
-        return
+        return True
     cols = max(term_cols, min_cols)
     lines = max(term_lines, min_lines)
-    set_terminal_size(cols, lines)
+    return set_terminal_size(cols, lines)
 
 
 class IntSlider(npyscreen.Slider):
@@ -164,7 +173,7 @@ class FloatSlider(npyscreen.Slider):
 
 
 class FloatTitleSlider(npyscreen.TitleText):
-    _entry_type = FloatSlider
+    _entry_type = npyscreen.Slider
 
 
 class SelectColumnBase:

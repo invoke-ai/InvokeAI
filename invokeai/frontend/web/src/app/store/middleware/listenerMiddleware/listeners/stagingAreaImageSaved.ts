@@ -20,7 +20,7 @@ export const addStagingAreaImageSavedListener = () => {
         // we may need to add it to the autoadd board
         const { autoAddBoardId } = getState().gallery;
 
-        if (autoAddBoardId) {
+        if (autoAddBoardId && autoAddBoardId !== 'none') {
           await dispatch(
             imagesApi.endpoints.addImageToBoard.initiate({
               imageDTO: newImageDTO,

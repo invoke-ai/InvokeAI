@@ -39,6 +39,7 @@ from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
 from invokeai.app.services.batch_manager import BatchManager
 from invokeai.app.services.batch_manager_storage import SqliteBatchProcessStorage
+from invokeai.app.services.invocation_stats import InvocationStatsService
 from .services.default_graphs import default_text_to_image_graph_id, create_system_graphs
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
@@ -317,6 +318,7 @@ def invoke_cli():
         graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs"),
         graph_execution_manager=graph_execution_manager,
         processor=DefaultInvocationProcessor(),
+        performance_statistics=InvocationStatsService(graph_execution_manager),
         logger=logger,
         configuration=config,
     )

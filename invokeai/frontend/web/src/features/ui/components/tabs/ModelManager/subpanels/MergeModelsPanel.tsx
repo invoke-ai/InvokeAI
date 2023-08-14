@@ -59,10 +59,10 @@ export default function MergeModelsPanel() {
   }, [sd1DiffusersModels, sd2DiffusersModels]);
 
   const [modelOne, setModelOne] = useState<string | null>(
-    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])[0]
+    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])?.[0] ?? null
   );
   const [modelTwo, setModelTwo] = useState<string | null>(
-    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])[1]
+    Object.keys(modelsMap[baseModel as keyof typeof modelsMap])?.[1] ?? null
   );
 
   const [modelThree, setModelThree] = useState<string | null>(null);
@@ -106,8 +106,9 @@ export default function MergeModelsPanel() {
     let modelsToMerge: (string | null)[] = [modelOne, modelTwo, modelThree];
     modelsToMerge = modelsToMerge.filter((model) => model !== null);
     modelsToMerge.forEach((model) => {
-      if (model) {
-        models_names.push(model?.split('/')[2]);
+      const n = model?.split('/')?.[2];
+      if (n) {
+        models_names.push(n);
       }
     });
 
