@@ -1,5 +1,5 @@
 import { OpenAPIV3 } from 'openapi-types';
-import { Edge, Node, OnConnectStartParams } from 'reactflow';
+import { Edge, Node, OnConnectStartParams, Viewport } from 'reactflow';
 import {
   FieldType,
   InvocationEdgeExtra,
@@ -27,5 +27,6 @@ export type NodesState = {
   selectedEdges: string[];
   workflow: Omit<Workflow, 'nodes' | 'edges'>;
   nodeExecutionStates: Record<string, NodeExecutionState>;
-  zoom: number;
+  viewport: Viewport;
+  isReady: boolean;
 };

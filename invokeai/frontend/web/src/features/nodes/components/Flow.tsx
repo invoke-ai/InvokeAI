@@ -1,3 +1,4 @@
+import { useToken } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import {
@@ -7,8 +8,7 @@ import {
   OnConnectStart,
   OnEdgesChange,
   OnEdgesDelete,
-  OnInit,
-  OnMove,
+  OnMoveEnd,
   OnNodesChange,
   OnNodesDelete,
   OnSelectionChangeFunc,
@@ -26,7 +26,7 @@ import {
   nodesDeleted,
   selectedEdgesChanged,
   selectedNodesChanged,
-  zoomChanged,
+  viewportChanged,
 } from '../store/nodesSlice';
 import { CustomConnectionLine } from './CustomConnectionLine';
 import { edgeTypes } from './CustomEdges';
@@ -44,11 +44,14 @@ export const Flow = () => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((state) => state.nodes.nodes);
   const edges = useAppSelector((state) => state.nodes.edges);
+  const viewport = useAppSelector((state) => state.nodes.viewport);
   const shouldSnapToGrid = useAppSelector(
     (state) => state.nodes.shouldSnapToGrid
   );
 
   const isValidConnection = useIsValidConnection();
+
+  const [borderRadius] = useToken('radii', ['base']);
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -82,10 +85,6 @@ export const Flow = () => {
     dispatch(connectionEnded());
   }, [dispatch]);
 
-  const onInit: OnInit = useCallback((v) => {
-    v.fitView();
-  }, []);
-
   const onEdgesDelete: OnEdgesDelete = useCallback(
     (edges) => {
       dispatch(edgesDeleted(edges));
@@ -108,16 +107,16 @@ export const Flow = () => {
     [dispatch]
   );
 
-  const handleMove: OnMove = useCallback(
+  const handleMoveEnd: OnMoveEnd = useCallback(
     (e, viewport) => {
-      const { zoom } = viewport;
-      dispatch(zoomChanged(zoom));
+      dispatch(viewportChanged(viewport));
     },
     [dispatch]
   );
 
   return (
     <ReactFlow
+      defaultViewport={viewport}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       nodes={nodes}
@@ -129,16 +128,16 @@ export const Flow = () => {
       onConnectStart={onConnectStart}
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
-      onMove={handleMove}
+      onMoveEnd={handleMoveEnd}
       connectionLineComponent={CustomConnectionLine}
       onSelectionChange={handleSelectionChange}
-      onInit={onInit}
       isValidConnection={isValidConnection}
       minZoom={0.2}
       snapToGrid={shouldSnapToGrid}
       snapGrid={[25, 25]}
       connectionRadius={30}
       proOptions={proOptions}
+      style={{ borderRadius }}
     >
       <TopLeftPanel />
       <TopCenterPanel />
