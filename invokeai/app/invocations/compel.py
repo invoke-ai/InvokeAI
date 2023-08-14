@@ -5,7 +5,7 @@ from typing import List, Literal, Union
 import torch
 from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
-from pydantic import BaseModel, Field
+from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
 
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import (
     BasicConditioningInfo,
@@ -32,13 +32,6 @@ from .baseinvocation import (
 from .model import ClipField
 
 
-class ConditioningField(BaseModel):
-    conditioning_name: str = Field(description="The name of conditioning data")
-
-    class Config:
-        schema_extra = {"required": ["conditioning_name"]}
-
-
 @dataclass
 class ConditioningFieldData:
     conditionings: List[BasicConditioningInfo]
@@ -49,16 +42,6 @@ class ConditioningFieldData:
 #    Compose = "compose"
 #    ComposeEx = "compose_ex"
 #    PerpNeg = "perp_neg"
-
-
-class CompelOutput(BaseInvocationOutput):
-    """Compel parser output"""
-
-    # fmt: off
-    type: Literal["compel_output"] = "compel_output"
-
-    conditioning: ConditioningField = OutputField(description=FieldDescriptions.cond)
-    # fmt: on
 
 
 @title("Compel Prompt")
@@ -80,7 +63,7 @@ class CompelInvocation(BaseInvocation):
     )
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> CompelOutput:
+    def invoke(self, context: InvocationContext) -> ConditioningOutput:
         tokenizer_info = context.services.model_manager.get_model(
             **self.clip.tokenizer.dict(),
             context=context,
@@ -163,7 +146,7 @@ class CompelInvocation(BaseInvocation):
         conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
         context.services.latents.save(conditioning_name, conditioning_data)
 
-        return CompelOutput(
+        return ConditioningOutput(
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
             ),
@@ -303,7 +286,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> CompelOutput:
+    def invoke(self, context: InvocationContext) -> ConditioningOutput:
         c1, c1_pooled, ec1 = self.run_clip_compel(
             context, self.clip, self.prompt, False, "lora_te1_", zero_on_empty=True
         )
@@ -336,7 +319,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
         conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
         context.services.latents.save(conditioning_name, conditioning_data)
 
-        return CompelOutput(
+        return ConditioningOutput(
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
             ),
@@ -361,7 +344,7 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
     clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> CompelOutput:
+    def invoke(self, context: InvocationContext) -> ConditioningOutput:
         # TODO: if there will appear lora for refiner - write proper prefix
         c2, c2_pooled, ec2 = self.run_clip_compel(context, self.clip2, self.style, True, "<NONE>", zero_on_empty=False)
 
@@ -384,7 +367,7 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
         conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
         context.services.latents.save(conditioning_name, conditioning_data)
 
-        return CompelOutput(
+        return ConditioningOutput(
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
             ),

@@ -46,7 +46,7 @@ class SDXLModelLoaderInvocation(BaseInvocation):
 
     # Inputs
     model: MainModelField = InputField(
-        description=FieldDescriptions.sdxl_main_model, input=Input.Direct, ui_type_hint=UITypeHint.SDXLMainModelField
+        description=FieldDescriptions.sdxl_main_model, input=Input.Direct, ui_type_hint=UITypeHint.SDXLMainModel
     )
     # TODO: precision?
 
@@ -133,7 +133,7 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
     model: MainModelField = InputField(
         description=FieldDescriptions.sdxl_refiner_model,
         input=Input.Direct,
-        ui_type_hint=UITypeHint.SDXLRefinerModelField,
+        ui_type_hint=UITypeHint.SDXLRefinerModel,
     )
     # TODO: precision?
 

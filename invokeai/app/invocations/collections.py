@@ -5,63 +5,10 @@ from typing import Literal
 import numpy as np
 from pydantic import validator
 
-from invokeai.app.models.image import ImageField
+from invokeai.app.invocations.primitives import ImageCollectionOutput, ImageField, IntegerCollectionOutput
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    InputField,
-    InvocationContext,
-    OutputField,
-    UITypeHint,
-    tags,
-    title,
-)
-
-
-class IntCollectionOutput(BaseInvocationOutput):
-    """A collection of integers"""
-
-    type: Literal["int_collection_output"] = "int_collection_output"
-
-    # Outputs
-    collection: list[int] = OutputField(
-        default=[], description="The int collection", ui_type_hint=UITypeHint.IntegerCollection
-    )
-
-
-class FloatCollectionOutput(BaseInvocationOutput):
-    """A collection of floats"""
-
-    type: Literal["float_collection_output"] = "float_collection_output"
-
-    # Outputs
-    collection: list[float] = OutputField(
-        default=[], description="The float collection", ui_type_hint=UITypeHint.FloatCollection
-    )
-
-
-class StringCollectionOutput(BaseInvocationOutput):
-    """A collection of strings"""
-
-    type: Literal["string_collection_output"] = "string_collection_output"
-
-    # Outputs
-    collection: list[str] = OutputField(
-        default=[], description="The output strings", ui_type_hint=UITypeHint.StringCollection
-    )
-
-
-class ImageCollectionOutput(BaseInvocationOutput):
-    """A collection of images"""
-
-    type: Literal["image_collection_output"] = "image_collection_output"
-
-    # Outputs
-    collection: list[ImageField] = OutputField(
-        default=[], description="The output images", ui_type_hint=UITypeHint.ImageCollection
-    )
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, UITypeHint, tags, title
 
 
 @title("Integer Range")
@@ -82,8 +29,8 @@ class RangeInvocation(BaseInvocation):
             raise ValueError("stop must be greater than start")
         return v
 
-    def invoke(self, context: InvocationContext) -> IntCollectionOutput:
-        return IntCollectionOutput(collection=list(range(self.start, self.stop, self.step)))
+    def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
+        return IntegerCollectionOutput(collection=list(range(self.start, self.stop, self.step)))
 
 
 @title("Integer Range of Size")
@@ -98,8 +45,8 @@ class RangeOfSizeInvocation(BaseInvocation):
     size: int = InputField(default=1, description="The number of values")
     step: int = InputField(default=1, description="The step of the range")
 
-    def invoke(self, context: InvocationContext) -> IntCollectionOutput:
-        return IntCollectionOutput(collection=list(range(self.start, self.start + self.size, self.step)))
+    def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
+        return IntegerCollectionOutput(collection=list(range(self.start, self.start + self.size, self.step)))
 
 
 @title("Random Range")
@@ -120,9 +67,9 @@ class RandomRangeInvocation(BaseInvocation):
         default_factory=get_random_seed,
     )
 
-    def invoke(self, context: InvocationContext) -> IntCollectionOutput:
+    def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
         rng = np.random.default_rng(self.seed)
-        return IntCollectionOutput(collection=list(rng.integers(low=self.low, high=self.high, size=self.size)))
+        return IntegerCollectionOutput(collection=list(rng.integers(low=self.low, high=self.high, size=self.size)))
 
 
 @title("Image Collection")

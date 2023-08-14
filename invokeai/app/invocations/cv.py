@@ -5,10 +5,10 @@ from typing import Literal
 import cv2 as cv
 import numpy
 from PIL import Image, ImageOps
+from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
-from invokeai.app.models.image import ImageCategory, ImageField, ResourceOrigin
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, tags, title
-from .image import ImageOutput
 
 
 @title("OpenCV Inpaint")

@@ -4,30 +4,9 @@ from typing import Literal
 
 import numpy as np
 
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    FieldDescriptions,
-    InputField,
-    InvocationContext,
-    OutputField,
-    tags,
-    title,
-)
+from invokeai.app.invocations.primitives import IntegerOutput
 
-
-class IntOutput(BaseInvocationOutput):
-    """An integer output"""
-
-    type: Literal["int_output"] = "int_output"
-    a: int = OutputField(default=None, description="The output integer")
-
-
-class FloatOutput(BaseInvocationOutput):
-    """A float output"""
-
-    type: Literal["float_output"] = "float_output"
-    a: float = OutputField(default=None, description="The output float")
+from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, tags, title
 
 
 @title("Add Integers")
@@ -41,8 +20,8 @@ class AddInvocation(BaseInvocation):
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
-    def invoke(self, context: InvocationContext) -> IntOutput:
-        return IntOutput(a=self.a + self.b)
+    def invoke(self, context: InvocationContext) -> IntegerOutput:
+        return IntegerOutput(a=self.a + self.b)
 
 
 @title("Subtract Integers")
@@ -56,8 +35,8 @@ class SubtractInvocation(BaseInvocation):
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
-    def invoke(self, context: InvocationContext) -> IntOutput:
-        return IntOutput(a=self.a - self.b)
+    def invoke(self, context: InvocationContext) -> IntegerOutput:
+        return IntegerOutput(a=self.a - self.b)
 
 
 @title("Multiply Integers")
@@ -71,8 +50,8 @@ class MultiplyInvocation(BaseInvocation):
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
-    def invoke(self, context: InvocationContext) -> IntOutput:
-        return IntOutput(a=self.a * self.b)
+    def invoke(self, context: InvocationContext) -> IntegerOutput:
+        return IntegerOutput(a=self.a * self.b)
 
 
 @title("Divide Integers")
@@ -86,8 +65,8 @@ class DivideInvocation(BaseInvocation):
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
-    def invoke(self, context: InvocationContext) -> IntOutput:
-        return IntOutput(a=int(self.a / self.b))
+    def invoke(self, context: InvocationContext) -> IntegerOutput:
+        return IntegerOutput(a=int(self.a / self.b))
 
 
 @title("Random Integer")
@@ -101,5 +80,5 @@ class RandomIntInvocation(BaseInvocation):
     low: int = InputField(default=0, description="The inclusive low value")
     high: int = InputField(default=np.iinfo(np.int32).max, description="The exclusive high value")
 
-    def invoke(self, context: InvocationContext) -> IntOutput:
-        return IntOutput(a=np.random.randint(self.low, self.high))
+    def invoke(self, context: InvocationContext) -> IntegerOutput:
+        return IntegerOutput(a=np.random.randint(self.low, self.high))

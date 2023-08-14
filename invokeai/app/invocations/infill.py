@@ -5,13 +5,13 @@ from typing import Literal, Optional, get_args
 import numpy as np
 import math
 from PIL import Image, ImageOps
+from invokeai.app.invocations.primitives import ImageField, ImageOutput, ColorField
 
-from invokeai.app.invocations.image import ImageOutput
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
-from ..models.image import ColorField, ImageCategory, ImageField, ResourceOrigin
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, UITypeHint, title, tags
+from ..models.image import ImageCategory, ResourceOrigin
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, title, tags
 
 
 def infill_methods() -> list[str]:
