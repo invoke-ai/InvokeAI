@@ -109,7 +109,7 @@ class ModelMerger(object):
             # pick up the first model's vae
             if mod == model_names[0]:
                 vae = info.get("vae")
-            model_paths.extend([config.root_path / info["path"]])
+            model_paths.extend([str(config.root_path / info["path"])])
 
         merge_method = None if interp == "weighted_sum" else MergeInterpolationMethod(interp)
         logger.debug(f"interp = {interp}, merge_method={merge_method}")
