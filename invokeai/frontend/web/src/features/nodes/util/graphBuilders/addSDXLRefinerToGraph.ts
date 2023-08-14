@@ -2,28 +2,31 @@ import { RootState } from 'app/store/store';
 import { MetadataAccumulatorInvocation } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
 import {
-  IMAGE_TO_LATENTS,
+  CANVAS_OUTPUT,
   LATENTS_TO_IMAGE,
+  MASK_BLUR,
   METADATA_ACCUMULATOR,
-  SDXL_LATENTS_TO_LATENTS,
+  SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
+  SDXL_CANVAS_INPAINT_GRAPH,
+  SDXL_CANVAS_OUTPAINT_GRAPH,
+  SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
   SDXL_MODEL_LOADER,
-  SDXL_REFINER_LATENTS_TO_LATENTS,
+  SDXL_REFINER_DENOISE_LATENTS,
   SDXL_REFINER_MODEL_LOADER,
   SDXL_REFINER_NEGATIVE_CONDITIONING,
   SDXL_REFINER_POSITIVE_CONDITIONING,
 } from './constants';
+import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
 export const addSDXLRefinerToGraph = (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string
 ): void => {
-  const { positivePrompt, negativePrompt } = state.generation;
   const {
     refinerModel,
-    refinerAestheticScore,
-    positiveStylePrompt,
-    negativeStylePrompt,
+    refinerPositiveAestheticScore,
+    refinerNegativeAestheticScore,
     refinerSteps,
     refinerScheduler,
     refinerCFGScale,
@@ -38,12 +41,19 @@ export const addSDXLRefinerToGraph = (
 
   if (metadataAccumulator) {
     metadataAccumulator.refiner_model = refinerModel;
-    metadataAccumulator.refiner_aesthetic_store = refinerAestheticScore;
+    metadataAccumulator.refiner_positive_aesthetic_score =
+      refinerPositiveAestheticScore;
+    metadataAccumulator.refiner_negative_aesthetic_score =
+      refinerNegativeAestheticScore;
     metadataAccumulator.refiner_cfg_scale = refinerCFGScale;
     metadataAccumulator.refiner_scheduler = refinerScheduler;
     metadataAccumulator.refiner_start = refinerStart;
     metadataAccumulator.refiner_steps = refinerSteps;
   }
+
+  // Construct Style Prompt
+  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
+    craftSDXLStylePrompt(state, true);
 
   // Unplug SDXL Latents Generation To Latents To Image
   graph.edges = graph.edges.filter(
@@ -59,21 +69,6 @@ export const addSDXLRefinerToGraph = (
       )
   );
 
-  // connect the VAE back to the i2l, which we just removed in the filter
-  // but only if we are doing l2l
-  if (baseNodeId === SDXL_LATENTS_TO_LATENTS) {
-    graph.edges.push({
-      source: {
-        node_id: SDXL_MODEL_LOADER,
-        field: 'vae',
-      },
-      destination: {
-        node_id: IMAGE_TO_LATENTS,
-        field: 'vae',
-      },
-    });
-  }
-
   graph.nodes[SDXL_REFINER_MODEL_LOADER] = {
     type: 'sdxl_refiner_model_loader',
     id: SDXL_REFINER_MODEL_LOADER,
@@ -82,20 +77,20 @@ export const addSDXLRefinerToGraph = (
   graph.nodes[SDXL_REFINER_POSITIVE_CONDITIONING] = {
     type: 'sdxl_refiner_compel_prompt',
     id: SDXL_REFINER_POSITIVE_CONDITIONING,
-    style: `${positivePrompt} ${positiveStylePrompt}`,
-    aesthetic_score: refinerAestheticScore,
+    style: craftedPositiveStylePrompt,
+    aesthetic_score: refinerPositiveAestheticScore,
   };
   graph.nodes[SDXL_REFINER_NEGATIVE_CONDITIONING] = {
     type: 'sdxl_refiner_compel_prompt',
     id: SDXL_REFINER_NEGATIVE_CONDITIONING,
-    style: `${negativePrompt} ${negativeStylePrompt}`,
-    aesthetic_score: refinerAestheticScore,
+    style: craftedNegativeStylePrompt,
+    aesthetic_score: refinerNegativeAestheticScore,
   };
-  graph.nodes[SDXL_REFINER_LATENTS_TO_LATENTS] = {
-    type: 'l2l_sdxl',
-    id: SDXL_REFINER_LATENTS_TO_LATENTS,
+  graph.nodes[SDXL_REFINER_DENOISE_LATENTS] = {
+    type: 'denoise_latents',
+    id: SDXL_REFINER_DENOISE_LATENTS,
     cfg_scale: refinerCFGScale,
-    steps: refinerSteps / (1 - Math.min(refinerStart, 0.99)),
+    steps: refinerSteps,
     scheduler: refinerScheduler,
     denoising_start: refinerStart,
     denoising_end: 1,
@@ -108,18 +103,8 @@ export const addSDXLRefinerToGraph = (
         field: 'unet',
       },
       destination: {
-        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        node_id: SDXL_REFINER_DENOISE_LATENTS,
         field: 'unet',
-      },
-    },
-    {
-      source: {
-        node_id: SDXL_REFINER_MODEL_LOADER,
-        field: 'vae',
-      },
-      destination: {
-        node_id: LATENTS_TO_IMAGE,
-        field: 'vae',
       },
     },
     {
@@ -148,7 +133,7 @@ export const addSDXLRefinerToGraph = (
         field: 'conditioning',
       },
       destination: {
-        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        node_id: SDXL_REFINER_DENOISE_LATENTS,
         field: 'positive_conditioning',
       },
     },
@@ -158,7 +143,7 @@ export const addSDXLRefinerToGraph = (
         field: 'conditioning',
       },
       destination: {
-        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        node_id: SDXL_REFINER_DENOISE_LATENTS,
         field: 'negative_conditioning',
       },
     },
@@ -168,19 +153,52 @@ export const addSDXLRefinerToGraph = (
         field: 'latents',
       },
       destination: {
-        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        node_id: SDXL_REFINER_DENOISE_LATENTS,
         field: 'latents',
       },
-    },
-    {
+    }
+  );
+
+  if (
+    graph.id === SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH ||
+    graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH
+  ) {
+    graph.edges.push({
       source: {
-        node_id: SDXL_REFINER_LATENTS_TO_LATENTS,
+        node_id: SDXL_REFINER_DENOISE_LATENTS,
+        field: 'latents',
+      },
+      destination: {
+        node_id: CANVAS_OUTPUT,
+        field: 'latents',
+      },
+    });
+  } else {
+    graph.edges.push({
+      source: {
+        node_id: SDXL_REFINER_DENOISE_LATENTS,
         field: 'latents',
       },
       destination: {
         node_id: LATENTS_TO_IMAGE,
         field: 'latents',
       },
-    }
-  );
+    });
+  }
+
+  if (
+    graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
+    graph.id === SDXL_CANVAS_OUTPAINT_GRAPH
+  ) {
+    graph.edges.push({
+      source: {
+        node_id: MASK_BLUR,
+        field: 'image',
+      },
+      destination: {
+        node_id: SDXL_REFINER_DENOISE_LATENTS,
+        field: 'mask',
+      },
+    });
+  }
 };

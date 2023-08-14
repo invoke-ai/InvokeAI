@@ -14,11 +14,11 @@ import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_IMAGE_TO_IMAGE_GRAPH,
+  CANVAS_OUTPUT,
   CLIP_SKIP,
-  IMAGE_TO_IMAGE_GRAPH,
+  DENOISE_LATENTS,
   IMAGE_TO_LATENTS,
-  LATENTS_TO_IMAGE,
-  LATENTS_TO_LATENTS,
   MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
@@ -73,8 +73,20 @@ export const buildCanvasImageToImageGraph = (
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    id: IMAGE_TO_IMAGE_GRAPH,
+    id: CANVAS_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
+      [MAIN_MODEL_LOADER]: {
+        type: 'main_model_loader',
+        id: MAIN_MODEL_LOADER,
+        is_intermediate: true,
+        model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        is_intermediate: true,
+        skipped_layers: clipSkip,
+      },
       [POSITIVE_CONDITIONING]: {
         type: 'compel',
         id: POSITIVE_CONDITIONING,
@@ -93,27 +105,6 @@ export const buildCanvasImageToImageGraph = (
         is_intermediate: true,
         use_cpu,
       },
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
-        is_intermediate: true,
-        model,
-      },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        is_intermediate: true,
-        skipped_layers: clipSkip,
-      },
-      [LATENTS_TO_LATENTS]: {
-        type: 'l2l',
-        id: LATENTS_TO_LATENTS,
-        is_intermediate: true,
-        cfg_scale,
-        scheduler,
-        steps,
-        strength,
-      },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
         id: IMAGE_TO_LATENTS,
@@ -123,13 +114,34 @@ export const buildCanvasImageToImageGraph = (
         //   image_name: initialImage.image_name,
         // },
       },
-      [LATENTS_TO_IMAGE]: {
+      [DENOISE_LATENTS]: {
+        type: 'denoise_latents',
+        id: DENOISE_LATENTS,
+        is_intermediate: true,
+        cfg_scale,
+        scheduler,
+        steps,
+        denoising_start: 1 - strength,
+        denoising_end: 1,
+      },
+      [CANVAS_OUTPUT]: {
         type: 'l2i',
-        id: LATENTS_TO_IMAGE,
+        id: CANVAS_OUTPUT,
         is_intermediate: !shouldAutoSave,
       },
     },
     edges: [
+      // Connect Model Loader to CLIP Skip and UNet
+      {
+        source: {
+          node_id: MAIN_MODEL_LOADER,
+          field: 'unet',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'unet',
+        },
+      },
       {
         source: {
           node_id: MAIN_MODEL_LOADER,
@@ -140,6 +152,7 @@ export const buildCanvasImageToImageGraph = (
           field: 'clip',
         },
       },
+      // Connect CLIP Skip To Conditioning
       {
         source: {
           node_id: CLIP_SKIP,
@@ -160,24 +173,25 @@ export const buildCanvasImageToImageGraph = (
           field: 'clip',
         },
       },
+      // Connect Everything To Denoise Latents
       {
         source: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'latents',
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
         },
         destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
+          node_id: DENOISE_LATENTS,
+          field: 'positive_conditioning',
         },
       },
       {
         source: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'latents',
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'conditioning',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'latents',
+          node_id: DENOISE_LATENTS,
+          field: 'negative_conditioning',
         },
       },
       {
@@ -186,38 +200,29 @@ export const buildCanvasImageToImageGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'noise',
         },
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'unet',
+          node_id: IMAGE_TO_LATENTS,
+          field: 'latents',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'unet',
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
         },
       },
+      // Decode the denoised latents to an image
       {
         source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'negative_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'positive_conditioning',
+          node_id: CANVAS_OUTPUT,
+          field: 'latents',
         },
       },
     ],
@@ -318,32 +323,32 @@ export const buildCanvasImageToImageGraph = (
       field: 'metadata',
     },
     destination: {
-      node_id: LATENTS_TO_IMAGE,
+      node_id: CANVAS_OUTPUT,
       field: 'metadata',
     },
   });
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS);
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph);
+  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, LATENTS_TO_LATENTS);
+  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph);
+    addNSFWCheckerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
   if (state.system.shouldUseWatermarker) {
     // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph);
+    addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
   return graph;

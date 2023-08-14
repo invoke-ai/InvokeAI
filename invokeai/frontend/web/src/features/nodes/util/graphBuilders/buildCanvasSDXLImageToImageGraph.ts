@@ -3,6 +3,7 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
+  ImageDTO,
   ImageResizeInvocation,
   ImageToLatentsInvocation,
 } from 'services/api/types';
@@ -14,24 +15,25 @@ import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_OUTPUT,
   IMAGE_TO_LATENTS,
-  LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
   SDXL_DENOISE_LATENTS,
-  SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_MODEL_LOADER,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
 /**
- * Builds the Image to Image tab graph.
+ * Builds the Canvas tab's Image to Image graph.
  */
-export const buildLinearSDXLImageToImageGraph = (
-  state: RootState
+export const buildCanvasSDXLImageToImageGraph = (
+  state: RootState,
+  initialImage: ImageDTO
 ): NonNullableGraph => {
   const log = logger('nodes');
   const {
@@ -41,38 +43,23 @@ export const buildLinearSDXLImageToImageGraph = (
     cfgScale: cfg_scale,
     scheduler,
     steps,
-    initialImage,
-    shouldFitToWidthHeight,
-    width,
-    height,
+    vaePrecision,
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
-    vaePrecision,
   } = state.generation;
 
   const {
-    positiveStylePrompt,
-    negativeStylePrompt,
-    shouldConcatSDXLStylePrompt,
     shouldUseSDXLRefiner,
     refinerStart,
     sdxlImg2ImgDenoisingStrength: strength,
+    shouldConcatSDXLStylePrompt,
   } = state.sdxl;
 
-  /**
-   * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
-   * full graph here as a template. Then use the parameters from app state and set friendlier node
-   * ids.
-   *
-   * The only thing we need extra logic for is handling randomized seed, control net, and for img2img,
-   * the `fit` param. These are added to the graph at the end.
-   */
+  // The bounding box determines width and height, not the width and height params
+  const { width, height } = state.canvas.boundingBoxDimensions;
 
-  if (!initialImage) {
-    log.error('No initial image found in state');
-    throw new Error('No initial image found in state');
-  }
+  const { shouldAutoSave } = state.canvas;
 
   if (!model) {
     log.error('No model found in state');
@@ -87,9 +74,18 @@ export const buildLinearSDXLImageToImageGraph = (
   const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
     craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
 
+  /**
+   * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
+   * full graph here as a template. Then use the parameters from app state and set friendlier node
+   * ids.
+   *
+   * The only thing we need extra logic for is handling randomized seed, control net, and for img2img,
+   * the `fit` param. These are added to the graph at the end.
+   */
+
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    id: SDXL_IMAGE_TO_IMAGE_GRAPH,
+    id: SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
       [SDXL_MODEL_LOADER]: {
         type: 'sdxl_model_loader',
@@ -111,16 +107,23 @@ export const buildLinearSDXLImageToImageGraph = (
       [NOISE]: {
         type: 'noise',
         id: NOISE,
+        is_intermediate: true,
         use_cpu,
       },
-      [LATENTS_TO_IMAGE]: {
-        type: 'l2i',
-        id: LATENTS_TO_IMAGE,
+      [IMAGE_TO_LATENTS]: {
+        type: 'i2l',
+        id: IMAGE_TO_LATENTS,
+        is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
+        // must be set manually later, bc `fit` parameter may require a resize node inserted
+        // image: {
+        //   image_name: initialImage.image_name,
+        // },
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: SDXL_DENOISE_LATENTS,
+        is_intermediate: true,
         cfg_scale,
         scheduler,
         steps,
@@ -129,18 +132,15 @@ export const buildLinearSDXLImageToImageGraph = (
           : 1 - strength,
         denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
-      [IMAGE_TO_LATENTS]: {
-        type: 'i2l',
-        id: IMAGE_TO_LATENTS,
-        // must be set manually later, bc `fit` parameter may require a resize node inserted
-        // image: {
-        //   image_name: initialImage.image_name,
-        // },
+      [CANVAS_OUTPUT]: {
+        type: 'l2i',
+        id: CANVAS_OUTPUT,
+        is_intermediate: !shouldAutoSave,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
     },
     edges: [
-      // Connect Model Loader to UNet, CLIP & VAE
+      // Connect Model Loader To UNet & CLIP
       {
         source: {
           node_id: SDXL_MODEL_LOADER,
@@ -191,7 +191,7 @@ export const buildLinearSDXLImageToImageGraph = (
           field: 'clip2',
         },
       },
-      // Connect everything to Denoise Latents
+      // Connect Everything to Denoise Latents
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
@@ -232,14 +232,14 @@ export const buildLinearSDXLImageToImageGraph = (
           field: 'latents',
         },
       },
-      // Decode Denoised Latents To Image
+      // Decode denoised latents to an image
       {
         source: {
           node_id: SDXL_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
-          node_id: LATENTS_TO_IMAGE,
+          node_id: CANVAS_OUTPUT,
           field: 'latents',
         },
       },
@@ -247,10 +247,7 @@ export const buildLinearSDXLImageToImageGraph = (
   };
 
   // handle `fit`
-  if (
-    shouldFitToWidthHeight &&
-    (initialImage.width !== width || initialImage.height !== height)
-  ) {
+  if (initialImage.width !== width || initialImage.height !== height) {
     // The init image needs to be resized to the specified width and height before being passed to `IMAGE_TO_LATENTS`
 
     // Create a resize node, explicitly setting its image
@@ -258,7 +255,7 @@ export const buildLinearSDXLImageToImageGraph = (
       id: RESIZE,
       type: 'img_resize',
       image: {
-        image_name: initialImage.imageName,
+        image_name: initialImage.image_name,
       },
       is_intermediate: true,
       width,
@@ -295,7 +292,7 @@ export const buildLinearSDXLImageToImageGraph = (
   } else {
     // We are not resizing, so we need to set the image on the `IMAGE_TO_LATENTS` node explicitly
     (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image = {
-      image_name: initialImage.imageName,
+      image_name: initialImage.image_name,
     };
 
     // Pass the image's dimensions to the `NOISE` node
@@ -319,7 +316,7 @@ export const buildLinearSDXLImageToImageGraph = (
   graph.nodes[METADATA_ACCUMULATOR] = {
     id: METADATA_ACCUMULATOR,
     type: 'metadata_accumulator',
-    generation_mode: 'sdxl_img2img',
+    generation_mode: 'img2img',
     cfg_scale,
     height,
     width,
@@ -330,14 +327,12 @@ export const buildLinearSDXLImageToImageGraph = (
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
-    vae: undefined,
-    controlnets: [],
-    loras: [],
+    vae: undefined, // option; set in addVAEToGraph
+    controlnets: [], // populated in addControlNetToLinearGraph
+    loras: [], // populated in addLoRAsToGraph
     clip_skip: clipSkip,
-    strength: strength,
-    init_image: initialImage.imageName,
-    positive_style_prompt: positiveStylePrompt,
-    negative_style_prompt: negativeStylePrompt,
+    strength,
+    init_image: initialImage.image_name,
   };
 
   graph.edges.push({
@@ -346,11 +341,12 @@ export const buildLinearSDXLImageToImageGraph = (
       field: 'metadata',
     },
     destination: {
-      node_id: LATENTS_TO_IMAGE,
+      node_id: CANVAS_OUTPUT,
       field: 'metadata',
     },
   });
 
+  // add LoRA support
   addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
 
   // Add Refiner if enabled
@@ -361,21 +357,21 @@ export const buildLinearSDXLImageToImageGraph = (
   // optionally add custom VAE
   addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
 
-  // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
-
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
+
+  // add controlnet, mutating `graph`
+  addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph);
+    addNSFWCheckerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
   if (state.system.shouldUseWatermarker) {
     // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph);
+    addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
   return graph;
