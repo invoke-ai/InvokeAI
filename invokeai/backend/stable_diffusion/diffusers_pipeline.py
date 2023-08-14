@@ -429,13 +429,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             step_count=len(self.scheduler.timesteps),
         ):
             if callback is not None:
-                callback(PipelineIntermediateState(
-                    step=-1,
-                    order=self.scheduler.order,
-                    total_steps=len(timesteps),
-                    timestep=self.scheduler.config.num_train_timesteps,
-                    latents=latents,
-                ))
+                callback(
+                    PipelineIntermediateState(
+                        step=-1,
+                        order=self.scheduler.order,
+                        total_steps=len(timesteps),
+                        timestep=self.scheduler.config.num_train_timesteps,
+                        latents=latents,
+                    )
+                )
 
             # print("timesteps:", timesteps)
             for i, t in enumerate(self.progress_bar(timesteps)):
@@ -469,15 +471,17 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 #    self.invokeai_diffuser.setup_attention_map_saving(attention_map_saver)
 
                 if callback is not None:
-                    callback(PipelineIntermediateState(
-                        step=i,
-                        order=self.scheduler.order,
-                        total_steps=len(timesteps),
-                        timestep=int(t),
-                        latents=latents,
-                        predicted_original=predicted_original,
-                        attention_map_saver=attention_map_saver,
-                    ))
+                    callback(
+                        PipelineIntermediateState(
+                            step=i,
+                            order=self.scheduler.order,
+                            total_steps=len(timesteps),
+                            timestep=int(t),
+                            latents=latents,
+                            predicted_original=predicted_original,
+                            attention_map_saver=attention_map_saver,
+                        )
+                    )
 
             return latents, attention_map_saver
 
