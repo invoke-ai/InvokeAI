@@ -1,16 +1,31 @@
 import { OpenAPIV3 } from 'openapi-types';
-import { Edge, Node, OnConnectStartParams, ReactFlowInstance } from 'reactflow';
-import { InvocationTemplate, InvocationValue } from '../types/types';
+import { Edge, Node, OnConnectStartParams } from 'reactflow';
+import {
+  FieldType,
+  InvocationEdgeExtra,
+  InvocationTemplate,
+  NodeData,
+  NodeExecutionState,
+  Workflow,
+} from '../types/types';
 
 export type NodesState = {
-  nodes: Node<InvocationValue>[];
-  edges: Edge[];
+  nodes: Node<NodeData>[];
+  edges: Edge<InvocationEdgeExtra>[];
   schema: OpenAPIV3.Document | null;
-  invocationTemplates: Record<string, InvocationTemplate>;
+  nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
-  shouldShowGraphOverlay: boolean;
+  currentConnectionFieldType: FieldType | null;
   shouldShowFieldTypeLegend: boolean;
   shouldShowMinimapPanel: boolean;
-  editorInstance: ReactFlowInstance | undefined;
-  progressNodeSize: { width: number; height: number };
+  shouldValidateGraph: boolean;
+  shouldAnimateEdges: boolean;
+  nodeOpacity: number;
+  shouldSnapToGrid: boolean;
+  shouldColorEdges: boolean;
+  selectedNodes: string[];
+  selectedEdges: string[];
+  workflow: Omit<Workflow, 'nodes' | 'edges'>;
+  nodeExecutionStates: Record<string, NodeExecutionState>;
+  zoom: number;
 };

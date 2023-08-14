@@ -26,7 +26,7 @@ const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   options: {
     scrollbars: {
       visibility: 'auto',
-      autoHide: 'leave',
+      autoHide: 'scroll',
       autoHideDelay: 1300,
       theme: 'os-theme-dark',
     },

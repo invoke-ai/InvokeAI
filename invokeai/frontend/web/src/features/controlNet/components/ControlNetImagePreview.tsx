@@ -4,7 +4,7 @@ import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
-} from 'app/components/ImageDnd/typesafeDnd';
+} from 'features/dnd/types';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';

@@ -41,9 +41,9 @@ export const addSDXLRefinerToGraph = (
 
   if (metadataAccumulator) {
     metadataAccumulator.refiner_model = refinerModel;
-    metadataAccumulator.refiner_positive_aesthetic_score =
+    metadataAccumulator.refiner_positive_aesthetic_store =
       refinerPositiveAestheticScore;
-    metadataAccumulator.refiner_negative_aesthetic_score =
+    metadataAccumulator.refiner_negative_aesthetic_store =
       refinerNegativeAestheticScore;
     metadataAccumulator.refiner_cfg_scale = refinerCFGScale;
     metadataAccumulator.refiner_scheduler = refinerScheduler;

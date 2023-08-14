@@ -5,7 +5,7 @@ import {
   ImageBlurInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
-  InfillPatchmatchInvocation,
+  InfillPatchMatchInvocation,
   InfillTileInvocation,
   NoiseInvocation,
   RandomIntInvocation,
@@ -539,7 +539,7 @@ export const buildCanvasOutpaintGraph = (
     graph.nodes[INPAINT_INFILL] = {
       ...(graph.nodes[INPAINT_INFILL] as
         | InfillTileInvocation
-        | InfillPatchmatchInvocation),
+        | InfillPatchMatchInvocation),
       image: canvasInitImage,
     };
     graph.nodes[NOISE] = {

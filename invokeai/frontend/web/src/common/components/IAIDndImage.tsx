@@ -6,10 +6,6 @@ import {
   useColorMode,
   useColorModeValue,
 } from '@chakra-ui/react';
-import {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'app/components/ImageDnd/typesafeDnd';
 import IAIIconButton from 'common/components/IAIIconButton';
 import {
   IAILoadingImageFallback,
@@ -17,6 +13,10 @@ import {
 } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'features/dnd/types';
 import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import {
   MouseEvent,
@@ -157,11 +157,10 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                     <IAILoadingImageFallback image={imageDTO} />
                   )
                 }
-                width={imageDTO.width}
-                height={imageDTO.height}
                 onError={onError}
                 draggable={false}
                 sx={{
+                  w: imageDTO.width,
                   objectFit: 'contain',
                   maxW: 'full',
                   maxH: 'full',
@@ -213,13 +212,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
               onClick={onClick}
             />
           )}
-          {!isDropDisabled && (
-            <IAIDroppable
-              data={droppableData}
-              disabled={isDropDisabled}
-              dropLabel={dropLabel}
-            />
-          )}
           {onClickReset && withResetIcon && imageDTO && (
             <IAIIconButton
               onClick={onClickReset}
@@ -242,6 +234,13 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                   filter: resetIconShadow,
                 },
               }}
+            />
+          )}
+          {!isDropDisabled && (
+            <IAIDroppable
+              data={droppableData}
+              disabled={isDropDisabled}
+              dropLabel={dropLabel}
             />
           )}
         </Flex>
