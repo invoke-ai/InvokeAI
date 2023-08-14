@@ -326,12 +326,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
     # original idea by https://github.com/AmericanPresidentJimmyCarter
     # TODO: research more for second order schedulers timesteps
     def init_scheduler(self, scheduler, device, steps, denoising_start, denoising_end):
-        if scheduler.config.get("cpu_only", False):
-            device = torch.device("cpu")
-
         num_inference_steps = steps
-        scheduler.set_timesteps(num_inference_steps, device=device)
-        timesteps = scheduler.timesteps
+        if scheduler.config.get("cpu_only", False):
+            scheduler.set_timesteps(num_inference_steps, device="cpu")
+            timesteps = scheduler.timesteps.to(device=device)
+        else:
+            scheduler.set_timesteps(num_inference_steps, device=device)
+            timesteps = scheduler.timesteps
 
         # apply denoising_start
         t_start_val = int(round(scheduler.config.num_train_timesteps * (1 - denoising_start)))
