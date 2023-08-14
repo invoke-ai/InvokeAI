@@ -426,7 +426,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_params.append(board_id)
 
             query_pagination = """--sql
-            ORDER BY images.created_at DESC LIMIT ? OFFSET ?
+            ORDER BY images.pinned DESC, images.created_at DESC LIMIT ? OFFSET ?
             """
 
             # Final images query with pagination
