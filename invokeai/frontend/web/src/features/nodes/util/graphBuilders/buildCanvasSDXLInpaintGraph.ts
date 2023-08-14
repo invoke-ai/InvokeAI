@@ -53,7 +53,6 @@ export const buildCanvasSDXLInpaintGraph = (
     cfgScale: cfg_scale,
     scheduler,
     steps,
-    img2imgStrength: strength,
     iterations,
     seed,
     shouldRandomizeSeed,
@@ -64,8 +63,12 @@ export const buildCanvasSDXLInpaintGraph = (
     maskBlurMethod,
   } = state.generation;
 
-  const { shouldUseSDXLRefiner, refinerStart, shouldConcatSDXLStylePrompt } =
-    state.sdxl;
+  const {
+    sdxlImg2ImgDenoisingStrength: strength,
+    shouldUseSDXLRefiner,
+    refinerStart,
+    shouldConcatSDXLStylePrompt,
+  } = state.sdxl;
 
   if (!model) {
     log.error('No model found in state');
