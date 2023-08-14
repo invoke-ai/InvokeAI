@@ -78,11 +78,8 @@ const ImageInputFieldComponent = (
         imageDTO={imageDTO}
         droppableData={droppableData}
         draggableData={draggableData}
-        onClickReset={handleReset}
-        withResetIcon
-        thumbnail
-        useThumbailFallback
         postUploadAction={postUploadAction}
+        useThumbailFallback
       />
     </Flex>
   );

@@ -1,5 +1,5 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -20,6 +20,8 @@ import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 import GalleryImage from './GalleryImage';
 import ImageGridItemContainer from './ImageGridItemContainer';
 import ImageGridListContainer from './ImageGridListContainer';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { shouldShowDeleteButtonChanged } from '../../store/gallerySlice';
 
 const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
   defer: true,
@@ -36,6 +38,7 @@ const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
 
 const GalleryImageGrid = () => {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const rootRef = useRef<HTMLDivElement>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars(
@@ -84,6 +87,23 @@ const GalleryImageGrid = () => {
     }
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
+
+  useHotkeys(
+    'shift',
+    () => {
+      dispatch(shouldShowDeleteButtonChanged(true));
+    },
+    [shouldShowDeleteButtonChanged]
+  );
+
+  useHotkeys(
+    'shift',
+    () => {
+      dispatch(shouldShowDeleteButtonChanged(false));
+    },
+    { keyup: true },
+    [shouldShowDeleteButtonChanged]
+  );
 
   if (!currentData) {
     return (

@@ -36,7 +36,7 @@ import {
 import { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
-import { BsBookmarkStar, BsFillBookmarkStarFill } from 'react-icons/bs';
+import { MdStar, MdStarBorder } from 'react-icons/md';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -211,15 +211,12 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         Change Board
       </MenuItem>
       {imageDTO.pinned ? (
-        <MenuItem icon={<BsBookmarkStar />} onClickCapture={handleUnpinImage}>
-          Unpin Image
+        <MenuItem icon={<MdStar />} onClickCapture={handleUnpinImage}>
+          Unstar Image
         </MenuItem>
       ) : (
-        <MenuItem
-          icon={<BsFillBookmarkStarFill />}
-          onClickCapture={handlePinImage}
-        >
-          Pin Image
+        <MenuItem icon={<MdStarBorder />} onClickCapture={handlePinImage}>
+          Star Image
         </MenuItem>
       )}
       <MenuItem
