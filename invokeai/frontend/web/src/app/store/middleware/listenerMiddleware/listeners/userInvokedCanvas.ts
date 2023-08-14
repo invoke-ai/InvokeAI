@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
+import { parseify } from 'common/util/serialize';
 import {
   canvasSessionIdChanged,
   stagingAreaInitialized,
@@ -15,7 +16,6 @@ import { imagesApi } from 'services/api/endpoints/images';
 import { sessionCreated } from 'services/api/thunks/session';
 import { ImageDTO } from 'services/api/types';
 import { startAppListening } from '..';
-import { parseify } from 'common/util/serialize';
 
 /**
  * This listener is responsible invoking the canvas. This involves a number of steps:

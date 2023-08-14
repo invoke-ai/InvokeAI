@@ -8,4 +8,4 @@ from .diffusers_pipeline import (
 )
 from .diffusion import InvokeAIDiffuserComponent
 from .diffusion.cross_attention_map_saving import AttentionMapSaver
-from .diffusion.shared_invokeai_diffusion import PostprocessingSettings
+from .diffusion.shared_invokeai_diffusion import PostprocessingSettings, BasicConditioningInfo, SDXLConditioningInfo

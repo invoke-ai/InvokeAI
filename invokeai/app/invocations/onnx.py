@@ -212,6 +212,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
             context=context,
             scheduler_info=self.unet.scheduler,
             scheduler_name=self.scheduler,
+            seed=0,  # TODO: refactor this node
         )
 
         def torch2numpy(latent: torch.Tensor):

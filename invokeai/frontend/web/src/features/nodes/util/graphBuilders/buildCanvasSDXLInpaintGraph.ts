@@ -10,22 +10,19 @@ import {
   RangeOfSizeInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
+import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
-  CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPUT,
-  CLIP_SKIP,
   COLOR_CORRECT,
-  DENOISE_LATENTS,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
   INPAINT_IMAGE_RESIZE_UP,
   ITERATE,
   LATENTS_TO_IMAGE,
-  MAIN_MODEL_LOADER,
   MASK_BLUR,
   MASK_RESIZE_DOWN,
   MASK_RESIZE_UP,
@@ -34,12 +31,16 @@ import {
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
+  SDXL_CANVAS_INPAINT_GRAPH,
+  SDXL_DENOISE_LATENTS,
+  SDXL_MODEL_LOADER,
 } from './constants';
+import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
  */
-export const buildCanvasInpaintGraph = (
+export const buildCanvasSDXLInpaintGraph = (
   state: RootState,
   canvasInitImage: ImageDTO,
   canvasMaskImage: ImageDTO
@@ -52,7 +53,6 @@ export const buildCanvasInpaintGraph = (
     cfgScale: cfg_scale,
     scheduler,
     steps,
-    img2imgStrength: strength,
     iterations,
     seed,
     shouldRandomizeSeed,
@@ -61,8 +61,14 @@ export const buildCanvasInpaintGraph = (
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
-    clipSkip,
   } = state.generation;
+
+  const {
+    sdxlImg2ImgDenoisingStrength: strength,
+    shouldUseSDXLRefiner,
+    refinerStart,
+    shouldConcatSDXLStylePrompt,
+  } = state.sdxl;
 
   if (!model) {
     log.error('No model found in state');
@@ -83,32 +89,29 @@ export const buildCanvasInpaintGraph = (
     ? shouldUseCpuNoise
     : shouldUseCpuNoise;
 
+  // Construct Style Prompt
+  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
+    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+
   const graph: NonNullableGraph = {
-    id: CANVAS_INPAINT_GRAPH,
+    id: SDXL_CANVAS_INPAINT_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
-        type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
-        is_intermediate: true,
+      [SDXL_MODEL_LOADER]: {
+        type: 'sdxl_model_loader',
+        id: SDXL_MODEL_LOADER,
         model,
       },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        is_intermediate: true,
-        skipped_layers: clipSkip,
-      },
       [POSITIVE_CONDITIONING]: {
-        type: 'compel',
+        type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
-        is_intermediate: true,
         prompt: positivePrompt,
+        style: craftedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: 'compel',
+        type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
-        is_intermediate: true,
         prompt: negativePrompt,
+        style: craftedNegativeStylePrompt,
       },
       [MASK_BLUR]: {
         type: 'img_blur',
@@ -129,15 +132,17 @@ export const buildCanvasInpaintGraph = (
         use_cpu,
         is_intermediate: true,
       },
-      [DENOISE_LATENTS]: {
+      [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: DENOISE_LATENTS,
+        id: SDXL_DENOISE_LATENTS,
         is_intermediate: true,
         steps: steps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
-        denoising_start: 1 - strength,
-        denoising_end: 1,
+        denoising_start: shouldUseSDXLRefiner
+          ? Math.min(refinerStart, 1 - strength)
+          : 1 - strength,
+        denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -173,31 +178,20 @@ export const buildCanvasInpaintGraph = (
       },
     },
     edges: [
-      // Connect Model Loader to CLIP Skip and UNet
+      // Connect Model Loader to UNet and CLIP
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: SDXL_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'unet',
         },
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
-          field: 'clip',
-        },
-        destination: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-      },
-      // Connect CLIP Skip to Conditioning
-      {
-        source: {
-          node_id: CLIP_SKIP,
+          node_id: SDXL_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -207,7 +201,17 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: CLIP_SKIP,
+          node_id: SDXL_MODEL_LOADER,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_MODEL_LOADER,
           field: 'clip',
         },
         destination: {
@@ -215,14 +219,24 @@ export const buildCanvasInpaintGraph = (
           field: 'clip',
         },
       },
-      // Connect Everything To Inpaint Node
+      {
+        source: {
+          node_id: SDXL_MODEL_LOADER,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      },
+      // Connect everything to Inpaint
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
           field: 'conditioning',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -232,7 +246,7 @@ export const buildCanvasInpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -242,7 +256,7 @@ export const buildCanvasInpaintGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -252,7 +266,7 @@ export const buildCanvasInpaintGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'latents',
         },
       },
@@ -262,7 +276,7 @@ export const buildCanvasInpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'mask',
         },
       },
@@ -287,10 +301,10 @@ export const buildCanvasInpaintGraph = (
           field: 'seed',
         },
       },
-      // Decode Inpainted Latents To Image
+      // Decode inpainted latents to image
       {
         source: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -512,14 +526,19 @@ export const buildCanvasInpaintGraph = (
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
   }
 
-  // Add VAE
-  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
+  // Add Refiner if enabled
+  if (shouldUseSDXLRefiner) {
+    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
+  }
+
+  // optionally add custom VAE
+  addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS, MAIN_MODEL_LOADER);
+  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+  addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
