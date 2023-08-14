@@ -9,8 +9,8 @@ import {
   ModalHeader,
   ModalOverlay,
   Text,
-  useDisclosure,
   useColorMode,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { VALID_LOG_LEVELS } from 'app/logging/logger';
@@ -23,7 +23,6 @@ import { setShouldShowAdvancedOptions } from 'features/parameters/store/generati
 import {
   consoleLogLevelChanged,
   setEnableImageDebugging,
-  setIsNodesEnabled,
   setShouldConfirmOnDelete,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
@@ -46,14 +45,14 @@ import {
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
+import { useFeatureStatus } from '../../hooks/useFeatureStatus';
+import { LANGUAGES } from '../../store/constants';
+import { languageSelector } from '../../store/systemSelectors';
+import { languageChanged } from '../../store/systemSlice';
 import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
 import StyledFlex from './StyledFlex';
-import { useFeatureStatus } from '../../hooks/useFeatureStatus';
-import { LANGUAGES } from '../../store/constants';
-import { languageChanged } from '../../store/systemSlice';
-import { languageSelector } from '../../store/systemSelectors';
 
 const selector = createSelector(
   [stateSelector],
@@ -64,7 +63,6 @@ const selector = createSelector(
       consoleLogLevel,
       shouldLogToConsole,
       shouldAntialiasProgressImage,
-      isNodesEnabled,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
     } = system;
@@ -87,7 +85,6 @@ const selector = createSelector(
       shouldLogToConsole,
       shouldAntialiasProgressImage,
       shouldShowAdvancedOptions,
-      isNodesEnabled,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
     };
@@ -103,7 +100,6 @@ type ConfigOptions = {
   shouldShowBetaLayout: boolean;
   shouldShowAdvancedOptionsSettings: boolean;
   shouldShowClearIntermediates: boolean;
-  shouldShowNodesToggle: boolean;
   shouldShowLocalizationToggle: boolean;
 };
 
@@ -125,7 +121,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     config?.shouldShowAdvancedOptionsSettings ?? true;
   const shouldShowClearIntermediates =
     config?.shouldShowClearIntermediates ?? true;
-  const shouldShowNodesToggle = config?.shouldShowNodesToggle ?? true;
   const shouldShowLocalizationToggle =
     config?.shouldShowLocalizationToggle ?? true;
 
@@ -167,7 +162,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     shouldLogToConsole,
     shouldAntialiasProgressImage,
     shouldShowAdvancedOptions,
-    isNodesEnabled,
     shouldUseNSFWChecker,
     shouldUseWatermarker,
   } = useAppSelector(selector);
@@ -203,13 +197,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const handleLogToConsoleChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldLogToConsoleChanged(e.target.checked));
-    },
-    [dispatch]
-  );
-
-  const handleToggleNodes = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(setIsNodesEnabled(e.target.checked));
     },
     [dispatch]
   );
@@ -318,14 +305,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
                       dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
                     }
-                  />
-                )}
-                {shouldShowNodesToggle && (
-                  <SettingSwitch
-                    label={t('settings.enableNodesEditor')}
-                    useBadge
-                    isChecked={isNodesEnabled}
-                    onChange={handleToggleNodes}
                   />
                 )}
                 {shouldShowLocalizationToggle && (

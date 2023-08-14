@@ -1,9 +1,4 @@
 import { Box, Flex } from '@chakra-ui/react';
-import {
-  ImageDTOsDraggableData,
-  ImageDraggableData,
-  TypesafeDraggableData,
-} from 'app/components/ImageDnd/typesafeDnd';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
@@ -12,6 +7,11 @@ import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { FaTrash } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import {
+  ImageDTOsDraggableData,
+  ImageDraggableData,
+  TypesafeDraggableData,
+} from 'features/dnd/types';
 
 interface HoverableImageProps {
   imageName: string;

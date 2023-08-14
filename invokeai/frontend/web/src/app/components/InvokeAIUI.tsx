@@ -14,7 +14,7 @@ import { $authToken, $baseUrl, $projectId } from 'services/api/client';
 import { socketMiddleware } from 'services/events/middleware';
 import Loading from '../../common/components/Loading/Loading';
 import '../../i18n';
-import ImageDndContext from './ImageDnd/ImageDndContext';
+import AppDndContext from '../../features/dnd/components/AppDndContext';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -80,9 +80,9 @@ const InvokeAIUI = ({
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
-            <ImageDndContext>
+            <AppDndContext>
               <App config={config} headerComponent={headerComponent} />
-            </ImageDndContext>
+            </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>
       </Provider>

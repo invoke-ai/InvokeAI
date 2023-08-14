@@ -19,7 +19,7 @@ import {
 } from 'services/events/actions';
 import { startAppListening } from '../..';
 
-const nodeDenylist = ['dataURL_image'];
+const nodeDenylist = ['load_image'];
 
 export const addInvocationCompleteEventListener = () => {
   startAppListening({

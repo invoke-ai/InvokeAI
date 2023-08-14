@@ -5,14 +5,13 @@ from pydantic import BaseModel, Field
 from invokeai.app.util.metaenum import MetaEnum
 from ..invocations.baseinvocation import (
     BaseInvocationOutput,
-    InvocationConfig,
 )
 
 
 class ImageField(BaseModel):
     """An image field used for passing image objects between invocations"""
 
-    image_name: Optional[str] = Field(default=None, description="The name of the image")
+    image_name: str = Field(description="The name of the image")
 
     class Config:
         schema_extra = {"required": ["image_name"]}
@@ -34,17 +33,6 @@ class ProgressImage(BaseModel):
     width: int = Field(description="The effective width of the image in pixels")
     height: int = Field(description="The effective height of the image in pixels")
     dataURL: str = Field(description="The image data as a b64 data URL")
-
-
-class PILInvocationConfig(BaseModel):
-    """Helper class to provide all PIL invocations with additional config"""
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "tags": ["PIL", "image"],
-            },
-        }
 
 
 class ImageOutput(BaseInvocationOutput):
