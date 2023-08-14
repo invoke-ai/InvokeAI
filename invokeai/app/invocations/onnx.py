@@ -14,13 +14,14 @@ from pydantic import BaseModel, Field, validator
 from tqdm import tqdm
 
 from invokeai.app.invocations.metadata import CoreMetadata
+from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend import BaseModelType, ModelType, SubModelType
 
 from ...backend.model_management import ONNXModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util import choose_torch_device
-from ..models.image import ImageCategory, ImageField, ResourceOrigin
+from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -34,9 +35,7 @@ from .baseinvocation import (
     tags,
     title,
 )
-from .compel import CompelOutput, ConditioningField
 from .controlnet_image_processors import ControlField
-from .image import ImageOutput
 from .latent import SAMPLER_NAME_VALUES, LatentsField, LatentsOutput, build_latents_output, get_scheduler
 from .model import ClipField, ModelInfo, UNetField, VaeField
 
@@ -66,7 +65,7 @@ class ONNXPromptInvocation(BaseInvocation):
     prompt: str = InputField(default="", description=FieldDescriptions.raw_prompt, ui_component=UIComponent.Textarea)
     clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
-    def invoke(self, context: InvocationContext) -> CompelOutput:
+    def invoke(self, context: InvocationContext) -> ConditioningOutput:
         tokenizer_info = context.services.model_manager.get_model(
             **self.clip.tokenizer.dict(),
         )
@@ -135,7 +134,7 @@ class ONNXPromptInvocation(BaseInvocation):
         # TODO: hacky but works ;D maybe rename latents somehow?
         context.services.latents.save(conditioning_name, (prompt_embeds, None))
 
-        return CompelOutput(
+        return ConditioningOutput(
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
             ),
@@ -181,7 +180,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     control: Optional[Union[ControlField, list[ControlField]]] = InputField(
         default=None,
         description=FieldDescriptions.control,
-        ui_type_hint=UITypeHint.ControlField,
+        ui_type_hint=UITypeHint.Control,
     )
     # seamless:   bool = InputField(default=False, description="Whether or not to generate an image that can tile without seams", )
     # seamless_axes: str = InputField(default="", description="The axes to tile the image on, 'x' and/or 'y'")
@@ -417,7 +416,7 @@ class OnnxModelLoaderInvocation(BaseInvocation):
 
     # Inputs
     model: OnnxModelField = InputField(
-        description=FieldDescriptions.onnx_main_model, input=Input.Direct, ui_type_hint=UITypeHint.ONNXModelField
+        description=FieldDescriptions.onnx_main_model, input=Input.Direct, ui_type_hint=UITypeHint.ONNXModel
     )
 
     def invoke(self, context: InvocationContext) -> ONNXModelLoaderOutput:

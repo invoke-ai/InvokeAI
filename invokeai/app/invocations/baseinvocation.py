@@ -98,36 +98,49 @@ class UITypeHint(str, Enum):
     on adding a new field type, which involves client-side changes.
     """
 
+    # region Primitives
     Integer = "integer"
     Float = "float"
     Boolean = "boolean"
     String = "string"
-    Enum = "enum"
     Array = "array"
-    ImageField = "ImageField"
-    LatentsField = "LatentsField"
-    ConditioningField = "ConditioningField"
-    ControlField = "ControlField"
-    MainModelField = "MainModelField"
-    SDXLMainModelField = "SDXLMainModelField"
-    SDXLRefinerModelField = "SDXLRefinerModelField"
-    ONNXModelField = "ONNXModelField"
-    VaeModelField = "VaeModelField"
-    LoRAModelField = "LoRAModelField"
-    ControlNetModelField = "ControlNetModelField"
-    UNetField = "UNetField"
-    VaeField = "VaeField"
-    ClipField = "ClipField"
-    ColorField = "ColorField"
+    Image = "ImageField"
+    Latents = "LatentsField"
+    Conditioning = "ConditioningField"
+    Control = "ControlField"
+    Color = "ColorField"
     ImageCollection = "ImageCollection"
+    ConditioningCollection = "ConditioningCollection"
+    ColorCollection = "ColorCollection"
+    LatentsCollection = "LatentsCollection"
     IntegerCollection = "IntegerCollection"
     FloatCollection = "FloatCollection"
     StringCollection = "StringCollection"
     BooleanCollection = "BooleanCollection"
+    # endregion
+
+    # region Models
+    MainModel = "MainModelField"
+    SDXLMainModel = "SDXLMainModelField"
+    SDXLRefinerModel = "SDXLRefinerModelField"
+    ONNXModel = "ONNXModelField"
+    VaeModel = "VaeModelField"
+    LoRAModel = "LoRAModelField"
+    ControlNetModel = "ControlNetModelField"
+    UNet = "UNetField"
+    Vae = "VaeField"
+    CLIP = "ClipField"
+    # endregion
+
+    # region Iterate/Collect
     Collection = "Collection"
     CollectionItem = "CollectionItem"
-    Seed = "Seed"
+    # endregion
+
+    # region Misc
     FilePath = "FilePath"
+    Enum = "enum"
+    # endregion
 
 
 class UIComponent(str, Enum):

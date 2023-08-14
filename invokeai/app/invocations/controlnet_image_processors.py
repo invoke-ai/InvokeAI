@@ -26,8 +26,11 @@ from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
 from pydantic import BaseModel, Field, validator
 
+from invokeai.app.invocations.primitives import ImageField, ImageOutput
+
+
 from ...backend.model_management import BaseModelType, ModelType
-from ..models.image import ImageCategory, ImageField, ResourceOrigin
+from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -40,7 +43,6 @@ from .baseinvocation import (
     tags,
     title,
 )
-from ..models.image import ImageOutput
 
 
 CONTROLNET_MODE_VALUES = Literal["balanced", "more_prompt", "more_control", "unbalanced"]

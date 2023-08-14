@@ -8,32 +8,12 @@ import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from invokeai.app.invocations.metadata import CoreMetadata
+from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
-from ..models.image import ImageCategory, ImageField, ImageOutput, MaskOutput, ResourceOrigin
+from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, tags, title
-
-
-@title("Load Image")
-@tags("image")
-class LoadImageInvocation(BaseInvocation):
-    """Load an image and provide it as output."""
-
-    # Metadata
-    type: Literal["load_image"] = "load_image"
-
-    # Inputs
-    image: ImageField = InputField(description="The image to load")
-
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
-
-        return ImageOutput(
-            image=ImageField(image_name=self.image.image_name),
-            width=image.width,
-            height=image.height,
-        )
 
 
 @title("Show Image")
@@ -162,7 +142,7 @@ class MaskFromAlphaInvocation(BaseInvocation):
     image: ImageField = InputField(description="The image to create the mask from")
     invert: bool = InputField(default=False, description="Whether or not to invert the mask")
 
-    def invoke(self, context: InvocationContext) -> MaskOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
         image_mask = image.split()[-1]
@@ -178,8 +158,8 @@ class MaskFromAlphaInvocation(BaseInvocation):
             is_intermediate=self.is_intermediate,
         )
 
-        return MaskOutput(
-            mask=ImageField(image_name=image_dto.image_name),
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )
@@ -608,7 +588,7 @@ class MaskEdgeInvocation(BaseInvocation):
         description="Second threshold for the hysteresis procedure in Canny edge detection"
     )
 
-    def invoke(self, context: InvocationContext) -> MaskOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         mask = context.services.images.get_pil_image(self.image.image_name)
 
         npimg = numpy.asarray(mask, dtype=numpy.uint8)
@@ -633,8 +613,8 @@ class MaskEdgeInvocation(BaseInvocation):
             is_intermediate=self.is_intermediate,
         )
 
-        return MaskOutput(
-            mask=ImageField(image_name=image_dto.image_name),
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )

@@ -19,6 +19,13 @@ from pydantic import BaseModel, Field, validator
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.metadata import CoreMetadata
+from invokeai.app.invocations.primitives import (
+    ImageField,
+    ImageOutput,
+    LatentsField,
+    LatentsOutput,
+    build_latents_output,
+)
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
@@ -35,7 +42,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
-from ..models.image import ImageCategory, ImageField, ResourceOrigin
+from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -50,41 +57,9 @@ from .baseinvocation import (
 )
 from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
-from .image import ImageOutput
 from .model import ModelInfo, UNetField, VaeField
 
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
-
-
-class LatentsField(BaseModel):
-    """A latents field used for passing latents between invocations"""
-
-    latents_name: str = Field(description="The name of the latents")
-    seed: Optional[int] = Field(default=None, description="Seed used to generate this latents")
-
-    class Config:
-        schema_extra = {"required": ["latents_name"]}
-
-
-class LatentsOutput(BaseInvocationOutput):
-    """Base class for invocations that output latents"""
-
-    type: Literal["latents_output"] = "latents_output"
-
-    # Inputs
-    latents: LatentsField = OutputField(
-        description=FieldDescriptions.latents,
-    )
-    width: int = OutputField(description=FieldDescriptions.width)
-    height: int = OutputField(description=FieldDescriptions.height)
-
-
-def build_latents_output(latents_name: str, latents: torch.Tensor, seed: Optional[int]):
-    return LatentsOutput(
-        latents=LatentsField(latents_name=latents_name, seed=seed),
-        width=latents.size()[3] * 8,
-        height=latents.size()[2] * 8,
-    )
 
 
 SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]

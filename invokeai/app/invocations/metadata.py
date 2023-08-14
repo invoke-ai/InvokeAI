@@ -7,6 +7,7 @@ from invokeai.app.invocations.baseinvocation import (
     BaseInvocationOutput,
     InputField,
     InvocationContext,
+    OutputField,
     tags,
     title,
 )
@@ -94,7 +95,7 @@ class MetadataAccumulatorOutput(BaseInvocationOutput):
 
     type: Literal["metadata_accumulator_output"] = "metadata_accumulator_output"
 
-    metadata: CoreMetadata = Field(description="The core metadata for the image")
+    metadata: CoreMetadata = OutputField(description="The core metadata for the image")
 
 
 @title("Metadata Accumulator")
