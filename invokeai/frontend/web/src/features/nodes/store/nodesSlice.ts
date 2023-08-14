@@ -14,6 +14,7 @@ import {
   Node,
   NodeChange,
   OnConnectStartParams,
+  Viewport,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { sessionInvoked } from 'services/api/thunks/session';
@@ -56,6 +57,7 @@ export const initialNodesState: NodesState = {
   edges: [],
   schema: null,
   nodeTemplates: {},
+  isReady: false,
   connectionStartParams: null,
   currentConnectionFieldType: null,
   shouldShowFieldTypeLegend: false,
@@ -78,7 +80,7 @@ export const initialNodesState: NodesState = {
     exposedFields: [],
   },
   nodeExecutionStates: {},
-  zoom: 1,
+  viewport: { x: 0, y: 0, zoom: 1 },
 };
 
 type FieldValueAction<T extends InputFieldValue> = PayloadAction<{
@@ -521,6 +523,7 @@ const nodesSlice = createSlice({
       action: PayloadAction<Record<string, InvocationTemplate>>
     ) => {
       state.nodeTemplates = action.payload;
+      state.isReady = true;
     },
     nodeEditorReset: (state) => {
       state.nodes = [];
@@ -587,11 +590,14 @@ const nodesSlice = createSlice({
         []
       );
     },
-    zoomChanged: (state, action: PayloadAction<number>) => {
-      state.zoom = action.payload;
+    viewportChanged: (state, action: PayloadAction<Viewport>) => {
+      state.viewport = action.payload;
     },
   },
   extraReducers: (builder) => {
+    builder.addCase(receivedOpenAPISchema.pending, (state) => {
+      state.isReady = false;
+    });
     builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
       state.schema = action.payload;
     });
@@ -693,7 +699,7 @@ export const {
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
   fieldLabelChanged,
-  zoomChanged,
+  viewportChanged,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

@@ -10,4 +10,5 @@ export const nodesPersistDenylist: (keyof NodesState)[] = [
   'currentConnectionFieldType',
   'selectedNodes',
   'selectedEdges',
+  'isReady',
 ];
