@@ -267,12 +267,11 @@ async def convert_model(
     logger = ApiDependencies.invoker.services.logger
     try:
         logger.info(f"Converting model: {model_name}")
-        dest = pathlib.Path(convert_dest_directory) if convert_dest_directory else None
         ApiDependencies.invoker.services.model_manager.convert_model(
             model_name,
             base_model=base_model,
             model_type=model_type,
-            convert_dest_directory=dest,
+            convert_dest_directory=convert_dest_directory,
         )
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(
             model_name, base_model=base_model, model_type=model_type

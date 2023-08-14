@@ -31,7 +31,7 @@ class ModelMerger(object):
 
     def merge_diffusion_models(
         self,
-        model_paths: List[Path],
+        model_paths: List[str],
         alpha: float = 0.5,
         interp: Optional[MergeInterpolationMethod] = None,
         force: bool = False,
@@ -75,7 +75,7 @@ class ModelMerger(object):
         alpha: float = 0.5,
         interp: Optional[MergeInterpolationMethod] = None,
         force: bool = False,
-        merge_dest_directory: Optional[Path] = None,
+        merge_dest_directory: Optional[str] = None,
         **kwargs,
     ) -> AddModelResult:
         """
