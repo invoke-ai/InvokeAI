@@ -162,7 +162,9 @@ export const buildCanvasSDXLOutpaintGraph = (
         steps: steps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
-        denoising_start: 1 - strength,
+        denoising_start: shouldUseSDXLRefiner
+          ? Math.min(refinerStart, 1 - strength)
+          : 1 - strength,
         denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
       [LATENTS_TO_IMAGE]: {
