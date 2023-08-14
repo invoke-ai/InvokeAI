@@ -1,10 +1,10 @@
-import { Flex, Icon } from '@chakra-ui/react';
+import { Box, Flex, Text } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { makeTemplateSelector } from 'features/nodes/store/util/makeTemplateSelector';
+import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { InvocationNodeData } from 'features/nodes/types/types';
 import { map } from 'lodash-es';
 import { memo, useMemo } from 'react';
-import { FaExclamationCircle } from 'react-icons/fa';
 import { NodeProps } from 'reactflow';
 import NodeCollapseButton from '../Invocation/NodeCollapseButton';
 import NodeCollapsedHandles from '../Invocation/NodeCollapsedHandles';
@@ -32,25 +32,52 @@ const InvocationNode = (props: NodeProps<InvocationNodeData>) => {
     return (
       <NodeWrapper nodeProps={props}>
         <Flex
-          layerStyle="nodeBody"
-          className="nopan"
+          className={DRAG_HANDLE_CLASSNAME}
+          layerStyle="nodeHeader"
           sx={{
+            borderTopRadius: 'base',
+            borderBottomRadius: isOpen ? 0 : 'base',
             alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'auto',
-            w: 'full',
-            h: 'full',
+            h: 8,
+            fontWeight: 600,
+            fontSize: 'sm',
           }}
         >
-          <Icon
-            as={FaExclamationCircle}
+          <NodeCollapseButton nodeProps={props} />
+          <Text
             sx={{
-              boxSize: 32,
-              color: 'base.600',
-              _dark: { color: 'base.400' },
+              w: 'full',
+              textAlign: 'center',
+              pe: 8,
+              color: 'error.500',
+              _dark: { color: 'error.300' },
             }}
-          ></Icon>
+          >
+            {data.label ? `${data.label} (${data.type})` : data.type}
+          </Text>
         </Flex>
+        {isOpen && (
+          <Flex
+            layerStyle="nodeBody"
+            sx={{
+              userSelect: 'auto',
+              flexDirection: 'column',
+              w: 'full',
+              h: 'full',
+              p: 4,
+              gap: 1,
+              borderBottomRadius: 'base',
+              fontSize: 'sm',
+            }}
+          >
+            <Box>
+              <Text as="span">Unknown node type: </Text>
+              <Text as="span" fontWeight={600}>
+                {data.type}
+              </Text>
+            </Box>
+          </Flex>
+        )}
       </NodeWrapper>
     );
   }
