@@ -33,7 +33,7 @@ const sdxlInitialState: SDXLInitialState = {
   refinerScheduler: 'euler',
   refinerPositiveAestheticScore: 6,
   refinerNegativeAestheticScore: 2.5,
-  refinerStart: 0.7,
+  refinerStart: 0.8,
 };
 
 const sdxlSlice = createSlice({
