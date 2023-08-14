@@ -120,11 +120,11 @@ class ModelMerger(object):
             else config.models_path / base_model.value / ModelType.Main.value
         )
         dump_path.mkdir(parents=True, exist_ok=True)
-        dump_path = dump_path / merged_model_name
+        dump_path = str(dump_path / merged_model_name)
 
         merged_pipe.save_pretrained(dump_path, safe_serialization=True)
         attributes = dict(
-            path=str(dump_path),
+            path=dump_path,
             description=f"Merge of models {', '.join(model_names)}",
             model_format="diffusers",
             variant=ModelVariantType.Normal.value,
