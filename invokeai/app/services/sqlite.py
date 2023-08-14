@@ -29,7 +29,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
         self._conn = sqlite3.connect(
             self._filename, check_same_thread=False
         )  # TODO: figure out a better threading solution
-        self._conn.execute('pragma journal_mode=wal')
+        self._conn.execute("pragma journal_mode=wal")
         self._cursor = self._conn.cursor()
 
         self._create_table()

@@ -39,7 +39,7 @@ def simple_batches():
     batches = [
         Batch(
             node_id=1,
-            data= [
+            data=[
                 {
                     "prompt": "Tomato sushi",
                 },
@@ -55,11 +55,11 @@ def simple_batches():
                 {
                     "prompt": "Tea sushi",
                 },
-            ]
+            ],
         ),
         Batch(
             node_id="2",
-            data= [
+            data=[
                 {
                     "prompt2": "Ume sushi",
                 },
@@ -75,8 +75,8 @@ def simple_batches():
                 {
                     "prompt2": "Cha sushi",
                 },
-            ]
-        )
+            ],
+        ),
     ]
     return batches
 
@@ -184,6 +184,7 @@ def test_handles_errors(mock_invoker: Invoker):
     assert g.is_complete()
 
     assert all((i in g.errors for i in g.source_prepared_mapping["1"]))
+
 
 def test_can_create_batch(mock_invoker: Invoker, simple_graph, simple_batches):
     batch_process_res = mock_invoker.services.batch_manager.create_batch_process(

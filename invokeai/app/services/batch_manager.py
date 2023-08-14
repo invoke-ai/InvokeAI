@@ -19,6 +19,7 @@ from invokeai.app.services.batch_manager_storage import (
     BatchSessionChanges,
 )
 
+
 class BatchProcessResponse(BaseModel):
     batch_id: str = Field(description="ID for the batch")
     session_ids: list[str] = Field(description="List of session IDs created for this batch")
@@ -75,9 +76,7 @@ class BatchManager(BatchManagerBase):
         batch_session = self.__batch_process_storage.get_session(data["graph_execution_state_id"])
         if not batch_session:
             return
-        updateSession = BatchSessionChanges(
-            state='error' if err else 'completed'
-        )
+        updateSession = BatchSessionChanges(state="error" if err else "completed")
         batch_session = self.__batch_process_storage.update_session_state(
             batch_session.batch_id,
             batch_session.session_id,
@@ -105,18 +104,18 @@ class BatchManager(BatchManagerBase):
         return GraphExecutionState(graph=graph)
 
     def run_batch_process(self, batch_id: str):
-        try: 
+        try:
             created_session = self.__batch_process_storage.get_created_session(batch_id)
         except BatchSessionNotFoundException:
             return
         ges = self.__invoker.services.graph_execution_manager.get(created_session.session_id)
         self.__invoker.invoke(ges, invoke_all=True)
-    
+
     def _valid_batch_config(self, batch_process: BatchProcess) -> bool:
         # TODO: Check that the node_ids in the batches are unique
         # TODO: Validate data types are correct for each batch data
         return True
-    
+
     def create_batch_process(self, batches: list[Batch], graph: Graph) -> BatchProcessResponse:
         batch_process = BatchProcess(
             batches=batches,
@@ -130,7 +129,7 @@ class BatchManager(BatchManagerBase):
             batch_id=batch_process.batch_id,
             session_ids=[session.session_id for session in sessions],
         )
-    
+
     def _create_sessions(self, batch_process: BatchProcess) -> list[BatchSession]:
         batch_indices = list()
         sessions = list()
@@ -140,11 +139,7 @@ class BatchManager(BatchManagerBase):
         for bi in all_batch_indices:
             ges = self._create_batch_session(batch_process, bi)
             self.__invoker.services.graph_execution_manager.set(ges)
-            batch_session = BatchSession(
-                batch_id=batch_process.batch_id,
-                session_id=ges.id,
-                state="created"
-            )
+            batch_session = BatchSession(batch_id=batch_process.batch_id, session_id=ges.id, state="created")
             sessions.append(self.__batch_process_storage.create_session(batch_session))
         return sessions
 
