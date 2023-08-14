@@ -1,4 +1,10 @@
-import { Box, Flex, Spinner, SystemStyleObject } from '@chakra-ui/react';
+import {
+  Box,
+  Flex,
+  Spinner,
+  SystemStyleObject,
+  useColorModeValue,
+} from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
@@ -16,6 +22,8 @@ import {
   ControlNetConfig,
   controlNetImageChanged,
 } from '../store/controlNetSlice';
+import { FaUndo } from 'react-icons/fa';
+import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
 
 type Props = {
   controlNet: ControlNetConfig;
@@ -93,6 +101,11 @@ const ControlNetImagePreview = (props: Props) => {
     [controlNetId]
   );
 
+  const resetIconShadow = useColorModeValue(
+    `drop-shadow(0px 0px 0.1rem var(--invokeai-colors-base-600))`,
+    `drop-shadow(0px 0px 0.1rem var(--invokeai-colors-base-800))`
+  );
+
   const shouldShowProcessedImage =
     controlImage &&
     processedControlImage &&
@@ -119,11 +132,15 @@ const ControlNetImagePreview = (props: Props) => {
         droppableData={droppableData}
         imageDTO={controlImage}
         isDropDisabled={shouldShowProcessedImage || !isEnabled}
-        onClickReset={handleResetControlImage}
         postUploadAction={postUploadAction}
-        resetTooltip="Reset Control Image"
-        withResetIcon={Boolean(controlImage)}
-      />
+      >
+        <IAIDndImageIcon
+          onClick={handleResetControlImage}
+          icon={controlImage ? <FaUndo /> : undefined}
+          tooltip="Reset Control Image"
+        />
+      </IAIDndImage>
+
       <Box
         sx={{
           position: 'absolute',
@@ -143,10 +160,13 @@ const ControlNetImagePreview = (props: Props) => {
           imageDTO={processedControlImage}
           isUploadDisabled={true}
           isDropDisabled={!isEnabled}
-          onClickReset={handleResetControlImage}
-          resetTooltip="Reset Control Image"
-          withResetIcon={Boolean(controlImage)}
-        />
+        >
+          <IAIDndImageIcon
+            onClick={handleResetControlImage}
+            icon={controlImage ? <FaUndo /> : undefined}
+            tooltip="Reset Control Image"
+          />
+        </IAIDndImage>
       </Box>
       {pendingControlImages.includes(controlNetId) && (
         <Flex
