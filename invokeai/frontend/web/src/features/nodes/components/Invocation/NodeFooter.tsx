@@ -16,6 +16,9 @@ import { some } from 'lodash-es';
 import { ChangeEvent, memo, useCallback, useMemo } from 'react';
 import { NodeProps } from 'reactflow';
 
+export const IMAGE_FIELDS = ['ImageField', 'ImageCollection'];
+export const FOOTER_FIELDS = IMAGE_FIELDS;
+
 type Props = {
   nodeProps: NodeProps<InvocationNodeData>;
   nodeTemplate: InvocationTemplate;
@@ -28,7 +31,7 @@ const NodeFooter = (props: Props) => {
   const hasImageOutput = useMemo(
     () =>
       some(nodeTemplate?.outputs, (output) =>
-        ['ImageField', 'ImageCollection'].includes(output.type)
+        IMAGE_FIELDS.includes(output.type)
       ),
     [nodeTemplate?.outputs]
   );
