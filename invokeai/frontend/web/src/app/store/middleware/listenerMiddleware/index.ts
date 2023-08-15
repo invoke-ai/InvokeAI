@@ -80,6 +80,8 @@ import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
+import { addImagesStarredListener } from './listeners/imagesStarred';
+import { addImagesUnstarredListener } from './listeners/imagesUnstarred';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -120,6 +122,10 @@ addImageDeletedFulfilledListener();
 addImageDeletedRejectedListener();
 addDeleteBoardAndImagesFulfilledListener();
 addImageToDeleteSelectedListener();
+
+// Image starred
+addImagesStarredListener();
+addImagesUnstarredListener();
 
 // User Invoked
 addUserInvokedCanvasListener();
