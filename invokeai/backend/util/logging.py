@@ -1,7 +1,6 @@
 # Copyright (c) 2023 Lincoln D. Stein and The InvokeAI Development Team
 
-"""
-invokeai.backend.util.logging
+"""invokeai.backend.util.logging
 
 Logging class for InvokeAI that produces console messages
 
@@ -40,7 +39,10 @@ object:
 
  config = InvokeAIAppConfig.get_config()
  config.parse_args()
- logger = InvokeAILogger.getLogger(config=config)
+ logger = InvokeAILogger.get_logger(config=config)
+
+For backward compatibility, getLogger() is an alias for get_logger(),
+but without the camel case.
 
 ### Three command-line options control logging:
 
@@ -173,6 +175,7 @@ InvokeAI:
     log_level: info
     log_format: color
 ```
+
 """
 
 import logging.handlers
@@ -227,6 +230,7 @@ def basicConfig(**kwargs):
 
 def getLogger(name: str = None) -> logging.Logger:
     return InvokeAILogger.getLogger(name)
+
 
 _FACILITY_MAP = (
     dict(
