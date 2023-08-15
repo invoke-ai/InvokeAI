@@ -391,7 +391,7 @@ export const imagesApi = api.injectEndpoints({
      * Star a list of images.
      */
     starImages: build.mutation<
-      void,
+      { images: string[] },
       { images: ImageDTO[] }
     >({
       query: ({ images }) => ({
@@ -498,7 +498,7 @@ export const imagesApi = api.injectEndpoints({
      * Unstar a list of images.
      */
     unstarImages: build.mutation<
-      void,
+      { images: string[] },
       { images: ImageDTO[] }
     >({
       query: ({ images }) => ({
