@@ -4,7 +4,7 @@ Test the refactored model config classes.
 
 from pathlib import Path
 
-from invokeai.backend.model_management2.model_config import (
+from invokeai.backend.model_manager.config import (
     ModelConfigFactory,
     InvalidModelConfigException,
     MainCheckpointConfig,

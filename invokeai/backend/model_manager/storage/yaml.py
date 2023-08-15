@@ -47,7 +47,7 @@ from typing import Union, Set, List, Optional
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
-from ..model_config import (
+from ..config import (
     ModelConfigBase,
     ModelConfigFactory,
     BaseModelType,

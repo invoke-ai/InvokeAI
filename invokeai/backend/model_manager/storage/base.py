@@ -7,7 +7,7 @@ Abstract base class for storing and retrieving model configuration records.
 from abc import ABC, abstractmethod
 from typing import Union, Set, List, Optional
 
-from ..model_config import ModelConfigBase, BaseModelType, ModelType
+from ..config import ModelConfigBase, BaseModelType, ModelType
 
 
 class DuplicateModelException(Exception):

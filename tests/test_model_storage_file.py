@@ -6,12 +6,12 @@ import pytest
 
 from hashlib import sha256
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_management2.storage.yaml import (
+from invokeai.backend.model_manager.storage import (
     ModelConfigStoreYAML,
     ModelConfigStore,
     UnknownModelException,
 )
-from invokeai.backend.model_management2.model_config import (
+from invokeai.backend.model_manager.config import (
     TextualInversionConfig,
     DiffusersConfig,
     VaeDiffusersConfig,

@@ -4,7 +4,7 @@ Implementation of ModelConfigStore using a SQLite3 database
 
 Typical usage:
 
-  from invokeai.backend.model_management2.storage.yaml import ModelConfigStoreSQL
+  from invokeai.backend.model_manager import ModelConfigStoreSQL
   store = ModelConfigStoreYAML("./configs/models.yaml")
   config = dict(
         path='/tmp/pokemon.bin',
@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Union, List, Optional, Set
 
 
-from ..model_config import (
+from ..config import (
     ModelConfigBase,
     ModelConfigFactory,
     BaseModelType,

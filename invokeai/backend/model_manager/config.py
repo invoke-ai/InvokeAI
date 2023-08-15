@@ -4,7 +4,7 @@ Configuration definitions for image generation models.
 
 Typical usage:
 
-  from invokeai.backend.model_management2.model_config import ModelConfigFactory
+  from invokeai.backend.model_manager import ModelConfigFactory
   raw = dict(path='models/sd-1/main/foo.ckpt',
              name='foo',
              base_model='sd-1',
