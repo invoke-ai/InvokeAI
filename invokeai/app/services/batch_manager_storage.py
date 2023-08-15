@@ -451,7 +451,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
                 (batch_id,),
             )
 
-            result = cast(list[sqlite3.Row], self._cursor.fetchone())
+            result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
         except sqlite3.Error as e:
             self._conn.rollback()
             raise BatchSessionNotFoundException from e
