@@ -16,7 +16,7 @@ from .baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    UITypeHint,
+    UIType,
     tags,
     title,
 )

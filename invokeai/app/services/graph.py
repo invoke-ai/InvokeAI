@@ -17,7 +17,7 @@ from ..invocations.baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    UITypeHint,
+    UIType,
 )
 
 # in 3.10 this would be "from types import NoneType"
@@ -179,7 +179,7 @@ class IterateInvocationOutput(BaseInvocationOutput):
     type: Literal["iterate_output"] = "iterate_output"
 
     item: Any = OutputField(
-        description="The item being iterated over", title="Collection Item", ui_type_hint=UITypeHint.CollectionItem
+        description="The item being iterated over", title="Collection Item", ui_type=UIType.CollectionItem
     )
 
 
@@ -190,7 +190,7 @@ class IterateInvocation(BaseInvocation):
     type: Literal["iterate"] = "iterate"
 
     collection: list[Any] = InputField(
-        description="The list of items to iterate over", default_factory=list, ui_type_hint=UITypeHint.Collection
+        description="The list of items to iterate over", default_factory=list, ui_type=UIType.Collection
     )
     index: int = InputField(description="The index, will be provided on executed iterators", default=0, ui_hidden=True)
 
@@ -203,7 +203,7 @@ class CollectInvocationOutput(BaseInvocationOutput):
     type: Literal["collect_output"] = "collect_output"
 
     collection: list[Any] = OutputField(
-        description="The collection of input items", title="Collection", ui_type_hint=UITypeHint.Collection
+        description="The collection of input items", title="Collection", ui_type=UIType.Collection
     )
 
 
@@ -214,7 +214,7 @@ class CollectInvocation(BaseInvocation):
 
     item: Any = InputField(
         description="The item to collect (all inputs must be of the same type)",
-        ui_type_hint=UITypeHint.CollectionItem,
+        ui_type=UIType.CollectionItem,
         title="Collection Item",
         input=Input.Connection,
     )

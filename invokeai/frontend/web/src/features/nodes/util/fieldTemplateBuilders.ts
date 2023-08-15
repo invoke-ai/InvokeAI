@@ -439,9 +439,9 @@ export const getFieldType = (
 ): FieldType => {
   let fieldType = '';
 
-  const { ui_type_hint } = schemaObject;
-  if (ui_type_hint) {
-    fieldType = ui_type_hint;
+  const { ui_type } = schemaObject;
+  if (ui_type) {
+    fieldType = ui_type;
   } else if (!schemaObject.type) {
     // console.log('refObject', schemaObject);
     // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
@@ -493,13 +493,13 @@ export const buildInputFieldTemplate = (
   const fieldType = getFieldType(fieldSchema);
   // console.log('input fieldType', fieldType);
 
-  const { input, ui_hidden, ui_component, ui_type_hint } = fieldSchema;
+  const { input, ui_hidden, ui_component, ui_type } = fieldSchema;
 
   const extra = {
     input,
     ui_hidden,
     ui_component,
-    ui_type_hint,
+    ui_type,
     required: nodeSchema.required?.includes(name) ?? false,
   };
 

@@ -8,7 +8,7 @@ from pydantic import validator
 from invokeai.app.invocations.primitives import ImageCollectionOutput, ImageField, IntegerCollectionOutput
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, UITypeHint, tags, title
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, UIType, tags, title
 
 
 @title("Integer Range")
@@ -81,7 +81,7 @@ class ImageCollectionInvocation(BaseInvocation):
 
     # Inputs
     images: list[ImageField] = InputField(
-        default=[], description="The image collection to load", ui_type_hint=UITypeHint.ImageCollection
+        default=[], description="The image collection to load", ui_type=UIType.ImageCollection
     )
 
     def invoke(self, context: InvocationContext) -> ImageCollectionOutput:

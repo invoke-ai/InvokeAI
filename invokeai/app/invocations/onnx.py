@@ -31,7 +31,7 @@ from .baseinvocation import (
     InvocationContext,
     OutputField,
     UIComponent,
-    UITypeHint,
+    UIType,
     tags,
     title,
 )
@@ -167,7 +167,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
         default=7.5,
         ge=1,
         description=FieldDescriptions.cfg_scale,
-        ui_type_hint=UITypeHint.Float,
+        ui_type=UIType.Float,
     )
     scheduler: SAMPLER_NAME_VALUES = InputField(
         default="euler", description=FieldDescriptions.scheduler, input=Input.Direct
@@ -180,7 +180,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     control: Optional[Union[ControlField, list[ControlField]]] = InputField(
         default=None,
         description=FieldDescriptions.control,
-        ui_type_hint=UITypeHint.Control,
+        ui_type=UIType.Control,
     )
     # seamless:   bool = InputField(default=False, description="Whether or not to generate an image that can tile without seams", )
     # seamless_axes: str = InputField(default="", description="The axes to tile the image on, 'x' and/or 'y'")
@@ -416,7 +416,7 @@ class OnnxModelLoaderInvocation(BaseInvocation):
 
     # Inputs
     model: OnnxModelField = InputField(
-        description=FieldDescriptions.onnx_main_model, input=Input.Direct, ui_type_hint=UITypeHint.ONNXModel
+        description=FieldDescriptions.onnx_main_model, input=Input.Direct, ui_type=UIType.ONNXModel
     )
 
     def invoke(self, context: InvocationContext) -> ONNXModelLoaderOutput:

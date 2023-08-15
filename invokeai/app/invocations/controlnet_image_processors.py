@@ -39,7 +39,7 @@ from .baseinvocation import (
     Input,
     InvocationContext,
     OutputField,
-    UITypeHint,
+    UIType,
     tags,
     title,
 )
@@ -109,7 +109,7 @@ class ControlNetInvocation(BaseInvocation):
         default="lllyasviel/sd-controlnet-canny", description=FieldDescriptions.controlnet_model, input=Input.Direct
     )
     control_weight: Union[float, List[float]] = InputField(
-        default=1.0, description="The weight given to the ControlNet", ui_type_hint=UITypeHint.Float
+        default=1.0, description="The weight given to the ControlNet", ui_type=UIType.Float
     )
     begin_step_percent: float = InputField(
         default=0, ge=-1, le=2, description="When the ControlNet is first applied (% of total steps)"
