@@ -47,7 +47,7 @@ async def create_session(
     },
 )
 async def create_batch(
-    graph: Optional[Graph] = Body(default=None, description="The graph to initialize the session with"),
+    graph: Optional[Graph] = Body(description="The graph to initialize the session with"),
     batches: list[Batch] = Body(description="Batch config to apply to the given graph"),
 ) -> BatchProcessResponse:
     """Creates and starts a new new batch process"""
