@@ -28,7 +28,7 @@ const ParamSDXLRefinerStart = () => {
   );
 
   const handleReset = useCallback(
-    () => dispatch(setRefinerStart(0.7)),
+    () => dispatch(setRefinerStart(0.8)),
     [dispatch]
   );
 
