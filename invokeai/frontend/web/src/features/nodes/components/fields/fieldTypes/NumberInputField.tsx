@@ -13,16 +13,14 @@ import {
   FloatInputFieldValue,
   IntegerInputFieldTemplate,
   IntegerInputFieldValue,
-  SeedInputFieldTemplate,
-  SeedInputFieldValue,
 } from 'features/nodes/types/types';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { FieldComponentProps } from './types';
 
 const NumberInputFieldComponent = (
   props: FieldComponentProps<
-    IntegerInputFieldValue | FloatInputFieldValue | SeedInputFieldValue,
-    IntegerInputFieldTemplate | FloatInputFieldTemplate | SeedInputFieldTemplate
+    IntegerInputFieldValue | FloatInputFieldValue,
+    IntegerInputFieldTemplate | FloatInputFieldTemplate
   >
 ) => {
   const { nodeData, field, fieldTemplate } = props;
@@ -32,7 +30,7 @@ const NumberInputFieldComponent = (
     String(field.value)
   );
   const isIntegerField = useMemo(
-    () => fieldTemplate.type === 'integer' || fieldTemplate.type === 'Seed',
+    () => fieldTemplate.type === 'integer',
     [fieldTemplate.type]
   );
 
