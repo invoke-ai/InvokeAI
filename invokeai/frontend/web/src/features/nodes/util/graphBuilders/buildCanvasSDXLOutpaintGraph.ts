@@ -268,7 +268,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       {
         source: {
           node_id: MASK_FROM_ALPHA,
-          field: 'mask',
+          field: 'image',
         },
         destination: {
           node_id: MASK_COMBINE,
