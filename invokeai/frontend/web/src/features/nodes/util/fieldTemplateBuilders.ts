@@ -25,9 +25,8 @@ import {
   LoRAModelInputFieldTemplate,
   MainModelInputFieldTemplate,
   OutputFieldTemplate,
-  SDXLRefinerModelInputFieldTemplate,
   SDXLMainModelInputFieldTemplate,
-  SeedInputFieldTemplate,
+  SDXLRefinerModelInputFieldTemplate,
   StringInputFieldTemplate,
   UNetInputFieldTemplate,
   VaeInputFieldTemplate,
@@ -68,39 +67,6 @@ const buildIntegerInputFieldTemplate = ({
   const template: IntegerInputFieldTemplate = {
     ...baseField,
     type: 'integer',
-    default: schemaObject.default ?? 0,
-  };
-
-  if (schemaObject.multipleOf !== undefined) {
-    template.multipleOf = schemaObject.multipleOf;
-  }
-
-  if (schemaObject.maximum !== undefined) {
-    template.maximum = schemaObject.maximum;
-  }
-
-  if (schemaObject.exclusiveMaximum !== undefined) {
-    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
-  }
-
-  if (schemaObject.minimum !== undefined) {
-    template.minimum = schemaObject.minimum;
-  }
-
-  if (schemaObject.exclusiveMinimum !== undefined) {
-    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
-  }
-
-  return template;
-};
-
-const buildSeedInputFieldTemplate = ({
-  schemaObject,
-  baseField,
-}: BuildInputFieldArg): SeedInputFieldTemplate => {
-  const template: SeedInputFieldTemplate = {
-    ...baseField,
-    type: 'Seed',
     default: schemaObject.default ?? 0,
   };
 
@@ -618,12 +584,6 @@ export const buildInputFieldTemplate = (
   }
   if (fieldType === 'boolean') {
     return buildBooleanInputFieldTemplate({
-      schemaObject: fieldSchema,
-      baseField,
-    });
-  }
-  if (fieldType === 'Seed') {
-    return buildSeedInputFieldTemplate({
       schemaObject: fieldSchema,
       baseField,
     });

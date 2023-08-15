@@ -44,6 +44,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: 'Enums are values that may be one of a number of options.',
     color: 'blue.500',
   },
+  array: {
+    title: 'Array',
+    description: 'Enums are values that may be one of a number of options.',
+    color: 'base.500',
+  },
   ImageField: {
     title: 'Image',
     description: 'Images may be passed between nodes.',
@@ -54,9 +59,19 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: 'Latents may be passed between nodes.',
     color: 'pink.500',
   },
+  LatentsCollection: {
+    title: 'Latents Collection',
+    description: 'Latents may be passed between nodes.',
+    color: 'pink.500',
+  },
   ConditioningField: {
     color: 'cyan.500',
     title: 'Conditioning',
+    description: 'Conditioning may be passed between nodes.',
+  },
+  ConditioningCollection: {
+    color: 'cyan.500',
+    title: 'Conditioning Collection',
     description: 'Conditioning may be passed between nodes.',
   },
   ImageCollection: {
@@ -139,15 +154,15 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     title: 'Float Collection',
     description: 'A collection of floats.',
   },
+  ColorCollection: {
+    color: 'base.500',
+    title: 'Color Collection',
+    description: 'A collection of colors.',
+  },
   FilePath: {
     color: 'base.500',
     title: 'File Path',
     description: 'A path to a file.',
-  },
-  LoRAField: {
-    color: 'base.500',
-    title: 'LoRA',
-    description: 'LoRA field.',
   },
   ONNXModelField: {
     color: 'base.500',
@@ -158,11 +173,6 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'base.500',
     title: 'SDXL Model',
     description: 'SDXL model field.',
-  },
-  Seed: {
-    color: 'green.500',
-    title: 'Seed',
-    description: 'A seed for random number generation.',
   },
   StringCollection: {
     color: 'yellow.500',

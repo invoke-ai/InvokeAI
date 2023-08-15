@@ -70,19 +70,3 @@ class RandomRangeInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
         rng = np.random.default_rng(self.seed)
         return IntegerCollectionOutput(collection=list(rng.integers(low=self.low, high=self.high, size=self.size)))
-
-
-@title("Image Collection")
-@tags("image", "collection")
-class ImageCollectionInvocation(BaseInvocation):
-    """Load a collection of images and provide it as output."""
-
-    type: Literal["image_collection"] = "image_collection"
-
-    # Inputs
-    images: list[ImageField] = InputField(
-        default=[], description="The image collection to load", ui_type=UIType.ImageCollection
-    )
-
-    def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
-        return ImageCollectionOutput(collection=self.images)

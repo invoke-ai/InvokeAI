@@ -64,8 +64,7 @@ const InputFieldRenderer = (props: InputFieldProps) => {
 
   if (
     (type === 'integer' && fieldTemplate.type === 'integer') ||
-    (type === 'float' && fieldTemplate.type === 'float') ||
-    (type === 'Seed' && fieldTemplate.type === 'Seed')
+    (type === 'float' && fieldTemplate.type === 'float')
   ) {
     return (
       <NumberInputField

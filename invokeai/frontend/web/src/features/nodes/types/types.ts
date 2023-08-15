@@ -56,15 +56,28 @@ export type FieldUIConfig = {
 
 // TODO: Get this from the OpenAPI schema? may be tricky...
 export const zFieldType = z.enum([
+  // region Primitives
   'integer',
   'float',
   'boolean',
   'string',
-  'enum',
+  'array',
   'ImageField',
   'LatentsField',
   'ConditioningField',
   'ControlField',
+  'ColorField',
+  'ImageCollection',
+  'ConditioningCollection',
+  'ColorCollection',
+  'LatentsCollection',
+  'IntegerCollection',
+  'FloatCollection',
+  'StringCollection',
+  'BooleanCollection',
+  // endregion
+
+  // region Models
   'MainModelField',
   'SDXLMainModelField',
   'SDXLRefinerModelField',
@@ -74,18 +87,18 @@ export const zFieldType = z.enum([
   'ControlNetModelField',
   'UNetField',
   'VaeField',
-  'LoRAField',
   'ClipField',
-  'ColorField',
-  'ImageCollection',
-  'IntegerCollection',
-  'FloatCollection',
-  'StringCollection',
-  'BooleanCollection',
-  'Seed',
-  'FilePath',
+  // endregion
+
+  // region Iterate/Collect
   'Collection',
   'CollectionItem',
+  // endregion
+
+  // region Misc
+  'FilePath',
+  'enum',
+  // endregion
 ]);
 
 export type FieldType = z.infer<typeof zFieldType>;
@@ -134,7 +147,6 @@ export type InputFieldValue =
  */
 export type InputFieldTemplate =
   | IntegerInputFieldTemplate
-  | SeedInputFieldTemplate
   | FloatInputFieldTemplate
   | StringInputFieldTemplate
   | BooleanInputFieldTemplate
@@ -321,16 +333,6 @@ export type InputFieldTemplateBase = {
 
 export type IntegerInputFieldTemplate = InputFieldTemplateBase & {
   type: 'integer';
-  default: number;
-  multipleOf?: number;
-  maximum?: number;
-  exclusiveMaximum?: boolean;
-  minimum?: number;
-  exclusiveMinimum?: boolean;
-};
-
-export type SeedInputFieldTemplate = InputFieldTemplateBase & {
-  type: 'Seed';
   default: number;
   multipleOf?: number;
   maximum?: number;
