@@ -286,3 +286,30 @@ async def delete_images_from_list(
         return DeleteImagesFromListResult(deleted_images=deleted_images)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to delete images")
+    
+    
+@images_router.post("/star", operation_id="star_images_in_list")
+async def star_images_in_list(
+    image_names: list[str] = Body(description="The list of names of images to star", embed=True),
+):
+    try:
+        for image_name in image_names:
+            try:
+                ApiDependencies.invoker.services.images.update(image_name, changes=ImageRecordChanges(starred=True))
+            except:
+                pass
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to star images")
+    
+@images_router.post("/unstar", operation_id="unstar_images_in_list")
+async def unstar_images_in_list(
+    image_names: list[str] = Body(description="The list of names of images to unstar", embed=True),
+):
+    try:
+        for image_name in image_names:
+            try:
+                ApiDependencies.invoker.services.images.update(image_name, changes=ImageRecordChanges(starred=False))
+            except:
+                pass
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to unstar images")
