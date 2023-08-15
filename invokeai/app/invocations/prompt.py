@@ -7,7 +7,7 @@ from pydantic import validator
 
 from invokeai.app.invocations.primitives import StringCollectionOutput
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, UIComponent, UITypeHint, tags, title
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, UIComponent, UIType, tags, title
 
 
 @title("Dynamic Prompt")
@@ -41,7 +41,7 @@ class PromptsFromFileInvocation(BaseInvocation):
     type: Literal["prompt_from_file"] = "prompt_from_file"
 
     # Inputs
-    file_path: str = InputField(description="Path to prompt text file", ui_type_hint=UITypeHint.FilePath)
+    file_path: str = InputField(description="Path to prompt text file", ui_type=UIType.FilePath)
     pre_prompt: Optional[str] = InputField(
         default=None, description="String to prepend to each prompt", ui_component=UIComponent.Textarea
     )

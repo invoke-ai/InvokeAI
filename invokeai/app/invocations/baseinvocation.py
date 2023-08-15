@@ -90,7 +90,7 @@ class Input(str, Enum):
     Any = "any"
 
 
-class UITypeHint(str, Enum):
+class UIType(str, Enum):
     """
     Type hints for the UI.
     If a field should be provided a data type that does not exactly match the python type of the field, \
@@ -164,7 +164,7 @@ class _InputField(BaseModel):
 
     input: Input
     ui_hidden: bool
-    ui_type_hint: Optional[UITypeHint]
+    ui_type: Optional[UIType]
     ui_component: Optional[UIComponent]
 
 
@@ -177,7 +177,7 @@ class _OutputField(BaseModel):
     """
 
     ui_hidden: bool
-    ui_type_hint: Optional[UITypeHint]
+    ui_type: Optional[UIType]
 
 
 def InputField(
@@ -208,7 +208,7 @@ def InputField(
     discriminator: Optional[str] = None,
     repr: bool = True,
     input: Input = Input.Any,
-    ui_type_hint: Optional[UITypeHint] = None,
+    ui_type: Optional[UIType] = None,
     ui_component: Optional[UIComponent] = None,
     ui_hidden: bool = False,
     **kwargs: Any,
@@ -224,12 +224,12 @@ def InputField(
       `Input.Connection` means the value must be provided by a connection. \
       `Input.Any` means either will do.
 
-    :param UITypeHint ui_type_hint: [None] Optionally provides an extra type hint for the UI. \
+    :param UIType ui_type: [None] Optionally provides an extra type hint for the UI. \
       In some situations, the field's type is not enough to infer the correct UI type. \
       For example, model selection fields should render a dropdown UI component to select a model. \
       Internally, there is no difference between SD-1, SD-2 and SDXL model fields, they all use \
       `MainModelField`. So to ensure the base-model-specific UI is rendered, you can use \
-      `UITypeHint.SDXLMainModelField` to indicate that the field is an SDXL main model field.
+      `UIType.SDXLMainModelField` to indicate that the field is an SDXL main model field.
       
     :param UIComponent ui_component: [None] Optionally specifies a specific component to use in the UI. \
       The UI will always render a suitable component, but sometimes you want something different than the default. \
@@ -266,7 +266,7 @@ def InputField(
         discriminator=discriminator,
         repr=repr,
         input=input,
-        ui_type_hint=ui_type_hint,
+        ui_type=ui_type,
         ui_component=ui_component,
         ui_hidden=ui_hidden,
         **kwargs,
@@ -300,7 +300,7 @@ def OutputField(
     regex: Optional[str] = None,
     discriminator: Optional[str] = None,
     repr: bool = True,
-    ui_type_hint: Optional[UITypeHint] = None,
+    ui_type: Optional[UIType] = None,
     ui_hidden: bool = False,
     **kwargs: Any,
 ) -> Any:
@@ -310,12 +310,12 @@ def OutputField(
     This is a wrapper for Pydantic's [Field](https://docs.pydantic.dev/1.10/usage/schema/#field-customization) \
     that adds a few extra parameters to support graph execution and the node editor UI.
 
-    :param UITypeHint ui_type_hint: [None] Optionally provides an extra type hint for the UI. \
+    :param UIType ui_type: [None] Optionally provides an extra type hint for the UI. \
       In some situations, the field's type is not enough to infer the correct UI type. \
       For example, model selection fields should render a dropdown UI component to select a model. \
       Internally, there is no difference between SD-1, SD-2 and SDXL model fields, they all use \
       `MainModelField`. So to ensure the base-model-specific UI is rendered, you can use \
-      `UITypeHint.SDXLMainModelField` to indicate that the field is an SDXL main model field.
+      `UIType.SDXLMainModelField` to indicate that the field is an SDXL main model field.
 
     : param bool ui_hidden: [False] Specifies whether or not this field should be hidden in the UI. \
     """
@@ -346,7 +346,7 @@ def OutputField(
         regex=regex,
         discriminator=discriminator,
         repr=repr,
-        ui_type_hint=ui_type_hint,
+        ui_type=ui_type,
         ui_hidden=ui_hidden,
         **kwargs,
     )

@@ -14,7 +14,7 @@ from .baseinvocation import (
     InvocationContext,
     OutputField,
     UIComponent,
-    UITypeHint,
+    UIType,
     tags,
     title,
 )
@@ -43,7 +43,7 @@ class BooleanCollectionOutput(BaseInvocationOutput):
 
     # Outputs
     collection: list[bool] = OutputField(
-        default_factory=list, description="The output boolean collection", ui_type_hint=UITypeHint.BooleanCollection
+        default_factory=list, description="The output boolean collection", ui_type=UIType.BooleanCollection
     )
 
 
@@ -80,7 +80,7 @@ class IntegerCollectionOutput(BaseInvocationOutput):
 
     # Outputs
     collection: list[int] = OutputField(
-        default_factory=list, description="The int collection", ui_type_hint=UITypeHint.IntegerCollection
+        default_factory=list, description="The int collection", ui_type=UIType.IntegerCollection
     )
 
 
@@ -117,7 +117,7 @@ class FloatCollectionOutput(BaseInvocationOutput):
 
     # Outputs
     collection: list[float] = OutputField(
-        default_factory=list, description="The float collection", ui_type_hint=UITypeHint.FloatCollection
+        default_factory=list, description="The float collection", ui_type=UIType.FloatCollection
     )
 
 
@@ -154,7 +154,7 @@ class StringCollectionOutput(BaseInvocationOutput):
 
     # Outputs
     collection: list[str] = OutputField(
-        default_factory=list, description="The output strings", ui_type_hint=UITypeHint.StringCollection
+        default_factory=list, description="The output strings", ui_type=UIType.StringCollection
     )
 
 
@@ -199,7 +199,7 @@ class ImageCollectionOutput(BaseInvocationOutput):
 
     # Outputs
     collection: list[ImageField] = OutputField(
-        default_factory=list, description="The output images", ui_type_hint=UITypeHint.ImageCollection
+        default_factory=list, description="The output images", ui_type=UIType.ImageCollection
     )
 
 
@@ -256,7 +256,7 @@ class LatentsCollectionOutput(BaseInvocationOutput):
     latents: list[LatentsField] = OutputField(
         default_factory=list,
         description=FieldDescriptions.latents,
-        ui_type_hint=UITypeHint.LatentsCollection,
+        ui_type=UIType.LatentsCollection,
     )
 
 
@@ -315,7 +315,7 @@ class ColorCollectionOutput(BaseInvocationOutput):
 
     # Outputs
     collection: list[ColorField] = OutputField(
-        default_factory=list, description="The output colors", ui_type_hint=UITypeHint.ColorCollection
+        default_factory=list, description="The output colors", ui_type=UIType.ColorCollection
     )
 
 
@@ -361,7 +361,7 @@ class ConditioningCollectionOutput(BaseInvocationOutput):
     collection: list[ConditioningField] = OutputField(
         default_factory=list,
         description="The output conditioning tensors",
-        ui_type_hint=UITypeHint.ConditioningCollection,
+        ui_type=UIType.ConditioningCollection,
     )
 
 

@@ -51,7 +51,7 @@ from .baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    UITypeHint,
+    UIType,
     tags,
     title,
 )
@@ -116,7 +116,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     noise: Optional[LatentsField] = InputField(description=FieldDescriptions.noise, input=Input.Connection)
     steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
     cfg_scale: Union[float, List[float]] = InputField(
-        default=7.5, ge=1, description=FieldDescriptions.cfg_scale, ui_type_hint=UITypeHint.Float
+        default=7.5, ge=1, description=FieldDescriptions.cfg_scale, ui_type=UIType.Float
     )
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
