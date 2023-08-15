@@ -67,7 +67,7 @@ IMAGE_DTO_COLS = ", ".join(
                 "created_at",
                 "updated_at",
                 "deleted_at",
-                "pinned"
+                "starred"
             ],
         )
     )
@@ -140,7 +140,7 @@ class ImageRecordStorageBase(ABC):
         node_id: Optional[str],
         metadata: Optional[dict],
         is_intermediate: bool = False,
-        pinned: bool = False
+        starred: bool = False
     ) -> datetime:
         """Saves an image record."""
         pass
@@ -205,10 +205,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self._cursor.execute("PRAGMA table_info(images)")
         columns = [column[1] for column in self._cursor.fetchall()]
         
-        if "pinned" not in columns:
+        if "starred" not in columns:
             self._cursor.execute(
                 """--sql
-                ALTER TABLE images ADD COLUMN pinned BOOLEAN DEFAULT FALSE;
+                ALTER TABLE images ADD COLUMN starred BOOLEAN DEFAULT FALSE;
                 """
             )
 
@@ -236,7 +236,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
         self._cursor.execute(
             """--sql
-            CREATE INDEX IF NOT EXISTS idx_images_pinned ON images(pinned);
+            CREATE INDEX IF NOT EXISTS idx_images_starred ON images(starred);
             """
         )
 
@@ -339,15 +339,15 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     (changes.is_intermediate, image_name),
                 )
 
-            # Change the image's `pinned`` state
-            if changes.pinned is not None:
+            # Change the image's `starred`` state
+            if changes.starred is not None:
                 self._cursor.execute(
                     f"""--sql
                     UPDATE images
-                    SET pinned = ?
+                    SET starred = ?
                     WHERE image_name = ?;
                     """,
-                    (changes.pinned, image_name),
+                    (changes.starred, image_name),
                 )
 
             self._conn.commit()
@@ -426,7 +426,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_params.append(board_id)
 
             query_pagination = """--sql
-            ORDER BY images.pinned DESC, images.created_at DESC LIMIT ? OFFSET ?
+            ORDER BY images.starred DESC, images.created_at DESC LIMIT ? OFFSET ?
             """
 
             # Final images query with pagination
@@ -529,7 +529,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         node_id: Optional[str],
         metadata: Optional[dict],
         is_intermediate: bool = False,
-        pinned: bool = False
+        starred: bool = False
     ) -> datetime:
         try:
             metadata_json = None if metadata is None else json.dumps(metadata)
@@ -546,7 +546,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     session_id,
                     metadata,
                     is_intermediate,
-                    pinned
+                    starred
                     )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
@@ -560,7 +560,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     session_id,
                     metadata_json,
                     is_intermediate,
-                    pinned,
+                    starred,
                 ),
             )
             self._conn.commit()
