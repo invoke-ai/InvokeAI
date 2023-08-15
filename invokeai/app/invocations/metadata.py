@@ -67,7 +67,10 @@ class CoreMetadata(BaseModelExcludeNull):
     )
     refiner_steps: Union[int, None] = Field(default=None, description="The number of steps used for the refiner")
     refiner_scheduler: Union[str, None] = Field(default=None, description="The scheduler used for the refiner")
-    refiner_aesthetic_store: Union[float, None] = Field(
+    refiner_positive_aesthetic_store: Union[float, None] = Field(
+        default=None, description="The aesthetic score used for the refiner"
+    )
+    refiner_negative_aesthetic_store: Union[float, None] = Field(
         default=None, description="The aesthetic score used for the refiner"
     )
     refiner_start: Union[float, None] = Field(default=None, description="The start value used for refiner denoising")
@@ -136,7 +139,10 @@ class MetadataAccumulatorInvocation(BaseInvocation):
     )
     refiner_steps: Union[int, None] = Field(default=None, description="The number of steps used for the refiner")
     refiner_scheduler: Union[str, None] = Field(default=None, description="The scheduler used for the refiner")
-    refiner_aesthetic_store: Union[float, None] = Field(
+    refiner_positive_aesthetic_score: Union[float, None] = Field(
+        default=None, description="The aesthetic score used for the refiner"
+    )
+    refiner_negative_aesthetic_score: Union[float, None] = Field(
         default=None, description="The aesthetic score used for the refiner"
     )
     refiner_start: Union[float, None] = Field(default=None, description="The start value used for refiner denoising")

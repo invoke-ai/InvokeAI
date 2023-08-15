@@ -353,22 +353,40 @@ export const isValidPrecision = (val: unknown): val is PrecisionParam =>
   zPrecision.safeParse(val).success;
 
 /**
- * Zod schema for SDXL refiner aesthetic score parameter
+ * Zod schema for SDXL refiner positive aesthetic score parameter
  */
-export const zSDXLRefinerAestheticScore = z.number().min(1).max(10);
+export const zSDXLRefinerPositiveAestheticScore = z.number().min(1).max(10);
 /**
- * Type alias for SDXL refiner aesthetic score parameter, inferred from its zod schema
+ * Type alias for SDXL refiner aesthetic positive score parameter, inferred from its zod schema
  */
-export type SDXLRefinerAestheticScoreParam = z.infer<
-  typeof zSDXLRefinerAestheticScore
+export type SDXLRefinerPositiveAestheticScoreParam = z.infer<
+  typeof zSDXLRefinerPositiveAestheticScore
 >;
 /**
- * Validates/type-guards a value as a SDXL refiner aesthetic score parameter
+ * Validates/type-guards a value as a SDXL refiner positive aesthetic score parameter
  */
-export const isValidSDXLRefinerAestheticScore = (
+export const isValidSDXLRefinerPositiveAestheticScore = (
   val: unknown
-): val is SDXLRefinerAestheticScoreParam =>
-  zSDXLRefinerAestheticScore.safeParse(val).success;
+): val is SDXLRefinerPositiveAestheticScoreParam =>
+  zSDXLRefinerPositiveAestheticScore.safeParse(val).success;
+
+/**
+ * Zod schema for SDXL refiner negative aesthetic score parameter
+ */
+export const zSDXLRefinerNegativeAestheticScore = z.number().min(1).max(10);
+/**
+ * Type alias for SDXL refiner aesthetic negative score parameter, inferred from its zod schema
+ */
+export type SDXLRefinerNegativeAestheticScoreParam = z.infer<
+  typeof zSDXLRefinerNegativeAestheticScore
+>;
+/**
+ * Validates/type-guards a value as a SDXL refiner negative aesthetic score parameter
+ */
+export const isValidSDXLRefinerNegativeAestheticScore = (
+  val: unknown
+): val is SDXLRefinerNegativeAestheticScoreParam =>
+  zSDXLRefinerNegativeAestheticScore.safeParse(val).success;
 
 /**
  * Zod schema for SDXL start parameter
@@ -384,6 +402,21 @@ export type SDXLRefinerStartParam = z.infer<typeof zSDXLRefinerstart>;
 export const isValidSDXLRefinerStart = (
   val: unknown
 ): val is SDXLRefinerStartParam => zSDXLRefinerstart.safeParse(val).success;
+
+/**
+ * Zod schema for a mask blur method parameter
+ */
+export const zMaskBlurMethod = z.enum(['box', 'gaussian']);
+/**
+ * Type alias for mask blur method parameter, inferred from its zod schema
+ */
+export type MaskBlurMethodParam = z.infer<typeof zMaskBlurMethod>;
+/**
+ * Validates/type-guards a value as a mask blur method parameter
+ */
+export const isValidMaskBlurMethod = (
+  val: unknown
+): val is MaskBlurMethodParam => zMaskBlurMethod.safeParse(val).success;
 
 // /**
 //  * Zod schema for BaseModelType
