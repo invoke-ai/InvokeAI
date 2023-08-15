@@ -577,7 +577,7 @@ class ModelManagerService(ModelManagerServiceBase):
         alpha: float = 0.5,
         interp: Optional[MergeInterpolationMethod] = None,
         force: bool = False,
-        merge_dest_directory: Optional[str] = Field(
+        merge_dest_directory: Optional[Path] = Field(
             default=None, description="Optional directory location for merged model"
         ),
     ) -> AddModelResult:

@@ -31,7 +31,7 @@ class ModelMerger(object):
 
     def merge_diffusion_models(
         self,
-        model_paths: List[str],
+        model_paths: List[Path],
         alpha: float = 0.5,
         interp: Optional[MergeInterpolationMethod] = None,
         force: bool = False,
@@ -75,7 +75,7 @@ class ModelMerger(object):
         alpha: float = 0.5,
         interp: Optional[MergeInterpolationMethod] = None,
         force: bool = False,
-        merge_dest_directory: Optional[str] = None,
+        merge_dest_directory: Optional[Path] = None,
         **kwargs,
     ) -> AddModelResult:
         """
@@ -109,7 +109,7 @@ class ModelMerger(object):
             # pick up the first model's vae
             if mod == model_names[0]:
                 vae = info.get("vae")
-            model_paths.extend([str(config.root_path / info["path"])])
+            model_paths.extend([(config.root_path / info["path"]).as_posix()])
 
         merge_method = None if interp == "weighted_sum" else MergeInterpolationMethod(interp)
         logger.debug(f"interp = {interp}, merge_method={merge_method}")
@@ -120,7 +120,7 @@ class ModelMerger(object):
             else config.models_path / base_model.value / ModelType.Main.value
         )
         dump_path.mkdir(parents=True, exist_ok=True)
-        dump_path = str(dump_path / merged_model_name)
+        dump_path = (dump_path / merged_model_name).as_posix()
 
         merged_pipe.save_pretrained(dump_path, safe_serialization=True)
         attributes = dict(
