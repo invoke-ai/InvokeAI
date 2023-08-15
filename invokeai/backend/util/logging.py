@@ -228,7 +228,6 @@ def basicConfig(**kwargs):
 def getLogger(name: str = None) -> logging.Logger:
     return InvokeAILogger.getLogger(name)
 
-
 _FACILITY_MAP = (
     dict(
         LOG_KERN=syslog.LOG_KERN,
@@ -365,6 +364,11 @@ class InvokeAILogger(object):
             logger.addHandler(ch)
             cls.loggers[name] = logger
         return cls.loggers[name]
+
+    # same thing without the camel case
+    @classmethod
+    def get_logger(cls, *arg, **kwarg) -> logging.Logger:
+        return cls.getLogger(*arg, **kwarg)
 
     @classmethod
     def getLoggers(cls, config: InvokeAIAppConfig) -> list[logging.Handler]:
