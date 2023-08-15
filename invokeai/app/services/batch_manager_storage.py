@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, Extra, parse_raw_as
 invocations = BaseInvocation.get_invocations()
 InvocationsUnion = Union[invocations]  # type: ignore
 
-BatchDataType = Union[str, int, float, ImageField]
+BatchDataType = Union[StrictStr, StrictInt, StrictFloat, ImageField]```
 
 
 class Batch(BaseModel):
