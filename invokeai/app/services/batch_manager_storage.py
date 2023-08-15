@@ -18,12 +18,12 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.services.graph import Graph
 from invokeai.app.models.image import ImageField
 
-from pydantic import BaseModel, Field, Extra, parse_raw_as
+from pydantic import BaseModel, Field, Extra, parse_raw_as, StrictStr, StrictInt, StrictFloat
 
 invocations = BaseInvocation.get_invocations()
 InvocationsUnion = Union[invocations]  # type: ignore
 
-BatchDataType = Union[StrictStr, StrictInt, StrictFloat, ImageField]```
+BatchDataType = Union[StrictStr, StrictInt, StrictFloat, ImageField]
 
 
 class Batch(BaseModel):
