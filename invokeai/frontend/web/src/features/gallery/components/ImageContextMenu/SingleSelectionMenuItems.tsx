@@ -30,8 +30,9 @@ import {
   FaTrash,
 } from 'react-icons/fa';
 import {
-  useChangeImagePinnedMutation,
   useGetImageMetadataQuery,
+  useStarImagesMutation,
+  useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
@@ -63,7 +64,8 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       : debouncedMetadataQueryArg ?? skipToken
   );
 
-  const [togglePin] = useChangeImagePinnedMutation();
+  const [starImages] = useStarImagesMutation();
+  const [unstarImages] = useUnstarImagesMutation();
 
   const { isClipboardAPIAvailable, copyImageToClipboard } =
     useCopyImageToClipboard();
@@ -133,13 +135,13 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     copyImageToClipboard(imageDTO.image_url);
   }, [copyImageToClipboard, imageDTO.image_url]);
 
-  const handlePinImage = useCallback(() => {
-    togglePin({ imageDTO, pinned: true });
-  }, [togglePin, imageDTO]);
+  const handleStarImage = useCallback(() => {
+    if (imageDTO) starImages({ images: [imageDTO] });
+  }, [starImages, imageDTO]);
 
-  const handleUnpinImage = useCallback(() => {
-    togglePin({ imageDTO, pinned: false });
-  }, [togglePin, imageDTO]);
+  const handleUnstarImage = useCallback(() => {
+    if (imageDTO) unstarImages({ images: [imageDTO] });
+  }, [unstarImages, imageDTO]);
 
   return (
     <>
@@ -210,12 +212,12 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
         Change Board
       </MenuItem>
-      {imageDTO.pinned ? (
-        <MenuItem icon={<MdStar />} onClickCapture={handleUnpinImage}>
+      {imageDTO.starred ? (
+        <MenuItem icon={<MdStar />} onClickCapture={handleUnstarImage}>
           Unstar Image
         </MenuItem>
       ) : (
-        <MenuItem icon={<MdStarBorder />} onClickCapture={handlePinImage}>
+        <MenuItem icon={<MdStarBorder />} onClickCapture={handleStarImage}>
           Star Image
         </MenuItem>
       )}

@@ -21,32 +21,28 @@ export const getIsImageInDateRange = (
     return true;
   }
 
-  const cachedPinnedImages = [];
-  const cachedUnpinnedImages = [];
+  const cachedStarredImages = [];
+  const cachedUnstarredImages = [];
 
   for (let index = 0; index < totalCachedImageDtos.length; index++) {
     const image = totalCachedImageDtos[index];
-    if (image?.pinned) cachedPinnedImages.push(image)
-    if (!image?.pinned) cachedUnpinnedImages.push(image)
+    if (image?.starred) cachedStarredImages.push(image)
+    if (!image?.starred) cachedUnstarredImages.push(image)
   }
 
-  const lastPinnedImage = cachedPinnedImages[cachedPinnedImages.length - 1];
-  const lastUnpinnedImage = cachedUnpinnedImages[cachedUnpinnedImages.length - 1];
-
-  if (!lastPinnedImage || !lastUnpinnedImage) {
-    // satisfy TS gods, we already confirmed the array has more than one image
-    return false;
-  }
-
-  if (imageDTO.pinned) {
-    // if pinning or already pinned, want to look in list of pinned images 
+  if (imageDTO.starred) {
+    const lastStarredImage = cachedStarredImages[cachedStarredImages.length - 1];
+    // if starring or already starred, want to look in list of starred images 
+    if (!lastStarredImage) return true; // no starred images showing, so always show this one
     const createdDate = new Date(imageDTO.created_at);
-    const oldestDate = new Date(lastPinnedImage.created_at);
+    const oldestDate = new Date(lastStarredImage.created_at);
     return createdDate >= oldestDate;
   } else {
-    // if unpinning or already unpinned, want to look in list of unpinned images 
+    const lastUnstarredImage = cachedUnstarredImages[cachedUnstarredImages.length - 1];
+    // if unstarring or already unstarred, want to look in list of unstarred images
+    if (!lastUnstarredImage) return false; // no unstarred images showing, so don't show this one
     const createdDate = new Date(imageDTO.created_at);
-    const oldestDate = new Date(lastUnpinnedImage.created_at);
+    const oldestDate = new Date(lastUnstarredImage.created_at);
     return createdDate >= oldestDate;
   }
 
@@ -64,11 +60,11 @@ export const getCategories = (imageDTO: ImageDTO) => {
 export const imagesAdapter = createEntityAdapter<ImageDTO>({
   selectId: (image) => image.image_name,
   sortComparer: (a, b) => {
-    // Compare pinned images first
-    if (a.pinned && !b.pinned) {
+    // Compare starred images first
+    if (a.starred && !b.starred) {
       return -1;
     }
-    if (!a.pinned && b.pinned) {
+    if (!a.starred && b.starred) {
       return 1;
     }
     return dateComparator(b.created_at, a.created_at)

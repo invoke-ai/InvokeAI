@@ -388,112 +388,217 @@ export const imagesApi = api.injectEndpoints({
       },
     }),
     /**
-     * Change an image's `pinned` state.
+     * Star a list of images.
      */
-    changeImagePinned: build.mutation<
-      ImageDTO,
-      { imageDTO: ImageDTO; pinned: boolean }
+    starImages: build.mutation<
+      void,
+      { images: ImageDTO[] }
     >({
-      query: ({ imageDTO, pinned }) => ({
-        url: `images/i/${imageDTO.image_name}`,
-        method: 'PATCH',
-        body: { pinned },
+      query: ({ images }) => ({
+        url: `images/star`,
+        method: 'POST',
+        body: { image_names: images.map(img => img.image_name) },
       }),
-      invalidatesTags: (result, error, { imageDTO }) => {
-        const categories = getCategories(imageDTO);
-        return [
-          {
-            type: 'ImageList',
-            id: getListImagesUrl({
-              board_id: imageDTO.board_id,
-              categories,
-            }),
-          },
-        ]
+      invalidatesTags: (result, error, { images }) => {
+        // assume all images are on the same board/category
+        if (images[0]) {
+          const categories = getCategories(images[0]);
+          const boardId = images[0].board_id;
+          return [
+            {
+              type: 'ImageList',
+              id: getListImagesUrl({
+                board_id: boardId,
+                categories,
+              }),
+            },
+          ]
+        }
+        return []
+
       },
       async onQueryStarted(
-        { imageDTO, pinned },
+        { images },
         { dispatch, queryFulfilled, getState }
       ) {
-        /**
-         * Cache changes for `changeImagePinned`:
-         * - *update* getImageDTO
-         */
+        try {
+          /**
+           * Cache changes for pinImages:
+           * - *update* getImageDTO for each image
+           * - *upsert* into list for each image
+           */
 
-        // Store patches so we can undo if the query fails
-        const patches: PatchCollection[] = [];
+          // assume all images are on the same board/category
+          if (!images[0]) return;
+          const categories = getCategories(images[0]);
+          const boardId = images[0].board_id;
 
-        // *update* getImageDTO
-        patches.push(
-          dispatch(
-            imagesApi.util.updateQueryData(
-              'getImageDTO',
-              imageDTO.image_name,
-              (draft) => {
-                Object.assign(draft, { pinned });
-              }
-            )
-          )
-        );
-
-        const categories = getCategories(imageDTO);
-
-        const queryArgs = {
-          board_id: imageDTO.board_id ?? 'none',
-          categories,
-        };
-
-        const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(
-          getState()
-        );
-
-        const { data: total } = IMAGE_CATEGORIES.includes(
-          imageDTO.image_category
-        )
-          ? boardsApi.endpoints.getBoardImagesTotal.select(
-            imageDTO.board_id ?? 'none'
-          )(getState())
-          : boardsApi.endpoints.getBoardAssetsTotal.select(
-            imageDTO.board_id ?? 'none'
-          )(getState());
-
-        // IF it eligible for insertion into existing $cache
-        // "eligible" means either:
-        // - The cache is fully populated, with all images in the db cached
-        //    OR
-        // - The image's `created_at` is within the range of the cached images within that pinned state
-
-        const updatedImage: ImageDTO = { ...imageDTO, pinned }
-
-        const isCacheFullyPopulated =
-          currentCache.data && currentCache.data.ids.length >= (total ?? 0);
-
-        const isInDateRange = getIsImageInDateRange(
-          currentCache.data,
-          updatedImage
-        );
-
-        // should we remove images from cache if _not_ in date range? ie you are showing 100 of 101 pinned images and you unpin one. technically it should disappear from list.
-
-        if (isCacheFullyPopulated || isInDateRange) {
-          // *upsert* to $cache
-          patches.push(
+          images.forEach((imageDTO) => {
+            const { image_name } = imageDTO;
             dispatch(
               imagesApi.util.updateQueryData(
-                'listImages',
-                queryArgs,
+                'getImageDTO',
+                image_name,
                 (draft) => {
-                  imagesAdapter.upsertOne(draft, updatedImage);
+                  draft.starred = true;
                 }
               )
-            )
-          );
-        }
+            );
 
-        try {
-          await queryFulfilled;
+            const queryArgs = {
+              board_id: boardId ?? 'none',
+              categories
+            };
+
+            const currentCache = imagesApi.endpoints.listImages.select(
+              queryArgs
+            )(getState());
+
+            const { data: previousTotal } = IMAGE_CATEGORIES.includes(
+              imageDTO.image_category
+            )
+              ? boardsApi.endpoints.getBoardImagesTotal.select(
+                boardId ?? 'none'
+              )(getState())
+              : boardsApi.endpoints.getBoardAssetsTotal.select(
+                boardId ?? 'none'
+              )(getState());
+
+            const isCacheFullyPopulated =
+              currentCache.data &&
+              currentCache.data.ids.length >= (previousTotal ?? 0);
+
+            const isInDateRange =
+              (previousTotal || 0) >= IMAGE_LIMIT
+                ? getIsImageInDateRange(currentCache.data, imageDTO)
+                : true;
+
+            if (isCacheFullyPopulated || isInDateRange) {
+              // *upsert* to $cache
+              dispatch(
+                imagesApi.util.updateQueryData(
+                  'listImages',
+                  queryArgs,
+                  (draft) => {
+                    imagesAdapter.upsertOne(draft, {
+                      ...imageDTO,
+                      starred: true
+                    });
+                  }
+                )
+              );
+            }
+          });
         } catch {
-          patches.forEach((patchResult) => patchResult.undo());
+          // no-op
+        }
+      },
+    }),
+    /**
+     * Unstar a list of images.
+     */
+    unstarImages: build.mutation<
+      void,
+      { images: ImageDTO[] }
+    >({
+      query: ({ images }) => ({
+        url: `images/unstar`,
+        method: 'POST',
+        body: { image_names: images.map(img => img.image_name) },
+      }),
+      invalidatesTags: (result, error, { images }) => {
+        // assume all images are on the same board/category
+        if (images[0]) {
+          const categories = getCategories(images[0]);
+          const boardId = images[0].board_id;
+          return [
+            {
+              type: 'ImageList',
+              id: getListImagesUrl({
+                board_id: boardId,
+                categories,
+              }),
+            },
+          ]
+        }
+        return []
+
+      },
+      async onQueryStarted(
+        { images },
+        { dispatch, queryFulfilled, getState }
+      ) {
+        try {
+          /**
+           * Cache changes for unstarImages:
+           * - *update* getImageDTO for each image
+           * - *upsert* into list for each image
+           */
+
+          // assume all images are on the same board/category
+          if (!images[0]) return;
+          const categories = getCategories(images[0]);
+          const boardId = images[0].board_id;
+
+          images.forEach((imageDTO) => {
+            const { image_name } = imageDTO;
+            dispatch(
+              imagesApi.util.updateQueryData(
+                'getImageDTO',
+                image_name,
+                (draft) => {
+                  draft.starred = false;
+                }
+              )
+            );
+
+
+            const queryArgs = {
+              board_id: boardId ?? 'none',
+              categories
+            };
+
+            const currentCache = imagesApi.endpoints.listImages.select(
+              queryArgs
+            )(getState());
+
+            const { data: previousTotal } = IMAGE_CATEGORIES.includes(
+              imageDTO.image_category
+            )
+              ? boardsApi.endpoints.getBoardImagesTotal.select(
+                boardId ?? 'none'
+              )(getState())
+              : boardsApi.endpoints.getBoardAssetsTotal.select(
+                boardId ?? 'none'
+              )(getState());
+
+            const isCacheFullyPopulated =
+              currentCache.data &&
+              currentCache.data.ids.length >= (previousTotal ?? 0);
+
+            const isInDateRange =
+              (previousTotal || 0) >= IMAGE_LIMIT
+                ? getIsImageInDateRange(currentCache.data, imageDTO)
+                : true;
+
+            if (isCacheFullyPopulated || isInDateRange) {
+              // *upsert* to $cache
+              dispatch(
+                imagesApi.util.updateQueryData(
+                  'listImages',
+                  queryArgs,
+                  (draft) => {
+                    imagesAdapter.upsertOne(draft, {
+                      ...imageDTO,
+                      starred: false
+                    });
+                  }
+                )
+              );
+            }
+          });
+        } catch {
+          // no-op
         }
       },
     }),
@@ -1268,7 +1373,8 @@ export const {
   useRemoveImageFromBoardMutation,
   useChangeImageIsIntermediateMutation,
   useChangeImageSessionIdMutation,
-  useChangeImagePinnedMutation,
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
+  useStarImagesMutation,
+  useUnstarImagesMutation
 } = imagesApi;

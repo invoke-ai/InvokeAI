@@ -209,6 +209,14 @@ export type paths = {
     /** Delete Images From List */
     post: operations['delete_images_from_list'];
   };
+  '/api/v1/images/star': {
+    /** Star Images In List */
+    post: operations['star_images_in_list'];
+  };
+  '/api/v1/images/unstar': {
+    /** Unstar Images In List */
+    post: operations['unstar_images_in_list'];
+  };
   '/api/v1/boards/': {
     /**
      * List Boards
@@ -536,6 +544,22 @@ export type components = {
       /**
        * Image Names
        * @description The names of the images to remove
+       */
+      image_names: string[];
+    };
+    /** Body_star_images_in_list */
+    Body_star_images_in_list: {
+      /**
+       * Image Names
+       * @description The list of names of images to star
+       */
+      image_names: string[];
+    };
+    /** Body_unstar_images_in_list */
+    Body_unstar_images_in_list: {
+      /**
+       * Image Names
+       * @description The list of names of images to unstar
        */
       image_names: string[];
     };
@@ -1927,21 +1951,6 @@ export type components = {
       nodes?: {
         [key: string]:
           | (
-              | components['schemas']['BooleanInvocation']
-              | components['schemas']['BooleanCollectionInvocation']
-              | components['schemas']['IntegerInvocation']
-              | components['schemas']['IntegerCollectionInvocation']
-              | components['schemas']['FloatInvocation']
-              | components['schemas']['FloatCollectionInvocation']
-              | components['schemas']['StringInvocation']
-              | components['schemas']['StringCollectionInvocation']
-              | components['schemas']['ImageInvocation']
-              | components['schemas']['ImageCollectionInvocation']
-              | components['schemas']['LatentsInvocation']
-              | components['schemas']['LatentsCollectionInvocation']
-              | components['schemas']['ColorInvocation']
-              | components['schemas']['ConditioningInvocation']
-              | components['schemas']['ConditioningCollectionInvocation']
               | components['schemas']['ControlNetInvocation']
               | components['schemas']['ImageProcessorInvocation']
               | components['schemas']['MainModelLoaderInvocation']
@@ -1949,21 +1958,15 @@ export type components = {
               | components['schemas']['SDXLLoraLoaderInvocation']
               | components['schemas']['VaeLoaderInvocation']
               | components['schemas']['MetadataAccumulatorInvocation']
-              | components['schemas']['SDXLModelLoaderInvocation']
-              | components['schemas']['SDXLRefinerModelLoaderInvocation']
+              | components['schemas']['RangeInvocation']
+              | components['schemas']['RangeOfSizeInvocation']
+              | components['schemas']['RandomRangeInvocation']
+              | components['schemas']['ImageCollectionInvocation']
               | components['schemas']['CompelInvocation']
               | components['schemas']['SDXLCompelPromptInvocation']
               | components['schemas']['SDXLRefinerCompelPromptInvocation']
               | components['schemas']['ClipSkipInvocation']
-              | components['schemas']['DenoiseLatentsInvocation']
-              | components['schemas']['LatentsToImageInvocation']
-              | components['schemas']['ResizeLatentsInvocation']
-              | components['schemas']['ScaleLatentsInvocation']
-              | components['schemas']['ImageToLatentsInvocation']
-              | components['schemas']['ONNXPromptInvocation']
-              | components['schemas']['ONNXTextToLatentsInvocation']
-              | components['schemas']['ONNXLatentsToImageInvocation']
-              | components['schemas']['OnnxModelLoaderInvocation']
+              | components['schemas']['LoadImageInvocation']
               | components['schemas']['ShowImageInvocation']
               | components['schemas']['ImageCropInvocation']
               | components['schemas']['ImagePasteInvocation']
@@ -1984,24 +1987,37 @@ export type components = {
               | components['schemas']['ImageHueAdjustmentInvocation']
               | components['schemas']['ImageLuminosityAdjustmentInvocation']
               | components['schemas']['ImageSaturationAdjustmentInvocation']
-              | components['schemas']['DynamicPromptInvocation']
-              | components['schemas']['PromptsFromFileInvocation']
               | components['schemas']['CvInpaintInvocation']
-              | components['schemas']['FloatLinearRangeInvocation']
-              | components['schemas']['StepParamEasingInvocation']
+              | components['schemas']['InfillColorInvocation']
+              | components['schemas']['InfillTileInvocation']
+              | components['schemas']['InfillPatchMatchInvocation']
+              | components['schemas']['DenoiseLatentsInvocation']
+              | components['schemas']['LatentsToImageInvocation']
+              | components['schemas']['ResizeLatentsInvocation']
+              | components['schemas']['ScaleLatentsInvocation']
+              | components['schemas']['ImageToLatentsInvocation']
               | components['schemas']['AddInvocation']
               | components['schemas']['SubtractInvocation']
               | components['schemas']['MultiplyInvocation']
               | components['schemas']['DivideInvocation']
               | components['schemas']['RandomIntInvocation']
               | components['schemas']['NoiseInvocation']
-              | components['schemas']['RangeInvocation']
-              | components['schemas']['RangeOfSizeInvocation']
-              | components['schemas']['RandomRangeInvocation']
+              | components['schemas']['ONNXPromptInvocation']
+              | components['schemas']['ONNXTextToLatentsInvocation']
+              | components['schemas']['ONNXLatentsToImageInvocation']
+              | components['schemas']['ONNXSD1ModelLoaderInvocation']
+              | components['schemas']['OnnxModelLoaderInvocation']
+              | components['schemas']['DynamicPromptInvocation']
+              | components['schemas']['PromptsFromFileInvocation']
+              | components['schemas']['ParamIntInvocation']
+              | components['schemas']['ParamFloatInvocation']
+              | components['schemas']['ParamStringInvocation']
+              | components['schemas']['ParamPromptInvocation']
+              | components['schemas']['FloatLinearRangeInvocation']
+              | components['schemas']['StepParamEasingInvocation']
+              | components['schemas']['SDXLModelLoaderInvocation']
+              | components['schemas']['SDXLRefinerModelLoaderInvocation']
               | components['schemas']['ESRGANInvocation']
-              | components['schemas']['InfillColorInvocation']
-              | components['schemas']['InfillTileInvocation']
-              | components['schemas']['InfillPatchMatchInvocation']
               | components['schemas']['GraphInvocation']
               | components['schemas']['IterateInvocation']
               | components['schemas']['CollectInvocation']
@@ -2507,10 +2523,10 @@ export type components = {
        */
       node_id?: string;
       /**
-       * Pinned
-       * @description Whether this image is pinned.
+       * Starred
+       * @description Whether this image is starred.
        */
-      pinned: boolean;
+      starred: boolean;
       /**
        * Board Id
        * @description The id of the board the image belongs to, if one exists.
@@ -2899,7 +2915,7 @@ export type components = {
      *   - `image_category`: change the category of an image
      *   - `session_id`: change the session associated with an image
      *   - `is_intermediate`: change the image's `is_intermediate` flag
-     *   - `pinned`: change whether the image is pinned
+     *   - `starred`: change whether the image is starred
      */
     ImageRecordChanges: {
       /** @description The image's new category. */
@@ -2915,10 +2931,10 @@ export type components = {
        */
       is_intermediate?: boolean;
       /**
-       * Pinned
-       * @description The image's new `pinned` state
+       * Starred
+       * @description The image's new `starred` state
        */
-      pinned?: boolean;
+      starred?: boolean;
     };
     /**
      * Resize Image
@@ -6390,36 +6406,20 @@ export type components = {
       image?: components['schemas']['ImageField'];
     };
     /**
-     * UIConfigBase
-     * @description Provides additional node configuration to the UI.
-     * This is used internally by the @tags and @title decorator logic. You probably want to use those
-     * decorators, though you may add this class to a node definition to specify the title and tags.
-     */
-    UIConfigBase: {
-      /**
-       * Tags
-       * @description The tags to display in the UI
-       */
-      tags?: string[];
-      /**
-       * Title
-       * @description The display name of the node
-       */
-      title?: string;
-    };
-    /**
-     * Input
-     * @description The type of input a field accepts.
-     * - `Input.Direct`: The field must have its value provided directly, when the invocation and field       are instantiated.
-     * - `Input.Connection`: The field must have its value provided by a connection.
-     * - `Input.Any`: The field may have its value provided either directly or by a connection.
+     * StableDiffusion2ModelFormat
+     * @description An enumeration.
      * @enum {string}
      */
     Input: 'connection' | 'direct' | 'any';
     /**
-     * UIType
-     * @description Type hints for the UI.
-     * If a field should be provided a data type that does not exactly match the python type of the field,     use this to provide the type that should be used instead. See the node development docs for detail     on adding a new field type, which involves client-side changes.
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: 'checkpoint' | 'diffusers';
+    /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
      * @enum {string}
      */
     UIType:
@@ -6456,11 +6456,11 @@ export type components = {
       | 'FilePath'
       | 'enum';
     /**
-     * UIComponent
-     * @description The type of UI component to use for a field, used to override the default components, which are     inferred from the field type.
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
      * @enum {string}
      */
-    UIComponent: 'none' | 'textarea' | 'slider';
+    StableDiffusionOnnxModelFormat: 'olive' | 'onnx';
     /**
      * _InputField
      * @description *DO NOT USE*
@@ -6627,21 +6627,6 @@ export type operations = {
     requestBody: {
       content: {
         'application/json':
-          | components['schemas']['BooleanInvocation']
-          | components['schemas']['BooleanCollectionInvocation']
-          | components['schemas']['IntegerInvocation']
-          | components['schemas']['IntegerCollectionInvocation']
-          | components['schemas']['FloatInvocation']
-          | components['schemas']['FloatCollectionInvocation']
-          | components['schemas']['StringInvocation']
-          | components['schemas']['StringCollectionInvocation']
-          | components['schemas']['ImageInvocation']
-          | components['schemas']['ImageCollectionInvocation']
-          | components['schemas']['LatentsInvocation']
-          | components['schemas']['LatentsCollectionInvocation']
-          | components['schemas']['ColorInvocation']
-          | components['schemas']['ConditioningInvocation']
-          | components['schemas']['ConditioningCollectionInvocation']
           | components['schemas']['ControlNetInvocation']
           | components['schemas']['ImageProcessorInvocation']
           | components['schemas']['MainModelLoaderInvocation']
@@ -6649,21 +6634,15 @@ export type operations = {
           | components['schemas']['SDXLLoraLoaderInvocation']
           | components['schemas']['VaeLoaderInvocation']
           | components['schemas']['MetadataAccumulatorInvocation']
-          | components['schemas']['SDXLModelLoaderInvocation']
-          | components['schemas']['SDXLRefinerModelLoaderInvocation']
+          | components['schemas']['RangeInvocation']
+          | components['schemas']['RangeOfSizeInvocation']
+          | components['schemas']['RandomRangeInvocation']
+          | components['schemas']['ImageCollectionInvocation']
           | components['schemas']['CompelInvocation']
           | components['schemas']['SDXLCompelPromptInvocation']
           | components['schemas']['SDXLRefinerCompelPromptInvocation']
           | components['schemas']['ClipSkipInvocation']
-          | components['schemas']['DenoiseLatentsInvocation']
-          | components['schemas']['LatentsToImageInvocation']
-          | components['schemas']['ResizeLatentsInvocation']
-          | components['schemas']['ScaleLatentsInvocation']
-          | components['schemas']['ImageToLatentsInvocation']
-          | components['schemas']['ONNXPromptInvocation']
-          | components['schemas']['ONNXTextToLatentsInvocation']
-          | components['schemas']['ONNXLatentsToImageInvocation']
-          | components['schemas']['OnnxModelLoaderInvocation']
+          | components['schemas']['LoadImageInvocation']
           | components['schemas']['ShowImageInvocation']
           | components['schemas']['ImageCropInvocation']
           | components['schemas']['ImagePasteInvocation']
@@ -6684,24 +6663,37 @@ export type operations = {
           | components['schemas']['ImageHueAdjustmentInvocation']
           | components['schemas']['ImageLuminosityAdjustmentInvocation']
           | components['schemas']['ImageSaturationAdjustmentInvocation']
-          | components['schemas']['DynamicPromptInvocation']
-          | components['schemas']['PromptsFromFileInvocation']
           | components['schemas']['CvInpaintInvocation']
-          | components['schemas']['FloatLinearRangeInvocation']
-          | components['schemas']['StepParamEasingInvocation']
+          | components['schemas']['InfillColorInvocation']
+          | components['schemas']['InfillTileInvocation']
+          | components['schemas']['InfillPatchMatchInvocation']
+          | components['schemas']['DenoiseLatentsInvocation']
+          | components['schemas']['LatentsToImageInvocation']
+          | components['schemas']['ResizeLatentsInvocation']
+          | components['schemas']['ScaleLatentsInvocation']
+          | components['schemas']['ImageToLatentsInvocation']
           | components['schemas']['AddInvocation']
           | components['schemas']['SubtractInvocation']
           | components['schemas']['MultiplyInvocation']
           | components['schemas']['DivideInvocation']
           | components['schemas']['RandomIntInvocation']
           | components['schemas']['NoiseInvocation']
-          | components['schemas']['RangeInvocation']
-          | components['schemas']['RangeOfSizeInvocation']
-          | components['schemas']['RandomRangeInvocation']
+          | components['schemas']['ONNXPromptInvocation']
+          | components['schemas']['ONNXTextToLatentsInvocation']
+          | components['schemas']['ONNXLatentsToImageInvocation']
+          | components['schemas']['ONNXSD1ModelLoaderInvocation']
+          | components['schemas']['OnnxModelLoaderInvocation']
+          | components['schemas']['DynamicPromptInvocation']
+          | components['schemas']['PromptsFromFileInvocation']
+          | components['schemas']['ParamIntInvocation']
+          | components['schemas']['ParamFloatInvocation']
+          | components['schemas']['ParamStringInvocation']
+          | components['schemas']['ParamPromptInvocation']
+          | components['schemas']['FloatLinearRangeInvocation']
+          | components['schemas']['StepParamEasingInvocation']
+          | components['schemas']['SDXLModelLoaderInvocation']
+          | components['schemas']['SDXLRefinerModelLoaderInvocation']
           | components['schemas']['ESRGANInvocation']
-          | components['schemas']['InfillColorInvocation']
-          | components['schemas']['InfillTileInvocation']
-          | components['schemas']['InfillPatchMatchInvocation']
           | components['schemas']['GraphInvocation']
           | components['schemas']['IterateInvocation']
           | components['schemas']['CollectInvocation']
@@ -6757,21 +6749,6 @@ export type operations = {
     requestBody: {
       content: {
         'application/json':
-          | components['schemas']['BooleanInvocation']
-          | components['schemas']['BooleanCollectionInvocation']
-          | components['schemas']['IntegerInvocation']
-          | components['schemas']['IntegerCollectionInvocation']
-          | components['schemas']['FloatInvocation']
-          | components['schemas']['FloatCollectionInvocation']
-          | components['schemas']['StringInvocation']
-          | components['schemas']['StringCollectionInvocation']
-          | components['schemas']['ImageInvocation']
-          | components['schemas']['ImageCollectionInvocation']
-          | components['schemas']['LatentsInvocation']
-          | components['schemas']['LatentsCollectionInvocation']
-          | components['schemas']['ColorInvocation']
-          | components['schemas']['ConditioningInvocation']
-          | components['schemas']['ConditioningCollectionInvocation']
           | components['schemas']['ControlNetInvocation']
           | components['schemas']['ImageProcessorInvocation']
           | components['schemas']['MainModelLoaderInvocation']
@@ -6779,21 +6756,15 @@ export type operations = {
           | components['schemas']['SDXLLoraLoaderInvocation']
           | components['schemas']['VaeLoaderInvocation']
           | components['schemas']['MetadataAccumulatorInvocation']
-          | components['schemas']['SDXLModelLoaderInvocation']
-          | components['schemas']['SDXLRefinerModelLoaderInvocation']
+          | components['schemas']['RangeInvocation']
+          | components['schemas']['RangeOfSizeInvocation']
+          | components['schemas']['RandomRangeInvocation']
+          | components['schemas']['ImageCollectionInvocation']
           | components['schemas']['CompelInvocation']
           | components['schemas']['SDXLCompelPromptInvocation']
           | components['schemas']['SDXLRefinerCompelPromptInvocation']
           | components['schemas']['ClipSkipInvocation']
-          | components['schemas']['DenoiseLatentsInvocation']
-          | components['schemas']['LatentsToImageInvocation']
-          | components['schemas']['ResizeLatentsInvocation']
-          | components['schemas']['ScaleLatentsInvocation']
-          | components['schemas']['ImageToLatentsInvocation']
-          | components['schemas']['ONNXPromptInvocation']
-          | components['schemas']['ONNXTextToLatentsInvocation']
-          | components['schemas']['ONNXLatentsToImageInvocation']
-          | components['schemas']['OnnxModelLoaderInvocation']
+          | components['schemas']['LoadImageInvocation']
           | components['schemas']['ShowImageInvocation']
           | components['schemas']['ImageCropInvocation']
           | components['schemas']['ImagePasteInvocation']
@@ -6814,24 +6785,37 @@ export type operations = {
           | components['schemas']['ImageHueAdjustmentInvocation']
           | components['schemas']['ImageLuminosityAdjustmentInvocation']
           | components['schemas']['ImageSaturationAdjustmentInvocation']
-          | components['schemas']['DynamicPromptInvocation']
-          | components['schemas']['PromptsFromFileInvocation']
           | components['schemas']['CvInpaintInvocation']
-          | components['schemas']['FloatLinearRangeInvocation']
-          | components['schemas']['StepParamEasingInvocation']
+          | components['schemas']['InfillColorInvocation']
+          | components['schemas']['InfillTileInvocation']
+          | components['schemas']['InfillPatchMatchInvocation']
+          | components['schemas']['DenoiseLatentsInvocation']
+          | components['schemas']['LatentsToImageInvocation']
+          | components['schemas']['ResizeLatentsInvocation']
+          | components['schemas']['ScaleLatentsInvocation']
+          | components['schemas']['ImageToLatentsInvocation']
           | components['schemas']['AddInvocation']
           | components['schemas']['SubtractInvocation']
           | components['schemas']['MultiplyInvocation']
           | components['schemas']['DivideInvocation']
           | components['schemas']['RandomIntInvocation']
           | components['schemas']['NoiseInvocation']
-          | components['schemas']['RangeInvocation']
-          | components['schemas']['RangeOfSizeInvocation']
-          | components['schemas']['RandomRangeInvocation']
+          | components['schemas']['ONNXPromptInvocation']
+          | components['schemas']['ONNXTextToLatentsInvocation']
+          | components['schemas']['ONNXLatentsToImageInvocation']
+          | components['schemas']['ONNXSD1ModelLoaderInvocation']
+          | components['schemas']['OnnxModelLoaderInvocation']
+          | components['schemas']['DynamicPromptInvocation']
+          | components['schemas']['PromptsFromFileInvocation']
+          | components['schemas']['ParamIntInvocation']
+          | components['schemas']['ParamFloatInvocation']
+          | components['schemas']['ParamStringInvocation']
+          | components['schemas']['ParamPromptInvocation']
+          | components['schemas']['FloatLinearRangeInvocation']
+          | components['schemas']['StepParamEasingInvocation']
+          | components['schemas']['SDXLModelLoaderInvocation']
+          | components['schemas']['SDXLRefinerModelLoaderInvocation']
           | components['schemas']['ESRGANInvocation']
-          | components['schemas']['InfillColorInvocation']
-          | components['schemas']['InfillTileInvocation']
-          | components['schemas']['InfillPatchMatchInvocation']
           | components['schemas']['GraphInvocation']
           | components['schemas']['IterateInvocation']
           | components['schemas']['CollectInvocation']
@@ -7713,6 +7697,50 @@ export type operations = {
       200: {
         content: {
           'application/json': components['schemas']['DeleteImagesFromListResult'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  /** Star Images In List */
+  star_images_in_list: {
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Body_star_images_in_list'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  /** Unstar Images In List */
+  unstar_images_in_list: {
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Body_unstar_images_in_list'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          'application/json': unknown;
         };
       };
       /** @description Validation Error */
