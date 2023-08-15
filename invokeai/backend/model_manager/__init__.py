@@ -1,15 +1,15 @@
 """
 Initialization file for invokeai.backend.model_manager.config
 """
-from invokeai.backend.model_manager.config import (
-    ModelConfigFactory,
-    ModelConfigBase,
-    InvalidModelConfigException,
+from .config import (
     BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelVariantType,
+    InvalidModelConfigException,
+    ModelConfigBase,
+    ModelConfigFactory,
     ModelFormat,
+    ModelType,
+    ModelVariantType,
     SchedulerPredictionType,
+    SubModelType,
 )
-
+from .model_install import ModelInstall
