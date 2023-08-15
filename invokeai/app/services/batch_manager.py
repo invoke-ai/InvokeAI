@@ -47,7 +47,6 @@ class BatchManager(BatchManagerBase):
     """Responsible for managing currently running and scheduled batch jobs"""
 
     __invoker: Invoker
-    __batches: list[BatchProcess]
     __batch_process_storage: BatchProcessStorageBase
 
     def __init__(self, batch_process_storage: BatchProcessStorageBase) -> None:
@@ -55,9 +54,7 @@ class BatchManager(BatchManagerBase):
         self.__batch_process_storage = batch_process_storage
 
     def start(self, invoker: Invoker) -> None:
-        # if we do want multithreading at some point, we could make this configurable
         self.__invoker = invoker
-        self.__batches = list()
         local_handler.register(event_name=EventServiceBase.session_event, _func=self.on_event)
 
     async def on_event(self, event: Event):
@@ -87,7 +84,7 @@ class BatchManager(BatchManagerBase):
             self.run_batch_process(batch_process.batch_id)
 
     def _create_batch_session(self, batch_process: BatchProcess, batch_indices: list[int]) -> GraphExecutionState:
-        graph = copy.deepcopy(batch_process.graph)
+        graph = batch_process.graph.copy(deep=True)
         batches = batch_process.batches
         g = graph.nx_graph_flat()
         sorted_nodes = nx.topological_sort(g)
@@ -104,6 +101,7 @@ class BatchManager(BatchManagerBase):
         return GraphExecutionState(graph=graph)
 
     def run_batch_process(self, batch_id: str):
+        self.__batch_process_storage.start(batch_id)
         try:
             created_session = self.__batch_process_storage.get_created_session(batch_id)
         except BatchSessionNotFoundException:

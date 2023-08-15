@@ -52,8 +52,23 @@ async def create_batch(
 ) -> BatchProcessResponse:
     """Creates and starts a new new batch process"""
     batch_process_res = ApiDependencies.invoker.services.batch_manager.create_batch_process(batches, graph)
-    ApiDependencies.invoker.services.batch_manager.run_batch_process(batch_process_res.batch_id)
     return batch_process_res
+
+
+@session_router.put(
+    "/batch/{batch_process_id}/invoke",
+    operation_id="start_batch",
+    responses={
+        200: {"model": BatchProcessResponse},
+        400: {"description": "Invalid json"},
+    },
+)
+async def start_batch(
+    batch_process_id: str = Path(description="ID of Batch to start"),
+) -> BatchProcessResponse:
+    ApiDependencies.invoker.services.batch_manager.run_batch_process(batch_process_id)
+
+    return Response(status_code=202)
 
 
 @session_router.delete(

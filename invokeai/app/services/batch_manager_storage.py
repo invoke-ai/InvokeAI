@@ -127,6 +127,14 @@ class BatchProcessStorageBase(ABC):
         pass
 
     @abstractmethod
+    def start(
+        self,
+        batch_id: str,
+    ):
+        """Start Batch Process record."""
+        pass
+
+    @abstractmethod
     def cancel(
         self,
         batch_id: str,
@@ -359,6 +367,27 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
         if result is None:
             raise BatchProcessNotFoundException
         return self._deserialize_batch_process(dict(result))
+
+    def start(
+        self,
+        batch_id: str,
+    ):
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                f"""--sql
+                UPDATE batch_process
+                SET canceled = 0
+                WHERE batch_id = ?;
+                """,
+                (batch_id,),
+            )
+            self._conn.commit()
+        except sqlite3.Error as e:
+            self._conn.rollback()
+            raise BatchSessionSaveException from e
+        finally:
+            self._lock.release()
 
     def cancel(
         self,
