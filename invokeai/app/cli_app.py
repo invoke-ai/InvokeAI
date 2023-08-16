@@ -5,6 +5,7 @@ import re
 import shlex
 import sys
 import time
+import sqlite3
 from typing import Union, get_type_hints, Optional
 
 from pydantic import BaseModel, ValidationError
@@ -257,19 +258,23 @@ def invoke_cli():
         db_location = config.db_path
         db_location.parent.mkdir(parents=True, exist_ok=True)
 
+
+    db_conn = sqlite3.connect(
+        db_location, check_same_thread=False
+    )  # TODO: figure out a better threading solution
     logger.info(f'InvokeAI database location is "{db_location}"')
 
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-        filename=db_location, table_name="graph_executions"
+        conn=db_conn, table_name="graph_executions"
     )
 
     urls = LocalUrlService()
-    image_record_storage = SqliteImageRecordStorage(db_location)
+    image_record_storage = SqliteImageRecordStorage(conn=db_conn)
     image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
     names = SimpleNameService()
 
-    board_record_storage = SqliteBoardRecordStorage(db_location)
-    board_image_record_storage = SqliteBoardImageRecordStorage(db_location)
+    board_record_storage = SqliteBoardRecordStorage(conn=db_conn)
+    board_image_record_storage = SqliteBoardImageRecordStorage(conn=db_conn)
 
     boards = BoardService(
         services=BoardServiceDependencies(
@@ -303,7 +308,7 @@ def invoke_cli():
         )
     )
 
-    batch_manager_storage = SqliteBatchProcessStorage(db_location)
+    batch_manager_storage = SqliteBatchProcessStorage(conn=db_conn)
     batch_manager = BatchManager(batch_manager_storage)
 
     services = InvocationServices(
@@ -315,7 +320,7 @@ def invoke_cli():
         batch_manager=batch_manager,
         board_images=board_images,
         queue=MemoryInvocationQueue(),
-        graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs"),
+        graph_library=SqliteItemStorage[LibraryGraph](conn=db_conn, table_name="graphs"),
         graph_execution_manager=graph_execution_manager,
         processor=DefaultInvocationProcessor(),
         performance_statistics=InvocationStatsService(graph_execution_manager),

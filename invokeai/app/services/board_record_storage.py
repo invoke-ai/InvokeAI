@@ -90,15 +90,13 @@ class BoardRecordStorageBase(ABC):
 
 
 class SqliteBoardRecordStorage(BoardRecordStorageBase):
-    _filename: str
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
     _lock: threading.Lock
 
-    def __init__(self, filename: str) -> None:
+    def __init__(self, conn: sqlite3.Connection) -> None:
         super().__init__()
-        self._filename = filename
-        self._conn = sqlite3.connect(filename, check_same_thread=False)
+        self._conn = conn
         # Enable row factory to get rows as dictionaries (must be done before making the cursor!)
         self._conn.row_factory = sqlite3.Row
         self._cursor = self._conn.cursor()

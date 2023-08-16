@@ -2,6 +2,7 @@
 
 from typing import Optional
 from logging import Logger
+import sqlite3
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
 )
@@ -74,18 +75,22 @@ class ApiDependencies:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         db_location = str(db_path)
 
+        db_conn = sqlite3.connect(
+            db_location, check_same_thread=False
+        )  # TODO: figure out a better threading solution
+
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-            filename=db_location, table_name="graph_executions"
+            conn=db_conn, table_name="graph_executions"
         )
 
         urls = LocalUrlService()
-        image_record_storage = SqliteImageRecordStorage(db_location)
+        image_record_storage = SqliteImageRecordStorage(conn=db_conn)
         image_file_storage = DiskImageFileStorage(f"{output_folder}/images")
         names = SimpleNameService()
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
 
-        board_record_storage = SqliteBoardRecordStorage(db_location)
-        board_image_record_storage = SqliteBoardImageRecordStorage(db_location)
+        board_record_storage = SqliteBoardRecordStorage(conn=db_conn)
+        board_image_record_storage = SqliteBoardImageRecordStorage(conn=db_conn)
 
         boards = BoardService(
             services=BoardServiceDependencies(
@@ -119,7 +124,7 @@ class ApiDependencies:
             )
         )
 
-        batch_manager_storage = SqliteBatchProcessStorage(db_location)
+        batch_manager_storage = SqliteBatchProcessStorage(conn=db_conn)
         batch_manager = BatchManager(batch_manager_storage)
 
         services = InvocationServices(
@@ -131,7 +136,7 @@ class ApiDependencies:
             boards=boards,
             board_images=board_images,
             queue=MemoryInvocationQueue(),
-            graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs"),
+            graph_library=SqliteItemStorage[LibraryGraph](conn=db_conn, table_name="graphs"),
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
             configuration=config,

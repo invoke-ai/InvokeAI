@@ -12,23 +12,19 @@ sqlite_memory = ":memory:"
 
 
 class SqliteItemStorage(ItemStorageABC, Generic[T]):
-    _filename: str
     _table_name: str
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
     _id_field: str
     _lock: Lock
 
-    def __init__(self, filename: str, table_name: str, id_field: str = "id"):
+    def __init__(self, conn: sqlite3.Connection, table_name: str,  id_field: str = "id"):
         super().__init__()
 
-        self._filename = filename
         self._table_name = table_name
         self._id_field = id_field  # TODO: validate that T has this field
         self._lock = Lock()
-        self._conn = sqlite3.connect(
-            self._filename, check_same_thread=False
-        )  # TODO: figure out a better threading solution
+        self._conn = conn
         self._cursor = self._conn.cursor()
 
         self._create_table()
