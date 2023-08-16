@@ -1,11 +1,11 @@
 import { SystemStyleObject, useColorModeValue } from '@chakra-ui/react';
-import { JSXElementConstructor, MouseEvent, ReactElement, memo } from 'react';
+import { MouseEvent, ReactElement, memo } from 'react';
 import IAIIconButton from './IAIIconButton';
 
 type Props = {
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   tooltip: string;
-  icon?: ReactElement<any, string | JSXElementConstructor<any>>;
+  icon?: ReactElement;
   styleOverrides?: SystemStyleObject;
 };
 
