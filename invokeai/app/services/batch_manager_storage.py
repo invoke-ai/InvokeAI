@@ -16,7 +16,7 @@ from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
 )
 from invokeai.app.services.graph import Graph
-from invokeai.app.models.image import ImageField
+from invokeai.app.invocations.primitives import ImageField
 
 from pydantic import BaseModel, Field, Extra, parse_raw_as, StrictStr, StrictInt, StrictFloat
 

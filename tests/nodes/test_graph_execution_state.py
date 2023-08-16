@@ -25,7 +25,7 @@ from invokeai.app.services.graph import (
     LibraryGraph,
 )
 import pytest
-
+import sqlite3
 
 @pytest.fixture
 def simple_graph():
@@ -42,8 +42,9 @@ def simple_graph():
 @pytest.fixture
 def mock_services() -> InvocationServices:
     # NOTE: none of these are actually called by the test invocations
+    db_conn = sqlite3.connect(sqlite_memory, check_same_thread=False)
     graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-        filename=sqlite_memory, table_name="graph_executions"
+        conn=db_conn, table_name="graph_executions"
     )
     return InvocationServices(
         model_manager=None,  # type: ignore
@@ -55,7 +56,7 @@ def mock_services() -> InvocationServices:
         batch_manager=None,  # type: ignore
         board_images=None,  # type: ignore
         queue=MemoryInvocationQueue(),
-        graph_library=SqliteItemStorage[LibraryGraph](filename=sqlite_memory, table_name="graphs"),
+        graph_library=SqliteItemStorage[LibraryGraph](conn=db_conn, table_name="graphs"),
         graph_execution_manager=graph_execution_manager,
         performance_statistics=InvocationStatsService(graph_execution_manager),
         processor=DefaultInvocationProcessor(),

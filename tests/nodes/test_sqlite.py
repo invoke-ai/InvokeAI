@@ -1,20 +1,25 @@
 from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
 from pydantic import BaseModel, Field
 
+import pytest
+import sqlite3
 
 class TestModel(BaseModel):
     id: str = Field(description="ID")
     name: str = Field(description="Name")
 
 
-def test_sqlite_service_can_create_and_get():
-    db = SqliteItemStorage[TestModel](sqlite_memory, "test", "id")
+@pytest.fixture
+def db() -> SqliteItemStorage[TestModel]:
+    db_conn = sqlite3.connect(sqlite_memory, check_same_thread=False)
+    return SqliteItemStorage[TestModel](db_conn, "test", "id")
+
+def test_sqlite_service_can_create_and_get(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
     assert db.get("1") == TestModel(id="1", name="Test")
 
 
-def test_sqlite_service_can_list():
-    db = SqliteItemStorage[TestModel](sqlite_memory, "test", "id")
+def test_sqlite_service_can_list(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
     db.set(TestModel(id="2", name="Test"))
     db.set(TestModel(id="3", name="Test"))
@@ -30,15 +35,13 @@ def test_sqlite_service_can_list():
     ]
 
 
-def test_sqlite_service_can_delete():
-    db = SqliteItemStorage[TestModel](sqlite_memory, "test", "id")
+def test_sqlite_service_can_delete(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
     db.delete("1")
     assert db.get("1") is None
 
 
-def test_sqlite_service_calls_set_callback():
-    db = SqliteItemStorage[TestModel](sqlite_memory, "test", "id")
+def test_sqlite_service_calls_set_callback(db: SqliteItemStorage[TestModel]):
     called = False
 
     def on_changed(item: TestModel):
@@ -50,8 +53,7 @@ def test_sqlite_service_calls_set_callback():
     assert called
 
 
-def test_sqlite_service_calls_delete_callback():
-    db = SqliteItemStorage[TestModel](sqlite_memory, "test", "id")
+def test_sqlite_service_calls_delete_callback(db: SqliteItemStorage[TestModel]):
     called = False
 
     def on_deleted(item_id: str):
@@ -64,8 +66,7 @@ def test_sqlite_service_calls_delete_callback():
     assert called
 
 
-def test_sqlite_service_can_list_with_pagination():
-    db = SqliteItemStorage[TestModel](sqlite_memory, "test", "id")
+def test_sqlite_service_can_list_with_pagination(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
     db.set(TestModel(id="2", name="Test"))
     db.set(TestModel(id="3", name="Test"))
@@ -77,8 +78,7 @@ def test_sqlite_service_can_list_with_pagination():
     assert results.items == [TestModel(id="1", name="Test"), TestModel(id="2", name="Test")]
 
 
-def test_sqlite_service_can_list_with_pagination_and_offset():
-    db = SqliteItemStorage[TestModel](sqlite_memory, "test", "id")
+def test_sqlite_service_can_list_with_pagination_and_offset(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
     db.set(TestModel(id="2", name="Test"))
     db.set(TestModel(id="3", name="Test"))
@@ -90,8 +90,7 @@ def test_sqlite_service_can_list_with_pagination_and_offset():
     assert results.items == [TestModel(id="3", name="Test")]
 
 
-def test_sqlite_service_can_search():
-    db = SqliteItemStorage[TestModel](sqlite_memory, "test", "id")
+def test_sqlite_service_can_search(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
     db.set(TestModel(id="2", name="Test"))
     db.set(TestModel(id="3", name="Test"))
@@ -107,8 +106,7 @@ def test_sqlite_service_can_search():
     ]
 
 
-def test_sqlite_service_can_search_with_pagination():
-    db = SqliteItemStorage[TestModel](sqlite_memory, "test", "id")
+def test_sqlite_service_can_search_with_pagination(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
     db.set(TestModel(id="2", name="Test"))
     db.set(TestModel(id="3", name="Test"))
@@ -120,8 +118,7 @@ def test_sqlite_service_can_search_with_pagination():
     assert results.items == [TestModel(id="1", name="Test"), TestModel(id="2", name="Test")]
 
 
-def test_sqlite_service_can_search_with_pagination_and_offset():
-    db = SqliteItemStorage[TestModel](sqlite_memory, "test", "id")
+def test_sqlite_service_can_search_with_pagination_and_offset(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
     db.set(TestModel(id="2", name="Test"))
     db.set(TestModel(id="3", name="Test"))
