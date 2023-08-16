@@ -392,14 +392,14 @@ export const imagesApi = api.injectEndpoints({
      */
     starImages: build.mutation<
       paths['/api/v1/images/unstar']['post']['responses']['200']['content']['application/json'],
-      { images: ImageDTO[] }
+      { imageDTOs: ImageDTO[] }
     >({
-      query: ({ images }) => ({
+      query: ({ imageDTOs: images }) => ({
         url: `images/star`,
         method: 'POST',
         body: { image_names: images.map((img) => img.image_name) },
       }),
-      invalidatesTags: (result, error, { images }) => {
+      invalidatesTags: (result, error, { imageDTOs: images }) => {
         // assume all images are on the same board/category
         if (images[0]) {
           const categories = getCategories(images[0]);
@@ -416,7 +416,10 @@ export const imagesApi = api.injectEndpoints({
         }
         return [];
       },
-      async onQueryStarted({ images }, { dispatch, queryFulfilled, getState }) {
+      async onQueryStarted(
+        { imageDTOs },
+        { dispatch, queryFulfilled, getState }
+      ) {
         try {
           /**
            * Cache changes for pinImages:
@@ -425,7 +428,7 @@ export const imagesApi = api.injectEndpoints({
            */
 
           const { data } = await queryFulfilled;
-          const updatedImages = images.filter((i) =>
+          const updatedImages = imageDTOs.filter((i) =>
             data.updated_image_names.includes(i.image_name)
           );
 
@@ -501,14 +504,14 @@ export const imagesApi = api.injectEndpoints({
      */
     unstarImages: build.mutation<
       paths['/api/v1/images/unstar']['post']['responses']['200']['content']['application/json'],
-      { images: ImageDTO[] }
+      { imageDTOs: ImageDTO[] }
     >({
-      query: ({ images }) => ({
+      query: ({ imageDTOs: images }) => ({
         url: `images/unstar`,
         method: 'POST',
         body: { image_names: images.map((img) => img.image_name) },
       }),
-      invalidatesTags: (result, error, { images }) => {
+      invalidatesTags: (result, error, { imageDTOs: images }) => {
         // assume all images are on the same board/category
         if (images[0]) {
           const categories = getCategories(images[0]);
@@ -525,7 +528,10 @@ export const imagesApi = api.injectEndpoints({
         }
         return [];
       },
-      async onQueryStarted({ images }, { dispatch, queryFulfilled, getState }) {
+      async onQueryStarted(
+        { imageDTOs },
+        { dispatch, queryFulfilled, getState }
+      ) {
         try {
           /**
            * Cache changes for unstarImages:
@@ -534,7 +540,7 @@ export const imagesApi = api.injectEndpoints({
            */
 
           const { data } = await queryFulfilled;
-          const updatedImages = images.filter((i) =>
+          const updatedImages = imageDTOs.filter((i) =>
             data.updated_image_names.includes(i.image_name)
           );
 
