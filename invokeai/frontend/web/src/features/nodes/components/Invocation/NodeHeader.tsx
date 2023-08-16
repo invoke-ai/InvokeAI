@@ -14,7 +14,7 @@ type Props = {
   selected: boolean;
 };
 
-const NodeHeader = ({ nodeId, isOpen, label, type, selected }: Props) => {
+const NodeHeader = ({ nodeId, isOpen }: Props) => {
   return (
     <Flex
       layerStyle="nodeHeader"

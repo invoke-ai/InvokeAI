@@ -6,6 +6,9 @@ export const NODE_WIDTH = 320;
 export const NODE_MIN_WIDTH = 320;
 export const DRAG_HANDLE_CLASSNAME = 'node-drag-handle';
 
+export const IMAGE_FIELDS = ['ImageField', 'ImageCollection'];
+export const FOOTER_FIELDS = IMAGE_FIELDS;
+
 export const COLLECTION_TYPES: FieldType[] = [
   'Collection',
   'IntegerCollection',

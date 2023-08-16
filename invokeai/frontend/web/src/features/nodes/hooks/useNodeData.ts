@@ -4,10 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { map, some } from 'lodash-es';
 import { useMemo } from 'react';
-import {
-  FOOTER_FIELDS,
-  IMAGE_FIELDS,
-} from '../components/Invocation/NodeFooter';
+import { FOOTER_FIELDS, IMAGE_FIELDS } from '../types/constants';
 import { isInvocationNode } from '../types/types';
 
 const KIND_MAP = {
