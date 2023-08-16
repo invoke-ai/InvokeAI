@@ -7,26 +7,29 @@ import {
   useEditableControls,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import {
+  useNodeLabel,
+  useNodeTemplateTitle,
+} from 'features/nodes/hooks/useNodeData';
 import { nodeLabelChanged } from 'features/nodes/store/nodesSlice';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import { NodeData } from 'features/nodes/types/types';
 import { MouseEvent, memo, useCallback, useEffect, useState } from 'react';
 
 type Props = {
-  nodeData: NodeData;
-  title: string;
+  nodeId: string;
+  title?: string;
 };
 
-const NodeTitle = (props: Props) => {
-  const { title } = props;
-  const { id: nodeId, label } = props.nodeData;
+const NodeTitle = ({ nodeId, title }: Props) => {
   const dispatch = useAppDispatch();
-  const [localTitle, setLocalTitle] = useState(label || title);
+  const label = useNodeLabel(nodeId);
+  const templateTitle = useNodeTemplateTitle(nodeId);
 
+  const [localTitle, setLocalTitle] = useState('');
   const handleSubmit = useCallback(
     async (newTitle: string) => {
       dispatch(nodeLabelChanged({ nodeId, label: newTitle }));
-      setLocalTitle(newTitle || title);
+      setLocalTitle(newTitle || title || 'Problem Setting Title');
     },
     [nodeId, dispatch, title]
   );
@@ -37,8 +40,8 @@ const NodeTitle = (props: Props) => {
 
   useEffect(() => {
     // Another component may change the title; sync local title with global state
-    setLocalTitle(label || title);
-  }, [label, title]);
+    setLocalTitle(label || title || templateTitle || 'Problem Setting Title');
+  }, [label, templateTitle, title]);
 
   return (
     <Flex

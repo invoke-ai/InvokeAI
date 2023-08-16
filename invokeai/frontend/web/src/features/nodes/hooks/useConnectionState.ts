@@ -2,8 +2,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeIsConnectionValidSelector';
-import { InputFieldValue, OutputFieldValue } from 'features/nodes/types/types';
 import { useMemo } from 'react';
+import { useFieldType } from './useNodeData';
 
 const selectIsConnectionInProgress = createSelector(
   stateSelector,
@@ -12,23 +12,19 @@ const selectIsConnectionInProgress = createSelector(
     nodes.connectionStartParams !== null
 );
 
-export type UseConnectionStateProps =
-  | {
-      nodeId: string;
-      field: InputFieldValue;
-      kind: 'input';
-    }
-  | {
-      nodeId: string;
-      field: OutputFieldValue;
-      kind: 'output';
-    };
+export type UseConnectionStateProps = {
+  nodeId: string;
+  fieldName: string;
+  kind: 'input' | 'output';
+};
 
 export const useConnectionState = ({
   nodeId,
-  field,
+  fieldName,
   kind,
 }: UseConnectionStateProps) => {
+  const fieldType = useFieldType(nodeId, fieldName, kind);
+
   const selectIsConnected = useMemo(
     () =>
       createSelector(stateSelector, ({ nodes }) =>
@@ -37,23 +33,23 @@ export const useConnectionState = ({
             return (
               (kind === 'input' ? edge.target : edge.source) === nodeId &&
               (kind === 'input' ? edge.targetHandle : edge.sourceHandle) ===
-                field.name
+                fieldName
             );
           }).length
         )
       ),
-    [field.name, kind, nodeId]
+    [fieldName, kind, nodeId]
   );
 
   const selectConnectionError = useMemo(
     () =>
       makeConnectionErrorSelector(
         nodeId,
-        field.name,
+        fieldName,
         kind === 'input' ? 'target' : 'source',
-        field.type
+        fieldType
       ),
-    [nodeId, field.name, field.type, kind]
+    [nodeId, fieldName, kind, fieldType]
   );
 
   const selectIsConnectionStartField = useMemo(
@@ -61,12 +57,12 @@ export const useConnectionState = ({
       createSelector(stateSelector, ({ nodes }) =>
         Boolean(
           nodes.connectionStartParams?.nodeId === nodeId &&
-            nodes.connectionStartParams?.handleId === field.name &&
+            nodes.connectionStartParams?.handleId === fieldName &&
             nodes.connectionStartParams?.handleType ===
               { input: 'target', output: 'source' }[kind]
         )
       ),
-    [field.name, kind, nodeId]
+    [fieldName, kind, nodeId]
   );
 
   const isConnected = useAppSelector(selectIsConnected);
