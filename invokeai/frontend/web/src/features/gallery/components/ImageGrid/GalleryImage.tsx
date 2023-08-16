@@ -71,10 +71,10 @@ const GalleryImage = (props: HoverableImageProps) => {
   const toggleStarredState = useCallback(() => {
     if (imageDTO) {
       if (imageDTO.starred) {
-        unstarImages({ images: [imageDTO] });
+        unstarImages({ imageDTOs: [imageDTO] });
       }
       if (!imageDTO.starred) {
-        starImages({ images: [imageDTO] });
+        starImages({ imageDTOs: [imageDTO] });
       }
     }
   }, [starImages, unstarImages, imageDTO]);

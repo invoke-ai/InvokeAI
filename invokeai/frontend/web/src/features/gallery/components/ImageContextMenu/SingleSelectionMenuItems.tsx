@@ -136,11 +136,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   }, [copyImageToClipboard, imageDTO.image_url]);
 
   const handleStarImage = useCallback(() => {
-    if (imageDTO) starImages({ images: [imageDTO] });
+    if (imageDTO) starImages({ imageDTOs: [imageDTO] });
   }, [starImages, imageDTO]);
 
   const handleUnstarImage = useCallback(() => {
-    if (imageDTO) unstarImages({ images: [imageDTO] });
+    if (imageDTO) unstarImages({ imageDTOs: [imageDTO] });
   }, [unstarImages, imageDTO]);
 
   return (

@@ -30,11 +30,11 @@ const MultipleSelectionMenuItems = () => {
   }, [dispatch, selection]);
 
   const handleStarSelection = useCallback(() => {
-    starImages({ images: selection });
+    starImages({ imageDTOs: selection });
   }, [starImages, selection]);
 
   const handleUnstarSelection = useCallback(() => {
-    unstarImages({ images: selection });
+    unstarImages({ imageDTOs: selection });
   }, [unstarImages, selection]);
 
   const areAllStarred = useMemo(() => {
