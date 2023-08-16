@@ -31,7 +31,7 @@ class BatchManagerBase(ABC):
         pass
 
     @abstractmethod
-    def create_batch_process(self, batches: list[Batch], graph: Graph) -> BatchProcessResponse:
+    def create_batch_process(self, batch: Batch, graph: Graph) -> BatchProcessResponse:
         pass
 
     @abstractmethod
@@ -85,17 +85,20 @@ class BatchManager(BatchManagerBase):
 
     def _create_batch_session(self, batch_process: BatchProcess, batch_indices: list[int]) -> GraphExecutionState:
         graph = batch_process.graph.copy(deep=True)
-        batches = batch_process.batches
+        batch = batch_process.batch
         g = graph.nx_graph_flat()
         sorted_nodes = nx.topological_sort(g)
         for npath in sorted_nodes:
             node = graph.get_node(npath)
-            (index, batch) = next(((i, b) for i, b in enumerate(batches) if b.node_id in node.id), (None, None))
-            if batch:
-                batch_index = batch_indices[index]
-                datum = batch.data[batch_index]
-                for key in datum:
-                    node.__dict__[key] = datum[key]
+            for index, bdl in enumerate(batch.data):
+                relavent_bd = [bd for bd in bdl if bd.node_id in node.id]
+                if not relavent_bd:
+                    continue
+                for bd in relavent_bd:
+                    batch_index = batch_indices[index]
+                    datum = bd.items[batch_index]
+                    key = bd.field_name
+                    node.__dict__[key] = datum
                 graph.update_node(npath, node)
 
         return GraphExecutionState(graph=graph)
@@ -110,13 +113,13 @@ class BatchManager(BatchManagerBase):
         self.__invoker.invoke(ges, invoke_all=True)
 
     def _valid_batch_config(self, batch_process: BatchProcess) -> bool:
-        # TODO: Check that the node_ids in the batches are unique
+        # TODO: Check that the node_ids in the batch are unique
         # TODO: Validate data types are correct for each batch data
         return True
 
-    def create_batch_process(self, batches: list[Batch], graph: Graph) -> BatchProcessResponse:
+    def create_batch_process(self, batch: Batch, graph: Graph) -> BatchProcessResponse:
         batch_process = BatchProcess(
-            batches=batches,
+            batch=batch,
             graph=graph,
         )
         if not self._valid_batch_config(batch_process):
@@ -131,8 +134,8 @@ class BatchManager(BatchManagerBase):
     def _create_sessions(self, batch_process: BatchProcess) -> list[BatchSession]:
         batch_indices = list()
         sessions = list()
-        for batch in batch_process.batches:
-            batch_indices.append(list(range(len(batch.data))))
+        for batchdata in batch_process.batch.data:
+            batch_indices.append(list(range(len(batchdata[0].items))))
         all_batch_indices = product(*batch_indices)
         for bi in all_batch_indices:
             ges = self._create_batch_session(batch_process, bi)
