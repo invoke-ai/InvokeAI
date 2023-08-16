@@ -1,4 +1,11 @@
-import { ChakraProps, Flex, Icon, Image, useColorMode } from '@chakra-ui/react';
+import {
+  ChakraProps,
+  Flex,
+  FlexProps,
+  Icon,
+  Image,
+  useColorMode,
+} from '@chakra-ui/react';
 import {
   IAILoadingImageFallback,
   IAINoContentFallback,
@@ -25,7 +32,7 @@ import {
   TypesafeDroppableData,
 } from 'features/dnd/types';
 
-type IAIDndImageProps = {
+type IAIDndImageProps = FlexProps & {
   imageDTO: ImageDTO | undefined;
   onError?: (event: SyntheticEvent<HTMLImageElement>) => void;
   onLoad?: (event: SyntheticEvent<HTMLImageElement>) => void;
@@ -47,8 +54,6 @@ type IAIDndImageProps = {
   useThumbailFallback?: boolean;
   withHoverOverlay?: boolean;
   children?: JSX.Element;
-  onMouseOver?: () => void;
-  onMouseOut?: () => void;
 };
 
 const IAIDndImage = (props: IAIDndImageProps) => {
@@ -79,14 +84,20 @@ const IAIDndImage = (props: IAIDndImageProps) => {
 
   const { colorMode } = useColorMode();
   const [isHovered, setIsHovered] = useState(false);
-  const handleMouseOver = useCallback(() => {
-    if (onMouseOver) onMouseOver();
-    setIsHovered(true);
-  }, [onMouseOver]);
-  const handleMouseOut = useCallback(() => {
-    if (onMouseOut) onMouseOut();
-    setIsHovered(false);
-  }, [onMouseOut]);
+  const handleMouseOver = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      if (onMouseOver) onMouseOver(e);
+      setIsHovered(true);
+    },
+    [onMouseOver]
+  );
+  const handleMouseOut = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      if (onMouseOut) onMouseOut(e);
+      setIsHovered(false);
+    },
+    [onMouseOut]
+  );
 
   const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
     postUploadAction,
