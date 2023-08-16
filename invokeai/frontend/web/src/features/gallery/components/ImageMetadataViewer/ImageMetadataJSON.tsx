@@ -1,26 +1,40 @@
 import { Box, Flex, IconButton, Tooltip } from '@chakra-ui/react';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import { useMemo } from 'react';
-import { FaCopy } from 'react-icons/fa';
+import { useCallback, useMemo } from 'react';
+import { FaCopy, FaSave } from 'react-icons/fa';
 
 type Props = {
-  copyTooltip: string;
+  label: string;
   jsonObject: object;
+  fileName?: string;
 };
 
 const ImageMetadataJSON = (props: Props) => {
-  const { copyTooltip, jsonObject } = props;
+  const { label, jsonObject, fileName } = props;
   const jsonString = useMemo(
     () => JSON.stringify(jsonObject, null, 2),
     [jsonObject]
   );
 
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(jsonString);
+  }, [jsonString]);
+
+  const handleSave = useCallback(() => {
+    const blob = new Blob([jsonString]);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${fileName || label}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }, [jsonString, label, fileName]);
+
   return (
     <Flex
+      layerStyle="second"
       sx={{
         borderRadius: 'base',
-        bg: 'whiteAlpha.500',
-        _dark: { bg: 'blackAlpha.500' },
         flexGrow: 1,
         w: 'full',
         h: 'full',
@@ -36,6 +50,7 @@ const ImageMetadataJSON = (props: Props) => {
           bottom: 0,
           overflow: 'auto',
           p: 4,
+          fontSize: 'sm',
         }}
       >
         <OverlayScrollbarsComponent
@@ -44,7 +59,7 @@ const ImageMetadataJSON = (props: Props) => {
           options={{
             scrollbars: {
               visibility: 'auto',
-              autoHide: 'move',
+              autoHide: 'scroll',
               autoHideDelay: 1300,
               theme: 'os-theme-dark',
             },
@@ -54,12 +69,22 @@ const ImageMetadataJSON = (props: Props) => {
         </OverlayScrollbarsComponent>
       </Box>
       <Flex sx={{ position: 'absolute', top: 0, insetInlineEnd: 0, p: 2 }}>
-        <Tooltip label={copyTooltip}>
+        <Tooltip label={`Save ${label} JSON`}>
           <IconButton
-            aria-label={copyTooltip}
+            aria-label={`Save ${label} JSON`}
+            icon={<FaSave />}
+            variant="ghost"
+            opacity={0.7}
+            onClick={handleSave}
+          />
+        </Tooltip>
+        <Tooltip label={`Copy ${label} JSON`}>
+          <IconButton
+            aria-label={`Copy ${label} JSON`}
             icon={<FaCopy />}
             variant="ghost"
-            onClick={() => navigator.clipboard.writeText(jsonString)}
+            opacity={0.7}
+            onClick={handleCopy}
           />
         </Tooltip>
       </Flex>

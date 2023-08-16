@@ -5,7 +5,7 @@ from PIL import Image
 from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.metadata import ImageMetadata
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
@@ -18,6 +18,7 @@ from invokeai.app.services.models.image_record import (
 from ..dependencies import ApiDependencies
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
+
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
@@ -286,3 +287,41 @@ async def delete_images_from_list(
         return DeleteImagesFromListResult(deleted_images=deleted_images)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to delete images")
+
+
+class ImagesUpdatedFromListResult(BaseModel):
+    updated_image_names: list[str] = Field(description="The image names that were updated")
+
+
+@images_router.post("/star", operation_id="star_images_in_list", response_model=ImagesUpdatedFromListResult)
+async def star_images_in_list(
+    image_names: list[str] = Body(description="The list of names of images to star", embed=True),
+) -> ImagesUpdatedFromListResult:
+    try:
+        updated_image_names: list[str] = []
+        for image_name in image_names:
+            try:
+                ApiDependencies.invoker.services.images.update(image_name, changes=ImageRecordChanges(starred=True))
+                updated_image_names.append(image_name)
+            except:
+                pass
+        return ImagesUpdatedFromListResult(updated_image_names=updated_image_names)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to star images")
+
+
+@images_router.post("/unstar", operation_id="unstar_images_in_list", response_model=ImagesUpdatedFromListResult)
+async def unstar_images_in_list(
+    image_names: list[str] = Body(description="The list of names of images to unstar", embed=True),
+) -> ImagesUpdatedFromListResult:
+    try:
+        updated_image_names: list[str] = []
+        for image_name in image_names:
+            try:
+                ApiDependencies.invoker.services.images.update(image_name, changes=ImageRecordChanges(starred=False))
+                updated_image_names.append(image_name)
+            except:
+                pass
+        return ImagesUpdatedFromListResult(updated_image_names=updated_image_names)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to unstar images")

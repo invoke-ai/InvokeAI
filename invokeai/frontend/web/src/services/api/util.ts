@@ -14,24 +14,39 @@ export const getIsImageInDateRange = (
   if (!data) {
     return false;
   }
-  const cacheImageDTOS = imagesSelectors.selectAll(data);
 
-  if (cacheImageDTOS.length > 1) {
-    // Images are sorted by `created_at` DESC
-    // check if the image is newer than the oldest image in the cache
-    const createdDate = new Date(imageDTO.created_at);
-    const oldestImage = cacheImageDTOS[cacheImageDTOS.length - 1];
-    if (!oldestImage) {
-      // satisfy TS gods, we already confirmed the array has more than one image
-      return false;
-    }
-    const oldestDate = new Date(oldestImage.created_at);
-    return createdDate >= oldestDate;
-  } else if ([0, 1].includes(cacheImageDTOS.length)) {
-    // if there are only 1 or 0 images in the cache, we consider the image to be in the date range
+  const totalCachedImageDtos = imagesSelectors.selectAll(data);
+
+  if (totalCachedImageDtos.length <= 1) {
     return true;
   }
-  return false;
+
+  const cachedStarredImages = [];
+  const cachedUnstarredImages = [];
+
+  for (let index = 0; index < totalCachedImageDtos.length; index++) {
+    const image = totalCachedImageDtos[index];
+    if (image?.starred) cachedStarredImages.push(image);
+    if (!image?.starred) cachedUnstarredImages.push(image);
+  }
+
+  if (imageDTO.starred) {
+    const lastStarredImage =
+      cachedStarredImages[cachedStarredImages.length - 1];
+    // if starring or already starred, want to look in list of starred images
+    if (!lastStarredImage) return true; // no starred images showing, so always show this one
+    const createdDate = new Date(imageDTO.created_at);
+    const oldestDate = new Date(lastStarredImage.created_at);
+    return createdDate >= oldestDate;
+  } else {
+    const lastUnstarredImage =
+      cachedUnstarredImages[cachedUnstarredImages.length - 1];
+    // if unstarring or already unstarred, want to look in list of unstarred images
+    if (!lastUnstarredImage) return false; // no unstarred images showing, so don't show this one
+    const createdDate = new Date(imageDTO.created_at);
+    const oldestDate = new Date(lastUnstarredImage.created_at);
+    return createdDate >= oldestDate;
+  }
 };
 
 export const getCategories = (imageDTO: ImageDTO) => {
@@ -45,7 +60,16 @@ export const getCategories = (imageDTO: ImageDTO) => {
 // with some other store of data. We will use the RTK Query cache as that store.
 export const imagesAdapter = createEntityAdapter<ImageDTO>({
   selectId: (image) => image.image_name,
-  sortComparer: (a, b) => dateComparator(b.updated_at, a.updated_at),
+  sortComparer: (a, b) => {
+    // Compare starred images first
+    if (a.starred && !b.starred) {
+      return -1;
+    }
+    if (!a.starred && b.starred) {
+      return 1;
+    }
+    return dateComparator(b.created_at, a.created_at);
+  },
 });
 
 // Create selectors for the adapter.

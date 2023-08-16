@@ -9,30 +9,40 @@ import { map } from 'lodash-es';
 import { forwardRef, useCallback } from 'react';
 import 'reactflow/dist/style.css';
 import { AnyInvocationType } from 'services/events/types';
-import { useBuildInvocation } from '../hooks/useBuildInvocation';
+import { useBuildNodeData } from '../hooks/useBuildNodeData';
 import { nodeAdded } from '../store/nodesSlice';
 
 type NodeTemplate = {
   label: string;
   value: string;
   description: string;
+  tags: string[];
 };
 
 const selector = createSelector(
   [stateSelector],
   ({ nodes }) => {
-    const data: NodeTemplate[] = map(nodes.invocationTemplates, (template) => {
+    const data: NodeTemplate[] = map(nodes.nodeTemplates, (template) => {
       return {
         label: template.title,
         value: template.type,
         description: template.description,
+        tags: template.tags,
       };
     });
 
     data.push({
       label: 'Progress Image',
-      value: 'progress_image',
-      description: 'Displays the progress image in the Node Editor',
+      value: 'current_image',
+      description: 'Displays the current image in the Node Editor',
+      tags: ['progress'],
+    });
+
+    data.push({
+      label: 'Notes',
+      value: 'notes',
+      description: 'Add notes about your workflow',
+      tags: ['notes'],
     });
 
     return { data };
@@ -44,7 +54,7 @@ const AddNodeMenu = () => {
   const dispatch = useAppDispatch();
   const { data } = useAppSelector(selector);
 
-  const buildInvocation = useBuildInvocation();
+  const buildInvocation = useBuildNodeData();
 
   const toaster = useAppToaster();
 
@@ -89,11 +99,12 @@ const AddNodeMenu = () => {
         filter={(value, item: NodeTemplate) =>
           item.label.toLowerCase().includes(value.toLowerCase().trim()) ||
           item.value.toLowerCase().includes(value.toLowerCase().trim()) ||
-          item.description.toLowerCase().includes(value.toLowerCase().trim())
+          item.description.toLowerCase().includes(value.toLowerCase().trim()) ||
+          item.tags.includes(value.toLowerCase().trim())
         }
         onChange={handleChange}
         sx={{
-          width: '18rem',
+          width: '24rem',
         }}
       />
     </Flex>

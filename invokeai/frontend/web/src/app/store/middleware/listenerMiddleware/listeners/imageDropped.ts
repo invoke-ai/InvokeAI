@@ -1,16 +1,20 @@
 import { createAction } from '@reduxjs/toolkit';
-import {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'app/components/ImageDnd/typesafeDnd';
 import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
+import {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'features/dnd/types';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
+import {
+  fieldImageValueChanged,
+  workflowExposedFieldAdded,
+} from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '../';
+import { parseify } from 'common/util/serialize';
 
 export const dndDropped = createAction<{
   overData: TypesafeDroppableData;
@@ -21,7 +25,7 @@ export const addImageDroppedListener = () => {
   startAppListening({
     actionCreator: dndDropped,
     effect: async (action, { dispatch }) => {
-      const log = logger('images');
+      const log = logger('dnd');
       const { activeData, overData } = action.payload;
 
       if (activeData.payloadType === 'IMAGE_DTO') {
@@ -31,8 +35,26 @@ export const addImageDroppedListener = () => {
           { activeData, overData },
           `Images (${activeData.payload.imageDTOs.length}) dropped`
         );
+      } else if (activeData.payloadType === 'NODE_FIELD') {
+        log.debug(
+          { activeData: parseify(activeData), overData: parseify(overData) },
+          'Node field dropped'
+        );
       } else {
         log.debug({ activeData, overData }, `Unknown payload dropped`);
+      }
+
+      if (
+        overData.actionType === 'ADD_FIELD_TO_LINEAR' &&
+        activeData.payloadType === 'NODE_FIELD'
+      ) {
+        const { nodeId, field } = activeData.payload;
+        dispatch(
+          workflowExposedFieldAdded({
+            nodeId,
+            fieldName: field.name,
+          })
+        );
       }
 
       /**
@@ -99,7 +121,7 @@ export const addImageDroppedListener = () => {
       ) {
         const { fieldName, nodeId } = overData.context;
         dispatch(
-          fieldValueChanged({
+          fieldImageValueChanged({
             nodeId,
             fieldName,
             value: activeData.payload.imageDTO,
