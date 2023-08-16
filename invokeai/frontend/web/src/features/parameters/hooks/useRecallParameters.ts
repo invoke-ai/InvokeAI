@@ -4,16 +4,16 @@ import {
   refinerModelChanged,
   setNegativeStylePromptSDXL,
   setPositiveStylePromptSDXL,
-  setRefinerAestheticScore,
   setRefinerCFGScale,
+  setRefinerNegativeAestheticScore,
+  setRefinerPositiveAestheticScore,
   setRefinerScheduler,
   setRefinerStart,
   setRefinerSteps,
 } from 'features/sdxl/store/sdxlSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { UnsafeImageMetadata } from 'services/api/types';
-import { ImageDTO } from 'services/api/types';
+import { ImageDTO, UnsafeImageMetadata } from 'services/api/types';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
   setCfgScale,
@@ -34,8 +34,9 @@ import {
   isValidPositivePrompt,
   isValidSDXLNegativeStylePrompt,
   isValidSDXLPositiveStylePrompt,
-  isValidSDXLRefinerAestheticScore,
   isValidSDXLRefinerModel,
+  isValidSDXLRefinerNegativeAestheticScore,
+  isValidSDXLRefinerPositiveAestheticScore,
   isValidSDXLRefinerStart,
   isValidScheduler,
   isValidSeed,
@@ -339,7 +340,8 @@ export const useRecallParameters = () => {
         refiner_cfg_scale,
         refiner_steps,
         refiner_scheduler,
-        refiner_aesthetic_store,
+        refiner_positive_aesthetic_store,
+        refiner_negative_aesthetic_store,
         refiner_start,
       } = metadata;
 
@@ -398,8 +400,24 @@ export const useRecallParameters = () => {
         dispatch(setRefinerScheduler(refiner_scheduler));
       }
 
-      if (isValidSDXLRefinerAestheticScore(refiner_aesthetic_store)) {
-        dispatch(setRefinerAestheticScore(refiner_aesthetic_store));
+      if (
+        isValidSDXLRefinerPositiveAestheticScore(
+          refiner_positive_aesthetic_store
+        )
+      ) {
+        dispatch(
+          setRefinerPositiveAestheticScore(refiner_positive_aesthetic_store)
+        );
+      }
+
+      if (
+        isValidSDXLRefinerNegativeAestheticScore(
+          refiner_negative_aesthetic_store
+        )
+      ) {
+        dispatch(
+          setRefinerNegativeAestheticScore(refiner_negative_aesthetic_store)
+        );
       }
 
       if (isValidSDXLRefinerStart(refiner_start)) {

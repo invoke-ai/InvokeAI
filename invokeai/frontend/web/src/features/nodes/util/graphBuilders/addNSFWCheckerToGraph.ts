@@ -43,7 +43,7 @@ export const addNSFWCheckerToGraph = (
     is_intermediate,
   };
 
-  graph.nodes[NSFW_CHECKER] = nsfwCheckerNode;
+  graph.nodes[NSFW_CHECKER] = nsfwCheckerNode as ImageNSFWBlurInvocation;
   graph.edges.push({
     source: {
       node_id: nodeIdToAddTo,

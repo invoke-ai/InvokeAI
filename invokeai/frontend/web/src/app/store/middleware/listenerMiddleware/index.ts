@@ -15,6 +15,7 @@ import { addDeleteBoardAndImagesFulfilledListener } from './listeners/boardAndIm
 import { addBoardIdSelectedListener } from './listeners/boardIdSelected';
 import { addCanvasCopiedToClipboardListener } from './listeners/canvasCopiedToClipboard';
 import { addCanvasDownloadedAsImageListener } from './listeners/canvasDownloadedAsImage';
+import { addCanvasMaskSavedToGalleryListener } from './listeners/canvasMaskSavedToGallery';
 import { addCanvasMergedListener } from './listeners/canvasMerged';
 import { addCanvasSavedToGalleryListener } from './listeners/canvasSavedToGallery';
 import { addControlNetAutoProcessListener } from './listeners/controlNetAutoProcess';
@@ -27,8 +28,8 @@ import {
   addImageDeletedFulfilledListener,
   addImageDeletedPendingListener,
   addImageDeletedRejectedListener,
-  addRequestedSingleImageDeletionListener,
   addRequestedMultipleImageDeletionListener,
+  addRequestedSingleImageDeletionListener,
 } from './listeners/imageDeleted';
 import { addImageDroppedListener } from './listeners/imageDropped';
 import {
@@ -79,6 +80,8 @@ import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
+import { addImagesStarredListener } from './listeners/imagesStarred';
+import { addImagesUnstarredListener } from './listeners/imagesUnstarred';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -120,6 +123,10 @@ addImageDeletedRejectedListener();
 addDeleteBoardAndImagesFulfilledListener();
 addImageToDeleteSelectedListener();
 
+// Image starred
+addImagesStarredListener();
+addImagesUnstarredListener();
+
 // User Invoked
 addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
@@ -129,6 +136,7 @@ addSessionReadyToInvokeListener();
 
 // Canvas actions
 addCanvasSavedToGalleryListener();
+addCanvasMaskSavedToGalleryListener();
 addCanvasDownloadedAsImageListener();
 addCanvasCopiedToClipboardListener();
 addCanvasMergedListener();

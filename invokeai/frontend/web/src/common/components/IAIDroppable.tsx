@@ -1,9 +1,7 @@
 import { Box } from '@chakra-ui/react';
-import {
-  TypesafeDroppableData,
-  isValidDrop,
-  useDroppable,
-} from 'app/components/ImageDnd/typesafeDnd';
+import { useDroppableTypesafe } from 'features/dnd/hooks/typesafeHooks';
+import { TypesafeDroppableData } from 'features/dnd/types';
+import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import { AnimatePresence } from 'framer-motion';
 import { ReactNode, memo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -19,7 +17,7 @@ const IAIDroppable = (props: IAIDroppableProps) => {
   const { dropLabel, data, disabled } = props;
   const dndId = useRef(uuidv4());
 
-  const { isOver, setNodeRef, active } = useDroppable({
+  const { isOver, setNodeRef, active } = useDroppableTypesafe({
     id: dndId.current,
     disabled,
     data,

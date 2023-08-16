@@ -20,6 +20,7 @@ export const initialUIState: UIState = {
   shouldShowProgressInViewer: true,
   shouldShowEmbeddingPicker: false,
   favoriteSchedulers: [],
+  globalContextMenuCloseTrigger: 0,
 };
 
 export const uiSlice = createSlice({
@@ -96,6 +97,9 @@ export const uiSlice = createSlice({
     toggleEmbeddingPicker: (state) => {
       state.shouldShowEmbeddingPicker = !state.shouldShowEmbeddingPicker;
     },
+    contextMenusClosed: (state) => {
+      state.globalContextMenuCloseTrigger += 1;
+    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
@@ -122,6 +126,7 @@ export const {
   setShouldShowProgressInViewer,
   favoriteSchedulersChanged,
   toggleEmbeddingPicker,
+  contextMenusClosed,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

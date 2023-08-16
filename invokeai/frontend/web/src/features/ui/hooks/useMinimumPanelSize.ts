@@ -14,7 +14,10 @@ export const useMinimumPanelSize = (
   defaultSizePct: number,
   groupId: string,
   orientation: 'horizontal' | 'vertical' = 'horizontal'
-): { ref: RefObject<ImperativePanelHandle>; minSizePct: number } => {
+): {
+  ref: RefObject<ImperativePanelHandle>;
+  minSizePct: number;
+} => {
   const ref = useRef<ImperativePanelHandle>(null);
   const [minSizePct, setMinSizePct] = useState(defaultSizePct);
 
@@ -31,7 +34,9 @@ export const useMinimumPanelSize = (
       `[data-panel-group-id="${groupId}"]`
     );
     const resizeHandles = document.querySelectorAll(
-      '[data-panel-resize-handle-id]'
+      orientation === 'horizontal'
+        ? '.resize-handle-horizontal'
+        : '.resize-handle-vertical'
     );
 
     if (!panelGroup) {

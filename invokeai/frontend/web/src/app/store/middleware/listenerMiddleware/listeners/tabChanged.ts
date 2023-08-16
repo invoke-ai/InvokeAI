@@ -12,7 +12,10 @@ export const addTabChangedListener = () => {
       if (activeTabName === 'unifiedCanvas') {
         const currentBaseModel = getState().generation.model?.base_model;
 
-        if (currentBaseModel && ['sd-1', 'sd-2'].includes(currentBaseModel)) {
+        if (
+          currentBaseModel &&
+          ['sd-1', 'sd-2', 'sdxl'].includes(currentBaseModel)
+        ) {
           // if we're already on a valid model, no change needed
           return;
         }
@@ -36,7 +39,9 @@ export const addTabChangedListener = () => {
           const validCanvasModels = mainModelsAdapter
             .getSelectors()
             .selectAll(models)
-            .filter((model) => ['sd-1', 'sd-2'].includes(model.base_model));
+            .filter((model) =>
+              ['sd-1', 'sd-2', 'sxdl'].includes(model.base_model)
+            );
 
           const firstValidCanvasModel = validCanvasModels[0];
 

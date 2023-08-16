@@ -1,17 +1,23 @@
 import { Box, Flex } from '@chakra-ui/react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIDndImage from 'common/components/IAIDndImage';
+import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
+import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import {
   ImageDTOsDraggableData,
   ImageDraggableData,
   TypesafeDraggableData,
-} from 'app/components/ImageDnd/typesafeDnd';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDndImage from 'common/components/IAIDndImage';
-import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
+} from 'features/dnd/types';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect.ts';
-import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import { MouseEvent, memo, useCallback, useMemo } from 'react';
+import { MouseEvent, memo, useCallback, useMemo, useState } from 'react';
 import { FaTrash } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { MdStar, MdStarBorder } from 'react-icons/md';
+import {
+  useGetImageDTOQuery,
+  useStarImagesMutation,
+  useUnstarImagesMutation,
+} from 'services/api/endpoints/images';
+import IAIDndImageIcon from '../../../../common/components/IAIDndImageIcon';
 
 interface HoverableImageProps {
   imageName: string;
@@ -21,9 +27,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
   const { imageName } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
-  const shouldShowDeleteButton = useAppSelector(
-    (state) => state.gallery.shouldShowDeleteButton
-  );
+  const shift = useAppSelector((state) => state.hotkeys.shift);
 
   const { handleClick, isSelected, selection, selectionCount } =
     useMultiselect(imageDTO);
@@ -59,6 +63,35 @@ const GalleryImage = (props: HoverableImageProps) => {
     }
   }, [imageDTO, selection, selectionCount]);
 
+  const [starImages] = useStarImagesMutation();
+  const [unstarImages] = useUnstarImagesMutation();
+
+  const toggleStarredState = useCallback(() => {
+    if (imageDTO) {
+      if (imageDTO.starred) {
+        unstarImages({ imageDTOs: [imageDTO] });
+      }
+      if (!imageDTO.starred) {
+        starImages({ imageDTOs: [imageDTO] });
+      }
+    }
+  }, [starImages, unstarImages, imageDTO]);
+
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseOver = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+
+  const handleMouseOut = useCallback(() => {
+    setIsHovered(false);
+  }, []);
+
+  const starIcon = useMemo(() => {
+    if (imageDTO?.starred) return <MdStar size="20" />;
+    if (!imageDTO?.starred && isHovered) return <MdStarBorder size="20" />;
+  }, [imageDTO?.starred, isHovered]);
+
   if (!imageDTO) {
     return <IAIFillSkeleton />;
   }
@@ -80,16 +113,34 @@ const GalleryImage = (props: HoverableImageProps) => {
           draggableData={draggableData}
           isSelected={isSelected}
           minSize={0}
-          onClickReset={handleDelete}
           imageSx={{ w: 'full', h: 'full' }}
           isDropDisabled={true}
           isUploadDisabled={true}
           thumbnail={true}
           withHoverOverlay
-          resetIcon={<FaTrash />}
-          resetTooltip="Delete image"
-          withResetIcon={shouldShowDeleteButton} // removed bc it's too easy to accidentally delete images
-        />
+          onMouseOver={handleMouseOver}
+          onMouseOut={handleMouseOut}
+        >
+          <>
+            <IAIDndImageIcon
+              onClick={toggleStarredState}
+              icon={starIcon}
+              tooltip={imageDTO.starred ? 'Unstar' : 'Star'}
+            />
+
+            {isHovered && shift && (
+              <IAIDndImageIcon
+                onClick={handleDelete}
+                icon={<FaTrash />}
+                tooltip="Delete"
+                styleOverrides={{
+                  bottom: 2,
+                  top: 'auto',
+                }}
+              />
+            )}
+          </>
+        </IAIDndImage>
       </Flex>
     </Box>
   );

@@ -15,12 +15,21 @@ import {
   setShouldUseSDXLRefiner,
 } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
-import { modelsApi, vaeModelsAdapter } from 'services/api/endpoints/models';
+import {
+  mainModelsAdapter,
+  modelsApi,
+  vaeModelsAdapter,
+} from 'services/api/endpoints/models';
+import { TypeGuardFor } from 'services/api/types';
 import { startAppListening } from '..';
 
 export const addModelsLoadedListener = () => {
   startAppListening({
-    predicate: (state, action) =>
+    predicate: (
+      action
+    ): action is TypeGuardFor<
+      typeof modelsApi.endpoints.getMainModels.matchFulfilled
+    > =>
       modelsApi.endpoints.getMainModels.matchFulfilled(action) &&
       !action.meta.arg.originalArgs.includes('sdxl-refiner'),
     effect: async (action, { getState, dispatch }) => {
@@ -32,29 +41,28 @@ export const addModelsLoadedListener = () => {
       );
 
       const currentModel = getState().generation.model;
+      const models = mainModelsAdapter.getSelectors().selectAll(action.payload);
 
-      const isCurrentModelAvailable = some(
-        action.payload.entities,
-        (m) =>
-          m?.model_name === currentModel?.model_name &&
-          m?.base_model === currentModel?.base_model &&
-          m?.model_type === currentModel?.model_type
-      );
-
-      if (isCurrentModelAvailable) {
-        return;
-      }
-
-      const firstModelId = action.payload.ids[0];
-      const firstModel = action.payload.entities[firstModelId];
-
-      if (!firstModel) {
+      if (models.length === 0) {
         // No models loaded at all
         dispatch(modelChanged(null));
         return;
       }
 
-      const result = zMainOrOnnxModel.safeParse(firstModel);
+      const isCurrentModelAvailable = currentModel
+        ? models.some(
+            (m) =>
+              m.model_name === currentModel.model_name &&
+              m.base_model === currentModel.base_model &&
+              m.model_type === currentModel.model_type
+          )
+        : false;
+
+      if (isCurrentModelAvailable) {
+        return;
+      }
+
+      const result = zMainOrOnnxModel.safeParse(models[0]);
 
       if (!result.success) {
         log.error(
@@ -68,7 +76,11 @@ export const addModelsLoadedListener = () => {
     },
   });
   startAppListening({
-    predicate: (state, action) =>
+    predicate: (
+      action
+    ): action is TypeGuardFor<
+      typeof modelsApi.endpoints.getMainModels.matchFulfilled
+    > =>
       modelsApi.endpoints.getMainModels.matchFulfilled(action) &&
       action.meta.arg.originalArgs.includes('sdxl-refiner'),
     effect: async (action, { getState, dispatch }) => {
@@ -80,30 +92,29 @@ export const addModelsLoadedListener = () => {
       );
 
       const currentModel = getState().sdxl.refinerModel;
+      const models = mainModelsAdapter.getSelectors().selectAll(action.payload);
 
-      const isCurrentModelAvailable = some(
-        action.payload.entities,
-        (m) =>
-          m?.model_name === currentModel?.model_name &&
-          m?.base_model === currentModel?.base_model &&
-          m?.model_type === currentModel?.model_type
-      );
-
-      if (isCurrentModelAvailable) {
-        return;
-      }
-
-      const firstModelId = action.payload.ids[0];
-      const firstModel = action.payload.entities[firstModelId];
-
-      if (!firstModel) {
+      if (models.length === 0) {
         // No models loaded at all
         dispatch(refinerModelChanged(null));
         dispatch(setShouldUseSDXLRefiner(false));
         return;
       }
 
-      const result = zSDXLRefinerModel.safeParse(firstModel);
+      const isCurrentModelAvailable = currentModel
+        ? models.some(
+            (m) =>
+              m.model_name === currentModel.model_name &&
+              m.base_model === currentModel.base_model &&
+              m.model_type === currentModel.model_type
+          )
+        : false;
+
+      if (isCurrentModelAvailable) {
+        return;
+      }
+
+      const result = zSDXLRefinerModel.safeParse(models[0]);
 
       if (!result.success) {
         log.error(

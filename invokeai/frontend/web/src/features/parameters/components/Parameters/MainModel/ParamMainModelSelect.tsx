@@ -15,11 +15,11 @@ import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainM
 import SyncModelsButton from 'features/ui/components/tabs/ModelManager/subpanels/ModelManagerSettingsPanel/SyncModelsButton';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { forEach } from 'lodash-es';
+import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import {
   useGetMainModelsQuery,
   useGetOnnxModelsQuery,
 } from 'services/api/endpoints/models';
-import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const selector = createSelector(
@@ -52,10 +52,7 @@ const ParamMainModelSelect = () => {
     const data: SelectItem[] = [];
 
     forEach(mainModels.entities, (model, id) => {
-      if (
-        !model ||
-        (activeTabName === 'unifiedCanvas' && model.base_model === 'sdxl')
-      ) {
+      if (!model) {
         return;
       }
 
