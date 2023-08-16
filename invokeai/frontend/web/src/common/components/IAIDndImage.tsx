@@ -16,6 +16,7 @@ import ImageContextMenu from 'features/gallery/components/ImageContextMenu/Image
 import {
   MouseEvent,
   ReactElement,
+  ReactNode,
   SyntheticEvent,
   memo,
   useCallback,
@@ -32,6 +33,17 @@ import {
   TypesafeDroppableData,
 } from 'features/dnd/types';
 
+const defaultUploadElement = (
+  <Icon
+    as={FaUpload}
+    sx={{
+      boxSize: 16,
+    }}
+  />
+);
+
+const defaultNoContentFallback = <IAINoContentFallback icon={FaImage} />;
+
 type IAIDndImageProps = FlexProps & {
   imageDTO: ImageDTO | undefined;
   onError?: (event: SyntheticEvent<HTMLImageElement>) => void;
@@ -47,13 +59,14 @@ type IAIDndImageProps = FlexProps & {
   fitContainer?: boolean;
   droppableData?: TypesafeDroppableData;
   draggableData?: TypesafeDraggableData;
-  dropLabel?: string;
+  dropLabel?: ReactNode;
   isSelected?: boolean;
   thumbnail?: boolean;
   noContentFallback?: ReactElement;
   useThumbailFallback?: boolean;
   withHoverOverlay?: boolean;
   children?: JSX.Element;
+  uploadElement?: ReactNode;
 };
 
 const IAIDndImage = (props: IAIDndImageProps) => {
@@ -74,7 +87,8 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     dropLabel,
     isSelected = false,
     thumbnail = false,
-    noContentFallback = <IAINoContentFallback icon={FaImage} />,
+    noContentFallback = defaultNoContentFallback,
+    uploadElement = defaultUploadElement,
     useThumbailFallback,
     withHoverOverlay = false,
     children,
@@ -193,12 +207,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                 {...getUploadButtonProps()}
               >
                 <input {...getUploadInputProps()} />
-                <Icon
-                  as={FaUpload}
-                  sx={{
-                    boxSize: 16,
-                  }}
-                />
+                {uploadElement}
               </Flex>
             </>
           )}
@@ -210,6 +219,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
               onClick={onClick}
             />
           )}
+          {children}
           {!isDropDisabled && (
             <IAIDroppable
               data={droppableData}
@@ -217,7 +227,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
               dropLabel={dropLabel}
             />
           )}
-          {children}
         </Flex>
       )}
     </ImageContextMenu>

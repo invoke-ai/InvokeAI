@@ -1,39 +1,16 @@
 import { Flex, FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import {
-  InputFieldTemplate,
-  InputFieldValue,
-  InvocationNodeData,
-  InvocationTemplate,
-} from 'features/nodes/types/types';
 import { memo } from 'react';
 import FieldTitle from './FieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
 
 type Props = {
-  nodeData: InvocationNodeData;
-  nodeTemplate: InvocationTemplate;
-  field: InputFieldValue;
-  fieldTemplate: InputFieldTemplate;
+  nodeId: string;
+  fieldName: string;
 };
 
-const LinearViewField = ({
-  nodeData,
-  nodeTemplate,
-  field,
-  fieldTemplate,
-}: Props) => {
-  // const dispatch = useAppDispatch();
-  // const handleRemoveField = useCallback(() => {
-  //   dispatch(
-  //     workflowExposedFieldRemoved({
-  //       nodeId: nodeData.id,
-  //       fieldName: field.name,
-  //     })
-  //   );
-  // }, [dispatch, field.name, nodeData.id]);
-
+const LinearViewField = ({ nodeId, fieldName }: Props) => {
   return (
     <Flex
       layerStyle="second"
@@ -48,10 +25,9 @@ const LinearViewField = ({
         <Tooltip
           label={
             <FieldTooltipContent
-              nodeData={nodeData}
-              nodeTemplate={nodeTemplate}
-              field={field}
-              fieldTemplate={fieldTemplate}
+              nodeId={nodeId}
+              fieldName={fieldName}
+              kind="input"
             />
           }
           openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
@@ -66,20 +42,10 @@ const LinearViewField = ({
               mb: 0,
             }}
           >
-            <FieldTitle
-              nodeData={nodeData}
-              nodeTemplate={nodeTemplate}
-              field={field}
-              fieldTemplate={fieldTemplate}
-            />
+            <FieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />
           </FormLabel>
         </Tooltip>
-        <InputFieldRenderer
-          nodeData={nodeData}
-          nodeTemplate={nodeTemplate}
-          field={field}
-          fieldTemplate={fieldTemplate}
-        />
+        <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
       </FormControl>
     </Flex>
   );

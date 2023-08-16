@@ -6,14 +6,6 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { AddFieldToLinearViewDropData } from 'features/dnd/types';
-import {
-  InputFieldTemplate,
-  InputFieldValue,
-  InvocationNodeData,
-  InvocationTemplate,
-  isInvocationNode,
-} from 'features/nodes/types/types';
-import { forEach } from 'lodash-es';
 import { memo } from 'react';
 import LinearViewField from '../../fields/LinearViewField';
 import ScrollableContent from '../ScrollableContent';
@@ -21,41 +13,8 @@ import ScrollableContent from '../ScrollableContent';
 const selector = createSelector(
   stateSelector,
   ({ nodes }) => {
-    const fields: {
-      nodeData: InvocationNodeData;
-      nodeTemplate: InvocationTemplate;
-      field: InputFieldValue;
-      fieldTemplate: InputFieldTemplate;
-    }[] = [];
-    const { exposedFields } = nodes.workflow;
-    nodes.nodes.filter(isInvocationNode).forEach((node) => {
-      const nodeTemplate = nodes.nodeTemplates[node.data.type];
-      if (!nodeTemplate) {
-        return;
-      }
-      forEach(node.data.inputs, (field) => {
-        if (
-          !exposedFields.some(
-            (f) => f.nodeId === node.id && f.fieldName === field.name
-          )
-        ) {
-          return;
-        }
-        const fieldTemplate = nodeTemplate.inputs[field.name];
-        if (!fieldTemplate) {
-          return;
-        }
-        fields.push({
-          nodeData: node.data,
-          nodeTemplate,
-          field,
-          fieldTemplate,
-        });
-      });
-    });
-
     return {
-      fields,
+      fields: nodes.workflow.exposedFields,
     };
   },
   defaultSelectorOptions
@@ -89,13 +48,11 @@ const LinearTabContent = () => {
           }}
         >
           {fields.length ? (
-            fields.map(({ nodeData, nodeTemplate, field, fieldTemplate }) => (
+            fields.map(({ nodeId, fieldName }) => (
               <LinearViewField
-                key={field.id}
-                nodeData={nodeData}
-                nodeTemplate={nodeTemplate}
-                field={field}
-                fieldTemplate={fieldTemplate}
+                key={`${nodeId}-${fieldName}`}
+                nodeId={nodeId}
+                fieldName={fieldName}
               />
             ))
           ) : (

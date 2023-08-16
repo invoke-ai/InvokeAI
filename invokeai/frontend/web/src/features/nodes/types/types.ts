@@ -457,12 +457,13 @@ export type ColorInputFieldTemplate = InputFieldTemplateBase & {
 };
 
 export const isInputFieldValue = (
-  field: InputFieldValue | OutputFieldValue
-): field is InputFieldValue => field.fieldKind === 'input';
+  field?: InputFieldValue | OutputFieldValue
+): field is InputFieldValue => Boolean(field && field.fieldKind === 'input');
 
 export const isInputFieldTemplate = (
-  fieldTemplate: InputFieldTemplate | OutputFieldTemplate
-): fieldTemplate is InputFieldTemplate => fieldTemplate.fieldKind === 'input';
+  fieldTemplate?: InputFieldTemplate | OutputFieldTemplate
+): fieldTemplate is InputFieldTemplate =>
+  Boolean(fieldTemplate && fieldTemplate.fieldKind === 'input');
 
 /**
  * JANKY CUSTOMISATION OF OpenAPI SCHEMA TYPES
@@ -632,20 +633,22 @@ export type NodeData =
 
 export const isInvocationNode = (
   node?: Node<NodeData>
-): node is Node<InvocationNodeData> => node?.type === 'invocation';
+): node is Node<InvocationNodeData> =>
+  Boolean(node && node.type === 'invocation');
 
 export const isInvocationNodeData = (
   node?: NodeData
 ): node is InvocationNodeData =>
-  !['notes', 'current_image'].includes(node?.type ?? '');
+  Boolean(node && !['notes', 'current_image'].includes(node.type));
 
 export const isNotesNode = (
   node?: Node<NodeData>
-): node is Node<NotesNodeData> => node?.type === 'notes';
+): node is Node<NotesNodeData> => Boolean(node && node.type === 'notes');
 
 export const isProgressImageNode = (
   node?: Node<NodeData>
-): node is Node<CurrentImageNodeData> => node?.type === 'current_image';
+): node is Node<CurrentImageNodeData> =>
+  Boolean(node && node.type === 'current_image');
 
 export enum NodeStatus {
   PENDING,

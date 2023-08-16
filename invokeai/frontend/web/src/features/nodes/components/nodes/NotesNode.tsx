@@ -10,7 +10,7 @@ import NodeTitle from '../Invocation/NodeTitle';
 import NodeWrapper from '../Invocation/NodeWrapper';
 
 const NotesNode = (props: NodeProps<NotesNodeData>) => {
-  const { id: nodeId, data } = props;
+  const { id: nodeId, data, selected } = props;
   const { notes, isOpen } = data;
   const dispatch = useAppDispatch();
   const handleChange = useCallback(
@@ -21,7 +21,7 @@ const NotesNode = (props: NodeProps<NotesNodeData>) => {
   );
 
   return (
-    <NodeWrapper nodeProps={props}>
+    <NodeWrapper nodeId={nodeId} selected={selected}>
       <Flex
         layerStyle="nodeHeader"
         sx={{
@@ -32,8 +32,8 @@ const NotesNode = (props: NodeProps<NotesNodeData>) => {
           h: 8,
         }}
       >
-        <NodeCollapseButton nodeProps={props} />
-        <NodeTitle nodeData={props.data} title="Notes" />
+        <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
+        <NodeTitle nodeId={nodeId} title="Notes" />
         <Box minW={8} />
       </Flex>
       {isOpen && (
