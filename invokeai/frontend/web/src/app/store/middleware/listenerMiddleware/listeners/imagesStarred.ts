@@ -7,7 +7,7 @@ export const addImagesStarredListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.starImages.matchFulfilled,
     effect: async (action, { dispatch, getState }) => {
-      const { images: starredImages } = action.payload;
+      const { updated_image_names: starredImages } = action.payload;
 
       const state = getState();
 
