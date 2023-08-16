@@ -14,9 +14,6 @@ import { fieldBooleanValueChanged } from 'features/nodes/store/nodesSlice';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { ChangeEvent, memo, useCallback } from 'react';
 
-export const IMAGE_FIELDS = ['ImageField', 'ImageCollection'];
-export const FOOTER_FIELDS = IMAGE_FIELDS;
-
 type Props = {
   nodeId: string;
 };

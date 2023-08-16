@@ -84,7 +84,7 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
   const nodeTemplate = useNodeTemplate(nodeId);
 
   if (!isInvocationNodeData(data)) {
-    return 'Unknown Node';
+    return <Text sx={{ fontWeight: 600 }}>Unknown Node</Text>;
   }
 
   return (
