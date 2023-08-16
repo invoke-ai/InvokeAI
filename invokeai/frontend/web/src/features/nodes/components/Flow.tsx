@@ -1,5 +1,6 @@
 import { useToken } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { contextMenusClosed } from 'features/ui/store/uiSlice';
 import { useCallback } from 'react';
 import {
   Background,
@@ -114,6 +115,10 @@ export const Flow = () => {
     [dispatch]
   );
 
+  const handlePaneClick = useCallback(() => {
+    dispatch(contextMenusClosed());
+  }, [dispatch]);
+
   return (
     <ReactFlow
       defaultViewport={viewport}
@@ -132,12 +137,13 @@ export const Flow = () => {
       connectionLineComponent={CustomConnectionLine}
       onSelectionChange={handleSelectionChange}
       isValidConnection={isValidConnection}
-      minZoom={0.2}
+      minZoom={0.1}
       snapToGrid={shouldSnapToGrid}
       snapGrid={[25, 25]}
       connectionRadius={30}
       proOptions={proOptions}
       style={{ borderRadius }}
+      onPaneClick={handlePaneClick}
     >
       <TopLeftPanel />
       <TopCenterPanel />

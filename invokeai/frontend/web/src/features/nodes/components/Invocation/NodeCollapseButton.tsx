@@ -2,16 +2,15 @@ import { ChevronUpIcon } from '@chakra-ui/icons';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { nodeIsOpenChanged } from 'features/nodes/store/nodesSlice';
-import { NodeData } from 'features/nodes/types/types';
 import { memo, useCallback } from 'react';
-import { NodeProps, useUpdateNodeInternals } from 'reactflow';
+import { useUpdateNodeInternals } from 'reactflow';
 
 interface Props {
-  nodeProps: NodeProps<NodeData>;
+  nodeId: string;
+  isOpen: boolean;
 }
 
-const NodeCollapseButton = (props: Props) => {
-  const { id: nodeId, isOpen } = props.nodeProps.data;
+const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
   const dispatch = useAppDispatch();
   const updateNodeInternals = useUpdateNodeInternals();
 

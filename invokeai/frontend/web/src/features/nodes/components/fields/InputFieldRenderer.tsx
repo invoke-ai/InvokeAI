@@ -1,11 +1,9 @@
 import { Box } from '@chakra-ui/react';
-import { memo } from 'react';
 import {
-  InputFieldTemplate,
-  InputFieldValue,
-  InvocationNodeData,
-  InvocationTemplate,
-} from '../../types/types';
+  useFieldData,
+  useFieldTemplate,
+} from 'features/nodes/hooks/useNodeData';
+import { memo } from 'react';
 import BooleanInputField from './fieldTypes/BooleanInputField';
 import ClipInputField from './fieldTypes/ClipInputField';
 import CollectionInputField from './fieldTypes/CollectionInputField';
@@ -29,33 +27,33 @@ import VaeInputField from './fieldTypes/VaeInputField';
 import VaeModelInputField from './fieldTypes/VaeModelInputField';
 
 type InputFieldProps = {
-  nodeData: InvocationNodeData;
-  nodeTemplate: InvocationTemplate;
-  field: InputFieldValue;
-  fieldTemplate: InputFieldTemplate;
+  nodeId: string;
+  fieldName: string;
 };
 
 // build an individual input element based on the schema
-const InputFieldRenderer = (props: InputFieldProps) => {
-  const { nodeData, nodeTemplate, field, fieldTemplate } = props;
-  const { type } = field;
+const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
+  const field = useFieldData(nodeId, fieldName);
+  const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'input');
 
-  if (type === 'string' && fieldTemplate.type === 'string') {
+  if (fieldTemplate?.fieldKind === 'output') {
+    return <Box p={2}>Output field in input: {field?.type}</Box>;
+  }
+
+  if (field?.type === 'string' && fieldTemplate?.type === 'string') {
     return (
       <StringInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
     );
   }
 
-  if (type === 'boolean' && fieldTemplate.type === 'boolean') {
+  if (field?.type === 'boolean' && fieldTemplate?.type === 'boolean') {
     return (
       <BooleanInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
@@ -63,46 +61,32 @@ const InputFieldRenderer = (props: InputFieldProps) => {
   }
 
   if (
-    (type === 'integer' && fieldTemplate.type === 'integer') ||
-    (type === 'float' && fieldTemplate.type === 'float')
+    (field?.type === 'integer' && fieldTemplate?.type === 'integer') ||
+    (field?.type === 'float' && fieldTemplate?.type === 'float')
   ) {
     return (
       <NumberInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
     );
   }
 
-  if (type === 'enum' && fieldTemplate.type === 'enum') {
+  if (field?.type === 'enum' && fieldTemplate?.type === 'enum') {
     return (
       <EnumInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
     );
   }
 
-  if (type === 'ImageField' && fieldTemplate.type === 'ImageField') {
+  if (field?.type === 'ImageField' && fieldTemplate?.type === 'ImageField') {
     return (
       <ImageInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (type === 'LatentsField' && fieldTemplate.type === 'LatentsField') {
-    return (
-      <LatentsInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
@@ -110,68 +94,55 @@ const InputFieldRenderer = (props: InputFieldProps) => {
   }
 
   if (
-    type === 'ConditioningField' &&
-    fieldTemplate.type === 'ConditioningField'
+    field?.type === 'LatentsField' &&
+    fieldTemplate?.type === 'LatentsField'
+  ) {
+    return (
+      <LatentsInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  if (
+    field?.type === 'ConditioningField' &&
+    fieldTemplate?.type === 'ConditioningField'
   ) {
     return (
       <ConditioningInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
     );
   }
 
-  if (type === 'UNetField' && fieldTemplate.type === 'UNetField') {
+  if (field?.type === 'UNetField' && fieldTemplate?.type === 'UNetField') {
     return (
       <UnetInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
     );
   }
 
-  if (type === 'ClipField' && fieldTemplate.type === 'ClipField') {
+  if (field?.type === 'ClipField' && fieldTemplate?.type === 'ClipField') {
     return (
       <ClipInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
     );
   }
 
-  if (type === 'VaeField' && fieldTemplate.type === 'VaeField') {
+  if (field?.type === 'VaeField' && fieldTemplate?.type === 'VaeField') {
     return (
       <VaeInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (type === 'ControlField' && fieldTemplate.type === 'ControlField') {
-    return (
-      <ControlInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (type === 'MainModelField' && fieldTemplate.type === 'MainModelField') {
-    return (
-      <MainModelInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
@@ -179,35 +150,38 @@ const InputFieldRenderer = (props: InputFieldProps) => {
   }
 
   if (
-    type === 'SDXLRefinerModelField' &&
-    fieldTemplate.type === 'SDXLRefinerModelField'
+    field?.type === 'ControlField' &&
+    fieldTemplate?.type === 'ControlField'
+  ) {
+    return (
+      <ControlInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  if (
+    field?.type === 'MainModelField' &&
+    fieldTemplate?.type === 'MainModelField'
+  ) {
+    return (
+      <MainModelInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  if (
+    field?.type === 'SDXLRefinerModelField' &&
+    fieldTemplate?.type === 'SDXLRefinerModelField'
   ) {
     return (
       <RefinerModelInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (type === 'VaeModelField' && fieldTemplate.type === 'VaeModelField') {
-    return (
-      <VaeModelInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (type === 'LoRAModelField' && fieldTemplate.type === 'LoRAModelField') {
-    return (
-      <LoRAModelInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
@@ -215,57 +189,48 @@ const InputFieldRenderer = (props: InputFieldProps) => {
   }
 
   if (
-    type === 'ControlNetModelField' &&
-    fieldTemplate.type === 'ControlNetModelField'
+    field?.type === 'VaeModelField' &&
+    fieldTemplate?.type === 'VaeModelField'
+  ) {
+    return (
+      <VaeModelInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  if (
+    field?.type === 'LoRAModelField' &&
+    fieldTemplate?.type === 'LoRAModelField'
+  ) {
+    return (
+      <LoRAModelInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  if (
+    field?.type === 'ControlNetModelField' &&
+    fieldTemplate?.type === 'ControlNetModelField'
   ) {
     return (
       <ControlNetModelInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
     );
   }
 
-  if (type === 'Collection' && fieldTemplate.type === 'Collection') {
+  if (field?.type === 'Collection' && fieldTemplate?.type === 'Collection') {
     return (
       <CollectionInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (type === 'CollectionItem' && fieldTemplate.type === 'CollectionItem') {
-    return (
-      <CollectionItemInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (type === 'ColorField' && fieldTemplate.type === 'ColorField') {
-    return (
-      <ColorInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (type === 'ImageCollection' && fieldTemplate.type === 'ImageCollection') {
-    return (
-      <ImageCollectionInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
@@ -273,20 +238,55 @@ const InputFieldRenderer = (props: InputFieldProps) => {
   }
 
   if (
-    type === 'SDXLMainModelField' &&
-    fieldTemplate.type === 'SDXLMainModelField'
+    field?.type === 'CollectionItem' &&
+    fieldTemplate?.type === 'CollectionItem'
   ) {
     return (
-      <SDXLMainModelInputField
-        nodeData={nodeData}
-        nodeTemplate={nodeTemplate}
+      <CollectionItemInputField
+        nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
       />
     );
   }
 
-  return <Box p={2}>Unknown field type: {type}</Box>;
+  if (field?.type === 'ColorField' && fieldTemplate?.type === 'ColorField') {
+    return (
+      <ColorInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  if (
+    field?.type === 'ImageCollection' &&
+    fieldTemplate?.type === 'ImageCollection'
+  ) {
+    return (
+      <ImageCollectionInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  if (
+    field?.type === 'SDXLMainModelField' &&
+    fieldTemplate?.type === 'SDXLMainModelField'
+  ) {
+    return (
+      <SDXLMainModelInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  return <Box p={2}>Unknown field type: {field?.type}</Box>;
 };
 
 export default memo(InputFieldRenderer);

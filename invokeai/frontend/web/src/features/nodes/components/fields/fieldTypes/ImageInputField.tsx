@@ -21,8 +21,7 @@ import { FieldComponentProps } from './types';
 const ImageInputFieldComponent = (
   props: FieldComponentProps<ImageInputFieldValue, ImageInputFieldTemplate>
 ) => {
-  const { nodeData, field } = props;
-  const nodeId = nodeData.id;
+  const { nodeId, field } = props;
   const dispatch = useAppDispatch();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(

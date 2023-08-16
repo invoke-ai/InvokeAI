@@ -27,8 +27,7 @@ const ModelInputFieldComponent = (
     SDXLMainModelInputFieldTemplate
   >
 ) => {
-  const { nodeData, field } = props;
-  const nodeId = nodeData.id;
+  const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
