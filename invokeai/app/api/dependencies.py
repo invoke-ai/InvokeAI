@@ -75,13 +75,9 @@ class ApiDependencies:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         db_location = str(db_path)
 
-        db_conn = sqlite3.connect(
-            db_location, check_same_thread=False
-        )  # TODO: figure out a better threading solution
+        db_conn = sqlite3.connect(db_location, check_same_thread=False)  # TODO: figure out a better threading solution
 
-        graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-            conn=db_conn, table_name="graph_executions"
-        )
+        graph_execution_manager = SqliteItemStorage[GraphExecutionState](conn=db_conn, table_name="graph_executions")
 
         urls = LocalUrlService()
         image_record_storage = SqliteImageRecordStorage(conn=db_conn)

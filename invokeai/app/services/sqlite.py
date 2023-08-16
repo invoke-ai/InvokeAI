@@ -18,7 +18,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
     _id_field: str
     _lock: Lock
 
-    def __init__(self, conn: sqlite3.Connection, table_name: str,  id_field: str = "id"):
+    def __init__(self, conn: sqlite3.Connection, table_name: str, id_field: str = "id"):
         super().__init__()
 
         self._table_name = table_name

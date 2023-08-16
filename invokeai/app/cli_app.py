@@ -258,15 +258,10 @@ def invoke_cli():
         db_location = config.db_path
         db_location.parent.mkdir(parents=True, exist_ok=True)
 
-
-    db_conn = sqlite3.connect(
-        db_location, check_same_thread=False
-    )  # TODO: figure out a better threading solution
+    db_conn = sqlite3.connect(db_location, check_same_thread=False)  # TODO: figure out a better threading solution
     logger.info(f'InvokeAI database location is "{db_location}"')
 
-    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-        conn=db_conn, table_name="graph_executions"
-    )
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](conn=db_conn, table_name="graph_executions")
 
     urls = LocalUrlService()
     image_record_storage = SqliteImageRecordStorage(conn=db_conn)
