@@ -256,22 +256,27 @@ class InvocationStatsService(InvocationStatsServiceBase):
             logger.info(f"Graph stats: {graph_id}")
             logger.info("Node                 Calls    Seconds VRAM Used")
             for node_type, stats in self._stats[graph_id].nodes.items():
-                logger.info(f"{node_type:<20} {stats.calls:>5}   {stats.time_used:7.3f}s     {stats.max_vram:4.2f}G")
+                logger.info(f"{node_type:<20} {stats.calls:>5}   {stats.time_used:7.3f}s     {stats.max_vram:4.3f}G")
                 total_time += stats.time_used
 
-            logger.info(f"TOTAL GRAPH EXECUTION TIME:  {total_time:7.3f}s")
-            logger.info("RAM used: " + "%4.2fG" % stats.ram_used + f" (delta={stats.ram_changed:4.2f}G)")
-            if torch.cuda.is_available():
-                logger.info("VRAM used (all processes): " + "%4.2fG" % (torch.cuda.memory_allocated() / GIG))
             cache_stats = self._cache_stats[graph_id]
+            hwm = cache_stats.high_watermark / GIG
+            tot = cache_stats.cache_size / GIG
+            loaded = sum([v for v in cache_stats.loaded_model_sizes.values()]) / GIG
+
+            logger.info(f"TOTAL GRAPH EXECUTION TIME:  {total_time:7.3f}s")
+            logger.info(
+                "RAM used by InvokeAI process: " + "%4.2fG" % stats.ram_used + f" (delta={stats.ram_changed:4.2f}G)"
+            )
+            logger.info(f"RAM used to load models: {loaded:4.2f}G")
+            if torch.cuda.is_available():
+                logger.info("VRAM in use: " + "%4.3fG" % (torch.cuda.memory_allocated() / GIG))
             logger.info("RAM cache statistics:")
             logger.info(f"   Model cache hits: {cache_stats.hits}")
             logger.info(f"   Model cache misses: {cache_stats.misses}")
             logger.info(f"   Models cached: {cache_stats.in_cache}")
             logger.info(f"   Models cleared from cache: {cache_stats.cleared}")
-            hwm = cache_stats.high_watermark / GIG
-            tot = cache_stats.cache_size / GIG
-            logger.info(f"   Cache RAM usage: {hwm:4.2f}/{tot:4.2f}G")
+            logger.info(f"   Cache high water mark: {hwm:4.2f}/{tot:4.2f}G")
 
             completed.add(graph_id)
 

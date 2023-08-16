@@ -21,7 +21,7 @@ import os
 import sys
 import hashlib
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Union, types, Optional, Type, Any
 
@@ -43,12 +43,14 @@ GIG = 1073741824
 
 @dataclass
 class CacheStats(object):
-    hits: int = 0
-    misses: int = 0
-    high_watermark: int = 0
-    in_cache: int = 0
-    cleared: int = 0
-    cache_size: int = 0
+    hits: int = 0  # cache hits
+    misses: int = 0  # cache misses
+    high_watermark: int = 0  # amount of cache used
+    in_cache: int = 0  # number of models in cache
+    cleared: int = 0  # number of models cleared to make space
+    cache_size: int = 0  # total size of cache
+    # {submodel_key => size}
+    loaded_model_sizes: Dict[str, int] = field(default_factory=dict)
 
 
 class ModelLocker(object):
@@ -194,7 +196,6 @@ class ModelCache(object):
             model_type=model_type,
             submodel_type=submodel,
         )
-
         # TODO: lock for no copies on simultaneous calls?
         cache_entry = self._cached_models.get(key, None)
         if cache_entry is None:
@@ -219,11 +220,14 @@ class ModelCache(object):
         else:
             if self.stats:
                 self.stats.hits += 1
-                self.stats.cache_size = self.max_cache_size * GIG
 
         if self.stats:
+            self.stats.cache_size = self.max_cache_size * GIG
             self.stats.high_watermark = max(self.stats.high_watermark, self._cache_size())
             self.stats.in_cache = len(self._cached_models)
+            self.stats.loaded_model_sizes[key] = max(
+                self.stats.loaded_model_sizes.get("key", 0), model_info.get_size(submodel)
+            )
 
         with suppress(Exception):
             self._cache_stack.remove(key)
