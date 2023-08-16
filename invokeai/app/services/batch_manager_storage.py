@@ -363,7 +363,10 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
         graph_raw = session_dict.get("graph", "unknown")
         canceled = session_dict.get("canceled", 0)
         return BatchProcess(
-            batch_id=batch_id, batch=parse_raw_as(Batch, batch_raw), graph=parse_raw_as(Graph, graph_raw), canceled=canceled == 1
+            batch_id=batch_id,
+            batch=parse_raw_as(Batch, batch_raw),
+            graph=parse_raw_as(Graph, graph_raw),
+            canceled=canceled == 1,
         )
 
     def get(

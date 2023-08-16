@@ -27,6 +27,7 @@ from invokeai.app.services.graph import (
 import pytest
 import sqlite3
 
+
 @pytest.fixture
 def simple_graph():
     g = Graph()
@@ -43,9 +44,7 @@ def simple_graph():
 def mock_services() -> InvocationServices:
     # NOTE: none of these are actually called by the test invocations
     db_conn = sqlite3.connect(sqlite_memory, check_same_thread=False)
-    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
-        conn=db_conn, table_name="graph_executions"
-    )
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](conn=db_conn, table_name="graph_executions")
     return InvocationServices(
         model_manager=None,  # type: ignore
         events=TestEventService(),

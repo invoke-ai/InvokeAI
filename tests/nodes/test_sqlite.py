@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 import pytest
 import sqlite3
 
+
 class TestModel(BaseModel):
     id: str = Field(description="ID")
     name: str = Field(description="Name")
@@ -13,6 +14,7 @@ class TestModel(BaseModel):
 def db() -> SqliteItemStorage[TestModel]:
     db_conn = sqlite3.connect(sqlite_memory, check_same_thread=False)
     return SqliteItemStorage[TestModel](db_conn, "test", "id")
+
 
 def test_sqlite_service_can_create_and_get(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
