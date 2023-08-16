@@ -226,7 +226,7 @@ class ModelCache(object):
             self.stats.high_watermark = max(self.stats.high_watermark, self._cache_size())
             self.stats.in_cache = len(self._cached_models)
             self.stats.loaded_model_sizes[key] = max(
-                self.stats.loaded_model_sizes.get("key", 0), model_info.get_size(submodel)
+                self.stats.loaded_model_sizes.get(key, 0), model_info.get_size(submodel)
             )
 
         with suppress(Exception):
