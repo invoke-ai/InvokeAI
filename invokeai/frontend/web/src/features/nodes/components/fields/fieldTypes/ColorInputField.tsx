@@ -11,8 +11,7 @@ import { FieldComponentProps } from './types';
 const ColorInputFieldComponent = (
   props: FieldComponentProps<ColorInputFieldValue, ColorInputFieldTemplate>
 ) => {
-  const { nodeData, field } = props;
-  const nodeId = nodeData.id;
+  const { nodeId, field } = props;
 
   const dispatch = useAppDispatch();
 

@@ -11,17 +11,12 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import {
-  InvocationNodeData,
-  NodeExecutionState,
-  NodeStatus,
-} from 'features/nodes/types/types';
+import { NodeExecutionState, NodeStatus } from 'features/nodes/types/types';
 import { memo, useMemo } from 'react';
 import { FaCheck, FaEllipsisH, FaExclamation } from 'react-icons/fa';
-import { NodeProps } from 'reactflow';
 
 type Props = {
-  nodeProps: NodeProps<InvocationNodeData>;
+  nodeId: string;
 };
 
 const iconBoxSize = 3;
@@ -33,8 +28,7 @@ const circleStyles = {
   '.chakra-progress__track': { stroke: 'transparent' },
 };
 
-const NodeStatusIndicator = (props: Props) => {
-  const nodeId = props.nodeProps.data.id;
+const NodeStatusIndicator = ({ nodeId }: Props) => {
   const selectNodeExecutionState = useMemo(
     () =>
       createSelector(
@@ -76,7 +70,7 @@ type TooltipLabelProps = {
   nodeExecutionState: NodeExecutionState;
 };
 
-const TooltipLabel = ({ nodeExecutionState }: TooltipLabelProps) => {
+const TooltipLabel = memo(({ nodeExecutionState }: TooltipLabelProps) => {
   const { status, progress, progressImage } = nodeExecutionState;
   if (status === NodeStatus.PENDING) {
     return <Text>Pending</Text>;
@@ -118,13 +112,15 @@ const TooltipLabel = ({ nodeExecutionState }: TooltipLabelProps) => {
   }
 
   return null;
-};
+});
+
+TooltipLabel.displayName = 'TooltipLabel';
 
 type StatusIconProps = {
   nodeExecutionState: NodeExecutionState;
 };
 
-const StatusIcon = (props: StatusIconProps) => {
+const StatusIcon = memo((props: StatusIconProps) => {
   const { progress, status } = props.nodeExecutionState;
   if (status === NodeStatus.PENDING) {
     return (
@@ -182,4 +178,6 @@ const StatusIcon = (props: StatusIconProps) => {
     );
   }
   return null;
-};
+});
+
+StatusIcon.displayName = 'StatusIcon';

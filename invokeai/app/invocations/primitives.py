@@ -48,7 +48,7 @@ class BooleanCollectionOutput(BaseInvocationOutput):
     )
 
 
-@title("Boolean")
+@title("Boolean Primitive")
 @tags("primitives", "boolean")
 class BooleanInvocation(BaseInvocation):
     """A boolean primitive value"""
@@ -62,7 +62,7 @@ class BooleanInvocation(BaseInvocation):
         return BooleanOutput(a=self.a)
 
 
-@title("Boolean Collection")
+@title("Boolean Primitive Collection")
 @tags("primitives", "boolean", "collection")
 class BooleanCollectionInvocation(BaseInvocation):
     """A collection of boolean primitive values"""
@@ -101,7 +101,7 @@ class IntegerCollectionOutput(BaseInvocationOutput):
     )
 
 
-@title("Integer")
+@title("Integer Primitive")
 @tags("primitives", "integer")
 class IntegerInvocation(BaseInvocation):
     """An integer primitive value"""
@@ -115,7 +115,7 @@ class IntegerInvocation(BaseInvocation):
         return IntegerOutput(a=self.a)
 
 
-@title("Integer Collection")
+@title("Integer Primitive Collection")
 @tags("primitives", "integer", "collection")
 class IntegerCollectionInvocation(BaseInvocation):
     """A collection of integer primitive values"""
@@ -154,7 +154,7 @@ class FloatCollectionOutput(BaseInvocationOutput):
     )
 
 
-@title("Float")
+@title("Float Primitive")
 @tags("primitives", "float")
 class FloatInvocation(BaseInvocation):
     """A float primitive value"""
@@ -168,7 +168,7 @@ class FloatInvocation(BaseInvocation):
         return FloatOutput(a=self.param)
 
 
-@title("Float Collection")
+@title("Float Primitive Collection")
 @tags("primitives", "float", "collection")
 class FloatCollectionInvocation(BaseInvocation):
     """A collection of float primitive values"""
@@ -207,7 +207,7 @@ class StringCollectionOutput(BaseInvocationOutput):
     )
 
 
-@title("String")
+@title("String Primitive")
 @tags("primitives", "string")
 class StringInvocation(BaseInvocation):
     """A string primitive value"""
@@ -221,7 +221,7 @@ class StringInvocation(BaseInvocation):
         return StringOutput(text=self.text)
 
 
-@title("String Collection")
+@title("String Primitive Collection")
 @tags("primitives", "string", "collection")
 class StringCollectionInvocation(BaseInvocation):
     """A collection of string primitive values"""
@@ -289,7 +289,7 @@ class ImageInvocation(BaseInvocation):
         )
 
 
-@title("Image Collection")
+@title("Image Primitive Collection")
 @tags("primitives", "image", "collection")
 class ImageCollectionInvocation(BaseInvocation):
     """A collection of image primitive values"""
@@ -357,7 +357,7 @@ class LatentsInvocation(BaseInvocation):
         return build_latents_output(self.latents.latents_name, latents)
 
 
-@title("Latents Collection")
+@title("Latents Primitive Collection")
 @tags("primitives", "latents", "collection")
 class LatentsCollectionInvocation(BaseInvocation):
     """A collection of latents tensor primitive values"""
@@ -475,7 +475,7 @@ class ConditioningInvocation(BaseInvocation):
         return ConditioningOutput(conditioning=self.conditioning)
 
 
-@title("Conditioning Collection")
+@title("Conditioning Primitive Collection")
 @tags("primitives", "conditioning", "collection")
 class ConditioningCollectionInvocation(BaseInvocation):
     """A collection of conditioning tensor primitive values"""

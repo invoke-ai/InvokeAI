@@ -6,10 +6,14 @@ import {
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodeClicked } from 'features/nodes/store/nodesSlice';
-import { MouseEvent, PropsWithChildren, useCallback, useMemo } from 'react';
+import {
+  MouseEvent,
+  PropsWithChildren,
+  memo,
+  useCallback,
+  useMemo,
+} from 'react';
 import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from '../../types/constants';
-import { NodeData } from 'features/nodes/types/types';
-import { NodeProps } from 'reactflow';
 
 const useNodeSelect = (nodeId: string) => {
   const dispatch = useAppDispatch();
@@ -25,14 +29,13 @@ const useNodeSelect = (nodeId: string) => {
 };
 
 type NodeWrapperProps = PropsWithChildren & {
-  nodeProps: NodeProps<NodeData>;
+  nodeId: string;
+  selected: boolean;
   width?: NonNullable<ChakraProps['sx']>['w'];
 };
 
 const NodeWrapper = (props: NodeWrapperProps) => {
-  const { width, children, nodeProps } = props;
-  const { data, selected } = nodeProps;
-  const nodeId = data.id;
+  const { width, children, nodeId, selected } = props;
 
   const [
     nodeSelectedOutlineLight,
@@ -93,4 +96,4 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   );
 };
 
-export default NodeWrapper;
+export default memo(NodeWrapper);

@@ -46,7 +46,6 @@ const NodeEditor = () => {
           <AnimatePresence>
             {isReady && (
               <motion.div
-                layoutId="node-editor-flow"
                 initial={{
                   opacity: 0,
                 }}
@@ -67,7 +66,6 @@ const NodeEditor = () => {
           <AnimatePresence>
             {!isReady && (
               <motion.div
-                layoutId="node-editor-loading"
                 initial={{
                   opacity: 0,
                 }}

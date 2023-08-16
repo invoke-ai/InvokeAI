@@ -1,27 +1,24 @@
 import { Flex, FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
-import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import {
-  InputFieldValue,
-  InvocationNodeData,
-  InvocationTemplate,
-} from 'features/nodes/types/types';
-import { PropsWithChildren, useMemo } from 'react';
-import { NodeProps } from 'reactflow';
+  useDoesInputHaveValue,
+  useFieldTemplate,
+} from 'features/nodes/hooks/useNodeData';
+import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
+import { PropsWithChildren, memo, useMemo } from 'react';
 import FieldHandle from './FieldHandle';
 import FieldTitle from './FieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
 
 interface Props {
-  nodeProps: NodeProps<InvocationNodeData>;
-  nodeTemplate: InvocationTemplate;
-  field: InputFieldValue;
+  nodeId: string;
+  fieldName: string;
 }
 
-const InputField = (props: Props) => {
-  const { nodeProps, nodeTemplate, field } = props;
-  const { id: nodeId } = nodeProps.data;
+const InputField = ({ nodeId, fieldName }: Props) => {
+  const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'input');
+  const doesFieldHaveValue = useDoesInputHaveValue(nodeId, fieldName);
 
   const {
     isConnected,
@@ -29,15 +26,10 @@ const InputField = (props: Props) => {
     isConnectionStartField,
     connectionError,
     shouldDim,
-  } = useConnectionState({ nodeId, field, kind: 'input' });
-
-  const fieldTemplate = useMemo(
-    () => nodeTemplate.inputs[field.name],
-    [field.name, nodeTemplate.inputs]
-  );
+  } = useConnectionState({ nodeId, fieldName, kind: 'input' });
 
   const isMissingInput = useMemo(() => {
-    if (!fieldTemplate) {
+    if (fieldTemplate?.fieldKind !== 'input') {
       return false;
     }
 
@@ -49,18 +41,18 @@ const InputField = (props: Props) => {
       return true;
     }
 
-    if (!field.value && !isConnected && fieldTemplate.input === 'any') {
+    if (!doesFieldHaveValue && !isConnected && fieldTemplate.input === 'any') {
       return true;
     }
-  }, [fieldTemplate, isConnected, field.value]);
+  }, [fieldTemplate, isConnected, doesFieldHaveValue]);
 
-  if (!fieldTemplate) {
+  if (fieldTemplate?.fieldKind !== 'input') {
     return (
       <InputFieldWrapper shouldDim={shouldDim}>
         <FormControl
           sx={{ color: 'error.400', textAlign: 'left', fontSize: 'sm' }}
         >
-          Unknown input: {field.name}
+          Unknown input: {fieldName}
         </FormControl>
       </InputFieldWrapper>
     );
@@ -82,10 +74,9 @@ const InputField = (props: Props) => {
         <Tooltip
           label={
             <FieldTooltipContent
-              nodeData={nodeProps.data}
-              nodeTemplate={nodeTemplate}
-              field={field}
-              fieldTemplate={fieldTemplate}
+              nodeId={nodeId}
+              fieldName={fieldName}
+              kind="input"
             />
           }
           openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
@@ -95,27 +86,18 @@ const InputField = (props: Props) => {
         >
           <FormLabel sx={{ mb: 0 }}>
             <FieldTitle
-              nodeData={nodeProps.data}
-              nodeTemplate={nodeTemplate}
-              field={field}
-              fieldTemplate={fieldTemplate}
+              nodeId={nodeId}
+              fieldName={fieldName}
+              kind="input"
               isDraggable
             />
           </FormLabel>
         </Tooltip>
-        <InputFieldRenderer
-          nodeData={nodeProps.data}
-          nodeTemplate={nodeTemplate}
-          field={field}
-          fieldTemplate={fieldTemplate}
-        />
+        <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
       </FormControl>
 
       {fieldTemplate.input !== 'direct' && (
         <FieldHandle
-          nodeProps={nodeProps}
-          nodeTemplate={nodeTemplate}
-          field={field}
           fieldTemplate={fieldTemplate}
           handleType="target"
           isConnectionInProgress={isConnectionInProgress}
@@ -133,21 +115,25 @@ type InputFieldWrapperProps = PropsWithChildren<{
   shouldDim: boolean;
 }>;
 
-const InputFieldWrapper = ({ shouldDim, children }: InputFieldWrapperProps) => (
-  <Flex
-    className="nopan"
-    sx={{
-      position: 'relative',
-      minH: 8,
-      py: 0.5,
-      alignItems: 'center',
-      opacity: shouldDim ? 0.5 : 1,
-      transitionProperty: 'opacity',
-      transitionDuration: '0.1s',
-      w: 'full',
-      h: 'full',
-    }}
-  >
-    {children}
-  </Flex>
+const InputFieldWrapper = memo(
+  ({ shouldDim, children }: InputFieldWrapperProps) => (
+    <Flex
+      className="nopan"
+      sx={{
+        position: 'relative',
+        minH: 8,
+        py: 0.5,
+        alignItems: 'center',
+        opacity: shouldDim ? 0.5 : 1,
+        transitionProperty: 'opacity',
+        transitionDuration: '0.1s',
+        w: 'full',
+        h: 'full',
+      }}
+    >
+      {children}
+    </Flex>
+  )
 );
+
+InputFieldWrapper.displayName = 'InputFieldWrapper';

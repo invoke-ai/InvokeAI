@@ -1,10 +1,5 @@
 import { Flex } from '@chakra-ui/react';
-import {
-  InvocationNodeData,
-  InvocationTemplate,
-} from 'features/nodes/types/types';
 import { memo } from 'react';
-import { NodeProps } from 'reactflow';
 import NodeCollapseButton from '../Invocation/NodeCollapseButton';
 import NodeCollapsedHandles from '../Invocation/NodeCollapsedHandles';
 import NodeNotesEdit from '../Invocation/NodeNotesEdit';
@@ -12,14 +7,14 @@ import NodeStatusIndicator from '../Invocation/NodeStatusIndicator';
 import NodeTitle from '../Invocation/NodeTitle';
 
 type Props = {
-  nodeProps: NodeProps<InvocationNodeData>;
-  nodeTemplate: InvocationTemplate;
+  nodeId: string;
+  isOpen: boolean;
+  label: string;
+  type: string;
+  selected: boolean;
 };
 
-const NodeHeader = (props: Props) => {
-  const { nodeProps, nodeTemplate } = props;
-  const { isOpen } = nodeProps.data;
-
+const NodeHeader = ({ nodeId, isOpen }: Props) => {
   return (
     <Flex
       layerStyle="nodeHeader"
@@ -35,18 +30,13 @@ const NodeHeader = (props: Props) => {
         _dark: { color: 'base.200' },
       }}
     >
-      <NodeCollapseButton nodeProps={nodeProps} />
-      <NodeTitle nodeData={nodeProps.data} title={nodeTemplate.title} />
+      <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
+      <NodeTitle nodeId={nodeId} />
       <Flex alignItems="center">
-        <NodeStatusIndicator nodeProps={nodeProps} />
-        <NodeNotesEdit nodeProps={nodeProps} nodeTemplate={nodeTemplate} />
+        <NodeStatusIndicator nodeId={nodeId} />
+        <NodeNotesEdit nodeId={nodeId} />
       </Flex>
-      {!isOpen && (
-        <NodeCollapsedHandles
-          nodeProps={nodeProps}
-          nodeTemplate={nodeTemplate}
-        />
-      )}
+      {!isOpen && <NodeCollapsedHandles nodeId={nodeId} />}
     </Flex>
   );
 };

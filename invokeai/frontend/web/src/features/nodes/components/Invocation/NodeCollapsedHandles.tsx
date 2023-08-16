@@ -1,20 +1,17 @@
 import { useColorModeValue } from '@chakra-ui/react';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
-import {
-  InvocationNodeData,
-  InvocationTemplate,
-} from 'features/nodes/types/types';
+import { useNodeData } from 'features/nodes/hooks/useNodeData';
+import { isInvocationNodeData } from 'features/nodes/types/types';
 import { map } from 'lodash-es';
 import { CSSProperties, memo, useMemo } from 'react';
-import { Handle, NodeProps, Position } from 'reactflow';
+import { Handle, Position } from 'reactflow';
 
 interface Props {
-  nodeProps: NodeProps<InvocationNodeData>;
-  nodeTemplate: InvocationTemplate;
+  nodeId: string;
 }
 
-const NodeCollapsedHandles = (props: Props) => {
-  const { data } = props.nodeProps;
+const NodeCollapsedHandles = ({ nodeId }: Props) => {
+  const data = useNodeData(nodeId);
   const { base400, base600 } = useChakraThemeTokens();
   const backgroundColor = useColorModeValue(base400, base600);
 
@@ -30,6 +27,10 @@ const NodeCollapsedHandles = (props: Props) => {
     [backgroundColor]
   );
 
+  if (!isInvocationNodeData(data)) {
+    return null;
+  }
+
   return (
     <>
       <Handle
@@ -44,7 +45,7 @@ const NodeCollapsedHandles = (props: Props) => {
           key={`${data.id}-${input.name}-collapsed-input-handle`}
           type="target"
           id={input.name}
-          isValidConnection={() => false}
+          isConnectable={false}
           position={Position.Left}
           style={{ visibility: 'hidden' }}
         />
@@ -52,7 +53,6 @@ const NodeCollapsedHandles = (props: Props) => {
       <Handle
         type="source"
         id={`${data.id}-collapsed-source`}
-        isValidConnection={() => false}
         isConnectable={false}
         position={Position.Right}
         style={{ ...dummyHandleStyles, right: '-0.5rem' }}
@@ -62,7 +62,7 @@ const NodeCollapsedHandles = (props: Props) => {
           key={`${data.id}-${output.name}-collapsed-output-handle`}
           type="source"
           id={output.name}
-          isValidConnection={() => false}
+          isConnectable={false}
           position={Position.Right}
           style={{ visibility: 'hidden' }}
         />

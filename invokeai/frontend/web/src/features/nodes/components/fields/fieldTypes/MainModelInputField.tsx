@@ -26,8 +26,7 @@ const MainModelInputFieldComponent = (
     MainModelInputFieldTemplate
   >
 ) => {
-  const { nodeData, field } = props;
-  const nodeId = nodeData.id;
+  const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
 

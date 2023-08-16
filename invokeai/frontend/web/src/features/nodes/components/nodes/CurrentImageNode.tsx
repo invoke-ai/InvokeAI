@@ -55,7 +55,11 @@ const CurrentImageNode = (props: NodeProps) => {
 export default memo(CurrentImageNode);
 
 const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => (
-  <NodeWrapper nodeProps={props.nodeProps} width={384}>
+  <NodeWrapper
+    nodeId={props.nodeProps.data.id}
+    selected={props.nodeProps.selected}
+    width={384}
+  >
     <Flex
       className={DRAG_HANDLE_CLASSNAME}
       sx={{

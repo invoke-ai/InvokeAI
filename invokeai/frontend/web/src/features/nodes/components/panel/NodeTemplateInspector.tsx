@@ -16,21 +16,25 @@ const selector = createSelector(
       (node) => node.id === lastSelectedNodeId
     );
 
+    const lastSelectedNodeTemplate = lastSelectedNode
+      ? nodes.nodeTemplates[lastSelectedNode.data.type]
+      : undefined;
+
     return {
-      data: lastSelectedNode?.data,
+      template: lastSelectedNodeTemplate,
     };
   },
   defaultSelectorOptions
 );
 
-const NodeDataInspector = () => {
-  const { data } = useAppSelector(selector);
+const NodeTemplateInspector = () => {
+  const { template } = useAppSelector(selector);
 
-  if (!data) {
+  if (!template) {
     return <IAINoContentFallback label="No node selected" icon={null} />;
   }
 
-  return <ImageMetadataJSON jsonObject={data} label="Node Data" />;
+  return <ImageMetadataJSON jsonObject={template} label="Node Template" />;
 };
 
-export default memo(NodeDataInspector);
+export default memo(NodeTemplateInspector);

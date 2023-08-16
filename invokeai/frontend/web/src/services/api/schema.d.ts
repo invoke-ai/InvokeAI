@@ -573,7 +573,7 @@ export type components = {
       file: Blob;
     };
     /**
-     * Boolean Collection 
+     * Boolean Primitive Collection 
      * @description A collection of boolean primitive values
      */
     BooleanCollectionInvocation: {
@@ -619,7 +619,7 @@ export type components = {
       collection?: (boolean)[];
     };
     /**
-     * Boolean 
+     * Boolean Primitive 
      * @description A boolean primitive value
      */
     BooleanInvocation: {
@@ -1002,7 +1002,7 @@ export type components = {
       clip?: components["schemas"]["ClipField"];
     };
     /**
-     * Conditioning Collection 
+     * Conditioning Primitive Collection 
      * @description A collection of conditioning tensor primitive values
      */
     ConditioningCollectionInvocation: {
@@ -1770,7 +1770,7 @@ export type components = {
       field: string;
     };
     /**
-     * Float Collection 
+     * Float Primitive Collection 
      * @description A collection of float primitive values
      */
     FloatCollectionInvocation: {
@@ -1816,7 +1816,7 @@ export type components = {
       collection?: (number)[];
     };
     /**
-     * Float 
+     * Float Primitive 
      * @description A float primitive value
      */
     FloatInvocation: {
@@ -2161,7 +2161,7 @@ export type components = {
       channel?: "A" | "R" | "G" | "B";
     };
     /**
-     * Image Collection 
+     * Image Primitive Collection 
      * @description A collection of image primitive values
      */
     ImageCollectionInvocation: {
@@ -3113,7 +3113,7 @@ export type components = {
       seed?: number;
     };
     /**
-     * Integer Collection 
+     * Integer Primitive Collection 
      * @description A collection of integer primitive values
      */
     IntegerCollectionInvocation: {
@@ -3159,7 +3159,7 @@ export type components = {
       collection?: (number)[];
     };
     /**
-     * Integer 
+     * Integer Primitive 
      * @description An integer primitive value
      */
     IntegerInvocation: {
@@ -3256,7 +3256,7 @@ export type components = {
       item?: unknown;
     };
     /**
-     * Latents Collection 
+     * Latents Primitive Collection 
      * @description A collection of latents tensor primitive values
      */
     LatentsCollectionInvocation: {
@@ -5786,7 +5786,7 @@ export type components = {
       show_easing_plot?: boolean;
     };
     /**
-     * String Collection 
+     * String Primitive Collection 
      * @description A collection of string primitive values
      */
     StringCollectionInvocation: {
@@ -5832,7 +5832,7 @@ export type components = {
       collection?: (string)[];
     };
     /**
-     * String 
+     * String Primitive 
      * @description A string primitive value
      */
     StringInvocation: {
@@ -6194,24 +6194,6 @@ export type components = {
       ui_type?: components["schemas"]["UIType"];
     };
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * ControlNetModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionXLModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionOnnxModelFormat 
      * @description An enumeration. 
      * @enum {string}
@@ -6223,6 +6205,24 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * ControlNetModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionXLModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;

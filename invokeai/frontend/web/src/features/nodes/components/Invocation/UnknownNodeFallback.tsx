@@ -1,20 +1,26 @@
 import { Box, Flex, Text } from '@chakra-ui/react';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import { InvocationNodeData } from 'features/nodes/types/types';
 import { memo } from 'react';
-import { NodeProps } from 'reactflow';
 import NodeCollapseButton from '../Invocation/NodeCollapseButton';
 import NodeWrapper from '../Invocation/NodeWrapper';
 
 type Props = {
-  nodeProps: NodeProps<InvocationNodeData>;
+  nodeId: string;
+  isOpen: boolean;
+  label: string;
+  type: string;
+  selected: boolean;
 };
 
-const UnknownNodeFallback = ({ nodeProps }: Props) => {
-  const { data } = nodeProps;
-  const { isOpen, label, type } = data;
+const UnknownNodeFallback = ({
+  nodeId,
+  isOpen,
+  label,
+  type,
+  selected,
+}: Props) => {
   return (
-    <NodeWrapper nodeProps={nodeProps}>
+    <NodeWrapper nodeId={nodeId} selected={selected}>
       <Flex
         className={DRAG_HANDLE_CLASSNAME}
         layerStyle="nodeHeader"
@@ -27,7 +33,7 @@ const UnknownNodeFallback = ({ nodeProps }: Props) => {
           fontSize: 'sm',
         }}
       >
-        <NodeCollapseButton nodeProps={nodeProps} />
+        <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
         <Text
           sx={{
             w: 'full',

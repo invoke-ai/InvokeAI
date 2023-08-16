@@ -19,8 +19,7 @@ const ControlNetModelInputFieldComponent = (
     ControlNetModelInputFieldTemplate
   >
 ) => {
-  const { nodeData, field } = props;
-  const nodeId = nodeData.id;
+  const { nodeId, field } = props;
   const controlNetModel = field.value;
   const dispatch = useAppDispatch();
 
