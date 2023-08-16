@@ -86,7 +86,9 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
                 # Invoke
                 try:
-                    with statistics.collect_stats(invocation, graph_execution_state.id):
+                    graph_id = graph_execution_state.id
+                    model_manager = self.__invoker.services.model_manager
+                    with statistics.collect_stats(invocation, graph_id, model_manager):
                         outputs = invocation.invoke(
                             InvocationContext(
                                 services=self.__invoker.services,

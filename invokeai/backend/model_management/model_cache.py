@@ -21,12 +21,12 @@ import os
 import sys
 import hashlib
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Union, types, Optional, Type, Any
 
 import torch
 
-import logging
 import invokeai.backend.util.logging as logger
 from .models import BaseModelType, ModelType, SubModelType, ModelBase
 
@@ -39,6 +39,16 @@ DEFAULT_MAX_VRAM_CACHE_SIZE = 2.75
 
 # actual size of a gig
 GIG = 1073741824
+
+
+@dataclass
+class CacheStats(object):
+    hits: int = 0
+    misses: int = 0
+    high_watermark: int = 0
+    in_cache: int = 0
+    cleared: int = 0
+    cache_size: int = 0
 
 
 class ModelLocker(object):
@@ -115,6 +125,9 @@ class ModelCache(object):
         self.sha_chunksize = sha_chunksize
         self.logger = logger
 
+        # used for stats collection
+        self.stats = None
+
         self._cached_models = dict()
         self._cache_stack = list()
 
@@ -188,6 +201,8 @@ class ModelCache(object):
             self.logger.info(
                 f"Loading model {model_path}, type {base_model.value}:{model_type.value}{':'+submodel.value if submodel else ''}"
             )
+            if self.stats:
+                self.stats.misses += 1
 
             # this will remove older cached models until
             # there is sufficient room to load the requested model
@@ -201,6 +216,14 @@ class ModelCache(object):
 
             cache_entry = _CacheRecord(self, model, mem_used)
             self._cached_models[key] = cache_entry
+        else:
+            if self.stats:
+                self.stats.hits += 1
+                self.stats.cache_size = self.max_cache_size * GIG
+
+        if self.stats:
+            self.stats.high_watermark = max(self.stats.high_watermark, self._cache_size())
+            self.stats.in_cache = len(self._cached_models)
 
         with suppress(Exception):
             self._cache_stack.remove(key)
@@ -280,14 +303,14 @@ class ModelCache(object):
         """
         Given the HF repo id or path to a model on disk, returns a unique
         hash. Works for legacy checkpoint files, HF models on disk, and HF repo IDs
+
         :param model_path: Path to model file/directory on disk.
         """
         return self._local_model_hash(model_path)
 
     def cache_size(self) -> float:
-        "Return the current size of the cache, in GB"
-        current_cache_size = sum([m.size for m in self._cached_models.values()])
-        return current_cache_size / GIG
+        """Return the current size of the cache, in GB."""
+        return self._cache_size() / GIG
 
     def _has_cuda(self) -> bool:
         return self.execution_device.type == "cuda"
@@ -310,12 +333,15 @@ class ModelCache(object):
             f"Current VRAM/RAM usage: {vram}/{ram}; cached_models/loaded_models/locked_models/ = {cached_models}/{loaded_models}/{locked_models}"
         )
 
+    def _cache_size(self) -> int:
+        return sum([m.size for m in self._cached_models.values()])
+
     def _make_cache_room(self, model_size):
         # calculate how much memory this model will require
         # multiplier = 2 if self.precision==torch.float32 else 1
         bytes_needed = model_size
         maximum_size = self.max_cache_size * GIG  # stored in GB, convert to bytes
-        current_size = sum([m.size for m in self._cached_models.values()])
+        current_size = self._cache_size()
 
         if current_size + bytes_needed > maximum_size:
             self.logger.debug(
@@ -364,6 +390,8 @@ class ModelCache(object):
                     f"Unloading model {model_key} to free {(model_size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
                 )
                 current_size -= cache_entry.size
+                if self.stats:
+                    self.stats.cleared += 1
                 del self._cache_stack[pos]
                 del self._cached_models[model_key]
                 del cache_entry
