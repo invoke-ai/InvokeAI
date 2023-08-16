@@ -38,7 +38,7 @@ import mimetypes
 from .api.dependencies import ApiDependencies
 from .api.routers import sessions, models, images, boards, board_images, app_info
 from .api.sockets import SocketIO
-from .invocations.baseinvocation import BaseInvocation
+from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputField, UIConfigBase
 
 
 import torch
@@ -133,6 +133,11 @@ def custom_openapi():
         # TODO: note that we assume the schema_key here is the TYPE.__name__
         # This could break in some cases, figure out a better way to do it
         output_type_titles[schema_key] = output_schema["title"]
+
+    # Add Node Editor UI helper schemas
+    ui_config_schemas = schema([UIConfigBase, _InputField, _OutputField], ref_prefix="#/components/schemas/")
+    for schema_key, output_schema in ui_config_schemas["definitions"].items():
+        openapi_schema["components"]["schemas"][schema_key] = output_schema
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:

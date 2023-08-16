@@ -19,7 +19,7 @@ from invokeai.app.services.graph import (
 from invokeai.app.invocations.upscale import ESRGANInvocation
 from invokeai.app.invocations.image import *
 from invokeai.app.invocations.math import AddInvocation, SubtractInvocation
-from invokeai.app.invocations.params import ParamIntInvocation
+from invokeai.app.invocations.primitives import IntegerInvocation
 from invokeai.app.services.default_graphs import create_text_to_image
 import pytest
 
@@ -499,8 +499,8 @@ def test_graph_subgraph_t2i():
 
     g.add_node(n1)
 
-    n2 = ParamIntInvocation(id="2", a=512)
-    n3 = ParamIntInvocation(id="3", a=256)
+    n2 = IntegerInvocation(id="2", a=512)
+    n3 = IntegerInvocation(id="3", a=256)
 
     g.add_node(n2)
     g.add_node(n3)

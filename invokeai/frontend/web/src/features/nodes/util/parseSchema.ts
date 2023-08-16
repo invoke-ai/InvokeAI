@@ -1,11 +1,10 @@
 import { filter, reduce } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
-import { isSchemaObject } from '../types/typeGuards';
 import {
   InputFieldTemplate,
   InvocationSchemaObject,
   InvocationTemplate,
-  OutputFieldTemplate,
+  isInvocationFieldSchema,
   isInvocationSchemaObject,
 } from '../types/types';
 import {
@@ -13,12 +12,7 @@ import {
   buildOutputFieldTemplates,
 } from './fieldTemplateBuilders';
 
-const getReservedFieldNames = (type: string): string[] => {
-  if (type === 'l2i') {
-    return ['id', 'type', 'metadata'];
-  }
-  return ['id', 'type', 'is_intermediate', 'metadata'];
-};
+const RESERVED_FIELD_NAMES = ['id', 'type', 'metadata'];
 
 const invocationDenylist = [
   'Graph',
@@ -42,83 +36,41 @@ export const parseSchema = (
   >((acc, schema) => {
     if (isInvocationSchemaObject(schema)) {
       const type = schema.properties.type.default;
-      const RESERVED_FIELD_NAMES = getReservedFieldNames(type);
-
       const title = schema.ui?.title ?? schema.title.replace('Invocation', '');
-      const typeHints = schema.ui?.type_hints;
+      const tags = schema.ui?.tags ?? [];
+      const description = schema.description ?? '';
 
-      const inputs: Record<string, InputFieldTemplate> = {};
+      const inputs = reduce(
+        schema.properties,
+        (inputsAccumulator, property, propertyName) => {
+          if (
+            !RESERVED_FIELD_NAMES.includes(propertyName) &&
+            isInvocationFieldSchema(property) &&
+            !property.ui_hidden
+          ) {
+            const field = buildInputFieldTemplate(
+              schema,
+              property,
+              propertyName
+            );
 
-      if (type === 'collect') {
-        const itemProperty = schema.properties.item as InvocationSchemaObject;
-        inputs.item = {
-          type: 'item',
-          name: 'item',
-          description: itemProperty.description ?? '',
-          title: 'Collection Item',
-          inputKind: 'connection',
-          inputRequirement: 'always',
-          default: undefined,
-        };
-      } else if (type === 'iterate') {
-        const itemProperty = schema.properties
-          .collection as InvocationSchemaObject;
-        inputs.collection = {
-          type: 'array',
-          name: 'collection',
-          title: itemProperty.title ?? '',
-          default: [],
-          description: itemProperty.description ?? '',
-          inputRequirement: 'always',
-          inputKind: 'connection',
-        };
-      } else {
-        reduce(
-          schema.properties,
-          (inputsAccumulator, property, propertyName) => {
-            if (
-              !RESERVED_FIELD_NAMES.includes(propertyName) &&
-              isSchemaObject(property)
-            ) {
-              const field = buildInputFieldTemplate(
-                property,
-                propertyName,
-                typeHints
-              );
-              if (field) {
-                inputsAccumulator[propertyName] = field;
-              }
+            if (field) {
+              inputsAccumulator[propertyName] = field;
             }
-            return inputsAccumulator;
-          },
-          inputs
-        );
-      }
+          }
+          return inputsAccumulator;
+        },
+        {} as Record<string, InputFieldTemplate>
+      );
 
       const rawOutput = (schema as InvocationSchemaObject).output;
-      let outputs: Record<string, OutputFieldTemplate>;
-
-      if (type === 'iterate') {
-        const iterationOutput = openAPI.components?.schemas?.[
-          'IterateInvocationOutput'
-        ] as OpenAPIV3.SchemaObject;
-        outputs = {
-          item: {
-            name: 'item',
-            title: iterationOutput?.title ?? '',
-            description: iterationOutput?.description ?? '',
-            type: 'array',
-          },
-        };
-      } else {
-        outputs = buildOutputFieldTemplates(rawOutput, openAPI, typeHints);
-      }
+      const outputs = buildOutputFieldTemplates(rawOutput, openAPI);
 
       const invocation: InvocationTemplate = {
         title,
         type,
-        tags: schema.ui?.tags ?? [],
-        description: schema.description ?? '',
+        tags,
+        description,
         inputs,
         outputs,
       };

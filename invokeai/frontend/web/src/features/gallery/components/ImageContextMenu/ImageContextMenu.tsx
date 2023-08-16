@@ -1,5 +1,8 @@
 import { MenuList } from '@chakra-ui/react';
-import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
+import {
+  IAIContextMenu,
+  IAIContextMenuProps,
+} from 'common/components/IAIContextMenu';
 import { MouseEvent, memo, useCallback } from 'react';
 import { ImageDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
@@ -12,7 +15,7 @@ import MultipleSelectionMenuItems from './MultipleSelectionMenuItems';
 
 type Props = {
   imageDTO: ImageDTO | undefined;
-  children: ContextMenuProps<HTMLDivElement>['children'];
+  children: IAIContextMenuProps<HTMLDivElement>['children'];
 };
 
 const selector = createSelector(
@@ -33,7 +36,7 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
   }, []);
 
   return (
-    <ContextMenu<HTMLDivElement>
+    <IAIContextMenu<HTMLDivElement>
       menuProps={{ size: 'sm', isLazy: true }}
       menuButtonProps={{
         bg: 'transparent',
@@ -68,7 +71,7 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
       }}
     >
       {children}
-    </ContextMenu>
+    </IAIContextMenu>
   );
 };
 

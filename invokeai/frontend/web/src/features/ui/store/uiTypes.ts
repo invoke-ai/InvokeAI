@@ -26,4 +26,5 @@ export interface UIState {
   shouldShowProgressInViewer: boolean;
   shouldShowEmbeddingPicker: boolean;
   favoriteSchedulers: SchedulerParam[];
+  globalContextMenuCloseTrigger: number;
 }

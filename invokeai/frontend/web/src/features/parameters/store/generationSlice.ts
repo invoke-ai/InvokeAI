@@ -4,11 +4,13 @@ import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
+
 import { clipSkipMap } from '../types/constants';
 import {
   CfgScaleParam,
   HeightParam,
   MainModelParam,
+  MaskBlurMethodParam,
   NegativePromptParam,
   OnnxModelParam,
   PositivePromptParam,
@@ -33,10 +35,8 @@ export interface GenerationState {
   positivePrompt: PositivePromptParam;
   negativePrompt: NegativePromptParam;
   scheduler: SchedulerParam;
-  seamBlur: number;
-  seamSize: number;
-  seamSteps: number;
-  seamStrength: number;
+  maskBlur: number;
+  maskBlurMethod: MaskBlurMethodParam;
   seed: SeedParam;
   seedWeights: string;
   shouldFitToWidthHeight: boolean;
@@ -72,10 +72,8 @@ export const initialGenerationState: GenerationState = {
   positivePrompt: '',
   negativePrompt: '',
   scheduler: 'euler',
-  seamBlur: 16,
-  seamSize: 96,
-  seamSteps: 30,
-  seamStrength: 0.7,
+  maskBlur: 16,
+  maskBlurMethod: 'box',
   seed: 0,
   seedWeights: '',
   shouldFitToWidthHeight: true,
@@ -196,17 +194,11 @@ export const generationSlice = createSlice({
     clearInitialImage: (state) => {
       state.initialImage = undefined;
     },
-    setSeamSize: (state, action: PayloadAction<number>) => {
-      state.seamSize = action.payload;
+    setMaskBlur: (state, action: PayloadAction<number>) => {
+      state.maskBlur = action.payload;
     },
-    setSeamBlur: (state, action: PayloadAction<number>) => {
-      state.seamBlur = action.payload;
-    },
-    setSeamStrength: (state, action: PayloadAction<number>) => {
-      state.seamStrength = action.payload;
-    },
-    setSeamSteps: (state, action: PayloadAction<number>) => {
-      state.seamSteps = action.payload;
+    setMaskBlurMethod: (state, action: PayloadAction<MaskBlurMethodParam>) => {
+      state.maskBlurMethod = action.payload;
     },
     setTileSize: (state, action: PayloadAction<number>) => {
       state.tileSize = action.payload;
@@ -312,10 +304,8 @@ export const {
   setPositivePrompt,
   setNegativePrompt,
   setScheduler,
-  setSeamBlur,
-  setSeamSize,
-  setSeamSteps,
-  setSeamStrength,
+  setMaskBlur,
+  setMaskBlurMethod,
   setSeed,
   setSeedWeights,
   setShouldFitToWidthHeight,

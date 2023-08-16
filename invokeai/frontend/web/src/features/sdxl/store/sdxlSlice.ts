@@ -16,7 +16,8 @@ type SDXLInitialState = {
   refinerSteps: number;
   refinerCFGScale: number;
   refinerScheduler: SchedulerParam;
-  refinerAestheticScore: number;
+  refinerPositiveAestheticScore: number;
+  refinerNegativeAestheticScore: number;
   refinerStart: number;
 };
 
@@ -30,8 +31,9 @@ const sdxlInitialState: SDXLInitialState = {
   refinerSteps: 20,
   refinerCFGScale: 7.5,
   refinerScheduler: 'euler',
-  refinerAestheticScore: 6,
-  refinerStart: 0.7,
+  refinerPositiveAestheticScore: 6,
+  refinerNegativeAestheticScore: 2.5,
+  refinerStart: 0.8,
 };
 
 const sdxlSlice = createSlice({
@@ -68,8 +70,17 @@ const sdxlSlice = createSlice({
     setRefinerScheduler: (state, action: PayloadAction<SchedulerParam>) => {
       state.refinerScheduler = action.payload;
     },
-    setRefinerAestheticScore: (state, action: PayloadAction<number>) => {
-      state.refinerAestheticScore = action.payload;
+    setRefinerPositiveAestheticScore: (
+      state,
+      action: PayloadAction<number>
+    ) => {
+      state.refinerPositiveAestheticScore = action.payload;
+    },
+    setRefinerNegativeAestheticScore: (
+      state,
+      action: PayloadAction<number>
+    ) => {
+      state.refinerNegativeAestheticScore = action.payload;
     },
     setRefinerStart: (state, action: PayloadAction<number>) => {
       state.refinerStart = action.payload;
@@ -87,7 +98,8 @@ export const {
   setRefinerSteps,
   setRefinerCFGScale,
   setRefinerScheduler,
-  setRefinerAestheticScore,
+  setRefinerPositiveAestheticScore,
+  setRefinerNegativeAestheticScore,
   setRefinerStart,
 } = sdxlSlice.actions;
 

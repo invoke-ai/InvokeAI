@@ -47,7 +47,7 @@ export const initialCanvasState: CanvasState = {
   boundingBoxCoordinates: { x: 0, y: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
-  boundingBoxScaleMethod: 'auto',
+  boundingBoxScaleMethod: 'none',
   brushColor: { r: 90, g: 90, b: 255, a: 1 },
   brushSize: 50,
   canvasContainerDimensions: { width: 0, height: 0 },
