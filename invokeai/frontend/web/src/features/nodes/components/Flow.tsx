@@ -1,4 +1,4 @@
-import { RootState } from 'app/store/store';
+import { useToken } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import {
@@ -7,35 +7,51 @@ import {
   OnConnectEnd,
   OnConnectStart,
   OnEdgesChange,
-  OnInit,
+  OnEdgesDelete,
+  OnMoveEnd,
   OnNodesChange,
+  OnNodesDelete,
+  OnSelectionChangeFunc,
+  ProOptions,
   ReactFlow,
 } from 'reactflow';
+import { useIsValidConnection } from '../hooks/useIsValidConnection';
 import {
   connectionEnded,
   connectionMade,
   connectionStarted,
   edgesChanged,
+  edgesDeleted,
   nodesChanged,
-  setEditorInstance,
+  nodesDeleted,
+  selectedEdgesChanged,
+  selectedNodesChanged,
+  viewportChanged,
 } from '../store/nodesSlice';
-import { InvocationComponent } from './InvocationComponent';
-import ProgressImageNode from './ProgressImageNode';
-import BottomLeftPanel from './panels/BottomLeftPanel.tsx';
-import MinimapPanel from './panels/MinimapPanel';
-import TopCenterPanel from './panels/TopCenterPanel';
-import TopLeftPanel from './panels/TopLeftPanel';
-import TopRightPanel from './panels/TopRightPanel';
+import { CustomConnectionLine } from './CustomConnectionLine';
+import { edgeTypes } from './CustomEdges';
+import { nodeTypes } from './CustomNodes';
+import BottomLeftPanel from './editorPanels/BottomLeftPanel';
+import MinimapPanel from './editorPanels/MinimapPanel';
+import TopCenterPanel from './editorPanels/TopCenterPanel';
+import TopLeftPanel from './editorPanels/TopLeftPanel';
+import TopRightPanel from './editorPanels/TopRightPanel';
 
-const nodeTypes = {
-  invocation: InvocationComponent,
-  progress_image: ProgressImageNode,
-};
+// TODO: can we support reactflow? if not, we could style the attribution so it matches the app
+const proOptions: ProOptions = { hideAttribution: true };
 
 export const Flow = () => {
   const dispatch = useAppDispatch();
-  const nodes = useAppSelector((state: RootState) => state.nodes.nodes);
-  const edges = useAppSelector((state: RootState) => state.nodes.edges);
+  const nodes = useAppSelector((state) => state.nodes.nodes);
+  const edges = useAppSelector((state) => state.nodes.edges);
+  const viewport = useAppSelector((state) => state.nodes.viewport);
+  const shouldSnapToGrid = useAppSelector(
+    (state) => state.nodes.shouldSnapToGrid
+  );
+
+  const isValidConnection = useIsValidConnection();
+
+  const [borderRadius] = useToken('radii', ['base']);
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
@@ -69,35 +85,66 @@ export const Flow = () => {
     dispatch(connectionEnded());
   }, [dispatch]);
 
-  const onInit: OnInit = useCallback(
-    (v) => {
-      dispatch(setEditorInstance(v));
-      if (v) v.fitView();
+  const onEdgesDelete: OnEdgesDelete = useCallback(
+    (edges) => {
+      dispatch(edgesDeleted(edges));
+    },
+    [dispatch]
+  );
+
+  const onNodesDelete: OnNodesDelete = useCallback(
+    (nodes) => {
+      dispatch(nodesDeleted(nodes));
+    },
+    [dispatch]
+  );
+
+  const handleSelectionChange: OnSelectionChangeFunc = useCallback(
+    ({ nodes, edges }) => {
+      dispatch(selectedNodesChanged(nodes ? nodes.map((n) => n.id) : []));
+      dispatch(selectedEdgesChanged(edges ? edges.map((e) => e.id) : []));
+    },
+    [dispatch]
+  );
+
+  const handleMoveEnd: OnMoveEnd = useCallback(
+    (e, viewport) => {
+      dispatch(viewportChanged(viewport));
     },
     [dispatch]
   );
 
   return (
     <ReactFlow
+      defaultViewport={viewport}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       nodes={nodes}
       edges={edges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
+      onEdgesDelete={onEdgesDelete}
+      onNodesDelete={onNodesDelete}
       onConnectStart={onConnectStart}
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
-      onInit={onInit}
-      defaultEdgeOptions={{
-        style: { strokeWidth: 2 },
-      }}
+      onMoveEnd={handleMoveEnd}
+      connectionLineComponent={CustomConnectionLine}
+      onSelectionChange={handleSelectionChange}
+      isValidConnection={isValidConnection}
+      minZoom={0.2}
+      snapToGrid={shouldSnapToGrid}
+      snapGrid={[25, 25]}
+      connectionRadius={30}
+      proOptions={proOptions}
+      style={{ borderRadius }}
     >
       <TopLeftPanel />
       <TopCenterPanel />
       <TopRightPanel />
       <BottomLeftPanel />
-      <Background />
       <MinimapPanel />
+      <Background />
     </ReactFlow>
   );
 };

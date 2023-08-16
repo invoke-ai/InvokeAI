@@ -81,9 +81,9 @@ export const addControlNetToLinearGraph = (
           return;
         }
 
-        graph.nodes[controlNetNode.id] = controlNetNode;
+        graph.nodes[controlNetNode.id] = controlNetNode as ControlNetInvocation;
 
-        if (metadataAccumulator) {
+        if (metadataAccumulator?.controlnets) {
           // metadata accumulator only needs a control field - not the whole node
           // extract what we need and add to the accumulator
           const controlField = omit(controlNetNode, [
