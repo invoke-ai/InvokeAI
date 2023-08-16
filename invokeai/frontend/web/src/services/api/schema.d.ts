@@ -1958,10 +1958,8 @@ export type components = {
               | components['schemas']['SDXLLoraLoaderInvocation']
               | components['schemas']['VaeLoaderInvocation']
               | components['schemas']['MetadataAccumulatorInvocation']
-              | components['schemas']['RangeInvocation']
-              | components['schemas']['RangeOfSizeInvocation']
-              | components['schemas']['RandomRangeInvocation']
-              | components['schemas']['ImageCollectionInvocation']
+              | components['schemas']['SDXLModelLoaderInvocation']
+              | components['schemas']['SDXLRefinerModelLoaderInvocation']
               | components['schemas']['CompelInvocation']
               | components['schemas']['SDXLCompelPromptInvocation']
               | components['schemas']['SDXLRefinerCompelPromptInvocation']
@@ -1987,21 +1985,11 @@ export type components = {
               | components['schemas']['ImageHueAdjustmentInvocation']
               | components['schemas']['ImageLuminosityAdjustmentInvocation']
               | components['schemas']['ImageSaturationAdjustmentInvocation']
-              | components['schemas']['CvInpaintInvocation']
-              | components['schemas']['InfillColorInvocation']
-              | components['schemas']['InfillTileInvocation']
-              | components['schemas']['InfillPatchMatchInvocation']
               | components['schemas']['DenoiseLatentsInvocation']
               | components['schemas']['LatentsToImageInvocation']
               | components['schemas']['ResizeLatentsInvocation']
               | components['schemas']['ScaleLatentsInvocation']
               | components['schemas']['ImageToLatentsInvocation']
-              | components['schemas']['AddInvocation']
-              | components['schemas']['SubtractInvocation']
-              | components['schemas']['MultiplyInvocation']
-              | components['schemas']['DivideInvocation']
-              | components['schemas']['RandomIntInvocation']
-              | components['schemas']['NoiseInvocation']
               | components['schemas']['ONNXPromptInvocation']
               | components['schemas']['ONNXTextToLatentsInvocation']
               | components['schemas']['ONNXLatentsToImageInvocation']
@@ -2009,15 +1997,27 @@ export type components = {
               | components['schemas']['OnnxModelLoaderInvocation']
               | components['schemas']['DynamicPromptInvocation']
               | components['schemas']['PromptsFromFileInvocation']
+              | components['schemas']['AddInvocation']
+              | components['schemas']['SubtractInvocation']
+              | components['schemas']['MultiplyInvocation']
+              | components['schemas']['DivideInvocation']
+              | components['schemas']['RandomIntInvocation']
               | components['schemas']['ParamIntInvocation']
               | components['schemas']['ParamFloatInvocation']
               | components['schemas']['ParamStringInvocation']
               | components['schemas']['ParamPromptInvocation']
+              | components['schemas']['CvInpaintInvocation']
+              | components['schemas']['RangeInvocation']
+              | components['schemas']['RangeOfSizeInvocation']
+              | components['schemas']['RandomRangeInvocation']
+              | components['schemas']['ImageCollectionInvocation']
               | components['schemas']['FloatLinearRangeInvocation']
               | components['schemas']['StepParamEasingInvocation']
-              | components['schemas']['SDXLModelLoaderInvocation']
-              | components['schemas']['SDXLRefinerModelLoaderInvocation']
+              | components['schemas']['NoiseInvocation']
               | components['schemas']['ESRGANInvocation']
+              | components['schemas']['InfillColorInvocation']
+              | components['schemas']['InfillTileInvocation']
+              | components['schemas']['InfillPatchMatchInvocation']
               | components['schemas']['GraphInvocation']
               | components['schemas']['IterateInvocation']
               | components['schemas']['CollectInvocation']
@@ -2082,22 +2082,8 @@ export type components = {
       results: {
         [key: string]:
           | (
-              | components['schemas']['BooleanOutput']
-              | components['schemas']['BooleanCollectionOutput']
-              | components['schemas']['IntegerOutput']
-              | components['schemas']['IntegerCollectionOutput']
-              | components['schemas']['FloatOutput']
-              | components['schemas']['FloatCollectionOutput']
-              | components['schemas']['StringOutput']
-              | components['schemas']['StringCollectionOutput']
               | components['schemas']['ImageOutput']
-              | components['schemas']['ImageCollectionOutput']
-              | components['schemas']['LatentsOutput']
-              | components['schemas']['LatentsCollectionOutput']
-              | components['schemas']['ColorOutput']
-              | components['schemas']['ColorCollectionOutput']
-              | components['schemas']['ConditioningOutput']
-              | components['schemas']['ConditioningCollectionOutput']
+              | components['schemas']['MaskOutput']
               | components['schemas']['ControlOutput']
               | components['schemas']['ModelLoaderOutput']
               | components['schemas']['LoraLoaderOutput']
@@ -2106,8 +2092,18 @@ export type components = {
               | components['schemas']['MetadataAccumulatorOutput']
               | components['schemas']['SDXLModelLoaderOutput']
               | components['schemas']['SDXLRefinerModelLoaderOutput']
+              | components['schemas']['CompelOutput']
               | components['schemas']['ClipSkipInvocationOutput']
+              | components['schemas']['LatentsOutput']
               | components['schemas']['ONNXModelLoaderOutput']
+              | components['schemas']['PromptOutput']
+              | components['schemas']['PromptCollectionOutput']
+              | components['schemas']['IntOutput']
+              | components['schemas']['FloatOutput']
+              | components['schemas']['StringOutput']
+              | components['schemas']['IntCollectionOutput']
+              | components['schemas']['FloatCollectionOutput']
+              | components['schemas']['ImageCollectionOutput']
               | components['schemas']['NoiseOutput']
               | components['schemas']['GraphInvocationOutput']
               | components['schemas']['IterateInvocationOutput']
@@ -3174,6 +3170,14 @@ export type components = {
        * @description Optional core metadata to be written to image
        */
       metadata?: components['schemas']['CoreMetadata'];
+    };
+    /** ImagesUpdatedFromListResult */
+    ImagesUpdatedFromListResult: {
+      /**
+       * Updated Image Names
+       * @description The image names that were updated
+       */
+      updated_image_names: string[];
     };
     /**
      * Solid Color Infill
@@ -6406,100 +6410,6 @@ export type components = {
       image?: components['schemas']['ImageField'];
     };
     /**
-     * StableDiffusion2ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    Input: 'connection' | 'direct' | 'any';
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: 'checkpoint' | 'diffusers';
-    /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    UIType:
-      | 'integer'
-      | 'float'
-      | 'boolean'
-      | 'string'
-      | 'array'
-      | 'ImageField'
-      | 'LatentsField'
-      | 'ConditioningField'
-      | 'ControlField'
-      | 'ColorField'
-      | 'ImageCollection'
-      | 'ConditioningCollection'
-      | 'ColorCollection'
-      | 'LatentsCollection'
-      | 'IntegerCollection'
-      | 'FloatCollection'
-      | 'StringCollection'
-      | 'BooleanCollection'
-      | 'MainModelField'
-      | 'SDXLMainModelField'
-      | 'SDXLRefinerModelField'
-      | 'ONNXModelField'
-      | 'VaeModelField'
-      | 'LoRAModelField'
-      | 'ControlNetModelField'
-      | 'UNetField'
-      | 'VaeField'
-      | 'ClipField'
-      | 'Collection'
-      | 'CollectionItem'
-      | 'FilePath'
-      | 'enum';
-    /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: 'olive' | 'onnx';
-    /**
-     * _InputField
-     * @description *DO NOT USE*
-     * This helper class is used to tell the client about our custom field attributes via OpenAPI
-     * schema generation, and Typescript type generation from that schema. It serves no functional
-     * purpose in the backend.
-     */
-    _InputField: {
-      input: components['schemas']['Input'];
-      /** Ui Hidden */
-      ui_hidden: boolean;
-      ui_type?: components['schemas']['UIType'];
-      ui_component?: components['schemas']['UIComponent'];
-    };
-    /**
-     * _OutputField
-     * @description *DO NOT USE*
-     * This helper class is used to tell the client about our custom field attributes via OpenAPI
-     * schema generation, and Typescript type generation from that schema. It serves no functional
-     * purpose in the backend.
-     */
-    _OutputField: {
-      /** Ui Hidden */
-      ui_hidden: boolean;
-      ui_type?: components['schemas']['UIType'];
-    };
-    /**
-     * StableDiffusionXLModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: 'checkpoint' | 'diffusers';
-    /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: 'checkpoint' | 'diffusers';
-    /**
      * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -6512,11 +6422,23 @@ export type components = {
      */
     StableDiffusion2ModelFormat: 'checkpoint' | 'diffusers';
     /**
+     * StableDiffusionXLModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionXLModelFormat: 'checkpoint' | 'diffusers';
+    /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusionOnnxModelFormat: 'olive' | 'onnx';
+    /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: 'checkpoint' | 'diffusers';
   };
   responses: never;
   parameters: never;
@@ -6634,10 +6556,8 @@ export type operations = {
           | components['schemas']['SDXLLoraLoaderInvocation']
           | components['schemas']['VaeLoaderInvocation']
           | components['schemas']['MetadataAccumulatorInvocation']
-          | components['schemas']['RangeInvocation']
-          | components['schemas']['RangeOfSizeInvocation']
-          | components['schemas']['RandomRangeInvocation']
-          | components['schemas']['ImageCollectionInvocation']
+          | components['schemas']['SDXLModelLoaderInvocation']
+          | components['schemas']['SDXLRefinerModelLoaderInvocation']
           | components['schemas']['CompelInvocation']
           | components['schemas']['SDXLCompelPromptInvocation']
           | components['schemas']['SDXLRefinerCompelPromptInvocation']
@@ -6663,21 +6583,11 @@ export type operations = {
           | components['schemas']['ImageHueAdjustmentInvocation']
           | components['schemas']['ImageLuminosityAdjustmentInvocation']
           | components['schemas']['ImageSaturationAdjustmentInvocation']
-          | components['schemas']['CvInpaintInvocation']
-          | components['schemas']['InfillColorInvocation']
-          | components['schemas']['InfillTileInvocation']
-          | components['schemas']['InfillPatchMatchInvocation']
           | components['schemas']['DenoiseLatentsInvocation']
           | components['schemas']['LatentsToImageInvocation']
           | components['schemas']['ResizeLatentsInvocation']
           | components['schemas']['ScaleLatentsInvocation']
           | components['schemas']['ImageToLatentsInvocation']
-          | components['schemas']['AddInvocation']
-          | components['schemas']['SubtractInvocation']
-          | components['schemas']['MultiplyInvocation']
-          | components['schemas']['DivideInvocation']
-          | components['schemas']['RandomIntInvocation']
-          | components['schemas']['NoiseInvocation']
           | components['schemas']['ONNXPromptInvocation']
           | components['schemas']['ONNXTextToLatentsInvocation']
           | components['schemas']['ONNXLatentsToImageInvocation']
@@ -6685,15 +6595,27 @@ export type operations = {
           | components['schemas']['OnnxModelLoaderInvocation']
           | components['schemas']['DynamicPromptInvocation']
           | components['schemas']['PromptsFromFileInvocation']
+          | components['schemas']['AddInvocation']
+          | components['schemas']['SubtractInvocation']
+          | components['schemas']['MultiplyInvocation']
+          | components['schemas']['DivideInvocation']
+          | components['schemas']['RandomIntInvocation']
           | components['schemas']['ParamIntInvocation']
           | components['schemas']['ParamFloatInvocation']
           | components['schemas']['ParamStringInvocation']
           | components['schemas']['ParamPromptInvocation']
+          | components['schemas']['CvInpaintInvocation']
+          | components['schemas']['RangeInvocation']
+          | components['schemas']['RangeOfSizeInvocation']
+          | components['schemas']['RandomRangeInvocation']
+          | components['schemas']['ImageCollectionInvocation']
           | components['schemas']['FloatLinearRangeInvocation']
           | components['schemas']['StepParamEasingInvocation']
-          | components['schemas']['SDXLModelLoaderInvocation']
-          | components['schemas']['SDXLRefinerModelLoaderInvocation']
+          | components['schemas']['NoiseInvocation']
           | components['schemas']['ESRGANInvocation']
+          | components['schemas']['InfillColorInvocation']
+          | components['schemas']['InfillTileInvocation']
+          | components['schemas']['InfillPatchMatchInvocation']
           | components['schemas']['GraphInvocation']
           | components['schemas']['IterateInvocation']
           | components['schemas']['CollectInvocation']
@@ -6756,10 +6678,8 @@ export type operations = {
           | components['schemas']['SDXLLoraLoaderInvocation']
           | components['schemas']['VaeLoaderInvocation']
           | components['schemas']['MetadataAccumulatorInvocation']
-          | components['schemas']['RangeInvocation']
-          | components['schemas']['RangeOfSizeInvocation']
-          | components['schemas']['RandomRangeInvocation']
-          | components['schemas']['ImageCollectionInvocation']
+          | components['schemas']['SDXLModelLoaderInvocation']
+          | components['schemas']['SDXLRefinerModelLoaderInvocation']
           | components['schemas']['CompelInvocation']
           | components['schemas']['SDXLCompelPromptInvocation']
           | components['schemas']['SDXLRefinerCompelPromptInvocation']
@@ -6785,21 +6705,11 @@ export type operations = {
           | components['schemas']['ImageHueAdjustmentInvocation']
           | components['schemas']['ImageLuminosityAdjustmentInvocation']
           | components['schemas']['ImageSaturationAdjustmentInvocation']
-          | components['schemas']['CvInpaintInvocation']
-          | components['schemas']['InfillColorInvocation']
-          | components['schemas']['InfillTileInvocation']
-          | components['schemas']['InfillPatchMatchInvocation']
           | components['schemas']['DenoiseLatentsInvocation']
           | components['schemas']['LatentsToImageInvocation']
           | components['schemas']['ResizeLatentsInvocation']
           | components['schemas']['ScaleLatentsInvocation']
           | components['schemas']['ImageToLatentsInvocation']
-          | components['schemas']['AddInvocation']
-          | components['schemas']['SubtractInvocation']
-          | components['schemas']['MultiplyInvocation']
-          | components['schemas']['DivideInvocation']
-          | components['schemas']['RandomIntInvocation']
-          | components['schemas']['NoiseInvocation']
           | components['schemas']['ONNXPromptInvocation']
           | components['schemas']['ONNXTextToLatentsInvocation']
           | components['schemas']['ONNXLatentsToImageInvocation']
@@ -6807,15 +6717,27 @@ export type operations = {
           | components['schemas']['OnnxModelLoaderInvocation']
           | components['schemas']['DynamicPromptInvocation']
           | components['schemas']['PromptsFromFileInvocation']
+          | components['schemas']['AddInvocation']
+          | components['schemas']['SubtractInvocation']
+          | components['schemas']['MultiplyInvocation']
+          | components['schemas']['DivideInvocation']
+          | components['schemas']['RandomIntInvocation']
           | components['schemas']['ParamIntInvocation']
           | components['schemas']['ParamFloatInvocation']
           | components['schemas']['ParamStringInvocation']
           | components['schemas']['ParamPromptInvocation']
+          | components['schemas']['CvInpaintInvocation']
+          | components['schemas']['RangeInvocation']
+          | components['schemas']['RangeOfSizeInvocation']
+          | components['schemas']['RandomRangeInvocation']
+          | components['schemas']['ImageCollectionInvocation']
           | components['schemas']['FloatLinearRangeInvocation']
           | components['schemas']['StepParamEasingInvocation']
-          | components['schemas']['SDXLModelLoaderInvocation']
-          | components['schemas']['SDXLRefinerModelLoaderInvocation']
+          | components['schemas']['NoiseInvocation']
           | components['schemas']['ESRGANInvocation']
+          | components['schemas']['InfillColorInvocation']
+          | components['schemas']['InfillTileInvocation']
+          | components['schemas']['InfillPatchMatchInvocation']
           | components['schemas']['GraphInvocation']
           | components['schemas']['IterateInvocation']
           | components['schemas']['CollectInvocation']
@@ -7718,7 +7640,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          'application/json': unknown;
+          'application/json': components['schemas']['ImagesUpdatedFromListResult'];
         };
       };
       /** @description Validation Error */
@@ -7740,7 +7662,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          'application/json': unknown;
+          'application/json': components['schemas']['ImagesUpdatedFromListResult'];
         };
       };
       /** @description Validation Error */

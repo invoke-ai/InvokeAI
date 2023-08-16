@@ -8,7 +8,7 @@ import {
 } from 'features/gallery/store/types';
 import { keyBy } from 'lodash';
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
-import { components } from '../schema';
+import { components, paths } from '../schema';
 import {
   DeleteBoardResult,
   ImageCategory,
@@ -296,11 +296,11 @@ export const imagesApi = api.injectEndpoints({
             imageDTO.image_category
           )
             ? boardsApi.endpoints.getBoardImagesTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState())
+                imageDTO.board_id ?? 'none'
+              )(getState())
             : boardsApi.endpoints.getBoardAssetsTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState());
+                imageDTO.board_id ?? 'none'
+              )(getState());
 
           // IF it eligible for insertion into existing $cache
           // "eligible" means either:
@@ -391,13 +391,13 @@ export const imagesApi = api.injectEndpoints({
      * Star a list of images.
      */
     starImages: build.mutation<
-      { images: string[] },
+      paths['/api/v1/images/unstar']['post']['responses']['200']['content']['application/json'],
       { images: ImageDTO[] }
     >({
       query: ({ images }) => ({
         url: `images/star`,
         method: 'POST',
-        body: { image_names: images.map(img => img.image_name) },
+        body: { image_names: images.map((img) => img.image_name) },
       }),
       invalidatesTags: (result, error, { images }) => {
         // assume all images are on the same board/category
@@ -412,15 +412,11 @@ export const imagesApi = api.injectEndpoints({
                 categories,
               }),
             },
-          ]
+          ];
         }
-        return []
-
+        return [];
       },
-      async onQueryStarted(
-        { images },
-        { dispatch, queryFulfilled, getState }
-      ) {
+      async onQueryStarted({ images }, { dispatch, queryFulfilled, getState }) {
         try {
           /**
            * Cache changes for pinImages:
@@ -428,12 +424,18 @@ export const imagesApi = api.injectEndpoints({
            * - *upsert* into list for each image
            */
 
-          // assume all images are on the same board/category
-          if (!images[0]) return;
-          const categories = getCategories(images[0]);
-          const boardId = images[0].board_id;
+          const { data } = await queryFulfilled;
+          const updatedImages = images.filter((i) =>
+            data.updated_image_names.includes(i.image_name)
+          );
 
-          images.forEach((imageDTO) => {
+          if (!updatedImages[0]) return;
+
+          // assume all images are on the same board/category
+          const categories = getCategories(updatedImages[0]);
+          const boardId = updatedImages[0].board_id;
+
+          updatedImages.forEach((imageDTO) => {
             const { image_name } = imageDTO;
             dispatch(
               imagesApi.util.updateQueryData(
@@ -447,7 +449,7 @@ export const imagesApi = api.injectEndpoints({
 
             const queryArgs = {
               board_id: boardId ?? 'none',
-              categories
+              categories,
             };
 
             const currentCache = imagesApi.endpoints.listImages.select(
@@ -458,11 +460,11 @@ export const imagesApi = api.injectEndpoints({
               imageDTO.image_category
             )
               ? boardsApi.endpoints.getBoardImagesTotal.select(
-                boardId ?? 'none'
-              )(getState())
+                  boardId ?? 'none'
+                )(getState())
               : boardsApi.endpoints.getBoardAssetsTotal.select(
-                boardId ?? 'none'
-              )(getState());
+                  boardId ?? 'none'
+                )(getState());
 
             const isCacheFullyPopulated =
               currentCache.data &&
@@ -482,7 +484,7 @@ export const imagesApi = api.injectEndpoints({
                   (draft) => {
                     imagesAdapter.upsertOne(draft, {
                       ...imageDTO,
-                      starred: true
+                      starred: true,
                     });
                   }
                 )
@@ -498,13 +500,13 @@ export const imagesApi = api.injectEndpoints({
      * Unstar a list of images.
      */
     unstarImages: build.mutation<
-      { images: string[] },
+      paths['/api/v1/images/unstar']['post']['responses']['200']['content']['application/json'],
       { images: ImageDTO[] }
     >({
       query: ({ images }) => ({
         url: `images/unstar`,
         method: 'POST',
-        body: { image_names: images.map(img => img.image_name) },
+        body: { image_names: images.map((img) => img.image_name) },
       }),
       invalidatesTags: (result, error, { images }) => {
         // assume all images are on the same board/category
@@ -519,15 +521,11 @@ export const imagesApi = api.injectEndpoints({
                 categories,
               }),
             },
-          ]
+          ];
         }
-        return []
-
+        return [];
       },
-      async onQueryStarted(
-        { images },
-        { dispatch, queryFulfilled, getState }
-      ) {
+      async onQueryStarted({ images }, { dispatch, queryFulfilled, getState }) {
         try {
           /**
            * Cache changes for unstarImages:
@@ -535,12 +533,17 @@ export const imagesApi = api.injectEndpoints({
            * - *upsert* into list for each image
            */
 
-          // assume all images are on the same board/category
-          if (!images[0]) return;
-          const categories = getCategories(images[0]);
-          const boardId = images[0].board_id;
+          const { data } = await queryFulfilled;
+          const updatedImages = images.filter((i) =>
+            data.updated_image_names.includes(i.image_name)
+          );
 
-          images.forEach((imageDTO) => {
+          if (!updatedImages[0]) return;
+          // assume all images are on the same board/category
+          const categories = getCategories(updatedImages[0]);
+          const boardId = updatedImages[0].board_id;
+
+          updatedImages.forEach((imageDTO) => {
             const { image_name } = imageDTO;
             dispatch(
               imagesApi.util.updateQueryData(
@@ -552,10 +555,9 @@ export const imagesApi = api.injectEndpoints({
               )
             );
 
-
             const queryArgs = {
               board_id: boardId ?? 'none',
-              categories
+              categories,
             };
 
             const currentCache = imagesApi.endpoints.listImages.select(
@@ -566,11 +568,11 @@ export const imagesApi = api.injectEndpoints({
               imageDTO.image_category
             )
               ? boardsApi.endpoints.getBoardImagesTotal.select(
-                boardId ?? 'none'
-              )(getState())
+                  boardId ?? 'none'
+                )(getState())
               : boardsApi.endpoints.getBoardAssetsTotal.select(
-                boardId ?? 'none'
-              )(getState());
+                  boardId ?? 'none'
+                )(getState());
 
             const isCacheFullyPopulated =
               currentCache.data &&
@@ -590,7 +592,7 @@ export const imagesApi = api.injectEndpoints({
                   (draft) => {
                     imagesAdapter.upsertOne(draft, {
                       ...imageDTO,
-                      starred: false
+                      starred: false,
                     });
                   }
                 )
@@ -941,11 +943,11 @@ export const imagesApi = api.injectEndpoints({
             imageDTO.image_category
           )
             ? boardsApi.endpoints.getBoardImagesTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState())
+                imageDTO.board_id ?? 'none'
+              )(getState())
             : boardsApi.endpoints.getBoardAssetsTotal.select(
-              imageDTO.board_id ?? 'none'
-            )(getState());
+                imageDTO.board_id ?? 'none'
+              )(getState());
 
           const isCacheFullyPopulated =
             currentCache.data && currentCache.data.ids.length >= (total ?? 0);
@@ -1061,11 +1063,11 @@ export const imagesApi = api.injectEndpoints({
           imageDTO.image_category
         )
           ? boardsApi.endpoints.getBoardImagesTotal.select(
-            imageDTO.board_id ?? 'none'
-          )(getState())
+              imageDTO.board_id ?? 'none'
+            )(getState())
           : boardsApi.endpoints.getBoardAssetsTotal.select(
-            imageDTO.board_id ?? 'none'
-          )(getState());
+              imageDTO.board_id ?? 'none'
+            )(getState());
 
         const isCacheFullyPopulated =
           currentCache.data && currentCache.data.ids.length >= (total ?? 0);
@@ -1188,11 +1190,11 @@ export const imagesApi = api.injectEndpoints({
               imageDTO.image_category
             )
               ? boardsApi.endpoints.getBoardImagesTotal.select(
-                new_board_id ?? 'none'
-              )(getState())
+                  new_board_id ?? 'none'
+                )(getState())
               : boardsApi.endpoints.getBoardAssetsTotal.select(
-                new_board_id ?? 'none'
-              )(getState());
+                  new_board_id ?? 'none'
+                )(getState());
 
             const isCacheFullyPopulated =
               currentCache.data &&
@@ -1319,11 +1321,11 @@ export const imagesApi = api.injectEndpoints({
               imageDTO.image_category
             )
               ? boardsApi.endpoints.getBoardImagesTotal.select(
-                imageDTO.board_id ?? 'none'
-              )(getState())
+                  imageDTO.board_id ?? 'none'
+                )(getState())
               : boardsApi.endpoints.getBoardAssetsTotal.select(
-                imageDTO.board_id ?? 'none'
-              )(getState());
+                  imageDTO.board_id ?? 'none'
+                )(getState());
 
             const isCacheFullyPopulated =
               currentCache.data && currentCache.data.ids.length >= (total ?? 0);
@@ -1376,5 +1378,5 @@ export const {
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
   useStarImagesMutation,
-  useUnstarImagesMutation
+  useUnstarImagesMutation,
 } = imagesApi;
