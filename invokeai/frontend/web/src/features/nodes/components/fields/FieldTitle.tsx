@@ -8,13 +8,11 @@ import {
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIDraggable from 'common/components/IAIDraggable';
 import { NodeFieldDraggableData } from 'features/dnd/types';
-import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
 import {
-  InputFieldTemplate,
-  InputFieldValue,
-  InvocationNodeData,
-  InvocationTemplate,
-} from 'features/nodes/types/types';
+  useFieldData,
+  useFieldTemplate,
+} from 'features/nodes/hooks/useNodeData';
+import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
 import {
   MouseEvent,
   memo,
@@ -25,41 +23,43 @@ import {
 } from 'react';
 
 interface Props {
-  nodeData: InvocationNodeData;
-  nodeTemplate: InvocationTemplate;
-  field: InputFieldValue;
-  fieldTemplate: InputFieldTemplate;
+  nodeId: string;
+  fieldName: string;
   isDraggable?: boolean;
+  kind: 'input' | 'output';
 }
 
 const FieldTitle = (props: Props) => {
-  const { nodeData, field, fieldTemplate, isDraggable = false } = props;
-  const { label } = field;
-  const { title, input } = fieldTemplate;
-  const { id: nodeId } = nodeData;
+  const { nodeId, fieldName, isDraggable = false, kind } = props;
+  const fieldTemplate = useFieldTemplate(nodeId, fieldName, kind);
+  const field = useFieldData(nodeId, fieldName);
+
   const dispatch = useAppDispatch();
-  const [localTitle, setLocalTitle] = useState(label || title);
+  const [localTitle, setLocalTitle] = useState(
+    field?.label || fieldTemplate?.title || 'Unknown Field'
+  );
 
   const draggableData: NodeFieldDraggableData | undefined = useMemo(
     () =>
-      input !== 'connection' && isDraggable
+      field &&
+      fieldTemplate?.fieldKind === 'input' &&
+      fieldTemplate?.input !== 'connection' &&
+      isDraggable
         ? {
-            id: `${nodeId}-${field.name}`,
+            id: `${nodeId}-${fieldName}`,
             payloadType: 'NODE_FIELD',
             payload: { nodeId, field, fieldTemplate },
           }
         : undefined,
-    [field, fieldTemplate, input, isDraggable, nodeId]
+    [field, fieldName, fieldTemplate, isDraggable, nodeId]
   );
 
   const handleSubmit = useCallback(
     async (newTitle: string) => {
-      dispatch(
-        fieldLabelChanged({ nodeId, fieldName: field.name, label: newTitle })
-      );
-      setLocalTitle(newTitle || title);
+      dispatch(fieldLabelChanged({ nodeId, fieldName, label: newTitle }));
+      setLocalTitle(newTitle || fieldTemplate?.title || 'Unknown Field');
     },
-    [dispatch, nodeId, field.name, title]
+    [dispatch, nodeId, fieldName, fieldTemplate?.title]
   );
 
   const handleChange = useCallback((newTitle: string) => {
@@ -68,8 +68,8 @@ const FieldTitle = (props: Props) => {
 
   useEffect(() => {
     // Another component may change the title; sync local title with global state
-    setLocalTitle(label || title);
-  }, [label, title]);
+    setLocalTitle(field?.label || fieldTemplate?.title || 'Unknown Field');
+  }, [field?.label, fieldTemplate?.title]);
 
   return (
     <Flex
@@ -120,7 +120,7 @@ type EditableControlsProps = {
   draggableData?: NodeFieldDraggableData;
 };
 
-function EditableControls(props: EditableControlsProps) {
+const EditableControls = memo((props: EditableControlsProps) => {
   const { isEditing, getEditButtonProps } = useEditableControls();
   const handleDoubleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
@@ -158,4 +158,6 @@ function EditableControls(props: EditableControlsProps) {
       cursor="text"
     />
   );
-}
+});
+
+EditableControls.displayName = 'EditableControls';

@@ -1,19 +1,12 @@
 import { Tooltip } from '@chakra-ui/react';
 import { CSSProperties, memo, useMemo } from 'react';
-import { Handle, HandleType, NodeProps, Position } from 'reactflow';
+import { Handle, HandleType, Position } from 'reactflow';
 import {
   FIELDS,
   HANDLE_TOOLTIP_OPEN_DELAY,
   colorTokenToCssVar,
 } from '../../types/constants';
-import {
-  InputFieldTemplate,
-  InputFieldValue,
-  InvocationNodeData,
-  InvocationTemplate,
-  OutputFieldTemplate,
-  OutputFieldValue,
-} from '../../types/types';
+import { InputFieldTemplate, OutputFieldTemplate } from '../../types/types';
 
 export const handleBaseStyles: CSSProperties = {
   position: 'absolute',
@@ -32,9 +25,6 @@ export const outputHandleStyles: CSSProperties = {
 };
 
 type FieldHandleProps = {
-  nodeProps: NodeProps<InvocationNodeData>;
-  nodeTemplate: InvocationTemplate;
-  field: InputFieldValue | OutputFieldValue;
   fieldTemplate: InputFieldTemplate | OutputFieldTemplate;
   handleType: HandleType;
   isConnectionInProgress: boolean;

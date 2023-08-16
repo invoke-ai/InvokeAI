@@ -11,8 +11,7 @@ import { FieldComponentProps } from './types';
 const EnumInputFieldComponent = (
   props: FieldComponentProps<EnumInputFieldValue, EnumInputFieldTemplate>
 ) => {
-  const { nodeData, field, fieldTemplate } = props;
-  const nodeId = nodeData.id;
+  const { nodeId, field, fieldTemplate } = props;
 
   const dispatch = useAppDispatch();
 
