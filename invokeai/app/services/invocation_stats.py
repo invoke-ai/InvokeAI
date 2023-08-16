@@ -171,7 +171,8 @@ class InvocationStatsService(InvocationStatsServiceBase):
             if torch.cuda.is_available():
                 torch.cuda.reset_peak_memory_stats()
             self.ram_used = psutil.Process().memory_info().rss
-            self.model_manager.collect_cache_stats(self.collector._cache_stats[self.graph_id])
+            if self.model_manager:
+                self.model_manager.collect_cache_stats(self.collector._cache_stats[self.graph_id])
 
         def __exit__(self, *args):
             """Called on exit from the context."""
