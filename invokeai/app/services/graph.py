@@ -3,16 +3,7 @@
 import copy
 import itertools
 import uuid
-from typing import (
-    Annotated,
-    Any,
-    Literal,
-    Optional,
-    Union,
-    get_args,
-    get_origin,
-    get_type_hints,
-)
+from typing import Annotated, Any, Literal, Optional, Union, get_args, get_origin, get_type_hints
 
 import networkx as nx
 from pydantic import BaseModel, root_validator, validator
@@ -22,7 +13,11 @@ from ..invocations import *
 from ..invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
+    Input,
+    InputField,
     InvocationContext,
+    OutputField,
+    UIType,
 )
 
 # in 3.10 this would be "from types import NoneType"
@@ -183,15 +178,9 @@ class IterateInvocationOutput(BaseInvocationOutput):
 
     type: Literal["iterate_output"] = "iterate_output"
 
-    item: Any = Field(description="The item being iterated over")
-
-    class Config:
-        schema_extra = {
-            "required": [
-                "type",
-                "item",
-            ]
-        }
+    item: Any = OutputField(
+        description="The item being iterated over", title="Collection Item", ui_type=UIType.CollectionItem
+    )
 
 
 # TODO: Fill this out and move to invocations
@@ -200,8 +189,10 @@ class IterateInvocation(BaseInvocation):
 
     type: Literal["iterate"] = "iterate"
 
-    collection: list[Any] = Field(description="The list of items to iterate over", default_factory=list)
-    index: int = Field(description="The index, will be provided on executed iterators", default=0)
+    collection: list[Any] = InputField(
+        description="The list of items to iterate over", default_factory=list, ui_type=UIType.Collection
+    )
+    index: int = InputField(description="The index, will be provided on executed iterators", default=0, ui_hidden=True)
 
     def invoke(self, context: InvocationContext) -> IterateInvocationOutput:
         """Produces the outputs as values"""
@@ -211,15 +202,9 @@ class IterateInvocation(BaseInvocation):
 class CollectInvocationOutput(BaseInvocationOutput):
     type: Literal["collect_output"] = "collect_output"
 
-    collection: list[Any] = Field(description="The collection of input items")
-
-    class Config:
-        schema_extra = {
-            "required": [
-                "type",
-                "collection",
-            ]
-        }
+    collection: list[Any] = OutputField(
+        description="The collection of input items", title="Collection", ui_type=UIType.Collection
+    )
 
 
 class CollectInvocation(BaseInvocation):
@@ -227,13 +212,14 @@ class CollectInvocation(BaseInvocation):
 
     type: Literal["collect"] = "collect"
 
-    item: Any = Field(
+    item: Any = InputField(
         description="The item to collect (all inputs must be of the same type)",
-        default=None,
+        ui_type=UIType.CollectionItem,
+        title="Collection Item",
+        input=Input.Connection,
     )
-    collection: list[Any] = Field(
-        description="The collection, will be provided on execution",
-        default_factory=list,
+    collection: list[Any] = InputField(
+        description="The collection, will be provided on execution", default_factory=list, ui_hidden=True
     )
 
     def invoke(self, context: InvocationContext) -> CollectInvocationOutput:

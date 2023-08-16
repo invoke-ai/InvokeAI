@@ -52,11 +52,13 @@ const ImageGalleryContent = () => {
 
   return (
     <VStack
+      layerStyle="first"
       sx={{
         flexDirection: 'column',
         h: 'full',
         w: 'full',
         borderRadius: 'base',
+        p: 2,
       }}
     >
       <Box sx={{ w: 'full' }}>

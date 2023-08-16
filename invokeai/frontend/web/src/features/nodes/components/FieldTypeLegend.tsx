@@ -1,8 +1,8 @@
-import 'reactflow/dist/style.css';
-import { Tooltip, Badge, Flex } from '@chakra-ui/react';
+import { Badge, Flex, Tooltip } from '@chakra-ui/react';
 import { map } from 'lodash-es';
-import { FIELDS } from '../types/constants';
 import { memo } from 'react';
+import 'reactflow/dist/style.css';
+import { FIELDS } from '../types/constants';
 
 const FieldTypeLegend = () => {
   return (
@@ -10,8 +10,14 @@ const FieldTypeLegend = () => {
       {map(FIELDS, ({ title, description, color }, key) => (
         <Tooltip key={key} label={description}>
           <Badge
-            colorScheme={color}
-            sx={{ userSelect: 'none' }}
+            sx={{
+              userSelect: 'none',
+              color:
+                parseInt(color.split('.')[1] ?? '0', 10) < 500
+                  ? 'base.800'
+                  : 'base.50',
+              bg: color,
+            }}
             textAlign="center"
           >
             {title}

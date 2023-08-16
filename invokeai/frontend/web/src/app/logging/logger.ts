@@ -19,7 +19,8 @@ type LoggerNamespace =
   | 'nodes'
   | 'system'
   | 'socketio'
-  | 'session';
+  | 'session'
+  | 'dnd';
 
 export const logger = (namespace: LoggerNamespace) =>
   $logger.get().child({ namespace });
