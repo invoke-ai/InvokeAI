@@ -27,9 +27,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
   const { imageName } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
-  const shouldShowDeleteButton = useAppSelector(
-    (state) => state.gallery.shouldShowDeleteButton
-  );
+  const shift = useAppSelector((state) => state.hotkeys.shift);
 
   const { handleClick, isSelected, selection, selectionCount } =
     useMultiselect(imageDTO);
@@ -81,6 +79,14 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const [isHovered, setIsHovered] = useState(false);
 
+  const handleMouseOver = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+
+  const handleMouseOut = useCallback(() => {
+    setIsHovered(false);
+  }, []);
+
   const starIcon = useMemo(() => {
     if (imageDTO?.starred) return <MdStar size="20" />;
     if (!imageDTO?.starred && isHovered) return <MdStarBorder size="20" />;
@@ -112,8 +118,8 @@ const GalleryImage = (props: HoverableImageProps) => {
           isUploadDisabled={true}
           thumbnail={true}
           withHoverOverlay
-          onMouseOver={() => setIsHovered(true)}
-          onMouseOut={() => setIsHovered(false)}
+          onMouseOver={handleMouseOver}
+          onMouseOut={handleMouseOut}
         >
           <>
             <IAIDndImageIcon
@@ -122,13 +128,13 @@ const GalleryImage = (props: HoverableImageProps) => {
               tooltip={imageDTO.starred ? 'Unstar' : 'Star'}
             />
 
-            {isHovered && shouldShowDeleteButton && (
+            {isHovered && shift && (
               <IAIDndImageIcon
                 onClick={handleDelete}
                 icon={<FaTrash />}
-                tooltip={'Delete'}
+                tooltip="Delete"
                 styleOverrides={{
-                  bottom: 1,
+                  bottom: 2,
                   top: 'auto',
                 }}
               />

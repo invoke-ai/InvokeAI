@@ -26,26 +26,27 @@ export const getIsImageInDateRange = (
 
   for (let index = 0; index < totalCachedImageDtos.length; index++) {
     const image = totalCachedImageDtos[index];
-    if (image?.starred) cachedStarredImages.push(image)
-    if (!image?.starred) cachedUnstarredImages.push(image)
+    if (image?.starred) cachedStarredImages.push(image);
+    if (!image?.starred) cachedUnstarredImages.push(image);
   }
 
   if (imageDTO.starred) {
-    const lastStarredImage = cachedStarredImages[cachedStarredImages.length - 1];
-    // if starring or already starred, want to look in list of starred images 
+    const lastStarredImage =
+      cachedStarredImages[cachedStarredImages.length - 1];
+    // if starring or already starred, want to look in list of starred images
     if (!lastStarredImage) return true; // no starred images showing, so always show this one
     const createdDate = new Date(imageDTO.created_at);
     const oldestDate = new Date(lastStarredImage.created_at);
     return createdDate >= oldestDate;
   } else {
-    const lastUnstarredImage = cachedUnstarredImages[cachedUnstarredImages.length - 1];
+    const lastUnstarredImage =
+      cachedUnstarredImages[cachedUnstarredImages.length - 1];
     // if unstarring or already unstarred, want to look in list of unstarred images
     if (!lastUnstarredImage) return false; // no unstarred images showing, so don't show this one
     const createdDate = new Date(imageDTO.created_at);
     const oldestDate = new Date(lastUnstarredImage.created_at);
     return createdDate >= oldestDate;
   }
-
 };
 
 export const getCategories = (imageDTO: ImageDTO) => {
@@ -67,7 +68,7 @@ export const imagesAdapter = createEntityAdapter<ImageDTO>({
     if (!a.starred && b.starred) {
       return 1;
     }
-    return dateComparator(b.created_at, a.created_at)
+    return dateComparator(b.created_at, a.created_at);
   },
 });
 

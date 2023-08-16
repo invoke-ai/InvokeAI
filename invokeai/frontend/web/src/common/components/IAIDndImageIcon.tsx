@@ -1,6 +1,6 @@
-import { JSXElementConstructor, ReactElement, memo, MouseEvent } from 'react';
-import IAIIconButton from './IAIIconButton';
 import { SystemStyleObject, useColorModeValue } from '@chakra-ui/react';
+import { JSXElementConstructor, MouseEvent, ReactElement, memo } from 'react';
+import IAIIconButton from './IAIIconButton';
 
 type Props = {
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;

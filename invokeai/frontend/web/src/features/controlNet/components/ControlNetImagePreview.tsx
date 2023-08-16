@@ -1,10 +1,4 @@
-import {
-  Box,
-  Flex,
-  Spinner,
-  SystemStyleObject,
-  useColorModeValue,
-} from '@chakra-ui/react';
+import { Box, Flex, Spinner, SystemStyleObject } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
@@ -16,14 +10,14 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { memo, useCallback, useMemo, useState } from 'react';
+import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
+import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
 import {
   ControlNetConfig,
   controlNetImageChanged,
 } from '../store/controlNetSlice';
-import { FaUndo } from 'react-icons/fa';
-import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
 
 type Props = {
   controlNet: ControlNetConfig;
@@ -99,11 +93,6 @@ const ControlNetImagePreview = (props: Props) => {
   const postUploadAction = useMemo<PostUploadAction>(
     () => ({ type: 'SET_CONTROLNET_IMAGE', controlNetId }),
     [controlNetId]
-  );
-
-  const resetIconShadow = useColorModeValue(
-    `drop-shadow(0px 0px 0.1rem var(--invokeai-colors-base-600))`,
-    `drop-shadow(0px 0px 0.1rem var(--invokeai-colors-base-800))`
   );
 
   const shouldShowProcessedImage =
