@@ -30,7 +30,6 @@ import { useTranslation } from 'react-i18next';
 import { FaCube, FaFont, FaImage } from 'react-icons/fa';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
-import { systemSelector } from '../../system/store/systemSelectors';
 import { useMinimumPanelSize } from '../hooks/useMinimumPanelSize';
 import {
   activeTabIndexSelector,
