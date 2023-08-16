@@ -8,7 +8,7 @@ import IAIIconButton, {
 import { selectIsReadyNodes } from 'features/nodes/store/selectors';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
@@ -18,7 +18,7 @@ interface InvokeButton
   iconButton?: boolean;
 }
 
-export default function NodeInvokeButton(props: InvokeButton) {
+const NodeInvokeButton = (props: InvokeButton) => {
   const { iconButton = false, ...rest } = props;
   const dispatch = useAppDispatch();
   const activeTabName = useAppSelector(activeTabNameSelector);
@@ -92,4 +92,6 @@ export default function NodeInvokeButton(props: InvokeButton) {
       </Box>
     </Box>
   );
-}
+};
+
+export default memo(NodeInvokeButton);
