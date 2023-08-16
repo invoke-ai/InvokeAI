@@ -5,7 +5,7 @@ import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
+import { selectIsReadyNodes } from 'features/nodes/store/selectors';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
@@ -22,7 +22,7 @@ export default function NodeInvokeButton(props: InvokeButton) {
   const { iconButton = false, ...rest } = props;
   const dispatch = useAppDispatch();
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const isReady = useIsReadyToInvoke();
+  const isReady = useAppSelector(selectIsReadyNodes);
   const handleInvoke = useCallback(() => {
     dispatch(userInvoked('nodes'));
   }, [dispatch]);
@@ -71,12 +71,6 @@ export default function NodeInvokeButton(props: InvokeButton) {
             tooltipProps={{ placement: 'bottom' }}
             colorScheme="accent"
             id="invoke-button"
-            _disabled={{
-              background: 'none',
-              _hover: {
-                background: 'none',
-              },
-            }}
             {...rest}
           />
         ) : (
@@ -90,12 +84,6 @@ export default function NodeInvokeButton(props: InvokeButton) {
             colorScheme="accent"
             id="invoke-button"
             fontWeight={700}
-            _disabled={{
-              background: 'none',
-              _hover: {
-                background: 'none',
-              },
-            }}
             {...rest}
           >
             Invoke

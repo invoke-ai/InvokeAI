@@ -1,15 +1,15 @@
 import { Box, Flex, Image, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { RemoveFromBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import InvokeAILogoImage from 'assets/images/logo.png';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
+import { RemoveFromBoardDropData } from 'features/dnd/types';
 import {
-  boardIdSelected,
   autoAddBoardIdChanged,
+  boardIdSelected,
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';

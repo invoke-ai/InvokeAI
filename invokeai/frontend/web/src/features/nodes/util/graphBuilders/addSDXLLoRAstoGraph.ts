@@ -70,6 +70,9 @@ export const addSDXLLoRAsToGraph = (
 
     // add the lora to the metadata accumulator
     if (metadataAccumulator) {
+      if (!metadataAccumulator.loras) {
+        metadataAccumulator.loras = [];
+      }
       metadataAccumulator.loras.push({
         lora: { model_name, base_model },
         weight,

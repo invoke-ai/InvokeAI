@@ -2,10 +2,11 @@ import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
+import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
+import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
 import {
   canvasSelector,
   isStagingSelector,
@@ -22,7 +23,7 @@ import { isEqual } from 'lodash-es';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaMask, FaTrash } from 'react-icons/fa';
+import { FaMask, FaSave, FaTrash } from 'react-icons/fa';
 
 export const selector = createSelector(
   [canvasSelector, isStagingSelector],
@@ -102,6 +103,10 @@ const IAICanvasMaskOptions = () => {
   const handleToggleEnableMask = () =>
     dispatch(setIsMaskEnabled(!isMaskEnabled));
 
+  const handleSaveMask = async () => {
+    dispatch(canvasMaskSavedToGallery());
+  };
+
   return (
     <IAIPopover
       triggerComponent={
@@ -134,6 +139,9 @@ const IAICanvasMaskOptions = () => {
           pickerColor={maskColor}
           onChange={(newColor) => dispatch(setMaskColor(newColor))}
         />
+        <IAIButton size="sm" leftIcon={<FaSave />} onClick={handleSaveMask}>
+          Save Mask
+        </IAIButton>
         <IAIButton size="sm" leftIcon={<FaTrash />} onClick={handleClearMask}>
           {t('unifiedCanvas.clearMask')} (Shift+C)
         </IAIButton>
