@@ -55,7 +55,7 @@ const MultipleSelectionMenuItems = () => {
           Unstar All
         </MenuItem>
       )}
-      {areAllUnstarred && (
+      {(areAllUnstarred || (!areAllStarred && !areAllUnstarred)) && (
         <MenuItem icon={<MdStar />} onClickCapture={handleStarSelection}>
           Star All
         </MenuItem>
