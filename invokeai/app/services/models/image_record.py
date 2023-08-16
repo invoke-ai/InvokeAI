@@ -132,5 +132,5 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         updated_at=updated_at,
         deleted_at=deleted_at,
         is_intermediate=is_intermediate,
-        starred=starred
+        starred=starred,
     )
