@@ -2,6 +2,7 @@ import { Flex } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
+import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
@@ -12,6 +13,7 @@ import {
   ImageInputFieldValue,
 } from 'features/nodes/types/types';
 import { memo, useCallback, useMemo } from 'react';
+import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 import { FieldComponentProps } from './types';
@@ -80,7 +82,13 @@ const ImageInputFieldComponent = (
         draggableData={draggableData}
         postUploadAction={postUploadAction}
         useThumbailFallback
-      />
+      >
+        <IAIDndImageIcon
+          onClick={handleReset}
+          icon={imageDTO ? <FaUndo /> : undefined}
+          tooltip="Reset Image"
+        />
+      </IAIDndImage>
     </Flex>
   );
 };
