@@ -67,7 +67,7 @@ IMAGE_DTO_COLS = ", ".join(
                 "created_at",
                 "updated_at",
                 "deleted_at",
-                "starred"
+                "starred",
             ],
         )
     )
@@ -140,7 +140,7 @@ class ImageRecordStorageBase(ABC):
         node_id: Optional[str],
         metadata: Optional[dict],
         is_intermediate: bool = False,
-        starred: bool = False
+        starred: bool = False,
     ) -> datetime:
         """Saves an image record."""
         pass
@@ -204,7 +204,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
         self._cursor.execute("PRAGMA table_info(images)")
         columns = [column[1] for column in self._cursor.fetchall()]
-        
+
         if "starred" not in columns:
             self._cursor.execute(
                 """--sql
@@ -529,7 +529,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         node_id: Optional[str],
         metadata: Optional[dict],
         is_intermediate: bool = False,
-        starred: bool = False
+        starred: bool = False,
     ) -> datetime:
         try:
             metadata_json = None if metadata is None else json.dumps(metadata)
