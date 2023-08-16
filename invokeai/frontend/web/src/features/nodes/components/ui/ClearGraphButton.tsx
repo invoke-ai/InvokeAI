@@ -25,7 +25,9 @@ const ClearGraphButton = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cancelRef = useRef<HTMLButtonElement | null>(null);
 
-  const nodes = useAppSelector((state: RootState) => state.nodes.nodes);
+  const nodesCount = useAppSelector(
+    (state: RootState) => state.nodes.nodes.length
+  );
 
   const handleConfirmClear = useCallback(() => {
     dispatch(nodeEditorReset());
@@ -49,7 +51,7 @@ const ClearGraphButton = () => {
         tooltip={t('nodes.clearGraph')}
         aria-label={t('nodes.clearGraph')}
         onClick={onOpen}
-        isDisabled={nodes.length === 0}
+        isDisabled={!nodesCount}
       />
 
       <AlertDialog

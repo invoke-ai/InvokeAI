@@ -15,7 +15,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
-import { ChangeEvent, useCallback } from 'react';
+import { ChangeEvent, memo, useCallback } from 'react';
 import { FaCog } from 'react-icons/fa';
 import {
   shouldAnimateEdgesChanged,
@@ -23,21 +23,26 @@ import {
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
 } from '../store/nodesSlice';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
-const selector = createSelector(stateSelector, ({ nodes }) => {
-  const {
-    shouldAnimateEdges,
-    shouldValidateGraph,
-    shouldSnapToGrid,
-    shouldColorEdges,
-  } = nodes;
-  return {
-    shouldAnimateEdges,
-    shouldValidateGraph,
-    shouldSnapToGrid,
-    shouldColorEdges,
-  };
-});
+const selector = createSelector(
+  stateSelector,
+  ({ nodes }) => {
+    const {
+      shouldAnimateEdges,
+      shouldValidateGraph,
+      shouldSnapToGrid,
+      shouldColorEdges,
+    } = nodes;
+    return {
+      shouldAnimateEdges,
+      shouldValidateGraph,
+      shouldSnapToGrid,
+      shouldColorEdges,
+    };
+  },
+  defaultSelectorOptions
+);
 
 const NodeEditorSettings = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -136,4 +141,4 @@ const NodeEditorSettings = () => {
   );
 };
 
-export default NodeEditorSettings;
+export default memo(NodeEditorSettings);
