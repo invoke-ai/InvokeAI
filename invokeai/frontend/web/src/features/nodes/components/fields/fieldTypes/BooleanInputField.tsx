@@ -11,8 +11,7 @@ import { FieldComponentProps } from './types';
 const BooleanInputFieldComponent = (
   props: FieldComponentProps<BooleanInputFieldValue, BooleanInputFieldTemplate>
 ) => {
-  const { nodeData, field } = props;
-  const nodeId = nodeData.id;
+  const { nodeId, field } = props;
 
   const dispatch = useAppDispatch();
 

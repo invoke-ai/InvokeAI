@@ -1,5 +1,6 @@
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { makeTemplateSelector } from 'features/nodes/store/util/makeTemplateSelector';
 import { InvocationNodeData } from 'features/nodes/types/types';
 import { memo, useMemo } from 'react';
 import { NodeProps } from 'reactflow';
@@ -7,18 +8,40 @@ import InvocationNode from '../Invocation/InvocationNode';
 import UnknownNodeFallback from '../Invocation/UnknownNodeFallback';
 
 const InvocationNodeWrapper = (props: NodeProps<InvocationNodeData>) => {
-  const { data } = props;
-  const { type } = data;
+  const { data, selected } = props;
+  const { id: nodeId, type, isOpen, label } = data;
 
-  const templateSelector = useMemo(() => makeTemplateSelector(type), [type]);
+  const hasTemplateSelector = useMemo(
+    () =>
+      createSelector(stateSelector, ({ nodes }) =>
+        Boolean(nodes.nodeTemplates[type])
+      ),
+    [type]
+  );
 
-  const nodeTemplate = useAppSelector(templateSelector);
+  const nodeTemplate = useAppSelector(hasTemplateSelector);
 
   if (!nodeTemplate) {
-    return <UnknownNodeFallback nodeProps={props} />;
+    return (
+      <UnknownNodeFallback
+        nodeId={nodeId}
+        isOpen={isOpen}
+        label={label}
+        type={type}
+        selected={selected}
+      />
+    );
   }
 
-  return <InvocationNode nodeProps={props} nodeTemplate={nodeTemplate} />;
+  return (
+    <InvocationNode
+      nodeId={nodeId}
+      isOpen={isOpen}
+      label={label}
+      type={type}
+      selected={selected}
+    />
+  );
 };
 
 export default memo(InvocationNodeWrapper);

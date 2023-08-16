@@ -9,9 +9,13 @@ export const makeConnectionErrorSelector = (
   nodeId: string,
   fieldName: string,
   handleType: HandleType,
-  fieldType: FieldType
+  fieldType?: FieldType
 ) =>
   createSelector(stateSelector, (state) => {
+    if (!fieldType) {
+      return 'No field type';
+    }
+
     const { currentConnectionFieldType, connectionStartParams, nodes, edges } =
       state.nodes;
 

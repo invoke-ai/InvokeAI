@@ -6,25 +6,19 @@ import {
   Tooltip,
 } from '@chakra-ui/react';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
+import { useFieldTemplate } from 'features/nodes/hooks/useNodeData';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import {
-  InvocationNodeData,
-  InvocationTemplate,
-  OutputFieldValue,
-} from 'features/nodes/types/types';
-import { PropsWithChildren, useMemo } from 'react';
-import { NodeProps } from 'reactflow';
+import { PropsWithChildren, memo } from 'react';
 import FieldHandle from './FieldHandle';
 import FieldTooltipContent from './FieldTooltipContent';
 
 interface Props {
-  nodeProps: NodeProps<InvocationNodeData>;
-  nodeTemplate: InvocationTemplate;
-  field: OutputFieldValue;
+  nodeId: string;
+  fieldName: string;
 }
 
-const OutputField = (props: Props) => {
-  const { nodeTemplate, nodeProps, field } = props;
+const OutputField = ({ nodeId, fieldName }: Props) => {
+  const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'output');
 
   const {
     isConnected,
@@ -32,20 +26,15 @@ const OutputField = (props: Props) => {
     isConnectionStartField,
     connectionError,
     shouldDim,
-  } = useConnectionState({ nodeId: nodeProps.data.id, field, kind: 'output' });
+  } = useConnectionState({ nodeId, fieldName, kind: 'output' });
 
-  const fieldTemplate = useMemo(
-    () => nodeTemplate.outputs[field.name],
-    [field.name, nodeTemplate]
-  );
-
-  if (!fieldTemplate) {
+  if (fieldTemplate?.fieldKind !== 'output') {
     return (
       <OutputFieldWrapper shouldDim={shouldDim}>
         <FormControl
           sx={{ color: 'error.400', textAlign: 'right', fontSize: 'sm' }}
         >
-          Unknown output: {field.name}
+          Unknown output: {fieldName}
         </FormControl>
       </OutputFieldWrapper>
     );
@@ -57,10 +46,9 @@ const OutputField = (props: Props) => {
       <Tooltip
         label={
           <FieldTooltipContent
-            nodeData={nodeProps.data}
-            nodeTemplate={nodeTemplate}
-            field={field}
-            fieldTemplate={fieldTemplate}
+            nodeId={nodeId}
+            fieldName={fieldName}
+            kind="output"
           />
         }
         openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
@@ -75,9 +63,6 @@ const OutputField = (props: Props) => {
         </FormControl>
       </Tooltip>
       <FieldHandle
-        nodeProps={nodeProps}
-        nodeTemplate={nodeTemplate}
-        field={field}
         fieldTemplate={fieldTemplate}
         handleType="source"
         isConnectionInProgress={isConnectionInProgress}
@@ -88,27 +73,28 @@ const OutputField = (props: Props) => {
   );
 };
 
-export default OutputField;
+export default memo(OutputField);
 
 type OutputFieldWrapperProps = PropsWithChildren<{
   shouldDim: boolean;
 }>;
 
-const OutputFieldWrapper = ({
-  shouldDim,
-  children,
-}: OutputFieldWrapperProps) => (
-  <Flex
-    sx={{
-      position: 'relative',
-      minH: 8,
-      py: 0.5,
-      alignItems: 'center',
-      opacity: shouldDim ? 0.5 : 1,
-      transitionProperty: 'opacity',
-      transitionDuration: '0.1s',
-    }}
-  >
-    {children}
-  </Flex>
+const OutputFieldWrapper = memo(
+  ({ shouldDim, children }: OutputFieldWrapperProps) => (
+    <Flex
+      sx={{
+        position: 'relative',
+        minH: 8,
+        py: 0.5,
+        alignItems: 'center',
+        opacity: shouldDim ? 0.5 : 1,
+        transitionProperty: 'opacity',
+        transitionDuration: '0.1s',
+      }}
+    >
+      {children}
+    </Flex>
+  )
 );
+
+OutputFieldWrapper.displayName = 'OutputFieldWrapper';

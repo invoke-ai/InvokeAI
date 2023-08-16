@@ -1,40 +1,34 @@
 import { Flex } from '@chakra-ui/react';
-import {
-  InvocationNodeData,
-  InvocationTemplate,
-} from 'features/nodes/types/types';
-import { map, some } from 'lodash-es';
-import { memo, useMemo } from 'react';
-import { NodeProps } from 'reactflow';
+import { useFieldNames, useWithFooter } from 'features/nodes/hooks/useNodeData';
+import { memo } from 'react';
 import InputField from '../fields/InputField';
 import OutputField from '../fields/OutputField';
-import NodeFooter, { FOOTER_FIELDS } from './NodeFooter';
+import NodeFooter from './NodeFooter';
 import NodeHeader from './NodeHeader';
 import NodeWrapper from './NodeWrapper';
 
 type Props = {
-  nodeProps: NodeProps<InvocationNodeData>;
-  nodeTemplate: InvocationTemplate;
+  nodeId: string;
+  isOpen: boolean;
+  label: string;
+  type: string;
+  selected: boolean;
 };
 
-const InvocationNode = ({ nodeProps, nodeTemplate }: Props) => {
-  const { id: nodeId, data } = nodeProps;
-  const { inputs, outputs, isOpen } = data;
-
-  const inputFields = useMemo(
-    () => map(inputs).filter((i) => i.name !== 'is_intermediate'),
-    [inputs]
-  );
-  const outputFields = useMemo(() => map(outputs), [outputs]);
-
-  const withFooter = useMemo(
-    () => some(outputs, (output) => FOOTER_FIELDS.includes(output.type)),
-    [outputs]
-  );
+const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
+  const inputFieldNames = useFieldNames(nodeId, 'input');
+  const outputFieldNames = useFieldNames(nodeId, 'output');
+  const withFooter = useWithFooter(nodeId);
 
   return (
-    <NodeWrapper nodeProps={nodeProps}>
-      <NodeHeader nodeProps={nodeProps} nodeTemplate={nodeTemplate} />
+    <NodeWrapper nodeId={nodeId} selected={selected}>
+      <NodeHeader
+        nodeId={nodeId}
+        isOpen={isOpen}
+        label={label}
+        selected={selected}
+        type={type}
+      />
       {isOpen && (
         <>
           <Flex
@@ -54,27 +48,23 @@ const InvocationNode = ({ nodeProps, nodeTemplate }: Props) => {
               className="nopan"
               sx={{ flexDir: 'column', px: 2, w: 'full', h: 'full' }}
             >
-              {outputFields.map((field) => (
+              {outputFieldNames.map((fieldName) => (
                 <OutputField
-                  key={`${nodeId}.${field.id}.input-field`}
-                  nodeProps={nodeProps}
-                  nodeTemplate={nodeTemplate}
-                  field={field}
+                  key={`${nodeId}.${fieldName}.output-field`}
+                  nodeId={nodeId}
+                  fieldName={fieldName}
                 />
               ))}
-              {inputFields.map((field) => (
+              {inputFieldNames.map((fieldName) => (
                 <InputField
-                  key={`${nodeId}.${field.id}.input-field`}
-                  nodeProps={nodeProps}
-                  nodeTemplate={nodeTemplate}
-                  field={field}
+                  key={`${nodeId}.${fieldName}.input-field`}
+                  nodeId={nodeId}
+                  fieldName={fieldName}
                 />
               ))}
             </Flex>
           </Flex>
-          {withFooter && (
-            <NodeFooter nodeProps={nodeProps} nodeTemplate={nodeTemplate} />
-          )}
+          {withFooter && <NodeFooter nodeId={nodeId} />}
         </>
       )}
     </NodeWrapper>

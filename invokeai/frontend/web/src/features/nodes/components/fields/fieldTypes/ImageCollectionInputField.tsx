@@ -19,8 +19,7 @@ const ImageCollectionInputFieldComponent = (
     ImageCollectionInputFieldTemplate
   >
 ) => {
-  const { nodeData, field } = props;
-  const nodeId = nodeData.id;
+  const { nodeId, field } = props;
 
   // const dispatch = useAppDispatch();
 

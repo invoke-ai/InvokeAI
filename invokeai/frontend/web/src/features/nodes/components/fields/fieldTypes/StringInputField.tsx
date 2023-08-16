@@ -12,8 +12,7 @@ import { FieldComponentProps } from './types';
 const StringInputFieldComponent = (
   props: FieldComponentProps<StringInputFieldValue, StringInputFieldTemplate>
 ) => {
-  const { nodeData, field, fieldTemplate } = props;
-  const nodeId = nodeData.id;
+  const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
 
   const handleValueChanged = useCallback(

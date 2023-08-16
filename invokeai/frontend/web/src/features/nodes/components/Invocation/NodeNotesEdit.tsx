@@ -16,41 +16,31 @@ import {
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAITextarea from 'common/components/IAITextarea';
+import {
+  useNodeData,
+  useNodeLabel,
+  useNodeTemplate,
+  useNodeTemplateTitle,
+} from 'features/nodes/hooks/useNodeData';
 import { nodeNotesChanged } from 'features/nodes/store/nodesSlice';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import {
-  InvocationNodeData,
-  InvocationTemplate,
-} from 'features/nodes/types/types';
+import { isInvocationNodeData } from 'features/nodes/types/types';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
-import { NodeProps } from 'reactflow';
 
 interface Props {
-  nodeProps: NodeProps<InvocationNodeData>;
-  nodeTemplate: InvocationTemplate;
+  nodeId: string;
 }
 
-const NodeNotesEdit = (props: Props) => {
-  const { nodeProps, nodeTemplate } = props;
-  const { data } = nodeProps;
+const NodeNotesEdit = ({ nodeId }: Props) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const dispatch = useAppDispatch();
-  const handleNotesChanged = useCallback(
-    (e: ChangeEvent<HTMLTextAreaElement>) => {
-      dispatch(nodeNotesChanged({ nodeId: data.id, notes: e.target.value }));
-    },
-    [data.id, dispatch]
-  );
+  const label = useNodeLabel(nodeId);
+  const title = useNodeTemplateTitle(nodeId);
 
   return (
     <>
       <Tooltip
-        label={
-          nodeTemplate ? (
-            <TooltipContent nodeProps={nodeProps} nodeTemplate={nodeTemplate} />
-          ) : undefined
-        }
+        label={<TooltipContent nodeId={nodeId} />}
         placement="top"
         shouldWrapChildren
       >
@@ -75,19 +65,10 @@ const NodeNotesEdit = (props: Props) => {
       <Modal isOpen={isOpen} onClose={onClose} isCentered>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>
-            {data.label || nodeTemplate?.title || 'Unknown Node'}
-          </ModalHeader>
+          <ModalHeader>{label || title || 'Unknown Node'}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <FormControl>
-              <FormLabel>Notes</FormLabel>
-              <IAITextarea
-                value={data.notes}
-                onChange={handleNotesChanged}
-                rows={10}
-              />
-            </FormControl>
+            <NotesTextarea nodeId={nodeId} />
           </ModalBody>
           <ModalFooter />
         </ModalContent>
@@ -98,16 +79,49 @@ const NodeNotesEdit = (props: Props) => {
 
 export default memo(NodeNotesEdit);
 
-type TooltipContentProps = Props;
+const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
+  const data = useNodeData(nodeId);
+  const nodeTemplate = useNodeTemplate(nodeId);
 
-const TooltipContent = (props: TooltipContentProps) => {
+  if (!isInvocationNodeData(data)) {
+    return <Text sx={{ fontWeight: 600 }}>Unknown Node</Text>;
+  }
+
   return (
     <Flex sx={{ flexDir: 'column' }}>
-      <Text sx={{ fontWeight: 600 }}>{props.nodeTemplate?.title}</Text>
+      <Text sx={{ fontWeight: 600 }}>{nodeTemplate?.title}</Text>
       <Text sx={{ opacity: 0.7, fontStyle: 'oblique 5deg' }}>
-        {props.nodeTemplate?.description}
+        {nodeTemplate?.description}
       </Text>
-      {props.nodeProps.data.notes && <Text>{props.nodeProps.data.notes}</Text>}
+      {data?.notes && <Text>{data.notes}</Text>}
     </Flex>
   );
-};
+});
+
+TooltipContent.displayName = 'TooltipContent';
+
+const NotesTextarea = memo(({ nodeId }: { nodeId: string }) => {
+  const dispatch = useAppDispatch();
+  const data = useNodeData(nodeId);
+  const handleNotesChanged = useCallback(
+    (e: ChangeEvent<HTMLTextAreaElement>) => {
+      dispatch(nodeNotesChanged({ nodeId, notes: e.target.value }));
+    },
+    [dispatch, nodeId]
+  );
+  if (!isInvocationNodeData(data)) {
+    return null;
+  }
+  return (
+    <FormControl>
+      <FormLabel>Notes</FormLabel>
+      <IAITextarea
+        value={data?.notes}
+        onChange={handleNotesChanged}
+        rows={10}
+      />
+    </FormControl>
+  );
+});
+
+NotesTextarea.displayName = 'NodesTextarea';
