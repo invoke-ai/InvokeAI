@@ -43,7 +43,7 @@ Web Interface, interactive Command Line Interface, and also serves as
 the foundation for multiple commercial products.
 
 **Quick links**: [[How to
-  Install](https://invoke-ai.github.io/InvokeAI/#installation)] [<a
+  Install](https://invoke-ai.github.io/InvokeAI/installation/installation/)] [<a
   href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a
   href="https://invoke-ai.github.io/InvokeAI/">Documentation and
   Tutorials</a>] [<a
