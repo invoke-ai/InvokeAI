@@ -266,9 +266,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             loaded = sum([v for v in cache_stats.loaded_model_sizes.values()]) / GIG
 
             logger.info(f"TOTAL GRAPH EXECUTION TIME:  {total_time:7.3f}s")
-            logger.info(
-                "RAM used by InvokeAI process: " + "%4.2fG" % stats.ram_used + f" (delta={stats.ram_changed:4.2f}G)"
-            )
+            logger.info("RAM used by InvokeAI process: " + "%4.2fG" % stats.ram_used + f" ({stats.ram_changed:+5.3f}G)")
             logger.info(f"RAM used to load models: {loaded:4.2f}G")
             if torch.cuda.is_available():
                 logger.info("VRAM in use: " + "%4.3fG" % (torch.cuda.memory_allocated() / GIG))
