@@ -107,7 +107,10 @@ class BatchManager(BatchManagerBase):
 
     def run_batch_process(self, batch_id: str) -> None:
         self.__batch_process_storage.start(batch_id)
-        created_session = self.__batch_process_storage.get_created_session(batch_id)
+        try:
+            created_session = self.__batch_process_storage.get_created_session(batch_id)
+        except BatchSessionNotFoundException:
+            return
         ges = self.__invoker.services.graph_execution_manager.get(created_session.session_id)
         self.__invoker.invoke(ges, invoke_all=True)
 
