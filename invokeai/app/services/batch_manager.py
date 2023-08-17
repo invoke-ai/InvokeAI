@@ -74,11 +74,11 @@ class BatchManager(BatchManagerBase):
         batch_session = self.__batch_process_storage.get_session(data["graph_execution_state_id"])
         if not batch_session:
             return None
-        updateSession = BatchSessionChanges(state="error" if err else "completed")
+        changes = BatchSessionChanges(state="error" if err else "completed")
         batch_session = self.__batch_process_storage.update_session_state(
             batch_session.batch_id,
             batch_session.session_id,
-            updateSession,
+            changes,
         )
         batch_process = self.__batch_process_storage.get(batch_session.batch_id)
         if not batch_process.canceled:
