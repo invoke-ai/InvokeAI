@@ -2,14 +2,13 @@
 
 import inspect
 import re
-from contextlib import ExitStack
+
+# from contextlib import ExitStack
 from typing import List, Literal, Optional, Union
 
 import numpy as np
 import torch
-from diffusers import ControlNetModel, DPMSolverMultistepScheduler
 from diffusers.image_processor import VaeImageProcessor
-from diffusers.schedulers import SchedulerMixin as Scheduler
 from pydantic import BaseModel, Field, validator
 from tqdm import tqdm
 
@@ -72,7 +71,7 @@ class ONNXPromptInvocation(BaseInvocation):
         text_encoder_info = context.services.model_manager.get_model(
             **self.clip.text_encoder.dict(),
         )
-        with tokenizer_info as orig_tokenizer, text_encoder_info as text_encoder, ExitStack() as stack:
+        with tokenizer_info as orig_tokenizer, text_encoder_info as text_encoder:  # , ExitStack() as stack:
             loras = [
                 (context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)
                 for lora in self.clip.loras
@@ -259,7 +258,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
         unet_info = context.services.model_manager.get_model(**self.unet.unet.dict())
 
-        with unet_info as unet, ExitStack() as stack:
+        with unet_info as unet:  # , ExitStack() as stack:
             # loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
             loras = [
                 (context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight)

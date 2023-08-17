@@ -38,13 +38,10 @@ from easing_functions import (
     SineEaseInOut,
     SineEaseOut,
 )
-from matplotlib.figure import Figure
 from matplotlib.ticker import MaxNLocator
-from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.primitives import FloatCollectionOutput
 
-from ...backend.util.logging import InvokeAILogger
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, tags, title
 
 
