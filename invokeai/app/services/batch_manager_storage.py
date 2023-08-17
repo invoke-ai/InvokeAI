@@ -18,8 +18,6 @@ from invokeai.app.invocations.primitives import ImageField
 
 from pydantic import BaseModel, Field, Extra, parse_raw_as, StrictStr, StrictInt, StrictFloat, validator
 
-invocations = BaseInvocation.get_invocations()
-InvocationsUnion = Union[invocations]  # type: ignore
 
 BatchDataType = Union[StrictStr, StrictInt, StrictFloat, ImageField]
 
