@@ -27,6 +27,7 @@ import {
   OutputFieldTemplate,
   SDXLMainModelInputFieldTemplate,
   SDXLRefinerModelInputFieldTemplate,
+  SchedulerInputFieldTemplate,
   StringInputFieldTemplate,
   UNetInputFieldTemplate,
   VaeInputFieldTemplate,
@@ -400,6 +401,19 @@ const buildColorInputFieldTemplate = ({
   return template;
 };
 
+const buildSchedulerInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): SchedulerInputFieldTemplate => {
+  const template: SchedulerInputFieldTemplate = {
+    ...baseField,
+    type: 'Scheduler',
+    default: schemaObject.default ?? 'euler',
+  };
+
+  return template;
+};
+
 export const getFieldType = (
   schemaObject: InvocationFieldSchema
 ): FieldType => {
@@ -602,6 +616,12 @@ export const buildInputFieldTemplate = (
   }
   if (fieldType === 'ColorField') {
     return buildColorInputFieldTemplate({
+      schemaObject: fieldSchema,
+      baseField,
+    });
+  }
+  if (fieldType === 'Scheduler') {
+    return buildSchedulerInputFieldTemplate({
       schemaObject: fieldSchema,
       baseField,
     });

@@ -143,6 +143,7 @@ class UIType(str, Enum):
     # region Misc
     FilePath = "FilePath"
     Enum = "enum"
+    Scheduler = "Scheduler"
     # endregion
 
 

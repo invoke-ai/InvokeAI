@@ -119,7 +119,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
     )
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
-    scheduler: SAMPLER_NAME_VALUES = InputField(default="euler", description=FieldDescriptions.scheduler)
+    scheduler: SAMPLER_NAME_VALUES = InputField(
+        default="euler", description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler
+    )
     unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection)
     control: Union[ControlField, list[ControlField]] = InputField(
         default=None, description=FieldDescriptions.control, input=Input.Connection

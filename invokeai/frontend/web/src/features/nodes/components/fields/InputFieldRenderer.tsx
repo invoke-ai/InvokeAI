@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box, Text } from '@chakra-ui/react';
 import {
   useFieldData,
   useFieldTemplate,
@@ -21,6 +21,7 @@ import MainModelInputField from './fieldTypes/MainModelInputField';
 import NumberInputField from './fieldTypes/NumberInputField';
 import RefinerModelInputField from './fieldTypes/RefinerModelInputField';
 import SDXLMainModelInputField from './fieldTypes/SDXLMainModelInputField';
+import SchedulerInputField from './fieldTypes/SchedulerInputField';
 import StringInputField from './fieldTypes/StringInputField';
 import UnetInputField from './fieldTypes/UnetInputField';
 import VaeInputField from './fieldTypes/VaeInputField';
@@ -286,7 +287,30 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
     );
   }
 
-  return <Box p={2}>Unknown field type: {field?.type}</Box>;
+  if (field?.type === 'Scheduler' && fieldTemplate?.type === 'Scheduler') {
+    return (
+      <SchedulerInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  return (
+    <Box p={1}>
+      <Text
+        sx={{
+          fontSize: 'sm',
+          fontWeight: 600,
+          color: 'error.400',
+          _dark: { color: 'error.300' },
+        }}
+      >
+        Unknown field type: {field?.type}
+      </Text>
+    </Box>
+  );
 };
 
 export default memo(InputFieldRenderer);

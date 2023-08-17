@@ -127,6 +127,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     title: 'ControlNet',
     description: 'TODO',
   },
+  Scheduler: {
+    color: 'base.500',
+    title: 'Scheduler',
+    description: 'TODO',
+  },
   Collection: {
     color: 'base.500',
     title: 'Collection',

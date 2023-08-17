@@ -45,6 +45,7 @@ import {
   MainModelInputFieldValue,
   NodeStatus,
   NotesNodeData,
+  SchedulerInputFieldValue,
   SDXLRefinerModelInputFieldValue,
   StringInputFieldValue,
   VaeModelInputFieldValue,
@@ -447,6 +448,12 @@ const nodesSlice = createSlice({
     ) => {
       fieldValueReducer(state, action);
     },
+    fieldSchedulerValueChanged: (
+      state,
+      action: FieldValueAction<SchedulerInputFieldValue>
+    ) => {
+      fieldValueReducer(state, action);
+    },
     imageCollectionFieldValueChanged: (
       state,
       action: PayloadAction<{
@@ -670,6 +677,7 @@ export const {
   fieldEnumModelValueChanged,
   fieldControlNetModelValueChanged,
   fieldRefinerModelValueChanged,
+  fieldSchedulerValueChanged,
   nodeIsOpenChanged,
   nodeLabelChanged,
   nodeNotesChanged,

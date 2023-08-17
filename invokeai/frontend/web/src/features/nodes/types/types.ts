@@ -3,6 +3,7 @@ import {
   LoRAModelParam,
   MainModelParam,
   OnnxModelParam,
+  SchedulerParam,
   VaeModelParam,
 } from 'features/parameters/types/parameterSchemas';
 import { OpenAPIV3 } from 'openapi-types';
@@ -98,6 +99,7 @@ export const zFieldType = z.enum([
   // region Misc
   'FilePath',
   'enum',
+  'Scheduler',
   // endregion
 ]);
 
@@ -137,7 +139,8 @@ export type InputFieldValue =
   | CollectionInputFieldValue
   | CollectionItemInputFieldValue
   | ColorInputFieldValue
-  | ImageCollectionInputFieldValue;
+  | ImageCollectionInputFieldValue
+  | SchedulerInputFieldValue;
 
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
@@ -167,7 +170,8 @@ export type InputFieldTemplate =
   | CollectionInputFieldTemplate
   | CollectionItemInputFieldTemplate
   | ColorInputFieldTemplate
-  | ImageCollectionInputFieldTemplate;
+  | ImageCollectionInputFieldTemplate
+  | SchedulerInputFieldTemplate;
 
 /**
  * An output field is persisted across as part of the user's local state.
@@ -322,6 +326,11 @@ export type ColorInputFieldValue = InputFieldValueBase & {
   value?: RgbaColor;
 };
 
+export type SchedulerInputFieldValue = InputFieldValueBase & {
+  type: 'Scheduler';
+  value?: SchedulerParam;
+};
+
 export type InputFieldTemplateBase = {
   name: string;
   title: string;
@@ -454,6 +463,11 @@ export type CollectionItemInputFieldTemplate = InputFieldTemplateBase & {
 export type ColorInputFieldTemplate = InputFieldTemplateBase & {
   default: RgbaColor;
   type: 'ColorField';
+};
+
+export type SchedulerInputFieldTemplate = InputFieldTemplateBase & {
+  default: SchedulerParam;
+  type: 'Scheduler';
 };
 
 export const isInputFieldValue = (
