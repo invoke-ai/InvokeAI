@@ -4,7 +4,6 @@ Read a checkpoint/safetensors file and write out a template .json file containin
 its metadata for use in fast model probing.
 """
 
-import sys
 import argparse
 import json
 

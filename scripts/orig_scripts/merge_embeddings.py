@@ -2,7 +2,7 @@ from ldm.modules.encoders.modules import FrozenCLIPEmbedder, BERTEmbedder
 from ldm.modules.embedding_manager import EmbeddingManager
 from ldm.invoke.globals import Globals
 
-import argparse, os
+import argparse
 from functools import partial
 
 import torch
@@ -108,7 +108,7 @@ if __name__ == "__main__":
         manager.load(manager_ckpt)
 
         for placeholder_string in manager.string_to_token_dict:
-            if not placeholder_string in string_to_token_dict:
+            if placeholder_string not in string_to_token_dict:
                 string_to_token_dict[placeholder_string] = manager.string_to_token_dict[placeholder_string]
                 string_to_param_dict[placeholder_string] = manager.string_to_param_dict[placeholder_string]
 

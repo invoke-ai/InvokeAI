@@ -12,7 +12,7 @@ from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion impor
     SDXLConditioningInfo,
 )
 
-from ...backend.model_management import ModelPatcher, ModelType
+from ...backend.model_management.models import ModelType
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.model_management.models import ModelNotFoundException
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent

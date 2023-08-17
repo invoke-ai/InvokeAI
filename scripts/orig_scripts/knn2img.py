@@ -1,13 +1,13 @@
-import argparse, os, sys, glob
-import clip
+import argparse
+import glob
+import os
 import torch
-import torch.nn as nn
 import numpy as np
 from omegaconf import OmegaConf
 from PIL import Image
 from tqdm import tqdm, trange
 from itertools import islice
-from einops import rearrange, repeat
+from einops import rearrange
 from torchvision.utils import make_grid
 import scann
 import time
@@ -390,8 +390,8 @@ if __name__ == "__main__":
                     grid = make_grid(grid, nrow=n_rows)
 
                     # to image
-                    grid = 255.0 * rearrange(grid, "c h w -> h w c").cpu().numpy()
-                    Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f"grid-{grid_count:04}.png"))
+                    grid_np = 255.0 * rearrange(grid, "c h w -> h w c").cpu().numpy()
+                    Image.fromarray(grid_np.astype(np.uint8)).save(os.path.join(outpath, f"grid-{grid_count:04}.png"))
                     grid_count += 1
 
     print(f"Your samples are ready and waiting for you here: \n{outpath} \nEnjoy.")

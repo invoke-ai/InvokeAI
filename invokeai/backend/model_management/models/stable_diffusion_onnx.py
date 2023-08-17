@@ -1,25 +1,16 @@
-import os
-import json
 from enum import Enum
-from pydantic import Field
-from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Literal
 from .base import (
-    ModelBase,
     ModelConfigBase,
     BaseModelType,
     ModelType,
-    SubModelType,
     ModelVariantType,
     DiffusersModel,
     SchedulerPredictionType,
-    SilenceWarnings,
-    read_checkpoint_meta,
     classproperty,
     OnnxRuntimeModel,
     IAIOnnxRuntimeModel,
 )
-from invokeai.app.services.config import InvokeAIAppConfig
 
 
 class StableDiffusionOnnxModelFormat(str, Enum):
