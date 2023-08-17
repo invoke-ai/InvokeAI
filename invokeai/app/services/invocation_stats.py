@@ -152,6 +152,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
 
     class StatsContext:
         """Context manager for collecting statistics."""
+
         invocation: BaseInvocation = None
         collector: "InvocationStatsServiceBase" = None
         graph_id: str = None
@@ -224,9 +225,9 @@ class InvocationStatsService(InvocationStatsServiceBase):
             logger.warning(f"Attempted to clear statistics for unknown graph {graph_execution_id}")
 
     def update_mem_stats(
-            self,
-            ram_used: float,
-            ram_changed: float,
+        self,
+        ram_used: float,
+        ram_changed: float,
     ):
         """
         Update the collector with RAM memory usage info.
