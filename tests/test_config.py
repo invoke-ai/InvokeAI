@@ -31,6 +31,21 @@ InvokeAI:
 """
 )
 
+init3 = OmegaConf.create(
+    """
+InvokeAI:
+  Generation:
+    sequential_guidance: true
+    attention_type: xformers
+    attention_slice_size: 7
+    forced_tiled_decode: True
+  Device:
+    device: cpu
+  Cache:
+    ram: 1.25
+"""
+)
+
 
 def test_use_init():
     # note that we explicitly set omegaconf dict and argv here
@@ -49,6 +64,16 @@ def test_use_init():
     assert conf2.tiled_decode
     assert conf2.max_cache_size == 2
     assert not hasattr(conf2, "invalid_attribute")
+
+
+def test_legacy():
+    conf = InvokeAIAppConfig.get_config()
+    assert conf
+    conf.parse_args(conf=init3, argv=[])
+    assert conf.xformers_enabled
+    assert conf.device == "cpu"
+    assert conf.use_cpu
+    assert conf.ram_cache_size == 1.25
 
 
 def test_argv_override():
