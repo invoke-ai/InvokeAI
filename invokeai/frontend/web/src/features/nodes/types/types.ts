@@ -63,6 +63,7 @@ export const zFieldType = z.enum([
   'string',
   'array',
   'ImageField',
+  'InpaintMaskField',
   'LatentsField',
   'ConditioningField',
   'ControlField',
@@ -121,6 +122,7 @@ export type InputFieldValue =
   | StringInputFieldValue
   | BooleanInputFieldValue
   | ImageInputFieldValue
+  | InpaintMaskFieldValue
   | LatentsInputFieldValue
   | ConditioningInputFieldValue
   | UNetInputFieldValue
@@ -151,6 +153,7 @@ export type InputFieldTemplate =
   | StringInputFieldTemplate
   | BooleanInputFieldTemplate
   | ImageInputFieldTemplate
+  | InpaintMaskInputFieldTemplate
   | LatentsInputFieldTemplate
   | ConditioningInputFieldTemplate
   | UNetInputFieldTemplate
@@ -277,6 +280,11 @@ export type ImageCollectionInputFieldValue = InputFieldValueBase & {
   value?: ImageField[];
 };
 
+export type InpaintMaskFieldValue = InputFieldValueBase & {
+  type: 'InpaintMaskField';
+  value?: undefined;
+};
+
 export type MainModelInputFieldValue = InputFieldValueBase & {
   type: 'MainModelField';
   value?: MainModelParam | OnnxModelParam;
@@ -372,6 +380,11 @@ export type ImageInputFieldTemplate = InputFieldTemplateBase & {
 export type ImageCollectionInputFieldTemplate = InputFieldTemplateBase & {
   default: ImageField[];
   type: 'ImageCollection';
+};
+
+export type InpaintMaskInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'InpaintMaskField';
 };
 
 export type LatentsInputFieldTemplate = InputFieldTemplateBase & {

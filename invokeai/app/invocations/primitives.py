@@ -1,10 +1,10 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
 from typing import Literal, Optional, Tuple, Union
-from anyio import Condition
 
-from pydantic import BaseModel, Field
 import torch
+from anyio import Condition
+from pydantic import BaseModel, Field
 
 from .baseinvocation import (
     BaseInvocation,
@@ -311,7 +311,7 @@ class ImageCollectionInvocation(BaseInvocation):
 
 
 class InpaintMaskField(BaseModel):
-    """An inapint mask field"""
+    """An inpaint mask field"""
 
     mask_name: str = Field(description="The name of the mask image")
     masked_latens_name: Optional[str] = Field(description="The name of the masked image latents")

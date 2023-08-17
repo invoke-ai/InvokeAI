@@ -57,6 +57,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: 'Images may be passed between nodes.',
     color: 'purple.500',
   },
+  InpaintMaskField: {
+    title: 'Inpaint Mask',
+    description: 'Inpaint Mask may be passed between nodes',
+    color: 'purple.500',
+  },
   LatentsField: {
     title: 'Latents',
     description: 'Latents may be passed between nodes.',

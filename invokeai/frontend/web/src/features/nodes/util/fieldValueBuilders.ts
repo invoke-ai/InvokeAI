@@ -49,6 +49,10 @@ export const buildInputFieldValue = (
     fieldValue.value = [];
   }
 
+  if (template.type === 'InpaintMaskField') {
+    fieldValue.value = undefined;
+  }
+
   if (template.type === 'LatentsField') {
     fieldValue.value = undefined;
   }

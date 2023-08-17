@@ -17,6 +17,7 @@ import {
   FloatInputFieldTemplate,
   ImageCollectionInputFieldTemplate,
   ImageInputFieldTemplate,
+  InpaintMaskInputFieldTemplate,
   InputFieldTemplateBase,
   IntegerInputFieldTemplate,
   InvocationFieldSchema,
@@ -268,6 +269,19 @@ const buildImageCollectionInputFieldTemplate = ({
   return template;
 };
 
+const buildInpaintMaskInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): InpaintMaskInputFieldTemplate => {
+  const template: InpaintMaskInputFieldTemplate = {
+    ...baseField,
+    type: 'InpaintMaskField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildLatentsInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -485,6 +499,12 @@ export const buildInputFieldTemplate = (
   }
   if (fieldType === 'ImageCollection') {
     return buildImageCollectionInputFieldTemplate({
+      schemaObject: fieldSchema,
+      baseField,
+    });
+  }
+  if (fieldType === 'InpaintMaskField') {
+    return buildInpaintMaskInputFieldTemplate({
       schemaObject: fieldSchema,
       baseField,
     });
