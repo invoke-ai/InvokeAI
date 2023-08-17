@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
-import math
-import secrets
 from dataclasses import dataclass, field
-from typing import Any, Callable, Generic, List, Optional, Type, Union
+from typing import Any, Callable, List, Optional, Union
 
 import PIL.Image
 import einops
@@ -293,6 +291,22 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if xformers is available, use it, otherwise use sliced attention.
         """
         config = InvokeAIAppConfig.get_config()
+        if config.attention_type == "xformers":
+            self.enable_xformers_memory_efficient_attention()
+            return
+        elif config.attention_type == "sliced":
+            slice_size = config.attention_slice_size
+            if torch.backends.mps.is_available():  #  doesn't auto already do this?
+                slice_size = "max"
+            self.enable_attention_slicing(slice_size=slice_size)
+            return
+        elif config.attention_type == "normal":
+            self.disable_attention_slicing()
+            return
+        elif config.attention_type == "torch-sdp":
+            raise Exception("torch-sdp attention slicing not yet implemented")
+
+        # the remainder if this code is called when attention_type=='auto'
         if self.unet.device.type == "cuda":
             if is_xformers_available() and not config.disable_xformers:
                 self.enable_xformers_memory_efficient_attention()
