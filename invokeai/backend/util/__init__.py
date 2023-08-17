@@ -12,3 +12,4 @@ from .devices import (
 )
 from .log import write_log
 from .util import ask_user, download_with_resume, instantiate_from_config, url_attachment_name, Chdir
+from .attention import auto_detect_slice_size

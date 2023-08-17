@@ -184,7 +184,7 @@ These options tune InvokeAI's memory and performance characteristics.
 |-----------------------|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `sequential_guidance` | `false`       | Calculate guidance in serial rather than in parallel, lowering memory requirements at the cost of some performance loss                                                                                                                                          |
 | `attention_type`      | `auto`        | Select the type of attention to use. One of `auto`,`normal`,`xformers`,`sliced`, or `torch-sdp`                                                                                                                                                                  |
-| `attention_slice_size` | `auto`       | When "sliced" attention is selected, set the slice size. One of `auto`, `max` or the integers 1-8|
+| `attention_slice_size` | `auto`       | When "sliced" attention is selected, set the slice size. One of `auto`, `balanced`, `max` or the integers 1-8|
 | `force_tiled_decode`  | `false`       | Force the VAE step to decode in tiles, reducing memory consumption at the cost of performance |
 
 ### Device

@@ -353,7 +353,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         # old settings for defaults
         precision = old_opts.precision or ("float32" if program_opts.full_precision else "auto")
         device = old_opts.device
-        attention_type = "xformers" if old_opts.xformers_enabled else old_opts.attention_type
+        attention_type = old_opts.attention_type
         attention_slice_size = old_opts.attention_slice_size
 
         self.nextrely += 1
@@ -443,7 +443,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             name="Attention Slice Size:",
             relx=5,
             editable=False,
-            hidden=True,
+            hidden=attention_type != "sliced",
             color="CONTROL",
             scroll_exit=True,
         )
@@ -453,11 +453,10 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             columns=len(ATTENTION_SLICE_CHOICES),
             values=ATTENTION_SLICE_CHOICES,
             value=ATTENTION_SLICE_CHOICES.index(attention_slice_size),
-            begin_entry_at=2,
             relx=30,
-            hidden=True,
+            hidden=attention_type != "sliced",
             max_height=2,
-            max_width=100,
+            max_width=110,
             scroll_exit=True,
         )
 
@@ -611,7 +610,7 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
         new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
         new_opts.device = DEVICE_CHOICES[self.device.value[0]]
         new_opts.attention_type = ATTENTION_CHOICES[self.attention_type.value[0]]
-        new_opts.attention_slice_size = ATTENTION_SLICE_CHOICES[self.attention_slice_size.value]
+        new_opts.attention_slice_size = ATTENTION_SLICE_CHOICES[self.attention_slice_size.value[0]]
         generation_options = [GENERATION_OPT_CHOICES[x] for x in self.generation_options.value]
         for v in GENERATION_OPT_CHOICES:
             setattr(new_opts, v, v in generation_options)

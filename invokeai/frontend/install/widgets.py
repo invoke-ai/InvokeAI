@@ -17,7 +17,7 @@ from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED, BUTTON3_CLICKED
 
 # minimum size for UIs
-MIN_COLS = 130
+MIN_COLS = 150
 MIN_LINES = 40
 
 
