@@ -6,6 +6,8 @@ from fastapi import Body, HTTPException, Path, Query, Response
 from fastapi.routing import APIRouter
 from pydantic.fields import Field
 
+from invokeai.app.services.batch_manager_storage import BatchSessionNotFoundException
+
 from ...invocations import *
 from ...invocations.baseinvocation import BaseInvocation
 from ...services.batch_manager import Batch, BatchProcessResponse
@@ -54,14 +56,17 @@ async def create_batch(
     operation_id="start_batch",
     responses={
         202: {"description": "Batch process started"},
-        400: {"description": "Invalid json"},
+        404: {"description": "Batch session not found"},
     },
 )
 async def start_batch(
     batch_process_id: str = Path(description="ID of Batch to start"),
 ) -> Response:
-    ApiDependencies.invoker.services.batch_manager.run_batch_process(batch_process_id)
-    return Response(status_code=202)
+    try:
+        ApiDependencies.invoker.services.batch_manager.run_batch_process(batch_process_id)
+        return Response(status_code=202)
+    except BatchSessionNotFoundException:
+        raise HTTPException(status_code=404, detail="Batch session not found")
 
 
 @session_router.delete(
