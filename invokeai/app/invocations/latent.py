@@ -24,6 +24,7 @@ from invokeai.app.invocations.primitives import (
     ImageOutput,
     LatentsField,
     LatentsOutput,
+    InpaintMaskField,
     build_latents_output,
 )
 from invokeai.app.util.controlnet_utils import prepare_control_image
@@ -126,7 +127,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         default=None, description=FieldDescriptions.control, input=Input.Connection
     )
     latents: Optional[LatentsField] = InputField(description=FieldDescriptions.latents, input=Input.Connection)
-    mask: Optional[ImageField] = InputField(
+    mask: Optional[InpaintMaskField] = InputField(
         default=None,
         description=FieldDescriptions.mask,
     )
