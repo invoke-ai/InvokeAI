@@ -4,15 +4,11 @@ These are nodes that have been developed by the community, for the community. If
 
 If you'd like to submit a node for the community, please refer to the [node creation overview](./overview.md#contributing-nodes).
 
-To download a node, simply download the `.py` node file from the link and add it to the `invokeai/app/invocations/` folder in your Invoke AI install location. Along with the node, an example node graph should be provided to help you get started with the node. 
+To download a node, simply download the `.py` node file from the link and add it to the `.venv/lib/python3.x/site-packages/invokeai/app/invocations` folder in your Invoke AI install location. Along with the node, an example node graph should be provided to help you get started with the node. 
 
 To use a community node graph, download the the `.json` node graph file and load it into Invoke AI via the **Load Nodes** button on the Node Editor. 
 
-## Disclaimer
-
-The nodes linked below have been developed and contributed by members of the Invoke AI community. While we strive to ensure the quality and safety of these contributions, we do not guarantee the reliability or security of the nodes. If you have issues or concerns with any of the nodes below, please raise it on GitHub or in the Discord.
-
-## List of Nodes
+## Community Nodes
 
 ### FaceTools
 
@@ -47,7 +43,12 @@ The nodes linked below have been developed and contributed by members of the Inv
 
 ![Example Image](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png){: style="height:115px;width:240px"}
 
+
+## Disclaimer
+
+The nodes linked below have been developed and contributed by members of the Invoke AI community. While we strive to ensure the quality and safety of these contributions, we do not guarantee the reliability or security of the nodes. If you have issues or concerns with any of the nodes below, please raise it on GitHub or in the Discord.
+
+
 ## Help
 If you run into any issues with a node, please post in the [InvokeAI Discord](https://discord.gg/ZmtBAhwWhy). 
-
 
