@@ -112,18 +112,11 @@ class BatchManager(BatchManagerBase):
         ges = self.__invoker.services.graph_execution_manager.get(created_session.session_id)
         self.__invoker.invoke(ges, invoke_all=True)
 
-    def _valid_batch_config(self, batch_process: BatchProcess) -> bool:
-        # TODO: Check that the node_ids in the batch are unique
-        # TODO: Validate data types are correct for each batch data
-        return True
-
     def create_batch_process(self, batch: Batch, graph: Graph) -> BatchProcessResponse:
         batch_process = BatchProcess(
             batch=batch,
             graph=graph,
         )
-        if not self._valid_batch_config(batch_process):
-            return None
         batch_process = self.__batch_process_storage.save(batch_process)
         sessions = self._create_sessions(batch_process)
         return BatchProcessResponse(
