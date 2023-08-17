@@ -240,6 +240,7 @@ class InvokeAIDiffuserComponent:
                     controlnet_cond=control_datum.image_tensor,
                     conditioning_scale=controlnet_weight,  # controlnet specific, NOT the guidance scale
                     encoder_attention_mask=encoder_attention_mask,
+                    added_cond_kwargs=added_cond_kwargs,
                     guess_mode=soft_injection,  # this is still called guess_mode in diffusers ControlNetModel
                     return_dict=False,
                 )
