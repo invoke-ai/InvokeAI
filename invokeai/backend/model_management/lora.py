@@ -307,7 +307,8 @@ class TextualInversionManager(BaseTextualInversionManager):
 
 
 class ONNXModelPatcher:
-    from .models.base import IAIOnnxRuntimeModel, OnnxRuntimeModel
+    from .models.base import IAIOnnxRuntimeModel
+    from diffusers import OnnxRuntimeModel
 
     @classmethod
     @contextmanager
