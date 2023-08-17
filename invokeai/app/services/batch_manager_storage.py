@@ -548,8 +548,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
                     """,
                     (changes.state, batch_id, session_id),
                 )
-
-            self._conn.commit()
+                self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()
             raise BatchSessionSaveException from e
