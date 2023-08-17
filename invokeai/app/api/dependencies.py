@@ -49,7 +49,7 @@ def check_internet() -> bool:
         return False
 
 
-logger = InvokeAILogger.getLogger()
+logger = InvokeAILogger.get_logger()
 
 
 class ApiDependencies:

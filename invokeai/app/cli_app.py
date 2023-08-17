@@ -16,7 +16,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 config = InvokeAIAppConfig.get_config()
 config.parse_args()
-logger = InvokeAILogger().getLogger(config=config)
+logger = InvokeAILogger().get_logger(config=config)
 from invokeai.version.invokeai_version import __version__
 
 # we call this early so that the message appears before other invokeai initialization messages

@@ -23,7 +23,7 @@ from ..backend.util.logging import InvokeAILogger
 
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
-logger = InvokeAILogger.getLogger(config=app_config)
+logger = InvokeAILogger.get_logger(config=app_config)
 from invokeai.version.invokeai_version import __version__
 
 # we call this early so that the message appears before
@@ -230,7 +230,7 @@ def invoke_api():
 
     # replace uvicorn's loggers with InvokeAI's for consistent appearance
     for logname in ["uvicorn.access", "uvicorn"]:
-        l = logging.getLogger(logname)
+        l = logging.get_logger(logname)
         l.handlers.clear()
         for ch in logger.handlers:
             l.addHandler(ch)
