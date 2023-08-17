@@ -41,7 +41,7 @@ InvokeAI:
     forced_tiled_decode: True
   Device:
     device: cpu
-  Cache:
+  Model Cache:
     ram: 1.25
 """
 )
@@ -73,6 +73,7 @@ def test_legacy():
     assert conf.xformers_enabled
     assert conf.device == "cpu"
     assert conf.use_cpu
+    assert conf.ram == 1.25
     assert conf.ram_cache_size == 1.25
 
 

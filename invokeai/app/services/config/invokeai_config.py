@@ -10,37 +10,49 @@ categories returned by `invokeai --help`. The file looks like this:
 [file: invokeai.yaml]
 
 InvokeAI:
-  Paths:
-    root: /home/lstein/invokeai-main
-    conf_path: configs/models.yaml
-    legacy_conf_dir: configs/stable-diffusion
-    outdir: outputs
-    autoimport_dir: null
-  Models:
-    model: stable-diffusion-1.5
-    embeddings: true
-  Memory/Performance:
-    xformers_enabled: false
-    sequential_guidance: false
-    precision: float16
-    max_cache_size: 6
-    max_vram_cache_size: 0.5
-    always_use_cpu: false
-    free_gpu_mem: false
-  Features:
-    esrgan: true
-    patchmatch: true
-    internet_available: true
-    log_tokenization: false
   Web Server:
     host: 127.0.0.1
-    port: 8081
+    port: 9090
     allow_origins: []
     allow_credentials: true
     allow_methods:
     - '*'
     allow_headers:
     - '*'
+  Features:
+    esrgan: true
+    internet_available: true
+    log_tokenization: false
+    patchmatch: true
+    ignore_missing_core_models: false
+  Paths:
+    autoimport_dir: autoimport
+    lora_dir: null
+    embedding_dir: null
+    controlnet_dir: null
+    conf_path: configs/models.yaml
+    models_dir: models
+    legacy_conf_dir: configs/stable-diffusion
+    db_dir: databases
+    outdir: /home/lstein/invokeai-main/outputs
+    use_memory_db: false
+  Logging:
+    log_handlers:
+    - console
+    log_format: plain
+    log_level: info
+  Model Cache:
+    ram: 13.5
+    vram: 0.25
+    lazy_offload: true
+  Device:
+    device: auto
+    precision: auto
+  Generation:
+    sequential_guidance: false
+    attention_type: xformers
+    attention_slice_size: auto
+    force_tiled_decode: false
 
 The default name of the configuration file is `invokeai.yaml`, located
 in INVOKEAI_ROOT. You can replace supersede this by providing any
@@ -54,24 +66,23 @@ InvokeAIAppConfig.parse_args() will parse the contents of `sys.argv`
 at initialization time. You may pass a list of strings in the optional
 `argv` argument to use instead of the system argv:
 
- conf.parse_args(argv=['--xformers_enabled'])
+ conf.parse_args(argv=['--log_tokenization'])
 
 It is also possible to set a value at initialization time. However, if
 you call parse_args() it may be overwritten.
 
- conf = InvokeAIAppConfig(xformers_enabled=True)
- conf.parse_args(argv=['--no-xformers'])
- conf.xformers_enabled
+ conf = InvokeAIAppConfig(log_tokenization=True)
+ conf.parse_args(argv=['--no-log_tokenization'])
+ conf.log_tokenization
  # False
-
 
 To avoid this, use `get_config()` to retrieve the application-wide
 configuration object. This will retain any properties set at object
 creation time:
 
- conf = InvokeAIAppConfig.get_config(xformers_enabled=True)
- conf.parse_args(argv=['--no-xformers'])
- conf.xformers_enabled
+ conf = InvokeAIAppConfig.get_config(log_tokenization=True)
+ conf.parse_args(argv=['--no-log_tokenization'])
+ conf.log_tokenization
  # True
 
 Any setting can be overwritten by setting an environment variable of
@@ -93,7 +104,7 @@ Typical usage at the top level file:
  # get global configuration and print its cache size
  conf = InvokeAIAppConfig.get_config()
  conf.parse_args()
- print(conf.max_cache_size)
+ print(conf.ram_cache_size)
 
 Typical usage in a backend module:
 
@@ -101,8 +112,7 @@ Typical usage in a backend module:
 
  # get global configuration and print its cache size value
  conf = InvokeAIAppConfig.get_config()
- print(conf.max_cache_size)
-
+ print(conf.ram_cache_size)
 
 Computed properties:
 
