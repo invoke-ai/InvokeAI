@@ -141,7 +141,6 @@ const InputFieldWrapper = memo(
       <Flex
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
-        className="nopan"
         sx={{
           position: 'relative',
           minH: 8,

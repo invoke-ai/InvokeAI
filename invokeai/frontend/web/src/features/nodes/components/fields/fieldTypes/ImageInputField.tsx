@@ -68,6 +68,7 @@ const ImageInputFieldComponent = (
 
   return (
     <Flex
+      className="nodrag"
       sx={{
         w: 'full',
         h: 'full',

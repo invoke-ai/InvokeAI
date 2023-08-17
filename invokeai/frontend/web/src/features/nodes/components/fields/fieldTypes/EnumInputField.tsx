@@ -30,7 +30,7 @@ const EnumInputFieldComponent = (
 
   return (
     <Select
-      className="nowheel"
+      className="nowheel nodrag"
       onChange={handleValueChanged}
       value={field.value}
     >

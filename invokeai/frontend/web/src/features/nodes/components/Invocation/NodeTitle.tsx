@@ -45,7 +45,6 @@ const NodeTitle = ({ nodeId, title }: Props) => {
 
   return (
     <Flex
-      className="nopan"
       sx={{
         overflow: 'hidden',
         w: 'full',
@@ -76,6 +75,7 @@ const NodeTitle = ({ nodeId, title }: Props) => {
           noOfLines={1}
         />
         <EditableInput
+          className="nodrag"
           fontSize="sm"
           sx={{
             p: 0,

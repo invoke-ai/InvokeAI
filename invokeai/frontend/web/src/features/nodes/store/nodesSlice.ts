@@ -485,19 +485,6 @@ const nodesSlice = createSlice({
         'image_name'
       );
     },
-    nodeClicked: (
-      state,
-      action: PayloadAction<{ nodeId: string; ctrlOrMeta?: boolean }>
-    ) => {
-      const { nodeId, ctrlOrMeta } = action.payload;
-      state.nodes.forEach((node) => {
-        if (node.id === nodeId) {
-          node.selected = true;
-        } else if (!ctrlOrMeta) {
-          node.selected = false;
-        }
-      });
-    },
     notesNodeValueChanged: (
       state,
       action: PayloadAction<{ nodeId: string; value: string }>
@@ -665,7 +652,6 @@ export const {
   connectionMade,
   connectionStarted,
   connectionEnded,
-  nodeClicked,
   shouldShowFieldTypeLegendChanged,
   shouldShowMinimapPanelChanged,
   nodeTemplatesBuilt,

@@ -123,7 +123,7 @@ const MainModelInputFieldComponent = (
         <Text variant="subtext">Loading...</Text>
       ) : (
         <IAIMantineSearchableSelect
-          className="nowheel"
+          className="nowheel nodrag"
           tooltip={selectedModel?.description}
           value={selectedModel?.id}
           placeholder={
@@ -135,7 +135,7 @@ const MainModelInputFieldComponent = (
           onChange={handleChangeModel}
         />
       )}
-      {isSyncModelEnabled && <SyncModelsButton iconMode />}
+      {isSyncModelEnabled && <SyncModelsButton className="nodrag" iconMode />}
     </Flex>
   );
 };

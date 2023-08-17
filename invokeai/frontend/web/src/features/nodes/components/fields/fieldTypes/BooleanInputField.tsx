@@ -29,7 +29,11 @@ const BooleanInputFieldComponent = (
   );
 
   return (
-    <Switch onChange={handleValueChanged} isChecked={field.value}></Switch>
+    <Switch
+      className="nodrag"
+      onChange={handleValueChanged}
+      isChecked={field.value}
+    ></Switch>
   );
 };
 

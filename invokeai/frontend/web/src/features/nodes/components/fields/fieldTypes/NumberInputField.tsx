@@ -64,7 +64,7 @@ const NumberInputFieldComponent = (
       step={isIntegerField ? 1 : 0.1}
       precision={isIntegerField ? 0 : 3}
     >
-      <NumberInputField />
+      <NumberInputField className="nodrag" />
       <NumberInputStepper>
         <NumberIncrementStepper />
         <NumberDecrementStepper />

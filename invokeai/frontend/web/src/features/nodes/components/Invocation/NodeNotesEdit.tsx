@@ -23,7 +23,6 @@ import {
   useNodeTemplateTitle,
 } from 'features/nodes/hooks/useNodeData';
 import { nodeNotesChanged } from 'features/nodes/store/nodesSlice';
-import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { isInvocationNodeData } from 'features/nodes/types/types';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
@@ -45,7 +44,7 @@ const NodeNotesEdit = ({ nodeId }: Props) => {
         shouldWrapChildren
       >
         <Flex
-          className={DRAG_HANDLE_CLASSNAME}
+          className="nodrag"
           onClick={onOpen}
           sx={{
             alignItems: 'center',

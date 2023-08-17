@@ -85,6 +85,7 @@ const VaeModelInputFieldComponent = (
 
   return (
     <IAIMantineSearchableSelect
+      className="nowheel nodrag"
       itemComponent={IAIMantineSelectItemWithTooltip}
       tooltip={selectedVaeModel?.description}
       label={

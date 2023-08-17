@@ -31,6 +31,7 @@ const StringInputFieldComponent = (
   if (fieldTemplate.ui_component === 'textarea') {
     return (
       <IAITextarea
+        className="nodrag"
         onChange={handleValueChanged}
         value={field.value}
         rows={5}

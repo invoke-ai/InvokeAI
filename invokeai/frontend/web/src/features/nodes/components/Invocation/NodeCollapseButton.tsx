@@ -21,7 +21,7 @@ const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
 
   return (
     <IAIIconButton
-      className="nopan"
+      className="nodrag"
       onClick={handleClick}
       aria-label="Minimize"
       sx={{

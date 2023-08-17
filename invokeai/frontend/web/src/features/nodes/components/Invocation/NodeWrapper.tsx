@@ -5,28 +5,9 @@ import {
   useToken,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { nodeClicked } from 'features/nodes/store/nodesSlice';
-import {
-  MouseEvent,
-  PropsWithChildren,
-  memo,
-  useCallback,
-  useMemo,
-} from 'react';
+import { contextMenusClosed } from 'features/ui/store/uiSlice';
+import { PropsWithChildren, memo, useCallback } from 'react';
 import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from '../../types/constants';
-
-const useNodeSelect = (nodeId: string) => {
-  const dispatch = useAppDispatch();
-
-  const selectNode = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      dispatch(nodeClicked({ nodeId, ctrlOrMeta: e.ctrlKey || e.metaKey }));
-    },
-    [dispatch, nodeId]
-  );
-
-  return selectNode;
-};
 
 type NodeWrapperProps = PropsWithChildren & {
   nodeId: string;
@@ -35,7 +16,7 @@ type NodeWrapperProps = PropsWithChildren & {
 };
 
 const NodeWrapper = (props: NodeWrapperProps) => {
-  const { width, children, nodeId, selected } = props;
+  const { width, children, selected } = props;
 
   const [
     nodeSelectedOutlineLight,
@@ -49,24 +30,23 @@ const NodeWrapper = (props: NodeWrapperProps) => {
     'shadows.base',
   ]);
 
-  const selectNode = useNodeSelect(nodeId);
+  const dispatch = useAppDispatch();
 
   const shadow = useColorModeValue(
     nodeSelectedOutlineLight,
     nodeSelectedOutlineDark
   );
 
-  const shift = useAppSelector((state) => state.hotkeys.shift);
   const opacity = useAppSelector((state) => state.nodes.nodeOpacity);
-  const className = useMemo(
-    () => (shift ? DRAG_HANDLE_CLASSNAME : 'nopan'),
-    [shift]
-  );
+
+  const handleClick = useCallback(() => {
+    dispatch(contextMenusClosed());
+  }, [dispatch]);
 
   return (
     <Box
-      onClickCapture={selectNode}
-      className={className}
+      onClick={handleClick}
+      className={DRAG_HANDLE_CLASSNAME}
       sx={{
         h: 'full',
         position: 'relative',
@@ -75,6 +55,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
         transitionProperty: 'common',
         transitionDuration: '0.1s',
         shadow: selected ? shadow : undefined,
+        cursor: 'grab',
         opacity,
       }}
     >

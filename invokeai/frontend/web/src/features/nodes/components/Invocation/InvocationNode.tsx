@@ -33,9 +33,7 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
         <>
           <Flex
             layerStyle="nodeBody"
-            className={'nopan'}
             sx={{
-              cursor: 'auto',
               flexDirection: 'column',
               w: 'full',
               h: 'full',
@@ -44,10 +42,7 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
               borderBottomRadius: withFooter ? 0 : 'base',
             }}
           >
-            <Flex
-              className="nopan"
-              sx={{ flexDir: 'column', px: 2, w: 'full', h: 'full' }}
-            >
+            <Flex sx={{ flexDir: 'column', px: 2, w: 'full', h: 'full' }}>
               {outputFieldNames.map((fieldName) => (
                 <OutputField
                   key={`${nodeId}.${fieldName}.output-field`}

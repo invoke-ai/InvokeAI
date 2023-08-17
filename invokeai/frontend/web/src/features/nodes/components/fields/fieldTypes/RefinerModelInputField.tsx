@@ -96,7 +96,7 @@ const RefinerModelInputFieldComponent = (
   ) : (
     <Flex w="100%" alignItems="center" gap={2}>
       <IAIMantineSearchableSelect
-        className="nowheel"
+        className="nowheel nodrag"
         tooltip={selectedModel?.description}
         value={selectedModel?.id}
         placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
@@ -107,7 +107,7 @@ const RefinerModelInputFieldComponent = (
       />
       {isSyncModelEnabled && (
         <Box mt={7}>
-          <SyncModelsButton iconMode />
+          <SyncModelsButton className="nodrag" iconMode />
         </Box>
       )}
     </Flex>

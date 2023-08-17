@@ -123,7 +123,7 @@ const ModelInputFieldComponent = (
   ) : (
     <Flex w="100%" alignItems="center" gap={2}>
       <IAIMantineSearchableSelect
-        className="nowheel"
+        className="nowheel nodrag"
         tooltip={selectedModel?.description}
         value={selectedModel?.id}
         placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
@@ -132,7 +132,7 @@ const ModelInputFieldComponent = (
         disabled={data.length === 0}
         onChange={handleChangeModel}
       />
-      {isSyncModelEnabled && <SyncModelsButton iconMode />}
+      {isSyncModelEnabled && <SyncModelsButton className="nodrag" iconMode />}
     </Flex>
   );
 };

@@ -53,7 +53,6 @@ const FieldTitle = forwardRef((props: Props, ref) => {
   return (
     <Flex
       ref={ref}
-      className="nopan"
       sx={{
         position: 'relative',
         overflow: 'hidden',
@@ -84,6 +83,7 @@ const FieldTitle = forwardRef((props: Props, ref) => {
           noOfLines={1}
         />
         <EditableInput
+          className="nodrag"
           sx={{
             p: 0,
             fontWeight: 600,
