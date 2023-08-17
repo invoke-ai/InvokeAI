@@ -29,6 +29,7 @@ The abstract base class for this class is InvocationStatsServiceBase. An impleme
 writes to the system log is stored in InvocationServices.performance_statistics.
 """
 
+import psutil
 import time
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
@@ -42,6 +43,11 @@ import invokeai.backend.util.logging as logger
 from ..invocations.baseinvocation import BaseInvocation
 from .graph import GraphExecutionState
 from .item_storage import ItemStorageABC
+from .model_manager_service import ModelManagerService
+from invokeai.backend.model_management.model_cache import CacheStats
+
+# size of GIG in bytes
+GIG = 1073741824
 
 
 class InvocationStatsServiceBase(ABC):
@@ -89,6 +95,8 @@ class InvocationStatsServiceBase(ABC):
         invocation_type: str,
         time_used: float,
         vram_used: float,
+        ram_used: float,
+        ram_changed: float,
     ):
         """
         Add timing information on execution of a node. Usually
@@ -97,6 +105,8 @@ class InvocationStatsServiceBase(ABC):
         :param invocation_type: String literal type of the node
         :param time_used: Time used by node's exection (sec)
         :param vram_used: Maximum VRAM used during exection (GB)
+        :param ram_used: Current RAM available (GB)
+        :param ram_changed: Change in RAM usage over course of the run (GB)
         """
         pass
 
@@ -115,6 +125,9 @@ class NodeStats:
     calls: int = 0
     time_used: float = 0.0  # seconds
     max_vram: float = 0.0  # GB
+    cache_hits: int = 0
+    cache_misses: int = 0
+    cache_high_watermark: int = 0
 
 
 @dataclass
@@ -133,31 +146,62 @@ class InvocationStatsService(InvocationStatsServiceBase):
         self.graph_execution_manager = graph_execution_manager
         # {graph_id => NodeLog}
         self._stats: Dict[str, NodeLog] = {}
+        self._cache_stats: Dict[str, CacheStats] = {}
+        self.ram_used: float = 0.0
+        self.ram_changed: float = 0.0
 
     class StatsContext:
-        def __init__(self, invocation: BaseInvocation, graph_id: str, collector: "InvocationStatsServiceBase"):
+        """Context manager for collecting statistics."""
+
+        invocation: BaseInvocation = None
+        collector: "InvocationStatsServiceBase" = None
+        graph_id: str = None
+        start_time: int = 0
+        ram_used: int = 0
+        model_manager: ModelManagerService = None
+
+        def __init__(
+            self,
+            invocation: BaseInvocation,
+            graph_id: str,
+            model_manager: ModelManagerService,
+            collector: "InvocationStatsServiceBase",
+        ):
+            """Initialize statistics for this run."""
             self.invocation = invocation
             self.collector = collector
             self.graph_id = graph_id
             self.start_time = 0
+            self.ram_used = 0
+            self.model_manager = model_manager
 
         def __enter__(self):
             self.start_time = time.time()
             if torch.cuda.is_available():
                 torch.cuda.reset_peak_memory_stats()
+            self.ram_used = psutil.Process().memory_info().rss
+            if self.model_manager:
+                self.model_manager.collect_cache_stats(self.collector._cache_stats[self.graph_id])
 
         def __exit__(self, *args):
+            """Called on exit from the context."""
+            ram_used = psutil.Process().memory_info().rss
+            self.collector.update_mem_stats(
+                ram_used=ram_used / GIG,
+                ram_changed=(ram_used - self.ram_used) / GIG,
+            )
             self.collector.update_invocation_stats(
-                self.graph_id,
-                self.invocation.type,
-                time.time() - self.start_time,
-                torch.cuda.max_memory_allocated() / 1e9 if torch.cuda.is_available() else 0.0,
+                graph_id=self.graph_id,
+                invocation_type=self.invocation.type,
+                time_used=time.time() - self.start_time,
+                vram_used=torch.cuda.max_memory_allocated() / GIG if torch.cuda.is_available() else 0.0,
             )
 
     def collect_stats(
         self,
         invocation: BaseInvocation,
         graph_execution_state_id: str,
+        model_manager: ModelManagerService,
     ) -> StatsContext:
         """
         Return a context object that will capture the statistics.
@@ -166,7 +210,8 @@ class InvocationStatsService(InvocationStatsServiceBase):
         """
         if not self._stats.get(graph_execution_state_id):  # first time we're seeing this
             self._stats[graph_execution_state_id] = NodeLog()
-        return self.StatsContext(invocation, graph_execution_state_id, self)
+            self._cache_stats[graph_execution_state_id] = CacheStats()
+        return self.StatsContext(invocation, graph_execution_state_id, model_manager, self)
 
     def reset_all_stats(self):
         """Zero all statistics"""
@@ -179,13 +224,36 @@ class InvocationStatsService(InvocationStatsServiceBase):
         except KeyError:
             logger.warning(f"Attempted to clear statistics for unknown graph {graph_execution_id}")
 
-    def update_invocation_stats(self, graph_id: str, invocation_type: str, time_used: float, vram_used: float):
+    def update_mem_stats(
+        self,
+        ram_used: float,
+        ram_changed: float,
+    ):
+        """
+        Update the collector with RAM memory usage info.
+
+        :param ram_used: How much RAM is currently in use.
+        :param ram_changed: How much RAM changed since last generation.
+        """
+        self.ram_used = ram_used
+        self.ram_changed = ram_changed
+
+    def update_invocation_stats(
+        self,
+        graph_id: str,
+        invocation_type: str,
+        time_used: float,
+        vram_used: float,
+    ):
         """
         Add timing information on execution of a node. Usually
         used internally.
         :param graph_id: ID of the graph that is currently executing
         :param invocation_type: String literal type of the node
-        :param time_used: Floating point seconds used by node's exection
+        :param time_used: Time used by node's exection (sec)
+        :param vram_used: Maximum VRAM used during exection (GB)
+        :param ram_used: Current RAM available (GB)
+        :param ram_changed: Change in RAM usage over course of the run (GB)
         """
         if not self._stats[graph_id].nodes.get(invocation_type):
             self._stats[graph_id].nodes[invocation_type] = NodeStats()
@@ -197,7 +265,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
     def log_stats(self):
         """
         Send the statistics to the system logger at the info level.
-        Stats will only be printed if when the execution of the graph
+        Stats will only be printed when the execution of the graph
         is complete.
         """
         completed = set()
@@ -208,16 +276,30 @@ class InvocationStatsService(InvocationStatsServiceBase):
 
             total_time = 0
             logger.info(f"Graph stats: {graph_id}")
-            logger.info("Node                 Calls    Seconds VRAM Used")
+            logger.info(f"{'Node':>30} {'Calls':>7}{'Seconds':>9} {'VRAM Used':>10}")
             for node_type, stats in self._stats[graph_id].nodes.items():
-                logger.info(f"{node_type:<20} {stats.calls:>5}   {stats.time_used:7.3f}s     {stats.max_vram:4.2f}G")
+                logger.info(f"{node_type:>30}  {stats.calls:>4}   {stats.time_used:7.3f}s     {stats.max_vram:4.3f}G")
                 total_time += stats.time_used
 
+            cache_stats = self._cache_stats[graph_id]
+            hwm = cache_stats.high_watermark / GIG
+            tot = cache_stats.cache_size / GIG
+            loaded = sum([v for v in cache_stats.loaded_model_sizes.values()]) / GIG
+
             logger.info(f"TOTAL GRAPH EXECUTION TIME:  {total_time:7.3f}s")
+            logger.info("RAM used by InvokeAI process: " + "%4.2fG" % self.ram_used + f" ({self.ram_changed:+5.3f}G)")
+            logger.info(f"RAM used to load models: {loaded:4.2f}G")
             if torch.cuda.is_available():
-                logger.info("Current VRAM utilization " + "%4.2fG" % (torch.cuda.memory_allocated() / 1e9))
+                logger.info("VRAM in use: " + "%4.3fG" % (torch.cuda.memory_allocated() / GIG))
+            logger.info("RAM cache statistics:")
+            logger.info(f"   Model cache hits: {cache_stats.hits}")
+            logger.info(f"   Model cache misses: {cache_stats.misses}")
+            logger.info(f"   Models cached: {cache_stats.in_cache}")
+            logger.info(f"   Models cleared from cache: {cache_stats.cleared}")
+            logger.info(f"   Cache high water mark: {hwm:4.2f}/{tot:4.2f}G")
 
             completed.add(graph_id)
 
         for graph_id in completed:
             del self._stats[graph_id]
+            del self._cache_stats[graph_id]
