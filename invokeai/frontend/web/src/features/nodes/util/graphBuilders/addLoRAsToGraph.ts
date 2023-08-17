@@ -67,7 +67,7 @@ export const addLoRAsToGraph = (
     };
 
     // add the lora to the metadata accumulator
-    if (metadataAccumulator) {
+    if (metadataAccumulator?.loras) {
       metadataAccumulator.loras.push({
         lora: { model_name, base_model },
         weight,

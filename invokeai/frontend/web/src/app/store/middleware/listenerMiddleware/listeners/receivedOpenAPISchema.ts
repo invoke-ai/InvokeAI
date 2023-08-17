@@ -13,7 +13,7 @@ export const addReceivedOpenAPISchemaListener = () => {
       const log = logger('system');
       const schemaJSON = action.payload;
 
-      log.debug({ schemaJSON }, 'Dereferenced OpenAPI schema');
+      log.debug({ schemaJSON }, 'Received OpenAPI schema');
 
       const nodeTemplates = parseSchema(schemaJSON);
 
@@ -28,9 +28,12 @@ export const addReceivedOpenAPISchemaListener = () => {
 
   startAppListening({
     actionCreator: receivedOpenAPISchema.rejected,
-    effect: () => {
+    effect: (action) => {
       const log = logger('system');
-      log.error('Problem dereferencing OpenAPI Schema');
+      log.error(
+        { error: parseify(action.error) },
+        'Problem retrieving OpenAPI Schema'
+      );
     },
   });
 };

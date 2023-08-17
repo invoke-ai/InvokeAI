@@ -3,6 +3,7 @@ import { RootState } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { some } from 'lodash-es';
 import { ImageUsage } from './types';
+import { isInvocationNode } from 'features/nodes/types/types';
 
 export const getImageUsage = (state: RootState, image_name: string) => {
   const { generation, canvas, nodes, controlNet } = state;
@@ -12,11 +13,11 @@ export const getImageUsage = (state: RootState, image_name: string) => {
     (obj) => obj.kind === 'image' && obj.imageName === image_name
   );
 
-  const isNodesImage = nodes.nodes.some((node) => {
+  const isNodesImage = nodes.nodes.filter(isInvocationNode).some((node) => {
     return some(
       node.data.inputs,
       (input) =>
-        input.type === 'image' && input.value?.image_name === image_name
+        input.type === 'ImageField' && input.value?.image_name === image_name
     );
   });
 

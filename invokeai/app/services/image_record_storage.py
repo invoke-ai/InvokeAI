@@ -67,6 +67,7 @@ IMAGE_DTO_COLS = ", ".join(
                 "created_at",
                 "updated_at",
                 "deleted_at",
+                "starred",
             ],
         )
     )
@@ -139,6 +140,7 @@ class ImageRecordStorageBase(ABC):
         node_id: Optional[str],
         metadata: Optional[dict],
         is_intermediate: bool = False,
+        starred: bool = False,
     ) -> datetime:
         """Saves an image record."""
         pass
@@ -200,6 +202,16 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             """
         )
 
+        self._cursor.execute("PRAGMA table_info(images)")
+        columns = [column[1] for column in self._cursor.fetchall()]
+
+        if "starred" not in columns:
+            self._cursor.execute(
+                """--sql
+                ALTER TABLE images ADD COLUMN starred BOOLEAN DEFAULT FALSE;
+                """
+            )
+
         # Create the `images` table indices.
         self._cursor.execute(
             """--sql
@@ -219,6 +231,12 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self._cursor.execute(
             """--sql
             CREATE INDEX IF NOT EXISTS idx_images_created_at ON images(created_at);
+            """
+        )
+
+        self._cursor.execute(
+            """--sql
+            CREATE INDEX IF NOT EXISTS idx_images_starred ON images(starred);
             """
         )
 
@@ -321,6 +339,17 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     (changes.is_intermediate, image_name),
                 )
 
+            # Change the image's `starred`` state
+            if changes.starred is not None:
+                self._cursor.execute(
+                    f"""--sql
+                    UPDATE images
+                    SET starred = ?
+                    WHERE image_name = ?;
+                    """,
+                    (changes.starred, image_name),
+                )
+
             self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()
@@ -397,7 +426,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_params.append(board_id)
 
             query_pagination = """--sql
-            ORDER BY images.created_at DESC LIMIT ? OFFSET ?
+            ORDER BY images.starred DESC, images.created_at DESC LIMIT ? OFFSET ?
             """
 
             # Final images query with pagination
@@ -500,6 +529,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         node_id: Optional[str],
         metadata: Optional[dict],
         is_intermediate: bool = False,
+        starred: bool = False,
     ) -> datetime:
         try:
             metadata_json = None if metadata is None else json.dumps(metadata)
@@ -515,9 +545,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     node_id,
                     session_id,
                     metadata,
-                    is_intermediate
+                    is_intermediate,
+                    starred
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     image_name,
@@ -529,6 +560,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     session_id,
                     metadata_json,
                     is_intermediate,
+                    starred,
                 ),
             )
             self._conn.commit()

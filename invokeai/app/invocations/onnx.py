@@ -1,37 +1,43 @@
 # Copyright (c) 2023 Borisov Sergey (https://github.com/StAlKeR7779)
 
+import inspect
+import re
 from contextlib import ExitStack
 from typing import List, Literal, Optional, Union
 
-import re
-import inspect
-
-from pydantic import BaseModel, Field, validator
-import torch
 import numpy as np
+import torch
 from diffusers import ControlNetModel, DPMSolverMultistepScheduler
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.schedulers import SchedulerMixin as Scheduler
-
-from ..models.image import ImageCategory, ImageField, ResourceOrigin
-from ...backend.model_management import ONNXModelPatcher
-from ...backend.util import choose_torch_device
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
-from .compel import ConditioningField
-from .controlnet_image_processors import ControlField
-from .image import ImageOutput
-from .model import ModelInfo, UNetField, VaeField
+from pydantic import BaseModel, Field, validator
+from tqdm import tqdm
 
 from invokeai.app.invocations.metadata import CoreMetadata
-from invokeai.backend import BaseModelType, ModelType, SubModelType
+from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
+from invokeai.backend import BaseModelType, ModelType, SubModelType
+
+from ...backend.model_management import ONNXModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
-
-from tqdm import tqdm
-from .model import ClipField
-from .latent import LatentsField, LatentsOutput, build_latents_output, get_scheduler, SAMPLER_NAME_VALUES
-from .compel import CompelOutput
-
+from ...backend.util import choose_torch_device
+from ..models.image import ImageCategory, ResourceOrigin
+from .baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    FieldDescriptions,
+    InputField,
+    Input,
+    InvocationContext,
+    OutputField,
+    UIComponent,
+    UIType,
+    tags,
+    title,
+)
+from .controlnet_image_processors import ControlField
+from .latent import SAMPLER_NAME_VALUES, LatentsField, LatentsOutput, build_latents_output, get_scheduler
+from .model import ClipField, ModelInfo, UNetField, VaeField
 
 ORT_TO_NP_TYPE = {
     "tensor(bool)": np.bool_,
@@ -51,13 +57,15 @@ ORT_TO_NP_TYPE = {
 PRECISION_VALUES = Literal[tuple(list(ORT_TO_NP_TYPE.keys()))]
 
 
+@title("ONNX Prompt (Raw)")
+@tags("onnx", "prompt")
 class ONNXPromptInvocation(BaseInvocation):
     type: Literal["prompt_onnx"] = "prompt_onnx"
 
-    prompt: str = Field(default="", description="Prompt")
-    clip: ClipField = Field(None, description="Clip to use")
+    prompt: str = InputField(default="", description=FieldDescriptions.raw_prompt, ui_component=UIComponent.Textarea)
+    clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
-    def invoke(self, context: InvocationContext) -> CompelOutput:
+    def invoke(self, context: InvocationContext) -> ConditioningOutput:
         tokenizer_info = context.services.model_manager.get_model(
             **self.clip.tokenizer.dict(),
         )
@@ -126,7 +134,7 @@ class ONNXPromptInvocation(BaseInvocation):
         # TODO: hacky but works ;D maybe rename latents somehow?
         context.services.latents.save(conditioning_name, (prompt_embeds, None))
 
-        return CompelOutput(
+        return ConditioningOutput(
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
             ),
@@ -134,25 +142,48 @@ class ONNXPromptInvocation(BaseInvocation):
 
 
 # Text to image
+@title("ONNX Text to Latents")
+@tags("latents", "inference", "txt2img", "onnx")
 class ONNXTextToLatentsInvocation(BaseInvocation):
     """Generates latents from conditionings."""
 
     type: Literal["t2l_onnx"] = "t2l_onnx"
 
     # Inputs
-    # fmt: off
-    positive_conditioning: Optional[ConditioningField] = Field(description="Positive conditioning for generation")
-    negative_conditioning: Optional[ConditioningField] = Field(description="Negative conditioning for generation")
-    noise: Optional[LatentsField] = Field(description="The noise to use")
-    steps:       int = Field(default=10, gt=0, description="The number of steps to use to generate the image")
-    cfg_scale: Union[float, List[float]] = Field(default=7.5, ge=1, description="The Classifier-Free Guidance, higher values may result in a result closer to the prompt", )
-    scheduler: SAMPLER_NAME_VALUES = Field(default="euler", description="The scheduler to use" )
-    precision: PRECISION_VALUES = Field(default = "tensor(float16)", description="The precision to use when generating latents")
-    unet: UNetField = Field(default=None, description="UNet submodel")
-    control: Union[ControlField, list[ControlField]] = Field(default=None, description="The control to use")
-    # seamless:   bool = Field(default=False, description="Whether or not to generate an image that can tile without seams", )
-    # seamless_axes: str = Field(default="", description="The axes to tile the image on, 'x' and/or 'y'")
-    # fmt: on
+    positive_conditioning: ConditioningField = InputField(
+        description=FieldDescriptions.positive_cond,
+        input=Input.Connection,
+    )
+    negative_conditioning: ConditioningField = InputField(
+        description=FieldDescriptions.negative_cond,
+        input=Input.Connection,
+    )
+    noise: LatentsField = InputField(
+        description=FieldDescriptions.noise,
+        input=Input.Connection,
+    )
+    steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
+    cfg_scale: Union[float, List[float]] = InputField(
+        default=7.5,
+        ge=1,
+        description=FieldDescriptions.cfg_scale,
+        ui_type=UIType.Float,
+    )
+    scheduler: SAMPLER_NAME_VALUES = InputField(
+        default="euler", description=FieldDescriptions.scheduler, input=Input.Direct
+    )
+    precision: PRECISION_VALUES = InputField(default="tensor(float16)", description=FieldDescriptions.precision)
+    unet: UNetField = InputField(
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+    )
+    control: Optional[Union[ControlField, list[ControlField]]] = InputField(
+        default=None,
+        description=FieldDescriptions.control,
+        ui_type=UIType.Control,
+    )
+    # seamless:   bool = InputField(default=False, description="Whether or not to generate an image that can tile without seams", )
+    # seamless_axes: str = InputField(default="", description="The axes to tile the image on, 'x' and/or 'y'")
 
     @validator("cfg_scale")
     def ge_one(cls, v):
@@ -165,20 +196,6 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
             if v < 1:
                 raise ValueError("cfg_scale must be greater than 1")
         return v
-
-    # Schema customisation
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "tags": ["latents"],
-                "type_hints": {
-                    "model": "model",
-                    "control": "control",
-                    # "cfg_scale": "float",
-                    "cfg_scale": "number",
-                },
-            },
-        }
 
     # based on
     # https://github.com/huggingface/diffusers/blob/3ebbaf7c96801271f9e6c21400033b6aa5ffcf29/src/diffusers/pipelines/stable_diffusion/pipeline_onnx_stable_diffusion.py#L375
@@ -300,26 +317,28 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
 
 # Latent to image
+@title("ONNX Latents to Image")
+@tags("latents", "image", "vae", "onnx")
 class ONNXLatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
 
     type: Literal["l2i_onnx"] = "l2i_onnx"
 
     # Inputs
-    latents: Optional[LatentsField] = Field(description="The latents to generate an image from")
-    vae: VaeField = Field(default=None, description="Vae submodel")
-    metadata: Optional[CoreMetadata] = Field(
-        default=None, description="Optional core metadata to be written to the image"
+    latents: LatentsField = InputField(
+        description=FieldDescriptions.denoised_latents,
+        input=Input.Connection,
     )
-    # tiled: bool = Field(default=False, description="Decode latents by overlaping tiles(less memory consumption)")
-
-    # Schema customisation
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "tags": ["latents", "image"],
-            },
-        }
+    vae: VaeField = InputField(
+        description=FieldDescriptions.vae,
+        input=Input.Connection,
+    )
+    metadata: Optional[CoreMetadata] = InputField(
+        default=None,
+        description=FieldDescriptions.core_metadata,
+        ui_hidden=True,
+    )
+    # tiled: bool = InputField(default=False, description="Decode latents by overlaping tiles(less memory consumption)")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.services.latents.get(self.latents.latents_name)
@@ -373,87 +392,11 @@ class ONNXModelLoaderOutput(BaseInvocationOutput):
     # fmt: off
     type: Literal["model_loader_output_onnx"] = "model_loader_output_onnx"
 
-    unet: UNetField = Field(default=None, description="UNet submodel")
-    clip: ClipField = Field(default=None, description="Tokenizer and text_encoder submodels")
-    vae_decoder: VaeField = Field(default=None, description="Vae submodel")
-    vae_encoder: VaeField = Field(default=None, description="Vae submodel")
+    unet: UNetField = OutputField(default=None, description=FieldDescriptions.unet, title="UNet")
+    clip: ClipField = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
+    vae_decoder: VaeField = OutputField(default=None, description=FieldDescriptions.vae, title="VAE Decoder")
+    vae_encoder: VaeField = OutputField(default=None, description=FieldDescriptions.vae, title="VAE Encoder")
     # fmt: on
-
-
-class ONNXSD1ModelLoaderInvocation(BaseInvocation):
-    """Loading submodels of selected model."""
-
-    type: Literal["sd1_model_loader_onnx"] = "sd1_model_loader_onnx"
-
-    model_name: str = Field(default="", description="Model to load")
-    # TODO: precision?
-
-    # Schema customisation
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"tags": ["model", "loader"], "type_hints": {"model_name": "model"}},  # TODO: rename to model_name?
-        }
-
-    def invoke(self, context: InvocationContext) -> ONNXModelLoaderOutput:
-        model_name = "stable-diffusion-v1-5"
-        base_model = BaseModelType.StableDiffusion1
-
-        # TODO: not found exceptions
-        if not context.services.model_manager.model_exists(
-            model_name=model_name,
-            base_model=BaseModelType.StableDiffusion1,
-            model_type=ModelType.ONNX,
-        ):
-            raise Exception(f"Unkown model name: {model_name}!")
-
-        return ONNXModelLoaderOutput(
-            unet=UNetField(
-                unet=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=ModelType.ONNX,
-                    submodel=SubModelType.UNet,
-                ),
-                scheduler=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=ModelType.ONNX,
-                    submodel=SubModelType.Scheduler,
-                ),
-                loras=[],
-            ),
-            clip=ClipField(
-                tokenizer=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=ModelType.ONNX,
-                    submodel=SubModelType.Tokenizer,
-                ),
-                text_encoder=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=ModelType.ONNX,
-                    submodel=SubModelType.TextEncoder,
-                ),
-                loras=[],
-            ),
-            vae_decoder=VaeField(
-                vae=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=ModelType.ONNX,
-                    submodel=SubModelType.VaeDecoder,
-                ),
-            ),
-            vae_encoder=VaeField(
-                vae=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=ModelType.ONNX,
-                    submodel=SubModelType.VaeEncoder,
-                ),
-            ),
-        )
 
 
 class OnnxModelField(BaseModel):
@@ -464,22 +407,17 @@ class OnnxModelField(BaseModel):
     model_type: ModelType = Field(description="Model Type")
 
 
+@title("ONNX Model Loader")
+@tags("onnx", "model")
 class OnnxModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
     type: Literal["onnx_model_loader"] = "onnx_model_loader"
 
-    model: OnnxModelField = Field(description="The model to load")
-
-    # Schema customisation
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "title": "Onnx Model Loader",
-                "tags": ["model", "loader"],
-                "type_hints": {"model": "model"},
-            },
-        }
+    # Inputs
+    model: OnnxModelField = InputField(
+        description=FieldDescriptions.onnx_main_model, input=Input.Direct, ui_type=UIType.ONNXModel
+    )
 
     def invoke(self, context: InvocationContext) -> ONNXModelLoaderOutput:
         base_model = self.model.base_model
