@@ -157,16 +157,16 @@ class BatchProcessStorageBase(ABC):
     def start(
         self,
         batch_id: str,
-    ):
-        """Starts a BatchProcess record by marking its `canceled` attribute to False."""
+    ) -> None:
+        """'Starts' a BatchProcess record by marking its `canceled` attribute to False."""
         pass
 
     @abstractmethod
     def cancel(
         self,
         batch_id: str,
-    ):
-        """Cancel BatchProcess record by setting its `canceled` attribute to True."""
+    ) -> None:
+        """'Cancels' a BatchProcess record by setting its `canceled` attribute to True."""
         pass
 
     @abstractmethod
@@ -396,7 +396,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
     def start(
         self,
         batch_id: str,
-    ):
+    ) -> None:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -417,7 +417,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
     def cancel(
         self,
         batch_id: str,
-    ):
+    ) -> None:
         try:
             self._lock.acquire()
             self._cursor.execute(
