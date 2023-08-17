@@ -102,6 +102,11 @@ const LoRAModelInputFieldComponent = (
         item.value.toLowerCase().includes(value.toLowerCase().trim())
       }
       onChange={handleChange}
+      sx={{
+        '.mantine-Select-dropdown': {
+          width: '16rem !important',
+        },
+      }}
     />
   );
 };

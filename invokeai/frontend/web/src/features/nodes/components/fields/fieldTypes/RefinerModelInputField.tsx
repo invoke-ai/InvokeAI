@@ -104,6 +104,11 @@ const RefinerModelInputFieldComponent = (
         error={data.length === 0}
         disabled={data.length === 0}
         onChange={handleChangeModel}
+        sx={{
+          '.mantine-Select-dropdown': {
+            width: '16rem !important',
+          },
+        }}
       />
       {isSyncModelEnabled && (
         <Box mt={7}>

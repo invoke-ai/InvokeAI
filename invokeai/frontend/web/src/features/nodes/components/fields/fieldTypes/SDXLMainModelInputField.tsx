@@ -131,6 +131,11 @@ const ModelInputFieldComponent = (
         error={data.length === 0}
         disabled={data.length === 0}
         onChange={handleChangeModel}
+        sx={{
+          '.mantine-Select-dropdown': {
+            width: '16rem !important',
+          },
+        }}
       />
       {isSyncModelEnabled && <SyncModelsButton className="nodrag" iconMode />}
     </Flex>
