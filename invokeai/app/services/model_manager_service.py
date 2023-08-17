@@ -22,6 +22,7 @@ from invokeai.backend.model_management import (
     ModelNotFoundException,
 )
 from invokeai.backend.model_management.model_search import FindModels
+from invokeai.backend.model_management.model_cache import CacheStats
 
 import torch
 from invokeai.app.models.exceptions import CanceledException
@@ -277,6 +278,13 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
+    def collect_cache_stats(self, cache_stats: CacheStats):
+        """
+        Reset model cache statistics for graph with graph_id.
+        """
+        pass
+
+    @abstractmethod
     def commit(self, conf_file: Optional[Path] = None) -> None:
         """
         Write current configuration out to the indicated file.
@@ -499,6 +507,12 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         self.logger.debug(f"convert model {model_name}")
         return self.mgr.convert_model(model_name, base_model, model_type, convert_dest_directory)
+
+    def collect_cache_stats(self, cache_stats: CacheStats):
+        """
+        Reset model cache statistics for graph with graph_id.
+        """
+        self.mgr.cache.stats = cache_stats
 
     def commit(self, conf_file: Optional[Path] = None):
         """
