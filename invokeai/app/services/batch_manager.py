@@ -71,8 +71,9 @@ class BatchManager(BatchManagerBase):
 
     async def _process(self, event: Event, err: bool) -> None:
         data = event[1]["data"]
-        batch_session = self.__batch_process_storage.get_session(data["graph_execution_state_id"])
-        if not batch_session:
+        try:
+            batch_session = self.__batch_process_storage.get_session(data["graph_execution_state_id"])
+        except BatchSessionNotFoundException:
             return None
         changes = BatchSessionChanges(state="error" if err else "completed")
         batch_session = self.__batch_process_storage.update_session_state(
