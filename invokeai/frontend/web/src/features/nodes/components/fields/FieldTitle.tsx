@@ -3,63 +3,42 @@ import {
   EditableInput,
   EditablePreview,
   Flex,
+  forwardRef,
   useEditableControls,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIDraggable from 'common/components/IAIDraggable';
-import { NodeFieldDraggableData } from 'features/dnd/types';
 import {
-  useFieldData,
-  useFieldTemplate,
+  useFieldLabel,
+  useFieldTemplateTitle,
 } from 'features/nodes/hooks/useNodeData';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
-import {
-  MouseEvent,
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { MouseEvent, memo, useCallback, useEffect, useState } from 'react';
 
 interface Props {
   nodeId: string;
   fieldName: string;
-  isDraggable?: boolean;
   kind: 'input' | 'output';
 }
 
-const FieldTitle = (props: Props) => {
-  const { nodeId, fieldName, isDraggable = false, kind } = props;
-  const fieldTemplate = useFieldTemplate(nodeId, fieldName, kind);
-  const field = useFieldData(nodeId, fieldName);
+const FieldTitle = forwardRef((props: Props, ref) => {
+  const { nodeId, fieldName, kind } = props;
+  const label = useFieldLabel(nodeId, fieldName);
+  const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, kind);
 
   const dispatch = useAppDispatch();
   const [localTitle, setLocalTitle] = useState(
-    field?.label || fieldTemplate?.title || 'Unknown Field'
-  );
-
-  const draggableData: NodeFieldDraggableData | undefined = useMemo(
-    () =>
-      field &&
-      fieldTemplate?.fieldKind === 'input' &&
-      fieldTemplate?.input !== 'connection' &&
-      isDraggable
-        ? {
-            id: `${nodeId}-${fieldName}`,
-            payloadType: 'NODE_FIELD',
-            payload: { nodeId, field, fieldTemplate },
-          }
-        : undefined,
-    [field, fieldName, fieldTemplate, isDraggable, nodeId]
+    label || fieldTemplateTitle || 'Unknown Field'
   );
 
   const handleSubmit = useCallback(
     async (newTitle: string) => {
+      if (newTitle === label || newTitle === fieldTemplateTitle) {
+        return;
+      }
+      setLocalTitle(newTitle || fieldTemplateTitle || 'Unknown Field');
       dispatch(fieldLabelChanged({ nodeId, fieldName, label: newTitle }));
-      setLocalTitle(newTitle || fieldTemplate?.title || 'Unknown Field');
     },
-    [dispatch, nodeId, fieldName, fieldTemplate?.title]
+    [label, fieldTemplateTitle, dispatch, nodeId, fieldName]
   );
 
   const handleChange = useCallback((newTitle: string) => {
@@ -68,27 +47,33 @@ const FieldTitle = (props: Props) => {
 
   useEffect(() => {
     // Another component may change the title; sync local title with global state
-    setLocalTitle(field?.label || fieldTemplate?.title || 'Unknown Field');
-  }, [field?.label, fieldTemplate?.title]);
+    setLocalTitle(label || fieldTemplateTitle || 'Unknown Field');
+  }, [label, fieldTemplateTitle]);
 
   return (
     <Flex
+      ref={ref}
       className="nopan"
       sx={{
         position: 'relative',
         overflow: 'hidden',
-        h: 'full',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         justifyContent: 'flex-start',
         gap: 1,
+        h: 'full',
+        w: 'full',
       }}
     >
       <Editable
         value={localTitle}
         onChange={handleChange}
         onSubmit={handleSubmit}
+        as={Flex}
         sx={{
           position: 'relative',
+          alignItems: 'center',
+          h: 'full',
+          w: 'full',
         }}
       >
         <EditablePreview
@@ -101,6 +86,11 @@ const FieldTitle = (props: Props) => {
         <EditableInput
           sx={{
             p: 0,
+            fontWeight: 600,
+            color: 'base.900',
+            _dark: {
+              color: 'base.100',
+            },
             _focusVisible: {
               p: 0,
               textAlign: 'left',
@@ -108,27 +98,24 @@ const FieldTitle = (props: Props) => {
             },
           }}
         />
-        <EditableControls draggableData={draggableData} />
+        <EditableControls />
       </Editable>
     </Flex>
   );
-};
+});
 
 export default memo(FieldTitle);
 
-type EditableControlsProps = {
-  draggableData?: NodeFieldDraggableData;
-};
-
-const EditableControls = memo((props: EditableControlsProps) => {
+const EditableControls = memo(() => {
   const { isEditing, getEditButtonProps } = useEditableControls();
-  const handleDoubleClick = useCallback(
+  const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       const { onClick } = getEditButtonProps();
       if (!onClick) {
         return;
       }
       onClick(e);
+      e.preventDefault();
     },
     [getEditButtonProps]
   );
@@ -137,19 +124,9 @@ const EditableControls = memo((props: EditableControlsProps) => {
     return null;
   }
 
-  if (props.draggableData) {
-    return (
-      <IAIDraggable
-        data={props.draggableData}
-        onDoubleClick={handleDoubleClick}
-        cursor={props.draggableData ? 'grab' : 'text'}
-      />
-    );
-  }
-
   return (
     <Flex
-      onDoubleClick={handleDoubleClick}
+      onClick={handleClick}
       position="absolute"
       w="full"
       h="full"

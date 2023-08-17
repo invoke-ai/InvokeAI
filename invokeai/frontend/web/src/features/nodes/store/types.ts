@@ -1,6 +1,7 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { Edge, Node, OnConnectStartParams, Viewport } from 'reactflow';
 import {
+  FieldIdentifier,
   FieldType,
   InvocationEdgeExtra,
   InvocationTemplate,
@@ -29,4 +30,5 @@ export type NodesState = {
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
   isReady: boolean;
+  mouseOverField: FieldIdentifier | null;
 };

@@ -1,26 +1,111 @@
-import { MenuItem, MenuList } from '@chakra-ui/react';
-import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
+import { MenuGroup, MenuItem, MenuList } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import {
-  InputFieldTemplate,
-  InputFieldValue,
-} from 'features/nodes/types/types';
-import { MouseEvent, useCallback } from 'react';
+  IAIContextMenu,
+  IAIContextMenuProps,
+} from 'common/components/IAIContextMenu';
+import {
+  useFieldInputKind,
+  useFieldLabel,
+  useFieldTemplateTitle,
+} from 'features/nodes/hooks/useNodeData';
+import {
+  workflowExposedFieldAdded,
+  workflowExposedFieldRemoved,
+} from 'features/nodes/store/nodesSlice';
+import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
+import { FaMinus, FaPlus } from 'react-icons/fa';
 import { menuListMotionProps } from 'theme/components/menu';
 
 type Props = {
   nodeId: string;
-  field: InputFieldValue;
-  fieldTemplate: InputFieldTemplate;
-  children: ContextMenuProps<HTMLDivElement>['children'];
+  fieldName: string;
+  kind: 'input' | 'output';
+  children: IAIContextMenuProps<HTMLDivElement>['children'];
 };
 
-const FieldContextMenu = (props: Props) => {
+const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
+  const dispatch = useAppDispatch();
+  const label = useFieldLabel(nodeId, fieldName);
+  const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, kind);
+
   const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
   }, []);
 
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ nodes }) => {
+          const isExposed = Boolean(
+            nodes.workflow.exposedFields.find(
+              (f) => f.nodeId === nodeId && f.fieldName === fieldName
+            )
+          );
+
+          return { isExposed };
+        },
+        defaultSelectorOptions
+      ),
+    [fieldName, nodeId]
+  );
+
+  const input = useFieldInputKind(nodeId, fieldName);
+  const mayExpose = useMemo(
+    () => ['any', 'direct'].includes(input ?? '__UNKNOWN_INPUT__'),
+    [input]
+  );
+
+  const { isExposed } = useAppSelector(selector);
+
+  const handleExposeField = useCallback(() => {
+    dispatch(workflowExposedFieldAdded({ nodeId, fieldName }));
+  }, [dispatch, fieldName, nodeId]);
+
+  const handleUnexposeField = useCallback(() => {
+    dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
+  }, [dispatch, fieldName, nodeId]);
+
+  const menuItems = useMemo(() => {
+    const menuItems: ReactNode[] = [];
+    if (mayExpose && !isExposed) {
+      menuItems.push(
+        <MenuItem
+          key={`${nodeId}.${fieldName}.expose-field`}
+          icon={<FaPlus />}
+          onClick={handleExposeField}
+        >
+          Add to Linear View
+        </MenuItem>
+      );
+    }
+    if (mayExpose && isExposed) {
+      menuItems.push(
+        <MenuItem
+          key={`${nodeId}.${fieldName}.unexpose-field`}
+          icon={<FaMinus />}
+          onClick={handleUnexposeField}
+        >
+          Remove from Linear View
+        </MenuItem>
+      );
+    }
+    return menuItems;
+  }, [
+    fieldName,
+    handleExposeField,
+    handleUnexposeField,
+    isExposed,
+    mayExpose,
+    nodeId,
+  ]);
+
   return (
-    <ContextMenu<HTMLDivElement>
+    <IAIContextMenu<HTMLDivElement>
       menuProps={{
         size: 'sm',
         isLazy: true,
@@ -29,19 +114,23 @@ const FieldContextMenu = (props: Props) => {
         bg: 'transparent',
         _hover: { bg: 'transparent' },
       }}
-      renderMenu={() => (
-        <MenuList
-          sx={{ visibility: 'visible !important' }}
-          motionProps={menuListMotionProps}
-          onContextMenu={skipEvent}
-        >
-          <MenuItem>Test</MenuItem>
-        </MenuList>
-      )}
+      renderMenu={() =>
+        !menuItems.length ? null : (
+          <MenuList
+            sx={{ visibility: 'visible !important' }}
+            motionProps={menuListMotionProps}
+            onContextMenu={skipEvent}
+          >
+            <MenuGroup title={label || fieldTemplateTitle || 'Unknown Field'}>
+              {menuItems}
+            </MenuGroup>
+          </MenuList>
+        )
+      }
     >
-      {props.children}
-    </ContextMenu>
+      {children}
+    </IAIContextMenu>
   );
 };
 
-export default FieldContextMenu;
+export default memo(FieldContextMenu);

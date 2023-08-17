@@ -1,9 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { map, some } from 'lodash-es';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { mouseOverFieldChanged } from '../store/nodesSlice';
 import { FOOTER_FIELDS, IMAGE_FIELDS } from '../types/constants';
 import { isInvocationNode } from '../types/types';
 
@@ -51,6 +52,28 @@ export const useNodeData = (nodeId: string) => {
   return nodeData;
 };
 
+export const useFieldLabel = (nodeId: string, fieldName: string) => {
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ nodes }) => {
+          const node = nodes.nodes.find((node) => node.id === nodeId);
+          if (!isInvocationNode(node)) {
+            return;
+          }
+          return node?.data.inputs[fieldName]?.label;
+        },
+        defaultSelectorOptions
+      ),
+    [fieldName, nodeId]
+  );
+
+  const label = useAppSelector(selector);
+
+  return label;
+};
+
 export const useFieldData = (nodeId: string, fieldName: string) => {
   const selector = useMemo(
     () =>
@@ -71,6 +94,30 @@ export const useFieldData = (nodeId: string, fieldName: string) => {
   const fieldData = useAppSelector(selector);
 
   return fieldData;
+};
+
+export const useFieldInputKind = (nodeId: string, fieldName: string) => {
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ nodes }) => {
+          const node = nodes.nodes.find((node) => node.id === nodeId);
+          if (!isInvocationNode(node)) {
+            return;
+          }
+          const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
+          const fieldTemplate = nodeTemplate?.inputs[fieldName];
+          return fieldTemplate?.input;
+        },
+        defaultSelectorOptions
+      ),
+    [fieldName, nodeId]
+  );
+
+  const fieldType = useAppSelector(selector);
+
+  return fieldType;
 };
 
 export const useFieldType = (
@@ -236,6 +283,33 @@ export const useNodeTemplateTitle = (nodeId: string) => {
   return title;
 };
 
+export const useFieldTemplateTitle = (
+  nodeId: string,
+  fieldName: string,
+  kind: 'input' | 'output'
+) => {
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ nodes }) => {
+          const node = nodes.nodes.find((node) => node.id === nodeId);
+          if (!isInvocationNode(node)) {
+            return;
+          }
+          const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
+          return nodeTemplate?.[KIND_MAP[kind]][fieldName]?.title;
+        },
+        defaultSelectorOptions
+      ),
+    [fieldName, kind, nodeId]
+  );
+
+  const fieldTemplate = useAppSelector(selector);
+
+  return fieldTemplate;
+};
+
 export const useFieldTemplate = (
   nodeId: string,
   fieldName: string,
@@ -283,4 +357,31 @@ export const useDoesInputHaveValue = (nodeId: string, fieldName: string) => {
   const doesFieldHaveValue = useAppSelector(selector);
 
   return doesFieldHaveValue;
+};
+
+export const useIsMouseOverField = (nodeId: string, fieldName: string) => {
+  const dispatch = useAppDispatch();
+  const selector = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ nodes }) =>
+          nodes.mouseOverField?.nodeId === nodeId &&
+          nodes.mouseOverField?.fieldName === fieldName,
+        defaultSelectorOptions
+      ),
+    [fieldName, nodeId]
+  );
+
+  const isMouseOverField = useAppSelector(selector);
+
+  const handleMouseOver = useCallback(() => {
+    dispatch(mouseOverFieldChanged({ nodeId, fieldName }));
+  }, [dispatch, fieldName, nodeId]);
+
+  const handleMouseOut = useCallback(() => {
+    dispatch(mouseOverFieldChanged(null));
+  }, [dispatch]);
+
+  return { isMouseOverField, handleMouseOver, handleMouseOut };
 };

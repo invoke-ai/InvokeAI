@@ -18,6 +18,7 @@ const SelectionOverlay = ({ isSelected, isHovered }: Props) => {
         opacity: isSelected ? 1 : 0.7,
         transitionProperty: 'common',
         transitionDuration: '0.1s',
+        pointerEvents: 'none',
         shadow: isSelected
           ? isHovered
             ? 'hoverSelected.light'

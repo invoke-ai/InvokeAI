@@ -79,6 +79,7 @@ const NodeTitle = ({ nodeId, title }: Props) => {
           fontSize="sm"
           sx={{
             p: 0,
+            fontWeight: 'initial',
             _focusVisible: {
               p: 0,
               boxShadow: 'none',

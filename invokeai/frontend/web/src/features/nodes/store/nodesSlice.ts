@@ -81,6 +81,7 @@ export const initialNodesState: NodesState = {
   },
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
+  mouseOverField: null,
 };
 
 type FieldValueAction<T extends InputFieldValue> = PayloadAction<{
@@ -594,6 +595,12 @@ const nodesSlice = createSlice({
     viewportChanged: (state, action: PayloadAction<Viewport>) => {
       state.viewport = action.payload;
     },
+    mouseOverFieldChanged: (
+      state,
+      action: PayloadAction<FieldIdentifier | null>
+    ) => {
+      state.mouseOverField = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(receivedOpenAPISchema.pending, (state) => {
@@ -701,6 +708,7 @@ export const {
   workflowExposedFieldRemoved,
   fieldLabelChanged,
   viewportChanged,
+  mouseOverFieldChanged,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

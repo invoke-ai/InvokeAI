@@ -3,13 +3,16 @@ import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import {
   useDoesInputHaveValue,
   useFieldTemplate,
+  useIsMouseOverField,
 } from 'features/nodes/hooks/useNodeData';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { PropsWithChildren, memo, useMemo } from 'react';
+import FieldContextMenu from './FieldContextMenu';
 import FieldHandle from './FieldHandle';
 import FieldTitle from './FieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
+import SelectionOverlay from 'common/components/SelectionOverlay';
 
 interface Props {
   nodeId: string;
@@ -48,7 +51,11 @@ const InputField = ({ nodeId, fieldName }: Props) => {
 
   if (fieldTemplate?.fieldKind !== 'input') {
     return (
-      <InputFieldWrapper shouldDim={shouldDim}>
+      <InputFieldWrapper
+        nodeId={nodeId}
+        fieldName={fieldName}
+        shouldDim={shouldDim}
+      >
         <FormControl
           sx={{ color: 'error.400', textAlign: 'left', fontSize: 'sm' }}
         >
@@ -59,40 +66,48 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   }
 
   return (
-    <InputFieldWrapper shouldDim={shouldDim}>
+    <InputFieldWrapper
+      nodeId={nodeId}
+      fieldName={fieldName}
+      shouldDim={shouldDim}
+    >
       <FormControl
         as={Flex}
         isInvalid={isMissingInput}
         isDisabled={isConnected}
         sx={{
-          alignItems: 'center',
+          alignItems: 'stretch',
           justifyContent: 'space-between',
           ps: 2,
           gap: 2,
+          h: 'full',
         }}
       >
-        <Tooltip
-          label={
-            <FieldTooltipContent
-              nodeId={nodeId}
-              fieldName={fieldName}
-              kind="input"
-            />
-          }
-          openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
-          placement="top"
-          shouldWrapChildren
-          hasArrow
-        >
-          <FormLabel sx={{ mb: 0 }}>
-            <FieldTitle
-              nodeId={nodeId}
-              fieldName={fieldName}
-              kind="input"
-              isDraggable
-            />
-          </FormLabel>
-        </Tooltip>
+        <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
+          {(ref) => (
+            <Tooltip
+              label={
+                <FieldTooltipContent
+                  nodeId={nodeId}
+                  fieldName={fieldName}
+                  kind="input"
+                />
+              }
+              openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
+              placement="top"
+              hasArrow
+            >
+              <FormLabel sx={{ mb: 0 }}>
+                <FieldTitle
+                  ref={ref}
+                  nodeId={nodeId}
+                  fieldName={fieldName}
+                  kind="input"
+                />
+              </FormLabel>
+            </Tooltip>
+          )}
+        </FieldContextMenu>
         <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
       </FormControl>
 
@@ -113,27 +128,37 @@ export default InputField;
 
 type InputFieldWrapperProps = PropsWithChildren<{
   shouldDim: boolean;
+  nodeId: string;
+  fieldName: string;
 }>;
 
 const InputFieldWrapper = memo(
-  ({ shouldDim, children }: InputFieldWrapperProps) => (
-    <Flex
-      className="nopan"
-      sx={{
-        position: 'relative',
-        minH: 8,
-        py: 0.5,
-        alignItems: 'center',
-        opacity: shouldDim ? 0.5 : 1,
-        transitionProperty: 'opacity',
-        transitionDuration: '0.1s',
-        w: 'full',
-        h: 'full',
-      }}
-    >
-      {children}
-    </Flex>
-  )
+  ({ shouldDim, nodeId, fieldName, children }: InputFieldWrapperProps) => {
+    const { isMouseOverField, handleMouseOver, handleMouseOut } =
+      useIsMouseOverField(nodeId, fieldName);
+
+    return (
+      <Flex
+        onMouseOver={handleMouseOver}
+        onMouseOut={handleMouseOut}
+        className="nopan"
+        sx={{
+          position: 'relative',
+          minH: 8,
+          py: 0.5,
+          alignItems: 'center',
+          opacity: shouldDim ? 0.5 : 1,
+          transitionProperty: 'opacity',
+          transitionDuration: '0.1s',
+          w: 'full',
+          h: 'full',
+        }}
+      >
+        {children}
+        <SelectionOverlay isSelected={false} isHovered={isMouseOverField} />
+      </Flex>
+    );
+  }
 );
 
 InputFieldWrapper.displayName = 'InputFieldWrapper';

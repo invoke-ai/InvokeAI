@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex, Text } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
@@ -81,6 +81,9 @@ const ImageInputFieldComponent = (
         draggableData={draggableData}
         postUploadAction={postUploadAction}
         useThumbailFallback
+        uploadElement={<UploadElement />}
+        dropLabel={<DropLabel />}
+        minSize={8}
       >
         <IAIDndImageIcon
           onClick={handleReset}
@@ -93,3 +96,14 @@ const ImageInputFieldComponent = (
 };
 
 export default memo(ImageInputFieldComponent);
+
+const UploadElement = () => (
+  <Text fontSize={16} fontWeight={600}>
+    Drop or Upload
+  </Text>
+);
+const DropLabel = () => (
+  <Text fontSize={16} fontWeight={600}>
+    Drop
+  </Text>
+);
