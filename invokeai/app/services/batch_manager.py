@@ -92,10 +92,10 @@ class BatchManager(BatchManagerBase):
         for npath in sorted_nodes:
             node = graph.get_node(npath)
             for index, bdl in enumerate(batch.data):
-                relavent_bd = [bd for bd in bdl if bd.node_id in node.id]
-                if not relavent_bd:
+                relevant_bd = [bd for bd in bdl if bd.node_id in node.id]
+                if not relevant_bd:
                     continue
-                for bd in relavent_bd:
+                for bd in relevant_bd:
                     batch_index = batch_indices[index]
                     datum = bd.items[batch_index]
                     key = bd.field_name
