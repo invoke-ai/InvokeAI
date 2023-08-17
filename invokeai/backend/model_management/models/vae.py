@@ -5,7 +5,6 @@ from typing import Optional
 
 import safetensors
 import torch
-from diffusers.utils import is_safetensors_available
 from omegaconf import OmegaConf
 
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -175,5 +174,5 @@ def _convert_vae_ckpt_and_cache(
         vae_config=config,
         image_size=image_size,
     )
-    vae_model.save_pretrained(output_path, safe_serialization=is_safetensors_available())
+    vae_model.save_pretrained(output_path, safe_serialization=True)
     return output_path
