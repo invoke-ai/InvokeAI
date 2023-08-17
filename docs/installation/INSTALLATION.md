@@ -25,10 +25,10 @@ This method is recommended for experienced users and developers
 #### [Docker Installation](040_INSTALL_DOCKER.md)
 This method is recommended for those familiar with running Docker containers
 ### Other Installation Guides
-  - [PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md)
-  - [XFormers](installation/070_INSTALL_XFORMERS.md)
-  - [CUDA and ROCm Drivers](installation/030_INSTALL_CUDA_AND_ROCM.md)
-  - [Installing New Models](installation/050_INSTALLING_MODELS.md)
+  - [PyPatchMatch](060_INSTALL_PATCHMATCH.md)
+  - [XFormers](070_INSTALL_XFORMERS.md)
+  - [CUDA and ROCm Drivers](030_INSTALL_CUDA_AND_ROCM.md)
+  - [Installing New Models](050_INSTALLING_MODELS.md)
 
 ## :fontawesome-solid-computer: Hardware Requirements
 
