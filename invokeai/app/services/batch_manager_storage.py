@@ -76,7 +76,7 @@ def uuid_string():
 
 
 class BatchProcess(BaseModel):
-    batch_id: Optional[str] = Field(default_factory=uuid_string, description="Identifier for this batch")
+    batch_id: str = Field(default_factory=uuid_string, description="Identifier for this batch")
     batch: Batch = Field(description="List of batch configs to apply to this session")
     canceled: bool = Field(description="Flag for saying whether or not to run sessions from this batch", default=False)
     graph: Graph = Field(description="The graph being executed")
