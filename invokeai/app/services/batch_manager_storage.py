@@ -481,17 +481,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
     def _deserialize_batch_session(self, session_dict: dict) -> BatchSession:
         """Deserializes a batch session."""
 
-        # Retrieve all the values, setting "reasonable" defaults if they are not present.
-
-        batch_id = session_dict.get("batch_id", "unknown")
-        session_id = session_dict.get("session_id", "unknown")
-        state = session_dict.get("state", "unknown")
-
-        return BatchSession(
-            batch_id=batch_id,
-            session_id=session_id,
-            state=state,
-        )
+        return BatchSession.parse_obj(session_dict)
 
     def get_created_session(self, batch_id: str) -> BatchSession:
         try:
