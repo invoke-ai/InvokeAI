@@ -2,8 +2,12 @@ import { MenuGroup, MenuItem, MenuList } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ContextMenu, ContextMenuProps } from 'chakra-ui-contextmenu';
+import {
+  IAIContextMenu,
+  IAIContextMenuProps,
+} from 'common/components/IAIContextMenu';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
+import { BoardId } from 'features/gallery/store/types';
 import { MouseEvent, memo, useCallback, useMemo } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { useBoardName } from 'services/api/hooks/useBoardName';
@@ -11,12 +15,11 @@ import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
-import { BoardId } from 'features/gallery/store/types';
 
 type Props = {
   board?: BoardDTO;
   board_id: BoardId;
-  children: ContextMenuProps<HTMLDivElement>['children'];
+  children: IAIContextMenuProps<HTMLDivElement>['children'];
   setBoardToDelete?: (board?: BoardDTO) => void;
 };
 
@@ -48,7 +51,7 @@ const BoardContextMenu = memo(
     }, []);
 
     return (
-      <ContextMenu<HTMLDivElement>
+      <IAIContextMenu<HTMLDivElement>
         menuProps={{ size: 'sm', isLazy: true }}
         menuButtonProps={{
           bg: 'transparent',
@@ -80,7 +83,7 @@ const BoardContextMenu = memo(
         )}
       >
         {children}
-      </ContextMenu>
+      </IAIContextMenu>
     );
   }
 );
