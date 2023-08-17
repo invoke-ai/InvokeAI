@@ -63,13 +63,13 @@ class BatchManager(BatchManagerBase):
 
         match event_name:
             case "graph_execution_state_complete":
-                await self.process(event, False)
+                await self._process(event, False)
             case "invocation_error":
-                await self.process(event, True)
+                await self._process(event, True)
 
         return event
 
-    async def process(self, event: Event, err: bool) -> None:
+    async def _process(self, event: Event, err: bool) -> None:
         data = event[1]["data"]
         batch_session = self.__batch_process_storage.get_session(data["graph_execution_state_id"])
         if not batch_session:
