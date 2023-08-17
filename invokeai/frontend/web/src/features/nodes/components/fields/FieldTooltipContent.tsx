@@ -23,7 +23,6 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
   const isInputTemplate = isInputFieldTemplate(fieldTemplate);
   const fieldTitle = useMemo(() => {
     if (isInputFieldValue(field)) {
-      console.log(field, fieldTemplate);
       if (field.label && fieldTemplate?.title) {
         return `${field.label} (${fieldTemplate.title})`;
       }

@@ -1,18 +1,19 @@
-import { Flex, FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
+import { Box, Flex, FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
+import SelectionOverlay from 'common/components/SelectionOverlay';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import {
   useDoesInputHaveValue,
+  useFieldInputKind,
   useFieldTemplate,
   useIsMouseOverField,
 } from 'features/nodes/hooks/useNodeData';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import { PropsWithChildren, memo, useMemo } from 'react';
+import { PropsWithChildren, memo, useCallback, useMemo, useState } from 'react';
 import FieldContextMenu from './FieldContextMenu';
 import FieldHandle from './FieldHandle';
 import FieldTitle from './FieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
-import SelectionOverlay from 'common/components/SelectionOverlay';
 
 interface Props {
   nodeId: string;
@@ -22,6 +23,16 @@ interface Props {
 const InputField = ({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'input');
   const doesFieldHaveValue = useDoesInputHaveValue(nodeId, fieldName);
+  const input = useFieldInputKind(nodeId, fieldName);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseOver = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+
+  const handleMouseOut = useCallback(() => {
+    setIsHovered(false);
+  }, []);
 
   const {
     isConnected,
@@ -81,6 +92,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
           ps: 2,
           gap: 2,
           h: 'full',
+          w: 'full',
         }}
       >
         <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
@@ -97,18 +109,32 @@ const InputField = ({ nodeId, fieldName }: Props) => {
               placement="top"
               hasArrow
             >
-              <FormLabel sx={{ mb: 0 }}>
+              <FormLabel
+                sx={{
+                  mb: 0,
+                  width: input === 'connection' ? 'auto' : '25%',
+                  flexShrink: 0,
+                  flexGrow: 0,
+                }}
+              >
                 <FieldTitle
                   ref={ref}
                   nodeId={nodeId}
                   fieldName={fieldName}
                   kind="input"
+                  isMissingInput={isMissingInput}
                 />
               </FormLabel>
             </Tooltip>
           )}
         </FieldContextMenu>
-        <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+        <Box
+          sx={{
+            width: input === 'connection' ? 'auto' : '75%',
+          }}
+        >
+          <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+        </Box>
       </FormControl>
 
       {fieldTemplate.input !== 'direct' && (

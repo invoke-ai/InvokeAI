@@ -18,10 +18,11 @@ interface Props {
   nodeId: string;
   fieldName: string;
   kind: 'input' | 'output';
+  isMissingInput?: boolean;
 }
 
 const FieldTitle = forwardRef((props: Props, ref) => {
-  const { nodeId, fieldName, kind } = props;
+  const { nodeId, fieldName, kind, isMissingInput = false } = props;
   const label = useFieldLabel(nodeId, fieldName);
   const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, kind);
 
@@ -78,7 +79,11 @@ const FieldTitle = forwardRef((props: Props, ref) => {
         <EditablePreview
           sx={{
             p: 0,
+            fontWeight: isMissingInput ? 600 : 400,
             textAlign: 'left',
+            _hover: {
+              fontWeight: '600 !important',
+            },
           }}
           noOfLines={1}
         />

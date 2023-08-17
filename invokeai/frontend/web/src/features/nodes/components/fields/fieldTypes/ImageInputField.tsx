@@ -98,13 +98,18 @@ const ImageInputFieldComponent = (
 
 export default memo(ImageInputFieldComponent);
 
-const UploadElement = () => (
+const UploadElement = memo(() => (
   <Text fontSize={16} fontWeight={600}>
     Drop or Upload
   </Text>
-);
-const DropLabel = () => (
+));
+
+UploadElement.displayName = 'UploadElement';
+
+const DropLabel = memo(() => (
   <Text fontSize={16} fontWeight={600}>
     Drop
   </Text>
-);
+));
+
+DropLabel.displayName = 'DropLabel';

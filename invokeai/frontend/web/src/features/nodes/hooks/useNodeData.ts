@@ -115,9 +115,9 @@ export const useFieldInputKind = (nodeId: string, fieldName: string) => {
     [fieldName, nodeId]
   );
 
-  const fieldType = useAppSelector(selector);
+  const inputKind = useAppSelector(selector);
 
-  return fieldType;
+  return inputKind;
 };
 
 export const useFieldType = (

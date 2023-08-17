@@ -25,7 +25,7 @@ const NodeHeader = ({ nodeId, isOpen }: Props) => {
         justifyContent: 'space-between',
         h: 8,
         textAlign: 'center',
-        fontWeight: 600,
+        fontWeight: 500,
         color: 'base.700',
         _dark: { color: 'base.200' },
       }}
