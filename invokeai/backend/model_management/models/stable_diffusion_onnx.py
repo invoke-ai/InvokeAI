@@ -1,5 +1,7 @@
 from enum import Enum
 from typing import Literal
+
+from diffusers import OnnxRuntimeModel
 from .base import (
     ModelConfigBase,
     BaseModelType,
@@ -8,7 +10,6 @@ from .base import (
     DiffusersModel,
     SchedulerPredictionType,
     classproperty,
-    OnnxRuntimeModel,
     IAIOnnxRuntimeModel,
 )
 
