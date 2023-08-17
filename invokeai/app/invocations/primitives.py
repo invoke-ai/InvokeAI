@@ -307,6 +307,18 @@ class ImageCollectionInvocation(BaseInvocation):
 
 # endregion
 
+# region InpaintMask
+
+
+class InpaintMaskField(BaseModel):
+    """An inapint mask field"""
+
+    mask_name: str = Field(description="The name of the mask image")
+    masked_latens_name: Optional[str] = Field(description="The name of the masked image latents")
+
+
+# endregion
+
 # region Latents
 
 
