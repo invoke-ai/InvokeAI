@@ -1,60 +1,31 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Literal, Optional
 
 import cv2
 import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
-from pydantic import Field
 
 from invokeai.app.invocations.metadata import CoreMetadata
+from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
-from ..models.image import ImageCategory, ImageField, ImageOutput, MaskOutput, PILInvocationConfig, ResourceOrigin
-from .baseinvocation import BaseInvocation, InvocationConfig, InvocationContext
+from ..models.image import ImageCategory, ResourceOrigin
+from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, tags, title
 
 
-class LoadImageInvocation(BaseInvocation):
-    """Load an image and provide it as output."""
-
-    # fmt: off
-    type: Literal["load_image"] = "load_image"
-
-    # Inputs
-    image: Optional[ImageField] = Field(
-        default=None, description="The image to load"
-    )
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Load Image", "tags": ["image", "load"]},
-        }
-
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
-
-        return ImageOutput(
-            image=ImageField(image_name=self.image.image_name),
-            width=image.width,
-            height=image.height,
-        )
-
-
+@title("Show Image")
+@tags("image")
 class ShowImageInvocation(BaseInvocation):
     """Displays a provided image, and passes it forward in the pipeline."""
 
+    # Metadata
     type: Literal["show_image"] = "show_image"
 
     # Inputs
-    image: Optional[ImageField] = Field(default=None, description="The image to show")
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Show Image", "tags": ["image", "show"]},
-        }
+    image: ImageField = InputField(description="The image to show")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -70,24 +41,20 @@ class ShowImageInvocation(BaseInvocation):
         )
 
 
-class ImageCropInvocation(BaseInvocation, PILInvocationConfig):
+@title("Crop Image")
+@tags("image", "crop")
+class ImageCropInvocation(BaseInvocation):
     """Crops an image to a specified box. The box can be outside of the image."""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_crop"] = "img_crop"
 
     # Inputs
-    image: Optional[ImageField]  = Field(default=None, description="The image to crop")
-    x:      int = Field(default=0, description="The left x coordinate of the crop rectangle")
-    y:      int = Field(default=0, description="The top y coordinate of the crop rectangle")
-    width:  int = Field(default=512, gt=0, description="The width of the crop rectangle")
-    height: int = Field(default=512, gt=0, description="The height of the crop rectangle")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Crop Image", "tags": ["image", "crop"]},
-        }
+    image: ImageField = InputField(description="The image to crop")
+    x: int = InputField(default=0, description="The left x coordinate of the crop rectangle")
+    y: int = InputField(default=0, description="The top y coordinate of the crop rectangle")
+    width: int = InputField(default=512, gt=0, description="The width of the crop rectangle")
+    height: int = InputField(default=512, gt=0, description="The height of the crop rectangle")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -111,24 +78,23 @@ class ImageCropInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
+@title("Paste Image")
+@tags("image", "paste")
+class ImagePasteInvocation(BaseInvocation):
     """Pastes an image into another image."""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_paste"] = "img_paste"
 
     # Inputs
-    base_image:     Optional[ImageField]  = Field(default=None, description="The base image")
-    image:          Optional[ImageField]  = Field(default=None, description="The image to paste")
-    mask: Optional[ImageField] = Field(default=None, description="The mask to use when pasting")
-    x:                     int = Field(default=0, description="The left x coordinate at which to paste the image")
-    y:                     int = Field(default=0, description="The top y coordinate at which to paste the image")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Paste Image", "tags": ["image", "paste"]},
-        }
+    base_image: ImageField = InputField(description="The base image")
+    image: ImageField = InputField(description="The image to paste")
+    mask: Optional[ImageField] = InputField(
+        default=None,
+        description="The mask to use when pasting",
+    )
+    x: int = InputField(default=0, description="The left x coordinate at which to paste the image")
+    y: int = InputField(default=0, description="The top y coordinate at which to paste the image")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         base_image = context.services.images.get_pil_image(self.base_image.image_name)
@@ -164,23 +130,19 @@ class ImagePasteInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
+@title("Mask from Alpha")
+@tags("image", "mask")
+class MaskFromAlphaInvocation(BaseInvocation):
     """Extracts the alpha channel of an image as a mask."""
 
-    # fmt: off
+    # Metadata
     type: Literal["tomask"] = "tomask"
 
     # Inputs
-    image: Optional[ImageField]  = Field(default=None, description="The image to create the mask from")
-    invert:      bool = Field(default=False, description="Whether or not to invert the mask")
-    # fmt: on
+    image: ImageField = InputField(description="The image to create the mask from")
+    invert: bool = InputField(default=False, description="Whether or not to invert the mask")
 
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Mask From Alpha", "tags": ["image", "mask", "alpha"]},
-        }
-
-    def invoke(self, context: InvocationContext) -> MaskOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
         image_mask = image.split()[-1]
@@ -196,28 +158,24 @@ class MaskFromAlphaInvocation(BaseInvocation, PILInvocationConfig):
             is_intermediate=self.is_intermediate,
         )
 
-        return MaskOutput(
-            mask=ImageField(image_name=image_dto.image_name),
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )
 
 
-class ImageMultiplyInvocation(BaseInvocation, PILInvocationConfig):
+@title("Multiply Images")
+@tags("image", "multiply")
+class ImageMultiplyInvocation(BaseInvocation):
     """Multiplies two images together using `PIL.ImageChops.multiply()`."""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_mul"] = "img_mul"
 
     # Inputs
-    image1: Optional[ImageField]  = Field(default=None, description="The first image to multiply")
-    image2: Optional[ImageField]  = Field(default=None, description="The second image to multiply")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Multiply Images", "tags": ["image", "multiply"]},
-        }
+    image1: ImageField = InputField(description="The first image to multiply")
+    image2: ImageField = InputField(description="The second image to multiply")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image1 = context.services.images.get_pil_image(self.image1.image_name)
@@ -244,21 +202,17 @@ class ImageMultiplyInvocation(BaseInvocation, PILInvocationConfig):
 IMAGE_CHANNELS = Literal["A", "R", "G", "B"]
 
 
-class ImageChannelInvocation(BaseInvocation, PILInvocationConfig):
+@title("Extract Image Channel")
+@tags("image", "channel")
+class ImageChannelInvocation(BaseInvocation):
     """Gets a channel from an image."""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_chan"] = "img_chan"
 
     # Inputs
-    image: Optional[ImageField]  = Field(default=None, description="The image to get the channel from")
-    channel: IMAGE_CHANNELS  = Field(default="A", description="The channel to get")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Image Channel", "tags": ["image", "channel"]},
-        }
+    image: ImageField = InputField(description="The image to get the channel from")
+    channel: IMAGE_CHANNELS = InputField(default="A", description="The channel to get")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -284,21 +238,17 @@ class ImageChannelInvocation(BaseInvocation, PILInvocationConfig):
 IMAGE_MODES = Literal["L", "RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV", "I", "F"]
 
 
-class ImageConvertInvocation(BaseInvocation, PILInvocationConfig):
+@title("Convert Image Mode")
+@tags("image", "convert")
+class ImageConvertInvocation(BaseInvocation):
     """Converts an image to a different mode."""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_conv"] = "img_conv"
 
     # Inputs
-    image: Optional[ImageField]  = Field(default=None, description="The image to convert")
-    mode: IMAGE_MODES  = Field(default="L", description="The mode to convert to")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Convert Image", "tags": ["image", "convert"]},
-        }
+    image: ImageField = InputField(description="The image to convert")
+    mode: IMAGE_MODES = InputField(default="L", description="The mode to convert to")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -321,22 +271,19 @@ class ImageConvertInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-class ImageBlurInvocation(BaseInvocation, PILInvocationConfig):
+@title("Blur Image")
+@tags("image", "blur")
+class ImageBlurInvocation(BaseInvocation):
     """Blurs an image"""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_blur"] = "img_blur"
 
     # Inputs
-    image: Optional[ImageField]  = Field(default=None, description="The image to blur")
-    radius:     float = Field(default=8.0, ge=0, description="The blur radius")
-    blur_type: Literal["gaussian", "box"] = Field(default="gaussian", description="The type of blur")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Blur Image", "tags": ["image", "blur"]},
-        }
+    image: ImageField = InputField(description="The image to blur")
+    radius: float = InputField(default=8.0, ge=0, description="The blur radius")
+    # Metadata
+    blur_type: Literal["gaussian", "box"] = InputField(default="gaussian", description="The type of blur")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -382,23 +329,19 @@ PIL_RESAMPLING_MAP = {
 }
 
 
-class ImageResizeInvocation(BaseInvocation, PILInvocationConfig):
+@title("Resize Image")
+@tags("image", "resize")
+class ImageResizeInvocation(BaseInvocation):
     """Resizes an image to specific dimensions"""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_resize"] = "img_resize"
 
     # Inputs
-    image: Optional[ImageField]  = Field(default=None, description="The image to resize")
-    width:                         Union[int, None] = Field(ge=64, multiple_of=8, description="The width to resize to (px)")
-    height:                        Union[int, None] = Field(ge=64, multiple_of=8, description="The height to resize to (px)")
-    resample_mode:  PIL_RESAMPLING_MODES = Field(default="bicubic", description="The resampling mode")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Resize Image", "tags": ["image", "resize"]},
-        }
+    image: ImageField = InputField(description="The image to resize")
+    width: int = InputField(default=512, ge=64, multiple_of=8, description="The width to resize to (px)")
+    height: int = InputField(default=512, ge=64, multiple_of=8, description="The height to resize to (px)")
+    resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -426,22 +369,22 @@ class ImageResizeInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-class ImageScaleInvocation(BaseInvocation, PILInvocationConfig):
+@title("Scale Image")
+@tags("image", "scale")
+class ImageScaleInvocation(BaseInvocation):
     """Scales an image by a factor"""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_scale"] = "img_scale"
 
     # Inputs
-    image:          Optional[ImageField] = Field(default=None, description="The image to scale")
-    scale_factor:        Optional[float] = Field(default=2.0, gt=0, description="The factor by which to scale the image")
-    resample_mode:  PIL_RESAMPLING_MODES = Field(default="bicubic", description="The resampling mode")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Scale Image", "tags": ["image", "scale"]},
-        }
+    image: ImageField = InputField(description="The image to scale")
+    scale_factor: float = InputField(
+        default=2.0,
+        gt=0,
+        description="The factor by which to scale the image",
+    )
+    resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -471,22 +414,18 @@ class ImageScaleInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
+@title("Lerp Image")
+@tags("image", "lerp")
+class ImageLerpInvocation(BaseInvocation):
     """Linear interpolation of all pixels of an image"""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_lerp"] = "img_lerp"
 
     # Inputs
-    image: Optional[ImageField]  = Field(default=None, description="The image to lerp")
-    min: int = Field(default=0, ge=0, le=255, description="The minimum output value")
-    max: int = Field(default=255, ge=0, le=255, description="The maximum output value")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Image Linear Interpolation", "tags": ["image", "linear", "interpolation", "lerp"]},
-        }
+    image: ImageField = InputField(description="The image to lerp")
+    min: int = InputField(default=0, ge=0, le=255, description="The minimum output value")
+    max: int = InputField(default=255, ge=0, le=255, description="The maximum output value")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -512,25 +451,18 @@ class ImageLerpInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
+@title("Inverse Lerp Image")
+@tags("image", "ilerp")
+class ImageInverseLerpInvocation(BaseInvocation):
     """Inverse linear interpolation of all pixels of an image"""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_ilerp"] = "img_ilerp"
 
     # Inputs
-    image: Optional[ImageField]  = Field(default=None, description="The image to lerp")
-    min: int = Field(default=0, ge=0, le=255, description="The minimum input value")
-    max: int = Field(default=255, ge=0, le=255, description="The maximum input value")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "title": "Image Inverse Linear Interpolation",
-                "tags": ["image", "linear", "interpolation", "inverse"],
-            },
-        }
+    image: ImageField = InputField(description="The image to lerp")
+    min: int = InputField(default=0, ge=0, le=255, description="The minimum input value")
+    max: int = InputField(default=255, ge=0, le=255, description="The maximum input value")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -556,21 +488,19 @@ class ImageInverseLerpInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
+@title("Blur NSFW Image")
+@tags("image", "nsfw")
+class ImageNSFWBlurInvocation(BaseInvocation):
     """Add blur to NSFW-flagged images"""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_nsfw"] = "img_nsfw"
 
     # Inputs
-    image: Optional[ImageField]  = Field(default=None, description="The image to check")
-    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")    
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Blur NSFW Images", "tags": ["image", "nsfw", "checker"]},
-        }
+    image: ImageField = InputField(description="The image to check")
+    metadata: Optional[CoreMetadata] = InputField(
+        default=None, description=FieldDescriptions.core_metadata, ui_hidden=True
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -607,22 +537,20 @@ class ImageNSFWBlurInvocation(BaseInvocation, PILInvocationConfig):
         return caution.resize((caution.width // 2, caution.height // 2))
 
 
-class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
+@title("Add Invisible Watermark")
+@tags("image", "watermark")
+class ImageWatermarkInvocation(BaseInvocation):
     """Add an invisible watermark to an image"""
 
-    # fmt: off
+    # Metadata
     type: Literal["img_watermark"] = "img_watermark"
 
     # Inputs
-    image: Optional[ImageField]  = Field(default=None, description="The image to check")
-    text: str = Field(default='InvokeAI', description="Watermark text")
-    metadata: Optional[CoreMetadata] = Field(default=None, description="Optional core metadata to be written to the image")    
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Add Invisible Watermark", "tags": ["image", "watermark", "invisible"]},
-        }
+    image: ImageField = InputField(description="The image to check")
+    text: str = InputField(default="InvokeAI", description="Watermark text")
+    metadata: Optional[CoreMetadata] = InputField(
+        default=None, description=FieldDescriptions.core_metadata, ui_hidden=True
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -644,21 +572,23 @@ class ImageWatermarkInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-class MaskEdgeInvocation(BaseInvocation, PILInvocationConfig):
+@title("Mask Edge")
+@tags("image", "mask", "inpaint")
+class MaskEdgeInvocation(BaseInvocation):
     """Applies an edge mask to an image"""
 
-    # fmt: off
     type: Literal["mask_edge"] = "mask_edge"
 
     # Inputs
-    image: Optional[ImageField] = Field(default=None, description="The image to apply the mask to")
-    edge_size: int = Field(description="The size of the edge")
-    edge_blur: int = Field(description="The amount of blur on the edge")
-    low_threshold: int = Field(description="First threshold for the hysteresis procedure in Canny edge detection")
-    high_threshold: int = Field(description="Second threshold for the hysteresis procedure in Canny edge detection")
-    # fmt: on
+    image: ImageField = InputField(description="The image to apply the mask to")
+    edge_size: int = InputField(description="The size of the edge")
+    edge_blur: int = InputField(description="The amount of blur on the edge")
+    low_threshold: int = InputField(description="First threshold for the hysteresis procedure in Canny edge detection")
+    high_threshold: int = InputField(
+        description="Second threshold for the hysteresis procedure in Canny edge detection"
+    )
 
-    def invoke(self, context: InvocationContext) -> MaskOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         mask = context.services.images.get_pil_image(self.image.image_name)
 
         npimg = numpy.asarray(mask, dtype=numpy.uint8)
@@ -683,28 +613,23 @@ class MaskEdgeInvocation(BaseInvocation, PILInvocationConfig):
             is_intermediate=self.is_intermediate,
         )
 
-        return MaskOutput(
-            mask=ImageField(image_name=image_dto.image_name),
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
             width=image_dto.width,
             height=image_dto.height,
         )
 
 
-class MaskCombineInvocation(BaseInvocation, PILInvocationConfig):
+@title("Combine Mask")
+@tags("image", "mask", "multiply")
+class MaskCombineInvocation(BaseInvocation):
     """Combine two masks together by multiplying them using `PIL.ImageChops.multiply()`."""
 
-    # fmt: off
     type: Literal["mask_combine"] = "mask_combine"
 
     # Inputs
-    mask1: ImageField  = Field(default=None, description="The first mask to combine")
-    mask2: ImageField  = Field(default=None, description="The second image to combine")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Mask Combine", "tags": ["mask", "combine"]},
-        }
+    mask1: ImageField = InputField(description="The first mask to combine")
+    mask2: ImageField = InputField(description="The second image to combine")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         mask1 = context.services.images.get_pil_image(self.mask1.image_name).convert("L")
@@ -728,7 +653,9 @@ class MaskCombineInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
-class ColorCorrectInvocation(BaseInvocation, PILInvocationConfig):
+@title("Color Correct")
+@tags("image", "color")
+class ColorCorrectInvocation(BaseInvocation):
     """
     Shifts the colors of a target image to match the reference image, optionally
     using a mask to only color-correct certain regions of the target image.
@@ -736,10 +663,11 @@ class ColorCorrectInvocation(BaseInvocation, PILInvocationConfig):
 
     type: Literal["color_correct"] = "color_correct"
 
-    image: Optional[ImageField] = Field(default=None, description="The image to color-correct")
-    reference: Optional[ImageField] = Field(default=None, description="Reference image for color-correction")
-    mask: Optional[ImageField] = Field(default=None, description="Mask to use when applying color-correction")
-    mask_blur_radius: float = Field(default=8, description="Mask blur radius")
+    # Inputs
+    image: ImageField = InputField(description="The image to color-correct")
+    reference: ImageField = InputField(description="Reference image for color-correction")
+    mask: Optional[ImageField] = InputField(default=None, description="Mask to use when applying color-correction")
+    mask_blur_radius: float = InputField(default=8, description="Mask blur radius")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_init_mask = None
@@ -833,16 +761,16 @@ class ColorCorrectInvocation(BaseInvocation, PILInvocationConfig):
         )
 
 
+@title("Image Hue Adjustment")
+@tags("image", "hue", "hsl")
 class ImageHueAdjustmentInvocation(BaseInvocation):
     """Adjusts the Hue of an image."""
 
-    # fmt: off
     type: Literal["img_hue_adjust"] = "img_hue_adjust"
 
     # Inputs
-    image: ImageField = Field(default=None, description="The image to adjust")
-    hue: int = Field(default=0, description="The degrees by which to rotate the hue, 0-360")
-    # fmt: on
+    image: ImageField = InputField(description="The image to adjust")
+    hue: int = InputField(default=0, description="The degrees by which to rotate the hue, 0-360")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_image = context.services.images.get_pil_image(self.image.image_name)
@@ -877,16 +805,18 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
         )
 
 
+@title("Image Luminosity Adjustment")
+@tags("image", "luminosity", "hsl")
 class ImageLuminosityAdjustmentInvocation(BaseInvocation):
     """Adjusts the Luminosity (Value) of an image."""
 
-    # fmt: off
     type: Literal["img_luminosity_adjust"] = "img_luminosity_adjust"
 
     # Inputs
-    image: ImageField = Field(default=None, description="The image to adjust")
-    luminosity: float = Field(default=1.0, ge=0, le=1, description="The factor by which to adjust the luminosity (value)")
-    # fmt: on
+    image: ImageField = InputField(description="The image to adjust")
+    luminosity: float = InputField(
+        default=1.0, ge=0, le=1, description="The factor by which to adjust the luminosity (value)"
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_image = context.services.images.get_pil_image(self.image.image_name)
@@ -925,16 +855,16 @@ class ImageLuminosityAdjustmentInvocation(BaseInvocation):
         )
 
 
+@title("Image Saturation Adjustment")
+@tags("image", "saturation", "hsl")
 class ImageSaturationAdjustmentInvocation(BaseInvocation):
     """Adjusts the Saturation of an image."""
 
-    # fmt: off
     type: Literal["img_saturation_adjust"] = "img_saturation_adjust"
 
     # Inputs
-    image: ImageField = Field(default=None, description="The image to adjust")
-    saturation: float = Field(default=1.0, ge=0, le=1, description="The factor by which to adjust the saturation")
-    # fmt: on
+    image: ImageField = InputField(description="The image to adjust")
+    saturation: float = InputField(default=1.0, ge=0, le=1, description="The factor by which to adjust the saturation")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_image = context.services.images.get_pil_image(self.image.image_name)

@@ -1,7 +1,8 @@
 import { UseToastOptions } from '@chakra-ui/react';
 import { EntityState } from '@reduxjs/toolkit';
-import { O } from 'ts-toolbelt';
 import { components, paths } from './schema';
+
+type s = components['schemas'];
 
 export type ImageCache = EntityState<ImageDTO>;
 
@@ -25,70 +26,63 @@ export type UpdateBoardArg =
  * This is an unsafe type; the object inside is not guaranteed to be valid.
  */
 export type UnsafeImageMetadata = {
-  metadata: components['schemas']['CoreMetadata'];
-  graph: NonNullable<components['schemas']['Graph']>;
+  metadata: s['CoreMetadata'];
+  graph: NonNullable<s['Graph']>;
 };
 
-/**
- * Marks the `type` property as required. Use for nodes.
- */
-type TypeReq<T extends object> = O.Required<T, 'type'>;
-
-// Extracted types from API schema
+export type _InputField = s['_InputField'];
+export type _OutputField = s['_OutputField'];
 
 // App Info
-export type AppVersion = components['schemas']['AppVersion'];
-export type AppConfig = components['schemas']['AppConfig'];
+export type AppVersion = s['AppVersion'];
+export type AppConfig = s['AppConfig'];
 
 // Images
-export type ImageDTO = components['schemas']['ImageDTO'];
-export type BoardDTO = components['schemas']['BoardDTO'];
-export type BoardChanges = components['schemas']['BoardChanges'];
-export type ImageChanges = components['schemas']['ImageRecordChanges'];
-export type ImageCategory = components['schemas']['ImageCategory'];
-export type ResourceOrigin = components['schemas']['ResourceOrigin'];
-export type ImageField = components['schemas']['ImageField'];
-export type ImageMetadata = components['schemas']['ImageMetadata'];
+export type ImageDTO = s['ImageDTO'];
+export type BoardDTO = s['BoardDTO'];
+export type BoardChanges = s['BoardChanges'];
+export type ImageChanges = s['ImageRecordChanges'];
+export type ImageCategory = s['ImageCategory'];
+export type ResourceOrigin = s['ResourceOrigin'];
+export type ImageField = s['ImageField'];
+export type ImageMetadata = s['ImageMetadata'];
 export type OffsetPaginatedResults_BoardDTO_ =
-  components['schemas']['OffsetPaginatedResults_BoardDTO_'];
+  s['OffsetPaginatedResults_BoardDTO_'];
 export type OffsetPaginatedResults_ImageDTO_ =
-  components['schemas']['OffsetPaginatedResults_ImageDTO_'];
+  s['OffsetPaginatedResults_ImageDTO_'];
 
 // Models
-export type ModelType = components['schemas']['ModelType'];
-export type SubModelType = components['schemas']['SubModelType'];
-export type BaseModelType = components['schemas']['BaseModelType'];
-export type MainModelField = components['schemas']['MainModelField'];
-export type OnnxModelField = components['schemas']['OnnxModelField'];
-export type VAEModelField = components['schemas']['VAEModelField'];
-export type LoRAModelField = components['schemas']['LoRAModelField'];
-export type ControlNetModelField =
-  components['schemas']['ControlNetModelField'];
-export type ModelsList = components['schemas']['ModelsList'];
-export type ControlField = components['schemas']['ControlField'];
+export type ModelType = s['ModelType'];
+export type SubModelType = s['SubModelType'];
+export type BaseModelType = s['BaseModelType'];
+export type MainModelField = s['MainModelField'];
+export type OnnxModelField = s['OnnxModelField'];
+export type VAEModelField = s['VAEModelField'];
+export type LoRAModelField = s['LoRAModelField'];
+export type ControlNetModelField = s['ControlNetModelField'];
+export type ModelsList = s['ModelsList'];
+export type ControlField = s['ControlField'];
 
 // Model Configs
-export type LoRAModelConfig = components['schemas']['LoRAModelConfig'];
-export type VaeModelConfig = components['schemas']['VaeModelConfig'];
+export type LoRAModelConfig = s['LoRAModelConfig'];
+export type VaeModelConfig = s['VaeModelConfig'];
 export type ControlNetModelCheckpointConfig =
-  components['schemas']['ControlNetModelCheckpointConfig'];
+  s['ControlNetModelCheckpointConfig'];
 export type ControlNetModelDiffusersConfig =
-  components['schemas']['ControlNetModelDiffusersConfig'];
+  s['ControlNetModelDiffusersConfig'];
 export type ControlNetModelConfig =
   | ControlNetModelCheckpointConfig
   | ControlNetModelDiffusersConfig;
-export type TextualInversionModelConfig =
-  components['schemas']['TextualInversionModelConfig'];
+export type TextualInversionModelConfig = s['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
-  | components['schemas']['StableDiffusion1ModelDiffusersConfig']
-  | components['schemas']['StableDiffusion2ModelDiffusersConfig']
-  | components['schemas']['StableDiffusionXLModelDiffusersConfig'];
+  | s['StableDiffusion1ModelDiffusersConfig']
+  | s['StableDiffusion2ModelDiffusersConfig']
+  | s['StableDiffusionXLModelDiffusersConfig'];
 export type CheckpointModelConfig =
-  | components['schemas']['StableDiffusion1ModelCheckpointConfig']
-  | components['schemas']['StableDiffusion2ModelCheckpointConfig']
-  | components['schemas']['StableDiffusionXLModelCheckpointConfig'];
-export type OnnxModelConfig =
-  components['schemas']['ONNXStableDiffusion1ModelConfig'];
+  | s['StableDiffusion1ModelCheckpointConfig']
+  | s['StableDiffusion2ModelCheckpointConfig']
+  | s['StableDiffusionXLModelCheckpointConfig'];
+export type OnnxModelConfig = s['ONNXStableDiffusion1ModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig
@@ -98,154 +92,73 @@ export type AnyModelConfig =
   | MainModelConfig
   | OnnxModelConfig;
 
-export type MergeModelConfig = components['schemas']['Body_merge_models'];
-export type ImportModelConfig = components['schemas']['Body_import_model'];
+export type MergeModelConfig = s['Body_merge_models'];
+export type ImportModelConfig = s['Body_import_model'];
 
 // Graphs
-export type Graph = components['schemas']['Graph'];
-export type Edge = components['schemas']['Edge'];
-export type GraphExecutionState = components['schemas']['GraphExecutionState'];
+export type Graph = s['Graph'];
+export type Edge = s['Edge'];
+export type GraphExecutionState = s['GraphExecutionState'];
 
 // General nodes
-export type CollectInvocation = TypeReq<
-  components['schemas']['CollectInvocation']
->;
-export type IterateInvocation = TypeReq<
-  components['schemas']['IterateInvocation']
->;
-export type RangeInvocation = TypeReq<components['schemas']['RangeInvocation']>;
-export type RandomRangeInvocation = TypeReq<
-  components['schemas']['RandomRangeInvocation']
->;
-export type RangeOfSizeInvocation = TypeReq<
-  components['schemas']['RangeOfSizeInvocation']
->;
-export type ImageResizeInvocation = TypeReq<
-  components['schemas']['ImageResizeInvocation']
->;
-export type ImageScaleInvocation = TypeReq<
-  components['schemas']['ImageScaleInvocation']
->;
-export type RandomIntInvocation = TypeReq<
-  components['schemas']['RandomIntInvocation']
->;
-export type CompelInvocation = TypeReq<
-  components['schemas']['CompelInvocation']
->;
-export type DynamicPromptInvocation = TypeReq<
-  components['schemas']['DynamicPromptInvocation']
->;
-export type NoiseInvocation = TypeReq<components['schemas']['NoiseInvocation']>;
-export type ONNXTextToLatentsInvocation = TypeReq<
-  components['schemas']['ONNXTextToLatentsInvocation']
->;
-export type DenoiseLatentsInvocation = TypeReq<
-  components['schemas']['DenoiseLatentsInvocation']
->;
-export type ImageToLatentsInvocation = TypeReq<
-  components['schemas']['ImageToLatentsInvocation']
->;
-export type LatentsToImageInvocation = TypeReq<
-  components['schemas']['LatentsToImageInvocation']
->;
-export type ImageCollectionInvocation = TypeReq<
-  components['schemas']['ImageCollectionInvocation']
->;
-export type MainModelLoaderInvocation = TypeReq<
-  components['schemas']['MainModelLoaderInvocation']
->;
-export type OnnxModelLoaderInvocation = TypeReq<
-  components['schemas']['OnnxModelLoaderInvocation']
->;
-export type LoraLoaderInvocation = TypeReq<
-  components['schemas']['LoraLoaderInvocation']
->;
-export type SDXLLoraLoaderInvocation = TypeReq<
-  components['schemas']['SDXLLoraLoaderInvocation']
->;
-export type MetadataAccumulatorInvocation = TypeReq<
-  components['schemas']['MetadataAccumulatorInvocation']
->;
-export type ESRGANInvocation = TypeReq<
-  components['schemas']['ESRGANInvocation']
->;
-export type DivideInvocation = TypeReq<
-  components['schemas']['DivideInvocation']
->;
-export type InfillTileInvocation = TypeReq<
-  components['schemas']['InfillTileInvocation']
->;
-export type InfillPatchmatchInvocation = TypeReq<
-  components['schemas']['InfillPatchMatchInvocation']
->;
-export type ImageNSFWBlurInvocation = TypeReq<
-  components['schemas']['ImageNSFWBlurInvocation']
->;
-export type ImageWatermarkInvocation = TypeReq<
-  components['schemas']['ImageWatermarkInvocation']
->;
-export type ImageBlurInvocation = TypeReq<
-  components['schemas']['ImageBlurInvocation']
->;
-export type ColorCorrectInvocation = TypeReq<
-  components['schemas']['ColorCorrectInvocation']
->;
-export type ImagePasteInvocation = TypeReq<
-  components['schemas']['ImagePasteInvocation']
->;
+export type CollectInvocation = s['CollectInvocation'];
+export type IterateInvocation = s['IterateInvocation'];
+export type RangeInvocation = s['RangeInvocation'];
+export type RandomRangeInvocation = s['RandomRangeInvocation'];
+export type RangeOfSizeInvocation = s['RangeOfSizeInvocation'];
+export type ImageResizeInvocation = s['ImageResizeInvocation'];
+export type ImageBlurInvocation = s['ImageBlurInvocation'];
+export type ImageScaleInvocation = s['ImageScaleInvocation'];
+export type InfillPatchMatchInvocation = s['InfillPatchMatchInvocation'];
+export type InfillTileInvocation = s['InfillTileInvocation'];
+export type RandomIntInvocation = s['RandomIntInvocation'];
+export type CompelInvocation = s['CompelInvocation'];
+export type DynamicPromptInvocation = s['DynamicPromptInvocation'];
+export type NoiseInvocation = s['NoiseInvocation'];
+export type DenoiseLatentsInvocation = s['DenoiseLatentsInvocation'];
+export type ONNXTextToLatentsInvocation = s['ONNXTextToLatentsInvocation'];
+export type SDXLLoraLoaderInvocation = s['SDXLLoraLoaderInvocation'];
+export type ImageToLatentsInvocation = s['ImageToLatentsInvocation'];
+export type LatentsToImageInvocation = s['LatentsToImageInvocation'];
+export type ImageCollectionInvocation = s['ImageCollectionInvocation'];
+export type MainModelLoaderInvocation = s['MainModelLoaderInvocation'];
+export type OnnxModelLoaderInvocation = s['OnnxModelLoaderInvocation'];
+export type LoraLoaderInvocation = s['LoraLoaderInvocation'];
+export type MetadataAccumulatorInvocation = s['MetadataAccumulatorInvocation'];
+export type ESRGANInvocation = s['ESRGANInvocation'];
+export type DivideInvocation = s['DivideInvocation'];
+export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
+export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
 
 // ControlNet Nodes
-export type ControlNetInvocation = TypeReq<
-  components['schemas']['ControlNetInvocation']
->;
-export type CannyImageProcessorInvocation = TypeReq<
-  components['schemas']['CannyImageProcessorInvocation']
->;
-export type ContentShuffleImageProcessorInvocation = TypeReq<
-  components['schemas']['ContentShuffleImageProcessorInvocation']
->;
-export type HedImageProcessorInvocation = TypeReq<
-  components['schemas']['HedImageProcessorInvocation']
->;
-export type LineartAnimeImageProcessorInvocation = TypeReq<
-  components['schemas']['LineartAnimeImageProcessorInvocation']
->;
-export type LineartImageProcessorInvocation = TypeReq<
-  components['schemas']['LineartImageProcessorInvocation']
->;
-export type MediapipeFaceProcessorInvocation = TypeReq<
-  components['schemas']['MediapipeFaceProcessorInvocation']
->;
-export type MidasDepthImageProcessorInvocation = TypeReq<
-  components['schemas']['MidasDepthImageProcessorInvocation']
->;
-export type MlsdImageProcessorInvocation = TypeReq<
-  components['schemas']['MlsdImageProcessorInvocation']
->;
-export type NormalbaeImageProcessorInvocation = TypeReq<
-  components['schemas']['NormalbaeImageProcessorInvocation']
->;
-export type OpenposeImageProcessorInvocation = TypeReq<
-  components['schemas']['OpenposeImageProcessorInvocation']
->;
-export type PidiImageProcessorInvocation = TypeReq<
-  components['schemas']['PidiImageProcessorInvocation']
->;
-export type ZoeDepthImageProcessorInvocation = TypeReq<
-  components['schemas']['ZoeDepthImageProcessorInvocation']
->;
+export type ControlNetInvocation = s['ControlNetInvocation'];
+export type CannyImageProcessorInvocation = s['CannyImageProcessorInvocation'];
+export type ContentShuffleImageProcessorInvocation =
+  s['ContentShuffleImageProcessorInvocation'];
+export type HedImageProcessorInvocation = s['HedImageProcessorInvocation'];
+export type LineartAnimeImageProcessorInvocation =
+  s['LineartAnimeImageProcessorInvocation'];
+export type LineartImageProcessorInvocation =
+  s['LineartImageProcessorInvocation'];
+export type MediapipeFaceProcessorInvocation =
+  s['MediapipeFaceProcessorInvocation'];
+export type MidasDepthImageProcessorInvocation =
+  s['MidasDepthImageProcessorInvocation'];
+export type MlsdImageProcessorInvocation = s['MlsdImageProcessorInvocation'];
+export type NormalbaeImageProcessorInvocation =
+  s['NormalbaeImageProcessorInvocation'];
+export type OpenposeImageProcessorInvocation =
+  s['OpenposeImageProcessorInvocation'];
+export type PidiImageProcessorInvocation = s['PidiImageProcessorInvocation'];
+export type ZoeDepthImageProcessorInvocation =
+  s['ZoeDepthImageProcessorInvocation'];
 
 // Node Outputs
-export type ImageOutput = components['schemas']['ImageOutput'];
-export type MaskOutput = components['schemas']['MaskOutput'];
-export type PromptOutput = components['schemas']['PromptOutput'];
-export type IterateInvocationOutput =
-  components['schemas']['IterateInvocationOutput'];
-export type CollectInvocationOutput =
-  components['schemas']['CollectInvocationOutput'];
-export type LatentsOutput = components['schemas']['LatentsOutput'];
-export type GraphInvocationOutput =
-  components['schemas']['GraphInvocationOutput'];
+export type ImageOutput = s['ImageOutput'];
+export type IterateInvocationOutput = s['IterateInvocationOutput'];
+export type CollectInvocationOutput = s['CollectInvocationOutput'];
+export type LatentsOutput = s['LatentsOutput'];
+export type GraphInvocationOutput = s['GraphInvocationOutput'];
 
 // Post-image upload actions, controls workflows when images are uploaded
 
@@ -284,3 +197,14 @@ export type PostUploadAction =
   | CanvasInitialImageAction
   | ToastAction
   | AddToBatchAction;
+
+type TypeGuard<T> = {
+  (input: unknown): input is T;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type TypeGuardFor<T extends TypeGuard<any>> = T extends TypeGuard<
+  infer U
+>
+  ? U
+  : never;

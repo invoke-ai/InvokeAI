@@ -1,5 +1,5 @@
-import { RootState } from 'app/store/store';
-import { InputFieldValue } from 'features/nodes/types/types';
+import { NodesState } from 'features/nodes/store/types';
+import { InputFieldValue, isInvocationNode } from 'features/nodes/types/types';
 import { cloneDeep, omit, reduce } from 'lodash-es';
 import { Graph } from 'services/api/types';
 import { AnyInvocation } from 'services/events/types';
@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
  * We need to do special handling for some fields
  */
 export const parseFieldValue = (field: InputFieldValue) => {
-  if (field.type === 'color') {
+  if (field.type === 'ColorField') {
     if (field.value) {
       const clonedValue = cloneDeep(field.value);
 
@@ -30,10 +30,10 @@ export const parseFieldValue = (field: InputFieldValue) => {
 /**
  * Builds a graph from the node editor state.
  */
-export const buildNodesGraph = (state: RootState): Graph => {
-  const { nodes, edges } = state.nodes;
+export const buildNodesGraph = (nodesState: NodesState): Graph => {
+  const { nodes, edges } = nodesState;
 
-  const filteredNodes = nodes.filter((n) => n.type !== 'progress_image');
+  const filteredNodes = nodes.filter(isInvocationNode);
 
   // Reduce the node editor nodes into invocation graph nodes
   const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>(
@@ -70,8 +70,11 @@ export const buildNodesGraph = (state: RootState): Graph => {
     {}
   );
 
+  // skip out the "dummy" edges between collapsed nodes
+  const filteredEdges = edges.filter((n) => n.type !== 'collapsed');
+
   // Reduce the node editor edges into invocation graph edges
-  const parsedEdges = edges.reduce<NonNullable<Graph['edges']>>(
+  const parsedEdges = filteredEdges.reduce<NonNullable<Graph['edges']>>(
     (edgesAccumulator, edge) => {
       const { source, target, sourceHandle, targetHandle } = edge;
 

@@ -11,7 +11,6 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { AddToBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
@@ -32,6 +31,7 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
+import { AddToBoardDropData } from 'features/dnd/types';
 
 interface GalleryBoardProps {
   board: BoardDTO;

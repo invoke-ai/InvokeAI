@@ -29,10 +29,15 @@ import {
   FaShare,
   FaTrash,
 } from 'react-icons/fa';
-import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
+import {
+  useGetImageMetadataQuery,
+  useStarImagesMutation,
+  useUnstarImagesMutation,
+} from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import { MdStar, MdStarBorder } from 'react-icons/md';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -58,6 +63,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       ? skipToken
       : debouncedMetadataQueryArg ?? skipToken
   );
+
+  const [starImages] = useStarImagesMutation();
+  const [unstarImages] = useUnstarImagesMutation();
 
   const { isClipboardAPIAvailable, copyImageToClipboard } =
     useCopyImageToClipboard();
@@ -126,6 +134,14 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const handleCopyImage = useCallback(() => {
     copyImageToClipboard(imageDTO.image_url);
   }, [copyImageToClipboard, imageDTO.image_url]);
+
+  const handleStarImage = useCallback(() => {
+    if (imageDTO) starImages({ imageDTOs: [imageDTO] });
+  }, [starImages, imageDTO]);
+
+  const handleUnstarImage = useCallback(() => {
+    if (imageDTO) unstarImages({ imageDTOs: [imageDTO] });
+  }, [unstarImages, imageDTO]);
 
   return (
     <>
@@ -196,6 +212,15 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
         Change Board
       </MenuItem>
+      {imageDTO.starred ? (
+        <MenuItem icon={<MdStar />} onClickCapture={handleUnstarImage}>
+          Unstar Image
+        </MenuItem>
+      ) : (
+        <MenuItem icon={<MdStarBorder />} onClickCapture={handleStarImage}>
+          Star Image
+        </MenuItem>
+      )}
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
         icon={<FaTrash />}
