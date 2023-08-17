@@ -121,7 +121,7 @@ export const addRequestedMultipleImageDeletionListener = () => {
     effect: async (action, { dispatch, getState }) => {
       const { imageDTOs, imagesUsage } = action.payload;
 
-      if (imageDTOs.length < 1 || imagesUsage.length < 1) {
+      if (imageDTOs.length <= 1 || imagesUsage.length <= 1) {
         // handle singles in separate listener
         return;
       }
