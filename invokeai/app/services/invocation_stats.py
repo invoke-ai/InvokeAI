@@ -147,9 +147,17 @@ class InvocationStatsService(InvocationStatsServiceBase):
         # {graph_id => NodeLog}
         self._stats: Dict[str, NodeLog] = {}
         self._cache_stats: Dict[str, CacheStats] = {}
+        self.ram_used: float = 0.0
+        self.ram_changed: float = 0.0
 
     class StatsContext:
         """Context manager for collecting statistics."""
+        invocation: BaseInvocation = None
+        collector: "InvocationStatsServiceBase" = None
+        graph_id: str = None
+        start_time: int = 0
+        ram_used: int = 0
+        model_manager: ModelManagerService = None
 
         def __init__(
             self,
@@ -177,13 +185,15 @@ class InvocationStatsService(InvocationStatsServiceBase):
         def __exit__(self, *args):
             """Called on exit from the context."""
             ram_used = psutil.Process().memory_info().rss
+            self.collector.update_mem_stats(
+                ram_used=ram_used / GIG,
+                ram_changed=(ram_used - self.ram_used) / GIG,
+            )
             self.collector.update_invocation_stats(
                 graph_id=self.graph_id,
                 invocation_type=self.invocation.type,
                 time_used=time.time() - self.start_time,
                 vram_used=torch.cuda.max_memory_allocated() / GIG if torch.cuda.is_available() else 0.0,
-                ram_used=ram_used / GIG,
-                ram_changed=(ram_used - self.ram_used) / GIG,
             )
 
     def collect_stats(
@@ -213,14 +223,26 @@ class InvocationStatsService(InvocationStatsServiceBase):
         except KeyError:
             logger.warning(f"Attempted to clear statistics for unknown graph {graph_execution_id}")
 
+    def update_mem_stats(
+            self,
+            ram_used: float,
+            ram_changed: float,
+    ):
+        """
+        Update the collector with RAM memory usage info.
+
+        :param ram_used: How much RAM is currently in use.
+        :param ram_changed: How much RAM changed since last generation.
+        """
+        self.ram_used = ram_used
+        self.ram_changed = ram_changed
+
     def update_invocation_stats(
         self,
         graph_id: str,
         invocation_type: str,
         time_used: float,
         vram_used: float,
-        ram_used: float,
-        ram_changed: float,
     ):
         """
         Add timing information on execution of a node. Usually
@@ -238,8 +260,6 @@ class InvocationStatsService(InvocationStatsServiceBase):
         stats.calls += 1
         stats.time_used += time_used
         stats.max_vram = max(stats.max_vram, vram_used)
-        stats.ram_used = ram_used
-        stats.ram_changed = ram_changed
 
     def log_stats(self):
         """
@@ -266,7 +286,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             loaded = sum([v for v in cache_stats.loaded_model_sizes.values()]) / GIG
 
             logger.info(f"TOTAL GRAPH EXECUTION TIME:  {total_time:7.3f}s")
-            logger.info("RAM used by InvokeAI process: " + "%4.2fG" % stats.ram_used + f" ({stats.ram_changed:+5.3f}G)")
+            logger.info("RAM used by InvokeAI process: " + "%4.2fG" % self.ram_used + f" ({self.ram_changed:+5.3f}G)")
             logger.info(f"RAM used to load models: {loaded:4.2f}G")
             if torch.cuda.is_available():
                 logger.info("VRAM in use: " + "%4.3fG" % (torch.cuda.memory_allocated() / GIG))
