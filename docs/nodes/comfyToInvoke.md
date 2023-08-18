@@ -36,7 +36,7 @@ Some things to note:
 |Conditioning |Apply ControlNet (Advanced) | ControlNet |
 |Latent |VAE Decode | Latents to Image|
 |Latent |VAE Encode | Image to Latents |
-|Latent |Empty Latent Image | Link an empty "Image" node to an "Image to Latents" node |
+|Latent |Empty Latent Image | Noise |
 |Latent |Upscale Latent |Resize Latents |
 |Latent |Upscale Latent By |Scale Latents |
 |Latent |Latent Composite | N/A|
@@ -44,25 +44,33 @@ Some things to note:
 |Image |Save Image | Image |
 |Image |Preview Image |Current |
 |Image |Load Image | Image|
+|Image |Empty Image| N/A|
 |Image |Invert Image | Invert Lerp Image |
 |Image |Batch Images | Link "Image" nodes into an "Image Collection" node |
 |Image |Pad Image for Outpainting | Outpainting is easily accomplished in the Unified Canvas |
-|Image |ImageCompositeMasked | N/A |
+|Image |ImageCompositeMasked | Paste Image |
+|Image | Upscale Image | Resize Image |
+|Image | Upscale Image By | Upscale Image |
+|Image | Upscale Image (using Model) | Upscale Image |
+|Image | ImageBlur | Blur Image |
+|Image | ImageQuantize | N/A |
+|Image | ImageSharpen | N/A |
+|Image | Canny | Canny Processor |
 |Mask |Load Image (as Mask) | Image |
 |Mask |Convert Mask to Image | Image|
-|Mask |Convert Image to Mask | Mask from Alpha |
-|Mask |SolidMask | Mask Edge|
+|Mask |Convert Image to Mask | Image |
+|Mask |SolidMask | N/A |
 |Mask |InvertMask |Invert Lerp Image |
-|Mask |CropMask | Masking & inpainting is able to quickly be done on the canvas|
+|Mask |CropMask | Crop Image |
 |Mask |MaskComposite | Combine Mask |
-|Mask |FeatherMask | N/A |
+|Mask |FeatherMask | Blur Image |
 |Advanced | Load CLIP | Main Model Loader _or_ SDXL Main Model Loader|
 |Advanced | UNETLoader | Main Model Loader _or_ SDXL Main Model Loader|
 |Advanced | DualCLIPLoader | Main Model Loader _or_ SDXL Main Model Loader|
 |Advanced | Load Checkpoint | Main Model Loader _or_ SDXL Main Model Loader |
-|Advanced | ConditioningZeroOut | Compel (Prompt) or SDXL Compel (Prompt) |
-|Advanced | ConditioningSetTimestepRange | Compel (Prompt) or SDXL Compel (Prompt)|
-|Advanced | CLIPTextEncodeSDXLRefiner |Compel (Prompt) or SDXL Compel (Prompt) |
+|Advanced | ConditioningZeroOut | N/A |
+|Advanced | ConditioningSetTimestepRange | N/A |
+|Advanced | CLIPTextEncodeSDXLRefiner | Compel (Prompt) or SDXL Compel (Prompt) |
 |Advanced | CLIPTextEncodeSDXL |Compel (Prompt) or SDXL Compel (Prompt) |
 |Advanced | ModelMergeSimple | Model Merging is available in the Model Manager |
 |Advanced | ModelMergeBlocks | Model Merging is available in the Model Manager|
