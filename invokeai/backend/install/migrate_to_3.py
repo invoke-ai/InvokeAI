@@ -525,7 +525,7 @@ def do_migrate(src_directory: Path, dest_directory: Path):
     if version_3:  # write into the dest directory
         try:
             shutil.copy(dest_directory / "configs" / "models.yaml", config_file)
-        except:
+        except Exception:
             MigrateTo3.initialize_yaml(config_file)
         mgr = ModelManager(config_file)  # important to initialize BEFORE moving the models directory
         (dest_directory / "models").replace(dest_models)
@@ -553,7 +553,7 @@ def main():
     parser = argparse.ArgumentParser(
         prog="invokeai-migrate3",
         description="""
-This will copy and convert the models directory and the configs/models.yaml from the InvokeAI 2.3 format 
+This will copy and convert the models directory and the configs/models.yaml from the InvokeAI 2.3 format
 '--from-directory' root to the InvokeAI 3.0 '--to-directory' root. These may be abbreviated '--from' and '--to'.a
 
 The old models directory and config file will be renamed 'models.orig' and 'models.yaml.orig' respectively.

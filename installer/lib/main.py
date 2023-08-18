@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     try:
         inst.install(**args.__dict__)
-    except KeyboardInterrupt as exc:
+    except KeyboardInterrupt:
         print("\n")
         print("Ctrl-C pressed. Aborting.")
         print("Come back soon!")

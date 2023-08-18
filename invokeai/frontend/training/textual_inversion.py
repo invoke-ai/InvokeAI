@@ -59,7 +59,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
 
         try:
             default = self.model_names.index(saved_args["model"])
-        except:
+        except Exception:
             pass
 
         self.add_widget_intelligent(
@@ -377,7 +377,7 @@ def previous_args() -> dict:
     try:
         conf = OmegaConf.load(conf_file)
         conf["placeholder_token"] = conf["placeholder_token"].strip("<>")
-    except:
+    except Exception:
         conf = None
 
     return conf

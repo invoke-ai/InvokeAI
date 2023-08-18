@@ -230,7 +230,7 @@ def InputField(
       Internally, there is no difference between SD-1, SD-2 and SDXL model fields, they all use \
       `MainModelField`. So to ensure the base-model-specific UI is rendered, you can use \
       `UIType.SDXLMainModelField` to indicate that the field is an SDXL main model field.
-      
+
     :param UIComponent ui_component: [None] Optionally specifies a specific component to use in the UI. \
       The UI will always render a suitable component, but sometimes you want something different than the default. \
       For example, a `string` field will default to a single-line input, but you may want a multi-line textarea instead. \

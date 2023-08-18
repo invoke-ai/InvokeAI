@@ -1,24 +1,24 @@
-import argparse, os, sys, datetime, glob, importlib, csv
+import argparse
+import datetime
+import glob
+import os
+import sys
+
 import numpy as np
 import time
 import torch
-
 import torchvision
 import pytorch_lightning as pl
 
 from packaging import version
 from omegaconf import OmegaConf
-from torch.utils.data import random_split, DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, Dataset
 from functools import partial
 from PIL import Image
 
 from pytorch_lightning import seed_everything
 from pytorch_lightning.trainer import Trainer
-from pytorch_lightning.callbacks import (
-    ModelCheckpoint,
-    Callback,
-    LearningRateMonitor,
-)
+from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.utilities.distributed import rank_zero_only
 from pytorch_lightning.utilities import rank_zero_info
 
@@ -651,7 +651,7 @@ if __name__ == "__main__":
         trainer_config["accelerator"] = "auto"
         for k in nondefault_trainer_args(opt):
             trainer_config[k] = getattr(opt, k)
-        if not "gpus" in trainer_config:
+        if "gpus" not in trainer_config:
             del trainer_config["accelerator"]
             cpu = True
         else:
@@ -803,7 +803,7 @@ if __name__ == "__main__":
             trainer_opt.detect_anomaly = False
 
         trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
-        trainer.logdir = logdir  ###
+        trainer.logdir = logdir
 
         # data
         config.data.params.train.params.data_root = opt.data_root
