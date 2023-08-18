@@ -116,6 +116,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
     cfg_scale: Union[float, List[float]] = InputField(
         default=7.5, ge=1, description=FieldDescriptions.cfg_scale, ui_type=UIType.Float
     )
+    cfg_rescale_multiplier: Union[float, List[float]] = InputField(
+        default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier, ui_type=UIType.Float
+    )
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
     scheduler: SAMPLER_NAME_VALUES = InputField(default="euler", description=FieldDescriptions.scheduler)
@@ -175,6 +178,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             unconditioned_embeddings=uc,
             text_embeddings=c,
             guidance_scale=self.cfg_scale,
+            guidance_rescale_multiplier=self.cfg_rescale_multiplier,
             extra=extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(
                 threshold=0.0,  # threshold,

@@ -30,6 +30,18 @@ ModelForwardCallback: TypeAlias = Union[
     Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
 ]
 
+def rescale_noise_cfg(noise_cfg, noise_pred_text, guidance_rescale=0.0):
+     """
+     Rescale `noise_cfg` according to `guidance_rescale`. Based on findings of [Common Diffusion Noise Schedules and
+     Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf). See Section 3.4
+     """
+     std_text = noise_pred_text.std(dim=list(range(1, noise_pred_text.ndim)), keepdim=True)
+     std_cfg = noise_cfg.std(dim=list(range(1, noise_cfg.ndim)), keepdim=True)
+     # rescale the results from guidance (fixes overexposure)
+     noise_pred_rescaled = noise_cfg * (std_text / std_cfg)
+     # mix with the original results from guidance by factor guidance_rescale to avoid "plain looking" images
+     noise_cfg = guidance_rescale * noise_pred_rescaled + (1 - guidance_rescale) * noise_cfg
+     return noise_cfg
 
 @dataclass
 class BasicConditioningInfo:
@@ -543,11 +555,25 @@ class InvokeAIDiffuserComponent:
         )
         return unconditioned_next_x, conditioned_next_x
 
-    def _combine(self, unconditioned_next_x, conditioned_next_x, guidance_scale):
-        # to scale how much effect conditioning has, calculate the changes it does and then scale that
-        scaled_delta = (conditioned_next_x - unconditioned_next_x) * guidance_scale
-        combined_next_x = unconditioned_next_x + scaled_delta
-        return combined_next_x
+    @classmethod
+    def _rescale_cfg(cls, cond, uncond, cond_scale, multiplier=0.7):
+        x_cfg = uncond + cond_scale * (cond - uncond)
+        ro_pos = torch.std(cond, dim=(1, 2, 3), keepdim=True)
+        ro_cfg = torch.std(x_cfg, dim=(1, 2, 3), keepdim=True)
+
+        x_rescaled = x_cfg * (ro_pos / ro_cfg)
+        x_final = multiplier * x_rescaled + (1.0 - multiplier) * x_cfg
+        return x_final
+
+    def _combine(self, unconditioned_next_x, conditioned_next_x, guidance_scale, guidance_rescale_multiplier=0):
+        if guidance_rescale > 0:
+            # for models trained using zero-terminal SNR
+            return type(self)._rescale_cfg(conditioned_next_x, unconditioned_next_x, guidance_scale, multiplier=guidance_rescale_multiplier)
+        else:
+            # to scale how much effect conditioning has, calculate the changes it does and then scale that
+            scaled_delta = (conditioned_next_x - unconditioned_next_x) * guidance_scale
+            combined_next_x = unconditioned_next_x + scaled_delta
+            return combined_next_x
 
     def apply_symmetry(
         self,

@@ -174,6 +174,7 @@ class ConditioningData:
     unconditioned_embeddings: BasicConditioningInfo
     text_embeddings: BasicConditioningInfo
     guidance_scale: Union[float, List[float]]
+    guidance_rescale_multiplier: float = 0  # for models trained using zero-terminal SNR use 0.7
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
     `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
@@ -530,10 +531,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if isinstance(guidance_scale, list):
             guidance_scale = guidance_scale[step_index]
 
+        guidance_rescale_multiplier = conditioning_data.guidance_rescale_multiplier
+
         noise_pred = self.invokeai_diffuser._combine(
             uc_noise_pred,
             c_noise_pred,
             guidance_scale,
+            guidance_rescale_multiplier
         )
 
         # compute the previous noisy sample x_t -> x_t-1
