@@ -314,7 +314,14 @@ class InpaintMaskField(BaseModel):
     """An inpaint mask field"""
 
     mask_name: str = Field(description="The name of the mask image")
-    masked_latens_name: Optional[str] = Field(description="The name of the masked image latents")
+    masked_latents_name: Optional[str] = Field(description="The name of the masked image latents")
+
+
+class InpaintMaskOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single image"""
+
+    type: Literal["inpaint_mask_output"] = "inpaint_mask_output"
+    inpaint_mask: InpaintMaskField = OutputField(description="Mask for inpaint model run")
 
 
 # endregion

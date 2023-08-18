@@ -342,6 +342,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         callback: Callable[[PipelineIntermediateState], None] = None,
         control_data: List[ControlNetData] = None,
         mask: Optional[torch.Tensor] = None,
+        masked_latents: Optional[torch.Tensor] = None,
         seed: Optional[int] = None,
     ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
         if init_timestep.shape[0] == 0:
@@ -375,11 +376,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 )
 
             if is_inpainting_model(self.unet):
-                # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
-                # (that's why there's a mask!) but it seems to really want that blanked out.
-                masked_latents = orig_latents * torch.where(mask < 0.5, 1, 0)
+                if masked_latents is None:
+                    raise Exception("Source image required for inpaint mask when inpaint model used!")
 
-                # TODO: we should probably pass this in so we don't have to try/finally around setting it.
                 self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(
                     self._unet_forward, mask, masked_latents
                 )
