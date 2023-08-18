@@ -230,7 +230,7 @@ def invoke_api():
 
     # replace uvicorn's loggers with InvokeAI's for consistent appearance
     for logname in ["uvicorn.access", "uvicorn"]:
-        l = logging.get_logger(logname)
+        l = logging.getLogger(logname)
         l.handlers.clear()
         for ch in logger.handlers:
             l.addHandler(ch)
