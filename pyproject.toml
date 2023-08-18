@@ -101,6 +101,7 @@ dependencies = [
   "black",
   "flake8",
   "Flake8-pyproject",
+  "isort",
   "pytest>6.0.0",
   "pytest-cov",
   "pytest-datadir",
