@@ -38,6 +38,8 @@ import TopCenterPanel from './editorPanels/TopCenterPanel';
 import TopLeftPanel from './editorPanels/TopLeftPanel';
 import TopRightPanel from './editorPanels/TopRightPanel';
 
+const DELETE_KEYS = ['Delete', 'Backspace'];
+
 // TODO: can we support reactflow? if not, we could style the attribution so it matches the app
 const proOptions: ProOptions = { hideAttribution: true };
 
@@ -144,6 +146,7 @@ export const Flow = () => {
       proOptions={proOptions}
       style={{ borderRadius }}
       onPaneClick={handlePaneClick}
+      deleteKeyCode={DELETE_KEYS}
     >
       <TopLeftPanel />
       <TopCenterPanel />
