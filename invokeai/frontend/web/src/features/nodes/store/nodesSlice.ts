@@ -612,6 +612,16 @@ const nodesSlice = createSlice({
     ) => {
       state.mouseOverField = action.payload;
     },
+    selectedAll: (state) => {
+      state.nodes = applyNodeChanges(
+        state.nodes.map((n) => ({ id: n.id, type: 'select', selected: true })),
+        state.nodes
+      );
+      state.edges = applyEdgeChanges(
+        state.edges.map((e) => ({ id: e.id, type: 'select', selected: true })),
+        state.edges
+      );
+    },
     selectionCopied: (state) => {
       state.nodesToCopy = state.nodes.filter((n) => n.selected).map(cloneDeep);
       state.edgesToCopy = state.edges.filter((e) => e.selected).map(cloneDeep);
@@ -801,6 +811,7 @@ export const {
   mouseOverFieldChanged,
   selectionCopied,
   selectionPasted,
+  selectedAll,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

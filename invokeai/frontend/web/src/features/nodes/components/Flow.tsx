@@ -26,6 +26,7 @@ import {
   edgesDeleted,
   nodesChanged,
   nodesDeleted,
+  selectedAll,
   selectedEdgesChanged,
   selectedNodesChanged,
   selectionCopied,
@@ -124,11 +125,18 @@ export const Flow = () => {
     dispatch(contextMenusClosed());
   }, [dispatch]);
 
-  useHotkeys(['Ctrl+c', 'Meta+c'], () => {
+  useHotkeys(['Ctrl+c', 'Meta+c'], (e) => {
+    e.preventDefault();
     dispatch(selectionCopied());
   });
 
-  useHotkeys(['Ctrl+v', 'Meta+v'], () => {
+  useHotkeys(['Ctrl+a', 'Meta+a'], (e) => {
+    e.preventDefault();
+    dispatch(selectedAll());
+  });
+
+  useHotkeys(['Ctrl+v', 'Meta+v'], (e) => {
+    e.preventDefault();
     dispatch(selectionPasted());
   });
 
