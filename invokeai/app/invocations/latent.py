@@ -736,11 +736,12 @@ class ImageToLatentsInvocation(BaseInvocation):
         context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents, seed=None)
 
+    @singledispatchmethod
     def _encode_to_tensor(self, vae: AutoencoderKL, image_tensor: torch.FloatTensor) -> torch.FloatTensor:
         image_tensor_dist = vae.encode(image_tensor).latent_dist
         latents = image_tensor_dist.sample().to(dtype=vae.dtype)  # FIXME: uses torch.randn. make reproducible!
         return latents
 
-    @singledispatchmethod
-    def _encode_to_tensor(self, vae: AutoencoderTiny, image_tensor: torch.FloatTensor) -> torch.FloatTensor:
+    @_encode_to_tensor.register
+    def _(self, vae: AutoencoderTiny, image_tensor: torch.FloatTensor) -> torch.FloatTensor:
         return vae.encode(image_tensor).latents
