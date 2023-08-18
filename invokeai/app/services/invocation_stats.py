@@ -34,6 +34,7 @@ from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from typing import Dict
+from pydantic import ValidationError
 
 import torch
 
@@ -269,7 +270,13 @@ class InvocationStatsService(InvocationStatsServiceBase):
         """
         completed = set()
         for graph_id, node_log in self._stats.items():
-            current_graph_state = self.graph_execution_manager.get(graph_id)
+            try:
+                current_graph_state = self.graph_execution_manager.get(graph_id)
+            except ValidationError:
+                del self._stats[graph_id]
+                del self._cache_stats[graph_id]
+                continue
+
             if not current_graph_state.is_complete():
                 continue
 
