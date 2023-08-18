@@ -43,6 +43,22 @@ class BatchManagerBase(ABC):
     def cancel_batch_process(self, batch_process_id: str) -> None:
         pass
 
+    @abstractmethod
+    def get_batch(self, batch_id: str) -> BatchProcessResponse:
+        pass
+
+    @abstractmethod
+    def get_batch_processes(self) -> list[BatchProcessResponse]:
+        pass
+
+    @abstractmethod
+    def get_incomplete_batch_processes(self) -> list[BatchProcessResponse]:
+        pass
+
+    @abstractmethod
+    def get_sessions(self, batch_id: str) -> list[BatchSession]:
+        pass
+
 
 class BatchManager(BatchManagerBase):
     """Responsible for managing currently running and scheduled batch jobs"""
@@ -144,6 +160,38 @@ class BatchManager(BatchManagerBase):
                 batch_session = BatchSession(batch_id=batch_process.batch_id, session_id=ges.id, state="created")
                 sessions.append(self.__batch_process_storage.create_session(batch_session))
         return sessions
+
+    def get_sessions(self, batch_id: str) -> list[BatchSession]:
+        return self.__batch_process_storage.get_sessions(batch_id)
+
+    def get_batch(self, batch_id: str) -> BatchProcess:
+        return self.__batch_process_storage.get(batch_id)
+
+    def get_batch_processes(self) -> list[BatchProcessResponse]:
+        bps = self.__batch_process_storage.get_all()
+        res = list()
+        for bp in bps:
+            sessions = self.__batch_process_storage.get_sessions(bp.batch_id)
+            res.append(
+                BatchProcessResponse(
+                    batch_id=bp.batch_id,
+                    session_ids=[session.session_id for session in sessions],
+                )
+            )
+        return res
+
+    def get_incomplete_batch_processes(self) -> list[BatchProcessResponse]:
+        bps = self.__batch_process_storage.get_incomplete()
+        res = list()
+        for bp in bps:
+            sessions = self.__batch_process_storage.get_sessions(bp.batch_id)
+            res.append(
+                BatchProcessResponse(
+                    batch_id=bp.batch_id,
+                    session_ids=[session.session_id for session in sessions],
+                )
+            )
+        return res
 
     def cancel_batch_process(self, batch_process_id: str) -> None:
         self.__batch_process_storage.cancel(batch_process_id)

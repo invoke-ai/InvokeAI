@@ -6,7 +6,7 @@ from fastapi import Body, HTTPException, Path, Query, Response
 from fastapi.routing import APIRouter
 from pydantic.fields import Field
 
-from invokeai.app.services.batch_manager_storage import BatchSessionNotFoundException
+from invokeai.app.services.batch_manager_storage import BatchProcess, BatchSession, BatchSessionNotFoundException
 
 from ...invocations import *
 from ...invocations.baseinvocation import BaseInvocation
@@ -80,6 +80,50 @@ async def cancel_batch(
     """Creates and starts a new new batch process"""
     ApiDependencies.invoker.services.batch_manager.cancel_batch_process(batch_process_id)
     return Response(status_code=202)
+
+
+@session_router.get(
+    "/batch/incomplete",
+    operation_id="list_incomplete_batches",
+    responses={200: {"model": list[BatchProcessResponse]}},
+)
+async def list_incomplete_batches() -> list[BatchProcessResponse]:
+    """Gets a list of sessions, optionally searching"""
+    return ApiDependencies.invoker.services.batch_manager.get_incomplete_batch_processes()
+
+
+@session_router.get(
+    "/batch",
+    operation_id="list__batches",
+    responses={200: {"model": list[BatchProcessResponse]}},
+)
+async def list_batches() -> list[BatchProcessResponse]:
+    """Gets a list of sessions, optionally searching"""
+    return ApiDependencies.invoker.services.batch_manager.get_batch_processes()
+
+
+@session_router.get(
+    "/batch/{batch_process_id}",
+    operation_id="get_batch",
+    responses={200: {"model": BatchProcess}},
+)
+async def get_batch(
+    batch_process_id: str = Path(description="The id of the batch process to get"),
+) -> BatchProcess:
+    """Gets a Batch Process"""
+    return ApiDependencies.invoker.services.batch_manager.get_batch(batch_process_id)
+
+
+@session_router.get(
+    "/batch/{batch_process_id}/sessions",
+    operation_id="get_batch",
+    responses={200: {"model": list[BatchSession]}},
+)
+async def get_batch_sessions(
+    batch_process_id: str = Path(description="The id of the batch process to get"),
+) -> list[BatchSession]:
+    """Gets a list of BatchSessions Batch Process"""
+    return ApiDependencies.invoker.services.batch_manager.get_sessions(batch_process_id)
 
 
 @session_router.get(
