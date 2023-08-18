@@ -120,8 +120,11 @@ nav:
         - Source Installer: 'installation/deprecated_documentation/INSTALL_SOURCE.md'
     - Nodes:
       - Community Nodes: 'nodes/communityNodes.md'
+      - Example Workflows: 'nodes/exampleWorkflows.md'
       - Nodes Overview: 'nodes/overview.md'
-      - Nodes Editor (Experimental): 'nodes/NODES.md'
+      - List of Default Nodes: 'nodes/defaultNodes.md'
+      - Nodes Editor: 'nodes/NODES.md'
+      - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
       - Contributing Nodes: 'nodes/contributingNodes.md'
     - Features:
       - Overview: 'features/index.md'
@@ -132,7 +135,7 @@ nav:
       - Image-to-Image: 'features/IMG2IMG.md'
       - Controlling Logging: 'features/LOGGING.md'
       - Model Merging: 'features/MODEL_MERGING.md'
-      - Nodes Editor (Experimental): 'nodes/NODES.md'
+      - Using Nodes : './nodes/overview'
       - NSFW Checker: 'features/WATERMARK+NSFW.md'
       - Postprocessing: 'features/POSTPROCESS.md'
       - Prompting Features: 'features/PROMPTS.md'
