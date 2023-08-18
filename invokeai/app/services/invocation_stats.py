@@ -259,12 +259,12 @@ class InvocationStatsService(InvocationStatsServiceBase):
 
     def log_stats(self):
         completed = set()
+        errored = set()
         for graph_id, node_log in self._stats.items():
             try:
                 current_graph_state = self.graph_execution_manager.get(graph_id)
-            except ValidationError:
-                del self._stats[graph_id]
-                del self._cache_stats[graph_id]
+            except Exception:
+                errored.add(graph_id)
                 continue
 
             if not current_graph_state.is_complete():
@@ -297,5 +297,9 @@ class InvocationStatsService(InvocationStatsServiceBase):
             completed.add(graph_id)
 
         for graph_id in completed:
+            del self._stats[graph_id]
+            del self._cache_stats[graph_id]
+
+        for graph_id in errored:
             del self._stats[graph_id]
             del self._cache_stats[graph_id]
