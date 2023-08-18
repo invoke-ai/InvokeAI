@@ -137,6 +137,11 @@ class BatchManager(BatchManagerBase):
             self.__invoker.services.graph_execution_manager.set(ges)
             batch_session = BatchSession(batch_id=batch_process.batch_id, session_id=ges.id, state="created")
             sessions.append(self.__batch_process_storage.create_session(batch_session))
+        if not sessions:
+            ges = GraphExecutionState(graph=batch_process.graph)
+            self.__invoker.services.graph_execution_manager.set(ges)
+            batch_session = BatchSession(batch_id=batch_process.batch_id, session_id=ges.id, state="created")
+            sessions.append(self.__batch_process_storage.create_session(batch_session))
         return sessions
 
     def cancel_batch_process(self, batch_process_id: str) -> None:
