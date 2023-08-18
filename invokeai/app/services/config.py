@@ -159,15 +159,17 @@ two configs are kept in separate sections of the config file:
 
 """
 from __future__ import annotations
+
 import argparse
-import pydoc
 import os
+import pydoc
 import sys
 from argparse import ArgumentParser
-from omegaconf import OmegaConf, DictConfig, ListConfig
 from pathlib import Path
+from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
+
+from omegaconf import OmegaConf, DictConfig, ListConfig
 from pydantic import BaseSettings, Field, parse_obj_as
-from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
@@ -417,6 +419,8 @@ class InvokeAIAppConfig(InvokeAISettings):
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
     log_format          : Literal[tuple(['plain','color','syslog','legacy'])] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
     log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
+
+    dev_reload          : bool = Field(default=False, description="Automatically reload when Python sources are changed.", category="Development")
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
     # fmt: on

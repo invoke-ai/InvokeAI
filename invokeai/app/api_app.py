@@ -1,12 +1,12 @@
 # Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 import asyncio
+import logging
+import socket
 import sys
 from inspect import signature
+from pathlib import Path
 
-import logging
 import uvicorn
-import socket
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -14,7 +14,6 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
-from pathlib import Path
 from pydantic.schema import schema
 
 # This should come early so that modules can log their initialization properly
@@ -42,9 +41,12 @@ from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputFiel
 
 
 import torch
+
+# noinspection PyUnresolvedReferences
 import invokeai.backend.util.hotfixes
 
 if torch.backends.mps.is_available():
+    # noinspection PyUnresolvedReferences
     import invokeai.backend.util.mps_fixes
 
 # fix for windows mimetypes registry entries being borked
@@ -212,6 +214,17 @@ def invoke_api():
     from invokeai.backend.install.check_root import check_invokeai_root
 
     check_invokeai_root(app_config)  # note, may exit with an exception if root not set up
+
+    if app_config.dev_reload:
+        try:
+            import jurigged
+        except ImportError as e:
+            logger.error(
+                "Can't start `--dev_reload` because jurigged is not found; `pip install -e '.[dev]'` to include development dependencies.",
+                exc_info=e,
+            )
+        else:
+            jurigged.watch(logger=InvokeAILogger.getLogger(name="jurigged").info)
 
     port = find_port(app_config.port)
     if port != app_config.port:
