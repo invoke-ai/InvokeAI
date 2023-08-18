@@ -1,6 +1,4 @@
-from typing import Optional, Union
 import networkx as nx
-import copy
 
 from abc import ABC, abstractmethod
 from itertools import product

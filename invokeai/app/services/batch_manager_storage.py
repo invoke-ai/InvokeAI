@@ -6,7 +6,6 @@ from typing import List, Literal, Optional, Union, cast
 
 from pydantic import BaseModel, Extra, Field, StrictFloat, StrictInt, StrictStr, parse_raw_as, validator
 
-from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.services.graph import Graph
 
@@ -450,7 +449,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
                 """--sql
                 SELECT bp.*
                 FROM batch_process bp
-                WHERE bp.batch_id IN 
+                WHERE bp.batch_id IN
                 (
                 SELECT batch_id
                 FROM batch_session bs
@@ -476,7 +475,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
         try:
             self._lock.acquire()
             self._cursor.execute(
-                f"""--sql
+                """--sql
                 UPDATE batch_process
                 SET canceled = 0
                 WHERE batch_id = ?;
@@ -497,7 +496,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
         try:
             self._lock.acquire()
             self._cursor.execute(
-                f"""--sql
+                """--sql
                 UPDATE batch_process
                 SET canceled = 1
                 WHERE batch_id = ?;
@@ -640,7 +639,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
             # Change the state of a batch session
             if changes.state is not None:
                 self._cursor.execute(
-                    f"""--sql
+                    """--sql
                     UPDATE batch_session
                     SET state = ?
                     WHERE batch_id = ? AND session_id = ?;
