@@ -116,7 +116,7 @@ class MigrateTo3(object):
         appropriate location within the destination models directory.
         """
         directories_scanned = set()
-        for root, dirs, files in os.walk(src_dir):
+        for root, dirs, files in os.walk(src_dir, followlinks=True):
             for d in dirs:
                 try:
                     model = Path(root, d)
