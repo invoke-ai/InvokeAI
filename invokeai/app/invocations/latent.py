@@ -522,7 +522,9 @@ class LatentsToImageInvocation(BaseInvocation):
             except AttributeError as err:
                 # FIXME: This is a TEMPORARY measure until AutoencoderTiny gets tiling support from https://github.com/huggingface/diffusers/pull/4627
                 if err.name.endswith("_tiling"):
-                    InvokeAILogger.getLogger(self.__class__.__name__).debug("ignoring tiling error for %s", vae.__class__, exc_info=err)
+                    InvokeAILogger.getLogger(self.__class__.__name__).debug(
+                        "ignoring tiling error for %s", vae.__class__, exc_info=err
+                    )
                 else:
                     raise
 
@@ -719,7 +721,9 @@ class ImageToLatentsInvocation(BaseInvocation):
             except AttributeError as err:
                 # FIXME: This is a TEMPORARY measure until AutoencoderTiny gets tiling support from https://github.com/huggingface/diffusers/pull/4627
                 if err.name.endswith("_tiling"):
-                    InvokeAILogger.getLogger(self.__class__.__name__).debug("ignoring tiling error for %s", vae.__class__, exc_info=err)
+                    InvokeAILogger.getLogger(self.__class__.__name__).debug(
+                        "ignoring tiling error for %s", vae.__class__, exc_info=err
+                    )
                 else:
                     raise
 
