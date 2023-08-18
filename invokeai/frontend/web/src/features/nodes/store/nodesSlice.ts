@@ -44,6 +44,7 @@ import {
   isNotesNode,
   LoRAModelInputFieldValue,
   MainModelInputFieldValue,
+  NodeExecutionState,
   NodeStatus,
   NotesNodeData,
   SchedulerInputFieldValue,
@@ -54,6 +55,14 @@ import {
 } from '../types/types';
 import { NodesState } from './types';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
+
+const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
+  status: NodeStatus.PENDING,
+  error: null,
+  progress: null,
+  progressImage: null,
+  outputs: [],
+};
 
 export const initialNodesState: NodesState = {
   nodes: [],
@@ -67,7 +76,7 @@ export const initialNodesState: NodesState = {
   shouldShowMinimapPanel: true,
   shouldValidateGraph: true,
   shouldAnimateEdges: true,
-  shouldSnapToGrid: true,
+  shouldSnapToGrid: false,
   shouldColorEdges: true,
   nodeOpacity: 1,
   selectedNodes: [],
@@ -141,10 +150,8 @@ const nodesSlice = createSlice({
       }
 
       state.nodeExecutionStates[node.id] = {
-        status: NodeStatus.PENDING,
-        error: null,
-        progress: null,
-        progressImage: null,
+        nodeId: node.id,
+        ...initialNodeExecutionState,
       };
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
@@ -677,10 +684,8 @@ const nodesSlice = createSlice({
 
       newNodes.forEach((node) => {
         state.nodeExecutionStates[node.id] = {
-          status: NodeStatus.PENDING,
-          error: null,
-          progress: null,
-          progressImage: null,
+          nodeId: node.id,
+          ...initialNodeExecutionState,
         };
       });
     },
@@ -700,13 +705,14 @@ const nodesSlice = createSlice({
       }
     });
     builder.addCase(appSocketInvocationComplete, (state, action) => {
-      const { source_node_id } = action.payload.data;
-      const node = state.nodeExecutionStates[source_node_id];
-      if (node) {
-        node.status = NodeStatus.COMPLETED;
-        if (node.progress !== null) {
-          node.progress = 1;
+      const { source_node_id, result } = action.payload.data;
+      const nes = state.nodeExecutionStates[source_node_id];
+      if (nes) {
+        nes.status = NodeStatus.COMPLETED;
+        if (nes.progress !== null) {
+          nes.progress = 1;
         }
+        nes.outputs.push(result);
       }
     });
     builder.addCase(appSocketInvocationError, (state, action) => {
@@ -735,6 +741,7 @@ const nodesSlice = createSlice({
         nes.error = null;
         nes.progress = null;
         nes.progressImage = null;
+        nes.outputs = [];
       });
     });
   },

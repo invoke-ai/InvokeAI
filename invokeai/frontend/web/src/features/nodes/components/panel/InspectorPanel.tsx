@@ -8,6 +8,7 @@ import {
 } from '@chakra-ui/react';
 import { memo } from 'react';
 import NodeDataInspector from './NodeDataInspector';
+import NodeResultsInspector from './NodeResultsInspector';
 import NodeTemplateInspector from './NodeTemplateInspector';
 
 const InspectorPanel = () => {
@@ -15,10 +16,12 @@ const InspectorPanel = () => {
     <Flex
       layerStyle="first"
       sx={{
+        flexDir: 'column',
         w: 'full',
         h: 'full',
         borderRadius: 'base',
         p: 4,
+        gap: 2,
       }}
     >
       <Tabs
@@ -26,16 +29,20 @@ const InspectorPanel = () => {
         sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
       >
         <TabList>
-          <Tab>Node Template</Tab>
+          <Tab>Node Outputs</Tab>
           <Tab>Node Data</Tab>
+          <Tab>Node Template</Tab>
         </TabList>
 
         <TabPanels>
           <TabPanel>
-            <NodeTemplateInspector />
+            <NodeResultsInspector />
           </TabPanel>
           <TabPanel>
             <NodeDataInspector />
+          </TabPanel>
+          <TabPanel>
+            <NodeTemplateInspector />
           </TabPanel>
         </TabPanels>
       </Tabs>

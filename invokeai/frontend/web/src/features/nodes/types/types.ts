@@ -9,14 +9,20 @@ import {
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Edge, Node } from 'reactflow';
+import { components } from 'services/api/schema';
 import {
   Graph,
+  GraphExecutionState,
   ImageDTO,
   ImageField,
   _InputField,
   _OutputField,
 } from 'services/api/types';
-import { AnyInvocationType, ProgressImage } from 'services/events/types';
+import {
+  AnyInvocationType,
+  AnyResult,
+  ProgressImage,
+} from 'services/events/types';
 import { O } from 'ts-toolbelt';
 import { z } from 'zod';
 
@@ -671,11 +677,32 @@ export enum NodeStatus {
   FAILED,
 }
 
+type SavedOutput =
+  | components['schemas']['StringOutput']
+  | components['schemas']['IntegerOutput']
+  | components['schemas']['FloatOutput']
+  | components['schemas']['ImageOutput'];
+
+export const isSavedOutput = (
+  output: GraphExecutionState['results'][string]
+): output is SavedOutput =>
+  Boolean(
+    output &&
+      [
+        'string_output',
+        'integer_output',
+        'float_output',
+        'image_output',
+      ].includes(output?.type)
+  );
+
 export type NodeExecutionState = {
+  nodeId: string;
   status: NodeStatus;
   progress: number | null;
   progressImage: ProgressImage | null;
   error: string | null;
+  outputs: AnyResult[];
 };
 
 export type FieldIdentifier = {
