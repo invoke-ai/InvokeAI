@@ -8,7 +8,8 @@ from pydantic.fields import Field
 
 from invokeai.app.services.batch_manager_storage import BatchProcess, BatchSession, BatchSessionNotFoundException
 
-from ...invocations import *
+# Importing * is bad karma but needed here for node detection
+from ...invocations import *  # noqa: F401 F403
 from ...invocations.baseinvocation import BaseInvocation
 from ...services.batch_manager import Batch, BatchProcessResponse
 from ...services.graph import Edge, EdgeConnection, Graph, GraphExecutionState, NodeAlreadyExecutedError

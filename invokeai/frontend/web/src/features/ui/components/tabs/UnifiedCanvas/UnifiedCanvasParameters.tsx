@@ -6,6 +6,7 @@ import ParamControlNetCollapse from 'features/parameters/components/Parameters/C
 import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Symmetry/ParamSymmetryCollapse';
 // import ParamVariationCollapse from 'features/parameters/components/Parameters/Variations/ParamVariationCollapse';
 import ParamMaskAdjustmentCollapse from 'features/parameters/components/Parameters/Canvas/MaskAdjustment/ParamMaskAdjustmentCollapse';
+import ParamSeamPaintingCollapse from 'features/parameters/components/Parameters/Canvas/SeamPainting/ParamSeamPaintingCollapse';
 import ParamPromptArea from 'features/parameters/components/Parameters/Prompt/ParamPromptArea';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import UnifiedCanvasCoreParameters from './UnifiedCanvasCoreParameters';
@@ -23,6 +24,7 @@ const UnifiedCanvasParameters = () => {
       <ParamSymmetryCollapse />
       <ParamMaskAdjustmentCollapse />
       <ParamInfillAndScalingCollapse />
+      <ParamSeamPaintingCollapse />
       <ParamAdvancedCollapse />
     </>
   );

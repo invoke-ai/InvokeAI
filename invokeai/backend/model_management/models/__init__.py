@@ -2,7 +2,7 @@ import inspect
 from enum import Enum
 from pydantic import BaseModel
 from typing import Literal, get_origin
-from .base import (
+from .base import (  # noqa: F401
     BaseModelType,
     ModelType,
     SubModelType,
@@ -118,7 +118,7 @@ def get_model_config_enums():
             fields = model_config.__annotations__
         try:
             field = fields["model_format"]
-        except:
+        except Exception:
             raise Exception("format field not found")
 
         # model_format: None

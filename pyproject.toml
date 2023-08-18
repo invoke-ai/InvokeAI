@@ -95,7 +95,14 @@ dependencies = [
 "dev" = [
   "pudb",
 ]
-"test" = ["pytest>6.0.0", "pytest-cov", "pytest-datadir", "black"]
+"test" = [
+  "black",
+  "flake8",
+  "Flake8-pyproject",
+  "pytest>6.0.0",
+  "pytest-cov",
+  "pytest-datadir",
+]
 "xformers" = [
 	   "xformers~=0.0.19; sys_platform!='darwin'",
 	   "triton; sys_platform=='linux'",
@@ -185,6 +192,8 @@ output = "coverage/index.xml"
 
 [tool.flake8]
 max-line-length = 120
+ignore = ["E203", "E266", "E501", "W503"]
+select = ["B", "C", "E", "F", "W", "T4"]
 
 [tool.black]
 line-length = 120
