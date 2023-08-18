@@ -35,6 +35,7 @@ class EventServiceBase:
         source_node_id: str,
         progress_image: Optional[ProgressImage],
         step: int,
+        order: int,
         total_steps: int,
     ) -> None:
         """Emitted when there is generation progress"""
@@ -46,6 +47,7 @@ class EventServiceBase:
                 source_node_id=source_node_id,
                 progress_image=progress_image.dict() if progress_image is not None else None,
                 step=step,
+                order=order,
                 total_steps=total_steps,
             ),
         )

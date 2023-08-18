@@ -10,15 +10,17 @@ import sys
 import argparse
 import io
 import os
+import psutil
 import shutil
 import textwrap
+import torch
 import traceback
 import yaml
 import warnings
 from argparse import Namespace
+from enum import Enum
 from pathlib import Path
 from shutil import get_terminal_size
-from typing import get_type_hints
 from urllib import request
 
 import npyscreen
@@ -44,15 +46,17 @@ from invokeai.app.services.config import (
 )
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm, process_and_execute
+
+# TO DO - Move all the frontend code into invokeai.frontend.install
 from invokeai.frontend.install.widgets import (
     SingleSelectColumns,
     CenteredButtonPress,
     FileBox,
-    IntTitleSlider,
     set_min_terminal_size,
     CyclingForm,
     MIN_COLS,
     MIN_LINES,
+    WindowTooSmallException,
 )
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.install.model_install_backend import (
@@ -61,6 +65,7 @@ from invokeai.backend.install.model_install_backend import (
     ModelInstall,
 )
 from invokeai.backend.model_management.model_probe import ModelType, BaseModelType
+from pydantic.error_wrappers import ValidationError
 
 warnings.filterwarnings("ignore")
 transformers.logging.set_verbosity_error()
@@ -76,6 +81,13 @@ Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
 
 PRECISION_CHOICES = ["auto", "float16", "float32"]
+GB = 1073741824  # GB in bytes
+HAS_CUDA = torch.cuda.is_available()
+_, MAX_VRAM = torch.cuda.mem_get_info() if HAS_CUDA else (0, 0)
+
+
+MAX_VRAM /= GB
+MAX_RAM = psutil.virtual_memory().total / GB
 
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
@@ -84,6 +96,12 @@ INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 """
 
 logger = InvokeAILogger.getLogger()
+
+
+class DummyWidgetValue(Enum):
+    zero = 0
+    true = True
+    false = False
 
 
 # --------------------------------------------
@@ -289,7 +307,7 @@ class editOptsForm(CyclingForm, npyscreen.FormMultiPage):
         first_time = not (config.root_path / "invokeai.yaml").exists()
         access_token = HfFolder.get_token()
         window_width, window_height = get_terminal_size()
-        label = """Configure startup settings. You can come back and change these later. 
+        label = """Configure startup settings. You can come back and change these later.
 Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.
 Use cursor arrows to make a checkbox selection, and space to toggle.
 """
@@ -376,15 +394,47 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             max_width=80,
             scroll_exit=True,
         )
-        self.max_cache_size = self.add_widget_intelligent(
-            IntTitleSlider,
-            name="Size of the RAM cache used for fast model switching (GB)",
-            value=old_opts.max_cache_size,
-            out_of=20,
-            lowest=3,
-            begin_entry_at=6,
+        self.nextrely += 1
+        self.add_widget_intelligent(
+            npyscreen.TitleFixedText,
+            name="RAM cache size (GB). Make this at least large enough to hold a single full model.",
+            begin_entry_at=0,
+            editable=False,
+            color="CONTROL",
             scroll_exit=True,
         )
+        self.nextrely -= 1
+        self.max_cache_size = self.add_widget_intelligent(
+            npyscreen.Slider,
+            value=clip(old_opts.max_cache_size, range=(3.0, MAX_RAM), step=0.5),
+            out_of=round(MAX_RAM),
+            lowest=0.0,
+            step=0.5,
+            relx=8,
+            scroll_exit=True,
+        )
+        if HAS_CUDA:
+            self.nextrely += 1
+            self.add_widget_intelligent(
+                npyscreen.TitleFixedText,
+                name="VRAM cache size (GB). Reserving a small amount of VRAM will modestly speed up the start of image generation.",
+                begin_entry_at=0,
+                editable=False,
+                color="CONTROL",
+                scroll_exit=True,
+            )
+            self.nextrely -= 1
+            self.max_vram_cache_size = self.add_widget_intelligent(
+                npyscreen.Slider,
+                value=clip(old_opts.max_vram_cache_size, range=(0, MAX_VRAM), step=0.25),
+                out_of=round(MAX_VRAM * 2) / 2,
+                lowest=0.0,
+                relx=8,
+                step=0.25,
+                scroll_exit=True,
+            )
+        else:
+            self.max_vram_cache_size = DummyWidgetValue.zero
         self.nextrely += 1
         self.outdir = self.add_widget_intelligent(
             FileBox,
@@ -401,7 +451,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.autoimport_dirs = {}
         self.autoimport_dirs["autoimport_dir"] = self.add_widget_intelligent(
             FileBox,
-            name=f"Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models",
+            name="Folder to recursively scan for new checkpoints, ControlNets, LoRAs and TI models",
             value=str(config.root_path / config.autoimport_dir),
             select_dir=True,
             must_exist=False,
@@ -476,6 +526,7 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
             "outdir",
             "free_gpu_mem",
             "max_cache_size",
+            "max_vram_cache_size",
             "xformers_enabled",
             "always_use_cpu",
         ]:
@@ -554,6 +605,16 @@ def default_user_selections(program_opts: Namespace) -> InstallSelections:
 
 
 # -------------------------------------
+def clip(value: float, range: tuple[float, float], step: float) -> float:
+    minimum, maximum = range
+    if value < minimum:
+        value = minimum
+    if value > maximum:
+        value = maximum
+    return round(value / step) * step
+
+
+# -------------------------------------
 def initialize_rootdir(root: Path, yes_to_all: bool = False):
     logger.info("Initializing InvokeAI runtime directory")
     for name in ("models", "databases", "text-inversion-output", "text-inversion-training-data", "configs"):
@@ -592,13 +653,13 @@ def maybe_create_models_yaml(root: Path):
 
 # -------------------------------------
 def run_console_ui(program_opts: Namespace, initfile: Path = None) -> (Namespace, Namespace):
-    # parse_args() will read from init file if present
     invokeai_opts = default_startup_options(initfile)
     invokeai_opts.root = program_opts.root
 
-    # The third argument is needed in the Windows 11 environment to
-    # launch a console window running this program.
-    set_min_terminal_size(MIN_COLS, MIN_LINES)
+    if not set_min_terminal_size(MIN_COLS, MIN_LINES):
+        raise WindowTooSmallException(
+            "Could not increase terminal size. Try running again with a larger window or smaller font size."
+        )
 
     # the install-models application spawns a subprocess to install
     # models, and will crash unless this is set before running.
@@ -654,10 +715,13 @@ def migrate_init_file(legacy_format: Path):
     old = legacy_parser.parse_args([f"@{str(legacy_format)}"])
     new = InvokeAIAppConfig.get_config()
 
-    fields = list(get_type_hints(InvokeAIAppConfig).keys())
+    fields = [x for x, y in InvokeAIAppConfig.__fields__.items() if y.field_info.extra.get("category") != "DEPRECATED"]
     for attr in fields:
         if hasattr(old, attr):
-            setattr(new, attr, getattr(old, attr))
+            try:
+                setattr(new, attr, getattr(old, attr))
+            except ValidationError as e:
+                print(f"* Ignoring incompatible value for field {attr}:\n  {str(e)}")
 
     # a few places where the field names have changed and we have to
     # manually add in the new names/values
@@ -777,6 +841,7 @@ def main():
 
         models_to_download = default_user_selections(opt)
         new_init_file = config.root_path / "invokeai.yaml"
+
         if opt.yes_to_all:
             write_default_options(opt, new_init_file)
             init_options = Namespace(precision="float32" if opt.full_precision else "float16")
@@ -802,6 +867,8 @@ def main():
         postscript(errors=errors)
         if not opt.yes_to_all:
             input("Press any key to continue...")
+    except WindowTooSmallException as e:
+        logger.error(str(e))
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
 

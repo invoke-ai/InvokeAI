@@ -9,19 +9,15 @@ import curses
 import sys
 from argparse import Namespace
 from pathlib import Path
-from typing import List, Union
+from typing import List, Optional
 
 import npyscreen
-from diffusers import DiffusionPipeline
-from diffusers import logging as dlogging
 from npyscreen import widget
-from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_management import (
     ModelMerger,
-    MergeInterpolationMethod,
     ModelManager,
     ModelType,
     BaseModelType,
@@ -318,7 +314,7 @@ class mergeModelsForm(npyscreen.FormMultiPageAction):
         else:
             return True
 
-    def get_model_names(self, base_model: BaseModelType = None) -> List[str]:
+    def get_model_names(self, base_model: Optional[BaseModelType] = None) -> List[str]:
         model_names = [
             info["model_name"]
             for info in self.model_manager.list_models(model_type=ModelType.Main, base_model=base_model)
@@ -382,7 +378,8 @@ def run_cli(args: Namespace):
 
 def main():
     args = _parse_args()
-    config.parse_args(["--root", str(args.root_dir)])
+    if args.root_dir:
+        config.parse_args(["--root", str(args.root_dir)])
 
     try:
         if args.front_end:

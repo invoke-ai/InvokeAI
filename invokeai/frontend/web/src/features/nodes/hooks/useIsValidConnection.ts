@@ -1,94 +1,102 @@
 // TODO: enable this at some point
-// import graphlib from '@dagrejs/graphlib';
-// import { useCallback } from 'react';
-// import { Connection, Node, useReactFlow } from 'reactflow';
-// import { InvocationValue } from '../types/types';
+import graphlib from '@dagrejs/graphlib';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useCallback } from 'react';
+import { Connection, Edge, Node, useReactFlow } from 'reactflow';
+import { COLLECTION_TYPES } from '../types/constants';
+import { InvocationNodeData } from '../types/types';
 
-// export const useIsValidConnection = () => {
-//   const flow = useReactFlow();
+export const useIsValidConnection = () => {
+  const flow = useReactFlow();
+  const shouldValidateGraph = useAppSelector(
+    (state) => state.nodes.shouldValidateGraph
+  );
+  const isValidConnection = useCallback(
+    ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
+      if (!shouldValidateGraph) {
+        // manual override!
+        return true;
+      }
 
-//   // Check if an in-progress connection is valid
-//   const isValidConnection = useCallback(
-//     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
-//       const edges = flow.getEdges();
-//       const nodes = flow.getNodes();
+      const edges = flow.getEdges();
+      const nodes = flow.getNodes();
+      // Connection must have valid targets
+      if (!(source && sourceHandle && target && targetHandle)) {
+        return false;
+      }
 
-//       // Connection must have valid targets
-//       if (!(source && sourceHandle && target && targetHandle)) {
-//         return false;
-//       }
+      // Find the source and target nodes
+      const sourceNode = flow.getNode(source) as Node<InvocationNodeData>;
+      const targetNode = flow.getNode(target) as Node<InvocationNodeData>;
 
-//       // Connection is invalid if target already has a connection
-//       if (
-//         edges.find((edge) => {
-//           return edge.target === target && edge.targetHandle === targetHandle;
-//         })
-//       ) {
-//         return false;
-//       }
+      // Conditional guards against undefined nodes/handles
+      if (!(sourceNode && targetNode && sourceNode.data && targetNode.data)) {
+        return false;
+      }
 
-//       // Find the source and target nodes
-//       const sourceNode = flow.getNode(source) as Node<InvocationValue>;
+      const sourceType = sourceNode.data.outputs[sourceHandle]?.type;
+      const targetType = targetNode.data.inputs[targetHandle]?.type;
 
-//       const targetNode = flow.getNode(target) as Node<InvocationValue>;
+      if (!sourceType || !targetType) {
+        // something has gone terribly awry
+        return false;
+      }
 
-//       // Conditional guards against undefined nodes/handles
-//       if (!(sourceNode && targetNode && sourceNode.data && targetNode.data)) {
-//         return false;
-//       }
+      // Connection is invalid if target already has a connection
+      if (
+        edges.find((edge) => {
+          return edge.target === target && edge.targetHandle === targetHandle;
+        }) &&
+        // except CollectionItem inputs can have multiples
+        targetType !== 'CollectionItem'
+      ) {
+        return false;
+      }
 
-//       // Connection types must be the same for a connection
-//       if (
-//         sourceNode.data.outputs[sourceHandle].type !==
-//         targetNode.data.inputs[targetHandle].type
-//       ) {
-//         return false;
-//       }
+      // Connection types must be the same for a connection
+      if (
+        sourceType !== targetType &&
+        sourceType !== 'CollectionItem' &&
+        targetType !== 'CollectionItem'
+      ) {
+        if (
+          !(
+            COLLECTION_TYPES.includes(targetType) &&
+            COLLECTION_TYPES.includes(sourceType)
+          )
+        ) {
+          return false;
+        }
+      }
+      // Graphs much be acyclic (no loops!)
+      return getIsGraphAcyclic(source, target, nodes, edges);
+    },
+    [flow, shouldValidateGraph]
+  );
 
-//       // Graphs much be acyclic (no loops!)
+  return isValidConnection;
+};
 
-//       /**
-//        * TODO: use `graphlib.alg.findCycles()` to identify strong connections
-//        *
-//        * this validation func only runs when the cursor hits the second handle of the connection,
-//        * and only on that second handle - so it cannot tell us exhaustively which connections
-//        * are valid.
-//        *
-//        * ideally, we check when the connection starts to calculate all invalid handles at once.
-//        *
-//        * requires making a new graphlib graph - and calling `findCycles()` - for each potential
-//        * handle. instead of using the `isValidConnection` prop, it would use the `onConnectStart`
-//        * prop.
-//        *
-//        * the strong connections should be stored in global state.
-//        *
-//        * then, `isValidConnection` would simple loop through the strong connections and if the
-//        * source and target are in a single strong connection, return false.
-//        *
-//        * and also, we can use this knowledge to style every handle when a connection starts,
-//        * which is otherwise not possible.
-//        */
+export const getIsGraphAcyclic = (
+  source: string,
+  target: string,
+  nodes: Node[],
+  edges: Edge[]
+) => {
+  // construct graphlib graph from editor state
+  const g = new graphlib.Graph();
 
-//       // build a graphlib graph
-//       const g = new graphlib.Graph();
+  nodes.forEach((n) => {
+    g.setNode(n.id);
+  });
 
-//       nodes.forEach((n) => {
-//         g.setNode(n.id);
-//       });
+  edges.forEach((e) => {
+    g.setEdge(e.source, e.target);
+  });
 
-//       edges.forEach((e) => {
-//         g.setEdge(e.source, e.target);
-//       });
+  // add the candidate edge
+  g.setEdge(source, target);
 
-//       // Add the candidate edge to the graph
-//       g.setEdge(source, target);
-
-//       return graphlib.alg.isAcyclic(g);
-//     },
-//     [flow]
-//   );
-
-//   return isValidConnection;
-// };
-
-export const useIsValidConnection = () => () => true;
+  // check if the graph is acyclic
+  return graphlib.alg.isAcyclic(g);
+};

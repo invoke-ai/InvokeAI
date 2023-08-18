@@ -5,7 +5,6 @@ import {
   BaseModelType,
   CheckpointModelConfig,
   ControlNetModelConfig,
-  ConvertModelConfig,
   DiffusersModelConfig,
   ImportModelConfig,
   LoRAModelConfig,
@@ -83,7 +82,7 @@ type DeleteLoRAModelResponse = void;
 type ConvertMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
-  params: ConvertModelConfig;
+  convert_dest_directory?: string;
 };
 
 type ConvertMainModelResponse =
@@ -122,7 +121,7 @@ type CheckpointConfigsResponse =
 
 type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 
-const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
+export const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
 
@@ -132,15 +131,15 @@ const onnxModelsAdapter = createEntityAdapter<OnnxModelConfigEntity>({
 const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
-const controlNetModelsAdapter =
+export const controlNetModelsAdapter =
   createEntityAdapter<ControlNetModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
-const textualInversionModelsAdapter =
+export const textualInversionModelsAdapter =
   createEntityAdapter<TextualInversionModelConfigEntity>({
     sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
   });
-const vaeModelsAdapter = createEntityAdapter<VaeModelConfigEntity>({
+export const vaeModelsAdapter = createEntityAdapter<VaeModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
 
@@ -181,7 +180,7 @@ export const modelsApi = api.injectEndpoints({
       },
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
-          { id: 'OnnxModel', type: LIST_TAG },
+          { type: 'OnnxModel', id: LIST_TAG },
         ];
 
         if (result) {
@@ -266,6 +265,7 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [
         { type: 'MainModel', id: LIST_TAG },
         { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
       ],
     }),
     importMainModels: build.mutation<
@@ -282,6 +282,7 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [
         { type: 'MainModel', id: LIST_TAG },
         { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
       ],
     }),
     addMainModels: build.mutation<AddMainModelResponse, AddMainModelArg>({
@@ -295,6 +296,7 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [
         { type: 'MainModel', id: LIST_TAG },
         { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
       ],
     }),
     deleteMainModels: build.mutation<
@@ -310,22 +312,24 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [
         { type: 'MainModel', id: LIST_TAG },
         { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
       ],
     }),
     convertMainModels: build.mutation<
       ConvertMainModelResponse,
       ConvertMainModelArg
     >({
-      query: ({ base_model, model_name, params }) => {
+      query: ({ base_model, model_name, convert_dest_directory }) => {
         return {
           url: `models/convert/${base_model}/main/${model_name}`,
           method: 'PUT',
-          params: params,
+          params: { convert_dest_directory },
         };
       },
       invalidatesTags: [
         { type: 'MainModel', id: LIST_TAG },
         { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
       ],
     }),
     mergeMainModels: build.mutation<MergeMainModelResponse, MergeMainModelArg>({
@@ -339,6 +343,7 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [
         { type: 'MainModel', id: LIST_TAG },
         { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
       ],
     }),
     syncModels: build.mutation<SyncModelsResponse, void>({
@@ -351,6 +356,7 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [
         { type: 'MainModel', id: LIST_TAG },
         { type: 'SDXLRefinerModel', id: LIST_TAG },
+        { type: 'OnnxModel', id: LIST_TAG },
       ],
     }),
     getLoRAModels: build.query<EntityState<LoRAModelConfigEntity>, void>({

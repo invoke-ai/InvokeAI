@@ -2,19 +2,16 @@ import { Box, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIDropOverlay from 'common/components/IAIDropOverlay';
 import IAICanvas from 'features/canvas/components/IAICanvas';
 import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
 import IAICanvasToolbar from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
+import { useDroppableTypesafe } from 'features/dnd/hooks/typesafeHooks';
+import { CanvasInitialImageDropData } from 'features/dnd/types';
+import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import { uiSelector } from 'features/ui/store/uiSelectors';
-
-import {
-  CanvasInitialImageDropData,
-  isValidDrop,
-  useDroppable,
-} from 'app/components/ImageDnd/typesafeDnd';
-import IAIDropOverlay from 'common/components/IAIDropOverlay';
 import { memo, useLayoutEffect } from 'react';
 import UnifiedCanvasToolSettingsBeta from './UnifiedCanvasBeta/UnifiedCanvasToolSettingsBeta';
 import UnifiedCanvasToolbarBeta from './UnifiedCanvasBeta/UnifiedCanvasToolbarBeta';
@@ -47,7 +44,7 @@ const UnifiedCanvasContent = () => {
     isOver,
     setNodeRef: setDroppableRef,
     active,
-  } = useDroppable({
+  } = useDroppableTypesafe({
     id: 'unifiedCanvas',
     data: droppableData,
   });

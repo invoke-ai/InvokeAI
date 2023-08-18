@@ -3,6 +3,10 @@ import { ImageDTO } from 'services/api/types';
 
 export const canvasSavedToGallery = createAction('canvas/canvasSavedToGallery');
 
+export const canvasMaskSavedToGallery = createAction(
+  'canvas/canvasMaskSavedToGallery'
+);
+
 export const canvasCopiedToClipboard = createAction(
   'canvas/canvasCopiedToClipboard'
 );

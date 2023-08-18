@@ -39,11 +39,19 @@ export const loraSlice = createSlice({
       action: PayloadAction<{ id: string; weight: number }>
     ) => {
       const { id, weight } = action.payload;
-      state.loras[id].weight = weight;
+      const lora = state.loras[id];
+      if (!lora) {
+        return;
+      }
+      lora.weight = weight;
     },
     loraWeightReset: (state, action: PayloadAction<string>) => {
       const id = action.payload;
-      state.loras[id].weight = defaultLoRAConfig.weight;
+      const lora = state.loras[id];
+      if (!lora) {
+        return;
+      }
+      lora.weight = defaultLoRAConfig.weight;
     },
   },
 });

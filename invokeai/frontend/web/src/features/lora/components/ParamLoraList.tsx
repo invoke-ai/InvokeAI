@@ -1,3 +1,4 @@
+import { Divider, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -8,20 +9,21 @@ import ParamLora from './ParamLora';
 const selector = createSelector(
   stateSelector,
   ({ lora }) => {
-    const { loras } = lora;
-
-    return { loras };
+    return { lorasArray: map(lora.loras) };
   },
   defaultSelectorOptions
 );
 
 const ParamLoraList = () => {
-  const { loras } = useAppSelector(selector);
+  const { lorasArray } = useAppSelector(selector);
 
   return (
     <>
-      {map(loras, (lora) => (
-        <ParamLora key={lora.model_name} lora={lora} />
+      {lorasArray.map((lora, i) => (
+        <Flex key={lora.model_name} sx={{ flexDirection: 'column', gap: 2 }}>
+          {i > 0 && <Divider pt={1} />}
+          <ParamLora lora={lora} />
+        </Flex>
       ))}
     </>
   );

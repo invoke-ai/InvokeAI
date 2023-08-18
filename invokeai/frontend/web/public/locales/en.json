@@ -124,7 +124,8 @@
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
         "images": "Images",
-        "assets": "Assets"
+        "assets": "Assets",
+        "autoAssignBoardOnClick": "Auto-Assign Board on Click"
     },
     "hotkeys": {
         "keyboardShortcuts": "Keyboard Shortcuts",
@@ -502,10 +503,17 @@
         "hiresStrength": "High Res Strength",
         "imageFit": "Fit Initial Image To Output Size",
         "codeformerFidelity": "Fidelity",
+        "maskAdjustmentsHeader": "Mask Adjustments",
+        "maskBlur": "Mask Blur",
+        "maskBlurMethod": "Mask Blur Method",
+        "seamPaintingHeader": "Seam Painting",
         "seamSize": "Seam Size",
         "seamBlur": "Seam Blur",
-        "seamStrength": "Seam Strength",
         "seamSteps": "Seam Steps",
+        "seamStrength": "Seam Strength",
+        "seamThreshold": "Seam Threshold",
+        "seamLowThreshold": "Low",
+        "seamHighThreshold": "High",
         "scaleBeforeProcessing": "Scale Before Processing",
         "scaledWidth": "Scaled W",
         "scaledHeight": "Scaled H",

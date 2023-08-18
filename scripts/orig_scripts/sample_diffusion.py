@@ -1,6 +1,12 @@
-import argparse, os, sys, glob, datetime, yaml
-import torch
+import argparse
+import datetime
+import glob
+import os
+import sys
 import time
+import yaml
+
+import torch
 import numpy as np
 from tqdm import trange
 
@@ -10,7 +16,9 @@ from PIL import Image
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.util import instantiate_from_config
 
-rescale = lambda x: (x + 1.0) / 2.0
+
+def rescale(x: float) -> float:
+    return (x + 1.0) / 2.0
 
 
 def custom_to_pil(x):
@@ -45,7 +53,7 @@ def logs2pil(logs, keys=["sample"]):
             else:
                 print(f"Unknown format for key {k}. ")
                 img = None
-        except:
+        except Exception:
             img = None
         imgs[k] = img
     return imgs

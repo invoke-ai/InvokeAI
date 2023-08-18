@@ -2,6 +2,10 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
+import {
+  DenoiseLatentsInvocation,
+  ONNXTextToLatentsInvocation,
+} from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
@@ -9,16 +13,16 @@ import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_OUTPUT,
+  CANVAS_TEXT_TO_IMAGE_GRAPH,
   CLIP_SKIP,
-  LATENTS_TO_IMAGE,
+  DENOISE_LATENTS,
   MAIN_MODEL_LOADER,
-  ONNX_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
+  ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
-  TEXT_TO_IMAGE_GRAPH,
-  TEXT_TO_LATENTS,
 } from './constants';
 
 /**
@@ -53,8 +57,38 @@ export const buildCanvasTextToImageGraph = (
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
-  const onnx_model_type = model.model_type.includes('onnx');
-  const model_loader = onnx_model_type ? ONNX_MODEL_LOADER : MAIN_MODEL_LOADER;
+
+  const isUsingOnnxModel = model.model_type === 'onnx';
+
+  const modelLoaderNodeId = isUsingOnnxModel
+    ? ONNX_MODEL_LOADER
+    : MAIN_MODEL_LOADER;
+
+  const modelLoaderNodeType = isUsingOnnxModel
+    ? 'onnx_model_loader'
+    : 'main_model_loader';
+
+  const t2lNode: DenoiseLatentsInvocation | ONNXTextToLatentsInvocation =
+    isUsingOnnxModel
+      ? {
+          type: 't2l_onnx',
+          id: DENOISE_LATENTS,
+          is_intermediate: true,
+          cfg_scale,
+          scheduler,
+          steps,
+        }
+      : {
+          type: 'denoise_latents',
+          id: DENOISE_LATENTS,
+          is_intermediate: true,
+          cfg_scale,
+          scheduler,
+          steps,
+          denoising_start: 0,
+          denoising_end: 1,
+        };
+
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -67,16 +101,28 @@ export const buildCanvasTextToImageGraph = (
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
-    id: TEXT_TO_IMAGE_GRAPH,
+    id: CANVAS_TEXT_TO_IMAGE_GRAPH,
     nodes: {
+      [modelLoaderNodeId]: {
+        type: modelLoaderNodeType,
+        id: modelLoaderNodeId,
+        is_intermediate: true,
+        model,
+      },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        is_intermediate: true,
+        skipped_layers: clipSkip,
+      },
       [POSITIVE_CONDITIONING]: {
-        type: onnx_model_type ? 'prompt_onnx' : 'compel',
+        type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
         id: POSITIVE_CONDITIONING,
         is_intermediate: true,
         prompt: positivePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: onnx_model_type ? 'prompt_onnx' : 'compel',
+        type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
         id: NEGATIVE_CONDITIONING,
         is_intermediate: true,
         prompt: negativePrompt,
@@ -89,101 +135,75 @@ export const buildCanvasTextToImageGraph = (
         height,
         use_cpu,
       },
-      [TEXT_TO_LATENTS]: {
-        type: onnx_model_type ? 't2l_onnx' : 't2l',
-        id: TEXT_TO_LATENTS,
-        is_intermediate: true,
-        cfg_scale,
-        scheduler,
-        steps,
-      },
-      [model_loader]: {
-        type: model_loader,
-        id: model_loader,
-        is_intermediate: true,
-        model,
-      },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        is_intermediate: true,
-        skipped_layers: clipSkip,
-      },
-      [LATENTS_TO_IMAGE]: {
-        type: onnx_model_type ? 'l2i_onnx' : 'l2i',
-        id: LATENTS_TO_IMAGE,
+      [t2lNode.id]: t2lNode,
+      [CANVAS_OUTPUT]: {
+        type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
+        id: CANVAS_OUTPUT,
         is_intermediate: !shouldAutoSave,
       },
     },
     edges: [
+      // Connect Model Loader to UNet & CLIP Skip
       {
         source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
+          node_id: modelLoaderNodeId,
+          field: 'unet',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
-          field: 'negative_conditioning',
+          node_id: DENOISE_LATENTS,
+          field: 'unet',
         },
       },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'clip',
+        },
+        destination: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+      },
+      // Connect CLIP Skip to Conditioning
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      // Connect everything to Denoise Latents
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
           field: 'conditioning',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
       {
         source: {
-          node_id: model_loader,
-          field: 'clip',
-        },
-        destination: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-        destination: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-        destination: {
           node_id: NEGATIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: model_loader,
-          field: 'unet',
+          field: 'conditioning',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
-          field: 'unet',
-        },
-      },
-      {
-        source: {
-          node_id: TEXT_TO_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
+          node_id: DENOISE_LATENTS,
+          field: 'negative_conditioning',
         },
       },
       {
@@ -192,8 +212,19 @@ export const buildCanvasTextToImageGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: TEXT_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'noise',
+        },
+      },
+      // Decode denoised latents to image
+      {
+        source: {
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'latents',
         },
       },
     ],
@@ -226,32 +257,32 @@ export const buildCanvasTextToImageGraph = (
       field: 'metadata',
     },
     destination: {
-      node_id: LATENTS_TO_IMAGE,
+      node_id: CANVAS_OUTPUT,
       field: 'metadata',
     },
   });
 
-  // add LoRA support
-  addLoRAsToGraph(state, graph, TEXT_TO_LATENTS, model_loader);
-
   // optionally add custom VAE
-  addVAEToGraph(state, graph, model_loader);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
+
+  // add LoRA support
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, TEXT_TO_LATENTS);
+  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph);
+    addNSFWCheckerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
   if (state.system.shouldUseWatermarker) {
     // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph);
+    addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
 
   return graph;

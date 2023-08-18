@@ -47,7 +47,7 @@ export const initialCanvasState: CanvasState = {
   boundingBoxCoordinates: { x: 0, y: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
-  boundingBoxScaleMethod: 'auto',
+  boundingBoxScaleMethod: 'none',
   brushColor: { r: 90, g: 90, b: 255, a: 1 },
   brushSize: 50,
   canvasContainerDimensions: { width: 0, height: 0 },
@@ -727,10 +727,13 @@ export const canvasSlice = createSlice({
         state.pastLayerStates.shift();
       }
 
-      state.layerState.objects.push({
-        ...images[selectedImageIndex],
-      });
+      const imageToCommit = images[selectedImageIndex];
 
+      if (imageToCommit) {
+        state.layerState.objects.push({
+          ...imageToCommit,
+        });
+      }
       state.layerState.stagingArea = {
         ...initialLayerState.stagingArea,
       };

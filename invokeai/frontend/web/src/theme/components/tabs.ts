@@ -8,16 +8,16 @@ import { mode } from '@chakra-ui/theme-tools';
 const { defineMultiStyleConfig, definePartsStyle } =
   createMultiStyleConfigHelpers(parts.keys);
 
-const invokeAIRoot = defineStyle((_props) => {
+const appTabsRoot = defineStyle((_props) => {
   return {
     display: 'flex',
     columnGap: 4,
   };
 });
 
-const invokeAITab = defineStyle((_props) => ({}));
+const appTabsTab = defineStyle((_props) => ({}));
 
-const invokeAITablist = defineStyle((props) => {
+const appTabsTablist = defineStyle((props) => {
   const { colorScheme: c } = props;
 
   return {
@@ -65,24 +65,49 @@ const invokeAITablist = defineStyle((props) => {
   };
 });
 
-const invokeAITabpanel = defineStyle((_props) => ({
+const appTabsTabpanel = defineStyle((_props) => ({
   padding: 0,
   height: '100%',
 }));
 
-const invokeAI = definePartsStyle((props) => ({
-  root: invokeAIRoot(props),
-  tab: invokeAITab(props),
-  tablist: invokeAITablist(props),
-  tabpanel: invokeAITabpanel(props),
+const appTabs = definePartsStyle((props) => ({
+  root: appTabsRoot(props),
+  tab: appTabsTab(props),
+  tablist: appTabsTablist(props),
+  tabpanel: appTabsTabpanel(props),
+}));
+
+const line = definePartsStyle((props) => ({
+  tab: {
+    borderTopRadius: 'base',
+    px: 4,
+    py: 1,
+    fontSize: 'sm',
+    color: mode('base.600', 'base.400')(props),
+    fontWeight: 500,
+    _selected: {
+      color: mode('accent.600', 'accent.400')(props),
+    },
+  },
+  tabpanel: {
+    p: 0,
+    pt: 4,
+    w: 'full',
+    h: 'full',
+  },
+  tabpanels: {
+    w: 'full',
+    h: 'full',
+  },
 }));
 
 export const tabsTheme = defineMultiStyleConfig({
   variants: {
-    invokeAI,
+    line,
+    appTabs,
   },
   defaultProps: {
-    variant: 'invokeAI',
+    variant: 'appTabs',
     colorScheme: 'accent',
   },
 });

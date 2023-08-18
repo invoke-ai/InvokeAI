@@ -4,58 +4,51 @@ import { skipToken } from '@reduxjs/toolkit/dist/query';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
-} from 'app/components/ImageDnd/typesafeDnd';
+} from 'features/dnd/types';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { memo, useCallback, useMemo, useState } from 'react';
+import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
-import { controlNetImageChanged } from '../store/controlNetSlice';
+import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
+import {
+  ControlNetConfig,
+  controlNetImageChanged,
+} from '../store/controlNetSlice';
 
 type Props = {
-  controlNetId: string;
+  controlNet: ControlNetConfig;
   height: SystemStyleObject['h'];
 };
 
+const selector = createSelector(
+  stateSelector,
+  ({ controlNet }) => {
+    const { pendingControlImages } = controlNet;
+
+    return {
+      pendingControlImages,
+    };
+  },
+  defaultSelectorOptions
+);
+
 const ControlNetImagePreview = (props: Props) => {
-  const { height, controlNetId } = props;
+  const { height } = props;
+  const {
+    controlImage: controlImageName,
+    processedControlImage: processedControlImageName,
+    processorType,
+    isEnabled,
+    controlNetId,
+  } = props.controlNet;
+
   const dispatch = useAppDispatch();
 
-  const selector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ controlNet }) => {
-          const { pendingControlImages } = controlNet;
-          const {
-            controlImage,
-            processedControlImage,
-            processorType,
-            isEnabled,
-          } = controlNet.controlNets[controlNetId];
-
-          return {
-            controlImageName: controlImage,
-            processedControlImageName: processedControlImage,
-            processorType,
-            isEnabled,
-            pendingControlImages,
-          };
-        },
-        defaultSelectorOptions
-      ),
-    [controlNetId]
-  );
-
-  const {
-    controlImageName,
-    processedControlImageName,
-    processorType,
-    pendingControlImages,
-    isEnabled,
-  } = useAppSelector(selector);
+  const { pendingControlImages } = useAppSelector(selector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
@@ -128,11 +121,15 @@ const ControlNetImagePreview = (props: Props) => {
         droppableData={droppableData}
         imageDTO={controlImage}
         isDropDisabled={shouldShowProcessedImage || !isEnabled}
-        onClickReset={handleResetControlImage}
         postUploadAction={postUploadAction}
-        resetTooltip="Reset Control Image"
-        withResetIcon={Boolean(controlImage)}
-      />
+      >
+        <IAIDndImageIcon
+          onClick={handleResetControlImage}
+          icon={controlImage ? <FaUndo /> : undefined}
+          tooltip="Reset Control Image"
+        />
+      </IAIDndImage>
+
       <Box
         sx={{
           position: 'absolute',
@@ -152,10 +149,13 @@ const ControlNetImagePreview = (props: Props) => {
           imageDTO={processedControlImage}
           isUploadDisabled={true}
           isDropDisabled={!isEnabled}
-          onClickReset={handleResetControlImage}
-          resetTooltip="Reset Control Image"
-          withResetIcon={Boolean(controlImage)}
-        />
+        >
+          <IAIDndImageIcon
+            onClick={handleResetControlImage}
+            icon={controlImage ? <FaUndo /> : undefined}
+            tooltip="Reset Control Image"
+          />
+        </IAIDndImage>
       </Box>
       {pendingControlImages.includes(controlNetId) && (
         <Flex

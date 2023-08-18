@@ -104,8 +104,12 @@ async def update_model(
             ):  # model manager moved model path during rename - don't overwrite it
                 info.path = new_info.get("path")
 
+        # replace empty string values with None/null to avoid phenomenon of vae: ''
+        info_dict = info.dict()
+        info_dict = {x: info_dict[x] if info_dict[x] else None for x in info_dict.keys()}
+
         ApiDependencies.invoker.services.model_manager.update_model(
-            model_name=model_name, base_model=base_model, model_type=model_type, model_attributes=info.dict()
+            model_name=model_name, base_model=base_model, model_type=model_type, model_attributes=info_dict
         )
 
         model_raw = ApiDependencies.invoker.services.model_manager.list_model(

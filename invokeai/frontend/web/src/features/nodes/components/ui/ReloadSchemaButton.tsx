@@ -1,11 +1,11 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaSyncAlt } from 'react-icons/fa';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 
-export default function ReloadSchemaButton() {
+const ReloadSchemaButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -21,4 +21,6 @@ export default function ReloadSchemaButton() {
       onClick={handleReloadSchema}
     />
   );
-}
+};
+
+export default memo(ReloadSchemaButton);
