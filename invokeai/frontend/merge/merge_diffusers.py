@@ -16,13 +16,8 @@ from npyscreen import widget
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_management import (
-    ModelMerger,
-    ModelManager,
-    ModelType,
-    BaseModelType,
-)
-from invokeai.frontend.install.widgets import FloatTitleSlider, TextBox, SingleSelectColumns
+from invokeai.backend.model_management import BaseModelType, ModelManager, ModelMerger, ModelType
+from invokeai.frontend.install.widgets import FloatTitleSlider, SingleSelectColumns, TextBox
 
 config = InvokeAIAppConfig.get_config()
 
