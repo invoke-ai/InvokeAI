@@ -2,6 +2,7 @@ import { useToken } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { contextMenusClosed } from 'features/ui/store/uiSlice';
 import { useCallback } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import {
   Background,
   OnConnect,
@@ -27,6 +28,8 @@ import {
   nodesDeleted,
   selectedEdgesChanged,
   selectedNodesChanged,
+  selectionCopied,
+  selectionPasted,
   viewportChanged,
 } from '../store/nodesSlice';
 import { CustomConnectionLine } from './CustomConnectionLine';
@@ -121,8 +124,17 @@ export const Flow = () => {
     dispatch(contextMenusClosed());
   }, [dispatch]);
 
+  useHotkeys(['Ctrl+c', 'Meta+c'], () => {
+    dispatch(selectionCopied());
+  });
+
+  useHotkeys(['Ctrl+v', 'Meta+v'], () => {
+    dispatch(selectionPasted());
+  });
+
   return (
     <ReactFlow
+      id="workflow-editor"
       defaultViewport={viewport}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}

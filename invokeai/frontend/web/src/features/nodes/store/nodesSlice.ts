@@ -25,6 +25,7 @@ import {
   appSocketInvocationError,
   appSocketInvocationStarted,
 } from 'services/events/actions';
+import { v4 as uuidv4 } from 'uuid';
 import { DRAG_HANDLE_CLASSNAME } from '../types/constants';
 import {
   BooleanInputFieldValue,
@@ -52,6 +53,7 @@ import {
   Workflow,
 } from '../types/types';
 import { NodesState } from './types';
+import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
 export const initialNodesState: NodesState = {
   nodes: [],
@@ -83,6 +85,8 @@ export const initialNodesState: NodesState = {
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
   mouseOverField: null,
+  nodesToCopy: [],
+  edgesToCopy: [],
 };
 
 type FieldValueAction<T extends InputFieldValue> = PayloadAction<{
@@ -124,6 +128,12 @@ const nodesSlice = createSlice({
       >
     ) => {
       const node = action.payload;
+      const position = findUnoccupiedPosition(
+        state.nodes,
+        node.position.x,
+        node.position.y
+      );
+      node.position = position;
       state.nodes.push(node);
 
       if (!isInvocationNode(node)) {
@@ -595,6 +605,85 @@ const nodesSlice = createSlice({
     ) => {
       state.mouseOverField = action.payload;
     },
+    selectionCopied: (state) => {
+      state.nodesToCopy = state.nodes.filter((n) => n.selected).map(cloneDeep);
+      state.edgesToCopy = state.edges.filter((e) => e.selected).map(cloneDeep);
+    },
+    selectionPasted: (state) => {
+      const newNodes = state.nodesToCopy.map(cloneDeep);
+      const oldNodeIds = newNodes.map((n) => n.data.id);
+      const newEdges = state.edgesToCopy
+        .filter(
+          (e) => oldNodeIds.includes(e.source) && oldNodeIds.includes(e.target)
+        )
+        .map(cloneDeep);
+
+      newEdges.forEach((e) => (e.selected = true));
+
+      newNodes.forEach((node) => {
+        const newNodeId = uuidv4();
+        newEdges.forEach((edge) => {
+          if (edge.source === node.data.id) {
+            edge.source = newNodeId;
+            edge.id = edge.id.replace(node.data.id, newNodeId);
+          }
+          if (edge.target === node.data.id) {
+            edge.target = newNodeId;
+            edge.id = edge.id.replace(node.data.id, newNodeId);
+          }
+        });
+        node.selected = true;
+        node.id = newNodeId;
+        node.data.id = newNodeId;
+
+        const position = findUnoccupiedPosition(
+          state.nodes,
+          node.position.x,
+          node.position.y
+        );
+
+        node.position = position;
+      });
+
+      const nodeAdditions: NodeChange[] = newNodes.map((n) => ({
+        item: n,
+        type: 'add',
+      }));
+      const nodeSelectionChanges: NodeChange[] = state.nodes.map((n) => ({
+        id: n.data.id,
+        type: 'select',
+        selected: false,
+      }));
+
+      const edgeAdditions: EdgeChange[] = newEdges.map((e) => ({
+        item: e,
+        type: 'add',
+      }));
+      const edgeSelectionChanges: EdgeChange[] = state.edges.map((e) => ({
+        id: e.id,
+        type: 'select',
+        selected: false,
+      }));
+
+      state.nodes = applyNodeChanges(
+        nodeAdditions.concat(nodeSelectionChanges),
+        state.nodes
+      );
+
+      state.edges = applyEdgeChanges(
+        edgeAdditions.concat(edgeSelectionChanges),
+        state.edges
+      );
+
+      newNodes.forEach((node) => {
+        state.nodeExecutionStates[node.id] = {
+          status: NodeStatus.PENDING,
+          error: null,
+          progress: null,
+          progressImage: null,
+        };
+      });
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(receivedOpenAPISchema.pending, (state) => {
@@ -703,6 +792,8 @@ export const {
   fieldLabelChanged,
   viewportChanged,
   mouseOverFieldChanged,
+  selectionCopied,
+  selectionPasted,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

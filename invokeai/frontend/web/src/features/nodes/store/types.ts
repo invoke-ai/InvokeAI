@@ -31,4 +31,6 @@ export type NodesState = {
   viewport: Viewport;
   isReady: boolean;
   mouseOverField: FieldIdentifier | null;
+  nodesToCopy: Node<NodeData>[];
+  edgesToCopy: Edge<InvocationEdgeExtra>[];
 };
