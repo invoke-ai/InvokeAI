@@ -98,6 +98,10 @@ plugins:
           'installation/INSTALLING_MODELS.md': 'installation/050_INSTALLING_MODELS.md'
           'installation/INSTALL_PATCHMATCH.md': 'installation/060_INSTALL_PATCHMATCH.md'
 
+extra_javascript:
+  - https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js
+  - javascripts/tablesort.js
+
 nav:
     - Home: 'index.md'
     - Installation:
@@ -123,7 +127,7 @@ nav:
       - Example Workflows: 'nodes/exampleWorkflows.md'
       - Nodes Overview: 'nodes/overview.md'
       - List of Default Nodes: 'nodes/defaultNodes.md'
-      - Nodes Editor: 'nodes/NODES.md'
+      - Node Editor Usage: 'nodes/NODES.md'
       - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
       - Contributing Nodes: 'nodes/contributingNodes.md'
     - Features:
@@ -163,6 +167,7 @@ nav:
       - Outpainting: 'deprecated/OUTPAINTING.md'
     - Help:
       - Getting Started: 'help/gettingStartedWithAI.md'
+      - Diffusion Overview: 'help/diffusion.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
     - Other:
       - Contributors: 'other/CONTRIBUTORS.md'

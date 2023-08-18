@@ -1,5 +1,3 @@
-## Diffusion Overview
-
 Taking the time to understand the diffusion process will help you to understand how to more effectively use InvokeAI.
 
 There are two main spaces Stable Diffusion works in: image space and latent space.
