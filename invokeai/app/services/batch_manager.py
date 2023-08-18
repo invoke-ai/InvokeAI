@@ -133,15 +133,16 @@ class BatchManager(BatchManagerBase):
             batch_indices.append(list(range(len(batchdata[0].items))))
         all_batch_indices = product(*batch_indices)
         for bi in all_batch_indices:
-            ges = self._create_batch_session(batch_process, bi)
-            self.__invoker.services.graph_execution_manager.set(ges)
-            batch_session = BatchSession(batch_id=batch_process.batch_id, session_id=ges.id, state="created")
-            sessions.append(self.__batch_process_storage.create_session(batch_session))
-        if not sessions:
-            ges = GraphExecutionState(graph=batch_process.graph)
-            self.__invoker.services.graph_execution_manager.set(ges)
-            batch_session = BatchSession(batch_id=batch_process.batch_id, session_id=ges.id, state="created")
-            sessions.append(self.__batch_process_storage.create_session(batch_session))
+            for _ in range(batch_process.batch.runs):
+                ges = self._create_batch_session(batch_process, bi)
+                self.__invoker.services.graph_execution_manager.set(ges)
+                batch_session = BatchSession(batch_id=batch_process.batch_id, session_id=ges.id, state="created")
+                sessions.append(self.__batch_process_storage.create_session(batch_session))
+            if not sessions:
+                ges = GraphExecutionState(graph=batch_process.graph)
+                self.__invoker.services.graph_execution_manager.set(ges)
+                batch_session = BatchSession(batch_id=batch_process.batch_id, session_id=ges.id, state="created")
+                sessions.append(self.__batch_process_storage.create_session(batch_session))
         return sessions
 
     def cancel_batch_process(self, batch_process_id: str) -> None:

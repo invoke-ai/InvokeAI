@@ -35,6 +35,13 @@ class Batch(BaseModel):
     """
 
     data: list[list[BatchData]] = Field(default_factory=list, description="The list of batch data collections.")
+    runs: int = Field(default=1, description="Int stating how many times to iterate through all possible batch indices")
+
+    @validator("runs")
+    def validate_positive_runs(cls, r: int):
+        if r < 1:
+            raise ValueError("runs must be a positive integer")
+        return r
 
     @validator("data")
     def validate_len(cls, v: list[list[BatchData]]):
