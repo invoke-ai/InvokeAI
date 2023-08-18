@@ -566,7 +566,7 @@ class InvokeAIDiffuserComponent:
         return x_final
 
     def _combine(self, unconditioned_next_x, conditioned_next_x, guidance_scale, guidance_rescale_multiplier=0):
-        if guidance_rescale > 0:
+        if guidance_rescale_multiplier > 0:
             # for models trained using zero-terminal SNR
             return type(self)._rescale_cfg(conditioned_next_x, unconditioned_next_x, guidance_scale, multiplier=guidance_rescale_multiplier)
         else:
