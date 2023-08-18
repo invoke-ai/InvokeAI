@@ -1,10 +1,7 @@
 from typing import Any, Callable, Literal, Union
-
 from pydantic import Field
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.image import ImageField
-from invokeai.app.services.events import EventServiceBase
-from invokeai.app.services.graph import Edge, EdgeConnection
 
 
 # Define test invocations before importing anything that uses invocations
@@ -81,6 +78,11 @@ class PromptCollectionTestInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
         return PromptCollectionTestInvocationOutput(collection=self.collection.copy())
+
+
+# Importing these at the top breaks previous tests
+from invokeai.app.services.events import EventServiceBase  # noqa: E402
+from invokeai.app.services.graph import Edge, EdgeConnection  # noqa: E402
 
 
 def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edge:
