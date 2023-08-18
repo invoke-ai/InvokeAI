@@ -1,6 +1,7 @@
 import sqlite3
+import json
 from threading import Lock
-from typing import Generic, Optional, TypeVar, get_args
+from typing import Generic, Optional, TypeVar, Union, get_args
 
 from pydantic import BaseModel, parse_raw_as
 
@@ -99,7 +100,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             self._lock.release()
         self._on_deleted(id)
 
-    def list(self, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
+    def list(self, page: int = 0, per_page: int = 10) -> PaginatedResults[dict]:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -108,7 +109,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             )
             result = self._cursor.fetchall()
 
-            items = list(map(lambda r: self._parse_item(r[0]), result))
+            items = [json.loads(r[0]) for r in result]
 
             self._cursor.execute(f"""SELECT count(*) FROM {self._table_name};""")
             count = self._cursor.fetchone()[0]
@@ -117,9 +118,9 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
 
         pageCount = int(count / per_page) + 1
 
-        return PaginatedResults[T](items=items, page=page, pages=pageCount, per_page=per_page, total=count)
+        return PaginatedResults[dict](items=items, page=page, pages=pageCount, per_page=per_page, total=count)
 
-    def search(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
+    def search(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedResults[dict]:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -128,7 +129,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             )
             result = self._cursor.fetchall()
 
-            items = list(map(lambda r: self._parse_item(r[0]), result))
+            items = [json.loads(r[0]) for r in result]
 
             self._cursor.execute(
                 f"""SELECT count(*) FROM {self._table_name} WHERE item LIKE ?;""",
@@ -140,4 +141,4 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
 
         pageCount = int(count / per_page) + 1
 
-        return PaginatedResults[T](items=items, page=page, pages=pageCount, per_page=per_page, total=count)
+        return PaginatedResults[dict](items=items, page=page, pages=pageCount, per_page=per_page, total=count)

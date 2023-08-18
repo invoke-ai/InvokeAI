@@ -40,7 +40,7 @@ async def create_session(
 @session_router.get(
     "/",
     operation_id="list_sessions",
-    responses={200: {"model": PaginatedResults[GraphExecutionState]}},
+    responses={200: {"model": PaginatedResults[dict]}},
 )
 async def list_sessions(
     page: int = Query(default=0, description="The page of results to get"),
