@@ -1,5 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+import json
 from typing import Annotated, List, Optional, Union
 
 from fastapi import Body, HTTPException, Path, Query, Response
@@ -8,14 +9,8 @@ from pydantic.fields import Field
 
 from ...invocations import *
 from ...invocations.baseinvocation import BaseInvocation
-from ...services.graph import (
-    Edge,
-    EdgeConnection,
-    Graph,
-    GraphExecutionState,
-    NodeAlreadyExecutedError,
-)
-from ...services.item_storage import PaginatedResults
+from ...services.graph import Edge, EdgeConnection, Graph, GraphExecutionState, NodeAlreadyExecutedError
+from ...services.item_storage import PaginatedDictResults, PaginatedResults
 from ..dependencies import ApiDependencies
 
 session_router = APIRouter(prefix="/v1/sessions", tags=["sessions"])
@@ -40,18 +35,18 @@ async def create_session(
 @session_router.get(
     "/",
     operation_id="list_sessions",
-    responses={200: {"model": PaginatedResults[GraphExecutionState]}},
+    responses={200: {"model": PaginatedDictResults}},
 )
 async def list_sessions(
     page: int = Query(default=0, description="The page of results to get"),
     per_page: int = Query(default=10, description="The number of results per page"),
     query: str = Query(default="", description="The query string to search for"),
-) -> PaginatedResults[GraphExecutionState]:
+) -> PaginatedDictResults:
     """Gets a list of sessions, optionally searching"""
     if query == "":
-        result = ApiDependencies.invoker.services.graph_execution_manager.list(page, per_page)
+        result = ApiDependencies.invoker.services.graph_execution_manager.list_as_dict(page, per_page)
     else:
-        result = ApiDependencies.invoker.services.graph_execution_manager.search(query, page, per_page)
+        result = ApiDependencies.invoker.services.graph_execution_manager.search_as_dict(query, page, per_page)
     return result
 
 
@@ -59,19 +54,18 @@ async def list_sessions(
     "/{session_id}",
     operation_id="get_session",
     responses={
-        200: {"model": GraphExecutionState},
+        200: {"model": dict},
         404: {"description": "Session not found"},
     },
 )
 async def get_session(
     session_id: str = Path(description="The id of the session to get"),
-) -> GraphExecutionState:
+) -> dict:
     """Gets a session"""
-    session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
-    if session is None:
+    session_dict = ApiDependencies.invoker.services.graph_execution_manager.get_as_dict(session_id)
+    if session_dict is None:
         raise HTTPException(status_code=404)
-    else:
-        return session
+    return session_dict
 
 
 @session_router.post(

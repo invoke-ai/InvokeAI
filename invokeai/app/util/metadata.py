@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from invokeai.app.services.graph import Edge
 
 
-def get_metadata_graph_from_raw_session(session_raw: str) -> Optional[dict]:
+def get_metadata_graph_from_session_dict(session_dict: dict) -> Optional[dict]:
     """
     Parses raw session string, returning a dict of the graph.
 
@@ -17,7 +17,7 @@ def get_metadata_graph_from_raw_session(session_raw: str) -> Optional[dict]:
     Any validation failure will return None.
     """
 
-    graph = json.loads(session_raw).get("graph", None)
+    graph = session_dict.get("graph", None)
 
     # sanity check make sure the graph is at least reasonably shaped
     if (

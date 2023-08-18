@@ -4755,15 +4755,15 @@ export type components = {
       image_resolution?: number;
     };
     /**
-     * PaginatedResults[GraphExecutionState] 
-     * @description Paginated results
+     * PaginatedDictResults 
+     * @description Paginated raw results (dict)
      */
-    PaginatedResults_GraphExecutionState_: {
+    PaginatedDictResults: {
       /**
        * Items 
        * @description Items
        */
-      items: (components["schemas"]["GraphExecutionState"])[];
+      items: (Record<string, never>)[];
       /**
        * Page 
        * @description Current Page
@@ -6194,12 +6194,6 @@ export type components = {
       ui_type?: components["schemas"]["UIType"];
     };
     /**
-     * StableDiffusionOnnxModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
-    /**
      * StableDiffusion1ModelFormat 
      * @description An enumeration. 
      * @enum {string}
@@ -6217,6 +6211,12 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * StableDiffusionXLModelFormat 
      * @description An enumeration. 
@@ -6254,7 +6254,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["PaginatedResults_GraphExecutionState_"];
+          "application/json": components["schemas"]["PaginatedDictResults"];
         };
       };
       /** @description Validation Error */
@@ -6307,7 +6307,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["GraphExecutionState"];
+          "application/json": Record<string, never>;
         };
       };
       /** @description Session not found */

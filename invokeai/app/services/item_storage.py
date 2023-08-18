@@ -19,6 +19,18 @@ class PaginatedResults(GenericModel, Generic[T]):
     # fmt: on
 
 
+class PaginatedDictResults(BaseModel):
+    """Paginated raw results (dict)"""
+
+    # fmt: off
+    items: list[dict] = Field(description="Items")
+    page: int = Field(description="Current Page")
+    pages: int = Field(description="Total number of pages")
+    per_page: int = Field(description="Number of items per page")
+    total: int = Field(description="Total number of items in result")
+    # fmt: on
+
+
 class ItemStorageABC(ABC, Generic[T]):
     _on_changed_callbacks: list[Callable[[T], None]]
     _on_deleted_callbacks: list[Callable[[str], None]]
@@ -35,8 +47,8 @@ class ItemStorageABC(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def get_raw(self, item_id: str) -> Optional[str]:
-        """Gets the raw item as a string, skipping Pydantic parsing"""
+    def get_as_dict(self, item_id: str) -> Optional[dict]:
+        """Gets the item as a dict, skipping Pydantic parsing"""
         pass
 
     @abstractmethod
@@ -50,7 +62,16 @@ class ItemStorageABC(ABC, Generic[T]):
         pass
 
     @abstractmethod
+    def list_as_dict(self, page: int = 0, per_page: int = 10) -> PaginatedDictResults:
+        """Gets a paginated list of items, skipping Pydantic parsing"""
+        pass
+
+    @abstractmethod
     def search(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
+        pass
+
+    @abstractmethod
+    def search_as_dict(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedDictResults:
         pass
 
     def on_changed(self, on_changed: Callable[[T], None]) -> None:

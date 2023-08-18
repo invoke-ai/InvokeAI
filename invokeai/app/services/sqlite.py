@@ -1,10 +1,11 @@
+import json
 import sqlite3
 from threading import Lock
 from typing import Generic, Optional, TypeVar, get_args
 
-from pydantic import BaseModel, parse_raw_as
+from pydantic import BaseModel, parse_obj_as, parse_raw_as
 
-from .item_storage import ItemStorageABC, PaginatedResults
+from .item_storage import ItemStorageABC, PaginatedDictResults, PaginatedResults
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -47,9 +48,9 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
         finally:
             self._lock.release()
 
-    def _parse_item(self, item: str) -> T:
+    def _parse_item_from_dict(self, item: dict) -> T:
         item_type = get_args(self.__orig_class__)[0]
-        parsed = parse_raw_as(item_type, item)
+        parsed = parse_obj_as(item_type, item)
         return parsed
 
     def set(self, item: T):
@@ -64,31 +65,25 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             self._lock.release()
         self._on_changed(item)
 
+    def get_as_dict(self, id: str) -> Optional[dict]:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(f"""SELECT item FROM {self._table_name} WHERE id = ?;""", (str(id),))
+            result = self._cursor.fetchone()
+        finally:
+            self._lock.release()
+
+        if not result:
+            return None
+
+        return json.loads(result[0])
+
     def get(self, id: str) -> Optional[T]:
-        try:
-            self._lock.acquire()
-            self._cursor.execute(f"""SELECT item FROM {self._table_name} WHERE id = ?;""", (str(id),))
-            result = self._cursor.fetchone()
-        finally:
-            self._lock.release()
-
-        if not result:
+        item = self.get_as_dict(id)
+        if not item:
             return None
 
-        return self._parse_item(result[0])
-
-    def get_raw(self, id: str) -> Optional[str]:
-        try:
-            self._lock.acquire()
-            self._cursor.execute(f"""SELECT item FROM {self._table_name} WHERE id = ?;""", (str(id),))
-            result = self._cursor.fetchone()
-        finally:
-            self._lock.release()
-
-        if not result:
-            return None
-
-        return result[0]
+        return self._parse_item_from_dict(item)
 
     def delete(self, id: str):
         try:
@@ -99,7 +94,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             self._lock.release()
         self._on_deleted(id)
 
-    def list(self, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
+    def list_as_dict(self, page: int = 0, per_page: int = 10) -> PaginatedDictResults:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -108,7 +103,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             )
             result = self._cursor.fetchall()
 
-            items = list(map(lambda r: self._parse_item(r[0]), result))
+            items = list(map(lambda r: json.loads(r[0]), result))
 
             self._cursor.execute(f"""SELECT count(*) FROM {self._table_name};""")
             count = self._cursor.fetchone()[0]
@@ -117,9 +112,20 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
 
         pageCount = int(count / per_page) + 1
 
-        return PaginatedResults[T](items=items, page=page, pages=pageCount, per_page=per_page, total=count)
+        return PaginatedDictResults(items=items, page=page, pages=pageCount, per_page=per_page, total=count)
 
-    def search(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
+    def list(self, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
+        paginated_raw_results = self.list_as_dict(page, per_page)
+        items = list(map(lambda r: self._parse_item_from_dict(r), paginated_raw_results.items))
+        return PaginatedResults[T](
+            items=items,
+            page=page,
+            pages=paginated_raw_results.pages,
+            per_page=per_page,
+            total=paginated_raw_results.total,
+        )
+
+    def search_as_dict(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedDictResults:
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -128,7 +134,7 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
             )
             result = self._cursor.fetchall()
 
-            items = list(map(lambda r: self._parse_item(r[0]), result))
+            items = list(map(lambda r: json.loads(r[0]), result))
 
             self._cursor.execute(
                 f"""SELECT count(*) FROM {self._table_name} WHERE item LIKE ?;""",
@@ -140,4 +146,15 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
 
         pageCount = int(count / per_page) + 1
 
-        return PaginatedResults[T](items=items, page=page, pages=pageCount, per_page=per_page, total=count)
+        return PaginatedDictResults(items=items, page=page, pages=pageCount, per_page=per_page, total=count)
+
+    def search(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
+        paginated_raw_results = self.search_as_dict(query, page, per_page)
+        items = list(map(lambda r: self._parse_item_from_dict(r), paginated_raw_results.items))
+        return PaginatedResults[T](
+            items=items,
+            page=page,
+            pages=paginated_raw_results.pages,
+            per_page=per_page,
+            total=paginated_raw_results.total,
+        )

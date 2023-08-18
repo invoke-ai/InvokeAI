@@ -35,7 +35,7 @@ from invokeai.app.services.models.image_record import (
 )
 from invokeai.app.services.resource_name import NameServiceBase
 from invokeai.app.services.urls import UrlServiceBase
-from invokeai.app.util.metadata import get_metadata_graph_from_raw_session
+from invokeai.app.util.metadata import get_metadata_graph_from_session_dict
 
 if TYPE_CHECKING:
     from invokeai.app.services.graph import GraphExecutionState
@@ -190,10 +190,10 @@ class ImageService(ImageServiceABC):
         graph = None
 
         if session_id is not None:
-            session_raw = self._services.graph_execution_manager.get_raw(session_id)
+            session_raw = self._services.graph_execution_manager.get_as_dict(session_id)
             if session_raw is not None:
                 try:
-                    graph = get_metadata_graph_from_raw_session(session_raw)
+                    graph = get_metadata_graph_from_session_dict(session_raw)
                 except Exception as e:
                     self._services.logger.warn(f"Failed to parse session graph: {e}")
                     graph = None
@@ -294,12 +294,12 @@ class ImageService(ImageServiceABC):
             if not image_record.session_id:
                 return ImageMetadata(metadata=metadata)
 
-            session_raw = self._services.graph_execution_manager.get_raw(image_record.session_id)
+            session_raw = self._services.graph_execution_manager.get_as_dict(image_record.session_id)
             graph = None
 
             if session_raw:
                 try:
-                    graph = get_metadata_graph_from_raw_session(session_raw)
+                    graph = get_metadata_graph_from_session_dict(session_raw)
                 except Exception as e:
                     self._services.logger.warn(f"Failed to parse session graph: {e}")
                     graph = None
