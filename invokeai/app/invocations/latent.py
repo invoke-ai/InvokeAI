@@ -15,7 +15,7 @@ from diffusers.models.attention_processor import (
 )
 from diffusers.schedulers import DPMSolverSDEScheduler
 from diffusers.schedulers import SchedulerMixin as Scheduler
-from pydantic import BaseModel, Field, validator
+from pydantic import validator
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.metadata import CoreMetadata
@@ -32,7 +32,7 @@ from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 
-from ...backend.model_management import BaseModelType, ModelPatcher
+from ...backend.model_management.models import BaseModelType
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
@@ -47,12 +47,10 @@ from ...backend.util.devices import choose_precision, choose_torch_device
 from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
-    BaseInvocationOutput,
     FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
-    OutputField,
     UIType,
     tags,
     title,

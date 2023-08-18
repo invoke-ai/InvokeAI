@@ -1,9 +1,8 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Tuple
 
 import torch
-from anyio import Condition
 from pydantic import BaseModel, Field
 
 from .baseinvocation import (

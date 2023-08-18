@@ -3,15 +3,12 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 import math
-from typing import Any, Callable, Dict, Optional, Union, List
+from typing import Any, Callable, Optional, Union
 
-import numpy as np
 import torch
 from diffusers import UNet2DConditionModel
-from diffusers.models.attention_processor import AttentionProcessor
 from typing_extensions import TypeAlias
 
-import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
 from .cross_attention_control import (
@@ -579,7 +576,7 @@ class InvokeAIDiffuserComponent:
         latents.to(device="cpu")
 
         if (
-            h_symmetry_time_pct != None
+            h_symmetry_time_pct is not None
             and self.last_percent_through < h_symmetry_time_pct
             and percent_through >= h_symmetry_time_pct
         ):
@@ -595,7 +592,7 @@ class InvokeAIDiffuserComponent:
             )
 
         if (
-            v_symmetry_time_pct != None
+            v_symmetry_time_pct is not None
             and self.last_percent_through < v_symmetry_time_pct
             and percent_through >= v_symmetry_time_pct
         ):

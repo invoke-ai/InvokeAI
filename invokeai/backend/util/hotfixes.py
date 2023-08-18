@@ -25,8 +25,13 @@ from diffusers.models.unet_2d_condition import UNet2DConditionModel
 import diffusers
 from diffusers.models.controlnet import ControlNetConditioningEmbedding, ControlNetOutput, zero_module
 
+from invokeai.backend.util.logging import InvokeAILogger
+
 # TODO: create PR to diffusers
 # Modified ControlNetModel with encoder_attention_mask argument added
+
+
+logger = InvokeAILogger.getLogger(__name__)
 
 
 class ControlNetModel(ModelMixin, ConfigMixin, FromOriginalControlnetMixin):
@@ -111,7 +116,7 @@ class ControlNetModel(ModelMixin, ConfigMixin, FromOriginalControlnetMixin):
             "DownBlock2D",
         ),
         only_cross_attention: Union[bool, Tuple[bool]] = False,
-        block_out_channels: Tuple[int] = (320, 640, 1280, 1280),
+        block_out_channels: Tuple[int, ...] = (320, 640, 1280, 1280),
         layers_per_block: int = 2,
         downsample_padding: int = 1,
         mid_block_scale_factor: float = 1,
