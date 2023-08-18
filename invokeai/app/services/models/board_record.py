@@ -1,6 +1,8 @@
-from typing import Optional, Union
 from datetime import datetime
+from typing import Optional, Union
+
 from pydantic import Field
+
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 

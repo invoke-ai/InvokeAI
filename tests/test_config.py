@@ -6,8 +6,6 @@ import pytest
 from omegaconf import OmegaConf
 from pydantic import ValidationError
 
-from invokeai.app.services.config import InvokeAIAppConfig
-
 
 @pytest.fixture
 def patch_rootdir(tmp_path: Path, monkeypatch: Any) -> None:
@@ -166,6 +164,7 @@ def test_type_coercion(patch_rootdir):
     """
 )
 def test_deny_nodes(patch_rootdir):
+    from invokeai.app.services.config import InvokeAIAppConfig
     # Allow integer, string and float, but explicitly deny float
     allow_deny_nodes_conf = OmegaConf.create(
         """

@@ -1,13 +1,9 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from logging import Logger
-from invokeai.app.services.board_image_record_storage import (
-    SqliteBoardImageRecordStorage,
-)
-from invokeai.app.services.board_images import (
-    BoardImagesService,
-    BoardImagesServiceDependencies,
-)
+
+from invokeai.app.services.board_image_record_storage import SqliteBoardImageRecordStorage
+from invokeai.app.services.board_images import BoardImagesService, BoardImagesServiceDependencies
 from invokeai.app.services.board_record_storage import SqliteBoardRecordStorage
 from invokeai.app.services.boards import BoardService, BoardServiceDependencies
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -19,16 +15,16 @@ from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
 from ..services.default_graphs import create_system_graphs
-from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 from ..services.graph import GraphExecutionState, LibraryGraph
 from ..services.image_file_storage import DiskImageFileStorage
 from ..services.invocation_queue import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
+from ..services.invocation_stats import InvocationStatsService
 from ..services.invoker import Invoker
+from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
+from ..services.model_manager_service import ModelManagerService
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
-from ..services.model_manager_service import ModelManagerService
-from ..services.invocation_stats import InvocationStatsService
 from .events import FastAPIEventService
 
 
