@@ -26,7 +26,7 @@ import {
 import { ProgressImage } from 'services/events/types';
 import { makeToast } from '../util/makeToast';
 import { LANGUAGES } from './constants';
-import { zPydanticValidationError } from './zod';
+import { zPydanticValidationError } from './zodSchemas';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
