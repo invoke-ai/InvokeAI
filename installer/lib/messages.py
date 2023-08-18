@@ -70,7 +70,7 @@ def confirm_install(dest: Path) -> bool:
         )
     else:
         print(f"InvokeAI will be installed in {dest}")
-        dest_confirmed = not Confirm.ask(f"Would you like to pick a different location?", default=False)
+        dest_confirmed = not Confirm.ask("Would you like to pick a different location?", default=False)
     console.line()
 
     return dest_confirmed
@@ -90,7 +90,7 @@ def dest_path(dest=None) -> Path:
         dest = Path(dest).expanduser().resolve()
     else:
         dest = Path.cwd().expanduser().resolve()
-    prev_dest = dest.expanduser().resolve()
+    prev_dest = init_path = dest
 
     dest_confirmed = confirm_install(dest)
 
@@ -109,9 +109,9 @@ def dest_path(dest=None) -> Path:
         )
 
         console.line()
-        print(f"[orange3]Please select the destination directory for the installation:[/] \[{browse_start}]: ")
+        console.print(f"[orange3]Please select the destination directory for the installation:[/] \\[{browse_start}]: ")
         selected = prompt(
-            f">>> ",
+            ">>> ",
             complete_in_thread=True,
             completer=path_completer,
             default=str(browse_start) + os.sep,
@@ -134,14 +134,14 @@ def dest_path(dest=None) -> Path:
     try:
         dest.mkdir(exist_ok=True, parents=True)
         return dest
-    except PermissionError as exc:
-        print(
+    except PermissionError:
+        console.print(
             f"Failed to create directory {dest} due to insufficient permissions",
             style=Style(color="red"),
             highlight=True,
         )
-    except OSError as exc:
-        console.print_exception(exc)
+    except OSError:
+        console.print_exception()
 
     if Confirm.ask("Would you like to try again?"):
         dest_path(init_path)

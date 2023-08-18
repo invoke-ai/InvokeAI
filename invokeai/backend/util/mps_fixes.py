@@ -191,7 +191,7 @@ class ChunkedSlicedAttnProcessor:
         assert value.shape[0] == 1
         assert hidden_states.shape[0] == 1
 
-        dtype = query.dtype
+        # dtype = query.dtype
         if attn.upcast_attention:
             query = query.float()
             key = key.float()

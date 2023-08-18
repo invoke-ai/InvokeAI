@@ -224,9 +224,9 @@ class ModelProbe(object):
             raise "The model {model_name} is potentially infected by malware. Aborting import."
 
 
-###################################################3
+# ##################################################3
 # Checkpoint probing
-###################################################3
+# ##################################################3
 class ProbeBase(object):
     def get_base_type(self) -> BaseModelType:
         pass
@@ -438,7 +438,7 @@ class PipelineFolderProbe(FolderProbeBase):
                 return ModelVariantType.Depth
             elif in_channels == 4:
                 return ModelVariantType.Normal
-        except:
+        except Exception:
             pass
         return ModelVariantType.Normal
 
