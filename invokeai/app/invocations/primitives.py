@@ -2,8 +2,8 @@
 
 from typing import Literal, Optional, Tuple
 
-from pydantic import BaseModel, Field
 import torch
+from pydantic import BaseModel, Field
 
 from .baseinvocation import (
     BaseInvocation,
@@ -33,7 +33,7 @@ class BooleanOutput(BaseInvocationOutput):
     """Base class for nodes that output a single boolean"""
 
     type: Literal["boolean_output"] = "boolean_output"
-    a: bool = OutputField(description="The output boolean")
+    value: bool = OutputField(description="The output boolean")
 
 
 class BooleanCollectionOutput(BaseInvocationOutput):
@@ -55,10 +55,10 @@ class BooleanInvocation(BaseInvocation):
     type: Literal["boolean"] = "boolean"
 
     # Inputs
-    a: bool = InputField(default=False, description="The boolean value")
+    value: bool = InputField(default=False, description="The boolean value")
 
     def invoke(self, context: InvocationContext) -> BooleanOutput:
-        return BooleanOutput(a=self.a)
+        return BooleanOutput(value=self.value)
 
 
 @title("Boolean Primitive Collection")
@@ -86,7 +86,7 @@ class IntegerOutput(BaseInvocationOutput):
     """Base class for nodes that output a single integer"""
 
     type: Literal["integer_output"] = "integer_output"
-    a: int = OutputField(description="The output integer")
+    value: int = OutputField(description="The output integer")
 
 
 class IntegerCollectionOutput(BaseInvocationOutput):
@@ -108,10 +108,10 @@ class IntegerInvocation(BaseInvocation):
     type: Literal["integer"] = "integer"
 
     # Inputs
-    a: int = InputField(default=0, description="The integer value")
+    value: int = InputField(default=0, description="The integer value")
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        return IntegerOutput(a=self.a)
+        return IntegerOutput(value=self.value)
 
 
 @title("Integer Primitive Collection")
@@ -139,7 +139,7 @@ class FloatOutput(BaseInvocationOutput):
     """Base class for nodes that output a single float"""
 
     type: Literal["float_output"] = "float_output"
-    a: float = OutputField(description="The output float")
+    value: float = OutputField(description="The output float")
 
 
 class FloatCollectionOutput(BaseInvocationOutput):
@@ -161,10 +161,10 @@ class FloatInvocation(BaseInvocation):
     type: Literal["float"] = "float"
 
     # Inputs
-    param: float = InputField(default=0.0, description="The float value")
+    value: float = InputField(default=0.0, description="The float value")
 
     def invoke(self, context: InvocationContext) -> FloatOutput:
-        return FloatOutput(a=self.param)
+        return FloatOutput(value=self.value)
 
 
 @title("Float Primitive Collection")
@@ -192,7 +192,7 @@ class StringOutput(BaseInvocationOutput):
     """Base class for nodes that output a single string"""
 
     type: Literal["string_output"] = "string_output"
-    text: str = OutputField(description="The output string")
+    value: str = OutputField(description="The output string")
 
 
 class StringCollectionOutput(BaseInvocationOutput):
@@ -214,10 +214,10 @@ class StringInvocation(BaseInvocation):
     type: Literal["string"] = "string"
 
     # Inputs
-    text: str = InputField(default="", description="The string value", ui_component=UIComponent.Textarea)
+    value: str = InputField(default="", description="The string value", ui_component=UIComponent.Textarea)
 
     def invoke(self, context: InvocationContext) -> StringOutput:
-        return StringOutput(text=self.text)
+        return StringOutput(value=self.value)
 
 
 @title("String Primitive Collection")
