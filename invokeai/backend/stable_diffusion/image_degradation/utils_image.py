@@ -89,7 +89,7 @@ def get_image_paths(dataroot):
 def _get_paths_from_images(path):
     assert os.path.isdir(path), "{:s} is not a valid directory".format(path)
     images = []
-    for dirpath, _, fnames in sorted(os.walk(path)):
+    for dirpath, _, fnames in sorted(os.walk(path, followlinks=True)):
         for fname in sorted(fnames):
             if is_image_file(fname):
                 img_path = os.path.join(dirpath, fname)
