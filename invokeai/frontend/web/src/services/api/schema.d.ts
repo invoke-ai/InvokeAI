@@ -611,7 +611,7 @@ export type components = {
        * @default boolean_collection_output 
        * @enum {string}
        */
-      type?: "boolean_collection_output";
+      type: "boolean_collection_output";
       /**
        * Collection 
        * @description The output boolean collection
@@ -641,11 +641,11 @@ export type components = {
        */
       type: "boolean";
       /**
-       * A 
+       * Value 
        * @description The boolean value 
        * @default false
        */
-      a?: boolean;
+      value?: boolean;
     };
     /**
      * BooleanOutput 
@@ -657,12 +657,12 @@ export type components = {
        * @default boolean_output 
        * @enum {string}
        */
-      type?: "boolean_output";
+      type: "boolean_output";
       /**
-       * A 
+       * Value 
        * @description The output boolean
        */
-      a: boolean;
+      value: boolean;
     };
     /**
      * Canny Processor 
@@ -771,7 +771,7 @@ export type components = {
        * @default clip_skip_output 
        * @enum {string}
        */
-      type?: "clip_skip_output";
+      type: "clip_skip_output";
       /**
        * CLIP 
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
@@ -821,7 +821,7 @@ export type components = {
        * @default collect_output 
        * @enum {string}
        */
-      type?: "collect_output";
+      type: "collect_output";
       /**
        * Collection 
        * @description The collection of input items
@@ -838,7 +838,7 @@ export type components = {
        * @default color_collection_output 
        * @enum {string}
        */
-      type?: "color_collection_output";
+      type: "color_collection_output";
       /**
        * Collection 
        * @description The output colors
@@ -960,7 +960,7 @@ export type components = {
        * @default color_output 
        * @enum {string}
        */
-      type?: "color_output";
+      type: "color_output";
       /**
        * Color 
        * @description The output color
@@ -1040,7 +1040,7 @@ export type components = {
        * @default conditioning_collection_output 
        * @enum {string}
        */
-      type?: "conditioning_collection_output";
+      type: "conditioning_collection_output";
       /**
        * Collection 
        * @description The output conditioning tensors
@@ -1096,7 +1096,7 @@ export type components = {
        * @default conditioning_output 
        * @enum {string}
        */
-      type?: "conditioning_output";
+      type: "conditioning_output";
       /**
        * Conditioning 
        * @description Conditioning tensor
@@ -1339,7 +1339,7 @@ export type components = {
        * @default control_output 
        * @enum {string}
        */
-      type?: "control_output";
+      type: "control_output";
       /**
        * Control 
        * @description ControlNet(s) to apply
@@ -1578,7 +1578,7 @@ export type components = {
        */
       steps?: number;
       /**
-       * Cfg Scale 
+       * CFG Scale 
        * @description Classifier-Free Guidance scale 
        * @default 7.5
        */
@@ -1628,7 +1628,7 @@ export type components = {
        */
       negative_conditioning?: components["schemas"]["ConditioningField"];
       /**
-       * Unet 
+       * UNet 
        * @description UNet (scheduler, LoRAs)
        */
       unet?: components["schemas"]["UNetField"];
@@ -1808,7 +1808,7 @@ export type components = {
        * @default float_collection_output 
        * @enum {string}
        */
-      type?: "float_collection_output";
+      type: "float_collection_output";
       /**
        * Collection 
        * @description The float collection
@@ -1838,11 +1838,11 @@ export type components = {
        */
       type: "float";
       /**
-       * Param 
+       * Value 
        * @description The float value 
        * @default 0
        */
-      param?: number;
+      value?: number;
     };
     /**
      * Float Range 
@@ -1895,12 +1895,12 @@ export type components = {
        * @default float_output 
        * @enum {string}
        */
-      type?: "float_output";
+      type: "float_output";
       /**
-       * A 
+       * Value 
        * @description The output float
        */
-      a: number;
+      value: number;
     };
     /** Graph */
     Graph: {
@@ -2199,7 +2199,7 @@ export type components = {
        * @default image_collection_output 
        * @enum {string}
        */
-      type?: "image_collection_output";
+      type: "image_collection_output";
       /**
        * Collection 
        * @description The output images
@@ -2647,7 +2647,7 @@ export type components = {
        * @default image_output 
        * @enum {string}
        */
-      type?: "image_output";
+      type: "image_output";
       /**
        * Image 
        * @description The output image
@@ -3151,7 +3151,7 @@ export type components = {
        * @default integer_collection_output 
        * @enum {string}
        */
-      type?: "integer_collection_output";
+      type: "integer_collection_output";
       /**
        * Collection 
        * @description The int collection
@@ -3181,11 +3181,11 @@ export type components = {
        */
       type: "integer";
       /**
-       * A 
+       * Value 
        * @description The integer value 
        * @default 0
        */
-      a?: number;
+      value?: number;
     };
     /**
      * IntegerOutput 
@@ -3197,12 +3197,12 @@ export type components = {
        * @default integer_output 
        * @enum {string}
        */
-      type?: "integer_output";
+      type: "integer_output";
       /**
-       * A 
+       * Value 
        * @description The output integer
        */
-      a: number;
+      value: number;
     };
     /**
      * IterateInvocation 
@@ -3248,7 +3248,7 @@ export type components = {
        * @default iterate_output 
        * @enum {string}
        */
-      type?: "iterate_output";
+      type: "iterate_output";
       /**
        * Collection Item 
        * @description The item being iterated over
@@ -3294,7 +3294,7 @@ export type components = {
        * @default latents_collection_output 
        * @enum {string}
        */
-      type?: "latents_collection_output";
+      type: "latents_collection_output";
       /**
        * Collection 
        * @description Latents tensor
@@ -3355,7 +3355,7 @@ export type components = {
        * @default latents_output 
        * @enum {string}
        */
-      type?: "latents_output";
+      type: "latents_output";
       /**
        * Latents 
        * @description Latents tensor
@@ -3697,7 +3697,7 @@ export type components = {
        * @default lora_loader_output 
        * @enum {string}
        */
-      type?: "lora_loader_output";
+      type: "lora_loader_output";
       /**
        * UNet 
        * @description UNet (scheduler, LoRAs)
@@ -4076,7 +4076,7 @@ export type components = {
        * @default metadata_accumulator_output 
        * @enum {string}
        */
-      type?: "metadata_accumulator_output";
+      type: "metadata_accumulator_output";
       /**
        * Metadata 
        * @description The core metadata for the image
@@ -4205,7 +4205,7 @@ export type components = {
        * @default model_loader_output 
        * @enum {string}
        */
-      type?: "model_loader_output";
+      type: "model_loader_output";
       /**
        * UNet 
        * @description UNet (scheduler, LoRAs)
@@ -4330,7 +4330,7 @@ export type components = {
        * @default noise_output 
        * @enum {string}
        */
-      type?: "noise_output";
+      type: "noise_output";
       /**
        * Noise 
        * @description Noise tensor
@@ -4435,7 +4435,7 @@ export type components = {
        * @default model_loader_output_onnx 
        * @enum {string}
        */
-      type?: "model_loader_output_onnx";
+      type: "model_loader_output_onnx";
       /**
        * UNet 
        * @description UNet (scheduler, LoRAs)
@@ -5253,7 +5253,7 @@ export type components = {
        * @default sdxl_lora_loader_output 
        * @enum {string}
        */
-      type?: "sdxl_lora_loader_output";
+      type: "sdxl_lora_loader_output";
       /**
        * UNet 
        * @description UNet (scheduler, LoRAs)
@@ -5308,7 +5308,7 @@ export type components = {
        * @default sdxl_model_loader_output 
        * @enum {string}
        */
-      type?: "sdxl_model_loader_output";
+      type: "sdxl_model_loader_output";
       /**
        * UNet 
        * @description UNet (scheduler, LoRAs)
@@ -5428,7 +5428,7 @@ export type components = {
        * @default sdxl_refiner_model_loader_output 
        * @enum {string}
        */
-      type?: "sdxl_refiner_model_loader_output";
+      type: "sdxl_refiner_model_loader_output";
       /**
        * UNet 
        * @description UNet (scheduler, LoRAs)
@@ -5824,7 +5824,7 @@ export type components = {
        * @default string_collection_output 
        * @enum {string}
        */
-      type?: "string_collection_output";
+      type: "string_collection_output";
       /**
        * Collection 
        * @description The output strings
@@ -5854,11 +5854,11 @@ export type components = {
        */
       type: "string";
       /**
-       * Text 
+       * Value 
        * @description The string value 
        * @default
        */
-      text?: string;
+      value?: string;
     };
     /**
      * StringOutput 
@@ -5870,12 +5870,12 @@ export type components = {
        * @default string_output 
        * @enum {string}
        */
-      type?: "string_output";
+      type: "string_output";
       /**
-       * Text 
+       * Value 
        * @description The output string
        */
-      text: string;
+      value: string;
     };
     /**
      * SubModelType 
@@ -6060,7 +6060,7 @@ export type components = {
        * @default vae_loader_output 
        * @enum {string}
        */
-      type?: "vae_loader_output";
+      type: "vae_loader_output";
       /**
        * VAE 
        * @description VAE
@@ -6160,7 +6160,7 @@ export type components = {
      * If a field should be provided a data type that does not exactly match the python type of the field,     use this to provide the type that should be used instead. See the node development docs for detail     on adding a new field type, which involves client-side changes. 
      * @enum {string}
      */
-    UIType: "integer" | "float" | "boolean" | "string" | "array" | "ImageField" | "LatentsField" | "ConditioningField" | "ControlField" | "ColorField" | "ImageCollection" | "ConditioningCollection" | "ColorCollection" | "LatentsCollection" | "IntegerCollection" | "FloatCollection" | "StringCollection" | "BooleanCollection" | "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VaeModelField" | "LoRAModelField" | "ControlNetModelField" | "UNetField" | "VaeField" | "ClipField" | "Collection" | "CollectionItem" | "FilePath" | "enum";
+    UIType: "integer" | "float" | "boolean" | "string" | "array" | "ImageField" | "LatentsField" | "ConditioningField" | "ControlField" | "ColorField" | "ImageCollection" | "ConditioningCollection" | "ColorCollection" | "LatentsCollection" | "IntegerCollection" | "FloatCollection" | "StringCollection" | "BooleanCollection" | "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VaeModelField" | "LoRAModelField" | "ControlNetModelField" | "UNetField" | "VaeField" | "ClipField" | "Collection" | "CollectionItem" | "FilePath" | "enum" | "Scheduler";
     /**
      * UIComponent 
      * @description The type of UI component to use for a field, used to override the default components, which are     inferred from the field type. 
@@ -6212,17 +6212,17 @@ export type components = {
      */
     ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionXLModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
