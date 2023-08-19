@@ -136,19 +136,21 @@ class PTFieldsExpandInvocation(BaseInvocation):
 
 
 
+
 class PromptOutput(BaseInvocationOutput):
     """Base class for invocations that output a prompt"""
-    #fmt: off
+
+    # fmt: off
     type: Literal["prompt"] = "prompt"
 
     prompt: str = Field(default=None, description="The output prompt")
-    #fmt: on
+    # fmt: on
 
     class Config:
         schema_extra = {
-            'required': [
-                'type',
-                'prompt',
+            "required": [
+                "type",
+                "prompt",
             ]
         }
 
@@ -173,16 +175,11 @@ class DynamicPromptInvocation(BaseInvocation):
     type: Literal["dynamic_prompt"] = "dynamic_prompt"
     prompt: str = Field(description="The prompt to parse with dynamicprompts")
     max_prompts: int = Field(default=1, description="The number of prompts to generate")
-    combinatorial: bool = Field(
-        default=False, description="Whether to use the combinatorial generator"
-    )
+    combinatorial: bool = Field(default=False, description="Whether to use the combinatorial generator")
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Dynamic Prompt",
-                "tags": ["prompt", "dynamic"]
-            },
+            "ui": {"title": "Dynamic Prompt", "tags": ["prompt", "dynamic"]},
         }
 
     def invoke(self, context: InvocationContext) -> PromptCollectionOutput:
@@ -194,10 +191,11 @@ class DynamicPromptInvocation(BaseInvocation):
             prompts = generator.generate(self.prompt, num_images=self.max_prompts)
 
         return PromptCollectionOutput(prompt_collection=prompts, count=len(prompts))
-    
+
 
 class PromptsFromFileInvocation(BaseInvocation):
-    '''Loads prompts from a text file'''
+    """Loads prompts from a text file"""
+
     # fmt: off
     type: Literal['prompt_from_file'] = 'prompt_from_file'
 
@@ -207,14 +205,11 @@ class PromptsFromFileInvocation(BaseInvocation):
     post_prompt: Optional[str] = Field(description="String to append to each prompt")
     start_line: int = Field(default=1, ge=1, description="Line in the file to start start from")
     max_prompts: int = Field(default=1, ge=0, description="Max lines to read from file (0=all)")
-    #fmt: on
+    # fmt: on
 
     class Config(InvocationConfig):
         schema_extra = {
-            "ui": {
-                "title": "Prompts From File",
-                "tags": ["prompt", "file"]
-            },
+            "ui": {"title": "Prompts From File", "tags": ["prompt", "file"]},
         }
 
     @validator("file_path")
@@ -232,13 +227,15 @@ class PromptsFromFileInvocation(BaseInvocation):
         with open(file_path) as f:
             for i, line in enumerate(f):
                 if i >= start_line and i < end_line:
-                    prompts.append((pre_prompt or '') + line.strip() + (post_prompt or ''))
+                    prompts.append((pre_prompt or "") + line.strip() + (post_prompt or ""))
                 if i >= end_line:
                     break
         return prompts
 
     def invoke(self, context: InvocationContext) -> PromptCollectionOutput:
-        prompts = self.promptsFromFile(self.file_path, self.pre_prompt, self.post_prompt, self.start_line, self.max_prompts)
+        prompts = self.promptsFromFile(
+            self.file_path, self.pre_prompt, self.post_prompt, self.start_line, self.max_prompts
+        )
         return PromptCollectionOutput(prompt_collection=prompts, count=len(prompts))
 
 

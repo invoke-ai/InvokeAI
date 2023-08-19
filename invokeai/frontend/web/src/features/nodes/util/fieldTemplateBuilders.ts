@@ -22,6 +22,7 @@ import {
   LoRAModelInputFieldTemplate,
   ModelInputFieldTemplate,
   OutputFieldTemplate,
+  RefinerModelInputFieldTemplate,
   StringInputFieldTemplate,
   TypeHints,
   UNetInputFieldTemplate,
@@ -170,6 +171,21 @@ const buildModelInputFieldTemplate = ({
   const template: ModelInputFieldTemplate = {
     ...baseField,
     type: 'model',
+    inputRequirement: 'always',
+    inputKind: 'direct',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildRefinerModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): RefinerModelInputFieldTemplate => {
+  const template: RefinerModelInputFieldTemplate = {
+    ...baseField,
+    type: 'refiner_model',
     inputRequirement: 'always',
     inputKind: 'direct',
     default: schemaObject.default ?? undefined,
@@ -491,6 +507,9 @@ export const buildInputFieldTemplate = (
   }
   if (['model'].includes(fieldType)) {
     return buildModelInputFieldTemplate({ schemaObject, baseField });
+  }
+  if (['refiner_model'].includes(fieldType)) {
+    return buildRefinerModelInputFieldTemplate({ schemaObject, baseField });
   }
   if (['vae_model'].includes(fieldType)) {
     return buildVaeModelInputFieldTemplate({ schemaObject, baseField });

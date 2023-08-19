@@ -59,9 +59,7 @@ class AttentionMapSaver:
         for key, maps in self.collated_maps.items():
             # maps has shape [(H*W), N] for N tokens
             # but we want [N, H, W]
-            this_scale_factor = math.sqrt(
-                maps.shape[0] / (latents_width * latents_height)
-            )
+            this_scale_factor = math.sqrt(maps.shape[0] / (latents_width * latents_height))
             this_maps_height = int(float(latents_height) * this_scale_factor)
             this_maps_width = int(float(latents_width) * this_scale_factor)
             # and we need to do some dimension juggling
@@ -72,9 +70,7 @@ class AttentionMapSaver:
 
             # scale to output size if necessary
             if this_scale_factor != 1:
-                maps = tv_resize(
-                    maps, [latents_height, latents_width], InterpolationMode.BICUBIC
-                )
+                maps = tv_resize(maps, [latents_height, latents_width], InterpolationMode.BICUBIC)
 
             # normalize
             maps_min = torch.min(maps)
@@ -83,9 +79,7 @@ class AttentionMapSaver:
             maps_normalized = (maps - maps_min) / maps_range
             # expand to (-0.1, 1.1) and clamp
             maps_normalized_expanded = maps_normalized * 1.1 - 0.05
-            maps_normalized_expanded_clamped = torch.clamp(
-                maps_normalized_expanded, 0, 1
-            )
+            maps_normalized_expanded_clamped = torch.clamp(maps_normalized_expanded, 0, 1)
 
             # merge together, producing a vertical stack
             maps_stacked = torch.reshape(

@@ -39,23 +39,18 @@ CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
 CLIPSEG_SIZE = 352
 config = InvokeAIAppConfig.get_config()
 
+
 class SegmentedGrayscale(object):
     def __init__(self, image: Image, heatmap: torch.Tensor):
         self.heatmap = heatmap
         self.image = image
 
     def to_grayscale(self, invert: bool = False) -> Image:
-        return self._rescale(
-            Image.fromarray(
-                np.uint8(255 - self.heatmap * 255 if invert else self.heatmap * 255)
-            )
-        )
+        return self._rescale(Image.fromarray(np.uint8(255 - self.heatmap * 255 if invert else self.heatmap * 255)))
 
     def to_mask(self, threshold: float = 0.5) -> Image:
         discrete_heatmap = self.heatmap.lt(threshold).int()
-        return self._rescale(
-            Image.fromarray(np.uint8(discrete_heatmap * 255), mode="L")
-        )
+        return self._rescale(Image.fromarray(np.uint8(discrete_heatmap * 255), mode="L"))
 
     def to_transparent(self, invert: bool = False) -> Image:
         transparent_image = self.image.copy()
@@ -67,11 +62,7 @@ class SegmentedGrayscale(object):
 
     # unscales and uncrops the 352x352 heatmap so that it matches the image again
     def _rescale(self, heatmap: Image) -> Image:
-        size = (
-            self.image.width
-            if (self.image.width > self.image.height)
-            else self.image.height
-        )
+        size = self.image.width if (self.image.width > self.image.height) else self.image.height
         resized_image = heatmap.resize((size, size), resample=Image.Resampling.LANCZOS)
         return resized_image.crop((0, 0, self.image.width, self.image.height))
 
@@ -87,12 +78,8 @@ class Txt2Mask(object):
 
         # BUG: we are not doing anything with the device option at this time
         self.device = device
-        self.processor = AutoProcessor.from_pretrained(
-            CLIPSEG_MODEL, cache_dir=config.cache_dir
-        )
-        self.model = CLIPSegForImageSegmentation.from_pretrained(
-            CLIPSEG_MODEL, cache_dir=config.cache_dir
-        )
+        self.processor = AutoProcessor.from_pretrained(CLIPSEG_MODEL, cache_dir=config.cache_dir)
+        self.model = CLIPSegForImageSegmentation.from_pretrained(CLIPSEG_MODEL, cache_dir=config.cache_dir)
 
     @torch.no_grad()
     def segment(self, image, prompt: str) -> SegmentedGrayscale:
@@ -107,9 +94,7 @@ class Txt2Mask(object):
         image = ImageOps.exif_transpose(image)
         img = self._scale_and_crop(image)
 
-        inputs = self.processor(
-            text=[prompt], images=[img], padding=True, return_tensors="pt"
-        )
+        inputs = self.processor(text=[prompt], images=[img], padding=True, return_tensors="pt")
         outputs = self.model(**inputs)
         heatmap = torch.sigmoid(outputs.logits)
         return SegmentedGrayscale(image, heatmap)

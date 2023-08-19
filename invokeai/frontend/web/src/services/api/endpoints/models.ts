@@ -52,8 +52,16 @@ type UpdateMainModelArg = {
   body: MainModelConfig;
 };
 
+type UpdateLoRAModelArg = {
+  base_model: BaseModelType;
+  model_name: string;
+  body: LoRAModelConfig;
+};
+
 type UpdateMainModelResponse =
   paths['/api/v1/models/{base_model}/{model_type}/{model_name}']['patch']['responses']['200']['content']['application/json'];
+
+type UpdateLoRAModelResponse = UpdateMainModelResponse;
 
 type DeleteMainModelArg = {
   base_model: BaseModelType;
@@ -61,6 +69,10 @@ type DeleteMainModelArg = {
 };
 
 type DeleteMainModelResponse = void;
+
+type DeleteLoRAModelArg = DeleteMainModelArg;
+
+type DeleteLoRAModelResponse = void;
 
 type ConvertMainModelArg = {
   base_model: BaseModelType;
@@ -144,8 +156,19 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getMainModels: build.query<EntityState<MainModelConfigEntity>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'main' } }),
+    getMainModels: build.query<
+      EntityState<MainModelConfigEntity>,
+      BaseModelType[]
+    >({
+      query: (base_models) => {
+        const params = {
+          model_type: 'main',
+          base_models,
+        };
+
+        const query = queryString.stringify(params, { arrayFormat: 'none' });
+        return `models/?${query}`;
+      },
       providesTags: (result, error, arg) => {
         const tags: ApiFullTagDescription[] = [
           { type: 'MainModel', id: LIST_TAG },
@@ -187,7 +210,10 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+      ],
     }),
     importMainModels: build.mutation<
       ImportMainModelResponse,
@@ -200,7 +226,10 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+      ],
     }),
     addMainModels: build.mutation<AddMainModelResponse, AddMainModelArg>({
       query: ({ body }) => {
@@ -210,7 +239,10 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+      ],
     }),
     deleteMainModels: build.mutation<
       DeleteMainModelResponse,
@@ -222,7 +254,10 @@ export const modelsApi = api.injectEndpoints({
           method: 'DELETE',
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+      ],
     }),
     convertMainModels: build.mutation<
       ConvertMainModelResponse,
@@ -235,7 +270,10 @@ export const modelsApi = api.injectEndpoints({
           params: params,
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+      ],
     }),
     mergeMainModels: build.mutation<MergeMainModelResponse, MergeMainModelArg>({
       query: ({ base_model, body }) => {
@@ -245,7 +283,10 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+      ],
     }),
     syncModels: build.mutation<SyncModelsResponse, void>({
       query: () => {
@@ -254,7 +295,10 @@ export const modelsApi = api.injectEndpoints({
           method: 'POST',
         };
       },
-      invalidatesTags: [{ type: 'MainModel', id: LIST_TAG }],
+      invalidatesTags: [
+        { type: 'MainModel', id: LIST_TAG },
+        { type: 'SDXLRefinerModel', id: LIST_TAG },
+      ],
     }),
     getLoRAModels: build.query<EntityState<LoRAModelConfigEntity>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
@@ -287,6 +331,31 @@ export const modelsApi = api.injectEndpoints({
           entities
         );
       },
+    }),
+    updateLoRAModels: build.mutation<
+      UpdateLoRAModelResponse,
+      UpdateLoRAModelArg
+    >({
+      query: ({ base_model, model_name, body }) => {
+        return {
+          url: `models/${base_model}/lora/${model_name}`,
+          method: 'PATCH',
+          body: body,
+        };
+      },
+      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
+    }),
+    deleteLoRAModels: build.mutation<
+      DeleteLoRAModelResponse,
+      DeleteLoRAModelArg
+    >({
+      query: ({ base_model, model_name }) => {
+        return {
+          url: `models/${base_model}/lora/${model_name}`,
+          method: 'DELETE',
+        };
+      },
+      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
     }),
     getControlNetModels: build.query<
       EntityState<ControlNetModelConfigEntity>,
@@ -435,6 +504,8 @@ export const {
   useAddMainModelsMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
+  useDeleteLoRAModelsMutation,
+  useUpdateLoRAModelsMutation,
   useSyncModelsMutation,
   useGetModelsInFolderQuery,
   useGetCheckpointConfigsQuery,

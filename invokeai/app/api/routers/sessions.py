@@ -30,9 +30,7 @@ session_router = APIRouter(prefix="/v1/sessions", tags=["sessions"])
     },
 )
 async def create_session(
-    graph: Optional[Graph] = Body(
-        default=None, description="The graph to initialize the session with"
-    )
+    graph: Optional[Graph] = Body(default=None, description="The graph to initialize the session with")
 ) -> GraphExecutionState:
     """Creates a new session, optionally initializing it with an invocation graph"""
     session = ApiDependencies.invoker.create_execution_state(graph)
@@ -51,13 +49,9 @@ async def list_sessions(
 ) -> PaginatedResults[GraphExecutionState]:
     """Gets a list of sessions, optionally searching"""
     if query == "":
-        result = ApiDependencies.invoker.services.graph_execution_manager.list(
-            page, per_page
-        )
+        result = ApiDependencies.invoker.services.graph_execution_manager.list(page, per_page)
     else:
-        result = ApiDependencies.invoker.services.graph_execution_manager.search(
-            query, page, per_page
-        )
+        result = ApiDependencies.invoker.services.graph_execution_manager.search(query, page, per_page)
     return result
 
 
@@ -91,9 +85,9 @@ async def get_session(
 )
 async def add_node(
     session_id: str = Path(description="The id of the session"),
-    node: Annotated[
-        Union[BaseInvocation.get_invocations()], Field(discriminator="type") # type: ignore
-    ] = Body(description="The node to add"),
+    node: Annotated[Union[BaseInvocation.get_invocations()], Field(discriminator="type")] = Body(  # type: ignore
+        description="The node to add"
+    ),
 ) -> str:
     """Adds a node to the graph"""
     session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
@@ -124,9 +118,9 @@ async def add_node(
 async def update_node(
     session_id: str = Path(description="The id of the session"),
     node_path: str = Path(description="The path to the node in the graph"),
-    node: Annotated[
-        Union[BaseInvocation.get_invocations()], Field(discriminator="type") # type: ignore
-    ] = Body(description="The new node"),
+    node: Annotated[Union[BaseInvocation.get_invocations()], Field(discriminator="type")] = Body(  # type: ignore
+        description="The new node"
+    ),
 ) -> GraphExecutionState:
     """Updates a node in the graph and removes all linked edges"""
     session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
@@ -230,7 +224,7 @@ async def delete_edge(
     try:
         edge = Edge(
             source=EdgeConnection(node_id=from_node_id, field=from_field),
-            destination=EdgeConnection(node_id=to_node_id, field=to_field)
+            destination=EdgeConnection(node_id=to_node_id, field=to_field),
         )
         session.delete_edge(edge)
         ApiDependencies.invoker.services.graph_execution_manager.set(
@@ -255,9 +249,7 @@ async def delete_edge(
 )
 async def invoke_session(
     session_id: str = Path(description="The id of the session to invoke"),
-    all: bool = Query(
-        default=False, description="Whether or not to invoke all remaining invocations"
-    ),
+    all: bool = Query(default=False, description="Whether or not to invoke all remaining invocations"),
 ) -> Response:
     """Invokes a session"""
     session = ApiDependencies.invoker.services.graph_execution_manager.get(session_id)
@@ -274,9 +266,7 @@ async def invoke_session(
 @session_router.delete(
     "/{session_id}/invoke",
     operation_id="cancel_session_invoke",
-    responses={
-        202: {"description": "The invocation is canceled"}
-    },
+    responses={202: {"description": "The invocation is canceled"}},
 )
 async def cancel_session_invoke(
     session_id: str = Path(description="The id of the session to cancel"),

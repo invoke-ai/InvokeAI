@@ -40,9 +40,7 @@ def get_canvas_generation_mode(
     init_img_has_transparency = check_for_any_transparency(init_img)
 
     if init_img_has_transparency:
-        init_img_is_fully_transparent = (
-            True if init_img_alpha_mask.getbbox() is None else False
-        )
+        init_img_is_fully_transparent = True if init_img_alpha_mask.getbbox() is None else False
 
     """
     Mask images are white in areas where no change should be made, black where changes

@@ -8,6 +8,7 @@ export const appInfoApi = api.injectEndpoints({
         url: `app/version`,
         method: 'GET',
       }),
+      providesTags: ['AppVersion'],
       keepUnusedDataFor: 86400000, // 1 day
     }),
     getAppConfig: build.query<AppConfig, void>({
@@ -15,6 +16,7 @@ export const appInfoApi = api.injectEndpoints({
         url: `app/config`,
         method: 'GET',
       }),
+      providesTags: ['AppConfig'],
       keepUnusedDataFor: 86400000, // 1 day
     }),
   }),

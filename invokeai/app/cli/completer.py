@@ -19,8 +19,8 @@ from ..services.invocation_services import InvocationServices
 # singleton object, class variable
 completer = None
 
+
 class Completer(object):
-    
     def __init__(self, model_manager: ModelManager):
         self.commands = self.get_commands()
         self.matches = None
@@ -43,7 +43,7 @@ class Completer(object):
             except IndexError:
                 pass
             options = options or list(self.parse_commands().keys())
-            
+
             if not text:  # first time
                 self.matches = options
             else:
@@ -56,17 +56,17 @@ class Completer(object):
         return match
 
     @classmethod
-    def get_commands(self)->List[object]:
+    def get_commands(self) -> List[object]:
         """
         Return a list of all the client commands and invocations.
         """
         return BaseCommand.get_commands() + BaseInvocation.get_invocations()
 
-    def get_current_command(self, buffer: str)->tuple[str, str]:
+    def get_current_command(self, buffer: str) -> tuple[str, str]:
         """
         Parse the readline buffer to find the most recent command and its switch.
         """
-        if len(buffer)==0:
+        if len(buffer) == 0:
             return None, None
         tokens = shlex.split(buffer)
         command = None
@@ -78,11 +78,11 @@ class Completer(object):
             else:
                 switch = t
         # don't try to autocomplete switches that are already complete
-        if switch and buffer.endswith(' '):
-            switch=None
-        return command or '', switch or ''
+        if switch and buffer.endswith(" "):
+            switch = None
+        return command or "", switch or ""
 
-    def parse_commands(self)->Dict[str, List[str]]:
+    def parse_commands(self) -> Dict[str, List[str]]:
         """
         Return a dict in which the keys are the command name
         and the values are the parameters the command takes.
@@ -90,11 +90,11 @@ class Completer(object):
         result = dict()
         for command in self.commands:
             hints = get_type_hints(command)
-            name = get_args(hints['type'])[0]
-            result.update({name:hints})
+            name = get_args(hints["type"])[0]
+            result.update({name: hints})
         return result
 
-    def get_command_options(self, command: str, switch: str)->List[str]:
+    def get_command_options(self, command: str, switch: str) -> List[str]:
         """
         Return all the parameters that can be passed to the command as
         command-line switches. Returns None if the command is unrecognized.
@@ -102,42 +102,46 @@ class Completer(object):
         parsed_commands = self.parse_commands()
         if command not in parsed_commands:
             return None
-        
+
         # handle switches in the format "-foo=bar"
         argument = None
-        if switch and '=' in switch:
-            switch, argument = switch.split('=')
-            
-        parameter = switch.strip('-')
+        if switch and "=" in switch:
+            switch, argument = switch.split("=")
+
+        parameter = switch.strip("-")
         if parameter in parsed_commands[command]:
             if argument is None:
                 return self.get_parameter_options(parameter, parsed_commands[command][parameter])
             else:
-                return [f"--{parameter}={x}" for x in self.get_parameter_options(parameter, parsed_commands[command][parameter])]
+                return [
+                    f"--{parameter}={x}"
+                    for x in self.get_parameter_options(parameter, parsed_commands[command][parameter])
+                ]
         else:
             return [f"--{x}" for x in parsed_commands[command].keys()]
 
-    def get_parameter_options(self, parameter: str, typehint)->List[str]:
+    def get_parameter_options(self, parameter: str, typehint) -> List[str]:
         """
         Given a parameter type (such as Literal), offers autocompletions.
         """
         if get_origin(typehint) == Literal:
             return get_args(typehint)
-        if parameter == 'model':
+        if parameter == "model":
             return self.manager.model_names()
-        
+
     def _pre_input_hook(self):
         if self.linebuffer:
             readline.insert_text(self.linebuffer)
             readline.redisplay()
             self.linebuffer = None
-    
+
+
 def set_autocompleter(services: InvocationServices) -> Completer:
     global completer
-    
+
     if completer:
         return completer
-    
+
     completer = Completer(services.model_manager)
 
     readline.set_completer(completer.complete)
@@ -162,8 +166,6 @@ def set_autocompleter(services: InvocationServices) -> Completer:
         pass
     except OSError:  # file likely corrupted
         newname = f"{histfile}.old"
-        logger.error(
-            f"Your history file {histfile} couldn't be loaded and may be corrupted. Renaming it to {newname}"
-        )
+        logger.error(f"Your history file {histfile} couldn't be loaded and may be corrupted. Renaming it to {newname}")
         histfile.replace(Path(newname))
     atexit.register(readline.write_history_file, histfile)

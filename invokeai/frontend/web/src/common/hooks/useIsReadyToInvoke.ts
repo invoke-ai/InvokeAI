@@ -5,6 +5,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 // import { validateSeedWeights } from 'common/util/seedWeightPairs';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { forEach } from 'lodash-es';
+import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import { modelsApi } from '../../services/api/endpoints/models';
 
 const readinessSelector = createSelector(
@@ -24,7 +25,7 @@ const readinessSelector = createSelector(
     }
 
     const { isSuccess: mainModelsSuccessfullyLoaded } =
-      modelsApi.endpoints.getMainModels.select()(state);
+      modelsApi.endpoints.getMainModels.select(NON_REFINER_BASE_MODELS)(state);
     if (!mainModelsSuccessfullyLoaded) {
       isReady = false;
       reasonsWhyNotReady.push('Models are not loaded');

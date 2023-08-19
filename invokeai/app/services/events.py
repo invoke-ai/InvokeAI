@@ -44,9 +44,7 @@ class EventServiceBase:
                 graph_execution_state_id=graph_execution_state_id,
                 node=node,
                 source_node_id=source_node_id,
-                progress_image=progress_image.dict()
-                if progress_image is not None
-                else None,
+                progress_image=progress_image.dict() if progress_image is not None else None,
                 step=step,
                 total_steps=total_steps,
             ),
@@ -90,9 +88,7 @@ class EventServiceBase:
             ),
         )
 
-    def emit_invocation_started(
-        self, graph_execution_state_id: str, node: dict, source_node_id: str
-    ) -> None:
+    def emit_invocation_started(self, graph_execution_state_id: str, node: dict, source_node_id: str) -> None:
         """Emitted when an invocation has started"""
         self.__emit_session_event(
             event_name="invocation_started",

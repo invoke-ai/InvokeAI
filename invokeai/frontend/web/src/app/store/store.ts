@@ -15,6 +15,7 @@ import loraReducer from 'features/lora/store/loraSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
 import postprocessingReducer from 'features/parameters/store/postprocessingSlice';
+import sdxlReducer from 'features/sdxl/store/sdxlSlice';
 import configReducer from 'features/system/store/configSlice';
 import systemReducer from 'features/system/store/systemSlice';
 import modelmanagerReducer from 'features/ui/components/tabs/ModelManager/store/modelManagerSlice';
@@ -47,6 +48,7 @@ const allReducers = {
   imageDeletion: imageDeletionReducer,
   lora: loraReducer,
   modelmanager: modelmanagerReducer,
+  sdxl: sdxlReducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -58,6 +60,7 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'canvas',
   'gallery',
   'generation',
+  'sdxl',
   'nodes',
   'postprocessing',
   'system',

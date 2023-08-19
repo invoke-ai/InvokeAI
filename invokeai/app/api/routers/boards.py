@@ -18,9 +18,7 @@ class DeleteBoardResult(BaseModel):
     deleted_board_images: list[str] = Field(
         description="The image names of the board-images relationships that were deleted."
     )
-    deleted_images: list[str] = Field(
-        description="The names of the images that were deleted."
-    )
+    deleted_images: list[str] = Field(description="The names of the images that were deleted.")
 
 
 @boards_router.post(
@@ -73,22 +71,16 @@ async def update_board(
 ) -> BoardDTO:
     """Updates a board"""
     try:
-        result = ApiDependencies.invoker.services.boards.update(
-            board_id=board_id, changes=changes
-        )
+        result = ApiDependencies.invoker.services.boards.update(board_id=board_id, changes=changes)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to update board")
 
 
-@boards_router.delete(
-    "/{board_id}", operation_id="delete_board", response_model=DeleteBoardResult
-)
+@boards_router.delete("/{board_id}", operation_id="delete_board", response_model=DeleteBoardResult)
 async def delete_board(
     board_id: str = Path(description="The id of board to delete"),
-    include_images: Optional[bool] = Query(
-        description="Permanently delete all images on the board", default=False
-    ),
+    include_images: Optional[bool] = Query(description="Permanently delete all images on the board", default=False),
 ) -> DeleteBoardResult:
     """Deletes a board"""
     try:
@@ -96,9 +88,7 @@ async def delete_board(
             deleted_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
                 board_id=board_id
             )
-            ApiDependencies.invoker.services.images.delete_images_on_board(
-                board_id=board_id
-            )
+            ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id)
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
@@ -127,9 +117,7 @@ async def delete_board(
 async def list_boards(
     all: Optional[bool] = Query(default=None, description="Whether to list all boards"),
     offset: Optional[int] = Query(default=None, description="The page offset"),
-    limit: Optional[int] = Query(
-        default=None, description="The number of boards per page"
-    ),
+    limit: Optional[int] = Query(default=None, description="The number of boards per page"),
 ) -> Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]]:
     """Gets a list of boards"""
     if all:
