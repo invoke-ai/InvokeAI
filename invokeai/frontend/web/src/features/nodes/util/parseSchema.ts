@@ -36,8 +36,8 @@ export const parseSchema = (
   >((acc, schema) => {
     if (isInvocationSchemaObject(schema)) {
       const type = schema.properties.type.default;
-      const title = schema.ui?.title ?? schema.title.replace('Invocation', '');
-      const tags = schema.ui?.tags ?? [];
+      const title = schema.title.replace('Invocation', '');
+      const tags = schema.tags ?? [];
       const description = schema.description ?? '';
 
       const inputs = reduce(

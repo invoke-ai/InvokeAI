@@ -495,11 +495,8 @@ export type TypeHints = {
 
 export type InvocationSchemaExtra = {
   output: OpenAPIV3.ReferenceObject; // the output of the invocation
-  ui?: {
-    tags?: string[];
-    title?: string;
-  };
   title: string;
+  tags?: string[];
   properties: Omit<
     NonNullable<OpenAPIV3.SchemaObject['properties']> &
       (_InputField | _OutputField),
