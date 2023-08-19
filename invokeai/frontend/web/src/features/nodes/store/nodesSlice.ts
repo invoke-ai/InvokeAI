@@ -144,6 +144,18 @@ const nodesSlice = createSlice({
         node.position.y
       );
       node.position = position;
+      node.selected = true;
+
+      state.nodes = applyNodeChanges(
+        state.nodes.map((n) => ({ id: n.id, type: 'select', selected: false })),
+        state.nodes
+      );
+
+      state.edges = applyEdgeChanges(
+        state.edges.map((e) => ({ id: e.id, type: 'select', selected: false })),
+        state.edges
+      );
+
       state.nodes.push(node);
 
       if (!isInvocationNode(node)) {
