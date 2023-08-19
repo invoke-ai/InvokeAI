@@ -18,6 +18,23 @@ type NodeTemplate = {
   description: string;
   tags: string[];
 };
+const filter = (value: string, item: NodeTemplate) => {
+  const regex = new RegExp(
+    value
+      .toLowerCase()
+      .trim()
+      // strip out regex special characters to avoid errors
+      .replace(/[-[\]{}()*+!<=:?./\\^$|#,]/g, '')
+      .split(' ')
+      .join('.*'),
+    'g'
+  );
+  return (
+    regex.test(item.label.toLowerCase()) ||
+    regex.test(item.description.toLowerCase()) ||
+    item.tags.some((tag) => regex.test(tag))
+  );
+};
 
 const selector = createSelector(
   [stateSelector],
@@ -44,6 +61,8 @@ const selector = createSelector(
       description: 'Add notes about your workflow',
       tags: ['notes'],
     });
+
+    data.sort((a, b) => a.label.localeCompare(b.label));
 
     return { data };
   },
@@ -96,13 +115,9 @@ const AddNodeMenu = () => {
         maxDropdownHeight={400}
         nothingFound="No matching nodes"
         itemComponent={SelectItem}
-        filter={(value, item: NodeTemplate) =>
-          item.label.toLowerCase().includes(value.toLowerCase().trim()) ||
-          item.value.toLowerCase().includes(value.toLowerCase().trim()) ||
-          item.description.toLowerCase().includes(value.toLowerCase().trim()) ||
-          item.tags.includes(value.toLowerCase().trim())
-        }
+        filter={filter}
         onChange={handleChange}
+        hoverOnSearchChange={true}
         sx={{
           width: '24rem',
         }}
