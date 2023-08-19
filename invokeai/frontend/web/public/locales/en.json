@@ -52,7 +52,7 @@
         "img2img": "Image To Image",
         "unifiedCanvas": "Unified Canvas",
         "linear": "Linear",
-        "nodes": "Node Editor",
+        "nodes": "Workflow Editor",
         "batch": "Batch Manager",
         "modelManager": "Model Manager",
         "postprocessing": "Post Processing",
