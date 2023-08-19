@@ -1,4 +1,4 @@
-import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
+import { Box, FormControl, Text, useDisclosure } from '@chakra-ui/react';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
@@ -20,6 +20,7 @@ import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
+import { useDynamicPrompts } from 'common/util/dynamicPrompts/useDynamicPrompts';
 
 const promptInputSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -48,6 +49,7 @@ const ParamPositiveConditioning = () => {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { t } = useTranslation();
+  const parseResult = useDynamicPrompts(prompt);
   const handleChangePrompt = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       dispatch(setPositivePrompt(e.target.value));
@@ -155,6 +157,13 @@ const ParamPositiveConditioning = () => {
           <AddEmbeddingButton onClick={onOpen} />
         </Box>
       )}
+      <Box>
+        generated {parseResult.prompts.length} prompts:
+        {parseResult.error && <Text color="error.500">Parsing failed</Text>}
+        {parseResult.prompts.map((p, i) => (
+          <Text key={`${p}.${i}`}>{p}</Text>
+        ))}
+      </Box>
     </Box>
   );
 };
