@@ -9,7 +9,8 @@ import networkx as nx
 from pydantic import BaseModel, root_validator, validator
 from pydantic.fields import Field
 
-from ..invocations import *
+# Importing * is bad karma but needed here for node detection
+from ..invocations import *  # noqa: F401 F403
 from ..invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -445,7 +446,7 @@ class Graph(BaseModel):
         node = graph.nodes[node_id]
 
         # Ensure the node type matches the new node
-        if type(node) != type(new_node):
+        if type(node) is not type(new_node):
             raise TypeError(f"Node {node_path} is type {type(node)} but new node is type {type(new_node)}")
 
         # Ensure the new id is either the same or is not in the graph
@@ -632,7 +633,7 @@ class Graph(BaseModel):
             [
                 t
                 for input_field in input_fields
-                for t in ([input_field] if get_origin(input_field) == None else get_args(input_field))
+                for t in ([input_field] if get_origin(input_field) is None else get_args(input_field))
                 if t != NoneType
             ]
         )  # Get unique types
@@ -923,7 +924,7 @@ class GraphExecutionState(BaseModel):
             None,
         )
 
-        if next_node_id == None:
+        if next_node_id is None:
             return None
 
         # Get all parents of the next node

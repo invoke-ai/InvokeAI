@@ -282,7 +282,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             self._lock.acquire()
 
             self._cursor.execute(
-                f"""--sql
+                """--sql
                 SELECT images.metadata FROM images
                 WHERE image_name = ?;
                 """,
@@ -309,7 +309,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             # Change the category of the image
             if changes.image_category is not None:
                 self._cursor.execute(
-                    f"""--sql
+                    """--sql
                     UPDATE images
                     SET image_category = ?
                     WHERE image_name = ?;
@@ -320,7 +320,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             # Change the session associated with the image
             if changes.session_id is not None:
                 self._cursor.execute(
-                    f"""--sql
+                    """--sql
                     UPDATE images
                     SET session_id = ?
                     WHERE image_name = ?;
@@ -331,7 +331,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             # Change the image's `is_intermediate`` flag
             if changes.is_intermediate is not None:
                 self._cursor.execute(
-                    f"""--sql
+                    """--sql
                     UPDATE images
                     SET is_intermediate = ?
                     WHERE image_name = ?;
@@ -342,7 +342,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             # Change the image's `starred`` state
             if changes.starred is not None:
                 self._cursor.execute(
-                    f"""--sql
+                    """--sql
                     UPDATE images
                     SET starred = ?
                     WHERE image_name = ?;
