@@ -3,22 +3,31 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
+import { KIND_MAP } from '../types/constants';
+import { isInvocationNode } from '../types/types';
 
-export const useNodeData = (nodeId: string) => {
+export const useFieldType = (
+  nodeId: string,
+  fieldName: string,
+  kind: 'input' | 'output'
+) => {
   const selector = useMemo(
     () =>
       createSelector(
         stateSelector,
         ({ nodes }) => {
           const node = nodes.nodes.find((node) => node.id === nodeId);
-          return node?.data;
+          if (!isInvocationNode(node)) {
+            return;
+          }
+          return node?.data[KIND_MAP[kind]][fieldName]?.type;
         },
         defaultSelectorOptions
       ),
-    [nodeId]
+    [fieldName, kind, nodeId]
   );
 
-  const nodeData = useAppSelector(selector);
+  const fieldType = useAppSelector(selector);
 
-  return nodeData;
+  return fieldType;
 };

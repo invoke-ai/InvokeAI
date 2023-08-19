@@ -9,6 +9,11 @@ export const DRAG_HANDLE_CLASSNAME = 'node-drag-handle';
 export const IMAGE_FIELDS = ['ImageField', 'ImageCollection'];
 export const FOOTER_FIELDS = IMAGE_FIELDS;
 
+export const KIND_MAP = {
+  input: 'inputs' as const,
+  output: 'outputs' as const,
+};
+
 export const COLLECTION_TYPES: FieldType[] = [
   'Collection',
   'IntegerCollection',

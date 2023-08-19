@@ -6,8 +6,8 @@ import { memo, useState } from 'react';
 import { MdDeviceHub } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 import 'reactflow/dist/style.css';
-import NodeEditorPanelGroup from './panel/NodeEditorPanelGroup';
-import { Flow } from './Flow';
+import NodeEditorPanelGroup from './sidePanel/NodeEditorPanelGroup';
+import { Flow } from './flow/Flow';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const NodeEditor = () => {

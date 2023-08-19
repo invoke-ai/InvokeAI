@@ -15,9 +15,6 @@ invokeai.init
 # ignore the Anaconda/Miniconda installer used while building Docker image
 anaconda.sh
 
-# ignore a directory which serves as a place for initial images
-inputs/
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -212,7 +209,6 @@ invokeai/frontend/node_modules
 .vscode/
 gfpgan/
 models/ldm/stable-diffusion-v1/*.sha256
-
 
 # GFPGAN model files
 gfpgan/
