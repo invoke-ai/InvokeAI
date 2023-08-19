@@ -2,11 +2,139 @@ from os.path import exists
 from typing import Literal, Optional, Union, List
 
 import numpy as np
-import re
-from pydantic import Field, validator
+import re, json
+from pydantic import BaseModel, Field, validator
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationConfig, InvocationContext
 from dynamicprompts.generators import RandomPromptGenerator, CombinatorialPromptGenerator
+from .model import MainModelField, VAEModelField
+
+
+class PTFields(BaseModel):
+    """Prompt Tools Fields for an image generated in InvokeAI."""
+    positive_prompt: str = Field(default='', description="The positive prompt parameter")
+    positive_style_prompt: str = Field(default='', description="The positive style prompt parameter")
+    negative_prompt: str = Field(default='', description="The negative prompt parameter")
+    negative_style_prompt: str = Field(default='', description="The negative prompt parameter")
+    width: int = Field(default=512, description="The width parameter")
+    height: int = Field(default=512, description="The height parameter")
+    seed: int = Field(default=0, description="The seed used for noise generation")
+    cfg_scale: float = Field(default=7.0, description="The classifier-free guidance scale parameter")
+    steps: int = Field(default=10, description="The number of steps used for inference")
+#     class Config:
+#         schema_extra = {
+#             "required": ["positive_prompt", "positive_style_prompt", "negative_prompt"],
+#             "ui": {
+#                 "type_hints": {
+# #                    "model": "model",
+# #                    "vae": "vae_model",
+#                     },
+#                 },
+#             }
+
+class PTFieldsCollectOutput(BaseInvocationOutput):
+    """PTFieldsCollect Output"""
+    type: Literal["pt_fields_collect_output"] = "pt_fields_collect_output"
+
+    pt_fields: str = Field(description="PTFields in Json Format")
+
+class PTFieldsCollectInvocation(BaseInvocation):
+    """Prompt Tools Fields for an image generated in InvokeAI."""
+    type: Literal["pt_fields_collect"] = "pt_fields_collect"
+
+    positive_prompt: str = Field(default='', description="The positive prompt parameter")
+    positive_style_prompt: str = Field(default='', description="The positive style prompt parameter")
+    negative_prompt: str = Field(default='', description="The negative prompt parameter")
+    negative_style_prompt: str = Field(default='', description="The negative prompt parameter")
+    width: int = Field(default=512, description="The width parameter")
+    height: int = Field(default=512, description="The height parameter")
+    seed: int = Field(default=0, description="The seed used for noise generation")
+    cfg_scale: float = Field(default=7.0, description="The classifier-free guidance scale parameter")
+    steps: int = Field(default=10, description="The number of steps used for inference")
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "PTFields Collect",
+                "tags": ["prompt", "file"],
+            },
+        }
+       
+    def invoke(self, context: InvocationContext) -> PTFieldsCollectOutput:
+        x:str = str(json.dumps(
+                    PTFields(
+                        positive_prompt = self.positive_prompt, 
+                        positive_style_prompt = self.positive_style_prompt,
+                        negative_prompt = self.negative_prompt,
+                        negative_style_prompt = self.negative_style_prompt,
+                        width = self.width,
+                        height = self.height,
+                        seed = self.seed,
+                        cfg_scale = self.cfg_scale,
+                        steps = self.steps,
+                ).dict()
+            )
+        )
+        return PTFieldsCollectOutput(pt_fields=x)
+
+
+class PTFieldsExpandOutput(BaseInvocationOutput):
+    """Prompt Tools Fields for an image generated in InvokeAI."""
+    type: Literal["pt_fields_expand_output"] = "pt_fields_expand_output"    
+
+    positive_prompt: str = Field(description="The positive prompt parameter")
+    positive_style_prompt: str = Field(description="The positive style prompt parameter")
+    negative_prompt: str = Field(description="The negative prompt parameter")
+    negative_style_prompt: str = Field(description="The negative prompt parameter")
+    width: int = Field(description="The width parameter")
+    height: int = Field(description="The height parameter")
+    seed: int = Field(description="The seed used for noise generation")
+    cfg_scale: float = Field(description="The classifier-free guidance scale parameter")
+    steps: int = Field(description="The number of steps used for inference")
+
+    class Config:
+        schema_extra = {
+            'required': ['type'],
+            "ui": {
+                "type_hints": {
+                    },
+                },
+            }
+        
+class PTFieldsExpandInvocation(BaseInvocation):
+    '''Save Expand PTFields into individual items'''
+    type: Literal['pt_fields_expand'] = 'pt_fields_expand'
+    pt_fields: str = Field(default=None, description="PTFields in Json Format")
+
+    class Config(InvocationConfig):
+        schema_extra = {
+            "ui": {
+                "title": "PTFields Expand",
+                "tags": ["prompt", "file"],
+                "type_hints": {
+                    "pt_fields": "string",
+                }
+            },
+        }
+       
+    def invoke(self, context: InvocationContext) -> PTFieldsExpandOutput:
+        fields = json.loads(self.pt_fields)
+
+        return PTFieldsExpandOutput(
+            positive_prompt = fields.get('positive_prompt'),
+            positive_style_prompt = fields.get('positive_style_prompt'),
+            negative_prompt = fields.get('negative_prompt'),
+            negative_style_prompt = fields.get('negative_style_prompt'),
+            width = fields.get('width'),
+            height = fields.get('height'),
+            seed = fields.get('seed'),
+            cfg_scale = fields.get('cfg_scale'),
+            steps = fields.get('steps'),
+        )
+
+
+
+
 
 class PromptOutput(BaseInvocationOutput):
     """Base class for invocations that output a prompt"""
