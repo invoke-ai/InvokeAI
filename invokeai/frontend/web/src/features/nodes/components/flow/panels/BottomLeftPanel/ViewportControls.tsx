@@ -5,14 +5,14 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FaExpand,
-  FaInfo,
+  // FaInfo,
   FaMapMarkerAlt,
   FaMinus,
   FaPlus,
 } from 'react-icons/fa';
 import { useReactFlow } from 'reactflow';
 import {
-  shouldShowFieldTypeLegendChanged,
+  // shouldShowFieldTypeLegendChanged,
   shouldShowMinimapPanelChanged,
 } from 'features/nodes/store/nodesSlice';
 
@@ -20,9 +20,9 @@ const ViewportControls = () => {
   const { t } = useTranslation();
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
-  const shouldShowFieldTypeLegend = useAppSelector(
-    (state) => state.nodes.shouldShowFieldTypeLegend
-  );
+  // const shouldShowFieldTypeLegend = useAppSelector(
+  //   (state) => state.nodes.shouldShowFieldTypeLegend
+  // );
   const shouldShowMinimapPanel = useAppSelector(
     (state) => state.nodes.shouldShowMinimapPanel
   );
@@ -39,9 +39,9 @@ const ViewportControls = () => {
     fitView();
   }, [fitView]);
 
-  const handleClickedToggleFieldTypeLegend = useCallback(() => {
-    dispatch(shouldShowFieldTypeLegendChanged(!shouldShowFieldTypeLegend));
-  }, [shouldShowFieldTypeLegend, dispatch]);
+  // const handleClickedToggleFieldTypeLegend = useCallback(() => {
+  //   dispatch(shouldShowFieldTypeLegendChanged(!shouldShowFieldTypeLegend));
+  // }, [shouldShowFieldTypeLegend, dispatch]);
 
   const handleClickedToggleMiniMapPanel = useCallback(() => {
     dispatch(shouldShowMinimapPanelChanged(!shouldShowMinimapPanel));
@@ -70,7 +70,7 @@ const ViewportControls = () => {
           icon={<FaExpand />}
         />
       </Tooltip>
-      <Tooltip
+      {/* <Tooltip
         label={
           shouldShowFieldTypeLegend
             ? t('nodes.hideLegendNodes')
@@ -83,7 +83,7 @@ const ViewportControls = () => {
           onClick={handleClickedToggleFieldTypeLegend}
           icon={<FaInfo />}
         />
-      </Tooltip>
+      </Tooltip> */}
       <Tooltip
         label={
           shouldShowMinimapPanel

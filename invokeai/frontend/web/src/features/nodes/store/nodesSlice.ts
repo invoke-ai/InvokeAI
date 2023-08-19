@@ -78,6 +78,7 @@ export const initialNodesState: NodesState = {
   shouldAnimateEdges: true,
   shouldSnapToGrid: false,
   shouldColorEdges: true,
+  isAddNodePopoverOpen: false,
   nodeOpacity: 1,
   selectedNodes: [],
   selectedEdges: [],
@@ -699,6 +700,15 @@ const nodesSlice = createSlice({
         };
       });
     },
+    addNodePopoverOpened: (state) => {
+      state.isAddNodePopoverOpen = true;
+    },
+    addNodePopoverClosed: (state) => {
+      state.isAddNodePopoverOpen = false;
+    },
+    addNodePopoverToggled: (state) => {
+      state.isAddNodePopoverOpen = !state.isAddNodePopoverOpen;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(receivedOpenAPISchema.pending, (state) => {
@@ -812,6 +822,9 @@ export const {
   selectionCopied,
   selectionPasted,
   selectedAll,
+  addNodePopoverOpened,
+  addNodePopoverClosed,
+  addNodePopoverToggled,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
