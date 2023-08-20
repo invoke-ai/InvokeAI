@@ -406,7 +406,7 @@ class OnnxModelField(BaseModel):
     model_type: ModelType = Field(description="Model Type")
 
 
-@title("ONNX Model Loader")
+@title("ONNX Main Model")
 @tags("onnx", "model")
 class OnnxModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
