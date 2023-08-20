@@ -12,7 +12,6 @@ from typing import Optional, List, Dict, Callable, Union, Set
 import requests
 from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
-import onnx
 import torch
 from huggingface_hub import hf_hub_url, HfFolder, HfApi
 from omegaconf import OmegaConf

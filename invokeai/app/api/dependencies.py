@@ -1,6 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Optional
 from logging import Logger
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
@@ -45,7 +44,7 @@ def check_internet() -> bool:
     try:
         urllib.request.urlopen(host, timeout=1)
         return True
-    except:
+    except Exception:
         return False
 
 

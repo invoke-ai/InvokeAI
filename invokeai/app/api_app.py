@@ -1,6 +1,5 @@
 # Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 import asyncio
-import sys
 from inspect import signature
 
 import logging
@@ -17,20 +16,10 @@ from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pathlib import Path
 from pydantic.schema import schema
 
-# This should come early so that modules can log their initialization properly
 from .services.config import InvokeAIAppConfig
 from ..backend.util.logging import InvokeAILogger
 
-app_config = InvokeAIAppConfig.get_config()
-app_config.parse_args()
-logger = InvokeAILogger.get_logger(config=app_config)
 from invokeai.version.invokeai_version import __version__
-
-# we call this early so that the message appears before
-# other invokeai initialization messages
-if app_config.version:
-    print(f"InvokeAI version {__version__}")
-    sys.exit(0)
 
 import invokeai.frontend.web as web_dir
 import mimetypes
@@ -40,12 +29,17 @@ from .api.routers import sessions, models, images, boards, board_images, app_inf
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputField, UIConfigBase
 
-
 import torch
-import invokeai.backend.util.hotfixes
+import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 
 if torch.backends.mps.is_available():
-    import invokeai.backend.util.mps_fixes
+    import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
+
+
+app_config = InvokeAIAppConfig.get_config()
+app_config.parse_args()
+logger = InvokeAILogger.get_logger(config=app_config)
+
 
 # fix for windows mimetypes registry entries being borked
 # see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
@@ -230,13 +224,16 @@ def invoke_api():
 
     # replace uvicorn's loggers with InvokeAI's for consistent appearance
     for logname in ["uvicorn.access", "uvicorn"]:
-        l = logging.getLogger(logname)
-        l.handlers.clear()
+        log = logging.getLogger(logname)
+        log.handlers.clear()
         for ch in logger.handlers:
-            l.addHandler(ch)
+            log.addHandler(ch)
 
     loop.run_until_complete(server.serve())
 
 
 if __name__ == "__main__":
-    invoke_api()
+    if app_config.version:
+        print(f"InvokeAI version {__version__}")
+    else:
+        invoke_api()

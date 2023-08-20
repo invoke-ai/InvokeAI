@@ -52,7 +52,6 @@ from invokeai.frontend.install.widgets import (
     SingleSelectColumns,
     CenteredButtonPress,
     FileBox,
-    IntTitleSlider,
     set_min_terminal_size,
     CyclingForm,
     MIN_COLS,
@@ -308,7 +307,7 @@ class editOptsForm(CyclingForm, npyscreen.FormMultiPage):
         first_time = not (config.root_path / "invokeai.yaml").exists()
         access_token = HfFolder.get_token()
         window_width, window_height = get_terminal_size()
-        label = """Configure startup settings. You can come back and change these later. 
+        label = """Configure startup settings. You can come back and change these later.
 Use ctrl-N and ctrl-P to move to the <N>ext and <P>revious fields.
 Use cursor arrows to make a checkbox selection, and space to toggle.
 """
