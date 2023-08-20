@@ -8,8 +8,6 @@ import numpy as np
 import torch
 from torchvision.utils import make_grid
 
-# import matplotlib.pyplot as plt   # TODO: check with Dominik, also bsrgan.py vs bsrgan_light.py
-
 import invokeai.backend.util.logging as logger
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -50,6 +48,8 @@ def get_timestamp():
 
 
 def imshow(x, title=None, cbar=False, figsize=None):
+    import matplotlib.pyplot as plt
+
     plt.figure(figsize=figsize)
     plt.imshow(np.squeeze(x), interpolation="nearest", cmap="gray")
     if title:
@@ -60,6 +60,8 @@ def imshow(x, title=None, cbar=False, figsize=None):
 
 
 def surf(Z, cmap="rainbow", figsize=None):
+    import matplotlib.pyplot as plt
+
     plt.figure(figsize=figsize)
     ax3 = plt.axes(projection="3d")
 
@@ -89,7 +91,7 @@ def get_image_paths(dataroot):
 def _get_paths_from_images(path):
     assert os.path.isdir(path), "{:s} is not a valid directory".format(path)
     images = []
-    for dirpath, _, fnames in sorted(os.walk(path)):
+    for dirpath, _, fnames in sorted(os.walk(path, followlinks=True)):
         for fname in sorted(fnames):
             if is_image_file(fname):
                 img_path = os.path.join(dirpath, fname)

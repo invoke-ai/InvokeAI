@@ -1,4 +1,6 @@
-import argparse, os, sys, glob
+import argparse
+import glob
+import os
 from omegaconf import OmegaConf
 from PIL import Image
 from tqdm import tqdm

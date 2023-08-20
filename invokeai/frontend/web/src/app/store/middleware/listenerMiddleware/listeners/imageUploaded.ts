@@ -2,7 +2,7 @@ import { UseToastOptions } from '@chakra-ui/react';
 import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
+import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { omit } from 'lodash-es';
@@ -111,7 +111,9 @@ export const addImageUploadedFulfilledListener = () => {
 
       if (postUploadAction?.type === 'SET_NODES_IMAGE') {
         const { nodeId, fieldName } = postUploadAction;
-        dispatch(fieldValueChanged({ nodeId, fieldName, value: imageDTO }));
+        dispatch(
+          fieldImageValueChanged({ nodeId, fieldName, value: imageDTO })
+        );
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,

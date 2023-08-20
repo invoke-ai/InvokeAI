@@ -13,7 +13,6 @@ export const initialGalleryState: GalleryState = {
   galleryImageMinimumWidth: 96,
   selectedBoardId: 'none',
   galleryView: 'images',
-  shouldShowDeleteButton: false,
   boardSearchText: '',
 };
 
@@ -49,9 +48,6 @@ export const gallerySlice = createSlice({
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
       state.galleryView = action.payload;
-    },
-    shouldShowDeleteButtonChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowDeleteButton = action.payload;
     },
     boardSearchTextChanged: (state, action: PayloadAction<string>) => {
       state.boardSearchText = action.payload;
@@ -93,7 +89,6 @@ export const {
   autoAddBoardIdChanged,
   galleryViewChanged,
   selectionChanged,
-  shouldShowDeleteButtonChanged,
   boardSearchTextChanged,
 } = gallerySlice.actions;
 

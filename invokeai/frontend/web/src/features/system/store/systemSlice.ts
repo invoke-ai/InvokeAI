@@ -4,6 +4,7 @@ import { InvokeLogLevel } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { t } from 'i18next';
+import { startCase, upperFirst } from 'lodash-es';
 import { LogLevelName } from 'roarr';
 import {
   isAnySessionRejected,
@@ -25,7 +26,7 @@ import {
 import { ProgressImage } from 'services/events/types';
 import { makeToast } from '../util/makeToast';
 import { LANGUAGES } from './constants';
-import { startCase } from 'lodash-es';
+import { zPydanticValidationError } from './zodSchemas';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -86,7 +87,6 @@ export interface SystemState {
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
-  isNodesEnabled: boolean;
   shouldUseNSFWChecker: boolean;
   shouldUseWatermarker: boolean;
 }
@@ -120,7 +120,6 @@ export const initialSystemState: SystemState = {
   isPersisted: false,
   language: 'en',
   isUploading: false,
-  isNodesEnabled: false,
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
 };
@@ -194,9 +193,6 @@ export const systemSlice = createSlice({
     },
     progressImageSet(state, action: PayloadAction<ProgressImage | null>) {
       state.progressImage = action.payload;
-    },
-    setIsNodesEnabled(state, action: PayloadAction<boolean>) {
-      state.isNodesEnabled = action.payload;
     },
     shouldUseNSFWCheckerChanged(state, action: PayloadAction<boolean>) {
       state.shouldUseNSFWChecker = action.payload;
@@ -366,9 +362,24 @@ export const systemSlice = createSlice({
       state.progressImage = null;
 
       let errorDescription = undefined;
+      const duration = 5000;
 
       if (action.payload?.status === 422) {
-        errorDescription = 'Validation Error';
+        const result = zPydanticValidationError.safeParse(action.payload);
+        if (result.success) {
+          result.data.error.detail.map((e) => {
+            state.toastQueue.push(
+              makeToast({
+                title: upperFirst(e.msg),
+                status: 'error',
+                description: `Path:
+                ${e.loc.slice(3).join('.')}`,
+                duration,
+              })
+            );
+          });
+          return;
+        }
       } else if (action.payload?.error) {
         errorDescription = action.payload?.error as string;
       }
@@ -378,6 +389,7 @@ export const systemSlice = createSlice({
           title: t('toast.serverError'),
           status: 'error',
           description: errorDescription,
+          duration,
         })
       );
     });
@@ -425,7 +437,6 @@ export const {
   shouldAntialiasProgressImageChanged,
   languageChanged,
   progressImageSet,
-  setIsNodesEnabled,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } = systemSlice.actions;

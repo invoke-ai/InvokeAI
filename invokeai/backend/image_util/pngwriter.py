@@ -26,7 +26,7 @@ class PngWriter:
         dirlist = sorted(os.listdir(self.outdir), reverse=True)
         # find the first filename that matches our pattern or return 000000.0.png
         existing_name = next(
-            (f for f in dirlist if re.match("^(\d+)\..*\.png", f)),
+            (f for f in dirlist if re.match(r"^(\d+)\..*\.png", f)),
             "0000000.0.png",
         )
         basecount = int(existing_name.split(".", 1)[0]) + 1
@@ -98,11 +98,11 @@ class PromptFormatter:
         # to do: put model name into the t2i object
         #        switches.append(f'--model{t2i.model_name}')
         if opt.seamless or t2i.seamless:
-            switches.append(f"--seamless")
+            switches.append("--seamless")
         if opt.init_img:
             switches.append(f"-I{opt.init_img}")
         if opt.fit:
-            switches.append(f"--fit")
+            switches.append("--fit")
         if opt.strength and opt.init_img is not None:
             switches.append(f"-f{opt.strength or t2i.strength}")
         if opt.gfpgan_strength:

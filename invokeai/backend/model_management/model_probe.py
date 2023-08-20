@@ -217,9 +217,9 @@ class ModelProbe(object):
             raise "The model {model_name} is potentially infected by malware. Aborting import."
 
 
-###################################################3
+# ##################################################3
 # Checkpoint probing
-###################################################3
+# ##################################################3
 class ProbeBase(object):
     def get_base_type(self) -> BaseModelType:
         pass
@@ -431,7 +431,7 @@ class PipelineFolderProbe(FolderProbeBase):
                 return ModelVariantType.Depth
             elif in_channels == 4:
                 return ModelVariantType.Normal
-        except:
+        except Exception:
             pass
         return ModelVariantType.Normal
 
@@ -481,9 +481,19 @@ class ControlNetFolderProbe(FolderProbeBase):
         with open(config_file, "r") as file:
             config = json.load(file)
         # no obvious way to distinguish between sd2-base and sd2-768
-        return (
-            BaseModelType.StableDiffusion1 if config["cross_attention_dim"] == 768 else BaseModelType.StableDiffusion2
+        dimension = config["cross_attention_dim"]
+        base_model = (
+            BaseModelType.StableDiffusion1
+            if dimension == 768
+            else BaseModelType.StableDiffusion2
+            if dimension == 1024
+            else BaseModelType.StableDiffusionXL
+            if dimension == 2048
+            else None
         )
+        if not base_model:
+            raise InvalidModelException(f"Unable to determine model base for {self.folder_path}")
+        return base_model
 
 
 class LoRAFolderProbe(FolderProbeBase):
