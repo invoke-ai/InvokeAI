@@ -42,9 +42,7 @@ class BooleanCollectionOutput(BaseInvocationOutput):
     type: Literal["boolean_collection_output"] = "boolean_collection_output"
 
     # Outputs
-    collection: list[bool] = OutputField(
-        default_factory=list, description="The output boolean collection", ui_type=UIType.BooleanCollection
-    )
+    collection: list[bool] = OutputField(description="The output boolean collection", ui_type=UIType.BooleanCollection)
 
 
 @title("Boolean Primitive")
@@ -70,7 +68,7 @@ class BooleanCollectionInvocation(BaseInvocation):
 
     # Inputs
     collection: list[bool] = InputField(
-        default=False, description="The collection of boolean values", ui_type=UIType.BooleanCollection
+        default_factory=list, description="The collection of boolean values", ui_type=UIType.BooleanCollection
     )
 
     def invoke(self, context: InvocationContext) -> BooleanCollectionOutput:
@@ -95,9 +93,7 @@ class IntegerCollectionOutput(BaseInvocationOutput):
     type: Literal["integer_collection_output"] = "integer_collection_output"
 
     # Outputs
-    collection: list[int] = OutputField(
-        default_factory=list, description="The int collection", ui_type=UIType.IntegerCollection
-    )
+    collection: list[int] = OutputField(description="The int collection", ui_type=UIType.IntegerCollection)
 
 
 @title("Integer Primitive")
@@ -148,9 +144,7 @@ class FloatCollectionOutput(BaseInvocationOutput):
     type: Literal["float_collection_output"] = "float_collection_output"
 
     # Outputs
-    collection: list[float] = OutputField(
-        default_factory=list, description="The float collection", ui_type=UIType.FloatCollection
-    )
+    collection: list[float] = OutputField(description="The float collection", ui_type=UIType.FloatCollection)
 
 
 @title("Float Primitive")
@@ -176,7 +170,7 @@ class FloatCollectionInvocation(BaseInvocation):
 
     # Inputs
     collection: list[float] = InputField(
-        default=0, description="The collection of float values", ui_type=UIType.FloatCollection
+        default_factory=list, description="The collection of float values", ui_type=UIType.FloatCollection
     )
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
@@ -201,9 +195,7 @@ class StringCollectionOutput(BaseInvocationOutput):
     type: Literal["string_collection_output"] = "string_collection_output"
 
     # Outputs
-    collection: list[str] = OutputField(
-        default_factory=list, description="The output strings", ui_type=UIType.StringCollection
-    )
+    collection: list[str] = OutputField(description="The output strings", ui_type=UIType.StringCollection)
 
 
 @title("String Primitive")
@@ -229,7 +221,7 @@ class StringCollectionInvocation(BaseInvocation):
 
     # Inputs
     collection: list[str] = InputField(
-        default=0, description="The collection of string values", ui_type=UIType.StringCollection
+        default_factory=list, description="The collection of string values", ui_type=UIType.StringCollection
     )
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
@@ -262,9 +254,7 @@ class ImageCollectionOutput(BaseInvocationOutput):
     type: Literal["image_collection_output"] = "image_collection_output"
 
     # Outputs
-    collection: list[ImageField] = OutputField(
-        default_factory=list, description="The output images", ui_type=UIType.ImageCollection
-    )
+    collection: list[ImageField] = OutputField(description="The output images", ui_type=UIType.ImageCollection)
 
 
 @title("Image Primitive")
@@ -334,7 +324,6 @@ class LatentsCollectionOutput(BaseInvocationOutput):
     type: Literal["latents_collection_output"] = "latents_collection_output"
 
     collection: list[LatentsField] = OutputField(
-        default_factory=list,
         description=FieldDescriptions.latents,
         ui_type=UIType.LatentsCollection,
     )
@@ -365,7 +354,7 @@ class LatentsCollectionInvocation(BaseInvocation):
 
     # Inputs
     collection: list[LatentsField] = InputField(
-        default=0, description="The collection of latents tensors", ui_type=UIType.LatentsCollection
+        description="The collection of latents tensors", ui_type=UIType.LatentsCollection
     )
 
     def invoke(self, context: InvocationContext) -> LatentsCollectionOutput:
@@ -410,9 +399,7 @@ class ColorCollectionOutput(BaseInvocationOutput):
     type: Literal["color_collection_output"] = "color_collection_output"
 
     # Outputs
-    collection: list[ColorField] = OutputField(
-        default_factory=list, description="The output colors", ui_type=UIType.ColorCollection
-    )
+    collection: list[ColorField] = OutputField(description="The output colors", ui_type=UIType.ColorCollection)
 
 
 @title("Color Primitive")
@@ -455,7 +442,6 @@ class ConditioningCollectionOutput(BaseInvocationOutput):
 
     # Outputs
     collection: list[ConditioningField] = OutputField(
-        default_factory=list,
         description="The output conditioning tensors",
         ui_type=UIType.ConditioningCollection,
     )
