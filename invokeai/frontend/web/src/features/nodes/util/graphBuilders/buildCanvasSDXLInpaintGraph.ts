@@ -518,7 +518,7 @@ export const buildCanvasSDXLInpaintGraph = (
 
     // Connect random int to the start of the range of size so the range starts on the random first seed
     graph.edges.push({
-      source: { node_id: RANDOM_INT, field: 'a' },
+      source: { node_id: RANDOM_INT, field: 'value' },
       destination: { node_id: RANGE_OF_SIZE, field: 'start' },
     });
   } else {
