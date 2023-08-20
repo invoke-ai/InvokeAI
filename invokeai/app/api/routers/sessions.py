@@ -1,22 +1,24 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Annotated, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 from fastapi import Body, HTTPException, Path, Query, Response
 from fastapi.routing import APIRouter
 from pydantic.fields import Field
 
+from invokeai.app.services.item_storage import PaginatedResults
+
 # Importing * is bad karma but needed here for node detection
 from ...invocations import *  # noqa: F401 F403
-from ...invocations.baseinvocation import BaseInvocation
+from ...invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from ...services.graph import (
     Edge,
     EdgeConnection,
     Graph,
     GraphExecutionState,
     NodeAlreadyExecutedError,
+    update_invocations_union,
 )
-from ...services.item_storage import PaginatedResults
 from ..dependencies import ApiDependencies
 
 session_router = APIRouter(prefix="/v1/sessions", tags=["sessions"])
@@ -36,6 +38,24 @@ async def create_session(
     """Creates a new session, optionally initializing it with an invocation graph"""
     session = ApiDependencies.invoker.create_execution_state(graph)
     return session
+
+
+@session_router.post(
+    "/",
+    operation_id="update_nodes",
+)
+async def update_nodes() -> None:
+    class TestFromRouterOutput(BaseInvocationOutput):
+        type: Literal["test_from_router"] = "test_from_router"
+
+    class TestInvocationFromRouter(BaseInvocation):
+        type: Literal["test_from_router_output"] = "test_from_router_output"
+
+        def invoke(self, context) -> TestFromRouterOutput:
+            return TestFromRouterOutput()
+
+    # doesn't work from here... hmm...
+    update_invocations_union()
 
 
 @session_router.get(

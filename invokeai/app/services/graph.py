@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal, Optional, Union, get_args, get_origi
 
 import networkx as nx
 from pydantic import BaseModel, root_validator, validator
-from pydantic.fields import Field
+from pydantic.fields import Field, ModelField
 
 # Importing * is bad karma but needed here for node detection
 from ..invocations import *  # noqa: F401 F403
@@ -232,7 +232,39 @@ InvocationsUnion = Union[BaseInvocation.get_invocations()]  # type: ignore
 InvocationOutputsUnion = Union[BaseInvocationOutput.get_all_subclasses_tuple()]  # type: ignore
 
 
-class Graph(BaseModel):
+class DynamicBaseModel(BaseModel):
+    """https://github.com/pydantic/pydantic/issues/1937#issuecomment-695313040"""
+
+    @classmethod
+    def add_fields(cls, **field_definitions: Any):
+        new_fields: dict[str, ModelField] = {}
+        new_annotations: dict[str, Optional[type]] = {}
+
+        for f_name, f_def in field_definitions.items():
+            if isinstance(f_def, tuple):
+                try:
+                    f_annotation, f_value = f_def
+                except ValueError as e:
+                    raise Exception(
+                        "field definitions should either be a tuple of (<type>, <default>) or just a "
+                        "default value, unfortunately this means tuples as "
+                        "default values are not allowed"
+                    ) from e
+            else:
+                f_annotation, f_value = None, f_def
+
+            if f_annotation:
+                new_annotations[f_name] = f_annotation
+
+            new_fields[f_name] = ModelField.infer(
+                name=f_name, value=f_value, annotation=f_annotation, class_validators=None, config=cls.__config__
+            )
+
+        cls.__fields__.update(new_fields)
+        cls.__annotations__.update(new_annotations)
+
+
+class Graph(DynamicBaseModel):
     id: str = Field(description="The id of this graph", default_factory=lambda: uuid.uuid4().__str__())
     # TODO: use a list (and never use dict in a BaseModel) because pydantic/fastapi hates me
     nodes: dict[str, Annotated[InvocationsUnion, Field(discriminator="type")]] = Field(
@@ -700,7 +732,7 @@ class Graph(BaseModel):
         return g
 
 
-class GraphExecutionState(BaseModel):
+class GraphExecutionState(DynamicBaseModel):
     """Tracks the state of a graph execution"""
 
     id: str = Field(description="The id of the execution state", default_factory=lambda: uuid.uuid4().__str__())
@@ -1131,3 +1163,24 @@ class LibraryGraph(BaseModel):
 
 
 GraphInvocation.update_forward_refs()
+
+
+def update_invocations_union() -> None:
+    global InvocationsUnion
+    global InvocationOutputsUnion
+    InvocationsUnion = Union[BaseInvocation.get_invocations()]  # type: ignore
+    InvocationOutputsUnion = Union[BaseInvocationOutput.get_all_subclasses_tuple()]  # type: ignore
+
+    Graph.add_fields(
+        nodes=(
+            dict[str, Annotated[InvocationsUnion, Field(discriminator="type")]],
+            Field(description="The nodes in this graph", default_factory=dict),
+        )
+    )
+
+    GraphExecutionState.add_fields(
+        results=(
+            dict[str, Annotated[InvocationOutputsUnion, Field(discriminator="type")]],
+            Field(description="The results of node executions", default_factory=dict),
+        )
+    )

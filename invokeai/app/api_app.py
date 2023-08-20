@@ -3,6 +3,7 @@ import asyncio
 from inspect import signature
 
 import logging
+from typing import Literal
 import uvicorn
 import socket
 
@@ -15,6 +16,7 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pathlib import Path
 from pydantic.schema import schema
+from invokeai.app.services.graph import update_invocations_union
 
 from .services.config import InvokeAIAppConfig
 from ..backend.util.logging import InvokeAILogger
@@ -27,7 +29,7 @@ import mimetypes
 from .api.dependencies import ApiDependencies
 from .api.routers import sessions, models, images, boards, board_images, app_info
 from .api.sockets import SocketIO
-from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputField, UIConfigBase
+from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputField, BaseInvocationOutput, UIConfigBase
 
 import torch
 import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
@@ -103,8 +105,8 @@ app.include_router(app_info.app_router, prefix="/api")
 # Build a custom OpenAPI to include all outputs
 # TODO: can outputs be included on metadata of invocation schemas somehow?
 def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
+    # if app.openapi_schema:
+    #     return app.openapi_schema
     openapi_schema = get_openapi(
         title=app.title,
         description="An API for invoking AI image operations",
@@ -138,6 +140,9 @@ def custom_openapi():
         invoker_name = invoker.__name__
         output_type = signature(invoker.invoke).return_annotation
         output_type_title = output_type_titles[output_type.__name__]
+        if invoker_name not in openapi_schema["components"]["schemas"]:
+            openapi_schema["components"]["schemas"][invoker_name] = invoker.schema()
+
         invoker_schema = openapi_schema["components"]["schemas"][invoker_name]
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
 
@@ -228,6 +233,26 @@ def invoke_api():
         log.handlers.clear()
         for ch in logger.handlers:
             log.addHandler(ch)
+
+    class Test1Output(BaseInvocationOutput):
+        type: Literal["test1_output"] = "test1_output"
+
+    class Test1Invocation(BaseInvocation):
+        type: Literal["test1"] = "test1"
+
+        def invoke(self, context) -> Test1Output:
+            return Test1Output()
+
+    class Test2Output(BaseInvocationOutput):
+        type: Literal["test2_output"] = "test2_output"
+
+    class TestInvocation2(BaseInvocation):
+        type: Literal["test2"] = "test2"
+
+        def invoke(self, context) -> Test2Output:
+            return Test2Output()
+
+    update_invocations_union()
 
     loop.run_until_complete(server.serve())
 
