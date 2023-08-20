@@ -41,7 +41,7 @@ async def create_session(
 
 
 @session_router.post(
-    "/",
+    "/update_nodes",
     operation_id="update_nodes",
 )
 async def update_nodes() -> None:
