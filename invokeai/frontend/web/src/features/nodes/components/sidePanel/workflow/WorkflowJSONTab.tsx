@@ -1,7 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import ImageMetadataJSON from 'features/gallery/components/ImageMetadataViewer/ImageMetadataJSON';
+import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { buildWorkflow } from 'features/nodes/util/buildWorkflow';
 import { memo, useMemo } from 'react';
 import { useDebounce } from 'use-debounce';
@@ -31,11 +31,7 @@ const WorkflowJSONTab = () => {
         h: 'full',
       }}
     >
-      <ImageMetadataJSON
-        jsonObject={workflow}
-        label="Workflow"
-        fileName={workflow.name}
-      />
+      <DataViewer data={workflow} label="Workflow" fileName={workflow.name} />
     </Flex>
   );
 };

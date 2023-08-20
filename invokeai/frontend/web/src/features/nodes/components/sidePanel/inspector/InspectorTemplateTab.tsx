@@ -3,7 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import ImageMetadataJSON from 'features/gallery/components/ImageMetadataViewer/ImageMetadataJSON';
+import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { memo } from 'react';
 
 const selector = createSelector(
@@ -34,7 +34,7 @@ const NodeTemplateInspector = () => {
     return <IAINoContentFallback label="No node selected" icon={null} />;
   }
 
-  return <ImageMetadataJSON jsonObject={template} label="Node Template" />;
+  return <DataViewer data={template} label="Node Template" />;
 };
 
 export default memo(NodeTemplateInspector);

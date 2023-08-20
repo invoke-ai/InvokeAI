@@ -1,34 +1,35 @@
 import { Box, Flex, IconButton, Tooltip } from '@chakra-ui/react';
+import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { useCallback, useMemo } from 'react';
 import { FaCopy, FaSave } from 'react-icons/fa';
 
 type Props = {
   label: string;
-  jsonObject: object;
+  data: object | string;
   fileName?: string;
 };
 
-const ImageMetadataJSON = (props: Props) => {
-  const { label, jsonObject, fileName } = props;
-  const jsonString = useMemo(
-    () => JSON.stringify(jsonObject, null, 2),
-    [jsonObject]
+const DataViewer = (props: Props) => {
+  const { label, data, fileName } = props;
+  const dataString = useMemo(
+    () => (isString(data) ? data : JSON.stringify(data, null, 2)),
+    [data]
   );
 
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(jsonString);
-  }, [jsonString]);
+    navigator.clipboard.writeText(dataString);
+  }, [dataString]);
 
   const handleSave = useCallback(() => {
-    const blob = new Blob([jsonString]);
+    const blob = new Blob([dataString]);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${fileName || label}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }, [jsonString, label, fileName]);
+  }, [dataString, label, fileName]);
 
   return (
     <Flex
@@ -65,7 +66,7 @@ const ImageMetadataJSON = (props: Props) => {
             },
           }}
         >
-          <pre>{jsonString}</pre>
+          <pre>{dataString}</pre>
         </OverlayScrollbarsComponent>
       </Box>
       <Flex sx={{ position: 'absolute', top: 0, insetInlineEnd: 0, p: 2 }}>
@@ -92,4 +93,4 @@ const ImageMetadataJSON = (props: Props) => {
   );
 };
 
-export default ImageMetadataJSON;
+export default DataViewer;
