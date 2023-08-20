@@ -456,7 +456,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
 
 @title("Latents to Image")
-@tags("latents", "image", "vae")
+@tags("latents", "image", "vae", "l2i")
 class LatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
 
@@ -644,7 +644,7 @@ class ScaleLatentsInvocation(BaseInvocation):
 
 
 @title("Image to Latents")
-@tags("latents", "image", "vae")
+@tags("latents", "image", "vae", "i2l")
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""
 
