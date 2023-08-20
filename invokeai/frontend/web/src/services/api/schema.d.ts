@@ -596,8 +596,7 @@ export type components = {
       type: "boolean_collection";
       /**
        * Collection 
-       * @description The collection of boolean values 
-       * @default false
+       * @description The collection of boolean values
        */
       collection?: (boolean)[];
     };
@@ -616,7 +615,7 @@ export type components = {
        * Collection 
        * @description The output boolean collection
        */
-      collection?: (boolean)[];
+      collection: (boolean)[];
     };
     /**
      * Boolean Primitive 
@@ -843,7 +842,7 @@ export type components = {
        * Collection 
        * @description The output colors
        */
-      collection?: (components["schemas"]["ColorField"])[];
+      collection: (components["schemas"]["ColorField"])[];
     };
     /**
      * Color Correct 
@@ -1045,7 +1044,7 @@ export type components = {
        * Collection 
        * @description The output conditioning tensors
        */
-      collection?: (components["schemas"]["ConditioningField"])[];
+      collection: (components["schemas"]["ConditioningField"])[];
     };
     /**
      * ConditioningField 
@@ -1793,8 +1792,7 @@ export type components = {
       type: "float_collection";
       /**
        * Collection 
-       * @description The collection of float values 
-       * @default 0
+       * @description The collection of float values
        */
       collection?: (number)[];
     };
@@ -1813,7 +1811,7 @@ export type components = {
        * Collection 
        * @description The float collection
        */
-      collection?: (number)[];
+      collection: (number)[];
     };
     /**
      * Float Primitive 
@@ -2204,7 +2202,7 @@ export type components = {
        * Collection 
        * @description The output images
        */
-      collection?: (components["schemas"]["ImageField"])[];
+      collection: (components["schemas"]["ImageField"])[];
     };
     /**
      * Convert Image Mode 
@@ -3156,7 +3154,7 @@ export type components = {
        * Collection 
        * @description The int collection
        */
-      collection?: (number)[];
+      collection: (number)[];
     };
     /**
      * Integer Primitive 
@@ -3279,8 +3277,7 @@ export type components = {
       type: "latents_collection";
       /**
        * Collection 
-       * @description The collection of latents tensors 
-       * @default 0
+       * @description The collection of latents tensors
        */
       collection?: (components["schemas"]["LatentsField"])[];
     };
@@ -3299,7 +3296,7 @@ export type components = {
        * Collection 
        * @description Latents tensor
        */
-      collection?: (components["schemas"]["LatentsField"])[];
+      collection: (components["schemas"]["LatentsField"])[];
     };
     /**
      * LatentsField 
@@ -3644,7 +3641,7 @@ export type components = {
       weight: number;
     };
     /**
-     * LoRA Loader 
+     * LoRA 
      * @description Apply selected lora to unet and text_encoder.
      */
     LoraLoaderInvocation: {
@@ -3725,7 +3722,7 @@ export type components = {
       model_type: components["schemas"]["ModelType"];
     };
     /**
-     * Main Model Loader 
+     * Main Model 
      * @description Loads a main model, outputting its submodels.
      */
     MainModelLoaderInvocation: {
@@ -4681,7 +4678,7 @@ export type components = {
       model_type: components["schemas"]["ModelType"];
     };
     /**
-     * ONNX Model Loader 
+     * ONNX Main Model 
      * @description Loads a main model, outputting its submodels.
      */
     OnnxModelLoaderInvocation: {
@@ -5195,7 +5192,7 @@ export type components = {
       clip2?: components["schemas"]["ClipField"];
     };
     /**
-     * SDXL LoRA Loader 
+     * SDXL LoRA 
      * @description Apply selected lora to unet and text_encoder.
      */
     SDXLLoraLoaderInvocation: {
@@ -5271,7 +5268,7 @@ export type components = {
       clip2?: components["schemas"]["ClipField"];
     };
     /**
-     * SDXL Main Model Loader 
+     * SDXL Main Model 
      * @description Loads an sdxl base model, outputting its submodels.
      */
     SDXLModelLoaderInvocation: {
@@ -5391,7 +5388,7 @@ export type components = {
       clip2?: components["schemas"]["ClipField"];
     };
     /**
-     * SDXL Refiner Model Loader 
+     * SDXL Refiner Model 
      * @description Loads an sdxl refiner model, outputting its submodels.
      */
     SDXLRefinerModelLoaderInvocation: {
@@ -5809,8 +5806,7 @@ export type components = {
       type: "string_collection";
       /**
        * Collection 
-       * @description The collection of string values 
-       * @default 0
+       * @description The collection of string values
        */
       collection?: (string)[];
     };
@@ -5829,7 +5825,7 @@ export type components = {
        * Collection 
        * @description The output strings
        */
-      collection?: (string)[];
+      collection: (string)[];
     };
     /**
      * String Primitive 
@@ -6023,7 +6019,7 @@ export type components = {
       vae: components["schemas"]["ModelInfo"];
     };
     /**
-     * VAE Loader 
+     * VAE 
      * @description Loads a VAE model, outputting a VaeLoaderOutput
      */
     VaeLoaderInvocation: {
@@ -6194,6 +6190,18 @@ export type components = {
       ui_type?: components["schemas"]["UIType"];
     };
     /**
+     * ControlNetModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat 
+     * @description An enumeration. 
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
      * StableDiffusionOnnxModelFormat 
      * @description An enumeration. 
      * @enum {string}
@@ -6206,23 +6214,11 @@ export type components = {
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
-     * ControlNetModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionXLModelFormat 
      * @description An enumeration. 
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusion2ModelFormat 
-     * @description An enumeration. 
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
