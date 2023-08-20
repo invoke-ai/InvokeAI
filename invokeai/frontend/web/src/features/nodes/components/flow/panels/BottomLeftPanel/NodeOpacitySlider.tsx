@@ -1,13 +1,13 @@
 import {
-  Box,
+  Flex,
   Slider,
   SliderFilledTrack,
   SliderThumb,
   SliderTrack,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useCallback } from 'react';
 import { nodeOpacityChanged } from 'features/nodes/store/nodesSlice';
+import { useCallback } from 'react';
 
 export default function NodeOpacitySlider() {
   const dispatch = useAppDispatch();
@@ -21,7 +21,7 @@ export default function NodeOpacitySlider() {
   );
 
   return (
-    <Box>
+    <Flex alignItems="center">
       <Slider
         aria-label="Node Opacity"
         value={nodeOpacity}
@@ -31,12 +31,13 @@ export default function NodeOpacitySlider() {
         onChange={handleChange}
         orientation="vertical"
         defaultValue={30}
+        h="calc(100% - 0.5rem)"
       >
         <SliderTrack>
           <SliderFilledTrack />
         </SliderTrack>
         <SliderThumb />
       </Slider>
-    </Box>
+    </Flex>
   );
 }
