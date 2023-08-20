@@ -555,25 +555,11 @@ class InvokeAIDiffuserComponent:
         )
         return unconditioned_next_x, conditioned_next_x
 
-    @classmethod
-    def _rescale_cfg(cls, cond, uncond, cond_scale, multiplier=0.7):
-        x_cfg = uncond + cond_scale * (cond - uncond)
-        ro_pos = torch.std(cond, dim=(1, 2, 3), keepdim=True)
-        ro_cfg = torch.std(x_cfg, dim=(1, 2, 3), keepdim=True)
-
-        x_rescaled = x_cfg * (ro_pos / ro_cfg)
-        x_final = multiplier * x_rescaled + (1.0 - multiplier) * x_cfg
-        return x_final
-
-    def _combine(self, unconditioned_next_x, conditioned_next_x, guidance_scale, guidance_rescale_multiplier=0):
-        if guidance_rescale_multiplier > 0:
-            # for models trained using zero-terminal SNR
-            return type(self)._rescale_cfg(conditioned_next_x, unconditioned_next_x, guidance_scale, multiplier=guidance_rescale_multiplier)
-        else:
-            # to scale how much effect conditioning has, calculate the changes it does and then scale that
-            scaled_delta = (conditioned_next_x - unconditioned_next_x) * guidance_scale
-            combined_next_x = unconditioned_next_x + scaled_delta
-            return combined_next_x
+    def _combine(self, unconditioned_next_x, conditioned_next_x, guidance_scale):
+        # to scale how much effect conditioning has, calculate the changes it does and then scale that
+        scaled_delta = (conditioned_next_x - unconditioned_next_x) * guidance_scale
+        combined_next_x = unconditioned_next_x + scaled_delta
+        return combined_next_x
 
     def apply_symmetry(
         self,

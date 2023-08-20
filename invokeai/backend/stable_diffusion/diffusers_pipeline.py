@@ -531,14 +531,18 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if isinstance(guidance_scale, list):
             guidance_scale = guidance_scale[step_index]
 
-        guidance_rescale_multiplier = conditioning_data.guidance_rescale_multiplier
-
         noise_pred = self.invokeai_diffuser._combine(
             uc_noise_pred,
             c_noise_pred,
-            guidance_scale,
-            guidance_rescale_multiplier
+            guidance_scale
         )
+        guidance_rescale_multiplier = conditioning_data.guidance_rescale_multiplier
+        if guidance_rescale_multiplier > 0:
+            noise_pred = type(self).rescale_cfg(
+                noise_pred,
+                c_noise_pred,
+                guidance_rescale_multiplier,
+            )
 
         # compute the previous noisy sample x_t -> x_t-1
         step_output = self.scheduler.step(noise_pred, timestep, latents, **conditioning_data.scheduler_args)
@@ -550,6 +554,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             step_output = guidance(step_output, timestep, conditioning_data)
 
         return step_output
+
+    @classmethod
+    def _rescale_cfg(cls, total_noise_pred, pos_noise_pred, multiplier=0.7):
+        ro_pos = torch.std(pos_noise_pred, dim=(1, 2, 3), keepdim=True)
+        ro_cfg = torch.std(total_noise_pred, dim=(1, 2, 3), keepdim=True)
+
+        x_rescaled = total_noise_pred * (ro_pos / ro_cfg)
+        x_final = multiplier * x_rescaled + (1.0 - multiplier) * total_noise_pred
+        return x_final
 
     def _unet_forward(
         self,
