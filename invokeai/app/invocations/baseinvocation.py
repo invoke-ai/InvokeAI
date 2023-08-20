@@ -464,6 +464,16 @@ class BaseInvocation(ABC, BaseModel):
                 schema["required"] = list()
             schema["required"].extend(["type", "id"])
 
+            # nodes may have required fields, that can accept input from connections
+            # mark them as optional in the schema
+            for field_name, field in model_class.__fields__.items():
+                _input = field.field_info.extra.get("input", None)
+                if _input in [Input.Connection, Input.Any]:
+                    try:
+                        schema["required"].remove(field_name)
+                    except Exception:
+                        pass
+
     @abstractmethod
     def invoke(self, context: InvocationContext) -> BaseInvocationOutput:
         """Invoke with provided context and return outputs."""
