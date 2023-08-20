@@ -294,7 +294,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
          required fields, or a ModelConfigBase instance.
         """
         record = ModelConfigFactory.make_config(config)  # ensure it is a valid config obect
-        json_serialized = json.dumps(record.dict())  #  and turn it into a json string.
+        json_serialized = json.dumps(record.dict())  # and turn it into a json string.
         try:
             self._lock.acquire()
             self._cursor.execute(
@@ -307,7 +307,11 @@ class ModelConfigStoreSQL(ModelConfigStore):
                     config=?
                 WHERE id=?;
                 """,
-                (record.base_model, record.model_type, record.name, record.path, json_serialized, key),
+                (record.base_model,
+                 record.model_type,
+                 record.name,
+                 record.path,
+                 json_serialized, key),
             )
             if self._cursor.rowcount < 1:
                 raise UnknownModelException

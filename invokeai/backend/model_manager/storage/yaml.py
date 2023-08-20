@@ -192,7 +192,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
             self._lock.acquire()
             for config in self.all_models():
                 config_tags = set(config.tags)
-                if tags.difference(config_tags):  #  not all tags in the model
+                if tags.difference(config_tags):  # not all tags in the model
                     continue
                 results.append(config)
         finally:

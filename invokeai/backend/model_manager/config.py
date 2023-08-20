@@ -19,20 +19,16 @@ Typical usage:
 Validation errors will raise an InvalidModelConfigException error.
 
 """
-import pydantic
 from enum import Enum
-from pydantic import BaseModel, Field, Extra
 from typing import Optional, Literal, List, Union, Type
-from pydantic.error_wrappers import ValidationError
 from omegaconf.listconfig import ListConfig  # to support the yaml backend
+import pydantic
+from pydantic import BaseModel, Field, Extra
+from pydantic.error_wrappers import ValidationError
 
 
 class InvalidModelConfigException(Exception):
-    """Exception raised when the config parser doesn't recognize the passed
-    combination of model type and format."""
-
-    pass
-
+    """Exception for when config parser doesn't recognized this combination of model type and format."""
 
 class BaseModelType(str, Enum):
     """Base model type."""
@@ -201,7 +197,7 @@ class ONNXSD2Config(MainConfig):
 
 
 class ModelConfigFactory(object):
-    """Class for parsing config dicts into StableDiffusion*Config obects."""
+    """Class for parsing config dicts into StableDiffusion Config obects."""
 
     _class_map: dict = {
         ModelFormat.Checkpoint: {

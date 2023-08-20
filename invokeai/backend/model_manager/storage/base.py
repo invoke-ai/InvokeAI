@@ -13,13 +13,9 @@ from ..config import ModelConfigBase, BaseModelType, ModelType
 class DuplicateModelException(Exception):
     """Raised on an attempt to add a model with the same key twice."""
 
-    pass
-
 
 class UnknownModelException(Exception):
     """Raised on an attempt to delete a model with a nonexistent key."""
-
-    pass
 
 
 class ModelConfigStore(ABC):

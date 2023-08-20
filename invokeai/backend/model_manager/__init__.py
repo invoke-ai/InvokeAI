@@ -1,7 +1,7 @@
 """
 Initialization file for invokeai.backend.model_manager.config
 """
-from invokeai.backend.model_manager.config import (
+from invokeai.backend.model_manager.config import ( # noqa F401
     ModelConfigFactory,
     ModelConfigBase,
     InvalidModelConfigException,
@@ -12,4 +12,3 @@ from invokeai.backend.model_manager.config import (
     ModelFormat,
     SchedulerPredictionType,
 )
-
