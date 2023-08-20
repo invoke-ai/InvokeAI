@@ -420,12 +420,12 @@ class ModelManager(object):
         base_model_str, model_type_str, model_name = model_key.split("/", 2)
         try:
             model_type = ModelType(model_type_str)
-        except:
+        except Exception:
             raise Exception(f"Unknown model type: {model_type_str}")
 
         try:
             base_model = BaseModelType(base_model_str)
-        except:
+        except Exception:
             raise Exception(f"Unknown base model: {base_model_str}")
 
         return (model_name, base_model, model_type)
@@ -856,7 +856,7 @@ class ModelManager(object):
             info.pop("config")
 
             result = self.add_model(model_name, base_model, model_type, model_attributes=info, clobber=True)
-        except:
+        except Exception:
             # something went wrong, so don't leave dangling diffusers model in directory or it will cause a duplicate model error!
             rmtree(new_diffusers_path)
             raise
@@ -1043,7 +1043,7 @@ class ModelManager(object):
         # Patch in the SD VAE from core so that it is available for use by the UI
         try:
             self.heuristic_import({str(self.resolve_model_path("core/convert/sd-vae-ft-mse"))})
-        except:
+        except Exception:
             pass
 
         installer = ModelInstall(

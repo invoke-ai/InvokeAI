@@ -407,7 +407,7 @@ def get_pip_from_venv(venv_path: Path) -> str:
     :rtype: str
     """
 
-    pip = "Scripts\pip.exe" if OS == "Windows" else "bin/pip"
+    pip = "Scripts\\pip.exe" if OS == "Windows" else "bin/pip"
     return str(venv_path.expanduser().resolve() / pip)
 
 

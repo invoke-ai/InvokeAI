@@ -213,7 +213,6 @@ class InvokeAIAppConfig(InvokeAISettings):
     patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
     ignore_missing_core_models : bool = Field(default=False, description='Ignore missing models in models/core/convert', category='Features')
 
-
     # PATHS
     root                : Path = Field(default=None, description='InvokeAI runtime root directory', category='Paths')
     autoimport_dir      : Path = Field(default='autoimport', description='Path to a directory of models files to be imported on startup.', category='Paths')
@@ -231,8 +230,8 @@ class InvokeAIAppConfig(InvokeAISettings):
     # LOGGING
     log_handlers        : List[str] = Field(default=["console"], description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>"', category="Logging")
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
-    log_format          : Literal[tuple(['plain','color','syslog','legacy'])] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
-    log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
+    log_format          : Literal['plain', 'color', 'syslog', 'legacy'] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
+    log_level           : Literal["debug", "info", "warning", "error", "critical"] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
 
@@ -279,7 +278,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         if conf is None:
             try:
                 conf = OmegaConf.load(self.root_dir / INIT_FILE)
-            except:
+            except Exception:
                 pass
         InvokeAISettings.initconf = conf
 
@@ -298,7 +297,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         """
         if (
             cls.singleton_config is None
-            or type(cls.singleton_config) != cls
+            or type(cls.singleton_config) is not cls
             or (kwargs and cls.singleton_init != kwargs)
         ):
             cls.singleton_config = cls(**kwargs)

@@ -102,8 +102,8 @@ def set_min_terminal_size(min_cols: int, min_lines: int) -> bool:
 class IntSlider(npyscreen.Slider):
     def translate_value(self):
         stri = "%2d / %2d" % (self.value, self.out_of)
-        l = (len(str(self.out_of))) * 2 + 4
-        stri = stri.rjust(l)
+        length = (len(str(self.out_of))) * 2 + 4
+        stri = stri.rjust(length)
         return stri
 
 
@@ -167,8 +167,8 @@ class FloatSlider(npyscreen.Slider):
     # this is supposed to adjust display precision, but doesn't
     def translate_value(self):
         stri = "%3.2f / %3.2f" % (self.value, self.out_of)
-        l = (len(str(self.out_of))) * 2 + 4
-        stri = stri.rjust(l)
+        length = (len(str(self.out_of))) * 2 + 4
+        stri = stri.rjust(length)
         return stri
 
 
