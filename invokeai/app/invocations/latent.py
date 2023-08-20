@@ -118,6 +118,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
     )
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
+    cfg_rescale_multiplier: float = InputField(
+        default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier, ui_type=UIType.Float
+    )
     scheduler: SAMPLER_NAME_VALUES = InputField(default="euler", description=FieldDescriptions.scheduler)
     unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection)
     control: Union[ControlField, list[ControlField]] = InputField(
@@ -127,9 +130,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
     mask: Optional[ImageField] = InputField(
         default=None,
         description=FieldDescriptions.mask,
-    )
-    cfg_rescale_multiplier: float = InputField(
-        default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier, ui_type=UIType.Float
     )
 
     @validator("cfg_scale")
