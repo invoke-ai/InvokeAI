@@ -230,10 +230,10 @@ def int_or_float_or_str(value: str) -> Union[int, float, str]:
     """
     try:
         return int(value)
-    except:
+    except Exception as e:  # noqa F841
         pass
     try:
         return float(value)
-    except:
+    except Exception as e: # noqa F841
         pass
     return str(value)
