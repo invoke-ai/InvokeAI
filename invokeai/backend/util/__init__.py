@@ -11,11 +11,11 @@ from .devices import (  # noqa: F401
     torch_dtype,
 )
 from .log import write_log  # noqa: F401
-from .util import ( # noqa: F401
+from .util import (  # noqa: F401
     ask_user,
     download_with_resume,
     instantiate_from_config,
     url_attachment_name,
     Chdir,
 )
-from .attention import auto_detect_slice_size # noqa: F401
+from .attention import auto_detect_slice_size  # noqa: F401
