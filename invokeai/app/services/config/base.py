@@ -234,6 +234,6 @@ def int_or_float_or_str(value: str) -> Union[int, float, str]:
         pass
     try:
         return float(value)
-    except Exception as e: # noqa F841
+    except Exception as e:  # noqa F841
         pass
     return str(value)
