@@ -1,8 +1,7 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import IAIButton from 'common/components/IAIButton';
 import { addNodePopoverOpened } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
-import { FaPlus } from 'react-icons/fa';
 import { Panel } from 'reactflow';
 
 const TopLeftPanel = () => {
@@ -14,12 +13,9 @@ const TopLeftPanel = () => {
 
   return (
     <Panel position="top-left">
-      <IAIIconButton
-        aria-label="Add Node"
-        tooltip="Add Node"
-        onClick={handleOpenAddNodePopover}
-        icon={<FaPlus />}
-      />
+      <IAIButton aria-label="Add Node" onClick={handleOpenAddNodePopover}>
+        Add Node
+      </IAIButton>
     </Panel>
   );
 };
