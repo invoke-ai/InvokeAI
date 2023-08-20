@@ -518,6 +518,18 @@ export type InvocationBaseSchemaObject = Omit<
 > &
   InvocationSchemaExtra;
 
+export type InvocationOutputSchemaObject = Omit<
+  OpenAPIV3.SchemaObject,
+  'properties'
+> &
+  OpenAPIV3.SchemaObject['properties'] & {
+    type: Omit<OpenAPIV3.SchemaObject, 'default'> & {
+      default: AnyInvocationType;
+    };
+  } & {
+    class: 'output';
+  };
+
 export type InvocationFieldSchema = OpenAPIV3.SchemaObject & _InputField;
 
 export interface ArraySchemaObject extends InvocationBaseSchemaObject {
@@ -528,11 +540,30 @@ export interface NonArraySchemaObject extends InvocationBaseSchemaObject {
   type?: OpenAPIV3.NonArraySchemaObjectType;
 }
 
-export type InvocationSchemaObject = ArraySchemaObject | NonArraySchemaObject;
+export type InvocationSchemaObject = (
+  | ArraySchemaObject
+  | NonArraySchemaObject
+) & { class: 'invocation' };
+
+export const isSchemaObject = (
+  obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
+): obj is OpenAPIV3.SchemaObject => !('$ref' in obj);
 
 export const isInvocationSchemaObject = (
-  obj: OpenAPIV3.ReferenceObject | InvocationSchemaObject
-): obj is InvocationSchemaObject => !('$ref' in obj);
+  obj:
+    | OpenAPIV3.ReferenceObject
+    | OpenAPIV3.SchemaObject
+    | InvocationSchemaObject
+): obj is InvocationSchemaObject =>
+  'class' in obj && obj.class === 'invocation';
+
+export const isInvocationOutputSchemaObject = (
+  obj:
+    | OpenAPIV3.ReferenceObject
+    | OpenAPIV3.SchemaObject
+    | InvocationOutputSchemaObject
+): obj is InvocationOutputSchemaObject =>
+  'class' in obj && obj.class === 'output';
 
 export const isInvocationFieldSchema = (
   obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
