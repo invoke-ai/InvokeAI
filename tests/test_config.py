@@ -7,6 +7,7 @@ from pathlib import Path
 
 from invokeai.app.services.config import InvokeAIAppConfig
 
+
 @pytest.fixture
 def patch_rootdir(tmp_path: Path, monkeypatch: Any) -> None:
     """This may be overkill since the current tests don't need the root dir to exist"""
