@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) & the InvokeAI Team
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal
 
 import cv2 as cv
 import numpy as np

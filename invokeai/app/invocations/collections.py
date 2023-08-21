@@ -5,10 +5,10 @@ from typing import Literal
 import numpy as np
 from pydantic import validator
 
-from invokeai.app.invocations.primitives import ImageCollectionOutput, ImageField, IntegerCollectionOutput
+from invokeai.app.invocations.primitives import IntegerCollectionOutput
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, UIType, tags, title
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, tags, title
 
 
 @title("Integer Range")

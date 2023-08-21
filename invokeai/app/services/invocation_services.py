@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.board_images import BoardImagesServiceABC
     from invokeai.app.services.boards import BoardServiceABC
     from invokeai.app.services.images import ImageServiceABC
+    from invokeai.app.services.invocation_stats import InvocationStatsServiceBase
     from invokeai.app.services.model_manager_service import ModelManagerServiceBase
     from invokeai.app.services.events import EventServiceBase
     from invokeai.app.services.latent_storage import LatentsStorageBase
