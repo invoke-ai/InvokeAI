@@ -27,34 +27,42 @@ class BatchProcessResponse(BaseModel):
 class BatchManagerBase(ABC):
     @abstractmethod
     def start(self, invoker: Invoker) -> None:
+        """Starts the BatchManager service"""
         pass
 
     @abstractmethod
     def create_batch_process(self, batch: Batch, graph: Graph) -> BatchProcessResponse:
+        """Creates a batch process"""
         pass
 
     @abstractmethod
     def run_batch_process(self, batch_id: str) -> None:
+        """Runs a batch process"""
         pass
 
     @abstractmethod
     def cancel_batch_process(self, batch_process_id: str) -> None:
+        """Cancels a batch process"""
         pass
 
     @abstractmethod
     def get_batch(self, batch_id: str) -> BatchProcessResponse:
+        """Gets a batch process"""
         pass
 
     @abstractmethod
     def get_batch_processes(self) -> list[BatchProcessResponse]:
+        """Gets all batch processes"""
         pass
 
     @abstractmethod
     def get_incomplete_batch_processes(self) -> list[BatchProcessResponse]:
+        """Gets all incomplete batch processes"""
         pass
 
     @abstractmethod
     def get_sessions(self, batch_id: str) -> list[BatchSession]:
+        """Gets the sessions associated with a batch"""
         pass
 
 

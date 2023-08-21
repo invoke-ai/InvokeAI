@@ -47,7 +47,7 @@ async def create_batch(
     graph: Graph = Body(description="The graph to initialize the session with"),
     batch: Batch = Body(description="Batch config to apply to the given graph"),
 ) -> BatchProcessResponse:
-    """Creates and starts a new new batch process"""
+    """Creates a batch process"""
     batch_process_res = ApiDependencies.invoker.services.batch_manager.create_batch_process(batch, graph)
     return batch_process_res
 
@@ -63,6 +63,7 @@ async def create_batch(
 async def start_batch(
     batch_process_id: str = Path(description="ID of Batch to start"),
 ) -> Response:
+    """Executes a batch process"""
     try:
         ApiDependencies.invoker.services.batch_manager.run_batch_process(batch_process_id)
         return Response(status_code=202)
@@ -78,7 +79,7 @@ async def start_batch(
 async def cancel_batch(
     batch_process_id: str = Path(description="The id of the batch process to cancel"),
 ) -> Response:
-    """Creates and starts a new new batch process"""
+    """Cancels a batch process"""
     ApiDependencies.invoker.services.batch_manager.cancel_batch_process(batch_process_id)
     return Response(status_code=202)
 
@@ -89,7 +90,7 @@ async def cancel_batch(
     responses={200: {"model": list[BatchProcessResponse]}},
 )
 async def list_incomplete_batches() -> list[BatchProcessResponse]:
-    """Gets a list of sessions, optionally searching"""
+    """Lists incomplete batch processes"""
     return ApiDependencies.invoker.services.batch_manager.get_incomplete_batch_processes()
 
 
@@ -99,7 +100,7 @@ async def list_incomplete_batches() -> list[BatchProcessResponse]:
     responses={200: {"model": list[BatchProcessResponse]}},
 )
 async def list_batches() -> list[BatchProcessResponse]:
-    """Gets a list of sessions, optionally searching"""
+    """Lists all batch processes"""
     return ApiDependencies.invoker.services.batch_manager.get_batch_processes()
 
 
@@ -123,7 +124,7 @@ async def get_batch(
 async def get_batch_sessions(
     batch_process_id: str = Path(description="The id of the batch process to get"),
 ) -> list[BatchSession]:
-    """Gets a list of BatchSessions Batch Process"""
+    """Gets a list of batch sessions for a given batch process"""
     return ApiDependencies.invoker.services.batch_manager.get_sessions(batch_process_id)
 
 
