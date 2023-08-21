@@ -5,7 +5,7 @@ import { memo } from 'react';
 const TextToImageTabMain = () => {
   return (
     <Box
-      layerStyle={'first'}
+      layerStyle="first"
       sx={{
         position: 'relative',
         width: '100%',

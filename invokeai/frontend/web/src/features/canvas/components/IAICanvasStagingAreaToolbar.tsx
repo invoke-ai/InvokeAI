@@ -129,7 +129,9 @@ const IAICanvasStagingAreaToolbar = () => {
     currentStagingAreaImage?.imageName ?? skipToken
   );
 
-  if (!currentStagingAreaImage) return null;
+  if (!currentStagingAreaImage) {
+    return null;
+  }
 
   return (
     <Flex

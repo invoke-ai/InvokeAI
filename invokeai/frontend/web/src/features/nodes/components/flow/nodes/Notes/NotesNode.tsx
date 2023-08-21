@@ -40,7 +40,7 @@ const NotesNode = (props: NodeProps<NotesNodeData>) => {
         <>
           <Flex
             layerStyle="nodeBody"
-            className={'nopan'}
+            className="nopan"
             sx={{
               cursor: 'auto',
               flexDirection: 'column',

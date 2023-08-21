@@ -42,7 +42,9 @@ const IAICanvasResizer = () => {
 
   useLayoutEffect(() => {
     window.setTimeout(() => {
-      if (!ref.current) return;
+      if (!ref.current) {
+        return;
+      }
 
       const { clientWidth, clientHeight } = ref.current;
 

@@ -35,10 +35,12 @@ export default function UnifiedCanvasColorPicker() {
   const { brushColor, maskColor, layer, isStaging } = useAppSelector(selector);
 
   const currentColorDisplay = () => {
-    if (layer === 'base')
+    if (layer === 'base') {
       return `rgba(${brushColor.r},${brushColor.g},${brushColor.b},${brushColor.a})`;
-    if (layer === 'mask')
+    }
+    if (layer === 'mask') {
       return `rgba(${maskColor.r},${maskColor.g},${maskColor.b},${maskColor.a})`;
+    }
   };
 
   useHotkeys(

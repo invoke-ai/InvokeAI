@@ -40,7 +40,7 @@ const InitialImageDisplay = () => {
 
   return (
     <Flex
-      layerStyle={'first'}
+      layerStyle="first"
       sx={{
         position: 'relative',
         flexDirection: 'column',
@@ -76,14 +76,14 @@ const InitialImageDisplay = () => {
         </Text>
         <Spacer />
         <IAIIconButton
-          tooltip={'Upload Initial Image'}
-          aria-label={'Upload Initial Image'}
+          tooltip="Upload Initial Image"
+          aria-label="Upload Initial Image"
           icon={<FaUpload />}
           {...getUploadButtonProps()}
         />
         <IAIIconButton
-          tooltip={'Reset Initial Image'}
-          aria-label={'Reset Initial Image'}
+          tooltip="Reset Initial Image"
+          aria-label="Reset Initial Image"
           icon={<FaUndo />}
           onClick={handleReset}
           isDisabled={isResetButtonDisabled}

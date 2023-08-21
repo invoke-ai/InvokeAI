@@ -118,7 +118,7 @@ const ParamEmbeddingPopover = (props: Props) => {
             <IAIMantineSearchableSelect
               inputRef={inputRef}
               autoFocus
-              placeholder={'Add Embedding'}
+              placeholder="Add Embedding"
               value={null}
               data={data}
               nothingFound="No matching Embeddings"

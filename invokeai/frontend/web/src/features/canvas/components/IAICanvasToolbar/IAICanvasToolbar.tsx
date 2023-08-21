@@ -167,7 +167,9 @@ const IAICanvasToolbar = () => {
 
   const handleResetCanvasView = (shouldScaleTo1 = false) => {
     const canvasBaseLayer = getCanvasBaseLayer();
-    if (!canvasBaseLayer) return;
+    if (!canvasBaseLayer) {
+      return;
+    }
     const clientRect = canvasBaseLayer.getClientRect({
       skipTransform: true,
     });

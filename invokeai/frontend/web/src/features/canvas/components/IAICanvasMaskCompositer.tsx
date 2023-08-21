@@ -125,7 +125,9 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   }, [offset]);
 
   useEffect(() => {
-    if (fillPatternImage) return;
+    if (fillPatternImage) {
+      return;
+    }
     const image = new Image();
 
     image.onload = () => {
@@ -135,7 +137,9 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   }, [fillPatternImage, maskColorString]);
 
   useEffect(() => {
-    if (!fillPatternImage) return;
+    if (!fillPatternImage) {
+      return;
+    }
     fillPatternImage.src = getColoredSVG(maskColorString);
   }, [fillPatternImage, maskColorString]);
 
@@ -151,8 +155,9 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
     !isNumber(stageScale) ||
     !isNumber(stageDimensions.width) ||
     !isNumber(stageDimensions.height)
-  )
+  ) {
     return null;
+  }
 
   return (
     <Rect

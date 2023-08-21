@@ -34,7 +34,7 @@ const NodeEditor = () => {
       />
       <Panel id="node-editor-content">
         <Flex
-          layerStyle={'first'}
+          layerStyle="first"
           sx={{
             position: 'relative',
             width: 'full',
@@ -82,7 +82,7 @@ const NodeEditor = () => {
                 style={{ position: 'absolute', width: '100%', height: '100%' }}
               >
                 <Flex
-                  layerStyle={'first'}
+                  layerStyle="first"
                   sx={{
                     position: 'relative',
                     width: 'full',

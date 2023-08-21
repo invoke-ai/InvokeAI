@@ -34,7 +34,9 @@ const selector = createSelector(
 const IAICanvasObjectRenderer = () => {
   const { objects } = useAppSelector(selector);
 
-  if (!objects) return null;
+  if (!objects) {
+    return null;
+  }
 
   return (
     <Group name="outpainting-objects" listening={false}>

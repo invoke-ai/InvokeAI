@@ -135,7 +135,9 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
     clip,
   } = useAppSelector(canvasBrushPreviewSelector);
 
-  if (!shouldDrawBrushPreview) return null;
+  if (!shouldDrawBrushPreview) {
+    return null;
+  }
 
   return (
     <Group listening={false} {...clip} {...rest}>

@@ -66,7 +66,7 @@ const BoardAutoAddSelect = () => {
       label="Auto-Add Board"
       inputRef={inputRef}
       autoFocus
-      placeholder={'Select a Board'}
+      placeholder="Select a Board"
       value={autoAddBoardId}
       data={boards}
       nothingFound="No matching Boards"
