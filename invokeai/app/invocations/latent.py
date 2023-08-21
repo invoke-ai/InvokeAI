@@ -723,54 +723,6 @@ class ImageToLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=latents, seed=None)
 
 
-
-@title("Resize Latents")
-@tags("latents", "resize")
-class ResizeLatentsInvocation(BaseInvocation):
-    """Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8."""
-
-    type: Literal["lresize"] = "lresize"
-
-    # Inputs
-    latents: LatentsField = InputField(
-        description=FieldDescriptions.latents,
-        input=Input.Connection,
-    )
-    width: int = InputField(
-        ge=64,
-        multiple_of=8,
-        description=FieldDescriptions.width,
-    )
-    height: int = InputField(
-        ge=64,
-        multiple_of=8,
-        description=FieldDescriptions.width,
-    )
-    mode: LATENTS_INTERPOLATION_MODE = InputField(default="bilinear", description=FieldDescriptions.interp_mode)
-    antialias: bool = InputField(default=False, description=FieldDescriptions.torch_antialias)
-
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
-        latents = context.services.latents.get(self.latents.latents_name)
-
-        # TODO:
-        device = choose_torch_device()
-
-        resized_latents = torch.nn.functional.interpolate(
-            latents.to(device),
-            size=(self.height // 8, self.width // 8),
-            mode=self.mode,
-            antialias=self.antialias if self.mode in ["bilinear", "bicubic"] else False,
-        )
-
-        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        resized_latents = resized_latents.to("cpu")
-        torch.cuda.empty_cache()
-
-        name = f"{context.graph_execution_state_id}__{self.id}"
-        # context.services.latents.set(name, resized_latents)
-        context.services.latents.save(name, resized_latents)
-        return build_latents_output(latents_name=name, latents=resized_latents, seed=self.latents.seed)
-
 @title("Blend Latents")
 @tags("latents", "blend")
 class BlendLatentsInvocation(BaseInvocation):
