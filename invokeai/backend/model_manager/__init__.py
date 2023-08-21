@@ -1,14 +1,16 @@
 """
 Initialization file for invokeai.backend.model_manager.config
 """
-from invokeai.backend.model_manager.config import ( # noqa F401
-    ModelConfigFactory,
-    ModelConfigBase,
-    InvalidModelConfigException,
+from ..model_management.models.base import read_checkpoint_meta # noqa F401
+from .config import (  # noqa F401
     BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelVariantType,
+    InvalidModelConfigException,
+    ModelConfigBase,
+    ModelConfigFactory,
     ModelFormat,
+    ModelType,
+    ModelVariantType,
     SchedulerPredictionType,
+    SubModelType,
 )
+from .model_install import ModelInstall  # noqa F401

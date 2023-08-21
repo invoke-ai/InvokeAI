@@ -50,7 +50,6 @@ class ModelType(str, Enum):
     ControlNet = "controlnet"  # used by model_probe
     TextualInversion = "embedding"
 
-
 class SubModelType(str, Enum):
     """Submodel type."""
 

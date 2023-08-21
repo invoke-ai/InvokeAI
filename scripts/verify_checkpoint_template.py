@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 Read a checkpoint/safetensors file and compare it to a template .json.
+
 Returns True if their metadata match.
 """
 
@@ -26,12 +27,14 @@ checkpoint_metadata = {}
 for key, tensor in ckpt.items():
     checkpoint_metadata[key] = list(tensor.shape)
 
-with open(opt.template, "r") as f:
+with open(opt.template, "r", encoding="utf-8") as f:
     template = json.load(f)
 
-if checkpoint_metadata == template:
-    print("True")
-    sys.exit(0)
-else:
-    print("False")
-    sys.exit(-1)
+for key in template["template"]:
+    val1 = checkpoint_metadata.get(key)
+    val2 = template["template"][key]
+    if val1 != val2:
+        print(f"mismatch: {key}: template={val2} != checkpoint={val1}")
+        sys.exit(-1)
+print("Match")
+sys.exit(0)
