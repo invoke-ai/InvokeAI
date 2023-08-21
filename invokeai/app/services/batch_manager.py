@@ -94,7 +94,7 @@ class BatchManager(BatchManagerBase):
     async def _process(self, event: Event, err: bool) -> None:
         data = event[1]["data"]
         try:
-            batch_session = self.__batch_process_storage.get_session(data["graph_execution_state_id"])
+            batch_session = self.__batch_process_storage.get_session_by_session_id(data["graph_execution_state_id"])
         except BatchSessionNotFoundException:
             return None
         changes = BatchSessionChanges(state="error" if err else "completed")
@@ -130,10 +130,18 @@ class BatchManager(BatchManagerBase):
     def run_batch_process(self, batch_id: str) -> None:
         self.__batch_process_storage.start(batch_id)
         try:
-            created_session = self.__batch_process_storage.get_created_session(batch_id)
+            next_session = self.__batch_process_storage.get_next_session(batch_id)
         except BatchSessionNotFoundException:
             return
-        ges = self.__invoker.services.graph_execution_manager.get(created_session.session_id)
+        batch_process = self.__batch_process_storage.get(batch_id)
+        ges = self._create_batch_session(batch_process=batch_process, batch_indices=tuple(next_session.batch_index))
+        ges.id = next_session.session_id
+        self.__invoker.services.graph_execution_manager.set(ges)
+        self.__batch_process_storage.update_session_state(
+            batch_id=next_session.batch_id,
+            session_id=next_session.session_id,
+            changes=BatchSessionChanges(state="in_progress"),
+        )
         self.__invoker.invoke(ges, invoke_all=True)
 
     def create_batch_process(self, batch: Batch, graph: Graph) -> BatchProcessResponse:
@@ -150,25 +158,20 @@ class BatchManager(BatchManagerBase):
 
     def _create_sessions(self, batch_process: BatchProcess) -> list[BatchSession]:
         batch_indices = list()
-        sessions = list()
+        sessions_to_create: list[BatchSession] = list()
         for batchdata in batch_process.batch.data:
             batch_indices.append(list(range(len(batchdata[0].items))))
         all_batch_indices = product(*batch_indices)
         for bi in all_batch_indices:
             for _ in range(batch_process.batch.runs):
-                ges = self._create_batch_session(batch_process, bi)
-                self.__invoker.services.graph_execution_manager.set(ges)
-                batch_session = BatchSession(batch_id=batch_process.batch_id, session_id=ges.id, state="created")
-                sessions.append(self.__batch_process_storage.create_session(batch_session))
-            if not sessions:
-                ges = GraphExecutionState(graph=batch_process.graph)
-                self.__invoker.services.graph_execution_manager.set(ges)
-                batch_session = BatchSession(batch_id=batch_process.batch_id, session_id=ges.id, state="created")
-                sessions.append(self.__batch_process_storage.create_session(batch_session))
-        return sessions
+                sessions_to_create.append(BatchSession(batch_id=batch_process.batch_id, batch_index=list(bi)))
+            if not sessions_to_create:
+                sessions_to_create.append(BatchSession(batch_id=batch_process.batch_id, batch_index=list(bi)))
+        created_sessions = self.__batch_process_storage.create_sessions(sessions_to_create)
+        return created_sessions
 
     def get_sessions(self, batch_id: str) -> list[BatchSession]:
-        return self.__batch_process_storage.get_sessions(batch_id)
+        return self.__batch_process_storage.get_sessions_by_batch_id(batch_id)
 
     def get_batch(self, batch_id: str) -> BatchProcess:
         return self.__batch_process_storage.get(batch_id)
@@ -177,7 +180,7 @@ class BatchManager(BatchManagerBase):
         bps = self.__batch_process_storage.get_all()
         res = list()
         for bp in bps:
-            sessions = self.__batch_process_storage.get_sessions(bp.batch_id)
+            sessions = self.__batch_process_storage.get_sessions_by_batch_id(bp.batch_id)
             res.append(
                 BatchProcessResponse(
                     batch_id=bp.batch_id,
@@ -190,7 +193,7 @@ class BatchManager(BatchManagerBase):
         bps = self.__batch_process_storage.get_incomplete()
         res = list()
         for bp in bps:
-            sessions = self.__batch_process_storage.get_sessions(bp.batch_id)
+            sessions = self.__batch_process_storage.get_sessions_by_batch_id(bp.batch_id)
             res.append(
                 BatchProcessResponse(
                     batch_id=bp.batch_id,
