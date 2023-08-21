@@ -75,6 +75,20 @@ pytest --cov; open ./coverage/html/index.html
 
     ![html-detail](../assets/contributing/html-detail.png)
 
+### Reloading Changes
+
+Experimenting with changes to the Python source code is a drag if you have to re-start the server —
+and re-load those multi-gigabyte models —
+after every change.
+
+For a faster development workflow, add the `--dev_reload` flag when starting the server.
+The server will watch for changes to all the Python files in the `invokeai` directory and apply those changes to the
+running server on the fly.
+
+This will allow you to avoid restarting the server (and reloading models) in most cases, but there are some caveats; see
+the [jurigged documentation](https://github.com/breuleux/jurigged#caveats) for details.
+
+
 ## Front End
 
 <!--#TODO: get input from blessedcoolant here, for the moment inserted the frontend README via snippets extension.-->

@@ -213,7 +213,7 @@ def invoke_api():
             import jurigged
         except ImportError as e:
             logger.error(
-                "Can't start `--dev_reload` because jurigged is not found; `pip install -e '.[dev]'` to include development dependencies.",
+                'Can\'t start `--dev_reload` because jurigged is not found; `pip install -e ".[dev]"` to include development dependencies.',
                 exc_info=e,
             )
         else:
