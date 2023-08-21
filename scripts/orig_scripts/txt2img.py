@@ -1,4 +1,5 @@
-import argparse, os, sys, glob
+import argparse
+import os
 import torch
 import numpy as np
 from omegaconf import OmegaConf
@@ -7,10 +8,9 @@ from tqdm import tqdm, trange
 from itertools import islice
 from einops import rearrange
 from torchvision.utils import make_grid
-import time
 from pytorch_lightning import seed_everything
 from torch import autocast
-from contextlib import contextmanager, nullcontext
+from contextlib import nullcontext
 
 import k_diffusion as K
 import torch.nn as nn
@@ -251,7 +251,6 @@ def main():
     with torch.no_grad():
         with precision_scope(device.type):
             with model.ema_scope():
-                tic = time.time()
                 all_samples = list()
                 for n in trange(opt.n_iter, desc="Sampling"):
                     for prompts in tqdm(data, desc="data"):
@@ -309,8 +308,6 @@ def main():
                     grid = 255.0 * rearrange(grid, "c h w -> h w c").cpu().numpy()
                     Image.fromarray(grid.astype(np.uint8)).save(os.path.join(outpath, f"grid-{grid_count:04}.png"))
                     grid_count += 1
-
-                toc = time.time()
 
     print(f"Your samples are ready and waiting for you here: \n{outpath} \n" f" \nEnjoy.")
 

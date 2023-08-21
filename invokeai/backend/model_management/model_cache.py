@@ -273,7 +273,7 @@ class ModelCache(object):
                     self.cache.logger.debug(f"Locking {self.key} in {self.cache.execution_device}")
                     self.cache._print_cuda_stats()
 
-                except:
+                except Exception:
                     self.cache_entry.unlock()
                     raise
 

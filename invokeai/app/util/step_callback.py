@@ -5,7 +5,6 @@ from invokeai.app.models.image import ProgressImage
 from ..invocations.baseinvocation import InvocationContext
 from ...backend.util.util import image_to_dataURL
 from ...backend.stable_diffusion import PipelineIntermediateState
-from invokeai.app.services.config import InvokeAIAppConfig
 from ...backend.model_management.models import BaseModelType
 
 

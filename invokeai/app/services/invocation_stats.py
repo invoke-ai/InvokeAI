@@ -1,7 +1,6 @@
 # Copyright 2023 Lincoln D. Stein <lincoln.stein@gmail.com>
-"""Utility to collect execution time and GPU usage stats on invocations in flight"""
+"""Utility to collect execution time and GPU usage stats on invocations in flight
 
-"""
 Usage:
 
 statistics = InvocationStatsService(graph_execution_manager)

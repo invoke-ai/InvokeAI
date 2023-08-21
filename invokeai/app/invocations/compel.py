@@ -12,7 +12,7 @@ from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion impor
     SDXLConditioningInfo,
 )
 
-from ...backend.model_management import ModelPatcher, ModelType
+from ...backend.model_management.models import ModelType
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.model_management.models import ModelNotFoundException
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
@@ -233,7 +233,7 @@ class SDXLPromptInvocationBase:
                 dtype_for_device_getter=torch_dtype,
                 truncate_long_prompts=True,  # TODO:
                 returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,  # TODO: clip skip
-                requires_pooled=True,
+                requires_pooled=get_pooled,
             )
 
             conjunction = Compel.parse_prompt_string(prompt)

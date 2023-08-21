@@ -330,5 +330,5 @@ def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
             config_path = config_path.relative_to(app_config.root_path)
         return str(config_path)
 
-    except:
+    except Exception:
         return None
