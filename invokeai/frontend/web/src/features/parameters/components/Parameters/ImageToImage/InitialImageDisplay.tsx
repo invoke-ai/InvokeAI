@@ -6,7 +6,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { FaUndo, FaUpload } from 'react-icons/fa';
 import InitialImage from './InitialImage';
 import { PostUploadAction } from 'services/api/types';
@@ -95,4 +95,4 @@ const InitialImageDisplay = () => {
   );
 };
 
-export default InitialImageDisplay;
+export default memo(InitialImageDisplay);

@@ -1,4 +1,5 @@
 import { Box, Skeleton } from '@chakra-ui/react';
+import { memo } from 'react';
 
 const IAIFillSkeleton = () => {
   return (
@@ -27,4 +28,4 @@ const IAIFillSkeleton = () => {
   );
 };
 
-export default IAIFillSkeleton;
+export default memo(IAIFillSkeleton);

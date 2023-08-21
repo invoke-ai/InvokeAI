@@ -7,7 +7,7 @@ import {
   isInputFieldValue,
 } from 'features/nodes/types/types';
 import { startCase } from 'lodash-es';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 
 interface Props {
   nodeId: string;
@@ -51,4 +51,4 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
   );
 };
 
-export default FieldTooltipContent;
+export default memo(FieldTooltipContent);

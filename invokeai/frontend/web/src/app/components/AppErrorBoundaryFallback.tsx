@@ -1,7 +1,7 @@
 import { Flex, Heading, Link, Text, useToast } from '@chakra-ui/react';
 import IAIButton from 'common/components/IAIButton';
 import newGithubIssueUrl from 'new-github-issue-url';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { FaCopy, FaExternalLinkAlt } from 'react-icons/fa';
 import { FaArrowRotateLeft } from 'react-icons/fa6';
 import { serializeError } from 'serialize-error';
@@ -94,4 +94,4 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
   );
 };
 
-export default AppErrorBoundaryFallback;
+export default memo(AppErrorBoundaryFallback);

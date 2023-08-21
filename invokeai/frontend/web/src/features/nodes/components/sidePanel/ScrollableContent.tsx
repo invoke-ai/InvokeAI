@@ -1,6 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, memo } from 'react';
 
 const ScrollableContent = (props: PropsWithChildren) => {
   return (
@@ -42,4 +42,4 @@ const ScrollableContent = (props: PropsWithChildren) => {
   );
 };
 
-export default ScrollableContent;
+export default memo(ScrollableContent);

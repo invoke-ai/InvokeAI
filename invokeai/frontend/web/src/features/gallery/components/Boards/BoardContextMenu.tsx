@@ -23,71 +23,72 @@ type Props = {
   setBoardToDelete?: (board?: BoardDTO) => void;
 };
 
-const BoardContextMenu = memo(
-  ({ board, board_id, setBoardToDelete, children }: Props) => {
-    const dispatch = useAppDispatch();
+const BoardContextMenu = ({
+  board,
+  board_id,
+  setBoardToDelete,
+  children,
+}: Props) => {
+  const dispatch = useAppDispatch();
 
-    const selector = useMemo(
-      () =>
-        createSelector(stateSelector, ({ gallery, system }) => {
-          const isAutoAdd = gallery.autoAddBoardId === board_id;
-          const isProcessing = system.isProcessing;
-          const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
-          return { isAutoAdd, isProcessing, autoAssignBoardOnClick };
-        }),
-      [board_id]
-    );
+  const selector = useMemo(
+    () =>
+      createSelector(stateSelector, ({ gallery, system }) => {
+        const isAutoAdd = gallery.autoAddBoardId === board_id;
+        const isProcessing = system.isProcessing;
+        const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
+        return { isAutoAdd, isProcessing, autoAssignBoardOnClick };
+      }),
+    [board_id]
+  );
 
-    const { isAutoAdd, isProcessing, autoAssignBoardOnClick } =
-      useAppSelector(selector);
-    const boardName = useBoardName(board_id);
+  const { isAutoAdd, isProcessing, autoAssignBoardOnClick } =
+    useAppSelector(selector);
+  const boardName = useBoardName(board_id);
 
-    const handleSetAutoAdd = useCallback(() => {
-      dispatch(autoAddBoardIdChanged(board_id));
-    }, [board_id, dispatch]);
+  const handleSetAutoAdd = useCallback(() => {
+    dispatch(autoAddBoardIdChanged(board_id));
+  }, [board_id, dispatch]);
 
-    const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
-      e.preventDefault();
-    }, []);
+  const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  }, []);
 
-    return (
-      <IAIContextMenu<HTMLDivElement>
-        menuProps={{ size: 'sm', isLazy: true }}
-        menuButtonProps={{
-          bg: 'transparent',
-          _hover: { bg: 'transparent' },
-        }}
-        renderMenu={() => (
-          <MenuList
-            sx={{ visibility: 'visible !important' }}
-            motionProps={menuListMotionProps}
-            onContextMenu={skipEvent}
-          >
-            <MenuGroup title={boardName}>
-              <MenuItem
-                icon={<FaPlus />}
-                isDisabled={isAutoAdd || isProcessing || autoAssignBoardOnClick}
-                onClick={handleSetAutoAdd}
-              >
-                Auto-add to this Board
-              </MenuItem>
-              {!board && <NoBoardContextMenuItems />}
-              {board && (
-                <GalleryBoardContextMenuItems
-                  board={board}
-                  setBoardToDelete={setBoardToDelete}
-                />
-              )}
-            </MenuGroup>
-          </MenuList>
-        )}
-      >
-        {children}
-      </IAIContextMenu>
-    );
-  }
-);
+  return (
+    <IAIContextMenu<HTMLDivElement>
+      menuProps={{ size: 'sm', isLazy: true }}
+      menuButtonProps={{
+        bg: 'transparent',
+        _hover: { bg: 'transparent' },
+      }}
+      renderMenu={() => (
+        <MenuList
+          sx={{ visibility: 'visible !important' }}
+          motionProps={menuListMotionProps}
+          onContextMenu={skipEvent}
+        >
+          <MenuGroup title={boardName}>
+            <MenuItem
+              icon={<FaPlus />}
+              isDisabled={isAutoAdd || isProcessing || autoAssignBoardOnClick}
+              onClick={handleSetAutoAdd}
+            >
+              Auto-add to this Board
+            </MenuItem>
+            {!board && <NoBoardContextMenuItems />}
+            {board && (
+              <GalleryBoardContextMenuItems
+                board={board}
+                setBoardToDelete={setBoardToDelete}
+              />
+            )}
+          </MenuGroup>
+        </MenuList>
+      )}
+    >
+      {children}
+    </IAIContextMenu>
+  );
+};
 
-BoardContextMenu.displayName = 'HoverableBoard';
-
-export default BoardContextMenu;
+export default memo(BoardContextMenu);

@@ -13,7 +13,7 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { isEqual } from 'lodash-es';
 
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -207,4 +207,4 @@ const IAICanvasStagingAreaToolbar = () => {
   );
 };
 
-export default IAICanvasStagingAreaToolbar;
+export default memo(IAICanvasStagingAreaToolbar);

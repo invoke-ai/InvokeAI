@@ -139,7 +139,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   );
 };
 
-export default InputField;
+export default memo(InputField);
 
 type InputFieldWrapperProps = PropsWithChildren<{
   shouldDim: boolean;

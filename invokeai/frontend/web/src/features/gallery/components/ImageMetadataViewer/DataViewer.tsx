@@ -1,7 +1,7 @@
 import { Box, Flex, IconButton, Tooltip } from '@chakra-ui/react';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { FaCopy, FaSave } from 'react-icons/fa';
 
 type Props = {
@@ -93,4 +93,4 @@ const DataViewer = (props: Props) => {
   );
 };
 
-export default DataViewer;
+export default memo(DataViewer);

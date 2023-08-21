@@ -12,6 +12,7 @@ import {
   isCanvasFillRect,
 } from '../store/canvasTypes';
 import IAICanvasImage from './IAICanvasImage';
+import { memo } from 'react';
 
 const selector = createSelector(
   [canvasSelector],
@@ -101,4 +102,4 @@ const IAICanvasObjectRenderer = () => {
   );
 };
 
-export default IAICanvasObjectRenderer;
+export default memo(IAICanvasObjectRenderer);

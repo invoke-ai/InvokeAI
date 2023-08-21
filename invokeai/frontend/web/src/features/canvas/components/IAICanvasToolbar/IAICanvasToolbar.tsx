@@ -48,6 +48,7 @@ import IAICanvasRedoButton from './IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
+import { memo } from 'react';
 
 export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
@@ -309,4 +310,4 @@ const IAICanvasToolbar = () => {
   );
 };
 
-export default IAICanvasToolbar;
+export default memo(IAICanvasToolbar);

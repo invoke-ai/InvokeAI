@@ -1,5 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImage/CurrentImageDisplay';
+import { memo } from 'react';
 
 const TextToImageTabMain = () => {
   return (
@@ -25,4 +26,4 @@ const TextToImageTabMain = () => {
   );
 };
 
-export default TextToImageTabMain;
+export default memo(TextToImageTabMain);

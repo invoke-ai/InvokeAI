@@ -1,5 +1,5 @@
 import IAIIconButton from 'common/components/IAIIconButton';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
 
@@ -24,4 +24,4 @@ const AddBoardButton = () => {
   );
 };
 
-export default AddBoardButton;
+export default memo(AddBoardButton);

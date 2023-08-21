@@ -7,7 +7,7 @@ import { Rect } from 'react-konva';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import Konva from 'konva';
 import { isNumber } from 'lodash-es';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 export const canvasMaskCompositerSelector = createSelector(
   canvasSelector,
@@ -172,4 +172,4 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   );
 };
 
-export default IAICanvasMaskCompositer;
+export default memo(IAICanvasMaskCompositer);
