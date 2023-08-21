@@ -6,7 +6,7 @@ from fastapi import Body, HTTPException, Path, Query, Response
 from fastapi.routing import APIRouter
 from pydantic.fields import Field
 
-from invokeai.app.services.batch_manager_storage import BatchProcess, BatchSession, BatchSessionNotFoundException
+from invokeai.app.services.batch_manager_storage import BatchSession, BatchSessionNotFoundException
 
 # Importing * is bad karma but needed here for node detection
 from ...invocations import *  # noqa: F401 F403
@@ -106,11 +106,11 @@ async def list_batches() -> list[BatchProcessResponse]:
 @session_router.get(
     "/batch/{batch_process_id}",
     operation_id="get_batch",
-    responses={200: {"model": BatchProcess}},
+    responses={200: {"model": BatchProcessResponse}},
 )
 async def get_batch(
     batch_process_id: str = Path(description="The id of the batch process to get"),
-) -> BatchProcess:
+) -> BatchProcessResponse:
     """Gets a Batch Process"""
     return ApiDependencies.invoker.services.batch_manager.get_batch(batch_process_id)
 
