@@ -133,6 +133,7 @@
         "generalHotkeys": "General Hotkeys",
         "galleryHotkeys": "Gallery Hotkeys",
         "unifiedCanvasHotkeys": "Unified Canvas Hotkeys",
+        "nodesHotkeys": "Nodes Hotkeys",
         "invoke": {
             "title": "Invoke",
             "desc": "Generate an image"
@@ -332,6 +333,10 @@
         "acceptStagingImage": {
             "title": "Accept Staging Image",
             "desc": "Accept Current Staging Area Image"
+        },
+        "addNodes": {
+            "title": "Add Nodes",
+            "desc": "Opens the add node menu"
         }
     },
     "modelManager": {

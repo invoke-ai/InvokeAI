@@ -2,6 +2,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import { addNodePopoverOpened } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { Panel } from 'reactflow';
 
 const TopLeftPanel = () => {
@@ -10,6 +11,10 @@ const TopLeftPanel = () => {
   const handleOpenAddNodePopover = useCallback(() => {
     dispatch(addNodePopoverOpened());
   }, [dispatch]);
+
+  useHotkeys(['shift+a'], () => {
+    handleOpenAddNodePopover();
+  });
 
   return (
     <Panel position="top-left">
