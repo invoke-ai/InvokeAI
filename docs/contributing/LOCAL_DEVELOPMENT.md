@@ -35,18 +35,17 @@ access.
 
 ## Backend
 
-The backend is contained within the `./invokeai/backend` folder structure. To
-get started however please install the development dependencies.
+The backend is contained within the `./invokeai/backend` and `./invokeai/app` directories.
+To get started please install the development dependencies.
 
 From the root of the repository run the following command. Note the use of `"`.
 
 ```zsh
-pip install ".[test]"
+pip install ".[dev,test]"
 ```
 
-This in an optional group of packages which is defined within the
-`pyproject.toml` and will be required for testing the changes you make the the
-code.
+These are optional groups of packages which are defined within the `pyproject.toml`
+and will be required for testing the changes you make to the code.
 
 ### Running Tests
 
