@@ -1,6 +1,6 @@
 # Contributing Nodes
 
-To learn about creating a new node, please visit our [Node creation documenation](../contributing/INVOCATIONS.md). 
+To learn about the specifics of creating a new node, please visit our [Node creation documentation](../contributing/INVOCATIONS.md). 
 
 Once you’ve created a node and confirmed that it behaves as expected locally, follow these steps: 
 

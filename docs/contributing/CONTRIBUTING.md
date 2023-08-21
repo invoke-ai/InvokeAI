@@ -15,7 +15,7 @@ To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the 
 If you’d like to help with development, please see our [development guide](contribution_guides/development.md). If you’re unfamiliar with contributing to open source projects, there is a tutorial contained within the development guide.
 
 #### Nodes
-If you’d like to help with development, please see our [nodes contribution guide](INVOCATIONS.md). If you’re unfamiliar with contributing to open source projects, there is a tutorial contained within the development guide.
+If you’d like to help with development, please see our [nodes contribution guide](/nodes/contributingNodes). If you’re unfamiliar with contributing to open source projects, there is a tutorial contained within the development guide.
 
 #### Documentation
 If you’d like to help with documentation, please see our [documentation guide](contribution_guides/documenation.md).
