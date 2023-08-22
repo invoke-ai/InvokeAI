@@ -9,27 +9,9 @@ from pydantic import BaseModel, validator
 
 
 from invokeai.app.invocations.primitives import StringCollectionOutput, StringOutput
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, InputField, InvocationContext, UIComponent, UIType, tags, title
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, InputField, OutputField, InvocationContext, UIComponent, UIType, tags, title
 
 from .model import MainModelField, VAEModelField
-
-class PromptOutput(BaseInvocationOutput):
-    """Base class for invocations that output a prompt"""
-
-    # fmt: off
-    type: Literal["prompt"] = "prompt"
-
-    prompt: str = Field(default=None, description="The output prompt")
-    # fmt: on
-
-    class Config:
-        schema_extra = {
-            "required": [
-                "type",
-                "prompt",
-            ]
-        }
-
 
 @title("Dynamic Prompt")
 @tags("prompt", "collection")
@@ -108,38 +90,23 @@ class PromptsFromFileInvocation(BaseInvocation):
 
 class PromptsToFileInvocationOutput(BaseInvocationOutput):
     """Base class for invocation that writes to a file and returns nothing of use"""
-    #fmt: off
+
     type: Literal["prompt_to_file_output"] = "prompt_to_file_output"
-    #fmt: on
 
-    class Config:
-        schema_extra = {
-            'required': [
-                'type'
-            ]
-        }
 
+@title("Prompts To File")
+@tags("prompt", "file")
 class PromptsToFileInvocation(BaseInvocation):
     '''Save prompts to a text file'''
     # fmt: off
     type: Literal['prompt_to_file'] = 'prompt_to_file'
 
     # Inputs
-    file_path: str = Field(description="Path to prompt text file")
-    prompts: Union[str, list[str], None] = Field(default=None, description="Prompt or collection of prompts to write")
-    append: bool = Field(default=True, description="Append or overwrite file")
+    file_path: str = InputField(description="Path to prompt text file")
+    prompts: Union[str, list[str], None] = InputField(default=None, description="Prompt or collection of prompts to write", ui_type=UIType.String)
+    append: bool = InputField(default=True, description="Append or overwrite file")
     #fmt: on
 
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "title": "Prompts To File",
-                "tags": ["prompt", "file"],
-                "type_hints": {
-                    "prompts": "string",
-                }
-            },
-        }
         
     def invoke(self, context: InvocationContext) -> PromptsToFileInvocationOutput:
         if self.append:
@@ -160,29 +127,21 @@ class PromptsToFileInvocation(BaseInvocation):
 class PromptPosNegOutput(BaseInvocationOutput):
     """Base class for invocations that output a posirtive and negative prompt"""
 
-    # fmt: off
     type: Literal["prompt_pos_neg_output"] = "prompt_pos_neg_output"
 
-    positive_prompt: str = Field(description="Positive prompt")
-    negative_prompt: str = Field(description="Negative prompt")
-    # fmt: on
+    # Outputs
+    positive_prompt: str = OutputField(description="Positive prompt")
+    negative_prompt: str = OutputField(description="Negative prompt")
 
-    class Config:
-        schema_extra = {"required": ["type", "positive_prompt", "negative_prompt"]}
-
+@title("Prompt Spilt Negative")
+@tags("prompt", "split", "negative")
 class PromptSplitNegInvocation(BaseInvocation):
     """Splits prompt into two prompts, inside [] goes into negative prompt everthing else goes into positive prompt. Each [ and ] character is replaced with a space"""
 
     type: Literal["prompt_split_neg"] = "prompt_split_neg"
-    prompt: str = Field(default='', description="Prompt to split")
 
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "title": "Prompt Spilt Negative",
-                "tags": ["prompt", "split", "negative"]
-            },
-        }
+    # Inputs
+    prompt: str = InputField(default='', description="Prompt to split")
 
     def invoke(self, context: InvocationContext) -> PromptPosNegOutput:
         p_prompt = ""
@@ -209,45 +168,53 @@ class PromptSplitNegInvocation(BaseInvocation):
                 escaped = False
 
         return PromptPosNegOutput(positive_prompt=p_prompt, negative_prompt=n_prompt)
+    
 
-
+@title("Prompt Join")
+@tags("prompt", "join")
 class PromptJoinInvocation(BaseInvocation):
-    """Joins prompt a to prompt b"""
+    """Joins prompt left to prompt right"""
 
     type: Literal["prompt_join"] = "prompt_join"
-    prompt_a: str = Field(default='', description="Prompt a - (Left)")
-    prompt_b: str = Field(default='', description="Prompt b - (Right)")
 
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "title": "Prompt Join",
-                "tags": ["prompt", "join"]
-            },
-        }
+    # Inputs
+    prompt_left: str = InputField(default='', description="Prompt Left", ui_component=UIComponent.Textarea)
+    prompt_right: str = InputField(default='', description="Prompt Right", ui_component=UIComponent.Textarea)
 
-    def invoke(self, context: InvocationContext) -> PromptOutput:
-        return PromptOutput(prompt=((self.prompt_a or '') + (self.prompt_b or '')))  
+    def invoke(self, context: InvocationContext) -> StringOutput:
+        return StringOutput(prompt=((self.prompt_left or '') + (self.prompt_right or '')))  
 
 
+@title("Prompt Join Three")
+@tags("prompt", "join")
+class PromptJoinInvocation(BaseInvocation):
+    """Joins prompt left to prompt middle to prompt right"""
+
+    type: Literal["prompt_join_three"] = "prompt_join_three"
+
+    # Inputs
+    prompt_left: str = InputField(default='', description="Prompt Left", ui_component=UIComponent.Textarea)
+    prompt_middle: str = InputField(default='', description="Prompt Middle)", ui_component=UIComponent.Textarea)
+    prompt_right: str = InputField(default='', description="Prompt Right", ui_component=UIComponent.Textarea)
+
+    def invoke(self, context: InvocationContext) -> StringOutput:
+        return StringOutput(prompt=((self.prompt_left or '') + (self.prompt_middle or '') + (self.prompt_right or '')))  
+
+
+@title("Prompt Replace")
+@tags("prompt", "replace", "regex")
 class PromptReplaceInvocation(BaseInvocation):
     """Replaces the search string with the replace string in the prompt"""
 
     type: Literal["prompt_replace"] = "prompt_replace"
-    prompt: str = Field(default='', description="Prompt to work on")
-    search_string : str = Field(default='', description="String to search for")
-    replace_string : str = Field(default='', description="String to replace the search")
-    use_regex: bool = Field(default=False, description="Use search string as a regex expression (non regex is case insensitive)")
 
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "title": "Prompt Replace",
-                "tags": ["prompt", "replace", "regex"]
-            },
-        }
+    # Inputs
+    prompt: str = InputField(default='', description="Prompt to work on", ui_component=UIComponent.Textarea)
+    search_string : str = InputField(default='', description="String to search for", ui_component=UIComponent.Textarea)
+    replace_string : str = InputField(default='', description="String to replace the search", ui_component=UIComponent.Textarea)
+    use_regex: bool = InputField(default=False, description="Use search string as a regex expression (non regex is case insensitive)")
 
-    def invoke(self, context: InvocationContext) -> PromptOutput:
+    def invoke(self, context: InvocationContext) -> StringOutput:
         pattern = (self.search_string or '')
         new_prompt = (self.prompt or '')
         if len(pattern) > 0: 
@@ -255,57 +222,47 @@ class PromptReplaceInvocation(BaseInvocation):
                 #None regex so make case insensitve 
                 pattern = "(?i)" + re.escape(pattern)
             new_prompt = re.sub(pattern, (self.replace_string or ''), new_prompt)
-        return PromptOutput(prompt=new_prompt)  
-    
-    class PTFields(BaseModel):
+        return StringOutput(prompt=new_prompt)  
+
+
+class PTFields:
     """Prompt Tools Fields for an image generated in InvokeAI."""
-    positive_prompt: str = Field(default='', description="The positive prompt parameter")
-    positive_style_prompt: str = Field(default='', description="The positive style prompt parameter")
-    negative_prompt: str = Field(default='', description="The negative prompt parameter")
-    negative_style_prompt: str = Field(default='', description="The negative prompt parameter")
-    width: int = Field(default=512, description="The width parameter")
-    height: int = Field(default=512, description="The height parameter")
-    seed: int = Field(default=0, description="The seed used for noise generation")
-    cfg_scale: float = Field(default=7.0, description="The classifier-free guidance scale parameter")
-    steps: int = Field(default=10, description="The number of steps used for inference")
-#     class Config:
-#         schema_extra = {
-#             "required": ["positive_prompt", "positive_style_prompt", "negative_prompt"],
-#             "ui": {
-#                 "type_hints": {
-# #                    "model": "model",
-# #                    "vae": "vae_model",
-#                     },
-#                 },
-#             }
+    positive_prompt: str
+    positive_style_prompt: str
+    negative_prompt: str
+    negative_style_prompt: str
+    width: int
+    height: int
+    seed: int
+    cfg_scale: float
+    steps: int
+
 
 class PTFieldsCollectOutput(BaseInvocationOutput):
     """PTFieldsCollect Output"""
     type: Literal["pt_fields_collect_output"] = "pt_fields_collect_output"
 
-    pt_fields: str = Field(description="PTFields in Json Format")
+    # Outputs
+    pt_fields: str = OutputField(description="PTFields in Json Format")
 
+
+@title("PTFields Collect")
+@tags("prompt", "file")
 class PTFieldsCollectInvocation(BaseInvocation):
     """Prompt Tools Fields for an image generated in InvokeAI."""
     type: Literal["pt_fields_collect"] = "pt_fields_collect"
 
-    positive_prompt: str = Field(default='', description="The positive prompt parameter")
-    positive_style_prompt: str = Field(default='', description="The positive style prompt parameter")
-    negative_prompt: str = Field(default='', description="The negative prompt parameter")
-    negative_style_prompt: str = Field(default='', description="The negative prompt parameter")
-    width: int = Field(default=512, description="The width parameter")
-    height: int = Field(default=512, description="The height parameter")
-    seed: int = Field(default=0, description="The seed used for noise generation")
-    cfg_scale: float = Field(default=7.0, description="The classifier-free guidance scale parameter")
-    steps: int = Field(default=10, description="The number of steps used for inference")
+    # Inputs
+    positive_prompt: str = InputField(default='', description="The positive prompt parameter")
+    positive_style_prompt: str = InputField(default='', description="The positive style prompt parameter")
+    negative_prompt: str = InputField(default='', description="The negative prompt parameter")
+    negative_style_prompt: str = InputField(default='', description="The negative prompt parameter")
+    width: int = InputField(default=512, description="The width parameter")
+    height: int = InputField(default=512, description="The height parameter")
+    seed: int = InputField(default=0, description="The seed used for noise generation")
+    cfg_scale: float = InputField(default=7.0, description="The classifier-free guidance scale parameter")
+    steps: int = InputField(default=10, description="The number of steps used for inference")
 
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "title": "PTFields Collect",
-                "tags": ["prompt", "file"],
-            },
-        }
        
     def invoke(self, context: InvocationContext) -> PTFieldsCollectOutput:
         x:str = str(json.dumps(
@@ -329,40 +286,26 @@ class PTFieldsExpandOutput(BaseInvocationOutput):
     """Prompt Tools Fields for an image generated in InvokeAI."""
     type: Literal["pt_fields_expand_output"] = "pt_fields_expand_output"    
 
-    positive_prompt: str = Field(description="The positive prompt parameter")
-    positive_style_prompt: str = Field(description="The positive style prompt parameter")
-    negative_prompt: str = Field(description="The negative prompt parameter")
-    negative_style_prompt: str = Field(description="The negative prompt parameter")
-    width: int = Field(description="The width parameter")
-    height: int = Field(description="The height parameter")
-    seed: int = Field(description="The seed used for noise generation")
-    cfg_scale: float = Field(description="The classifier-free guidance scale parameter")
-    steps: int = Field(description="The number of steps used for inference")
-
-    class Config:
-        schema_extra = {
-            'required': ['type'],
-            "ui": {
-                "type_hints": {
-                    },
-                },
-            }
+    # Outputs
+    positive_prompt: str = OutputField(description="The positive prompt parameter")
+    positive_style_prompt: str = OutputField(description="The positive style prompt parameter")
+    negative_prompt: str = OutputField(description="The negative prompt parameter")
+    negative_style_prompt: str = OutputField(description="The negative prompt parameter")
+    width: int = OutputField(description="The width parameter")
+    height: int = OutputField(description="The height parameter")
+    seed: int = OutputField(description="The seed used for noise generation")
+    cfg_scale: float = OutputField(description="The classifier-free guidance scale parameter")
+    steps: int = OutputField(description="The number of steps used for inference")
         
+@title("PTFields Expand")
+@tags("prompt", "file")
 class PTFieldsExpandInvocation(BaseInvocation):
     '''Save Expand PTFields into individual items'''
     type: Literal['pt_fields_expand'] = 'pt_fields_expand'
-    pt_fields: str = Field(default=None, description="PTFields in Json Format")
 
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "title": "PTFields Expand",
-                "tags": ["prompt", "file"],
-                "type_hints": {
-                    "pt_fields": "string",
-                }
-            },
-        }
+    # Inputs
+    pt_fields: str = InputField(default=None, description="PTFields in json Format")
+
        
     def invoke(self, context: InvocationContext) -> PTFieldsExpandOutput:
         fields = json.loads(self.pt_fields)
