@@ -499,7 +499,7 @@ class BaseInvocation(ABC, BaseModel):
                     raise MissingInputException(self.__fields__["type"].default, field_name)
         return self.invoke(context)
 
-    id: str = InputField(description="The id of this node. Must be unique among all nodes.")
+    id: str = Field(description="The id of this node. Must be unique among all nodes.")
     is_intermediate: bool = InputField(
         default=False, description="Whether or not this node is an intermediate node.", input=Input.Direct
     )
