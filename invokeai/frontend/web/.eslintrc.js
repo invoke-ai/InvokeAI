@@ -9,8 +9,8 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'plugin:react/recommended',
     'plugin:react-hooks/recommended',
-    'plugin:prettier/recommended',
     'plugin:react/jsx-runtime',
+    'prettier',
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
@@ -39,7 +39,6 @@ module.exports = {
       'warn',
       { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
     ],
-    'prettier/prettier': ['error', { endOfLine: 'auto' }],
     '@typescript-eslint/ban-ts-comment': 'warn',
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-empty-interface': [
