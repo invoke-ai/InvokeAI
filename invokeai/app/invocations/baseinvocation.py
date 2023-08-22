@@ -71,6 +71,9 @@ class FieldDescriptions:
     safe_mode = "Whether or not to use safe mode"
     scribble_mode = "Whether or not to use scribble mode"
     scale_factor = "The factor by which to scale"
+    blend_alpha = (
+        "Blending factor. 0.0 = use input A only, 1.0 = use input B only, 0.5 = 50% mix of input A and input B."
+    )
     num_1 = "The first number"
     num_2 = "The second number"
     mask = "The mask to use for the operation"
