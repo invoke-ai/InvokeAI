@@ -1,4 +1,3 @@
-import json
 from abc import ABC, abstractmethod
 from logging import Logger
 from typing import TYPE_CHECKING, Optional
@@ -289,9 +288,10 @@ class ImageService(ImageServiceABC):
     def get_metadata(self, image_name: str) -> Optional[ImageMetadata]:
         try:
             image_record = self._services.image_records.get(image_name)
+            metadata = self._services.image_records.get_metadata(image_name)
 
             if not image_record.session_id:
-                return ImageMetadata()
+                return ImageMetadata(metadata=metadata)
 
             session_raw = self._services.graph_execution_manager.get_raw(image_record.session_id)
             graph = None
@@ -303,7 +303,6 @@ class ImageService(ImageServiceABC):
                     self._services.logger.warn(f"Failed to parse session graph: {e}")
                     graph = None
 
-            metadata = self._services.image_records.get_metadata(image_name)
             return ImageMetadata(graph=graph, metadata=metadata)
         except ImageRecordNotFoundException:
             self._services.logger.error("Image record not found")
@@ -379,10 +378,10 @@ class ImageService(ImageServiceABC):
             self._services.image_files.delete(image_name)
             self._services.image_records.delete(image_name)
         except ImageRecordDeleteException:
-            self._services.logger.error(f"Failed to delete image record")
+            self._services.logger.error("Failed to delete image record")
             raise
         except ImageFileDeleteException:
-            self._services.logger.error(f"Failed to delete image file")
+            self._services.logger.error("Failed to delete image file")
             raise
         except Exception as e:
             self._services.logger.error("Problem deleting image record and file")
@@ -395,10 +394,10 @@ class ImageService(ImageServiceABC):
                 self._services.image_files.delete(image_name)
             self._services.image_records.delete_many(image_names)
         except ImageRecordDeleteException:
-            self._services.logger.error(f"Failed to delete image records")
+            self._services.logger.error("Failed to delete image records")
             raise
         except ImageFileDeleteException:
-            self._services.logger.error(f"Failed to delete image files")
+            self._services.logger.error("Failed to delete image files")
             raise
         except Exception as e:
             self._services.logger.error("Problem deleting image records and files")
@@ -412,10 +411,10 @@ class ImageService(ImageServiceABC):
                 self._services.image_files.delete(image_name)
             return count
         except ImageRecordDeleteException:
-            self._services.logger.error(f"Failed to delete image records")
+            self._services.logger.error("Failed to delete image records")
             raise
         except ImageFileDeleteException:
-            self._services.logger.error(f"Failed to delete image files")
+            self._services.logger.error("Failed to delete image files")
             raise
         except Exception as e:
             self._services.logger.error("Problem deleting image records and files")

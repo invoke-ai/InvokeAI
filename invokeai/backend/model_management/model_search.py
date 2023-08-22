@@ -56,7 +56,7 @@ class ModelSearch(ABC):
         self.on_search_completed()
 
     def walk_directory(self, path: Path):
-        for root, dirs, files in os.walk(path):
+        for root, dirs, files in os.walk(path, followlinks=True):
             if str(Path(root).name).startswith("."):
                 self._pruned_paths.add(root)
             if any([Path(root).is_relative_to(x) for x in self._pruned_paths]):

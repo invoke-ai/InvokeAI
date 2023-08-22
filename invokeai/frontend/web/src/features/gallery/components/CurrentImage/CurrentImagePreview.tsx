@@ -1,14 +1,14 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'features/dnd/types';
 import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -32,7 +32,7 @@ export const imagesSelector = createSelector(
     return {
       shouldShowImageDetails,
       shouldHidePreview,
-      imageName: lastSelectedImage,
+      imageName: lastSelectedImage?.image_name,
       progressImage,
       shouldShowProgressInViewer,
       shouldAntialiasProgressImage,
@@ -57,8 +57,6 @@ const CurrentImagePreview = () => {
   const {
     handlePrevImage,
     handleNextImage,
-    prevImageId,
-    nextImageId,
     isOnLastImage,
     handleLoadMoreImages,
     areMoreImagesAvailable,
@@ -70,7 +68,7 @@ const CurrentImagePreview = () => {
     () => {
       handlePrevImage();
     },
-    [prevImageId]
+    [handlePrevImage]
   );
 
   useHotkeys(
@@ -85,11 +83,11 @@ const CurrentImagePreview = () => {
       }
     },
     [
-      nextImageId,
       isOnLastImage,
       areMoreImagesAvailable,
       handleLoadMoreImages,
       isFetching,
+      handleNextImage,
     ]
   );
 

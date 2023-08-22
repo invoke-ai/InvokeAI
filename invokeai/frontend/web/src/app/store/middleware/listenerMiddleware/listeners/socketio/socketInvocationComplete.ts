@@ -7,17 +7,19 @@ import {
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import { CANVAS_OUTPUT } from 'features/nodes/util/graphBuilders/constants';
 import { progressImageSet } from 'features/system/store/systemSlice';
-import { imagesAdapter, imagesApi } from 'services/api/endpoints/images';
+import { imagesApi } from 'services/api/endpoints/images';
 import { isImageOutput } from 'services/api/guards';
 import { sessionCanceled } from 'services/api/thunks/session';
+import { imagesAdapter } from 'services/api/util';
 import {
   appSocketInvocationComplete,
   socketInvocationComplete,
 } from 'services/events/actions';
 import { startAppListening } from '../..';
 
-const nodeDenylist = ['dataURL_image'];
+const nodeDenylist = ['load_image'];
 
 export const addInvocationCompleteEventListener = () => {
   startAppListening({
@@ -51,7 +53,9 @@ export const addInvocationCompleteEventListener = () => {
 
         // Add canvas images to the staging area
         if (
-          graph_execution_state_id === canvas.layerState.stagingArea.sessionId
+          graph_execution_state_id ===
+            canvas.layerState.stagingArea.sessionId &&
+          [CANVAS_OUTPUT].includes(data.source_node_id)
         ) {
           dispatch(addImageToStagingArea(imageDTO));
         }
@@ -67,7 +71,7 @@ export const addInvocationCompleteEventListener = () => {
            */
 
           const { autoAddBoardId } = gallery;
-          if (autoAddBoardId) {
+          if (autoAddBoardId && autoAddBoardId !== 'none') {
             dispatch(
               imagesApi.endpoints.addImageToBoard.initiate({
                 board_id: autoAddBoardId,
@@ -83,10 +87,7 @@ export const addInvocationCompleteEventListener = () => {
                   categories: IMAGE_CATEGORIES,
                 },
                 (draft) => {
-                  const oldTotal = draft.total;
-                  const newState = imagesAdapter.addOne(draft, imageDTO);
-                  const delta = newState.total - oldTotal;
-                  draft.total = draft.total + delta;
+                  imagesAdapter.addOne(draft, imageDTO);
                 }
               )
             );
@@ -94,8 +95,8 @@ export const addInvocationCompleteEventListener = () => {
 
           dispatch(
             imagesApi.util.invalidateTags([
-              { type: 'BoardImagesTotal', id: autoAddBoardId ?? 'none' },
-              { type: 'BoardAssetsTotal', id: autoAddBoardId ?? 'none' },
+              { type: 'BoardImagesTotal', id: autoAddBoardId },
+              { type: 'BoardAssetsTotal', id: autoAddBoardId },
             ])
           );
 
@@ -110,7 +111,7 @@ export const addInvocationCompleteEventListener = () => {
             } else if (!autoAddBoardId) {
               dispatch(galleryViewChanged('images'));
             }
-            dispatch(imageSelected(imageDTO.image_name));
+            dispatch(imageSelected(imageDTO));
           }
         }
 

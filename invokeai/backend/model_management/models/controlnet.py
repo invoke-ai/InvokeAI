@@ -17,6 +17,7 @@ from .base import (
     ModelNotFoundException,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
+import invokeai.backend.util.logging as logger
 
 
 class ControlNetModelFormat(str, Enum):
@@ -42,7 +43,7 @@ class ControlNetModel(ModelBase):
         try:
             config = EmptyConfigLoader.load_config(self.model_path, config_name="config.json")
             # config = json.loads(os.path.join(self.model_path, "config.json"))
-        except:
+        except Exception:
             raise Exception("Invalid controlnet model! (config.json not found or invalid)")
 
         model_class_name = config.get("_class_name", None)
@@ -52,7 +53,7 @@ class ControlNetModel(ModelBase):
         try:
             self.model_class = self._hf_definition_to_type(["diffusers", model_class_name])
             self.model_size = calc_model_size_by_fs(self.model_path)
-        except:
+        except Exception:
             raise Exception("Invalid ControlNet model!")
 
     def get_size(self, child_type: Optional[SubModelType] = None):
@@ -66,7 +67,7 @@ class ControlNetModel(ModelBase):
         child_type: Optional[SubModelType] = None,
     ):
         if child_type is not None:
-            raise Exception("There is no child models in controlnet model")
+            raise Exception("There are no child models in controlnet model")
 
         model = None
         for variant in ["fp16", None]:
@@ -77,7 +78,7 @@ class ControlNetModel(ModelBase):
                     variant=variant,
                 )
                 break
-            except:
+            except Exception:
                 pass
         if not model:
             raise ModelNotFoundException()
@@ -124,9 +125,7 @@ class ControlNetModel(ModelBase):
             return model_path
 
 
-@classmethod
 def _convert_controlnet_ckpt_and_cache(
-    cls,
     model_path: str,
     output_path: str,
     base_model: BaseModelType,
@@ -141,6 +140,7 @@ def _convert_controlnet_ckpt_and_cache(
     weights = app_config.root_path / model_path
     output_path = Path(output_path)
 
+    logger.info(f"Converting {weights} to diffusers format")
     # return cached version if it exists
     if output_path.exists():
         return output_path

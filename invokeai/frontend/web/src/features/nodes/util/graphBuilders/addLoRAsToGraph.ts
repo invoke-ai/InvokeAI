@@ -17,7 +17,8 @@ import {
 export const addLoRAsToGraph = (
   state: RootState,
   graph: NonNullableGraph,
-  baseNodeId: string
+  baseNodeId: string,
+  modelLoaderNodeId: string = MAIN_MODEL_LOADER
 ): void => {
   /**
    * LoRA nodes get the UNet and CLIP models from the main model loader and apply the LoRA to them.
@@ -34,11 +35,11 @@ export const addLoRAsToGraph = (
     | undefined;
 
   if (loraCount > 0) {
-    // Remove MAIN_MODEL_LOADER unet connection to feed it to LoRAs
+    // Remove modelLoaderNodeId unet connection to feed it to LoRAs
     graph.edges = graph.edges.filter(
       (e) =>
         !(
-          e.source.node_id === MAIN_MODEL_LOADER &&
+          e.source.node_id === modelLoaderNodeId &&
           ['unet'].includes(e.source.field)
         )
     );
@@ -66,7 +67,7 @@ export const addLoRAsToGraph = (
     };
 
     // add the lora to the metadata accumulator
-    if (metadataAccumulator) {
+    if (metadataAccumulator?.loras) {
       metadataAccumulator.loras.push({
         lora: { model_name, base_model },
         weight,
@@ -75,12 +76,11 @@ export const addLoRAsToGraph = (
 
     // add to graph
     graph.nodes[currentLoraNodeId] = loraLoaderNode;
-
     if (currentLoraIndex === 0) {
       // first lora = start the lora chain, attach directly to model loader
       graph.edges.push({
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {

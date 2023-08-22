@@ -3,13 +3,16 @@ import { createSlice } from '@reduxjs/toolkit';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
-import { ImageDTO, MainModelField } from 'services/api/types';
+import { ImageDTO } from 'services/api/types';
+
 import { clipSkipMap } from '../types/constants';
 import {
   CfgScaleParam,
   HeightParam,
   MainModelParam,
+  MaskBlurMethodParam,
   NegativePromptParam,
+  OnnxModelParam,
   PositivePromptParam,
   PrecisionParam,
   SchedulerParam,
@@ -32,10 +35,14 @@ export interface GenerationState {
   positivePrompt: PositivePromptParam;
   negativePrompt: NegativePromptParam;
   scheduler: SchedulerParam;
-  seamBlur: number;
+  maskBlur: number;
+  maskBlurMethod: MaskBlurMethodParam;
   seamSize: number;
+  seamBlur: number;
   seamSteps: number;
-  seamStrength: number;
+  seamStrength: StrengthParam;
+  seamLowThreshold: number;
+  seamHighThreshold: number;
   seed: SeedParam;
   seedWeights: string;
   shouldFitToWidthHeight: boolean;
@@ -50,7 +57,7 @@ export interface GenerationState {
   shouldUseSymmetry: boolean;
   horizontalSymmetrySteps: number;
   verticalSymmetrySteps: number;
-  model: MainModelField | null;
+  model: MainModelParam | OnnxModelParam | null;
   vae: VaeModelParam | null;
   vaePrecision: PrecisionParam;
   seamlessXAxis: boolean;
@@ -71,10 +78,14 @@ export const initialGenerationState: GenerationState = {
   positivePrompt: '',
   negativePrompt: '',
   scheduler: 'euler',
-  seamBlur: 16,
-  seamSize: 96,
-  seamSteps: 30,
+  maskBlur: 16,
+  maskBlurMethod: 'box',
+  seamSize: 16,
+  seamBlur: 8,
+  seamSteps: 20,
   seamStrength: 0.7,
+  seamLowThreshold: 100,
+  seamHighThreshold: 200,
   seed: 0,
   seedWeights: '',
   shouldFitToWidthHeight: true,
@@ -195,17 +206,29 @@ export const generationSlice = createSlice({
     clearInitialImage: (state) => {
       state.initialImage = undefined;
     },
+    setMaskBlur: (state, action: PayloadAction<number>) => {
+      state.maskBlur = action.payload;
+    },
+    setMaskBlurMethod: (state, action: PayloadAction<MaskBlurMethodParam>) => {
+      state.maskBlurMethod = action.payload;
+    },
     setSeamSize: (state, action: PayloadAction<number>) => {
       state.seamSize = action.payload;
     },
     setSeamBlur: (state, action: PayloadAction<number>) => {
       state.seamBlur = action.payload;
     },
+    setSeamSteps: (state, action: PayloadAction<number>) => {
+      state.seamSteps = action.payload;
+    },
     setSeamStrength: (state, action: PayloadAction<number>) => {
       state.seamStrength = action.payload;
     },
-    setSeamSteps: (state, action: PayloadAction<number>) => {
-      state.seamSteps = action.payload;
+    setSeamLowThreshold: (state, action: PayloadAction<number>) => {
+      state.seamLowThreshold = action.payload;
+    },
+    setSeamHighThreshold: (state, action: PayloadAction<number>) => {
+      state.seamHighThreshold = action.payload;
     },
     setTileSize: (state, action: PayloadAction<number>) => {
       state.tileSize = action.payload;
@@ -229,7 +252,10 @@ export const generationSlice = createSlice({
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelChanged: (state, action: PayloadAction<MainModelParam | null>) => {
+    modelChanged: (
+      state,
+      action: PayloadAction<MainModelParam | OnnxModelParam | null>
+    ) => {
       state.model = action.payload;
 
       if (state.model === null) {
@@ -272,11 +298,12 @@ export const generationSlice = createSlice({
       const defaultModel = action.payload.sd?.defaultModel;
 
       if (defaultModel && !state.model) {
-        const [base_model, _model_type, model_name] = defaultModel.split('/');
+        const [base_model, model_type, model_name] = defaultModel.split('/');
 
         const result = zMainModel.safeParse({
           model_name,
           base_model,
+          model_type,
         });
 
         if (result.success) {
@@ -307,10 +334,14 @@ export const {
   setPositivePrompt,
   setNegativePrompt,
   setScheduler,
-  setSeamBlur,
+  setMaskBlur,
+  setMaskBlurMethod,
   setSeamSize,
+  setSeamBlur,
   setSeamSteps,
   setSeamStrength,
+  setSeamLowThreshold,
+  setSeamHighThreshold,
   setSeed,
   setSeedWeights,
   setShouldFitToWidthHeight,

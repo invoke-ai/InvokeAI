@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.board_images import BoardImagesServiceABC
     from invokeai.app.services.boards import BoardServiceABC
     from invokeai.app.services.images import ImageServiceABC
+    from invokeai.app.services.invocation_stats import InvocationStatsServiceBase
     from invokeai.app.services.model_manager_service import ModelManagerServiceBase
     from invokeai.app.services.events import EventServiceBase
     from invokeai.app.services.latent_storage import LatentsStorageBase
@@ -32,6 +33,7 @@ class InvocationServices:
     logger: "Logger"
     model_manager: "ModelManagerServiceBase"
     processor: "InvocationProcessorABC"
+    performance_statistics: "InvocationStatsServiceBase"
     queue: "InvocationQueueABC"
 
     def __init__(
@@ -47,6 +49,7 @@ class InvocationServices:
         logger: "Logger",
         model_manager: "ModelManagerServiceBase",
         processor: "InvocationProcessorABC",
+        performance_statistics: "InvocationStatsServiceBase",
         queue: "InvocationQueueABC",
     ):
         self.board_images = board_images
@@ -61,4 +64,5 @@ class InvocationServices:
         self.logger = logger
         self.model_manager = model_manager
         self.processor = processor
+        self.performance_statistics = performance_statistics
         self.queue = queue

@@ -33,7 +33,7 @@ class ModelMerger(object):
         self,
         model_paths: List[Path],
         alpha: float = 0.5,
-        interp: MergeInterpolationMethod = None,
+        interp: Optional[MergeInterpolationMethod] = None,
         force: bool = False,
         **kwargs,
     ) -> DiffusionPipeline:
@@ -73,7 +73,7 @@ class ModelMerger(object):
         base_model: Union[BaseModelType, str],
         merged_model_name: str,
         alpha: float = 0.5,
-        interp: MergeInterpolationMethod = None,
+        interp: Optional[MergeInterpolationMethod] = None,
         force: bool = False,
         merge_dest_directory: Optional[Path] = None,
         **kwargs,
@@ -109,7 +109,7 @@ class ModelMerger(object):
             # pick up the first model's vae
             if mod == model_names[0]:
                 vae = info.get("vae")
-            model_paths.extend([config.root_path / info["path"]])
+            model_paths.extend([(config.root_path / info["path"]).as_posix()])
 
         merge_method = None if interp == "weighted_sum" else MergeInterpolationMethod(interp)
         logger.debug(f"interp = {interp}, merge_method={merge_method}")
@@ -120,11 +120,11 @@ class ModelMerger(object):
             else config.models_path / base_model.value / ModelType.Main.value
         )
         dump_path.mkdir(parents=True, exist_ok=True)
-        dump_path = dump_path / merged_model_name
+        dump_path = (dump_path / merged_model_name).as_posix()
 
-        merged_pipe.save_pretrained(dump_path, safe_serialization=1)
+        merged_pipe.save_pretrained(dump_path, safe_serialization=True)
         attributes = dict(
-            path=str(dump_path),
+            path=dump_path,
             description=f"Merge of models {', '.join(model_names)}",
             model_format="diffusers",
             variant=ModelVariantType.Normal.value,

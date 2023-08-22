@@ -1,9 +1,13 @@
 import os
-import torch
-import safetensors
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Union, Literal
+from typing import Optional
+
+import safetensors
+import torch
+from omegaconf import OmegaConf
+
+from invokeai.app.services.config import InvokeAIAppConfig
 from .base import (
     ModelBase,
     ModelConfigBase,
@@ -18,9 +22,6 @@ from .base import (
     InvalidModelException,
     ModelNotFoundException,
 )
-from invokeai.app.services.config import InvokeAIAppConfig
-from diffusers.utils import is_safetensors_available
-from omegaconf import OmegaConf
 
 
 class VaeModelFormat(str, Enum):
@@ -42,14 +43,14 @@ class VaeModel(ModelBase):
         try:
             config = EmptyConfigLoader.load_config(self.model_path, config_name="config.json")
             # config = json.loads(os.path.join(self.model_path, "config.json"))
-        except:
+        except Exception:
             raise Exception("Invalid vae model! (config.json not found or invalid)")
 
         try:
             vae_class_name = config.get("_class_name", "AutoencoderKL")
             self.vae_class = self._hf_definition_to_type(["diffusers", vae_class_name])
             self.model_size = calc_model_size_by_fs(self.model_path)
-        except:
+        except Exception:
             raise Exception("Invalid vae model! (Unkown vae type)")
 
     def get_size(self, child_type: Optional[SubModelType] = None):
@@ -80,7 +81,7 @@ class VaeModel(ModelBase):
     @classmethod
     def detect_format(cls, path: str):
         if not os.path.exists(path):
-            raise ModelNotFoundException()
+            raise ModelNotFoundException(f"Does not exist as local file: {path}")
 
         if os.path.isdir(path):
             if os.path.exists(os.path.join(path, "config.json")):
@@ -173,5 +174,5 @@ def _convert_vae_ckpt_and_cache(
         vae_config=config,
         image_size=image_size,
     )
-    vae_model.save_pretrained(output_path, safe_serialization=is_safetensors_available())
+    vae_model.save_pretrained(output_path, safe_serialization=True)
     return output_path

@@ -1,13 +1,14 @@
 import time
 import traceback
-from threading import Event, Thread, BoundedSemaphore
-
-from ..invocations.baseinvocation import InvocationContext
-from .invocation_queue import InvocationQueueItem
-from .invoker import InvocationProcessorABC, Invoker
-from ..models.exceptions import CanceledException
+from threading import BoundedSemaphore, Event, Thread
 
 import invokeai.backend.util.logging as logger
+
+from ..invocations.baseinvocation import InvocationContext
+from ..models.exceptions import CanceledException
+from .invocation_queue import InvocationQueueItem
+from .invocation_stats import InvocationStatsServiceBase
+from .invoker import InvocationProcessorABC, Invoker
 
 
 class DefaultInvocationProcessor(InvocationProcessorABC):
@@ -35,6 +36,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
     def __process(self, stop_event: Event):
         try:
             self.__threadLimit.acquire()
+            statistics: InvocationStatsServiceBase = self.__invoker.services.performance_statistics
+
             while not stop_event.is_set():
                 try:
                     queue_item: InvocationQueueItem = self.__invoker.services.queue.get()
@@ -83,35 +86,43 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
 
                 # Invoke
                 try:
-                    outputs = invocation.invoke(
-                        InvocationContext(
-                            services=self.__invoker.services,
-                            graph_execution_state_id=graph_execution_state.id,
+                    graph_id = graph_execution_state.id
+                    model_manager = self.__invoker.services.model_manager
+                    with statistics.collect_stats(invocation, graph_id, model_manager):
+                        # use the internal invoke_internal(), which wraps the node's invoke() method in
+                        # this accomodates nodes which require a value, but get it only from a
+                        # connection
+                        outputs = invocation.invoke_internal(
+                            InvocationContext(
+                                services=self.__invoker.services,
+                                graph_execution_state_id=graph_execution_state.id,
+                            )
                         )
-                    )
 
-                    # Check queue to see if this is canceled, and skip if so
-                    if self.__invoker.services.queue.is_canceled(graph_execution_state.id):
-                        continue
+                        # Check queue to see if this is canceled, and skip if so
+                        if self.__invoker.services.queue.is_canceled(graph_execution_state.id):
+                            continue
 
-                    # Save outputs and history
-                    graph_execution_state.complete(invocation.id, outputs)
+                        # Save outputs and history
+                        graph_execution_state.complete(invocation.id, outputs)
 
-                    # Save the state changes
-                    self.__invoker.services.graph_execution_manager.set(graph_execution_state)
+                        # Save the state changes
+                        self.__invoker.services.graph_execution_manager.set(graph_execution_state)
 
-                    # Send complete event
-                    self.__invoker.services.events.emit_invocation_complete(
-                        graph_execution_state_id=graph_execution_state.id,
-                        node=invocation.dict(),
-                        source_node_id=source_node_id,
-                        result=outputs.dict(),
-                    )
+                        # Send complete event
+                        self.__invoker.services.events.emit_invocation_complete(
+                            graph_execution_state_id=graph_execution_state.id,
+                            node=invocation.dict(),
+                            source_node_id=source_node_id,
+                            result=outputs.dict(),
+                        )
+                    statistics.log_stats()
 
                 except KeyboardInterrupt:
                     pass
 
                 except CanceledException:
+                    statistics.reset_stats(graph_execution_state.id)
                     pass
 
                 except Exception as e:
@@ -133,7 +144,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         error_type=e.__class__.__name__,
                         error=error,
                     )
-
+                    statistics.reset_stats(graph_execution_state.id)
                     pass
 
                 # Check queue to see if this is canceled, and skip if so

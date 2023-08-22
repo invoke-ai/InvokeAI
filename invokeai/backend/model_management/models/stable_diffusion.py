@@ -4,6 +4,7 @@ from enum import Enum
 from pydantic import Field
 from pathlib import Path
 from typing import Literal, Optional, Union
+from diffusers import StableDiffusionInpaintPipeline, StableDiffusionPipeline
 from .base import (
     ModelConfigBase,
     BaseModelType,
@@ -123,6 +124,7 @@ class StableDiffusion1Model(DiffusersModel):
             return _convert_ckpt_and_cache(
                 version=BaseModelType.StableDiffusion1,
                 model_config=config,
+                load_safety_checker=False,
                 output_path=output_path,
             )
         else:
@@ -259,9 +261,11 @@ def _convert_ckpt_and_cache(
     """
     app_config = InvokeAIAppConfig.get_config()
 
-    weights = app_config.root_path / model_config.path
+    weights = app_config.models_path / model_config.path
     config_file = app_config.root_path / model_config.config
     output_path = Path(output_path)
+    variant = model_config.variant
+    pipeline_class = StableDiffusionInpaintPipeline if variant == "inpaint" else StableDiffusionPipeline
 
     # return cached version if it exists
     if output_path.exists():
@@ -288,6 +292,7 @@ def _convert_ckpt_and_cache(
             original_config_file=config_file,
             extract_ema=True,
             scan_needed=True,
+            pipeline_class=pipeline_class,
             from_safetensors=weights.suffix == ".safetensors",
             precision=torch_dtype(choose_torch_device()),
             **kwargs,
@@ -325,5 +330,5 @@ def _select_ckpt_config(version: BaseModelType, variant: ModelVariantType):
             config_path = config_path.relative_to(app_config.root_path)
         return str(config_path)
 
-    except:
+    except Exception:
         return None

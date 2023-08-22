@@ -1,31 +1,31 @@
 import io
 from typing import Optional
 
+from PIL import Image
 from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
-from PIL import Image
+from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.metadata import ImageMetadata
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.item_storage import PaginatedResults
 from invokeai.app.services.models.image_record import (
     ImageDTO,
     ImageRecordChanges,
     ImageUrlsDTO,
 )
-
 from ..dependencies import ApiDependencies
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
+
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
 
 
 @images_router.post(
-    "/",
+    "/upload",
     operation_id="upload_image",
     responses={
         201: {"description": "The image was uploaded successfully"},
@@ -55,7 +55,7 @@ async def upload_image(
         if crop_visible:
             bbox = pil_image.getbbox()
             pil_image = pil_image.crop(bbox)
-    except:
+    except Exception:
         # Error opening the image
         raise HTTPException(status_code=415, detail="Failed to read image")
 
@@ -73,11 +73,11 @@ async def upload_image(
         response.headers["Location"] = image_dto.image_url
 
         return image_dto
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to create image")
 
 
-@images_router.delete("/{image_name}", operation_id="delete_image")
+@images_router.delete("/i/{image_name}", operation_id="delete_image")
 async def delete_image(
     image_name: str = Path(description="The name of the image to delete"),
 ) -> None:
@@ -85,7 +85,7 @@ async def delete_image(
 
     try:
         ApiDependencies.invoker.services.images.delete(image_name)
-    except Exception as e:
+    except Exception:
         # TODO: Does this need any exception handling at all?
         pass
 
@@ -97,13 +97,13 @@ async def clear_intermediates() -> int:
     try:
         count_deleted = ApiDependencies.invoker.services.images.delete_intermediates()
         return count_deleted
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to clear intermediates")
         pass
 
 
 @images_router.patch(
-    "/{image_name}",
+    "/i/{image_name}",
     operation_id="update_image",
     response_model=ImageDTO,
 )
@@ -115,12 +115,12 @@ async def update_image(
 
     try:
         return ApiDependencies.invoker.services.images.update(image_name, image_changes)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Failed to update image")
 
 
 @images_router.get(
-    "/{image_name}",
+    "/i/{image_name}",
     operation_id="get_image_dto",
     response_model=ImageDTO,
 )
@@ -131,12 +131,12 @@ async def get_image_dto(
 
     try:
         return ApiDependencies.invoker.services.images.get_dto(image_name)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404)
 
 
 @images_router.get(
-    "/{image_name}/metadata",
+    "/i/{image_name}/metadata",
     operation_id="get_image_metadata",
     response_model=ImageMetadata,
 )
@@ -147,12 +147,13 @@ async def get_image_metadata(
 
     try:
         return ApiDependencies.invoker.services.images.get_metadata(image_name)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404)
 
 
-@images_router.get(
-    "/{image_name}/full",
+@images_router.api_route(
+    "/i/{image_name}/full",
+    methods=["GET", "HEAD"],
     operation_id="get_image_full",
     response_class=Response,
     responses={
@@ -182,12 +183,12 @@ async def get_image_full(
         )
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         return response
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404)
 
 
 @images_router.get(
-    "/{image_name}/thumbnail",
+    "/i/{image_name}/thumbnail",
     operation_id="get_image_thumbnail",
     response_class=Response,
     responses={
@@ -211,12 +212,12 @@ async def get_image_thumbnail(
         response = FileResponse(path, media_type="image/webp", content_disposition_type="inline")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         return response
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404)
 
 
 @images_router.get(
-    "/{image_name}/urls",
+    "/i/{image_name}/urls",
     operation_id="get_image_urls",
     response_model=ImageUrlsDTO,
 )
@@ -233,7 +234,7 @@ async def get_image_urls(
             image_url=image_url,
             thumbnail_url=thumbnail_url,
         )
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404)
 
 
@@ -265,3 +266,62 @@ async def list_image_dtos(
     )
 
     return image_dtos
+
+
+class DeleteImagesFromListResult(BaseModel):
+    deleted_images: list[str]
+
+
+@images_router.post("/delete", operation_id="delete_images_from_list", response_model=DeleteImagesFromListResult)
+async def delete_images_from_list(
+    image_names: list[str] = Body(description="The list of names of images to delete", embed=True),
+) -> DeleteImagesFromListResult:
+    try:
+        deleted_images: list[str] = []
+        for image_name in image_names:
+            try:
+                ApiDependencies.invoker.services.images.delete(image_name)
+                deleted_images.append(image_name)
+            except Exception:
+                pass
+        return DeleteImagesFromListResult(deleted_images=deleted_images)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to delete images")
+
+
+class ImagesUpdatedFromListResult(BaseModel):
+    updated_image_names: list[str] = Field(description="The image names that were updated")
+
+
+@images_router.post("/star", operation_id="star_images_in_list", response_model=ImagesUpdatedFromListResult)
+async def star_images_in_list(
+    image_names: list[str] = Body(description="The list of names of images to star", embed=True),
+) -> ImagesUpdatedFromListResult:
+    try:
+        updated_image_names: list[str] = []
+        for image_name in image_names:
+            try:
+                ApiDependencies.invoker.services.images.update(image_name, changes=ImageRecordChanges(starred=True))
+                updated_image_names.append(image_name)
+            except Exception:
+                pass
+        return ImagesUpdatedFromListResult(updated_image_names=updated_image_names)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to star images")
+
+
+@images_router.post("/unstar", operation_id="unstar_images_in_list", response_model=ImagesUpdatedFromListResult)
+async def unstar_images_in_list(
+    image_names: list[str] = Body(description="The list of names of images to unstar", embed=True),
+) -> ImagesUpdatedFromListResult:
+    try:
+        updated_image_names: list[str] = []
+        for image_name in image_names:
+            try:
+                ApiDependencies.invoker.services.images.update(image_name, changes=ImageRecordChanges(starred=False))
+                updated_image_names.append(image_name)
+            except Exception:
+                pass
+        return ImagesUpdatedFromListResult(updated_image_names=updated_image_names)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to unstar images")

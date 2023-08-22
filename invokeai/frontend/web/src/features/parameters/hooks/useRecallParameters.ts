@@ -1,9 +1,19 @@
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
+import {
+  refinerModelChanged,
+  setNegativeStylePromptSDXL,
+  setPositiveStylePromptSDXL,
+  setRefinerCFGScale,
+  setRefinerNegativeAestheticScore,
+  setRefinerPositiveAestheticScore,
+  setRefinerScheduler,
+  setRefinerStart,
+  setRefinerSteps,
+} from 'features/sdxl/store/sdxlSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { UnsafeImageMetadata } from 'services/api/endpoints/images';
-import { ImageDTO } from 'services/api/types';
+import { ImageDTO, UnsafeImageMetadata } from 'services/api/types';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
   setCfgScale,
@@ -22,6 +32,12 @@ import {
   isValidMainModel,
   isValidNegativePrompt,
   isValidPositivePrompt,
+  isValidSDXLNegativeStylePrompt,
+  isValidSDXLPositiveStylePrompt,
+  isValidSDXLRefinerModel,
+  isValidSDXLRefinerNegativeAestheticScore,
+  isValidSDXLRefinerPositiveAestheticScore,
+  isValidSDXLRefinerStart,
   isValidScheduler,
   isValidSeed,
   isValidSteps,
@@ -74,17 +90,34 @@ export const useRecallParameters = () => {
    * Recall both prompts with toast
    */
   const recallBothPrompts = useCallback(
-    (positivePrompt: unknown, negativePrompt: unknown) => {
+    (
+      positivePrompt: unknown,
+      negativePrompt: unknown,
+      positiveStylePrompt: unknown,
+      negativeStylePrompt: unknown
+    ) => {
       if (
         isValidPositivePrompt(positivePrompt) ||
-        isValidNegativePrompt(negativePrompt)
+        isValidNegativePrompt(negativePrompt) ||
+        isValidSDXLPositiveStylePrompt(positiveStylePrompt) ||
+        isValidSDXLNegativeStylePrompt(negativeStylePrompt)
       ) {
         if (isValidPositivePrompt(positivePrompt)) {
           dispatch(setPositivePrompt(positivePrompt));
         }
+
         if (isValidNegativePrompt(negativePrompt)) {
           dispatch(setNegativePrompt(negativePrompt));
         }
+
+        if (isValidSDXLPositiveStylePrompt(positiveStylePrompt)) {
+          dispatch(setPositiveStylePromptSDXL(positiveStylePrompt));
+        }
+
+        if (isValidSDXLPositiveStylePrompt(negativeStylePrompt)) {
+          dispatch(setNegativeStylePromptSDXL(negativeStylePrompt));
+        }
+
         parameterSetToast();
         return;
       }
@@ -118,6 +151,36 @@ export const useRecallParameters = () => {
         return;
       }
       dispatch(setNegativePrompt(negativePrompt));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall SDXL Positive Style Prompt with toast
+   */
+  const recallSDXLPositiveStylePrompt = useCallback(
+    (positiveStylePrompt: unknown) => {
+      if (!isValidSDXLPositiveStylePrompt(positiveStylePrompt)) {
+        parameterNotSetToast();
+        return;
+      }
+      dispatch(setPositiveStylePromptSDXL(positiveStylePrompt));
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  /**
+   * Recall SDXL Negative Style Prompt with toast
+   */
+  const recallSDXLNegativeStylePrompt = useCallback(
+    (negativeStylePrompt: unknown) => {
+      if (!isValidSDXLNegativeStylePrompt(negativeStylePrompt)) {
+        parameterNotSetToast();
+        return;
+      }
+      dispatch(setNegativeStylePromptSDXL(negativeStylePrompt));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -271,6 +334,15 @@ export const useRecallParameters = () => {
         steps,
         width,
         strength,
+        positive_style_prompt,
+        negative_style_prompt,
+        refiner_model,
+        refiner_cfg_scale,
+        refiner_steps,
+        refiner_scheduler,
+        refiner_positive_aesthetic_store,
+        refiner_negative_aesthetic_store,
+        refiner_start,
       } = metadata;
 
       if (isValidCfgScale(cfg_scale)) {
@@ -304,6 +376,54 @@ export const useRecallParameters = () => {
         dispatch(setImg2imgStrength(strength));
       }
 
+      if (isValidSDXLPositiveStylePrompt(positive_style_prompt)) {
+        dispatch(setPositiveStylePromptSDXL(positive_style_prompt));
+      }
+
+      if (isValidSDXLNegativeStylePrompt(negative_style_prompt)) {
+        dispatch(setNegativeStylePromptSDXL(negative_style_prompt));
+      }
+
+      if (isValidSDXLRefinerModel(refiner_model)) {
+        dispatch(refinerModelChanged(refiner_model));
+      }
+
+      if (isValidSteps(refiner_steps)) {
+        dispatch(setRefinerSteps(refiner_steps));
+      }
+
+      if (isValidCfgScale(refiner_cfg_scale)) {
+        dispatch(setRefinerCFGScale(refiner_cfg_scale));
+      }
+
+      if (isValidScheduler(refiner_scheduler)) {
+        dispatch(setRefinerScheduler(refiner_scheduler));
+      }
+
+      if (
+        isValidSDXLRefinerPositiveAestheticScore(
+          refiner_positive_aesthetic_store
+        )
+      ) {
+        dispatch(
+          setRefinerPositiveAestheticScore(refiner_positive_aesthetic_store)
+        );
+      }
+
+      if (
+        isValidSDXLRefinerNegativeAestheticScore(
+          refiner_negative_aesthetic_store
+        )
+      ) {
+        dispatch(
+          setRefinerNegativeAestheticScore(refiner_negative_aesthetic_store)
+        );
+      }
+
+      if (isValidSDXLRefinerStart(refiner_start)) {
+        dispatch(setRefinerStart(refiner_start));
+      }
+
       allParameterSetToast();
     },
     [allParameterNotSetToast, allParameterSetToast, dispatch]
@@ -313,6 +433,8 @@ export const useRecallParameters = () => {
     recallBothPrompts,
     recallPositivePrompt,
     recallNegativePrompt,
+    recallSDXLPositiveStylePrompt,
+    recallSDXLNegativeStylePrompt,
     recallSeed,
     recallCfgScale,
     recallModel,

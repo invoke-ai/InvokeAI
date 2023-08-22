@@ -13,7 +13,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Union
 
-SUPPORTED_PYTHON = ">=3.9.0,<3.11"
+SUPPORTED_PYTHON = ">=3.9.0,<=3.11.100"
 INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
 BOOTSTRAP_VENV_PREFIX = "invokeai-installer-tmp"
 
@@ -149,7 +149,7 @@ class Installer:
         return venv_dir
 
     def install(
-        self, root: str = "~/invokeai-3", version: str = "latest", yes_to_all=False, find_links: Path = None
+        self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False, find_links: Path = None
     ) -> None:
         """
         Install the InvokeAI application into the given runtime path
@@ -168,7 +168,8 @@ class Installer:
 
         messages.welcome()
 
-        self.dest = Path(root).expanduser().resolve() if yes_to_all else messages.dest_path(root)
+        default_path = os.environ.get("INVOKEAI_ROOT") or Path(root).expanduser().resolve()
+        self.dest = default_path if yes_to_all else messages.dest_path(root)
 
         # create the venv for the app
         self.venv = self.app_venv()
@@ -248,6 +249,9 @@ class InvokeAiInstance:
             pip[
                 "install",
                 "--require-virtualenv",
+                "numpy~=1.24.0",  # choose versions that won't be uninstalled during phase 2
+                "urllib3~=1.26.0",
+                "requests~=2.28.0",
                 "torch~=2.0.0",
                 "torchmetrics==0.11.4",
                 "torchvision>=0.14.1",
@@ -344,7 +348,7 @@ class InvokeAiInstance:
 
         introduction()
 
-        from invokeai.frontend.install import invokeai_configure
+        from invokeai.frontend.install.invokeai_configure import invokeai_configure
 
         # NOTE: currently the config script does its own arg parsing! this means the command-line switches
         # from the installer will also automatically propagate down to the config script.
@@ -403,7 +407,7 @@ def get_pip_from_venv(venv_path: Path) -> str:
     :rtype: str
     """
 
-    pip = "Scripts\pip.exe" if OS == "Windows" else "bin/pip"
+    pip = "Scripts\\pip.exe" if OS == "Windows" else "bin/pip"
     return str(venv_path.expanduser().resolve() / pip)
 
 
@@ -451,7 +455,7 @@ def get_torch_source() -> (Union[str, None], str):
     device = graphical_accelerator()
 
     url = None
-    optional_modules = None
+    optional_modules = "[onnx]"
     if OS == "Linux":
         if device == "rocm":
             url = "https://download.pytorch.org/whl/rocm5.4.2"
@@ -459,8 +463,11 @@ def get_torch_source() -> (Union[str, None], str):
             url = "https://download.pytorch.org/whl/cpu"
 
     if device == "cuda":
-        url = "https://download.pytorch.org/whl/cu117"
-        optional_modules = "[xformers]"
+        url = "https://download.pytorch.org/whl/cu118"
+        optional_modules = "[xformers,onnx-cuda]"
+    if device == "cuda_and_dml":
+        url = "https://download.pytorch.org/whl/cu118"
+        optional_modules = "[xformers,onnx-directml]"
 
     # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13
 

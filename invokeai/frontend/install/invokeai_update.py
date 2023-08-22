@@ -80,7 +80,7 @@ def welcome(versions: dict):
 def get_extras():
     extras = ""
     try:
-        dist = pkg_resources.get_distribution("xformers")
+        _ = pkg_resources.get_distribution("xformers")
         extras = "[xformers]"
     except pkg_resources.DistributionNotFound:
         pass
@@ -90,7 +90,7 @@ def get_extras():
 def main():
     versions = get_versions()
     if invokeai_is_running():
-        print(f":exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]")
+        print(":exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]")
         input("Press any key to continue...")
         return
 
@@ -112,7 +112,7 @@ def main():
 
     extras = get_extras()
 
-    print(f":crossed_fingers: Upgrading to [yellow]{tag if tag else release}[/yellow]")
+    print(f":crossed_fingers: Upgrading to [yellow]{tag or release or branch}[/yellow]")
     if release:
         cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_SRC}/{release}.zip" --use-pep517 --upgrade'
     elif tag:
@@ -122,9 +122,9 @@ def main():
     print("")
     print("")
     if os.system(cmd) == 0:
-        print(f":heavy_check_mark: Upgrade successful")
+        print(":heavy_check_mark: Upgrade successful")
     else:
-        print(f":exclamation: [bold red]Upgrade failed[/red bold]")
+        print(":exclamation: [bold red]Upgrade failed[/red bold]")
 
 
 if __name__ == "__main__":

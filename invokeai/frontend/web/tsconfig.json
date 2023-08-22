@@ -13,6 +13,8 @@
     "moduleResolution": "Node",
     // TODO: Disabled for IDE performance issues with our translation JSON
     // "resolveJsonModule": true,
+    "noUncheckedIndexedAccess": true,
+    "strictNullChecks": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",

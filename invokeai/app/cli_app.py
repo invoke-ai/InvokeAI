@@ -13,16 +13,8 @@ from pydantic.fields import Field
 # This should come early so that the logger can pick up its configuration options
 from .services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
-
-config = InvokeAIAppConfig.get_config()
-config.parse_args()
-logger = InvokeAILogger().getLogger(config=config)
 from invokeai.version.invokeai_version import __version__
 
-# we call this early so that the message appears before other invokeai initialization messages
-if config.version:
-    print(f"InvokeAI version {__version__}")
-    sys.exit(0)
 
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
@@ -37,6 +29,7 @@ from invokeai.app.services.image_record_storage import SqliteImageRecordStorage
 from invokeai.app.services.images import ImageService, ImageServiceDependencies
 from invokeai.app.services.resource_name import SimpleNameService
 from invokeai.app.services.urls import LocalUrlService
+from invokeai.app.services.invocation_stats import InvocationStatsService
 from .services.default_graphs import default_text_to_image_graph_id, create_system_graphs
 from .services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsStorage
 
@@ -61,10 +54,15 @@ from .services.processor import DefaultInvocationProcessor
 from .services.sqlite import SqliteItemStorage
 
 import torch
-import invokeai.backend.util.hotfixes
+import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 
 if torch.backends.mps.is_available():
-    import invokeai.backend.util.mps_fixes
+    import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
+
+
+config = InvokeAIAppConfig.get_config()
+config.parse_args()
+logger = InvokeAILogger().getLogger(config=config)
 
 
 class CliCommand(BaseModel):
@@ -311,6 +309,7 @@ def invoke_cli():
         graph_library=SqliteItemStorage[LibraryGraph](filename=db_location, table_name="graphs"),
         graph_execution_manager=graph_execution_manager,
         processor=DefaultInvocationProcessor(),
+        performance_statistics=InvocationStatsService(graph_execution_manager),
         logger=logger,
         configuration=config,
     )
@@ -480,4 +479,7 @@ def invoke_cli():
 
 
 if __name__ == "__main__":
-    invoke_cli()
+    if config.version:
+        print(f"InvokeAI version {__version__}")
+    else:
+        invoke_cli()

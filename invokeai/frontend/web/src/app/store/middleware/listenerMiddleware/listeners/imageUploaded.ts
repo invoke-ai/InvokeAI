@@ -2,14 +2,13 @@ import { UseToastOptions } from '@chakra-ui/react';
 import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { imagesAddedToBatch } from 'features/gallery/store/gallerySlice';
-import { fieldValueChanged } from 'features/nodes/store/nodesSlice';
+import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
+import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
 import { imagesApi } from '../../../../../services/api/endpoints/images';
-import { omit } from 'lodash-es';
 
 const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
   title: 'Image Uploaded',
@@ -41,7 +40,7 @@ export const addImageUploadedFulfilledListener = () => {
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {
         const { toastOptions } = postUploadAction;
-        if (!autoAddBoardId) {
+        if (!autoAddBoardId || autoAddBoardId === 'none') {
           dispatch(addToast({ ...DEFAULT_UPLOADED_TOAST, ...toastOptions }));
         } else {
           // Add this image to the board
@@ -112,22 +111,13 @@ export const addImageUploadedFulfilledListener = () => {
 
       if (postUploadAction?.type === 'SET_NODES_IMAGE') {
         const { nodeId, fieldName } = postUploadAction;
-        dispatch(fieldValueChanged({ nodeId, fieldName, value: imageDTO }));
+        dispatch(
+          fieldImageValueChanged({ nodeId, fieldName, value: imageDTO })
+        );
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
             description: `Set as node field ${fieldName}`,
-          })
-        );
-        return;
-      }
-
-      if (postUploadAction?.type === 'ADD_TO_BATCH') {
-        dispatch(imagesAddedToBatch([imageDTO.image_name]));
-        dispatch(
-          addToast({
-            ...DEFAULT_UPLOADED_TOAST,
-            description: 'Added to batch',
           })
         );
         return;

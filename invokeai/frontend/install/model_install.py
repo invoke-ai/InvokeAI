@@ -28,7 +28,6 @@ from npyscreen import widget
 from invokeai.backend.util.logging import InvokeAILogger
 
 from invokeai.backend.install.model_install_backend import (
-    ModelInstallList,
     InstallSelections,
     ModelInstall,
     SchedulerPredictionType,
@@ -41,12 +40,12 @@ from invokeai.frontend.install.widgets import (
     SingleSelectColumns,
     TextBox,
     BufferBox,
-    FileBox,
     set_min_terminal_size,
     select_stable_diffusion_config_file,
     CyclingForm,
     MIN_COLS,
     MIN_LINES,
+    WindowTooSmallException,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
 
@@ -57,6 +56,9 @@ logger = InvokeAILogger.getLogger()
 # for stripping control characters
 # from https://stackoverflow.com/questions/92438/stripping-non-printable-characters-from-a-string-in-python
 NOPRINT_TRANS_TABLE = {i: None for i in range(0, sys.maxunicode + 1) if not chr(i).isprintable()}
+
+# maximum number of installed models we can display before overflowing vertically
+MAX_OTHER_MODELS = 72
 
 
 def make_printable(s: str) -> str:
@@ -102,7 +104,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             SingleSelectColumns,
             values=[
                 "STARTER MODELS",
-                "MORE MODELS",
+                "MAIN MODELS",
                 "CONTROLNETS",
                 "LORA/LYCORIS",
                 "TEXTUAL INVERSION",
@@ -153,7 +155,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             BufferBox,
             name="Log Messages",
             editable=False,
-            max_height=8,
+            max_height=6,
         )
 
         self.nextrely += 1
@@ -249,10 +251,11 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
     ) -> dict[str, npyscreen.widget]:
         """Generic code to create model selection widgets"""
         widgets = dict()
-        model_list = [x for x in self.all_models if self.all_models[x].model_type == model_type and not x in exclude]
+        model_list = [x for x in self.all_models if self.all_models[x].model_type == model_type and x not in exclude]
         model_labels = [self.model_labels[x] for x in model_list]
 
         show_recommended = len(self.installed_models) == 0
+        truncated = False
         if len(model_list) > 0:
             max_width = max([len(x) for x in model_labels])
             columns = window_width // (max_width + 8)  # 8 characters for "[x] " and padding
@@ -271,6 +274,10 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 )
             )
 
+            if len(model_labels) > MAX_OTHER_MODELS:
+                model_labels = model_labels[0:MAX_OTHER_MODELS]
+                truncated = True
+
             widgets.update(
                 models_selected=self.add_widget_intelligent(
                     MultiSelectColumns,
@@ -287,6 +294,16 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                     scroll_exit=True,
                 ),
                 models=model_list,
+            )
+
+        if truncated:
+            widgets.update(
+                warning_message=self.add_widget_intelligent(
+                    npyscreen.FixedText,
+                    value=f"Too many models to display (max={MAX_OTHER_MODELS}). Some are not displayed.",
+                    editable=False,
+                    color="CAUTION",
+                )
             )
 
         self.nextrely += 1
@@ -313,7 +330,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         widgets = self.add_model_widgets(
             model_type=model_type,
             window_width=window_width,
-            install_prompt=f"Additional {model_type.value.title()} models already installed.",
+            install_prompt=f"Installed {model_type.value.title()} models. Unchecked models in the InvokeAI root directory will be deleted. Enter URLs, paths or repo_ids to import.",
             **kwargs,
         )
 
@@ -340,14 +357,14 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 try:
                     v.hidden = True
                     v.editable = False
-                except:
+                except Exception:
                     pass
         for k, v in widgets[selected_tab].items():
             try:
                 v.hidden = False
                 if not isinstance(v, (npyscreen.FixedText, npyscreen.TitleFixedText, CenteredTitleText)):
                     v.editable = True
-            except:
+            except Exception:
                 pass
         self.__class__.current_tab = selected_tab  # for persistence
         self.display()
@@ -399,7 +416,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.ok_button.hidden = True
         self.display()
 
-        # for communication with the subprocess
+        # TO DO: Spawn a worker thread, not a subprocess
         parent_conn, child_conn = Pipe()
         p = Process(
             target=process_and_execute,
@@ -414,7 +431,6 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.subprocess_connection = parent_conn
         self.subprocess = p
         app.install_selections = InstallSelections()
-        # process_and_execute(app.opt, app.install_selections)
 
     def on_back(self):
         self.parentApp.switchFormPrevious()
@@ -489,8 +505,6 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
         # rebuild the form, saving and restoring some of the fields that need to be preserved.
         saved_messages = self.monitor.entry_widget.values
-        # autoload_dir = str(config.root_path / self.pipeline_models['autoload_directory'].value)
-        # autoscan = self.pipeline_models['autoscan_on_startup'].value
 
         app.main_form = app.addForm(
             "MAIN",
@@ -527,7 +541,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             self.ti_models,
         ]
         for section in ui_sections:
-            if not "models_selected" in section:
+            if "models_selected" not in section:
                 continue
             selected = set([section["models"][x] for x in section["models_selected"].value])
             models_to_install = [x for x in selected if not self.all_models[x].installed]
@@ -543,12 +557,6 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         for section in ui_sections:
             if downloads := section.get("download_ids"):
                 selections.install_models.extend(downloads.value.split())
-
-        # load directory and whether to scan on startup
-        # if self.parentApp.autoload_pending:
-        #     selections.scan_directory = str(config.root_path / self.pipeline_models['autoload_directory'].value)
-        #     self.parentApp.autoload_pending = False
-        # selections.autoscan_on_startup = self.pipeline_models['autoscan_on_startup'].value
 
 
 class AddModelApplication(npyscreen.NPSAppManaged):
@@ -629,7 +637,7 @@ def _ask_user_for_pt_tui(model_path: Path, tui_conn: Connection) -> SchedulerPre
             return None
         else:
             return response
-    except:
+    except Exception:
         return None
 
 
@@ -639,6 +647,11 @@ def process_and_execute(
     selections: InstallSelections,
     conn_out: Connection = None,
 ):
+    # need to reinitialize config in subprocess
+    config = InvokeAIAppConfig.get_config()
+    args = ["--root", opt.root] if opt.root else []
+    config.parse_args(args)
+
     # set up so that stderr is sent to conn_out
     if conn_out:
         translator = StderrToMessage(conn_out)
@@ -656,39 +669,11 @@ def process_and_execute(
         conn_out.close()
 
 
-def do_listings(opt) -> bool:
-    """List installed models of various sorts, and return
-    True if any were requested."""
-    model_manager = ModelManager(config.model_conf_path)
-    if opt.list_models == "diffusers":
-        print("Diffuser models:")
-        model_manager.print_models()
-    elif opt.list_models == "controlnets":
-        print("Installed Controlnet Models:")
-        cnm = model_manager.list_controlnet_models()
-        print(textwrap.indent("\n".join([x for x in cnm if cnm[x]]), prefix="   "))
-    elif opt.list_models == "loras":
-        print("Installed LoRA/LyCORIS Models:")
-        cnm = model_manager.list_lora_models()
-        print(textwrap.indent("\n".join([x for x in cnm if cnm[x]]), prefix="   "))
-    elif opt.list_models == "tis":
-        print("Installed Textual Inversion Embeddings:")
-        cnm = model_manager.list_ti_models()
-        print(textwrap.indent("\n".join([x for x in cnm if cnm[x]]), prefix="   "))
-    else:
-        return False
-    return True
-
-
 # --------------------------------------------------------
 def select_and_download_models(opt: Namespace):
     precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
     config.precision = precision
-    helper = lambda x: ask_user_for_prediction_type(x)
-    # if do_listings(opt):
-    # pass
-
-    installer = ModelInstall(config, prediction_type_helper=helper)
+    installer = ModelInstall(config, prediction_type_helper=ask_user_for_prediction_type)
     if opt.list_models:
         installer.list_models(opt.list_models)
     elif opt.add or opt.delete:
@@ -706,9 +691,11 @@ def select_and_download_models(opt: Namespace):
         # needed to support the probe() method running under a subprocess
         torch.multiprocessing.set_start_method("spawn")
 
-        # the third argument is needed in the Windows 11 environment in
-        # order to launch and resize a console window running this program
-        set_min_terminal_size(MIN_COLS, MIN_LINES)
+        if not set_min_terminal_size(MIN_COLS, MIN_LINES):
+            raise WindowTooSmallException(
+                "Could not increase terminal size. Try running again with a larger window or smaller font size."
+            )
+
         installApp = AddModelApplication(opt)
         try:
             installApp.run()
@@ -787,7 +774,7 @@ def main():
 
     if not config.model_conf_path.exists():
         logger.info("Your InvokeAI root directory is not set up. Calling invokeai-configure.")
-        from invokeai.frontend.install import invokeai_configure
+        from invokeai.frontend.install.invokeai_configure import invokeai_configure
 
         invokeai_configure()
         sys.exit(0)
@@ -802,6 +789,8 @@ def main():
         curses.echo()
         curses.endwin()
         logger.info("Goodbye! Come back soon.")
+    except WindowTooSmallException as e:
+        logger.error(str(e))
     except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
             logger.error("Insufficient vertical space for the interface. Please make your window taller and try again")

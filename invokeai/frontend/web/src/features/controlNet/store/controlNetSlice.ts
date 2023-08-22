@@ -96,8 +96,11 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { sourceControlNetId, newControlNetId } = action.payload;
-
-      const newControlnet = cloneDeep(state.controlNets[sourceControlNetId]);
+      const oldControlNet = state.controlNets[sourceControlNetId];
+      if (!oldControlNet) {
+        return;
+      }
+      const newControlnet = cloneDeep(oldControlNet);
       newControlnet.controlNetId = newControlNetId;
       state.controlNets[newControlNetId] = newControlnet;
     },
@@ -124,8 +127,11 @@ export const controlNetSlice = createSlice({
       action: PayloadAction<{ controlNetId: string }>
     ) => {
       const { controlNetId } = action.payload;
-      state.controlNets[controlNetId].isEnabled =
-        !state.controlNets[controlNetId].isEnabled;
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+      cn.isEnabled = !cn.isEnabled;
     },
     controlNetImageChanged: (
       state,
@@ -135,12 +141,14 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId, controlImage } = action.payload;
-      state.controlNets[controlNetId].controlImage = controlImage;
-      state.controlNets[controlNetId].processedControlImage = null;
-      if (
-        controlImage !== null &&
-        state.controlNets[controlNetId].processorType !== 'none'
-      ) {
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+
+      cn.controlImage = controlImage;
+      cn.processedControlImage = null;
+      if (controlImage !== null && cn.processorType !== 'none') {
         state.pendingControlImages.push(controlNetId);
       }
     },
@@ -152,8 +160,12 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId, processedControlImage } = action.payload;
-      state.controlNets[controlNetId].processedControlImage =
-        processedControlImage;
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+
+      cn.processedControlImage = processedControlImage;
       state.pendingControlImages = state.pendingControlImages.filter(
         (id) => id !== controlNetId
       );
@@ -166,10 +178,15 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId, model } = action.payload;
-      state.controlNets[controlNetId].model = model;
-      state.controlNets[controlNetId].processedControlImage = null;
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
 
-      if (state.controlNets[controlNetId].shouldAutoConfig) {
+      cn.model = model;
+      cn.processedControlImage = null;
+
+      if (cn.shouldAutoConfig) {
         let processorType: ControlNetProcessorType | undefined = undefined;
 
         for (const modelSubstring in CONTROLNET_MODEL_DEFAULT_PROCESSORS) {
@@ -180,14 +197,13 @@ export const controlNetSlice = createSlice({
         }
 
         if (processorType) {
-          state.controlNets[controlNetId].processorType = processorType;
-          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
-            processorType
-          ].default as RequiredControlNetProcessorNode;
+          cn.processorType = processorType;
+          cn.processorNode = CONTROLNET_PROCESSORS[processorType]
+            .default as RequiredControlNetProcessorNode;
         } else {
-          state.controlNets[controlNetId].processorType = 'none';
-          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS
-            .none.default as RequiredControlNetProcessorNode;
+          cn.processorType = 'none';
+          cn.processorNode = CONTROLNET_PROCESSORS.none
+            .default as RequiredControlNetProcessorNode;
         }
       }
     },
@@ -196,28 +212,48 @@ export const controlNetSlice = createSlice({
       action: PayloadAction<{ controlNetId: string; weight: number }>
     ) => {
       const { controlNetId, weight } = action.payload;
-      state.controlNets[controlNetId].weight = weight;
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+
+      cn.weight = weight;
     },
     controlNetBeginStepPctChanged: (
       state,
       action: PayloadAction<{ controlNetId: string; beginStepPct: number }>
     ) => {
       const { controlNetId, beginStepPct } = action.payload;
-      state.controlNets[controlNetId].beginStepPct = beginStepPct;
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+
+      cn.beginStepPct = beginStepPct;
     },
     controlNetEndStepPctChanged: (
       state,
       action: PayloadAction<{ controlNetId: string; endStepPct: number }>
     ) => {
       const { controlNetId, endStepPct } = action.payload;
-      state.controlNets[controlNetId].endStepPct = endStepPct;
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+
+      cn.endStepPct = endStepPct;
     },
     controlNetControlModeChanged: (
       state,
       action: PayloadAction<{ controlNetId: string; controlMode: ControlModes }>
     ) => {
       const { controlNetId, controlMode } = action.payload;
-      state.controlNets[controlNetId].controlMode = controlMode;
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+
+      cn.controlMode = controlMode;
     },
     controlNetResizeModeChanged: (
       state,
@@ -227,7 +263,12 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId, resizeMode } = action.payload;
-      state.controlNets[controlNetId].resizeMode = resizeMode;
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+
+      cn.resizeMode = resizeMode;
     },
     controlNetProcessorParamsChanged: (
       state,
@@ -240,12 +281,17 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId, changes } = action.payload;
-      const processorNode = state.controlNets[controlNetId].processorNode;
-      state.controlNets[controlNetId].processorNode = {
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+
+      const processorNode = cn.processorNode;
+      cn.processorNode = {
         ...processorNode,
         ...changes,
       };
-      state.controlNets[controlNetId].shouldAutoConfig = false;
+      cn.shouldAutoConfig = false;
     },
     controlNetProcessorTypeChanged: (
       state,
@@ -255,12 +301,16 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId, processorType } = action.payload;
-      state.controlNets[controlNetId].processedControlImage = null;
-      state.controlNets[controlNetId].processorType = processorType;
-      state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
-        processorType
-      ].default as RequiredControlNetProcessorNode;
-      state.controlNets[controlNetId].shouldAutoConfig = false;
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+
+      cn.processedControlImage = null;
+      cn.processorType = processorType;
+      cn.processorNode = CONTROLNET_PROCESSORS[processorType]
+        .default as RequiredControlNetProcessorNode;
+      cn.shouldAutoConfig = false;
     },
     controlNetAutoConfigToggled: (
       state,
@@ -269,37 +319,36 @@ export const controlNetSlice = createSlice({
       }>
     ) => {
       const { controlNetId } = action.payload;
-      const newShouldAutoConfig =
-        !state.controlNets[controlNetId].shouldAutoConfig;
+      const cn = state.controlNets[controlNetId];
+      if (!cn) {
+        return;
+      }
+
+      const newShouldAutoConfig = !cn.shouldAutoConfig;
 
       if (newShouldAutoConfig) {
         // manage the processor for the user
         let processorType: ControlNetProcessorType | undefined = undefined;
 
         for (const modelSubstring in CONTROLNET_MODEL_DEFAULT_PROCESSORS) {
-          if (
-            state.controlNets[controlNetId].model?.model_name.includes(
-              modelSubstring
-            )
-          ) {
+          if (cn.model?.model_name.includes(modelSubstring)) {
             processorType = CONTROLNET_MODEL_DEFAULT_PROCESSORS[modelSubstring];
             break;
           }
         }
 
         if (processorType) {
-          state.controlNets[controlNetId].processorType = processorType;
-          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS[
-            processorType
-          ].default as RequiredControlNetProcessorNode;
+          cn.processorType = processorType;
+          cn.processorNode = CONTROLNET_PROCESSORS[processorType]
+            .default as RequiredControlNetProcessorNode;
         } else {
-          state.controlNets[controlNetId].processorType = 'none';
-          state.controlNets[controlNetId].processorNode = CONTROLNET_PROCESSORS
-            .none.default as RequiredControlNetProcessorNode;
+          cn.processorType = 'none';
+          cn.processorNode = CONTROLNET_PROCESSORS.none
+            .default as RequiredControlNetProcessorNode;
         }
       }
 
-      state.controlNets[controlNetId].shouldAutoConfig = newShouldAutoConfig;
+      cn.shouldAutoConfig = newShouldAutoConfig;
     },
     controlNetReset: () => {
       return { ...initialControlNetState };
@@ -307,9 +356,11 @@ export const controlNetSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(controlNetImageProcessed, (state, action) => {
-      if (
-        state.controlNets[action.payload.controlNetId].controlImage !== null
-      ) {
+      const cn = state.controlNets[action.payload.controlNetId];
+      if (!cn) {
+        return;
+      }
+      if (cn.controlImage !== null) {
         state.pendingControlImages.push(action.payload.controlNetId);
       }
     });
