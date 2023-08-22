@@ -14,6 +14,7 @@ import {
   Node,
   NodeChange,
   OnConnectStartParams,
+  SelectionMode,
   Viewport,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
@@ -103,6 +104,7 @@ export const initialNodesState: NodesState = {
   mouseOverField: null,
   nodesToCopy: [],
   edgesToCopy: [],
+  selectionMode: SelectionMode.Partial,
 };
 
 type FieldValueAction<T extends InputFieldValue> = PayloadAction<{
@@ -721,6 +723,11 @@ const nodesSlice = createSlice({
     addNodePopoverToggled: (state) => {
       state.isAddNodePopoverOpen = !state.isAddNodePopoverOpen;
     },
+    selectionModeChanged: (state, action: PayloadAction<boolean>) => {
+      state.selectionMode = action.payload
+        ? SelectionMode.Full
+        : SelectionMode.Partial;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(receivedOpenAPISchema.pending, (state) => {
@@ -832,6 +839,7 @@ export const {
   addNodePopoverOpened,
   addNodePopoverClosed,
   addNodePopoverToggled,
+  selectionModeChanged,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

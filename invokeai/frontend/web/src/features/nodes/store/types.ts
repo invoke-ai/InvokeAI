@@ -1,4 +1,10 @@
-import { Edge, Node, OnConnectStartParams, Viewport } from 'reactflow';
+import {
+  Edge,
+  Node,
+  OnConnectStartParams,
+  SelectionMode,
+  Viewport,
+} from 'reactflow';
 import {
   FieldIdentifier,
   FieldType,
@@ -32,4 +38,5 @@ export type NodesState = {
   nodesToCopy: Node<NodeData>[];
   edgesToCopy: Edge<InvocationEdgeExtra>[];
   isAddNodePopoverOpen: boolean;
+  selectionMode: SelectionMode;
 };
