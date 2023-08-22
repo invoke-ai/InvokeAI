@@ -2,7 +2,6 @@ import { UseToastOptions } from '@chakra-ui/react';
 import { PayloadAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { InvokeLogLevel } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { t } from 'i18next';
 import { startCase, upperFirst } from 'lodash-es';
 import { LogLevelName } from 'roarr';
@@ -69,10 +68,6 @@ export interface SystemState {
    */
   wereModelsReceived: boolean;
   /**
-   * Whether or not the OpenAPI schema was received and parsed
-   */
-  wasSchemaParsed: boolean;
-  /**
    * The console output logging level
    */
   consoleLogLevel: InvokeLogLevel;
@@ -112,7 +107,6 @@ export const initialSystemState: SystemState = {
   isCancelScheduled: false,
   subscribedNodeIds: [],
   wereModelsReceived: false,
-  wasSchemaParsed: false,
   consoleLogLevel: 'debug',
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
@@ -337,13 +331,6 @@ export const systemSlice = createSlice({
       state.toastQueue.push(
         makeToast({ title: t('toast.canceled'), status: 'warning' })
       );
-    });
-
-    /**
-     * OpenAPI schema was parsed
-     */
-    builder.addCase(nodeTemplatesBuilt, (state) => {
-      state.wasSchemaParsed = true;
     });
 
     // *** Matchers - must be after all cases ***

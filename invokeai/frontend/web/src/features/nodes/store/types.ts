@@ -1,4 +1,3 @@
-import { OpenAPIV3 } from 'openapi-types';
 import { Edge, Node, OnConnectStartParams, Viewport } from 'reactflow';
 import {
   FieldIdentifier,
@@ -13,7 +12,6 @@ import {
 export type NodesState = {
   nodes: Node<NodeData>[];
   edges: Edge<InvocationEdgeExtra>[];
-  schema: OpenAPIV3.Document | null;
   nodeTemplates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   currentConnectionFieldType: FieldType | null;

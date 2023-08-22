@@ -6,6 +6,7 @@ import NodeEditorSettings from './NodeEditorSettings';
 import ClearGraphButton from './ClearGraphButton';
 import NodeInvokeButton from './NodeInvokeButton';
 import ReloadSchemaButton from './ReloadSchemaButton';
+import LoadWorkflowButton from './LoadWorkflowButton';
 
 const TopCenterPanel = () => {
   return (
@@ -16,6 +17,7 @@ const TopCenterPanel = () => {
         <ReloadSchemaButton />
         <ClearGraphButton />
         <NodeEditorSettings />
+        <LoadWorkflowButton />
       </HStack>
     </Panel>
   );

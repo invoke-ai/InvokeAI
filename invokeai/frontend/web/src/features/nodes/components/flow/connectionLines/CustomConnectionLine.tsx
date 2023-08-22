@@ -1,9 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { ConnectionLineComponentProps, getBezierPath } from 'reactflow';
-import { FIELDS, colorTokenToCssVar } from '../../../types/constants';
+import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
+import { FIELDS } from 'features/nodes/types/constants';
 import { memo } from 'react';
+import { ConnectionLineComponentProps, getBezierPath } from 'reactflow';
 
 const selector = createSelector(stateSelector, ({ nodes }) => {
   const { shouldAnimateEdges, currentConnectionFieldType, shouldColorEdges } =
