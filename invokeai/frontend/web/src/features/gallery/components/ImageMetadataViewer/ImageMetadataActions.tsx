@@ -1,5 +1,5 @@
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { UnsafeImageMetadata } from 'services/api/types';
 import ImageMetadataItem from './ImageMetadataItem';
 
@@ -206,4 +206,4 @@ const ImageMetadataActions = (props: Props) => {
   );
 };
 
-export default ImageMetadataActions;
+export default memo(ImageMetadataActions);

@@ -11,4 +11,6 @@ export const nodesPersistDenylist: (keyof NodesState)[] = [
   'selectedNodes',
   'selectedEdges',
   'isReady',
+  'nodesToCopy',
+  'edgesToCopy',
 ];

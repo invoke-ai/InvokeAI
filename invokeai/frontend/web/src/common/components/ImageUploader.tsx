@@ -150,7 +150,9 @@ const ImageUploader = (props: ImageUploaderProps) => {
       {...getRootProps({ style: {} })}
       onKeyDown={(e: KeyboardEvent) => {
         // Bail out if user hits spacebar - do not open the uploader
-        if (e.key === ' ') return;
+        if (e.key === ' ') {
+          return;
+        }
       }}
     >
       <input {...getInputProps()} />

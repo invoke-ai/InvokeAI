@@ -100,14 +100,18 @@ const IAIDndImage = (props: IAIDndImageProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      if (onMouseOver) onMouseOver(e);
+      if (onMouseOver) {
+        onMouseOver(e);
+      }
       setIsHovered(true);
     },
     [onMouseOver]
   );
   const handleMouseOut = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      if (onMouseOut) onMouseOut(e);
+      if (onMouseOut) {
+        onMouseOut(e);
+      }
       setIsHovered(false);
     },
     [onMouseOut]
