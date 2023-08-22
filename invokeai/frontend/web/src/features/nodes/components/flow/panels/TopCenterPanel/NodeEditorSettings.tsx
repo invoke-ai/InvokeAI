@@ -1,6 +1,7 @@
 import {
   Divider,
   Flex,
+  FormLabelProps,
   Heading,
   Modal,
   ModalBody,
@@ -13,17 +14,19 @@ import {
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
-import { ChangeEvent, memo, useCallback } from 'react';
-import { FaCog } from 'react-icons/fa';
 import {
+  selectionModeChanged,
   shouldAnimateEdgesChanged,
   shouldColorEdgesChanged,
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
 } from 'features/nodes/store/nodesSlice';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { ChangeEvent, memo, useCallback } from 'react';
+import { FaCog } from 'react-icons/fa';
+import { SelectionMode } from 'reactflow';
 
 const selector = createSelector(
   stateSelector,
@@ -33,12 +36,14 @@ const selector = createSelector(
       shouldValidateGraph,
       shouldSnapToGrid,
       shouldColorEdges,
+      selectionMode,
     } = nodes;
     return {
       shouldAnimateEdges,
       shouldValidateGraph,
       shouldSnapToGrid,
       shouldColorEdges,
+      selectionModeIsChecked: selectionMode === SelectionMode.Full,
     };
   },
   defaultSelectorOptions
@@ -52,6 +57,7 @@ const NodeEditorSettings = () => {
     shouldValidateGraph,
     shouldSnapToGrid,
     shouldColorEdges,
+    selectionModeIsChecked,
   } = useAppSelector(selector);
 
   const handleChangeShouldValidate = useCallback(
@@ -82,6 +88,13 @@ const NodeEditorSettings = () => {
     [dispatch]
   );
 
+  const handleChangeSelectionMode = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(selectionModeChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+
   return (
     <>
       <IAIIconButton
@@ -105,6 +118,7 @@ const NodeEditorSettings = () => {
             >
               <Heading size="sm">General</Heading>
               <IAISwitch
+                formLabelProps={formLabelProps}
                 onChange={handleChangeShouldAnimate}
                 isChecked={shouldAnimateEdges}
                 label="Animated Edges"
@@ -112,6 +126,7 @@ const NodeEditorSettings = () => {
               />
               <Divider />
               <IAISwitch
+                formLabelProps={formLabelProps}
                 isChecked={shouldSnapToGrid}
                 onChange={handleChangeShouldSnap}
                 label="Snap to Grid"
@@ -119,15 +134,24 @@ const NodeEditorSettings = () => {
               />
               <Divider />
               <IAISwitch
+                formLabelProps={formLabelProps}
                 isChecked={shouldColorEdges}
                 onChange={handleChangeShouldColor}
                 label="Color-Code Edges"
                 helperText="Color-code edges according to their connected fields"
               />
+              <IAISwitch
+                formLabelProps={formLabelProps}
+                isChecked={selectionModeIsChecked}
+                onChange={handleChangeSelectionMode}
+                label="Fully Contain Nodes to Select"
+                helperText="Nodes must be fully inside the selection box to be selected"
+              />
               <Heading size="sm" pt={4}>
                 Advanced
               </Heading>
               <IAISwitch
+                formLabelProps={formLabelProps}
                 isChecked={shouldValidateGraph}
                 onChange={handleChangeShouldValidate}
                 label="Validate Connections and Graph"
@@ -142,3 +166,7 @@ const NodeEditorSettings = () => {
 };
 
 export default memo(NodeEditorSettings);
+
+const formLabelProps: FormLabelProps = {
+  fontWeight: 600,
+};
