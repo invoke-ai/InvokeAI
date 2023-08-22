@@ -4,10 +4,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { map } from 'lodash-es';
 import { useMemo } from 'react';
-import { KIND_MAP } from '../types/constants';
 import { isInvocationNode } from '../types/types';
 
-export const useFieldNames = (nodeId: string, kind: 'input' | 'output') => {
+export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
   const selector = useMemo(
     () =>
       createSelector(
@@ -17,13 +16,19 @@ export const useFieldNames = (nodeId: string, kind: 'input' | 'output') => {
           if (!isInvocationNode(node)) {
             return [];
           }
-          return map(node.data[KIND_MAP[kind]], (field) => field.name).filter(
-            (fieldName) => fieldName !== 'is_intermediate'
-          );
+          const nodeTemplate = nodes.nodeTemplates[node.data.type];
+          if (!nodeTemplate) {
+            return [];
+          }
+          return map(nodeTemplate.inputs)
+            .filter((field) => ['any', 'direct'].includes(field.input))
+            .sort((a, b) => (a.ui_order ?? 0) - (b.ui_order ?? 0))
+            .map((field) => field.name)
+            .filter((fieldName) => fieldName !== 'is_intermediate');
         },
         defaultSelectorOptions
       ),
-    [kind, nodeId]
+    [nodeId]
   );
 
   const fieldNames = useAppSelector(selector);
