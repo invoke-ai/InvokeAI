@@ -142,6 +142,9 @@ export const parseSchema = (
           title: property.title ?? '',
           description: property.description ?? '',
           type: fieldType,
+          ui_hidden: property.ui_hidden ?? false,
+          ui_type: property.ui_type,
+          ui_order: property.ui_order,
         };
 
         return outputsAccumulator;

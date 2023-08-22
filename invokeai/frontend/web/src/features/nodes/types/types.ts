@@ -203,7 +203,7 @@ export type OutputFieldTemplate = {
   type: FieldType;
   title: string;
   description: string;
-};
+} & _OutputField;
 
 /**
  * Indicates the kind of input(s) this field may have.
