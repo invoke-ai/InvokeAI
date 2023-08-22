@@ -16,9 +16,11 @@ import InvokeTabs from 'features/ui/components/InvokeTabs';
 import ParametersDrawer from 'features/ui/components/ParametersDrawer';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
-import { ReactNode, memo, useEffect } from 'react';
+import { ReactNode, memo, useCallback, useEffect } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
+import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 
 const DEFAULT_CONFIG = {};
 
@@ -32,6 +34,11 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
 
   const logger = useLogger();
   const dispatch = useAppDispatch();
+  const handleReset = useCallback(() => {
+    localStorage.clear();
+    location.reload();
+    return false;
+  }, []);
 
   useEffect(() => {
     i18n.changeLanguage(language);
@@ -49,7 +56,10 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   }, [dispatch]);
 
   return (
-    <>
+    <ErrorBoundary
+      onReset={handleReset}
+      FallbackComponent={AppErrorBoundaryFallback}
+    >
       <Grid w="100vw" h="100vh" position="relative" overflow="hidden">
         <ImageUploader>
           <Grid
@@ -87,7 +97,7 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
       <ChangeBoardModal />
       <Toaster />
       <GlobalHotkeys />
-    </>
+    </ErrorBoundary>
   );
 };
 

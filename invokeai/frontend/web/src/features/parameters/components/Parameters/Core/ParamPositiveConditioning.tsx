@@ -1,7 +1,7 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
+import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 
 import { createSelector } from '@reduxjs/toolkit';
 import {
@@ -159,4 +159,4 @@ const ParamPositiveConditioning = () => {
   );
 };
 
-export default ParamPositiveConditioning;
+export default memo(ParamPositiveConditioning);

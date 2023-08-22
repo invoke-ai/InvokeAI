@@ -47,7 +47,9 @@ const useCanvasMouseUp = (
     if (!didMouseMoveRef.current && isDrawing && stageRef.current) {
       const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-      if (!scaledCursorPosition) return;
+      if (!scaledCursorPosition) {
+        return;
+      }
 
       /**
        * Extend the current line.

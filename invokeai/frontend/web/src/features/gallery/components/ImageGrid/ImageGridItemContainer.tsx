@@ -1,5 +1,5 @@
 import { Box, FlexProps, forwardRef } from '@chakra-ui/react';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, memo } from 'react';
 
 type ItemContainerProps = PropsWithChildren & FlexProps;
 const ItemContainer = forwardRef((props: ItemContainerProps, ref) => (
@@ -8,4 +8,4 @@ const ItemContainer = forwardRef((props: ItemContainerProps, ref) => (
   </Box>
 ));
 
-export default ItemContainer;
+export default memo(ItemContainer);

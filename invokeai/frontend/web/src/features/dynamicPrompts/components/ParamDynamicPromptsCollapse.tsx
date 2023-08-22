@@ -8,6 +8,7 @@ import ParamDynamicPromptsCombinatorial from './ParamDynamicPromptsCombinatorial
 import ParamDynamicPromptsToggle from './ParamDynamicPromptsEnabled';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
 import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
+import { memo } from 'react';
 
 const selector = createSelector(
   stateSelector,
@@ -40,4 +41,4 @@ const ParamDynamicPromptsCollapse = () => {
   );
 };
 
-export default ParamDynamicPromptsCollapse;
+export default memo(ParamDynamicPromptsCollapse);

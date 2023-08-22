@@ -3,7 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { isEnabledToggled } from '../store/dynamicPromptsSlice';
 
 const selector = createSelector(
@@ -33,4 +33,4 @@ const ParamDynamicPromptsToggle = () => {
   );
 };
 
-export default ParamDynamicPromptsToggle;
+export default memo(ParamDynamicPromptsToggle);

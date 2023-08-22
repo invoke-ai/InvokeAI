@@ -42,7 +42,6 @@ async function main() {
         // We only want to make fields optional if they are required
         if (!Array.isArray(schemaObject?.required)) {
           schemaObject.required = ['id', 'type'];
-          return;
         }
 
         schemaObject.required.forEach((prop) => {
@@ -68,12 +67,26 @@ async function main() {
 
         return;
       }
-      // if (
-      //   'input' in schemaObject &&
-      //   (schemaObject.input === 'any' || schemaObject.input === 'connection')
-      // ) {
-      //   schemaObject.required = false;
-      // }
+
+      // Check if we are generating types for an invocation output
+      const isInvocationOutputPath = metadata.path.match(
+        /^#\/components\/schemas\/\w*Output$/
+      );
+
+      const hasOutputProperties =
+        schemaObject.properties && 'type' in schemaObject.properties;
+
+      if (isInvocationOutputPath && hasOutputProperties) {
+        if (!Array.isArray(schemaObject?.required)) {
+          schemaObject.required = ['type'];
+        }
+        schemaObject.required = [
+          ...new Set(schemaObject.required.concat(['type'])),
+        ];
+        console.log(
+          `Making output's "type" required: ${COLORS.fg.yellow}${schemaObject.title}${COLORS.reset}`
+        );
+      }
     },
   });
   fs.writeFileSync(OUTPUT_FILE, types);

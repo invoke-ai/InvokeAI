@@ -39,6 +39,7 @@ import {
   ChangeEvent,
   ReactElement,
   cloneElement,
+  memo,
   useCallback,
   useEffect,
 } from 'react';
@@ -398,4 +399,4 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   );
 };
 
-export default SettingsModal;
+export default memo(SettingsModal);

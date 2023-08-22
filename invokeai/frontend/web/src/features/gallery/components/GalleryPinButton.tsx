@@ -5,6 +5,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { togglePinGalleryPanel } from 'features/ui/store/uiSlice';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 
@@ -41,4 +42,4 @@ const GalleryPinButton = () => {
   );
 };
 
-export default GalleryPinButton;
+export default memo(GalleryPinButton);

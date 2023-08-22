@@ -122,6 +122,7 @@ def custom_openapi():
 
     output_schemas = schema(output_types, ref_prefix="#/components/schemas/")
     for schema_key, output_schema in output_schemas["definitions"].items():
+        output_schema["class"] = "output"
         openapi_schema["components"]["schemas"][schema_key] = output_schema
 
         # TODO: note that we assume the schema_key here is the TYPE.__name__
@@ -130,8 +131,8 @@ def custom_openapi():
 
     # Add Node Editor UI helper schemas
     ui_config_schemas = schema([UIConfigBase, _InputField, _OutputField], ref_prefix="#/components/schemas/")
-    for schema_key, output_schema in ui_config_schemas["definitions"].items():
-        openapi_schema["components"]["schemas"][schema_key] = output_schema
+    for schema_key, ui_config_schema in ui_config_schemas["definitions"].items():
+        openapi_schema["components"]["schemas"][schema_key] = ui_config_schema
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
@@ -140,8 +141,8 @@ def custom_openapi():
         output_type_title = output_type_titles[output_type.__name__]
         invoker_schema = openapi_schema["components"]["schemas"][invoker_name]
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
-
         invoker_schema["output"] = outputs_ref
+        invoker_schema["class"] = "invocation"
 
     from invokeai.backend.model_management.models import get_model_config_enums
 

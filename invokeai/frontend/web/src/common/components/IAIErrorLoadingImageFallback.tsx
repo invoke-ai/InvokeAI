@@ -1,4 +1,5 @@
 import { Box, Flex, Icon } from '@chakra-ui/react';
+import { memo } from 'react';
 import { FaExclamation } from 'react-icons/fa';
 
 const IAIErrorLoadingImageFallback = () => {
@@ -39,4 +40,4 @@ const IAIErrorLoadingImageFallback = () => {
   );
 };
 
-export default IAIErrorLoadingImageFallback;
+export default memo(IAIErrorLoadingImageFallback);

@@ -35,13 +35,17 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   return useCallback(
     (e: KonvaEventObject<WheelEvent>) => {
       // stop default scrolling
-      if (!stageRef.current || isMoveStageKeyHeld) return;
+      if (!stageRef.current || isMoveStageKeyHeld) {
+        return;
+      }
 
       e.evt.preventDefault();
 
       const cursorPos = stageRef.current.getPointerPosition();
 
-      if (!cursorPos) return;
+      if (!cursorPos) {
+        return;
+      }
 
       const mousePointTo = {
         x: (cursorPos.x - stageRef.current.x()) / stageScale,
