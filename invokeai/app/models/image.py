@@ -1,31 +1,8 @@
 from enum import Enum
-from typing import Optional, Tuple, Literal
+
 from pydantic import BaseModel, Field
 
 from invokeai.app.util.metaenum import MetaEnum
-from ..invocations.baseinvocation import (
-    BaseInvocationOutput,
-    InvocationConfig,
-)
-
-
-class ImageField(BaseModel):
-    """An image field used for passing image objects between invocations"""
-
-    image_name: Optional[str] = Field(default=None, description="The name of the image")
-
-    class Config:
-        schema_extra = {"required": ["image_name"]}
-
-
-class ColorField(BaseModel):
-    r: int = Field(ge=0, le=255, description="The red component")
-    g: int = Field(ge=0, le=255, description="The green component")
-    b: int = Field(ge=0, le=255, description="The blue component")
-    a: int = Field(ge=0, le=255, description="The alpha component")
-
-    def tuple(self) -> Tuple[int, int, int, int]:
-        return (self.r, self.g, self.b, self.a)
 
 
 class ProgressImage(BaseModel):
@@ -34,50 +11,6 @@ class ProgressImage(BaseModel):
     width: int = Field(description="The effective width of the image in pixels")
     height: int = Field(description="The effective height of the image in pixels")
     dataURL: str = Field(description="The image data as a b64 data URL")
-
-
-class PILInvocationConfig(BaseModel):
-    """Helper class to provide all PIL invocations with additional config"""
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {
-                "tags": ["PIL", "image"],
-            },
-        }
-
-
-class ImageOutput(BaseInvocationOutput):
-    """Base class for invocations that output an image"""
-
-    # fmt: off
-    type: Literal["image_output"] = "image_output"
-    image:      ImageField = Field(default=None, description="The output image")
-    width:             int = Field(description="The width of the image in pixels")
-    height:            int = Field(description="The height of the image in pixels")
-    # fmt: on
-
-    class Config:
-        schema_extra = {"required": ["type", "image", "width", "height"]}
-
-
-class MaskOutput(BaseInvocationOutput):
-    """Base class for invocations that output a mask"""
-
-    # fmt: off
-    type: Literal["mask"] = "mask"
-    mask:      ImageField = Field(default=None, description="The output mask")
-    width:            int = Field(description="The width of the mask in pixels")
-    height:           int = Field(description="The height of the mask in pixels")
-    # fmt: on
-
-    class Config:
-        schema_extra = {
-            "required": [
-                "type",
-                "mask",
-            ]
-        }
 
 
 class ResourceOrigin(str, Enum, metaclass=MetaEnum):

@@ -5,20 +5,15 @@ from contextlib import contextmanager
 from typing import Optional, Dict, Tuple, Any, Union, List
 from pathlib import Path
 
-import torch
-from safetensors.torch import load_file
-from torch.utils.hooks import RemovableHandle
-
-from diffusers.models import UNet2DConditionModel
-from transformers import CLIPTextModel
-from onnx import numpy_helper
-from onnxruntime import OrtValue
 import numpy as np
-
+import torch
 from compel.embeddings_provider import BaseTextualInversionManager
 from diffusers.models import UNet2DConditionModel
 from safetensors.torch import load_file
 from transformers import CLIPTextModel, CLIPTokenizer
+
+from .models.lora import LoRAModel
+
 
 """
 loras = [
@@ -52,7 +47,7 @@ class ModelPatcher:
                 module = module.get_submodule(submodule_name)
                 module_key += "." + submodule_name
                 submodule_name = key_parts.pop(0)
-            except:
+            except Exception:
                 submodule_name += "_" + key_parts.pop(0)
 
         module = module.get_submodule(submodule_name)
@@ -143,7 +138,7 @@ class ModelPatcher:
                         # with torch.autocast(device_type="cpu"):
                         layer.to(dtype=torch.float32)
                         layer_scale = layer.alpha / layer.rank if (layer.alpha and layer.rank) else 1.0
-                        layer_weight = layer.get_weight() * lora_weight * layer_scale
+                        layer_weight = layer.get_weight(original_weights[module_key]) * lora_weight * layer_scale
 
                         if module.weight.shape != layer_weight.shape:
                             # TODO: debug on lycoris
@@ -312,7 +307,8 @@ class TextualInversionManager(BaseTextualInversionManager):
 
 
 class ONNXModelPatcher:
-    from .models.base import IAIOnnxRuntimeModel, OnnxRuntimeModel
+    from .models.base import IAIOnnxRuntimeModel
+    from diffusers import OnnxRuntimeModel
 
     @classmethod
     @contextmanager
@@ -341,7 +337,7 @@ class ONNXModelPatcher:
     def apply_lora(
         cls,
         model: IAIOnnxRuntimeModel,
-        loras: List[Tuple[LoraModel, float]],
+        loras: List[Tuple[LoRAModel, float]],
         prefix: str,
     ):
         from .models.base import IAIOnnxRuntimeModel
@@ -361,7 +357,8 @@ class ONNXModelPatcher:
 
                     layer.to(dtype=torch.float32)
                     layer_key = layer_key.replace(prefix, "")
-                    layer_weight = layer.get_weight().detach().cpu().numpy() * lora_weight
+                    # TODO: rewrite to pass original tensor weight(required by ia3)
+                    layer_weight = layer.get_weight(None).detach().cpu().numpy() * lora_weight
                     if layer_key is blended_loras:
                         blended_loras[layer_key] += layer_weight
                     else:

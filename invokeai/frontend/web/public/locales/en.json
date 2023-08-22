@@ -52,7 +52,7 @@
         "img2img": "Image To Image",
         "unifiedCanvas": "Unified Canvas",
         "linear": "Linear",
-        "nodes": "Node Editor",
+        "nodes": "Workflow Editor",
         "batch": "Batch Manager",
         "modelManager": "Model Manager",
         "postprocessing": "Post Processing",
@@ -133,6 +133,7 @@
         "generalHotkeys": "General Hotkeys",
         "galleryHotkeys": "Gallery Hotkeys",
         "unifiedCanvasHotkeys": "Unified Canvas Hotkeys",
+        "nodesHotkeys": "Nodes Hotkeys",
         "invoke": {
             "title": "Invoke",
             "desc": "Generate an image"
@@ -332,6 +333,10 @@
         "acceptStagingImage": {
             "title": "Accept Staging Image",
             "desc": "Accept Current Staging Area Image"
+        },
+        "addNodes": {
+            "title": "Add Nodes",
+            "desc": "Opens the add node menu"
         }
     },
     "modelManager": {
@@ -503,10 +508,17 @@
         "hiresStrength": "High Res Strength",
         "imageFit": "Fit Initial Image To Output Size",
         "codeformerFidelity": "Fidelity",
+        "maskAdjustmentsHeader": "Mask Adjustments",
+        "maskBlur": "Mask Blur",
+        "maskBlurMethod": "Mask Blur Method",
+        "seamPaintingHeader": "Seam Painting",
         "seamSize": "Seam Size",
         "seamBlur": "Seam Blur",
-        "seamStrength": "Seam Strength",
         "seamSteps": "Seam Steps",
+        "seamStrength": "Seam Strength",
+        "seamThreshold": "Seam Threshold",
+        "seamLowThreshold": "Low",
+        "seamHighThreshold": "High",
         "scaleBeforeProcessing": "Scale Before Processing",
         "scaledWidth": "Scaled W",
         "scaledHeight": "Scaled H",

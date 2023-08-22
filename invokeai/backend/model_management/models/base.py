@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import typing
+import warnings
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import suppress
@@ -11,19 +12,19 @@ from pathlib import Path
 from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
 
 import numpy as np
+import onnx
 import safetensors.torch
 import torch
-from diffusers import DiffusionPipeline, ConfigMixin, OnnxRuntimeModel
-from picklescan.scanner import scan_file_path
-from pydantic import BaseModel, Field
-
-import onnx
+from diffusers import DiffusionPipeline, ConfigMixin, logging as diffusers_logging
 from onnx import numpy_helper
 from onnxruntime import (
     InferenceSession,
     SessionOptions,
     get_available_providers,
 )
+from picklescan.scanner import scan_file_path
+from pydantic import BaseModel, Field
+from transformers import logging as transformers_logging
 
 
 class DuplicateModelException(Exception):
@@ -171,7 +172,7 @@ class ModelBase(metaclass=ABCMeta):
                 fields = value.__annotations__
             try:
                 field = fields["model_format"]
-            except:
+            except Exception:
                 raise Exception(f"Invalid config definition - format field not found({cls.__qualname__})")
 
             if isinstance(field, type) and issubclass(field, str) and issubclass(field, Enum):
@@ -244,7 +245,7 @@ class DiffusersModel(ModelBase):
         try:
             config_data = DiffusionPipeline.load_config(self.model_path)
             # config_data = json.loads(os.path.join(self.model_path, "model_index.json"))
-        except:
+        except Exception:
             raise Exception("Invalid diffusers model! (model_index.json not found or invalid)")
 
         config_data.pop("_ignore_files", None)
@@ -343,7 +344,7 @@ def calc_model_size_by_fs(model_path: str, subfolder: Optional[str] = None, vari
             with open(os.path.join(model_path, file), "r") as f:
                 index_data = json.loads(f.read())
             return int(index_data["metadata"]["total_size"])
-        except:
+        except Exception:
             pass
 
     # calculate files size if there is no index file
@@ -478,7 +479,7 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
     if str(path).endswith(".safetensors"):
         try:
             checkpoint = _fast_safetensors_reader(path)
-        except:
+        except Exception:
             # TODO: create issue for support "meta"?
             checkpoint = safetensors.torch.load_file(path, device="cpu")
     else:
@@ -488,11 +489,6 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
                 raise Exception(f'The model file "{path}" is potentially infected by malware. Aborting import.')
         checkpoint = torch.load(path, map_location=torch.device("meta"))
     return checkpoint
-
-
-import warnings
-from diffusers import logging as diffusers_logging
-from transformers import logging as transformers_logging
 
 
 class SilenceWarnings(object):
@@ -677,7 +673,7 @@ class IAIOnnxRuntimeModel:
             raise Exception("You should call create_session before running model")
 
         inputs = {k: np.array(v) for k, v in kwargs.items()}
-        output_names = self.session.get_outputs()
+        # output_names = self.session.get_outputs()
         # for k in inputs:
         #     self.io_binding.bind_cpu_input(k, inputs[k])
         # for name in output_names:

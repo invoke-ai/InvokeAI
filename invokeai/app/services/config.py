@@ -24,11 +24,10 @@ InvokeAI:
     sequential_guidance: false
     precision: float16
     max_cache_size: 6
-    max_vram_cache_size: 2.7
+    max_vram_cache_size: 0.5
     always_use_cpu: false
     free_gpu_mem: false
   Features:
-    restore: true
     esrgan: true
     patchmatch: true
     internet_available: true
@@ -165,14 +164,15 @@ import pydoc
 import os
 import sys
 from argparse import ArgumentParser
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import OmegaConf, DictConfig, ListConfig
 from pathlib import Path
 from pydantic import BaseSettings, Field, parse_obj_as
-from typing import ClassVar, Dict, List, Set, Literal, Union, get_origin, get_type_hints, get_args
+from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
 
 INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
+DEFAULT_MAX_VRAM = 0.5
 
 
 class InvokeAISettings(BaseSettings):
@@ -189,7 +189,12 @@ class InvokeAISettings(BaseSettings):
         opt = parser.parse_args(argv)
         for name in self.__fields__:
             if name not in self._excluded():
-                setattr(self, name, getattr(opt, name))
+                value = getattr(opt, name)
+                if isinstance(value, ListConfig):
+                    value = list(value)
+                elif isinstance(value, DictConfig):
+                    value = dict(value)
+                setattr(self, name, value)
 
     def to_yaml(self) -> str:
         """
@@ -282,14 +287,10 @@ class InvokeAISettings(BaseSettings):
         return [
             "type",
             "initconf",
-            "gpu_mem_reserved",
-            "max_loaded_models",
             "version",
             "from_file",
             "model",
-            "restore",
             "root",
-            "nsfw_checker",
         ]
 
     class Config:
@@ -388,16 +389,12 @@ class InvokeAIAppConfig(InvokeAISettings):
     internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models", category='Features')
     log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", category='Features')
     patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
-    restore             : bool = Field(default=True, description="Enable/disable face restoration code (DEPRECATED)", category='DEPRECATED')
 
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
     free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
-    max_loaded_models   : int = Field(default=3, gt=0, description="(DEPRECATED: use max_cache_size) Maximum number of models to keep in memory for rapid switching", category='DEPRECATED')
     max_cache_size      : float = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching", category='Memory/Performance')
     max_vram_cache_size : float = Field(default=2.75, ge=0, description="Amount of VRAM reserved for model storage", category='Memory/Performance')
-    gpu_mem_reserved    : float = Field(default=2.75, ge=0, description="DEPRECATED: use max_vram_cache_size. Amount of VRAM reserved for model storage", category='DEPRECATED')
-    nsfw_checker        : bool = Field(default=True, description="DEPRECATED: use Web settings to enable/disable", category='DEPRECATED')
-    precision           : Literal[tuple(['auto','float16','float32','autocast'])] = Field(default='auto',description='Floating point precision', category='Memory/Performance')
+    precision           : Literal['auto', 'float16', 'float32', 'autocast'] = Field(default='auto', description='Floating point precision', category='Memory/Performance')
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
     xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
     tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
@@ -414,17 +411,18 @@ class InvokeAIAppConfig(InvokeAISettings):
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
-    ignore_missing_core_models : bool = Field(default=False, description='Ignore missing models in models/core/convert')
-
-    model               : str = Field(default='stable-diffusion-1.5', description='Initial model name', category='Models')
+    ignore_missing_core_models : bool = Field(default=False, description='Ignore missing models in models/core/convert', category='Features')
 
     log_handlers        : List[str] = Field(default=["console"], description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>"', category="Logging")
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
-    log_format          : Literal[tuple(['plain','color','syslog','legacy'])] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
-    log_level           : Literal[tuple(["debug","info","warning","error","critical"])] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
+    log_format          : Literal['plain', 'color', 'syslog', 'legacy'] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
+    log_level           : Literal["debug", "info", "warning", "error", "critical"] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
     # fmt: on
+
+    class Config:
+        validate_assignment = True
 
     def parse_args(self, argv: List[str] = None, conf: DictConfig = None, clobber=False):
         """
@@ -440,7 +438,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         if conf is None:
             try:
                 conf = OmegaConf.load(self.root_dir / INIT_FILE)
-            except:
+            except Exception:
                 pass
         InvokeAISettings.initconf = conf
 
@@ -459,7 +457,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         """
         if (
             cls.singleton_config is None
-            or type(cls.singleton_config) != cls
+            or type(cls.singleton_config) is not cls
             or (kwargs and cls.singleton_init != kwargs)
         ):
             cls.singleton_config = cls(**kwargs)

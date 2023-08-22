@@ -6,9 +6,12 @@ import {
   ImageResizeInvocation,
   ImageToLatentsInvocation,
 } from 'services/api/types';
+import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   IMAGE_TO_LATENTS,
@@ -18,10 +21,11 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  SDXL_DENOISE_LATENTS,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
-  SDXL_LATENTS_TO_LATENTS,
   SDXL_MODEL_LOADER,
 } from './constants';
+import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Image to Image tab graph.
@@ -79,6 +83,10 @@ export const buildLinearSDXLImageToImageGraph = (
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
 
+  // Construct Style Prompt
+  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
+    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
     id: SDXL_IMAGE_TO_IMAGE_GRAPH,
@@ -92,17 +100,13 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${positivePrompt} ${positiveStylePrompt}`
-          : positiveStylePrompt,
+        style: craftedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: shouldConcatSDXLStylePrompt
-          ? `${negativePrompt} ${negativeStylePrompt}`
-          : negativeStylePrompt,
+        style: craftedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
@@ -114,9 +118,9 @@ export const buildLinearSDXLImageToImageGraph = (
         id: LATENTS_TO_IMAGE,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
-      [SDXL_LATENTS_TO_LATENTS]: {
-        type: 'l2l_sdxl',
-        id: SDXL_LATENTS_TO_LATENTS,
+      [SDXL_DENOISE_LATENTS]: {
+        type: 'denoise_latents',
+        id: SDXL_DENOISE_LATENTS,
         cfg_scale,
         scheduler,
         steps,
@@ -136,34 +140,15 @@ export const buildLinearSDXLImageToImageGraph = (
       },
     },
     edges: [
+      // Connect Model Loader to UNet, CLIP & VAE
       {
         source: {
           node_id: SDXL_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
-          node_id: SDXL_LATENTS_TO_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'unet',
-        },
-      },
-      {
-        source: {
-          node_id: SDXL_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'vae',
-        },
-      },
-      {
-        source: {
-          node_id: SDXL_MODEL_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'vae',
         },
       },
       {
@@ -206,43 +191,14 @@ export const buildLinearSDXLImageToImageGraph = (
           field: 'clip2',
         },
       },
-      {
-        source: {
-          node_id: SDXL_LATENTS_TO_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: SDXL_LATENTS_TO_LATENTS,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: SDXL_LATENTS_TO_LATENTS,
-          field: 'noise',
-        },
-      },
+      // Connect everything to Denoise Latents
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
           field: 'conditioning',
         },
         destination: {
-          node_id: SDXL_LATENTS_TO_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -252,8 +208,39 @@ export const buildLinearSDXLImageToImageGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: SDXL_LATENTS_TO_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'negative_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: NOISE,
+          field: 'noise',
+        },
+        destination: {
+          node_id: SDXL_DENOISE_LATENTS,
+          field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: SDXL_DENOISE_LATENTS,
+          field: 'latents',
+        },
+      },
+      // Decode Denoised Latents To Image
+      {
+        source: {
+          node_id: SDXL_DENOISE_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
         },
       },
     ],
@@ -364,10 +351,18 @@ export const buildLinearSDXLImageToImageGraph = (
     },
   });
 
+  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
+
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, SDXL_LATENTS_TO_LATENTS);
+    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
   }
+
+  // optionally add custom VAE
+  addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
+
+  // add controlnet, mutating `graph`
+  addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

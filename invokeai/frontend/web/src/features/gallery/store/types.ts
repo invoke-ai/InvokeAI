@@ -21,6 +21,5 @@ export type GalleryState = {
   galleryImageMinimumWidth: number;
   selectedBoardId: BoardId;
   galleryView: GalleryView;
-  shouldShowDeleteButton: boolean;
   boardSearchText: string;
 };

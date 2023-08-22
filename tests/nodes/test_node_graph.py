@@ -17,9 +17,10 @@ from invokeai.app.services.graph import (
     IterateInvocation,
 )
 from invokeai.app.invocations.upscale import ESRGANInvocation
-from invokeai.app.invocations.image import *
+
+from invokeai.app.invocations.image import ShowImageInvocation
 from invokeai.app.invocations.math import AddInvocation, SubtractInvocation
-from invokeai.app.invocations.params import ParamIntInvocation
+from invokeai.app.invocations.primitives import IntegerInvocation
 from invokeai.app.services.default_graphs import create_text_to_image
 import pytest
 
@@ -41,7 +42,7 @@ def test_connections_are_compatible():
 
     result = are_connections_compatible(from_node, from_field, to_node, to_field)
 
-    assert result == True
+    assert result is True
 
 
 def test_connections_are_incompatible():
@@ -52,7 +53,7 @@ def test_connections_are_incompatible():
 
     result = are_connections_compatible(from_node, from_field, to_node, to_field)
 
-    assert result == False
+    assert result is False
 
 
 def test_connections_incompatible_with_invalid_fields():
@@ -63,14 +64,14 @@ def test_connections_incompatible_with_invalid_fields():
 
     # From field is invalid
     result = are_connections_compatible(from_node, from_field, to_node, to_field)
-    assert result == False
+    assert result is False
 
     # To field is invalid
     from_field = "image"
     to_field = "invalid_field"
 
     result = are_connections_compatible(from_node, from_field, to_node, to_field)
-    assert result == False
+    assert result is False
 
 
 def test_graph_can_add_node():
@@ -394,7 +395,7 @@ def test_graph_validates():
     e1 = create_edge("1", "image", "2", "image")
     g.add_edge(e1)
 
-    assert g.is_valid() == True
+    assert g.is_valid() is True
 
 
 def test_graph_invalid_if_edges_reference_missing_nodes():
@@ -404,7 +405,7 @@ def test_graph_invalid_if_edges_reference_missing_nodes():
     e1 = create_edge("1", "image", "2", "image")
     g.edges.append(e1)
 
-    assert g.is_valid() == False
+    assert g.is_valid() is False
 
 
 def test_graph_invalid_if_subgraph_invalid():
@@ -419,7 +420,7 @@ def test_graph_invalid_if_subgraph_invalid():
 
     g.nodes[n1.id] = n1
 
-    assert g.is_valid() == False
+    assert g.is_valid() is False
 
 
 def test_graph_invalid_if_has_cycle():
@@ -433,7 +434,7 @@ def test_graph_invalid_if_has_cycle():
     g.edges.append(e1)
     g.edges.append(e2)
 
-    assert g.is_valid() == False
+    assert g.is_valid() is False
 
 
 def test_graph_invalid_with_invalid_connection():
@@ -445,7 +446,7 @@ def test_graph_invalid_with_invalid_connection():
     e1 = create_edge("1", "image", "2", "strength")
     g.edges.append(e1)
 
-    assert g.is_valid() == False
+    assert g.is_valid() is False
 
 
 # TODO: Subgraph operations
@@ -476,13 +477,13 @@ def test_graph_expands_subgraph():
     n1_2 = SubtractInvocation(id="2", b=3)
     n1.graph.add_node(n1_1)
     n1.graph.add_node(n1_2)
-    n1.graph.add_edge(create_edge("1", "a", "2", "a"))
+    n1.graph.add_edge(create_edge("1", "value", "2", "a"))
 
     g.add_node(n1)
 
     n2 = AddInvocation(id="2", b=5)
     g.add_node(n2)
-    g.add_edge(create_edge("1.2", "a", "2", "a"))
+    g.add_edge(create_edge("1.2", "value", "2", "a"))
 
     dg = g.nx_graph_flat()
     assert set(dg.nodes) == set(["1.1", "1.2", "2"])
@@ -499,14 +500,14 @@ def test_graph_subgraph_t2i():
 
     g.add_node(n1)
 
-    n2 = ParamIntInvocation(id="2", a=512)
-    n3 = ParamIntInvocation(id="3", a=256)
+    n2 = IntegerInvocation(id="2", value=512)
+    n3 = IntegerInvocation(id="3", value=256)
 
     g.add_node(n2)
     g.add_node(n3)
 
-    g.add_edge(create_edge("2", "a", "1.width", "a"))
-    g.add_edge(create_edge("3", "a", "1.height", "a"))
+    g.add_edge(create_edge("2", "value", "1.width", "value"))
+    g.add_edge(create_edge("3", "value", "1.height", "value"))
 
     n4 = ShowImageInvocation(id="4")
     g.add_node(n4)
@@ -536,7 +537,7 @@ def test_graph_fails_to_get_missing_subgraph_node():
     g.add_node(n1)
 
     with pytest.raises(NodeNotFoundError):
-        result = g.get_node("1.2")
+        _ = g.get_node("1.2")
 
 
 def test_graph_fails_to_enumerate_non_subgraph_node():
@@ -554,7 +555,7 @@ def test_graph_fails_to_enumerate_non_subgraph_node():
     g.add_node(n2)
 
     with pytest.raises(NodeNotFoundError):
-        result = g.get_node("2.1")
+        _ = g.get_node("2.1")
 
 
 def test_graph_gets_networkx_graph():
@@ -584,7 +585,7 @@ def test_graph_can_serialize():
     g.add_edge(e)
 
     # Not throwing on this line is sufficient
-    json = g.json()
+    _ = g.json()
 
 
 def test_graph_can_deserialize():
@@ -612,4 +613,4 @@ def test_graph_can_deserialize():
 def test_graph_can_generate_schema():
     # Not throwing on this line is sufficient
     # NOTE: if this test fails, it's PROBABLY because a new invocation type is breaking schema generation
-    schema = Graph.schema_json(indent=2)
+    _ = Graph.schema_json(indent=2)

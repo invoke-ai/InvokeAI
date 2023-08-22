@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
 import { isControlNetEnabledToggled } from 'features/controlNet/store/controlNetSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 
 const selector = createSelector(
   stateSelector,
@@ -36,4 +36,4 @@ const ParamControlNetFeatureToggle = () => {
   );
 };
 
-export default ParamControlNetFeatureToggle;
+export default memo(ParamControlNetFeatureToggle);

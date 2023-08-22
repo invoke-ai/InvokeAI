@@ -13,3 +13,10 @@ sdxl/main/SDXL with VAE:
   vae: sdxl/vae/sdxl-vae-fp16-fix/
   variant: normal
   format: diffusers
+
+sdxl/main/SDXL with empty VAE:
+  path: sdxl/main/SDXL base 1_0
+  description: SDXL with customized VAE
+  vae: ''
+  variant: normal
+  format: diffusers

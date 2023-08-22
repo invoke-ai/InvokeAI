@@ -27,8 +27,8 @@ def write_log_message(results, output_cntr):
     log_lines = [f"{path}: {prompt}\n" for path, prompt in results]
     if len(log_lines) > 1:
         subcntr = 1
-        for l in log_lines:
-            print(f"[{output_cntr}.{subcntr}] {l}", end="")
+        for ll in log_lines:
+            print(f"[{output_cntr}.{subcntr}] {ll}", end="")
             subcntr += 1
     else:
         print(f"[{output_cntr}] {log_lines[0]}", end="")

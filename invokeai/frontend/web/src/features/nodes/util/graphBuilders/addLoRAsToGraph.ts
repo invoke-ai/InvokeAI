@@ -9,7 +9,6 @@ import {
   CLIP_SKIP,
   LORA_LOADER,
   MAIN_MODEL_LOADER,
-  ONNX_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
@@ -36,15 +35,11 @@ export const addLoRAsToGraph = (
     | undefined;
 
   if (loraCount > 0) {
-    // Remove MAIN_MODEL_LOADER unet connection to feed it to LoRAs
+    // Remove modelLoaderNodeId unet connection to feed it to LoRAs
     graph.edges = graph.edges.filter(
       (e) =>
         !(
-          e.source.node_id === MAIN_MODEL_LOADER &&
-          ['unet'].includes(e.source.field)
-        ) &&
-        !(
-          e.source.node_id === ONNX_MODEL_LOADER &&
+          e.source.node_id === modelLoaderNodeId &&
           ['unet'].includes(e.source.field)
         )
     );
@@ -72,7 +67,7 @@ export const addLoRAsToGraph = (
     };
 
     // add the lora to the metadata accumulator
-    if (metadataAccumulator) {
+    if (metadataAccumulator?.loras) {
       metadataAccumulator.loras.push({
         lora: { model_name, base_model },
         weight,

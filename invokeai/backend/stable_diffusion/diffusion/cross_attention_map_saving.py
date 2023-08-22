@@ -5,8 +5,6 @@ import torch
 from torchvision.transforms.functional import InterpolationMode
 from torchvision.transforms.functional import resize as tv_resize
 
-from .cross_attention_control import CrossAttentionType, get_cross_attention_modules
-
 
 class AttentionMapSaver:
     def __init__(self, token_ids: range, latents_shape: torch.Size):

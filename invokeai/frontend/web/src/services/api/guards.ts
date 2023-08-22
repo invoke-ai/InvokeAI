@@ -3,8 +3,6 @@ import {
   GraphExecutionState,
   GraphInvocationOutput,
   ImageOutput,
-  MaskOutput,
-  PromptOutput,
   IterateInvocationOutput,
   CollectInvocationOutput,
   ImageField,
@@ -47,14 +45,6 @@ export const isImageOutput = (
 export const isLatentsOutput = (
   output: GraphExecutionState['results'][string]
 ): output is LatentsOutput => output?.type === 'latents_output';
-
-export const isMaskOutput = (
-  output: GraphExecutionState['results'][string]
-): output is MaskOutput => output?.type === 'mask';
-
-export const isPromptOutput = (
-  output: GraphExecutionState['results'][string]
-): output is PromptOutput => output?.type === 'prompt';
 
 export const isGraphOutput = (
   output: GraphExecutionState['results'][string]

@@ -4,13 +4,15 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
-import ParamSDXLRefinerAestheticScore from './SDXLRefiner/ParamSDXLRefinerAestheticScore';
 import ParamSDXLRefinerCFGScale from './SDXLRefiner/ParamSDXLRefinerCFGScale';
 import ParamSDXLRefinerModelSelect from './SDXLRefiner/ParamSDXLRefinerModelSelect';
+import ParamSDXLRefinerNegativeAestheticScore from './SDXLRefiner/ParamSDXLRefinerNegativeAestheticScore';
+import ParamSDXLRefinerPositiveAestheticScore from './SDXLRefiner/ParamSDXLRefinerPositiveAestheticScore';
 import ParamSDXLRefinerScheduler from './SDXLRefiner/ParamSDXLRefinerScheduler';
 import ParamSDXLRefinerStart from './SDXLRefiner/ParamSDXLRefinerStart';
 import ParamSDXLRefinerSteps from './SDXLRefiner/ParamSDXLRefinerSteps';
 import ParamUseSDXLRefiner from './SDXLRefiner/ParamUseSDXLRefiner';
+import { memo } from 'react';
 
 const selector = createSelector(
   stateSelector,
@@ -38,11 +40,12 @@ const ParamSDXLRefinerCollapse = () => {
           <ParamSDXLRefinerCFGScale />
         </Flex>
         <ParamSDXLRefinerScheduler />
-        <ParamSDXLRefinerAestheticScore />
+        <ParamSDXLRefinerPositiveAestheticScore />
+        <ParamSDXLRefinerNegativeAestheticScore />
         <ParamSDXLRefinerStart />
       </Flex>
     </IAICollapse>
   );
 };
 
-export default ParamSDXLRefinerCollapse;
+export default memo(ParamSDXLRefinerCollapse);

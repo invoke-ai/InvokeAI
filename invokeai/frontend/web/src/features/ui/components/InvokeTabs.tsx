@@ -11,11 +11,10 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
-import { RootState } from 'app/store/store';
+import { RootState, stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
-import { configSelector } from 'features/system/store/configSelectors';
 import { InvokeTabName, tabMap } from 'features/ui/store/tabMap';
 import { setActiveTab, togglePanels } from 'features/ui/store/uiSlice';
 import { ResourceKey } from 'i18next';
@@ -37,7 +36,6 @@ import NodesTab from './tabs/Nodes/NodesTab';
 import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
-import { systemSelector } from '../../system/store/systemSelectors';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
@@ -77,27 +75,13 @@ const tabs: InvokeTabInfo[] = [
     icon: <Icon as={FaCube} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <ModelManagerTab />,
   },
-  // {
-  //   id: 'batch',
-  //   icon: <Icon as={FaLayerGroup} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
-  //   content: <BatchTab />,
-  // },
 ];
 
 const enabledTabsSelector = createSelector(
-  [configSelector, systemSelector],
-  (config, system) => {
+  [stateSelector],
+  ({ config }) => {
     const { disabledTabs } = config;
-    const { isNodesEnabled } = system;
-
-    const enabledTabs = tabs.filter((tab) => {
-      if (tab.id === 'nodes') {
-        return isNodesEnabled && !disabledTabs.includes(tab.id);
-      } else {
-        return !disabledTabs.includes(tab.id);
-      }
-    });
-
+    const enabledTabs = tabs.filter((tab) => !disabledTabs.includes(tab.id));
     return enabledTabs;
   },
   {
@@ -185,6 +169,7 @@ const InvokeTabs = () => {
 
   return (
     <Tabs
+      variant="appTabs"
       defaultIndex={activeTab}
       index={activeTab}
       onChange={handleTabChange}

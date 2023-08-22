@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { toastQueueSelector } from 'features/system/store/systemSelectors';
 import { addToast, clearToastQueue } from 'features/system/store/systemSlice';
 import { MakeToastArg, makeToast } from 'features/system/util/makeToast';
-import { useCallback, useEffect } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 
 /**
  * Logical component. Watches the toast queue and makes toasts when the queue is not empty.
@@ -44,4 +44,4 @@ export const useAppToaster = () => {
   return toaster;
 };
 
-export default Toaster;
+export default memo(Toaster);

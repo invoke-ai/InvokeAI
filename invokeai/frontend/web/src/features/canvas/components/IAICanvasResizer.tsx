@@ -12,7 +12,7 @@ import {
   setDoesCanvasNeedScaling,
 } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { useLayoutEffect, useRef } from 'react';
+import { memo, useLayoutEffect, useRef } from 'react';
 
 const canvasResizerSelector = createSelector(
   canvasSelector,
@@ -42,7 +42,9 @@ const IAICanvasResizer = () => {
 
   useLayoutEffect(() => {
     window.setTimeout(() => {
-      if (!ref.current) return;
+      if (!ref.current) {
+        return;
+      }
 
       const { clientWidth, clientHeight } = ref.current;
 
@@ -86,4 +88,4 @@ const IAICanvasResizer = () => {
   );
 };
 
-export default IAICanvasResizer;
+export default memo(IAICanvasResizer);

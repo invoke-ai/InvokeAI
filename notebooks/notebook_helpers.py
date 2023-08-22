@@ -8,9 +8,8 @@ from google.colab import files
 from IPython.display import Image as ipyimg
 import ipywidgets as widgets
 from PIL import Image
-from numpy import asarray
 from einops import rearrange, repeat
-import torch, torchvision
+import torchvision
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.util import ismap
 import time
@@ -68,14 +67,14 @@ def get_custom_cond(mode):
 
     elif mode == "text_conditional":
         w = widgets.Text(value="A cake with cream!", disabled=True)
-        display(w)
+        display(w)  # noqa: F821
 
         with open(f"{dest}/{mode}/custom_{w.value[:20]}.txt", "w") as f:
             f.write(w.value)
 
     elif mode == "class_conditional":
         w = widgets.IntSlider(min=0, max=1000)
-        display(w)
+        display(w)  # noqa: F821
         with open(f"{dest}/{mode}/custom.txt", "w") as f:
             f.write(w.value)
 
@@ -96,7 +95,7 @@ def select_cond_path(mode):
     onlyfiles = [f for f in sorted(os.listdir(path))]
 
     selected = widgets.RadioButtons(options=onlyfiles, description="Select conditioning:", disabled=False)
-    display(selected)
+    display(selected)  # noqa: F821
     selected_path = os.path.join(path, selected.value)
     return selected_path
 
@@ -123,7 +122,7 @@ def get_cond(mode, selected_path):
 
 
 def visualize_cond_img(path):
-    display(ipyimg(filename=path))
+    display(ipyimg(filename=path))  # noqa: F821
 
 
 def run(model, selected_path, task, custom_steps, resize_enabled=False, classifier_ckpt=None, global_step=None):
@@ -331,7 +330,7 @@ def make_convolutional_sample(
         x_sample_noquant = model.decode_first_stage(sample, force_not_quantize=True)
         log["sample_noquant"] = x_sample_noquant
         log["sample_diff"] = torch.abs(x_sample_noquant - x_sample)
-    except:
+    except Exception:
         pass
 
     log["sample"] = x_sample

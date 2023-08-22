@@ -1,7 +1,7 @@
 import { Flex, Image, Text } from '@chakra-ui/react';
 import InvokeAILogoImage from 'assets/images/logo.png';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useRef } from 'react';
+import { memo, useRef } from 'react';
 import { useHoverDirty } from 'react-use';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
@@ -66,4 +66,4 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
   );
 };
 
-export default InvokeAILogoComponent;
+export default memo(InvokeAILogoComponent);

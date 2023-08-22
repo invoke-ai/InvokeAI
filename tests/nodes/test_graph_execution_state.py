@@ -90,17 +90,17 @@ def test_graph_state_executes_in_order(simple_graph, mock_services):
 
 def test_graph_is_complete(simple_graph, mock_services):
     g = GraphExecutionState(graph=simple_graph)
-    n1 = invoke_next(g, mock_services)
-    n2 = invoke_next(g, mock_services)
-    n3 = g.next()
+    _ = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
+    _ = g.next()
 
     assert g.is_complete()
 
 
 def test_graph_is_not_complete(simple_graph, mock_services):
     g = GraphExecutionState(graph=simple_graph)
-    n1 = invoke_next(g, mock_services)
-    n2 = g.next()
+    _ = invoke_next(g, mock_services)
+    _ = g.next()
 
     assert not g.is_complete()
 
@@ -116,14 +116,14 @@ def test_graph_state_expands_iterator(mock_services):
     graph.add_node(AddInvocation(id="3", b=1))
     graph.add_edge(create_edge("0", "collection", "1", "collection"))
     graph.add_edge(create_edge("1", "item", "2", "a"))
-    graph.add_edge(create_edge("2", "a", "3", "a"))
+    graph.add_edge(create_edge("2", "value", "3", "a"))
 
     g = GraphExecutionState(graph=graph)
     while not g.is_complete():
         invoke_next(g, mock_services)
 
     prepared_add_nodes = g.source_prepared_mapping["3"]
-    results = set([g.results[n].a for n in prepared_add_nodes])
+    results = set([g.results[n].value for n in prepared_add_nodes])
     expected = set([1, 11, 21])
     assert results == expected
 
@@ -140,11 +140,11 @@ def test_graph_state_collects(mock_services):
     graph.add_edge(create_edge("3", "prompt", "4", "item"))
 
     g = GraphExecutionState(graph=graph)
-    n1 = invoke_next(g, mock_services)
-    n2 = invoke_next(g, mock_services)
-    n3 = invoke_next(g, mock_services)
-    n4 = invoke_next(g, mock_services)
-    n5 = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
     n6 = invoke_next(g, mock_services)
 
     assert isinstance(n6[0], CollectInvocation)
@@ -195,10 +195,10 @@ def test_graph_executes_depth_first(mock_services):
     graph.add_edge(create_edge("prompt_iterated", "prompt", "prompt_successor", "prompt"))
 
     g = GraphExecutionState(graph=graph)
-    n1 = invoke_next(g, mock_services)
-    n2 = invoke_next(g, mock_services)
-    n3 = invoke_next(g, mock_services)
-    n4 = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
 
     # Because ordering is not guaranteed, we cannot compare results directly.
     # Instead, we must count the number of results.
@@ -211,17 +211,17 @@ def test_graph_executes_depth_first(mock_services):
     assert get_completed_count(g, "prompt_iterated") == 1
     assert get_completed_count(g, "prompt_successor") == 0
 
-    n5 = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
 
     assert get_completed_count(g, "prompt_iterated") == 1
     assert get_completed_count(g, "prompt_successor") == 1
 
-    n6 = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
 
     assert get_completed_count(g, "prompt_iterated") == 2
     assert get_completed_count(g, "prompt_successor") == 1
 
-    n7 = invoke_next(g, mock_services)
+    _ = invoke_next(g, mock_services)
 
     assert get_completed_count(g, "prompt_iterated") == 2
     assert get_completed_count(g, "prompt_successor") == 2

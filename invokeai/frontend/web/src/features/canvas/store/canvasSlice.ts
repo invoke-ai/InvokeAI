@@ -47,7 +47,7 @@ export const initialCanvasState: CanvasState = {
   boundingBoxCoordinates: { x: 0, y: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
-  boundingBoxScaleMethod: 'auto',
+  boundingBoxScaleMethod: 'none',
   brushColor: { r: 90, g: 90, b: 255, a: 1 },
   brushSize: 50,
   canvasContainerDimensions: { width: 0, height: 0 },
@@ -397,7 +397,9 @@ export const canvasSlice = createSlice({
       const { tool, layer, brushColor, brushSize, shouldRestrictStrokesToBox } =
         state;
 
-      if (tool === 'move' || tool === 'colorPicker') return;
+      if (tool === 'move' || tool === 'colorPicker') {
+        return;
+      }
 
       const newStrokeWidth = brushSize / 2;
 
@@ -434,14 +436,18 @@ export const canvasSlice = createSlice({
     addPointToCurrentLine: (state, action: PayloadAction<number[]>) => {
       const lastLine = state.layerState.objects.findLast(isCanvasAnyLine);
 
-      if (!lastLine) return;
+      if (!lastLine) {
+        return;
+      }
 
       lastLine.points.push(...action.payload);
     },
     undo: (state) => {
       const targetState = state.pastLayerStates.pop();
 
-      if (!targetState) return;
+      if (!targetState) {
+        return;
+      }
 
       state.futureLayerStates.unshift(cloneDeep(state.layerState));
 
@@ -454,7 +460,9 @@ export const canvasSlice = createSlice({
     redo: (state) => {
       const targetState = state.futureLayerStates.shift();
 
-      if (!targetState) return;
+      if (!targetState) {
+        return;
+      }
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 

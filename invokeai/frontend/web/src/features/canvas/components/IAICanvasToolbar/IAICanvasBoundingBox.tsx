@@ -19,7 +19,7 @@ import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Group, Rect, Transformer } from 'react-konva';
 
@@ -85,7 +85,9 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     useState(false);
 
   useEffect(() => {
-    if (!transformerRef.current || !shapeRef.current) return;
+    if (!transformerRef.current || !shapeRef.current) {
+      return;
+    }
     transformerRef.current.nodes([shapeRef.current]);
     transformerRef.current.getLayer()?.batchDraw();
   }, []);
@@ -133,7 +135,9 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
      * not its width and height. We need to un-scale the width and height before
      * setting the values.
      */
-    if (!shapeRef.current) return;
+    if (!shapeRef.current) {
+      return;
+    }
 
     const rect = shapeRef.current;
 
@@ -313,4 +317,4 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   );
 };
 
-export default IAICanvasBoundingBox;
+export default memo(IAICanvasBoundingBox);
