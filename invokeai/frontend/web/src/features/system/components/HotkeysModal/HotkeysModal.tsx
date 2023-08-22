@@ -290,7 +290,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: t('hotkeys.addNodes.title'),
       desc: t('hotkeys.addNodes.desc'),
-      hotkey: 'Shift + A',
+      hotkey: 'Shift + A / Space',
     },
   ];
 
