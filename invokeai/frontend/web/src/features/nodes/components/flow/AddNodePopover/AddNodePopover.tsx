@@ -140,7 +140,7 @@ const AddNodePopover = () => {
     onClose();
   }, [onClose]);
 
-  useHotkeys(['space', '/'], handleHotkeyOpen);
+  useHotkeys(['shift+a', 'space', '/'], handleHotkeyOpen);
   useHotkeys(['escape'], handleHotkeyClose);
 
   return (
