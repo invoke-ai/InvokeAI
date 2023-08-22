@@ -27,21 +27,10 @@ async function main() {
        * field accepts connection input. If it does, we can make the field optional.
        */
 
-      // Check if we are generating types for an invocation
-      const isInvocationPath = metadata.path.match(
-        /^#\/components\/schemas\/\w*Invocation$/
-      );
-
-      const hasInvocationProperties =
-        schemaObject.properties &&
-        ['id', 'is_intermediate', 'type'].every(
-          (prop) => prop in schemaObject.properties
-        );
-
-      if (isInvocationPath && hasInvocationProperties) {
+      if ('class' in schemaObject && schemaObject.class === 'invocation') {
         // We only want to make fields optional if they are required
         if (!Array.isArray(schemaObject?.required)) {
-          schemaObject.required = ['id', 'type'];
+          schemaObject.required = [];
         }
 
         schemaObject.required.forEach((prop) => {
@@ -60,32 +49,12 @@ async function main() {
             );
           }
         });
-
-        schemaObject.required = [
-          ...new Set(schemaObject.required.concat(['id', 'type'])),
-        ];
-
         return;
       }
 
       // Check if we are generating types for an invocation output
-      const isInvocationOutputPath = metadata.path.match(
-        /^#\/components\/schemas\/\w*Output$/
-      );
-
-      const hasOutputProperties =
-        schemaObject.properties && 'type' in schemaObject.properties;
-
-      if (isInvocationOutputPath && hasOutputProperties) {
-        if (!Array.isArray(schemaObject?.required)) {
-          schemaObject.required = ['type'];
-        }
-        schemaObject.required = [
-          ...new Set(schemaObject.required.concat(['type'])),
-        ];
-        console.log(
-          `Making output's "type" required: ${COLORS.fg.yellow}${schemaObject.title}${COLORS.reset}`
-        );
+      if ('class' in schemaObject && schemaObject.class === 'output') {
+        // modify output types
       }
     },
   });
