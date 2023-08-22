@@ -10,6 +10,7 @@ import ParamSeamPaintingCollapse from 'features/parameters/components/Parameters
 import ParamPromptArea from 'features/parameters/components/Parameters/Prompt/ParamPromptArea';
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import UnifiedCanvasCoreParameters from './UnifiedCanvasCoreParameters';
+import { memo } from 'react';
 
 const UnifiedCanvasParameters = () => {
   return (
@@ -30,4 +31,4 @@ const UnifiedCanvasParameters = () => {
   );
 };
 
-export default UnifiedCanvasParameters;
+export default memo(UnifiedCanvasParameters);

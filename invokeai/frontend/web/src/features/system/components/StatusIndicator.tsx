@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ResourceKey } from 'i18next';
-import { useMemo, useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaCircle } from 'react-icons/fa';
 import { useHoverDirty } from 'react-use';
@@ -125,4 +125,4 @@ const StatusIndicator = () => {
   );
 };
 
-export default StatusIndicator;
+export default memo(StatusIndicator);

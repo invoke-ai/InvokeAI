@@ -1,4 +1,5 @@
 import { Box, Flex, Heading } from '@chakra-ui/react';
+import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 type ImageUploadOverlayProps = {
@@ -87,4 +88,4 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
     </Box>
   );
 };
-export default ImageUploadOverlay;
+export default memo(ImageUploadOverlay);

@@ -23,7 +23,7 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
   return (
     <IAISlider
       isDisabled={!isEnabled}
-      label={'Weight'}
+      label="Weight"
       value={weight}
       onChange={handleWeightChanged}
       min={0}
