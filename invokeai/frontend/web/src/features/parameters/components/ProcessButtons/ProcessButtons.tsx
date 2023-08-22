@@ -1,6 +1,7 @@
 import { Flex } from '@chakra-ui/react';
 import CancelButton from './CancelButton';
 import InvokeButton from './InvokeButton';
+import { memo } from 'react';
 
 /**
  * Buttons to start and cancel image generation.
@@ -14,4 +15,4 @@ const ProcessButtons = () => {
   );
 };
 
-export default ProcessButtons;
+export default memo(ProcessButtons);

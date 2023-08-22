@@ -4,6 +4,7 @@ import { isEqual } from 'lodash-es';
 
 import { Group, Rect } from 'react-konva';
 import { canvasSelector } from '../store/canvasSelectors';
+import { memo } from 'react';
 
 const selector = createSelector(
   canvasSelector,
@@ -67,4 +68,4 @@ const IAICanvasBoundingBoxOverlay = () => {
   );
 };
 
-export default IAICanvasBoundingBoxOverlay;
+export default memo(IAICanvasBoundingBoxOverlay);

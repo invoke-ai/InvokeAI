@@ -3,19 +3,26 @@ import {
   LoRAModelParam,
   MainModelParam,
   OnnxModelParam,
+  SchedulerParam,
   VaeModelParam,
 } from 'features/parameters/types/parameterSchemas';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Edge, Node } from 'reactflow';
+import { components } from 'services/api/schema';
 import {
   Graph,
+  GraphExecutionState,
   ImageDTO,
   ImageField,
   _InputField,
   _OutputField,
 } from 'services/api/types';
-import { AnyInvocationType, ProgressImage } from 'services/events/types';
+import {
+  AnyInvocationType,
+  AnyResult,
+  ProgressImage,
+} from 'services/events/types';
 import { O } from 'ts-toolbelt';
 import { z } from 'zod';
 
@@ -98,6 +105,7 @@ export const zFieldType = z.enum([
   // region Misc
   'FilePath',
   'enum',
+  'Scheduler',
   // endregion
 ]);
 
@@ -137,7 +145,8 @@ export type InputFieldValue =
   | CollectionInputFieldValue
   | CollectionItemInputFieldValue
   | ColorInputFieldValue
-  | ImageCollectionInputFieldValue;
+  | ImageCollectionInputFieldValue
+  | SchedulerInputFieldValue;
 
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
@@ -167,7 +176,8 @@ export type InputFieldTemplate =
   | CollectionInputFieldTemplate
   | CollectionItemInputFieldTemplate
   | ColorInputFieldTemplate
-  | ImageCollectionInputFieldTemplate;
+  | ImageCollectionInputFieldTemplate
+  | SchedulerInputFieldTemplate;
 
 /**
  * An output field is persisted across as part of the user's local state.
@@ -322,6 +332,11 @@ export type ColorInputFieldValue = InputFieldValueBase & {
   value?: RgbaColor;
 };
 
+export type SchedulerInputFieldValue = InputFieldValueBase & {
+  type: 'Scheduler';
+  value?: SchedulerParam;
+};
+
 export type InputFieldTemplateBase = {
   name: string;
   title: string;
@@ -456,6 +471,11 @@ export type ColorInputFieldTemplate = InputFieldTemplateBase & {
   type: 'ColorField';
 };
 
+export type SchedulerInputFieldTemplate = InputFieldTemplateBase & {
+  default: SchedulerParam;
+  type: 'Scheduler';
+};
+
 export const isInputFieldValue = (
   field?: InputFieldValue | OutputFieldValue
 ): field is InputFieldValue => Boolean(field && field.fieldKind === 'input');
@@ -475,11 +495,8 @@ export type TypeHints = {
 
 export type InvocationSchemaExtra = {
   output: OpenAPIV3.ReferenceObject; // the output of the invocation
-  ui?: {
-    tags?: string[];
-    title?: string;
-  };
   title: string;
+  tags?: string[];
   properties: Omit<
     NonNullable<OpenAPIV3.SchemaObject['properties']> &
       (_InputField | _OutputField),
@@ -501,6 +518,18 @@ export type InvocationBaseSchemaObject = Omit<
 > &
   InvocationSchemaExtra;
 
+export type InvocationOutputSchemaObject = Omit<
+  OpenAPIV3.SchemaObject,
+  'properties'
+> &
+  OpenAPIV3.SchemaObject['properties'] & {
+    type: Omit<OpenAPIV3.SchemaObject, 'default'> & {
+      default: AnyInvocationType;
+    };
+  } & {
+    class: 'output';
+  };
+
 export type InvocationFieldSchema = OpenAPIV3.SchemaObject & _InputField;
 
 export interface ArraySchemaObject extends InvocationBaseSchemaObject {
@@ -511,11 +540,30 @@ export interface NonArraySchemaObject extends InvocationBaseSchemaObject {
   type?: OpenAPIV3.NonArraySchemaObjectType;
 }
 
-export type InvocationSchemaObject = ArraySchemaObject | NonArraySchemaObject;
+export type InvocationSchemaObject = (
+  | ArraySchemaObject
+  | NonArraySchemaObject
+) & { class: 'invocation' };
+
+export const isSchemaObject = (
+  obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
+): obj is OpenAPIV3.SchemaObject => !('$ref' in obj);
 
 export const isInvocationSchemaObject = (
-  obj: OpenAPIV3.ReferenceObject | InvocationSchemaObject
-): obj is InvocationSchemaObject => !('$ref' in obj);
+  obj:
+    | OpenAPIV3.ReferenceObject
+    | OpenAPIV3.SchemaObject
+    | InvocationSchemaObject
+): obj is InvocationSchemaObject =>
+  'class' in obj && obj.class === 'invocation';
+
+export const isInvocationOutputSchemaObject = (
+  obj:
+    | OpenAPIV3.ReferenceObject
+    | OpenAPIV3.SchemaObject
+    | InvocationOutputSchemaObject
+): obj is InvocationOutputSchemaObject =>
+  'class' in obj && obj.class === 'output';
 
 export const isInvocationFieldSchema = (
   obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
@@ -657,14 +705,44 @@ export enum NodeStatus {
   FAILED,
 }
 
+type SavedOutput =
+  | components['schemas']['StringOutput']
+  | components['schemas']['IntegerOutput']
+  | components['schemas']['FloatOutput']
+  | components['schemas']['ImageOutput'];
+
+export const isSavedOutput = (
+  output: GraphExecutionState['results'][string]
+): output is SavedOutput =>
+  Boolean(
+    output &&
+      [
+        'string_output',
+        'integer_output',
+        'float_output',
+        'image_output',
+      ].includes(output?.type)
+  );
+
 export type NodeExecutionState = {
+  nodeId: string;
   status: NodeStatus;
   progress: number | null;
   progressImage: ProgressImage | null;
   error: string | null;
+  outputs: AnyResult[];
 };
 
 export type FieldIdentifier = {
   nodeId: string;
   fieldName: string;
+};
+
+export type FieldComponentProps<
+  V extends InputFieldValue,
+  T extends InputFieldTemplate
+> = {
+  nodeId: string;
+  field: V;
+  fieldTemplate: T;
 };

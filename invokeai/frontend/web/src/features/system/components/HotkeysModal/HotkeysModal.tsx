@@ -286,6 +286,14 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     },
   ];
 
+  const nodesHotkeys = [
+    {
+      title: t('hotkeys.addNodes.title'),
+      desc: t('hotkeys.addNodes.desc'),
+      hotkey: 'Shift + A',
+    },
+  ];
+
   const renderHotkeyModalItems = (hotkeys: HotkeyList[]) => (
     <Flex flexDir="column" gap={4}>
       {hotkeys.map((hotkey, i) => (
@@ -375,6 +383,22 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
                   </AccordionButton>
                   <AccordionPanel>
                     {renderHotkeyModalItems(unifiedCanvasHotkeys)}
+                  </AccordionPanel>
+                </AccordionItem>
+
+                <AccordionItem>
+                  <AccordionButton>
+                    <Flex
+                      width="100%"
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <h2>{t('hotkeys.nodesHotkeys')}</h2>
+                      <AccordionIcon />
+                    </Flex>
+                  </AccordionButton>
+                  <AccordionPanel>
+                    {renderHotkeyModalItems(nodesHotkeys)}
                   </AccordionPanel>
                 </AccordionItem>
               </Flex>

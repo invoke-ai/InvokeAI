@@ -93,5 +93,9 @@ export const buildInputFieldValue = (
     fieldValue.value = undefined;
   }
 
+  if (template.type === 'Scheduler') {
+    fieldValue.value = 'euler';
+  }
+
   return fieldValue;
 };
