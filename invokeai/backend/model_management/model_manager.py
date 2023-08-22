@@ -628,12 +628,17 @@ class ModelManager(object):
             if model_type is not None and cur_model_type != model_type:
                 continue
 
+            model_dtype = self._instantiate(cur_model_name, cur_base_model, cur_model_type).get_data_type()
+            if isinstance(model_dtype, torch.dtype):
+                model_dtype = str(model_dtype).rsplit(".", 1)[-1]
+
             model_dict = dict(
                 **model_config.dict(exclude_defaults=True),
                 # OpenAPIModelInfoBase
                 model_name=cur_model_name,
                 base_model=cur_base_model,
                 model_type=cur_model_type,
+                dtype=model_dtype,
             )
 
             # expose paths as absolute to help web UI

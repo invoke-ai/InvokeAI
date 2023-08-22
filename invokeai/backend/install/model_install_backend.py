@@ -10,15 +10,14 @@ from tempfile import TemporaryDirectory
 from typing import Optional, List, Dict, Callable, Union, Set
 
 import requests
+import torch
 from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
-import torch
 from huggingface_hub import hf_hub_url, HfFolder, HfApi
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
 import invokeai.configs as configs
-
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_management import ModelManager, ModelType, BaseModelType, ModelVariantType, AddModelResult
 from invokeai.backend.model_management.model_probe import ModelProbe, SchedulerPredictionType, ModelProbeInfo
@@ -166,7 +165,7 @@ class ModelInstall(object):
         installed = self.mgr.list_models(model_type=model_type)
         print(f"Installed models of type `{model_type}`:")
         for i in installed:
-            print(f"{i['model_name']}\t{i['base_model']}\t{i['path']}")
+            print(f"{i['model_name']}\t{i['base_model']}\t{i['path']}\t{i['dtype']}")
 
     # logic here a little reversed to maintain backward compatibility
     def starter_models(self, all_models: bool = False) -> Set[str]:

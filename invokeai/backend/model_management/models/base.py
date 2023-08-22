@@ -1,4 +1,5 @@
 import inspect
+import itertools
 import json
 import os
 import sys
@@ -9,7 +10,7 @@ from collections import defaultdict
 from contextlib import suppress
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
+from typing import List, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
 
 import numpy as np
 import onnx
@@ -37,6 +38,11 @@ class InvalidModelException(Exception):
 
 class ModelNotFoundException(Exception):
     pass
+
+
+class SerializationFormat(Enum):
+    Safetensors = "safetensors"
+    Pickle = "pickle"
 
 
 class BaseModelType(str, Enum):
@@ -219,6 +225,22 @@ class ModelBase(metaclass=ABCMeta):
     def save_to_config(cls) -> bool:
         raise NotImplementedError()
 
+    def get_data_type(self, child_type: Optional[SubModelType] = None) -> torch.dtype:
+        path = Path(self.model_path)
+        if path.is_dir():
+            file_types = _get_format_and_type_in_directory(path)
+            return self._reduce_collection_of_dtypes(dtype for (_, dtype) in file_types.values())
+        else:
+            return calc_file_format_and_dtype(path)[1]
+
+    def _reduce_collection_of_dtypes(self, dtypes):
+        unique_types = set(dtypes)
+        if len(unique_types) == 1:
+            return unique_types.pop()
+        else:
+            # FIXME: How do we want to represent models with different types of submodels?
+            return f"MIXED {unique_types}"
+
     @abstractmethod
     def get_size(self, child_type: Optional[SubModelType] = None) -> int:
         raise NotImplementedError()
@@ -239,22 +261,13 @@ class DiffusersModel(ModelBase):
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         super().__init__(model_path, base_model, model_type)
 
-        self.child_types: Dict[str, Type] = dict()
-        self.child_sizes: Dict[str, int] = dict()
+        self.child_types: dict[SubModelType, Type] = {}
+        self.child_sizes: dict[SubModelType, int] = {}
 
-        try:
-            config_data = DiffusionPipeline.load_config(self.model_path)
-            # config_data = json.loads(os.path.join(self.model_path, "model_index.json"))
-        except Exception:
-            raise Exception("Invalid diffusers model! (model_index.json not found or invalid)")
+        component_configs = self._child_components()
 
-        config_data.pop("_ignore_files", None)
-
-        # retrieve all folder_names that contain relevant files
-        child_components = [k for k, v in config_data.items() if isinstance(v, list)]
-
-        for child_name in child_components:
-            child_type = self._hf_definition_to_type(config_data[child_name])
+        for child_name, child_config in component_configs.items():
+            child_type = self._hf_definition_to_type(child_config)
             self.child_types[child_name] = child_type
             self.child_sizes[child_name] = calc_model_size_by_fs(self.model_path, subfolder=child_name)
 
@@ -263,6 +276,41 @@ class DiffusersModel(ModelBase):
             return sum(self.child_sizes.values())
         else:
             return self.child_sizes[child_type]
+
+    def _child_components(self):
+        # FIXME: refactor this out of DiffusionPipeline so we can use it without loading the pipeline's weights
+        from diffusers.pipelines.pipeline_utils import _get_pipeline_class
+
+        try:
+            # noinspection PyTypeChecker
+            config: dict = DiffusionPipeline.load_config(self.model_path)
+        except Exception:
+            raise Exception(f"Invalid diffusers model! (model_index.json not found or invalid in {self.model_path})")
+        pipeline_class: Type[DiffusionPipeline] = _get_pipeline_class(DiffusionPipeline, config)
+        expected_modules, optional_parameters = pipeline_class._get_signature_keys(pipeline_class)
+        components = {k: v for (k, v) in config.items() if not k.startswith("_") and k not in optional_parameters}
+        return components
+
+    def get_data_type(self, child_type: Optional[SubModelType] = None) -> torch.dtype:
+        if child_type is not None:
+            files_and_types = self._get_weights_files_and_types(child_type)
+        else:
+            files_and_types = {}
+            for child_type, child_class in self.child_types.items():
+                if not child_class:
+                    continue
+                relative_path = self._get_child_path(child_type).relative_to(self.model_path)
+                for file_path, file_info in self._get_weights_files_and_types(child_type).items():
+                    files_and_types[relative_path / file_path] = file_info
+
+        return self._reduce_collection_of_dtypes(dtype for (_, dtype) in files_and_types.values())
+
+    def _get_weights_files_and_types(self, child_type: SubModelType) -> (str, torch.dtype):
+        path = self._get_child_path(child_type)
+        return _get_format_and_type_in_directory(path)
+
+    def _get_child_path(self, child_type: SubModelType) -> Path:
+        return Path(self.model_path) / child_type
 
     def get_model(
         self,
@@ -458,21 +506,43 @@ def _predominant_dtype(tensors: dict[Any, torch.Tensor]) -> torch.dtype:
     return sizes[0][0]
 
 
-def calc_file_format_and_dtype(path: Path) -> (str, torch.dtype):
+def calc_file_format_and_dtype(path: Path) -> (SerializationFormat, torch.dtype):
     """Find the predominant tensor data type.
 
     If the file contains multiple types of tensors, return the type with the largest
     number of bytes allocated to it.
     """
     if path.suffix == ".safetensors":
-        file_format = "safetensors"
+        file_format = SerializationFormat.Safetensors
     else:
-        file_format = "pickle"
+        file_format = SerializationFormat.Pickle
 
     tensors = read_checkpoint_meta(path)
     dtype = _predominant_dtype(tensors)
 
     return file_format, dtype
+
+
+def _get_format_and_type_in_directory(model_path: Path) -> dict[Path, (SerializationFormat, torch.dtype)]:
+    extensions = ["safetensors", "ckpt", "bin", "pt"]
+    if model_path.is_dir():
+        tensor_paths = list(itertools.chain.from_iterable(model_path.glob(f"**/*.{ext}") for ext in extensions))
+    else:
+        tensor_paths = [model_path]
+
+    dtypes: dict[Any, Any] = {}
+
+    for path in tensor_paths:
+        file_format, dtype = calc_file_format_and_dtype(path)
+
+        if model_path.is_dir():
+            relative_path = path.relative_to(model_path)
+        else:
+            relative_path = path.relative_to(model_path.parent)
+
+        dtypes[relative_path] = (file_format, dtype)
+
+    return dtypes
 
 
 def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
