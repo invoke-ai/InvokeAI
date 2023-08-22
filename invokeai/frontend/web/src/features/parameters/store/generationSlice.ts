@@ -313,7 +313,9 @@ export const generationSlice = createSlice({
     });
     builder.addCase(setShouldShowAdvancedOptions, (state, action) => {
       const advancedOptionsStatus = action.payload;
-      if (!advancedOptionsStatus) state.clipSkip = 0;
+      if (!advancedOptionsStatus) {
+        state.clipSkip = 0;
+      }
     });
   },
 });

@@ -24,6 +24,9 @@ export const useMantineSelectStyles = () => {
 
   const { colorMode } = useColorMode();
   const [boxShadow] = useToken('shadows', ['dark-lg']);
+  const [space1, space2, space6] = useToken('space', [1, 2, 6]);
+  const [radiiBase] = useToken('radii', ['base']);
+  const [lineHeightsBase] = useToken('lineHeights', ['base']);
 
   const styles = useCallback(
     () => ({
@@ -35,11 +38,22 @@ export const useMantineSelectStyles = () => {
         '::after': { borderTopColor: mode(base300, base700)(colorMode) },
       },
       input: {
+        border: 'unset',
         backgroundColor: mode(base50, base900)(colorMode),
+        borderRadius: radiiBase,
+        borderStyle: 'solid',
         borderWidth: '2px',
         borderColor: mode(base200, base800)(colorMode),
         color: mode(base900, base100)(colorMode),
-        paddingRight: 24,
+        minHeight: 'unset',
+        lineHeight: lineHeightsBase,
+        height: 'auto',
+        paddingRight: 0,
+        paddingLeft: 0,
+        paddingInlineStart: space2,
+        paddingInlineEnd: space6,
+        paddingTop: space1,
+        paddingBottom: space1,
         fontWeight: 600,
         '&:hover': { borderColor: mode(base300, base600)(colorMode) },
         '&:focus': {
@@ -127,6 +141,11 @@ export const useMantineSelectStyles = () => {
       base900,
       boxShadow,
       colorMode,
+      lineHeightsBase,
+      radiiBase,
+      space1,
+      space2,
+      space6,
     ]
   );
 

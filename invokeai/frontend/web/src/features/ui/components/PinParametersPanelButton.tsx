@@ -6,6 +6,7 @@ import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvas
 import { useTranslation } from 'react-i18next';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import { setShouldPinParametersPanel } from '../store/uiSlice';
+import { memo } from 'react';
 
 type PinParametersPanelButtonProps = Omit<IAIIconButtonProps, 'aria-label'>;
 
@@ -55,4 +56,4 @@ const PinParametersPanelButton = (props: PinParametersPanelButtonProps) => {
   );
 };
 
-export default PinParametersPanelButton;
+export default memo(PinParametersPanelButton);

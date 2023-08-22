@@ -1,18 +1,19 @@
-import { makeToast } from 'features/system/util/makeToast';
+import { ButtonProps } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { useTranslation } from 'react-i18next';
 import { FaSync } from 'react-icons/fa';
 import { useSyncModelsMutation } from 'services/api/endpoints/models';
 
-type SyncModelsButtonProps = {
+type SyncModelsButtonProps = ButtonProps & {
   iconMode?: boolean;
 };
 
 export default function SyncModelsButton(props: SyncModelsButtonProps) {
-  const { iconMode = false } = props;
+  const { iconMode = false, ...rest } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -50,6 +51,7 @@ export default function SyncModelsButton(props: SyncModelsButtonProps) {
       isLoading={isLoading}
       onClick={syncModelsHandler}
       minW="max-content"
+      {...rest}
     >
       Sync Models
     </IAIButton>
@@ -61,6 +63,7 @@ export default function SyncModelsButton(props: SyncModelsButtonProps) {
       isLoading={isLoading}
       onClick={syncModelsHandler}
       size="sm"
+      {...rest}
     />
   );
 }

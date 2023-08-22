@@ -14,7 +14,7 @@ import {
   ResizeCallback,
   ResizeStartCallback,
 } from 're-resizable';
-import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, memo, useEffect, useMemo, useRef, useState } from 'react';
 import { LangDirection } from './types';
 import {
   getHandleEnables,
@@ -193,4 +193,4 @@ const ResizableDrawer = ({
   );
 };
 
-export default ResizableDrawer;
+export default memo(ResizableDrawer);

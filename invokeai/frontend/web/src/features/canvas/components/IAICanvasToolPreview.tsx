@@ -10,6 +10,7 @@ import {
   COLOR_PICKER_SIZE,
   COLOR_PICKER_STROKE_RADIUS,
 } from '../util/constants';
+import { memo } from 'react';
 
 const canvasBrushPreviewSelector = createSelector(
   canvasSelector,
@@ -134,7 +135,9 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
     clip,
   } = useAppSelector(canvasBrushPreviewSelector);
 
-  if (!shouldDrawBrushPreview) return null;
+  if (!shouldDrawBrushPreview) {
+    return null;
+  }
 
   return (
     <Group listening={false} {...clip} {...rest}>
@@ -206,4 +209,4 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
   );
 };
 
-export default IAICanvasToolPreview;
+export default memo(IAICanvasToolPreview);

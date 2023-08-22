@@ -5,6 +5,7 @@ import { clearCanvasHistory } from 'features/canvas/store/canvasSlice';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 import { isStagingSelector } from '../store/canvasSelectors';
+import { memo } from 'react';
 
 const ClearCanvasHistoryButtonModal = () => {
   const isStaging = useAppSelector(isStagingSelector);
@@ -28,4 +29,4 @@ const ClearCanvasHistoryButtonModal = () => {
     </IAIAlertDialog>
   );
 };
-export default ClearCanvasHistoryButtonModal;
+export default memo(ClearCanvasHistoryButtonModal);

@@ -1,4 +1,5 @@
 import { Flex, Icon } from '@chakra-ui/react';
+import { memo } from 'react';
 import { FaImage } from 'react-icons/fa';
 
 const SelectImagePlaceholder = () => {
@@ -19,4 +20,4 @@ const SelectImagePlaceholder = () => {
   );
 };
 
-export default SelectImagePlaceholder;
+export default memo(SelectImagePlaceholder);

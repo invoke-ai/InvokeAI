@@ -7,7 +7,7 @@ import { Rect } from 'react-konva';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import Konva from 'konva';
 import { isNumber } from 'lodash-es';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 export const canvasMaskCompositerSelector = createSelector(
   canvasSelector,
@@ -125,7 +125,9 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   }, [offset]);
 
   useEffect(() => {
-    if (fillPatternImage) return;
+    if (fillPatternImage) {
+      return;
+    }
     const image = new Image();
 
     image.onload = () => {
@@ -135,7 +137,9 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   }, [fillPatternImage, maskColorString]);
 
   useEffect(() => {
-    if (!fillPatternImage) return;
+    if (!fillPatternImage) {
+      return;
+    }
     fillPatternImage.src = getColoredSVG(maskColorString);
   }, [fillPatternImage, maskColorString]);
 
@@ -151,8 +155,9 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
     !isNumber(stageScale) ||
     !isNumber(stageDimensions.width) ||
     !isNumber(stageDimensions.height)
-  )
+  ) {
     return null;
+  }
 
   return (
     <Rect
@@ -172,4 +177,4 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   );
 };
 
-export default IAICanvasMaskCompositer;
+export default memo(IAICanvasMaskCompositer);

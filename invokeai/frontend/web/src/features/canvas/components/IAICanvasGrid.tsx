@@ -6,7 +6,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { isEqual, range } from 'lodash-es';
 
-import { ReactNode, useCallback, useLayoutEffect, useState } from 'react';
+import { ReactNode, memo, useCallback, useLayoutEffect, useState } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';
 
 const selector = createSelector(
@@ -117,4 +117,4 @@ const IAICanvasGrid = () => {
   return <Group>{gridLines}</Group>;
 };
 
-export default IAICanvasGrid;
+export default memo(IAICanvasGrid);

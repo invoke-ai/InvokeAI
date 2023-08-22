@@ -155,6 +155,9 @@ export type ZoeDepthImageProcessorInvocation =
 
 // Node Outputs
 export type ImageOutput = s['ImageOutput'];
+export type StringOutput = s['StringOutput'];
+export type FloatOutput = s['FloatOutput'];
+export type IntegerOutput = s['IntegerOutput'];
 export type IterateInvocationOutput = s['IterateInvocationOutput'];
 export type CollectInvocationOutput = s['CollectInvocationOutput'];
 export type LatentsOutput = s['LatentsOutput'];

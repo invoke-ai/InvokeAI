@@ -23,6 +23,11 @@ module.exports = {
   plugins: ['react', '@typescript-eslint', 'eslint-plugin-react-hooks'],
   root: true,
   rules: {
+    curly: 'error',
+    'react/jsx-curly-brace-presence': [
+      'error',
+      { props: 'never', children: 'never' },
+    ],
     'react-hooks/exhaustive-deps': 'error',
     'no-var': 'error',
     'brace-style': 'error',
