@@ -102,7 +102,7 @@ class PromptsToFileInvocation(BaseInvocation):
     type: Literal['prompt_to_file'] = 'prompt_to_file'
 
     # Inputs
-    file_path: str = InputField(description="Path to prompt text file")
+    file_path: str = InputField(description="Path to prompt text file", ui_type=UIType.FilePath)
     prompts: Union[str, list[str], None] = InputField(default=None, description="Prompt or collection of prompts to write", ui_type=UIType.String)
     append: bool = InputField(default=True, description="Append or overwrite file")
     #fmt: on
