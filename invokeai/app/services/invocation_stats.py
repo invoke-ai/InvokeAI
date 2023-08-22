@@ -34,7 +34,6 @@ from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from typing import Dict
-from pydantic import ValidationError
 
 import torch
 
