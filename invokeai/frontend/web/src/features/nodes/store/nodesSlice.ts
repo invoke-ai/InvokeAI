@@ -56,6 +56,8 @@ import {
 import { NodesState } from './types';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
+export const WORKFLOW_FORMAT_VERSION = '1.0.0';
+
 const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
   status: NodeStatus.PENDING,
   error: null,
@@ -64,10 +66,23 @@ const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
   outputs: [],
 };
 
+export const initialWorkflow = {
+  meta: {
+    version: WORKFLOW_FORMAT_VERSION,
+  },
+  name: '',
+  author: '',
+  description: '',
+  notes: '',
+  tags: '',
+  contact: '',
+  version: '',
+  exposedFields: [],
+};
+
 export const initialNodesState: NodesState = {
   nodes: [],
   edges: [],
-  schema: null,
   nodeTemplates: {},
   isReady: false,
   connectionStartParams: null,
@@ -82,16 +97,7 @@ export const initialNodesState: NodesState = {
   nodeOpacity: 1,
   selectedNodes: [],
   selectedEdges: [],
-  workflow: {
-    name: '',
-    author: '',
-    description: '',
-    notes: '',
-    tags: '',
-    contact: '',
-    version: '',
-    exposedFields: [],
-  },
+  workflow: initialWorkflow,
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
   mouseOverField: null,
@@ -570,15 +576,6 @@ const nodesSlice = createSlice({
     nodeOpacityChanged: (state, action: PayloadAction<number>) => {
       state.nodeOpacity = action.payload;
     },
-    loadFileNodes: (
-      state,
-      action: PayloadAction<Node<InvocationNodeData>[]>
-    ) => {
-      state.nodes = action.payload;
-    },
-    loadFileEdges: (state, action: PayloadAction<Edge[]>) => {
-      state.edges = action.payload;
-    },
     workflowNameChanged: (state, action: PayloadAction<string>) => {
       state.workflow.name = action.payload;
     },
@@ -615,6 +612,9 @@ const nodesSlice = createSlice({
         edges.map((edge) => ({ item: edge, type: 'add' })),
         []
       );
+    },
+    workflowReset: (state) => {
+      state.workflow = cloneDeep(initialWorkflow);
     },
     viewportChanged: (state, action: PayloadAction<Viewport>) => {
       state.viewport = action.payload;
@@ -726,9 +726,6 @@ const nodesSlice = createSlice({
     builder.addCase(receivedOpenAPISchema.pending, (state) => {
       state.isReady = false;
     });
-    builder.addCase(receivedOpenAPISchema.fulfilled, (state, action) => {
-      state.schema = action.payload;
-    });
     builder.addCase(appSocketInvocationStarted, (state, action) => {
       const { source_node_id } = action.payload.data;
       const node = state.nodeExecutionStates[source_node_id];
@@ -792,8 +789,6 @@ export const {
   nodeTemplatesBuilt,
   nodeEditorReset,
   imageCollectionFieldValueChanged,
-  loadFileNodes,
-  loadFileEdges,
   fieldStringValueChanged,
   fieldNumberValueChanged,
   fieldBooleanValueChanged,

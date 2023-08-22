@@ -8,10 +8,12 @@ type Props = {
   label: string;
   data: object | string;
   fileName?: string;
+  withDownload?: boolean;
+  withCopy?: boolean;
 };
 
 const DataViewer = (props: Props) => {
-  const { label, data, fileName } = props;
+  const { label, data, fileName, withDownload = true, withCopy = true } = props;
   const dataString = useMemo(
     () => (isString(data) ? data : JSON.stringify(data, null, 2)),
     [data]
@@ -70,24 +72,28 @@ const DataViewer = (props: Props) => {
         </OverlayScrollbarsComponent>
       </Box>
       <Flex sx={{ position: 'absolute', top: 0, insetInlineEnd: 0, p: 2 }}>
-        <Tooltip label={`Save ${label} JSON`}>
-          <IconButton
-            aria-label={`Save ${label} JSON`}
-            icon={<FaSave />}
-            variant="ghost"
-            opacity={0.7}
-            onClick={handleSave}
-          />
-        </Tooltip>
-        <Tooltip label={`Copy ${label} JSON`}>
-          <IconButton
-            aria-label={`Copy ${label} JSON`}
-            icon={<FaCopy />}
-            variant="ghost"
-            opacity={0.7}
-            onClick={handleCopy}
-          />
-        </Tooltip>
+        {withDownload && (
+          <Tooltip label={`Save ${label} JSON`}>
+            <IconButton
+              aria-label={`Save ${label} JSON`}
+              icon={<FaSave />}
+              variant="ghost"
+              opacity={0.7}
+              onClick={handleSave}
+            />
+          </Tooltip>
+        )}
+        {withCopy && (
+          <Tooltip label={`Copy ${label} JSON`}>
+            <IconButton
+              aria-label={`Copy ${label} JSON`}
+              icon={<FaCopy />}
+              variant="ghost"
+              opacity={0.7}
+              onClick={handleCopy}
+            />
+          </Tooltip>
+        )}
       </Flex>
     </Flex>
   );

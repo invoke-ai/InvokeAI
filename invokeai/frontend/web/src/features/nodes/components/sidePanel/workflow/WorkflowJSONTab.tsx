@@ -31,7 +31,7 @@ const WorkflowJSONTab = () => {
         h: 'full',
       }}
     >
-      <DataViewer data={workflow} label="Workflow" fileName={workflow.name} />
+      <DataViewer data={workflow} label="Workflow" />
     </Flex>
   );
 };

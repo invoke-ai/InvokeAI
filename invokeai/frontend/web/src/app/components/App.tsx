@@ -32,7 +32,7 @@ interface Props {
 const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   const language = useAppSelector(languageSelector);
 
-  const logger = useLogger();
+  const logger = useLogger('system');
   const dispatch = useAppDispatch();
   const handleReset = useCallback(() => {
     localStorage.clear();
@@ -46,7 +46,7 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
 
   useEffect(() => {
     if (size(config)) {
-      logger.info({ namespace: 'App', config }, 'Received config');
+      logger.info({ config }, 'Received config');
       dispatch(configChanged(config));
     }
   }, [dispatch, config, logger]);
