@@ -13,13 +13,13 @@ There are several node grouping concepts that can be examined with a narrow focu
 
 ### Noise
 
-As described, an initial noise tensor is necessary for the latent diffusion process. As a result, the Denoising node requires a noise node input.  
+An initial noise tensor is necessary for the latent diffusion process. As a result, the Denoising node requires a noise node input.  
 
 ![groupsnoise](../assets/nodes/groupsnoise.png)
 
 ### Conditioning
 
-As described, conditioning is necessary for the latent diffusion process, whether empty or not. As a result, the Denoising node requires positive and negative conditioning inputs. Conditioning is reliant on a CLIP tokenizer provided by the Model Loader node.
+Conditioning is necessary for the latent diffusion process, whether empty or not. As a result, the Denoising node requires positive and negative conditioning inputs. Conditioning is reliant on a CLIP text encoder provided by the Model Loader node.
 
 ![groupsconditioning](../assets/nodes/groupsconditioning.png)
 
