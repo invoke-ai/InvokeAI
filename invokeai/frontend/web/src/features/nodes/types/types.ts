@@ -53,6 +53,10 @@ export type InvocationTemplate = {
    * Array of the invocation outputs
    */
   outputs: Record<string, OutputFieldTemplate>;
+  /**
+   * The type of this node's output
+   */
+  outputType: string; // TODO: generate a union of output types
 };
 
 export type FieldUIConfig = {
@@ -521,14 +525,15 @@ export type InvocationBaseSchemaObject = Omit<
 export type InvocationOutputSchemaObject = Omit<
   OpenAPIV3.SchemaObject,
   'properties'
-> &
-  OpenAPIV3.SchemaObject['properties'] & {
+> & {
+  properties: OpenAPIV3.SchemaObject['properties'] & {
     type: Omit<OpenAPIV3.SchemaObject, 'default'> & {
-      default: AnyInvocationType;
+      default: string;
     };
   } & {
     class: 'output';
   };
+};
 
 export type InvocationFieldSchema = OpenAPIV3.SchemaObject & _InputField;
 
