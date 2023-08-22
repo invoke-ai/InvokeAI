@@ -740,7 +740,7 @@ export type FieldIdentifier = {
 
 export type FieldComponentProps<
   V extends InputFieldValue,
-  T extends InputFieldTemplate
+  T extends InputFieldTemplate,
 > = {
   nodeId: string;
   field: V;
