@@ -6215,6 +6215,8 @@ export type components = {
       ui_hidden: boolean;
       ui_type?: components["schemas"]["UIType"];
       ui_component?: components["schemas"]["UIComponent"];
+      /** Ui Order */
+      ui_order?: number;
     };
     /**
      * _OutputField
@@ -6227,6 +6229,8 @@ export type components = {
       /** Ui Hidden */
       ui_hidden: boolean;
       ui_type?: components["schemas"]["UIType"];
+      /** Ui Order */
+      ui_order?: number;
     };
     /**
      * StableDiffusion1ModelFormat
@@ -6234,12 +6238,6 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * ControlNetModelFormat
      * @description An enumeration.
@@ -6258,6 +6256,12 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
   };
   responses: never;
   parameters: never;
