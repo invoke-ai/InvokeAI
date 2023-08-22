@@ -29,7 +29,7 @@
     "lint:eslint": "eslint --max-warnings=0 .",
     "lint:prettier": "prettier --check .",
     "lint:tsc": "tsc --noEmit",
-    "lint": "yarn run lint:eslint && yarn run lint:prettier && yarn run lint:tsc && yarn run lint:madge",
+    "lint": "concurrently -g -n eslint,prettier,tsc,madge -c cyan,green,magenta,yellow \"yarn run lint:eslint\" \"yarn run lint:prettier\" \"yarn run lint:tsc\" \"yarn run lint:madge\"",
     "fix": "eslint --fix . && prettier --loglevel warn --write . && tsc --noEmit",
     "lint-staged": "lint-staged",
     "postinstall": "patch-package && yarn run theme",
