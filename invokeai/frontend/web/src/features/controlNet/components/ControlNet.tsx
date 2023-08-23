@@ -83,10 +83,6 @@ const ControlNet = (props: ControlNetProps) => {
         p: 3,
         borderRadius: 'base',
         position: 'relative',
-        bg: 'base.200',
-        _dark: {
-          bg: 'base.850',
-        },
       }}
     >
       <Flex sx={{ gap: 2, alignItems: 'center' }}>

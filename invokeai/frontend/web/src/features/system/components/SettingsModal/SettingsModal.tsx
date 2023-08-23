@@ -42,6 +42,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
@@ -113,6 +114,7 @@ type SettingsModalProps = {
 const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const [countdown, setCountdown] = useState(3);
 
   const shouldShowBetaLayout = config?.shouldShowBetaLayout ?? true;
   const shouldShowDeveloperSettings =
@@ -179,7 +181,14 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     });
     onSettingsModalClose();
     onRefreshModalOpen();
+    setInterval(() => setCountdown((prev) => prev - 1), 1000);
   }, [onSettingsModalClose, onRefreshModalOpen]);
+
+  useEffect(() => {
+    if (countdown <= 0) {
+      window.location.reload();
+    }
+  }, [countdown]);
 
   const handleLogLevelChanged = useCallback(
     (v: string) => {
@@ -381,6 +390,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
         isOpen={isRefreshModalOpen}
         onClose={onRefreshModalClose}
         isCentered
+        closeOnEsc={false}
       >
         <ModalOverlay backdropFilter="blur(40px)" />
         <ModalContent>
@@ -388,7 +398,9 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
           <ModalBody>
             <Flex justifyContent="center">
               <Text fontSize="lg">
-                <Text>{t('settings.resetComplete')}</Text>
+                <Text>
+                  {t('settings.resetComplete')} Reloading in {countdown}...
+                </Text>
               </Text>
             </Flex>
           </ModalBody>

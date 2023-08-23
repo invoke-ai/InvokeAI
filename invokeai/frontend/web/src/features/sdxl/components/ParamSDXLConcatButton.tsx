@@ -9,10 +9,6 @@ export default function ParamSDXLConcatButton() {
     (state: RootState) => state.sdxl.shouldConcatSDXLStylePrompt
   );
 
-  const shouldPinParametersPanel = useAppSelector(
-    (state: RootState) => state.ui.shouldPinParametersPanel
-  );
-
   const dispatch = useAppDispatch();
 
   const handleShouldConcatPromptChange = () => {
@@ -31,7 +27,7 @@ export default function ParamSDXLConcatButton() {
       sx={{
         position: 'absolute',
         insetInlineEnd: 1,
-        top: shouldPinParametersPanel ? 12 : 20,
+        top: 6,
         border: 'none',
         color: shouldConcatSDXLStylePrompt ? 'accent.500' : 'base.500',
         _hover: {
