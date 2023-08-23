@@ -1,36 +1,36 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
-import { setRefineStrength } from 'features/parameters/store/generationSlice';
+import { setCanvasRefineSteps } from 'features/parameters/store/generationSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const ParamRefineStrength = () => {
+const ParamCanvasRefineSteps = () => {
   const dispatch = useAppDispatch();
-  const refineStrength = useAppSelector(
-    (state: RootState) => state.generation.refineStrength
+  const canvasRefineSteps = useAppSelector(
+    (state: RootState) => state.generation.canvasRefineSteps
   );
   const { t } = useTranslation();
 
   return (
     <IAISlider
-      label={t('parameters.refineStrength')}
+      label={t('parameters.refineSteps')}
       min={0}
-      max={1}
-      step={0.01}
+      max={100}
+      step={1}
       sliderNumberInputProps={{ max: 999 }}
-      value={refineStrength}
+      value={canvasRefineSteps}
       onChange={(v) => {
-        dispatch(setRefineStrength(v));
+        dispatch(setCanvasRefineSteps(v));
       }}
       withInput
       withSliderMarks
       withReset
       handleReset={() => {
-        dispatch(setRefineStrength(0.3));
+        dispatch(setCanvasRefineSteps(20));
       }}
     />
   );
 };
 
-export default memo(ParamRefineStrength);
+export default memo(ParamCanvasRefineSteps);

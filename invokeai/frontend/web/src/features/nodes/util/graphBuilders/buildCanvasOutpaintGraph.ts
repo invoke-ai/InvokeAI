@@ -19,6 +19,7 @@ import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_OUTPAINT_GRAPH,
   CANVAS_OUTPUT,
+  CANVAS_REFINE_DENOISE_LATENTS,
   CLIP_SKIP,
   DENOISE_LATENTS,
   INPAINT_IMAGE,
@@ -36,7 +37,6 @@ import {
   MASK_RESIZE_UP,
   NEGATIVE_CONDITIONING,
   NOISE,
-  OUTPAINT_REFINE_DENOISE_LATENTS,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
@@ -67,8 +67,8 @@ export const buildCanvasOutpaintGraph = (
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
-    refineSteps,
-    refineStrength,
+    canvasRefineSteps,
+    canvasRefineStrength,
     tileSize,
     infillMethod,
     clipSkip,
@@ -167,14 +167,14 @@ export const buildCanvasOutpaintGraph = (
         denoising_start: 1 - strength,
         denoising_end: 1,
       },
-      [OUTPAINT_REFINE_DENOISE_LATENTS]: {
+      [CANVAS_REFINE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: OUTPAINT_REFINE_DENOISE_LATENTS,
+        id: CANVAS_REFINE_DENOISE_LATENTS,
         is_intermediate: true,
-        steps: refineSteps,
+        steps: canvasRefineSteps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
-        denoising_start: 1 - refineStrength,
+        denoising_start: 1 - canvasRefineStrength,
         denoising_end: 1,
       },
       [LATENTS_TO_IMAGE]: {
@@ -347,7 +347,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'unet',
         },
         destination: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'unet',
         },
       },
@@ -357,7 +357,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -367,7 +367,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -377,7 +377,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -387,14 +387,14 @@ export const buildCanvasOutpaintGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'latents',
         },
       },
       // Decode the result from Inpaint
       {
         source: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
