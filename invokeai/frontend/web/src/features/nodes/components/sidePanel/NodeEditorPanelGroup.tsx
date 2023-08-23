@@ -1,3 +1,4 @@
+import { Flex } from '@chakra-ui/react';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import { memo, useCallback, useRef, useState } from 'react';
@@ -7,6 +8,7 @@ import {
   PanelGroup,
 } from 'react-resizable-panels';
 import 'reactflow/dist/style.css';
+import WorkflowEditorControls from '../flow/panels/TopCenterPanel/WorkflowEditorControls';
 import InspectorPanel from './inspector/InspectorPanel';
 import WorkflowPanel from './workflow/WorkflowPanel';
 
@@ -21,42 +23,46 @@ const NodeEditorPanelGroup = () => {
     }
     panelGroupRef.current.setLayout([50, 50]);
   }, []);
+
   return (
-    <PanelGroup
-      ref={panelGroupRef}
-      id="workflow-panel-group"
-      direction="vertical"
-      style={{ height: '100%', width: '100%' }}
-      storage={panelStorage}
-    >
-      <Panel
-        id="workflow"
-        collapsible
-        onCollapse={setIsTopPanelCollapsed}
-        minSize={25}
-      >
-        <WorkflowPanel />
-      </Panel>
-      <ResizeHandle
+    <Flex sx={{ flexDir: 'column', gap: 2, height: '100%', width: '100%' }}>
+      <WorkflowEditorControls />
+      <PanelGroup
+        ref={panelGroupRef}
+        id="workflow-panel-group"
         direction="vertical"
-        onDoubleClick={handleDoubleClickHandle}
-        collapsedDirection={
-          isTopPanelCollapsed
-            ? 'top'
-            : isBottomPanelCollapsed
-            ? 'bottom'
-            : undefined
-        }
-      />
-      <Panel
-        id="inspector"
-        collapsible
-        onCollapse={setIsBottomPanelCollapsed}
-        minSize={25}
+        style={{ height: '100%', width: '100%' }}
+        storage={panelStorage}
       >
-        <InspectorPanel />
-      </Panel>
-    </PanelGroup>
+        <Panel
+          id="workflow"
+          collapsible
+          onCollapse={setIsTopPanelCollapsed}
+          minSize={25}
+        >
+          <WorkflowPanel />
+        </Panel>
+        <ResizeHandle
+          direction="vertical"
+          onDoubleClick={handleDoubleClickHandle}
+          collapsedDirection={
+            isTopPanelCollapsed
+              ? 'top'
+              : isBottomPanelCollapsed
+              ? 'bottom'
+              : undefined
+          }
+        />
+        <Panel
+          id="inspector"
+          collapsible
+          onCollapse={setIsBottomPanelCollapsed}
+          minSize={25}
+        >
+          <InspectorPanel />
+        </Panel>
+      </PanelGroup>
+    </Flex>
   );
 };
 

@@ -8,9 +8,8 @@ import {
 } from '@chakra-ui/react';
 import { memo } from 'react';
 import WorkflowGeneralTab from './WorkflowGeneralTab';
-import WorkflowLinearTab from './WorkflowLinearTab';
 import WorkflowJSONTab from './WorkflowJSONTab';
-import WorkflowEditorControls from '../../flow/panels/TopCenterPanel/WorkflowEditorControls';
+import WorkflowLinearTab from './WorkflowLinearTab';
 
 const WorkflowPanel = () => {
   return (
@@ -25,9 +24,6 @@ const WorkflowPanel = () => {
         gap: 2,
       }}
     >
-      <Flex gap={2}>
-        <WorkflowEditorControls />
-      </Flex>
       <Tabs
         variant="line"
         sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
