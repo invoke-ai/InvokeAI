@@ -25,7 +25,7 @@ Some things to note:
 | Loaders |Load Upscale Model | Occurs within "Upscale (RealESRGAN)"|
 |Conditioning |CLIP Text Encode (Prompt) | Compel (Prompt) or SDXL Compel (Prompt) |
 |Conditioning |CLIP Set Last Layer | CLIP Skip|
-|Conditioning |Conditioning (Average) | N/A |
+|Conditioning |Conditioning (Average) | Use the .blend() feature of prompts |
 |Conditioning |Conditioning (Combine) | N/A |
 |Conditioning |Conditioning (Concat) | See the Prompt Tools Community Node|
 |Conditioning |Conditioning (Set Area) | N/A |
