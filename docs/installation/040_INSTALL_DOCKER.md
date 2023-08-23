@@ -4,9 +4,9 @@ title: Installing with Docker
 
 # :fontawesome-brands-docker: Docker
 
-!!! warning "For end users"
+!!! warning "For most users"
 
-    We highly recommend to Install InvokeAI locally using [these instructions](index.md)
+    We highly recommend to Install InvokeAI locally using [these instructions](INSTALLATION.md)
 
 !!! tip "For developers"
 
