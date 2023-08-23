@@ -14,3 +14,4 @@ from .config import (  # noqa F401
     SubModelType,
 )
 from .model_install import ModelInstall  # noqa F401
+from .probe import ModelProbe, InvalidModelException  # noqa F401

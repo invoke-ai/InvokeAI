@@ -79,7 +79,7 @@ class ModelProbe(object):
         model_path: Path,
         model: Optional[Union[Dict, ModelMixin]] = None,
         prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
-    ) -> ModelProbeInfo:
+    ) -> Optional[ModelProbeInfo]:
         """
         Probe the model at model_path and return sufficient information about it
         to place it somewhere in the models directory hierarchy. If the model is

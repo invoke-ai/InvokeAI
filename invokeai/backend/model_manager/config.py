@@ -171,13 +171,11 @@ class MainConfig(ModelConfigBase):
 class MainCheckpointConfig(CheckpointConfig, MainConfig):
     """Model config for main checkpoint models."""
 
-    pass
 
 
 class MainDiffusersConfig(DiffusersConfig, MainConfig):
     """Model config for main diffusers models."""
 
-    pass
 
 
 class ONNXSD1Config(MainConfig):
@@ -263,9 +261,9 @@ class ModelConfigFactory(object):
             if isinstance(class_to_return, dict):  # additional level allowed
                 class_to_return = class_to_return[model_base]
             return class_to_return.parse_obj(model_data)
-        except KeyError:
+        except KeyError as exc:
             raise InvalidModelConfigException(
                 f"Unknown combination of model_format '{model_format}' and model_type '{model_type}'"
-            )
-        except ValidationError as e:
-            raise InvalidModelConfigException(f"Invalid model configuration passed: {str(e)}") from e
+            ) from exc
+        except ValidationError as exc:
+            raise InvalidModelConfigException(f"Invalid model configuration passed: {str(exc)}") from exc
