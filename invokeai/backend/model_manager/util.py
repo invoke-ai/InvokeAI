@@ -2,11 +2,15 @@
 """
 Various utilities used by the model manager.
 """
-from typing import Optional
+import json
 import warnings
+import torch
+import safetensors
+from pathlib import Path
+from typing import Optional, Union
 from diffusers import logging as diffusers_logging
 from transformers import logging as transformers_logging
-
+from picklescan.scanner import scan_file_path
 
 class SilenceWarnings(object):
     """
@@ -106,3 +110,49 @@ def lora_token_vector_length(checkpoint: dict) -> Optional[int]:
             break
 
     return lora_token_vector_length
+
+def _fast_safetensors_reader(path: str):
+    checkpoint = dict()
+    device = torch.device("meta")
+    with open(path, "rb") as f:
+        definition_len = int.from_bytes(f.read(8), "little")
+        definition_json = f.read(definition_len)
+        definition = json.loads(definition_json)
+
+        if "__metadata__" in definition and definition["__metadata__"].get("format", "pt") not in {
+            "pt",
+            "torch",
+            "pytorch",
+        }:
+            raise Exception("Supported only pytorch safetensors files")
+        definition.pop("__metadata__", None)
+
+        for key, info in definition.items():
+            dtype = {
+                "I8": torch.int8,
+                "I16": torch.int16,
+                "I32": torch.int32,
+                "I64": torch.int64,
+                "F16": torch.float16,
+                "F32": torch.float32,
+                "F64": torch.float64,
+            }[info["dtype"]]
+
+            checkpoint[key] = torch.empty(info["shape"], dtype=dtype, device=device)
+
+    return checkpoint
+
+def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
+    if str(path).endswith(".safetensors"):
+        try:
+            checkpoint = _fast_safetensors_reader(path)
+        except Exception:
+            # TODO: create issue for support "meta"?
+            checkpoint = safetensors.torch.load_file(path, device="cpu")
+    else:
+        if scan:
+            scan_result = scan_file_path(path)
+            if scan_result.infected_files != 0:
+                raise Exception(f'The model file "{path}" is potentially infected by malware. Aborting import.')
+        checkpoint = torch.load(path, map_location=torch.device("meta"))
+    return checkpoint

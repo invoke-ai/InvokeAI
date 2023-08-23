@@ -184,7 +184,7 @@ class InvokeAISettings(BaseSettings):
     initconf: ClassVar[DictConfig] = None
     argparse_groups: ClassVar[Dict] = {}
 
-    def parse_args(self, argv: list = sys.argv[1:]):
+    def parse_args(self, argv: List[str] = sys.argv[1:]):
         parser = self.get_parser()
         opt = parser.parse_args(argv)
         for name in self.__fields__:
@@ -217,7 +217,7 @@ class InvokeAISettings(BaseSettings):
         return OmegaConf.to_yaml(conf)
 
     @classmethod
-    def add_parser_arguments(cls, parser):
+    def add_parser_arguments(cls, parser: argparse.ArgumentParser):
         if "type" in get_type_hints(cls):
             settings_stanza = get_args(get_type_hints(cls)["type"])[0]
         else:

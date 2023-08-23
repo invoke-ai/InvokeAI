@@ -16,11 +16,7 @@ from picklescan.scanner import scan_file_path
 import torch
 import safetensors.torch
 
-from invokeai.backend.model_management.models.base import (
-    read_checkpoint_meta,
-    InvalidModelException,
-)
-
+from .util import read_checkpoint_meta
 from .config import (
     ModelType,
     BaseModelType,
@@ -30,6 +26,9 @@ from .config import (
 )
 from .util import SilenceWarnings, lora_token_vector_length
 
+
+class InvalidModelException(Exception):
+    """Raised when an invalid model is encountered."""
 
 @dataclass
 class ModelProbeInfo(object):
@@ -373,7 +372,7 @@ class TextualInversionCheckpointProbe(CheckpointProbeBase):
 
     def get_format(self) -> Optional[str]:
         """Return the format of a TextualInversion emedding."""
-        return None
+        return ModelFormat.EmbeddingFile
 
     def get_base_type(self) -> BaseModelType:
         """Return BaseModelType of the checkpoint model."""
@@ -513,7 +512,7 @@ class TextualInversionFolderProbe(FolderProbeBase):
 
     def get_format(self) -> Optional[str]:
         """Return the format of the TextualInversion."""
-        return None
+        return ModelFormat.EmbeddingFolder
 
     def get_base_type(self) -> BaseModelType:
         """Return the ModelBaseType of the HuggingFace-style Textual Inversion Folder."""

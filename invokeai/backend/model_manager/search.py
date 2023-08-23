@@ -5,20 +5,21 @@ Abstract base class for recursive directory search for models.
 
 import os
 from abc import ABC, abstractmethod
-from typing import List, Set, types
+from typing import List, Set, Optional, Callable, Union, types
 from pathlib import Path
 
 import invokeai.backend.util.logging as logger
 
 
-class ModelSearch(ABC):
-    def __init__(self, directories: List[Path], logger: types.ModuleType = logger):
+class ModelSearchBase(ABC):
+    """Hierarchical directory model search class"""
+
+    def __init__(self, logger: types.ModuleType = logger):
         """
         Initialize a recursive model directory search.
         :param directories: List of directory Paths to recurse through
         :param logger: Logger to use
         """
-        self.directories = directories
         self.logger = logger
         self._items_scanned = 0
         self._models_found = 0
@@ -49,13 +50,13 @@ class ModelSearch(ABC):
         """
         pass
 
-    def search(self):
+    def search(self, directories: List[Union[Path, str]]):
         self.on_search_started()
-        for dir in self.directories:
+        for dir in directories:
             self.walk_directory(dir)
         self.on_search_completed()
 
-    def walk_directory(self, path: Path):
+    def walk_directory(self, path: Union[Path, str]):
         for root, dirs, files in os.walk(path, followlinks=True):
             if str(Path(root).name).startswith("."):
                 self._pruned_paths.add(root)
@@ -93,16 +94,45 @@ class ModelSearch(ABC):
                         self.logger.warning(str(e))
 
 
-class FindModels(ModelSearch):
+class ModelSearch(ModelSearchBase):
+    """
+    Implementation of ModelSearch with callbacks.
+    Usage:
+       search = ModelSearch()
+       search.model_found = lambda path : 'anime' in path.as_posix()
+       found = search.list_models(['/tmp/models1','/tmp/models2'])
+       # returns all models that have 'anime' in the path
+    """
+
+    _model_set: Set[Path]
+    search_started: Callable[[Path], None]
+    search_completed: Callable[[Set[Path]], None]
+    model_found: Callable[[Path], bool]
+
+    def __init__(self, logger: types.ModuleType = logger):
+        super().__init__(logger)
+        self._model_set = set()
+        self.search_started = None
+        self.search_completed = None
+        self.model_found = None
+
     def on_search_started(self):
-        self.models_found: Set[Path] = set()
+        self._model_set = set()
+        if self.search_started:
+            self.search_started()
 
     def on_model_found(self, model: Path):
-        self.models_found.add(model)
+        if not self.model_found:
+            self._model_set.add(model)
+            return
+        if self.model_found(model):
+            self._model_set.add(model)
 
     def on_search_completed(self):
-        pass
+        if self.search_completed:
+            self.search_completed(self._model_set)
 
-    def list_models(self) -> List[Path]:
-        self.search()
-        return list(self.models_found)
+    def list_models(self, directories: List[Union[Path,str]]) -> List[Path]:
+        """Return list of models found"""
+        self.search(directories)
+        return list(self._model_set)

@@ -14,9 +14,12 @@ class DuplicateModelException(Exception):
     """Raised on an attempt to add a model with the same key twice."""
 
 
+class InvalidModelException(Exception):
+    """Raised when an invalid model is detected."""
+
+
 class UnknownModelException(Exception):
     """Raised on an attempt to delete a model with a nonexistent key."""
-
 
 class ModelConfigStore(ABC):
     """Abstract base class for storage and retrieval of model configs."""
