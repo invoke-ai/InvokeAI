@@ -15,7 +15,7 @@ const ParamCanvasRefineSteps = () => {
   return (
     <IAISlider
       label={t('parameters.refineSteps')}
-      min={0}
+      min={1}
       max={100}
       step={1}
       sliderNumberInputProps={{ max: 999 }}
