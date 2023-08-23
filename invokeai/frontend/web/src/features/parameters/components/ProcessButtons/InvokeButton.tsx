@@ -55,11 +55,11 @@ const selector = createSelector(
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {
-  iconButton?: boolean;
+  asIconButton?: boolean;
 }
 
 export default function InvokeButton(props: InvokeButton) {
-  const { iconButton = false, ...rest } = props;
+  const { asIconButton = false, sx, ...rest } = props;
   const dispatch = useAppDispatch();
   const { isReady, isProcessing } = useIsReadyToInvoke();
   const { activeTabName } = useAppSelector(selector);
@@ -87,21 +87,22 @@ export default function InvokeButton(props: InvokeButton) {
       <Box style={{ position: 'relative' }}>
         {!isReady && (
           <Box
-            borderRadius="base"
-            style={{
+            sx={{
               position: 'absolute',
               bottom: '0',
               left: '0',
               right: '0',
               height: '100%',
               overflow: 'clip',
+              borderRadius: 'base',
+              ...sx,
             }}
             {...rest}
           >
             <ProgressBar />
           </Box>
         )}
-        {iconButton ? (
+        {asIconButton ? (
           <IAIIconButton
             aria-label={t('parameters.invoke')}
             type="submit"
@@ -112,12 +113,13 @@ export default function InvokeButton(props: InvokeButton) {
             colorScheme="accent"
             isLoading={isProcessing}
             id="invoke-button"
-            {...rest}
             sx={{
               w: 'full',
               flexGrow: 1,
               ...(isProcessing ? IN_PROGRESS_STYLES : {}),
+              ...sx,
             }}
+            {...rest}
           />
         ) : (
           <IAIButton
@@ -131,13 +133,14 @@ export default function InvokeButton(props: InvokeButton) {
             leftIcon={isProcessing ? undefined : <FaPlay />}
             isLoading={isProcessing}
             loadingText={t('parameters.invoke')}
-            {...rest}
             sx={{
               w: 'full',
               flexGrow: 1,
               fontWeight: 700,
               ...(isProcessing ? IN_PROGRESS_STYLES : {}),
+              ...sx,
             }}
+            {...rest}
           >
             Invoke
           </IAIButton>
@@ -166,7 +169,11 @@ export const InvokeButtonTooltipContent = memo(() => {
           ))}
         </UnorderedList>
       )}
-      <Divider opacity={0.2} />
+      <Divider
+        opacity={0.2}
+        borderColor="base.50"
+        _dark={{ borderColor: 'base.900' }}
+      />
       <Text fontWeight={400} fontStyle="oblique 10deg">
         Adding images to{' '}
         <Text as="span" fontWeight={600}>

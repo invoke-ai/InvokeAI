@@ -45,6 +45,11 @@ export const theme: ThemeOverride = {
       color: 'base.900',
       '.chakra-ui-dark &': { bg: 'base.800', color: 'base.100' },
     },
+    third: {
+      bg: 'base.300',
+      color: 'base.900',
+      '.chakra-ui-dark &': { bg: 'base.750', color: 'base.100' },
+    },
     nodeBody: {
       bg: 'base.100',
       color: 'base.900',
