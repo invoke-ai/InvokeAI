@@ -414,6 +414,14 @@ export const buildCanvasOutpaintGraph = (
     };
   }
 
+  if (infillMethod === 'lama') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_lama',
+      id: INPAINT_INFILL,
+      is_intermediate: true,
+    };
+  }
+
   // Handle Scale Before Processing
   if (['auto', 'manual'].includes(boundingBoxScaleMethod)) {
     const scaledWidth: number = scaledBoundingBoxDimensions.width;
