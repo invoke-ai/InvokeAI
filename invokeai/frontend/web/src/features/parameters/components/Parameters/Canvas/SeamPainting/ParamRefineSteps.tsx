@@ -1,36 +1,36 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
-import { setSeamBlur } from 'features/parameters/store/generationSlice';
+import { setRefineSteps } from 'features/parameters/store/generationSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const ParamSeamBlur = () => {
+const ParamRefineSteps = () => {
   const dispatch = useAppDispatch();
-  const seamBlur = useAppSelector(
-    (state: RootState) => state.generation.seamBlur
+  const refineSteps = useAppSelector(
+    (state: RootState) => state.generation.refineSteps
   );
   const { t } = useTranslation();
 
   return (
     <IAISlider
-      label={t('parameters.seamBlur')}
+      label={t('parameters.refineSteps')}
       min={0}
-      max={64}
-      step={8}
-      sliderNumberInputProps={{ max: 512 }}
-      value={seamBlur}
+      max={100}
+      step={1}
+      sliderNumberInputProps={{ max: 999 }}
+      value={refineSteps}
       onChange={(v) => {
-        dispatch(setSeamBlur(v));
+        dispatch(setRefineSteps(v));
       }}
       withInput
       withSliderMarks
       withReset
       handleReset={() => {
-        dispatch(setSeamBlur(8));
+        dispatch(setRefineSteps(20));
       }}
     />
   );
 };
 
-export default memo(ParamSeamBlur);
+export default memo(ParamRefineSteps);

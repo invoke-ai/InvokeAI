@@ -1,36 +1,36 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
-import { setSeamStrength } from 'features/parameters/store/generationSlice';
+import { setRefineStrength } from 'features/parameters/store/generationSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const ParamSeamStrength = () => {
+const ParamRefineStrength = () => {
   const dispatch = useAppDispatch();
-  const seamStrength = useAppSelector(
-    (state: RootState) => state.generation.seamStrength
+  const refineStrength = useAppSelector(
+    (state: RootState) => state.generation.refineStrength
   );
   const { t } = useTranslation();
 
   return (
     <IAISlider
-      label={t('parameters.seamStrength')}
+      label={t('parameters.refineStrength')}
       min={0}
       max={1}
       step={0.01}
       sliderNumberInputProps={{ max: 999 }}
-      value={seamStrength}
+      value={refineStrength}
       onChange={(v) => {
-        dispatch(setSeamStrength(v));
+        dispatch(setRefineStrength(v));
       }}
       withInput
       withSliderMarks
       withReset
       handleReset={() => {
-        dispatch(setSeamStrength(0.7));
+        dispatch(setRefineStrength(0.3));
       }}
     />
   );
 };
 
-export default memo(ParamSeamStrength);
+export default memo(ParamRefineStrength);

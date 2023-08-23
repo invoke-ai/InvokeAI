@@ -20,7 +20,6 @@ import {
   CANVAS_OUTPAINT_GRAPH,
   CANVAS_OUTPUT,
   CLIP_SKIP,
-  COLOR_CORRECT,
   DENOISE_LATENTS,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
@@ -32,16 +31,15 @@ import {
   MAIN_MODEL_LOADER,
   MASK_BLUR,
   MASK_COMBINE,
-  MASK_EDGE,
   MASK_FROM_ALPHA,
   MASK_RESIZE_DOWN,
   MASK_RESIZE_UP,
   NEGATIVE_CONDITIONING,
   NOISE,
+  OUTPAINT_REFINE_DENOISE_LATENTS,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
-  SEAM_FIX_DENOISE_LATENTS,
   SEAM_MASK_RESIZE_UP,
 } from './constants';
 
@@ -70,12 +68,8 @@ export const buildCanvasOutpaintGraph = (
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
-    seamSize,
-    seamBlur,
-    seamSteps,
-    seamStrength,
-    seamLowThreshold,
-    seamHighThreshold,
+    refineSteps,
+    refineStrength,
     tileSize,
     infillMethod,
     clipSkip,
@@ -174,23 +168,23 @@ export const buildCanvasOutpaintGraph = (
         denoising_start: 1 - strength,
         denoising_end: 1,
       },
-      [MASK_EDGE]: {
-        type: 'mask_edge',
-        id: MASK_EDGE,
-        is_intermediate: true,
-        edge_size: seamSize,
-        edge_blur: seamBlur,
-        low_threshold: seamLowThreshold,
-        high_threshold: seamHighThreshold,
-      },
-      [SEAM_FIX_DENOISE_LATENTS]: {
+      // [MASK_EDGE]: {
+      //   type: 'mask_edge',
+      //   id: MASK_EDGE,
+      //   is_intermediate: true,
+      //   edge_size: seamSize,
+      //   edge_blur: seamBlur,
+      //   low_threshold: seamLowThreshold,
+      //   high_threshold: seamHighThreshold,
+      // },
+      [OUTPAINT_REFINE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: SEAM_FIX_DENOISE_LATENTS,
+        id: OUTPAINT_REFINE_DENOISE_LATENTS,
         is_intermediate: true,
-        steps: seamSteps,
+        steps: refineSteps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
-        denoising_start: 1 - seamStrength,
+        denoising_start: 1 - refineStrength,
         denoising_end: 1,
       },
       [LATENTS_TO_IMAGE]: {
@@ -199,13 +193,8 @@ export const buildCanvasOutpaintGraph = (
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
-      [COLOR_CORRECT]: {
-        type: 'color_correct',
-        id: COLOR_CORRECT,
-        is_intermediate: true,
-      },
       [CANVAS_OUTPUT]: {
-        type: 'img_paste',
+        type: 'color_correct',
         id: CANVAS_OUTPUT,
         is_intermediate: !shouldAutoSave,
       },
@@ -361,24 +350,25 @@ export const buildCanvasOutpaintGraph = (
           field: 'seed',
         },
       },
-      // Seam Paint
+      // Image To Image Clean Up
       {
         source: {
           node_id: MAIN_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'unet',
         },
       },
+
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
           field: 'conditioning',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -388,7 +378,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -398,7 +388,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -408,14 +398,14 @@ export const buildCanvasOutpaintGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'latents',
         },
       },
       // Decode the result from Inpaint
       {
         source: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -525,37 +515,6 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
       },
-      // Seam Paint Mask
-      {
-        source: {
-          node_id: MASK_FROM_ALPHA,
-          field: 'image',
-        },
-        destination: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_RESIZE_UP,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: SEAM_MASK_RESIZE_UP,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
-          field: 'mask',
-        },
-      },
       // Resize Results Down
       {
         source: {
@@ -594,44 +553,13 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: COLOR_CORRECT,
+          node_id: CANVAS_OUTPUT,
           field: 'reference',
         },
       },
       {
         source: {
           node_id: INPAINT_IMAGE_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      // Paste Everything Back
-      {
-        source: {
-          node_id: INPAINT_INFILL_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'base_image',
-        },
-      },
-      {
-        source: {
-          node_id: COLOR_CORRECT,
           field: 'image',
         },
         destination: {
@@ -683,27 +611,6 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
       },
-      // Seam Paint Mask
-      {
-        source: {
-          node_id: MASK_FROM_ALPHA,
-          field: 'image',
-        },
-        destination: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
-          field: 'mask',
-        },
-      },
       // Color Correct The Inpainted Result
       {
         source: {
@@ -711,44 +618,13 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: COLOR_CORRECT,
+          node_id: CANVAS_OUTPUT,
           field: 'reference',
         },
       },
       {
         source: {
           node_id: LATENTS_TO_IMAGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_BLUR,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      // Paste Everything Back
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'base_image',
-        },
-      },
-      {
-        source: {
-          node_id: COLOR_CORRECT,
           field: 'image',
         },
         destination: {
