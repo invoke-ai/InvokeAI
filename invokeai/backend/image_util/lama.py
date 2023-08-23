@@ -1,5 +1,4 @@
 import gc
-import pathlib
 from typing import Any
 
 import numpy as np
@@ -44,7 +43,8 @@ class LaMA:
         image = torch.from_numpy(image).unsqueeze(0).to(device)
         mask = torch.from_numpy(mask).unsqueeze(0).to(device)
 
-        infilled_image = model(image, mask)
+        with torch.inference_mode():
+            infilled_image = model(image, mask)
 
         infilled_image = infilled_image[0].permute(1, 2, 0).detach().cpu().numpy()
         infilled_image = np.clip(infilled_image * 255, 0, 255).astype("uint8")
