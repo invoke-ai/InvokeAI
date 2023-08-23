@@ -29,7 +29,7 @@ def load_jit_model(url_or_path, device):
 class LaMA:
     def __call__(self, input_image: Image.Image, *args: Any, **kwds: Any) -> Any:
         device = choose_torch_device()
-        model_location = get_invokeai_config().models_path / 'core/misc/lama/lama.pt'
+        model_location = get_invokeai_config().models_path / "core/misc/lama/lama.pt"
         model = load_jit_model(model_location, device)
 
         image = np.asarray(input_image.convert("RGB"))
