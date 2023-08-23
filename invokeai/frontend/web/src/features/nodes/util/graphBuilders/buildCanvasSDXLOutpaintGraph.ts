@@ -42,8 +42,6 @@ import {
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
   SEAM_FIX_DENOISE_LATENTS,
-  SEAM_MASK_COMBINE,
-  SEAM_MASK_RESIZE_DOWN,
   SEAM_MASK_RESIZE_UP,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
@@ -143,11 +141,6 @@ export const buildCanvasSDXLOutpaintGraph = (
         id: MASK_COMBINE,
         is_intermediate: true,
         mask2: canvasMaskImage,
-      },
-      [SEAM_MASK_COMBINE]: {
-        type: 'mask_combine',
-        id: MASK_COMBINE,
-        is_intermediate: true,
       },
       [MASK_BLUR]: {
         type: 'img_blur',
@@ -506,13 +499,6 @@ export const buildCanvasSDXLOutpaintGraph = (
       width: width,
       height: height,
     };
-    graph.nodes[SEAM_MASK_RESIZE_DOWN] = {
-      type: 'img_resize',
-      id: SEAM_MASK_RESIZE_DOWN,
-      is_intermediate: true,
-      width: width,
-      height: height,
-    };
 
     graph.nodes[NOISE] = {
       ...(graph.nodes[NOISE] as NoiseInvocation),
@@ -585,26 +571,6 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'mask',
         },
       },
-      {
-        source: {
-          node_id: MASK_BLUR,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'mask1',
-        },
-      },
-      {
-        source: {
-          node_id: SEAM_MASK_RESIZE_UP,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'mask2',
-        },
-      },
       // Resize Results Down
       {
         source: {
@@ -623,16 +589,6 @@ export const buildCanvasSDXLOutpaintGraph = (
         },
         destination: {
           node_id: MASK_RESIZE_DOWN,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_RESIZE_DOWN,
           field: 'image',
         },
       },
@@ -669,7 +625,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
       {
         source: {
-          node_id: SEAM_MASK_RESIZE_DOWN,
+          node_id: MASK_RESIZE_DOWN,
           field: 'image',
         },
         destination: {
@@ -700,7 +656,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
       {
         source: {
-          node_id: SEAM_MASK_RESIZE_DOWN,
+          node_id: MASK_RESIZE_DOWN,
           field: 'image',
         },
         destination: {
@@ -763,26 +719,6 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'mask',
         },
       },
-      {
-        source: {
-          node_id: MASK_FROM_ALPHA,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'mask1',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'mask2',
-        },
-      },
       // Color Correct The Inpainted Result
       {
         source: {
@@ -806,7 +742,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
       {
         source: {
-          node_id: SEAM_MASK_COMBINE,
+          node_id: MASK_BLUR,
           field: 'image',
         },
         destination: {
@@ -837,7 +773,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
       {
         source: {
-          node_id: SEAM_MASK_COMBINE,
+          node_id: MASK_BLUR,
           field: 'image',
         },
         destination: {
