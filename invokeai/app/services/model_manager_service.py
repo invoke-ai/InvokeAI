@@ -330,8 +330,8 @@ class ModelManagerService(ModelManagerServiceBase):
         # configuration value. If present, then the
         # cache size is set to 2.5 GB times
         # the number of max_loaded_models. Otherwise
-        # use new `max_cache_size` config setting
-        max_cache_size = config.max_cache_size if hasattr(config, "max_cache_size") else config.max_loaded_models * 2.5
+        # use new `ram_cache_size` config setting
+        max_cache_size = config.ram_cache_size
 
         logger.debug(f"Maximum RAM cache size: {max_cache_size} GiB")
 
