@@ -17,6 +17,7 @@ import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPUT,
+  CANVAS_REFINE_DENOISE_LATENTS,
   CLIP_SKIP,
   DENOISE_LATENTS,
   INPAINT_IMAGE,
@@ -60,6 +61,8 @@ export const buildCanvasInpaintGraph = (
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
+    canvasRefineSteps,
+    canvasRefineStrength,
     clipSkip,
   } = state.generation;
 
@@ -136,6 +139,16 @@ export const buildCanvasInpaintGraph = (
         cfg_scale: cfg_scale,
         scheduler: scheduler,
         denoising_start: 1 - strength,
+        denoising_end: 1,
+      },
+      [CANVAS_REFINE_DENOISE_LATENTS]: {
+        type: 'denoise_latents',
+        id: DENOISE_LATENTS,
+        is_intermediate: true,
+        steps: canvasRefineSteps,
+        cfg_scale: cfg_scale,
+        scheduler: scheduler,
+        denoising_start: 1 - canvasRefineStrength,
         denoising_end: 1,
       },
       [LATENTS_TO_IMAGE]: {
@@ -280,10 +293,61 @@ export const buildCanvasInpaintGraph = (
           field: 'seed',
         },
       },
-      // Decode Inpainted Latents To Image
+      // Canvas Refine
+      {
+        source: {
+          node_id: MAIN_MODEL_LOADER,
+          field: 'unet',
+        },
+        destination: {
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
+          field: 'unet',
+        },
+      },
+      {
+        source: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
+          field: 'positive_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'conditioning',
+        },
+        destination: {
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
+          field: 'negative_conditioning',
+        },
+      },
+      {
+        source: {
+          node_id: NOISE,
+          field: 'noise',
+        },
+        destination: {
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
+          field: 'noise',
+        },
+      },
       {
         source: {
           node_id: DENOISE_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
+          field: 'latents',
+        },
+      },
+      // Decode Inpainted Latents To Image
+      {
+        source: {
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
