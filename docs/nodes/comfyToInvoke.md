@@ -39,12 +39,12 @@ Some things to note:
 |Latent |Empty Latent Image | Noise |
 |Latent |Upscale Latent |Resize Latents |
 |Latent |Upscale Latent By |Scale Latents |
-|Latent |Latent Composite | N/A|
+|Latent |Latent Composite | Blend Latents |
 |Latent |LatentCompositeMasked | N/A |
 |Image |Save Image | Image |
 |Image |Preview Image |Current |
 |Image |Load Image | Image|
-|Image |Empty Image| N/A|
+|Image |Empty Image| Blank Image |
 |Image |Invert Image | Invert Lerp Image |
 |Image |Batch Images | Link "Image" nodes into an "Image Collection" node |
 |Image |Pad Image for Outpainting | Outpainting is easily accomplished in the Unified Canvas |
