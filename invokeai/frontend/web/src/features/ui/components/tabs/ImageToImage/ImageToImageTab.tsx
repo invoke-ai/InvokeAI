@@ -1,6 +1,4 @@
 import { Box } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import InitialImageDisplay from 'features/parameters/components/Parameters/ImageToImage/InitialImageDisplay';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import { memo, useCallback, useRef } from 'react';
@@ -13,7 +11,6 @@ import ResizeHandle from '../ResizeHandle';
 import TextToImageTabMain from '../TextToImage/TextToImageTabMain';
 
 const ImageToImageTab = () => {
-  const dispatch = useAppDispatch();
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
 
   const handleDoubleClickHandle = useCallback(() => {
@@ -50,9 +47,6 @@ const ImageToImageTab = () => {
           order={1}
           defaultSize={50}
           minSize={25}
-          onResize={() => {
-            dispatch(requestCanvasRescale());
-          }}
         >
           <TextToImageTabMain />
         </Panel>

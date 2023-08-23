@@ -1,8 +1,6 @@
 import { Flex } from '@chakra-ui/layout';
 import { Portal } from '@chakra-ui/portal';
-import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { RefObject, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdPhotoLibrary } from 'react-icons/md';
@@ -18,11 +16,9 @@ const FloatingGalleryButton = ({
   galleryPanelRef,
 }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
 
   const handleShowGallery = () => {
     galleryPanelRef.current?.expand();
-    dispatch(requestCanvasRescale());
   };
 
   if (!isGalleryCollapsed) {

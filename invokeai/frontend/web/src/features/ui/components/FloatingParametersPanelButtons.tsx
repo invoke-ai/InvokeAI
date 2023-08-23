@@ -1,7 +1,5 @@
 import { ChakraProps, Flex, Portal } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
 import InvokeButton from 'features/parameters/components/ProcessButtons/InvokeButton';
 import { RefObject, memo } from 'react';
@@ -26,11 +24,9 @@ const FloatingSidePanelButtons = ({
   sidePanelRef,
 }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
 
   const handleShowSidePanel = () => {
     sidePanelRef.current?.expand();
-    dispatch(requestCanvasRescale());
   };
 
   if (!isSidePanelCollapsed) {

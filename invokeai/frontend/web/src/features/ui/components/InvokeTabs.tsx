@@ -13,7 +13,6 @@ import { createSelector } from '@reduxjs/toolkit';
 import AuxiliaryProgressIndicator from 'app/components/AuxiliaryProgressIndicator';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
 import { InvokeTabName, tabMap } from 'features/ui/store/tabMap';
@@ -108,12 +107,6 @@ const InvokeTabs = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const handleResizeGallery = useCallback(() => {
-    if (activeTabName === 'unifiedCanvas') {
-      dispatch(requestCanvasRescale());
-    }
-  }, [dispatch, activeTabName]);
-
   const handleClickTab = useCallback((e: MouseEvent<HTMLElement>) => {
     if (e.target instanceof HTMLElement) {
       e.target.blur();
@@ -189,7 +182,6 @@ const InvokeTabs = () => {
         collapseSidePanel();
         collapseGalleryPanel();
       }
-      dispatch(requestCanvasRescale());
     },
     [dispatch, isGalleryPanelCollapsed, isSidePanelCollapsed]
   );
@@ -198,7 +190,6 @@ const InvokeTabs = () => {
     ['t', 'o'],
     () => {
       toggleSidePanel();
-      dispatch(requestCanvasRescale());
     },
     [dispatch]
   );
@@ -207,7 +198,6 @@ const InvokeTabs = () => {
     'g',
     () => {
       toggleGalleryPanel();
-      dispatch(requestCanvasRescale());
     },
     [dispatch]
   );
@@ -253,7 +243,6 @@ const InvokeTabs = () => {
               ref={sidePanelRef}
               defaultSize={sidePanelMinSize}
               minSize={sidePanelMinSize}
-              onResize={handleResizeGallery}
               onCollapse={setIsSidePanelCollapsed}
               collapsible
             >
@@ -290,7 +279,6 @@ const InvokeTabs = () => {
               id="gallery"
               ref={galleryPanelRef}
               order={2}
-              onResize={handleResizeGallery}
               defaultSize={galleryPanelMinSize}
               minSize={galleryPanelMinSize}
               onCollapse={setIsGalleryPanelCollapsed}
