@@ -718,10 +718,11 @@
         "swapSizes": "Swap Sizes"
     },
     "nodes": {
-        "reloadSchema": "Reload Schema",
-        "saveGraph": "Save Graph",
-        "loadGraph": "Load Graph (saved from Node Editor) (Do not copy-paste metadata)",
-        "clearGraph": "Clear Graph",
+        "reloadSchema": "Reload Node Templates",
+        "saveGraph": "Save Workflow",
+        "loadGraph": "Load Workflow",
+        "resetGraph": "Reset Workflow",
+        "clearGraph": "Reset Graph",
         "clearGraphDesc": "Are you sure you want to clear all nodes?",
         "zoomInNodes": "Zoom In",
         "zoomOutNodes": "Zoom Out",

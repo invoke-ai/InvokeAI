@@ -27,6 +27,11 @@ import {
 import { ChangeEvent, memo, useCallback } from 'react';
 import { FaCog } from 'react-icons/fa';
 import { SelectionMode } from 'reactflow';
+import ReloadSchemaButton from '../TopCenterPanel/ReloadSchemaButton';
+
+const formLabelProps: FormLabelProps = {
+  fontWeight: 600,
+};
 
 const selector = createSelector(
   stateSelector,
@@ -49,7 +54,7 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const NodeEditorSettings = () => {
+const WorkflowEditorSettings = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
   const {
@@ -98,7 +103,8 @@ const NodeEditorSettings = () => {
   return (
     <>
       <IAIIconButton
-        aria-label="Node Editor Settings"
+        aria-label="Workflow Editor Settings"
+        tooltip="Workflow Editor Settings"
         icon={<FaCog />}
         onClick={onOpen}
       />
@@ -106,7 +112,7 @@ const NodeEditorSettings = () => {
       <Modal isOpen={isOpen} onClose={onClose} size="2xl" isCentered>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Node Editor Settings</ModalHeader>
+          <ModalHeader>Workflow Editor Settings</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <Flex
@@ -157,6 +163,7 @@ const NodeEditorSettings = () => {
                 label="Validate Connections and Graph"
                 helperText="Prevent invalid connections from being made, and invalid graphs from being invoked"
               />
+              <ReloadSchemaButton />
             </Flex>
           </ModalBody>
         </ModalContent>
@@ -165,8 +172,4 @@ const NodeEditorSettings = () => {
   );
 };
 
-export default memo(NodeEditorSettings);
-
-const formLabelProps: FormLabelProps = {
-  fontWeight: 600,
-};
+export default memo(WorkflowEditorSettings);

@@ -15,7 +15,7 @@ const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
   const isHovered = useHoverDirty(ref);
 
   return (
-    <Flex alignItems="center" gap={3} ps={1} ref={ref}>
+    <Flex alignItems="center" gap={5} ps={1} ref={ref}>
       <Image
         src={InvokeAILogoImage}
         alt="invoke-ai-logo"
