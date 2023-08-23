@@ -56,7 +56,7 @@ const FloatingSidePanelButtons = ({
           icon={<FaSlidersH />}
         />
         <InvokeButton asIconButton sx={floatingButtonStyles} />
-        <CancelButton sx={floatingButtonStyles} />
+        <CancelButton sx={floatingButtonStyles} asIconButton />
       </Flex>
     </Portal>
   );

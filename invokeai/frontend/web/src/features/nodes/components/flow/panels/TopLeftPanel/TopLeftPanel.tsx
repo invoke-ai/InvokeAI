@@ -1,8 +1,8 @@
-import { Tooltip } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
+import IAIIconButton from 'common/components/IAIIconButton';
 import { addNodePopoverOpened } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
+import { FaPlus } from 'react-icons/fa';
 import { Panel } from 'reactflow';
 
 const TopLeftPanel = () => {
@@ -14,15 +14,12 @@ const TopLeftPanel = () => {
 
   return (
     <Panel position="top-left">
-      <Tooltip label="Add New Node (Shift+A, Space)">
-        <IAIButton
-          size="sm"
-          aria-label="Add Node"
-          onClick={handleOpenAddNodePopover}
-        >
-          Add Node
-        </IAIButton>
-      </Tooltip>
+      <IAIIconButton
+        tooltip="Add Node (Shift+A, Space)"
+        aria-label="Add Node"
+        icon={<FaPlus />}
+        onClick={handleOpenAddNodePopover}
+      />
     </Panel>
   );
 };

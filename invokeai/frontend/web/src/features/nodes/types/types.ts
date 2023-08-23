@@ -807,7 +807,7 @@ export const zSemVer = z.string().refine((val) => {
 export type SemVer = z.infer<typeof zSemVer>;
 
 export const zWorkflow = z.object({
-  name: z.string().trim().min(1),
+  name: z.string(),
   author: z.string(),
   description: z.string(),
   version: z.string(),

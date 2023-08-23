@@ -600,9 +600,9 @@ const nodesSlice = createSlice({
       state.workflow.contact = action.payload;
     },
     workflowLoaded: (state, action: PayloadAction<Workflow>) => {
-      // TODO: validation
       const { nodes, edges, ...workflow } = action.payload;
       state.workflow = workflow;
+
       state.nodes = applyNodeChanges(
         nodes.map((node) => ({
           item: { ...node, dragHandle: `.${DRAG_HANDLE_CLASSNAME}` },
@@ -614,6 +614,16 @@ const nodesSlice = createSlice({
         edges.map((edge) => ({ item: edge, type: 'add' })),
         []
       );
+
+      state.nodeExecutionStates = nodes.reduce<
+        Record<string, NodeExecutionState>
+      >((acc, node) => {
+        acc[node.id] = {
+          nodeId: node.id,
+          ...initialNodeExecutionState,
+        };
+        return acc;
+      }, {});
     },
     workflowReset: (state) => {
       state.workflow = cloneDeep(initialWorkflow);

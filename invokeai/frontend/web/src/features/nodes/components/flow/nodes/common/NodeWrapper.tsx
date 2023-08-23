@@ -24,34 +24,40 @@ type NodeWrapperProps = PropsWithChildren & {
 const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
 
-  const selectNodeExecutionState = useMemo(
+  const selectIsInProgress = useMemo(
     () =>
       createSelector(
         stateSelector,
-        ({ nodes }) => nodes.nodeExecutionStates[nodeId]
+        ({ nodes }) =>
+          nodes.nodeExecutionStates[nodeId]?.status === NodeStatus.IN_PROGRESS
       ),
     [nodeId]
   );
 
-  const nodeExecutionState = useAppSelector(selectNodeExecutionState);
+  const isInProgress = useAppSelector(selectIsInProgress);
 
   const [
-    nodeSelectedOutlineLight,
-    nodeSelectedOutlineDark,
+    nodeSelectedLight,
+    nodeSelectedDark,
+    nodeInProgressLight,
+    nodeInProgressDark,
     shadowsXl,
     shadowsBase,
   ] = useToken('shadows', [
-    'nodeSelectedOutline.light',
-    'nodeSelectedOutline.dark',
+    'nodeSelected.light',
+    'nodeSelected.dark',
+    'nodeInProgress.light',
+    'nodeInProgress.dark',
     'shadows.xl',
     'shadows.base',
   ]);
 
   const dispatch = useAppDispatch();
 
-  const shadow = useColorModeValue(
-    nodeSelectedOutlineLight,
-    nodeSelectedOutlineDark
+  const selectedShadow = useColorModeValue(nodeSelectedLight, nodeSelectedDark);
+  const inProgressShadow = useColorModeValue(
+    nodeInProgressLight,
+    nodeInProgressDark
   );
 
   const opacity = useAppSelector((state) => state.nodes.nodeOpacity);
@@ -71,24 +77,9 @@ const NodeWrapper = (props: NodeWrapperProps) => {
         w: width ?? NODE_WIDTH,
         transitionProperty: 'common',
         transitionDuration: '0.1s',
-        shadow: selected
-          ? nodeExecutionState?.status === NodeStatus.IN_PROGRESS
-            ? undefined
-            : shadow
-          : undefined,
+        shadow: selected ? selectedShadow : undefined,
         cursor: 'grab',
         opacity,
-        borderWidth: 2,
-        borderColor:
-          nodeExecutionState?.status === NodeStatus.IN_PROGRESS
-            ? 'warning.300'
-            : 'base.200',
-        _dark: {
-          borderColor:
-            nodeExecutionState?.status === NodeStatus.IN_PROGRESS
-              ? 'warning.500'
-              : 'base.900',
-        },
       }}
     >
       <Box
@@ -101,6 +92,22 @@ const NodeWrapper = (props: NodeWrapperProps) => {
           borderRadius: 'base',
           pointerEvents: 'none',
           shadow: `${shadowsXl}, ${shadowsBase}, ${shadowsBase}`,
+          zIndex: -1,
+        }}
+      />
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          insetInlineEnd: 0,
+          bottom: 0,
+          insetInlineStart: 0,
+          borderRadius: 'md',
+          pointerEvents: 'none',
+          transitionProperty: 'common',
+          transitionDuration: 'normal',
+          opacity: 0.7,
+          shadow: isInProgress ? inProgressShadow : undefined,
           zIndex: -1,
         }}
       />
