@@ -20,6 +20,7 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { isEqual } from 'lodash-es';
+import { memo } from 'react';
 
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -150,4 +151,4 @@ const IAICanvasMaskOptions = () => {
   );
 };
 
-export default IAICanvasMaskOptions;
+export default memo(IAICanvasMaskOptions);

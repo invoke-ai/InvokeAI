@@ -1,8 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
-import { pick } from 'lodash-es';
 import { NodesState } from '../store/types';
-import { Workflow, isInvocationNode, isNotesNode } from '../types/types';
+import { Workflow, zWorkflowEdge, zWorkflowNode } from '../types/types';
 
 export const buildWorkflow = (nodesState: NodesState): Workflow => {
   const { workflow: workflowMeta, nodes, edges } = nodesState;
@@ -13,25 +12,19 @@ export const buildWorkflow = (nodesState: NodesState): Workflow => {
   };
 
   nodes.forEach((node) => {
-    if (!isInvocationNode(node) && !isNotesNode(node)) {
+    const result = zWorkflowNode.safeParse(node);
+    if (!result.success) {
       return;
     }
-    workflow.nodes.push(
-      pick(node, ['id', 'type', 'position', 'width', 'height', 'data'])
-    );
+    workflow.nodes.push(result.data);
   });
 
   edges.forEach((edge) => {
-    workflow.edges.push(
-      pick(edge, [
-        'source',
-        'sourceHandle',
-        'target',
-        'targetHandle',
-        'id',
-        'type',
-      ])
-    );
+    const result = zWorkflowEdge.safeParse(edge);
+    if (!result.success) {
+      return;
+    }
+    workflow.edges.push(result.data);
   });
 
   return workflow;

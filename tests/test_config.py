@@ -5,6 +5,8 @@ import pytest
 from omegaconf import OmegaConf
 from pathlib import Path
 
+from invokeai.app.services.config import InvokeAIAppConfig
+
 
 @pytest.fixture
 def patch_rootdir(tmp_path: Path, monkeypatch: Any) -> None:
@@ -34,6 +36,21 @@ InvokeAI:
 """
 )
 
+init3 = OmegaConf.create(
+    """
+InvokeAI:
+  Generation:
+    sequential_guidance: true
+    attention_type: xformers
+    attention_slice_size: 7
+    forced_tiled_decode: True
+  Device:
+    device: cpu
+  Model Cache:
+    ram: 1.25
+"""
+)
+
 
 def test_use_init(patch_rootdir):
     # note that we explicitly set omegaconf dict and argv here
@@ -56,9 +73,18 @@ def test_use_init(patch_rootdir):
     assert not hasattr(conf2, "invalid_attribute")
 
 
-def test_argv_override(patch_rootdir):
-    from invokeai.app.services.config import InvokeAIAppConfig
+def test_legacy():
+    conf = InvokeAIAppConfig.get_config()
+    assert conf
+    conf.parse_args(conf=init3, argv=[])
+    assert conf.xformers_enabled
+    assert conf.device == "cpu"
+    assert conf.use_cpu
+    assert conf.ram == 1.25
+    assert conf.ram_cache_size == 1.25
 
+
+def test_argv_override():
     conf = InvokeAIAppConfig.get_config()
     conf.parse_args(conf=init1, argv=["--always_use_cpu", "--max_cache=10"])
     assert conf.always_use_cpu

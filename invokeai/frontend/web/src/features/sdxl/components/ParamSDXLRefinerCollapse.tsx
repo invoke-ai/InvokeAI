@@ -12,6 +12,7 @@ import ParamSDXLRefinerScheduler from './SDXLRefiner/ParamSDXLRefinerScheduler';
 import ParamSDXLRefinerStart from './SDXLRefiner/ParamSDXLRefinerStart';
 import ParamSDXLRefinerSteps from './SDXLRefiner/ParamSDXLRefinerSteps';
 import ParamUseSDXLRefiner from './SDXLRefiner/ParamUseSDXLRefiner';
+import { memo } from 'react';
 
 const selector = createSelector(
   stateSelector,
@@ -47,4 +48,4 @@ const ParamSDXLRefinerCollapse = () => {
   );
 };
 
-export default ParamSDXLRefinerCollapse;
+export default memo(ParamSDXLRefinerCollapse);

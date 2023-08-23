@@ -9,6 +9,11 @@ export const DRAG_HANDLE_CLASSNAME = 'node-drag-handle';
 export const IMAGE_FIELDS = ['ImageField', 'ImageCollection'];
 export const FOOTER_FIELDS = IMAGE_FIELDS;
 
+export const KIND_MAP = {
+  input: 'inputs' as const,
+  output: 'outputs' as const,
+};
+
 export const COLLECTION_TYPES: FieldType[] = [
   'Collection',
   'IntegerCollection',
@@ -17,9 +22,6 @@ export const COLLECTION_TYPES: FieldType[] = [
   'BooleanCollection',
   'ImageCollection',
 ];
-
-export const colorTokenToCssVar = (colorToken: string) =>
-  `var(--invokeai-colors-${colorToken.split('.').join('-')}`;
 
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
   integer: {
@@ -125,6 +127,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
   ControlNetModelField: {
     color: 'teal.500',
     title: 'ControlNet',
+    description: 'TODO',
+  },
+  Scheduler: {
+    color: 'base.500',
+    title: 'Scheduler',
     description: 'TODO',
   },
   Collection: {

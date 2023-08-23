@@ -16,7 +16,6 @@ export const systemPersistDenylist: (keyof SystemState)[] = [
   'isCancelScheduled',
   'progressImage',
   'wereModelsReceived',
-  'wasSchemaParsed',
   'isPersisted',
   'isUploading',
 ];
