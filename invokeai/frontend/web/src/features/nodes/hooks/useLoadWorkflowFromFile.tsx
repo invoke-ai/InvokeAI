@@ -7,14 +7,11 @@ import { zWorkflow } from 'features/nodes/types/types';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
-import { flushSync } from 'react-dom';
-import { useReactFlow } from 'reactflow';
 import { ZodError } from 'zod';
 import { fromZodError, fromZodIssue } from 'zod-validation-error';
 
 export const useLoadWorkflowFromFile = () => {
   const dispatch = useAppDispatch();
-  const { fitView } = useReactFlow();
   const logger = useLogger('nodes');
   const loadWorkflowFromFile = useCallback(
     (file: File | null) => {
@@ -51,7 +48,6 @@ export const useLoadWorkflowFromFile = () => {
           }
 
           dispatch(workflowLoaded(result.data));
-          flushSync(fitView);
 
           dispatch(
             addToast(
@@ -79,7 +75,7 @@ export const useLoadWorkflowFromFile = () => {
 
       reader.readAsText(file);
     },
-    [dispatch, fitView, logger]
+    [dispatch, logger]
   );
 
   return loadWorkflowFromFile;

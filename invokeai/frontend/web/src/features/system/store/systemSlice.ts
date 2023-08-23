@@ -3,7 +3,7 @@ import { PayloadAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { InvokeLogLevel } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import { t } from 'i18next';
-import { startCase, upperFirst } from 'lodash-es';
+import { get, startCase, upperFirst } from 'lodash-es';
 import { LogLevelName } from 'roarr';
 import {
   isAnySessionRejected,
@@ -368,14 +368,14 @@ export const systemSlice = createSlice({
           return;
         }
       } else if (action.payload?.error) {
-        errorDescription = action.payload?.error as string;
+        errorDescription = action.payload?.error;
       }
 
       state.toastQueue.push(
         makeToast({
           title: t('toast.serverError'),
           status: 'error',
-          description: errorDescription,
+          description: get(errorDescription, 'detail', 'Unknown Error'),
           duration,
         })
       );

@@ -1,6 +1,5 @@
 import {
   Box,
-  ChakraProps,
   Divider,
   Flex,
   ListItem,
@@ -19,39 +18,12 @@ import IAIIconButton, {
 import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
 import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
 import ProgressBar from 'features/system/components/ProgressBar';
-import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaPlay } from 'react-icons/fa';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-
-const IN_PROGRESS_STYLES: ChakraProps['sx'] = {
-  _disabled: {
-    bg: 'none',
-    color: 'base.600',
-    cursor: 'not-allowed',
-    _hover: {
-      color: 'base.600',
-      bg: 'none',
-    },
-  },
-};
-
-const selector = createSelector(
-  [stateSelector, activeTabNameSelector, selectIsBusy],
-  ({ gallery }, activeTabName, isBusy) => {
-    const { autoAddBoardId } = gallery;
-
-    return {
-      isBusy,
-      autoAddBoardId,
-      activeTabName,
-    };
-  },
-  defaultSelectorOptions
-);
 
 interface InvokeButton
   extends Omit<IAIButtonProps | IAIIconButtonProps, 'aria-label'> {
@@ -62,7 +34,7 @@ export default function InvokeButton(props: InvokeButton) {
   const { asIconButton = false, sx, ...rest } = props;
   const dispatch = useAppDispatch();
   const { isReady, isProcessing } = useIsReadyToInvoke();
-  const { activeTabName } = useAppSelector(selector);
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
   const handleInvoke = useCallback(() => {
     dispatch(clampSymmetrySteps());
@@ -113,10 +85,10 @@ export default function InvokeButton(props: InvokeButton) {
             colorScheme="accent"
             isLoading={isProcessing}
             id="invoke-button"
+            data-progress={isProcessing}
             sx={{
               w: 'full',
               flexGrow: 1,
-              ...(isProcessing ? IN_PROGRESS_STYLES : {}),
               ...sx,
             }}
             {...rest}
@@ -126,6 +98,7 @@ export default function InvokeButton(props: InvokeButton) {
             tooltip={<InvokeButtonTooltipContent />}
             aria-label={t('parameters.invoke')}
             type="submit"
+            data-progress={isProcessing}
             isDisabled={!isReady}
             onClick={handleInvoke}
             colorScheme="accent"
@@ -137,7 +110,6 @@ export default function InvokeButton(props: InvokeButton) {
               w: 'full',
               flexGrow: 1,
               fontWeight: 700,
-              ...(isProcessing ? IN_PROGRESS_STYLES : {}),
               ...sx,
             }}
             {...rest}
@@ -150,9 +122,21 @@ export default function InvokeButton(props: InvokeButton) {
   );
 }
 
+const tooltipSelector = createSelector(
+  [stateSelector],
+  ({ gallery }) => {
+    const { autoAddBoardId } = gallery;
+
+    return {
+      autoAddBoardId,
+    };
+  },
+  defaultSelectorOptions
+);
+
 export const InvokeButtonTooltipContent = memo(() => {
   const { isReady, reasons } = useIsReadyToInvoke();
-  const { autoAddBoardId } = useAppSelector(selector);
+  const { autoAddBoardId } = useAppSelector(tooltipSelector);
   const autoAddBoardName = useBoardName(autoAddBoardId);
 
   return (

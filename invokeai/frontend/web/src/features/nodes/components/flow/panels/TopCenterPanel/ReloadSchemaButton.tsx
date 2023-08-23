@@ -1,5 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import IAIButton from 'common/components/IAIButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaSyncAlt } from 'react-icons/fa';
@@ -14,12 +14,14 @@ const ReloadSchemaButton = () => {
   }, [dispatch]);
 
   return (
-    <IAIIconButton
-      icon={<FaSyncAlt />}
+    <IAIButton
+      leftIcon={<FaSyncAlt />}
       tooltip={t('nodes.reloadSchema')}
       aria-label={t('nodes.reloadSchema')}
       onClick={handleReloadSchema}
-    />
+    >
+      {t('nodes.reloadSchema')}
+    </IAIButton>
   );
 };
 
