@@ -31,7 +31,6 @@ import {
 } from 'features/system/store/systemSlice';
 import {
   setShouldShowProgressInViewer,
-  setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
@@ -69,18 +68,13 @@ const selector = createSelector(
       shouldUseWatermarker,
     } = system;
 
-    const {
-      shouldUseCanvasBetaLayout,
-      shouldUseSliders,
-      shouldShowProgressInViewer,
-    } = ui;
+    const { shouldUseSliders, shouldShowProgressInViewer } = ui;
 
     const { shouldShowAdvancedOptions } = generation;
 
     return {
       shouldConfirmOnDelete,
       enableImageDebugging,
-      shouldUseCanvasBetaLayout,
       shouldUseSliders,
       shouldShowProgressInViewer,
       consoleLogLevel,
@@ -99,7 +93,6 @@ const selector = createSelector(
 type ConfigOptions = {
   shouldShowDeveloperSettings: boolean;
   shouldShowResetWebUiText: boolean;
-  shouldShowBetaLayout: boolean;
   shouldShowAdvancedOptionsSettings: boolean;
   shouldShowClearIntermediates: boolean;
   shouldShowLocalizationToggle: boolean;
@@ -116,7 +109,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const { t } = useTranslation();
   const [countdown, setCountdown] = useState(3);
 
-  const shouldShowBetaLayout = config?.shouldShowBetaLayout ?? true;
   const shouldShowDeveloperSettings =
     config?.shouldShowDeveloperSettings ?? true;
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
@@ -158,7 +150,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const {
     shouldConfirmOnDelete,
     enableImageDebugging,
-    shouldUseCanvasBetaLayout,
     shouldUseSliders,
     shouldShowProgressInViewer,
     consoleLogLevel,
@@ -306,17 +297,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     )
                   }
                 />
-                {shouldShowBetaLayout && (
-                  <SettingSwitch
-                    label={t('settings.alternateCanvasLayout')}
-                    useBadge
-                    badgeLabel={t('settings.beta')}
-                    isChecked={shouldUseCanvasBetaLayout}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
-                    }
-                  />
-                )}
                 {shouldShowLocalizationToggle && (
                   <IAIMantineSelect
                     disabled={!isLocalizationEnabled}
