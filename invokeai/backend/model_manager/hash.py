@@ -55,7 +55,7 @@ class FastModelHash(object):
             for file in files:
                 # Ignore the config files, which change locally,
                 # and just look at the bin files.
-                if file in ['config.json', 'model_index.json']:
+                if file in ["config.json", "model_index.json"]:
                     continue
                 path = Path(root) / file
                 fast_hash = cls._hash_file(path)

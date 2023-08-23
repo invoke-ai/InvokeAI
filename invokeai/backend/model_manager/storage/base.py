@@ -21,6 +21,7 @@ class InvalidModelException(Exception):
 class UnknownModelException(Exception):
     """Raised on an attempt to delete a model with a nonexistent key."""
 
+
 class ModelConfigStore(ABC):
     """Abstract base class for storage and retrieval of model configs."""
 

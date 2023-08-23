@@ -30,6 +30,7 @@ from pydantic.error_wrappers import ValidationError
 class InvalidModelConfigException(Exception):
     """Exception for when config parser doesn't recognized this combination of model type and format."""
 
+
 class BaseModelType(str, Enum):
     """Base model type."""
 
@@ -49,6 +50,7 @@ class ModelType(str, Enum):
     Lora = "lora"
     ControlNet = "controlnet"  # used by model_probe
     TextualInversion = "embedding"
+
 
 class SubModelType(str, Enum):
     """Submodel type."""
@@ -172,10 +174,8 @@ class MainCheckpointConfig(CheckpointConfig, MainConfig):
     """Model config for main checkpoint models."""
 
 
-
 class MainDiffusersConfig(DiffusersConfig, MainConfig):
     """Model config for main diffusers models."""
-
 
 
 class ONNXSD1Config(MainConfig):

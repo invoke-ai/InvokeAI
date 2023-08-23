@@ -11,9 +11,11 @@ from invokeai.backend.model_manager import (
     InvalidModelException,
 )
 
+
 def helper(model_path: Path):
     print('Warning: guessing "v_prediction" SchedulerPredictionType', file=sys.stderr)
     return SchedulerPredictionType.VPrediction
+
 
 parser = argparse.ArgumentParser(description="Probe model type")
 parser.add_argument(

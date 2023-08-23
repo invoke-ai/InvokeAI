@@ -43,14 +43,12 @@ class CreateTemplateScanner(ModelSearch):
 
     def write_template(self, model: Path, info: ModelProbeInfo):
         """Write template for a checkpoint file."""
-        dest_path = Path(self._dest,
-                         "checkpoints" if model.is_file() else 'diffusers',
-                         info.base_type.value,
-                         info.model_type.value
-                         )
-        template: dict = self._make_checkpoint_template(model) \
-            if model.is_file() \
-            else self._make_diffusers_template(model)
+        dest_path = Path(
+            self._dest, "checkpoints" if model.is_file() else "diffusers", info.base_type.value, info.model_type.value
+        )
+        template: dict = (
+            self._make_checkpoint_template(model) if model.is_file() else self._make_diffusers_template(model)
+        )
         if not template:
             print(f"Could not create template for {model}, got {template}")
             return
@@ -105,7 +103,7 @@ class CreateTemplateScanner(ModelSearch):
         tmpl = None
         if (model / "model_index.json").exists():  # a pipeline
             tmpl = {}
-            for subdir in ['unet', 'text_encoder', 'vae', 'text_encoder_2']:
+            for subdir in ["unet", "text_encoder", "vae", "text_encoder_2"]:
                 config = model / subdir / "config.json"
                 try:
                     tmpl[subdir] = self._read_config(config)
@@ -122,7 +120,7 @@ class CreateTemplateScanner(ModelSearch):
         return tmpl
 
     def _read_config(self, config: Path) -> dict:
-        with open(config, 'r', encoding='utf-8') as f:
+        with open(config, "r", encoding="utf-8") as f:
             return {x: y for x, y in json.load(f).items() if not x.startswith("_")}
 
     def on_search_completed(self):
@@ -137,16 +135,14 @@ class CreateTemplateScanner(ModelSearch):
 parser = argparse.ArgumentParser(
     description="Scan the provided path recursively and create .json templates for all models found.",
 )
-parser.add_argument("--scan",
-                    type=Path,
-                    help="Path to recursively scan for models"
-                    )
-parser.add_argument("--out",
-                    type=Path,
-                    dest="outdir",
-                    default=Path(__file__).resolve().parents[1] / "invokeai/configs/model_probe_templates",
-                    help="Destination for templates",
-                    )
+parser.add_argument("--scan", type=Path, help="Path to recursively scan for models")
+parser.add_argument(
+    "--out",
+    type=Path,
+    dest="outdir",
+    default=Path(__file__).resolve().parents[1] / "invokeai/configs/model_probe_templates",
+    help="Destination for templates",
+)
 
 opt = parser.parse_args()
 scanner = CreateTemplateScanner([opt.scan], dest=opt.outdir)

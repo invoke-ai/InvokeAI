@@ -59,11 +59,12 @@ class ModelInstallBase(ABC):
     """Abstract base class for InvokeAI model installation"""
 
     @abstractmethod
-    def __init__(self,
-                 store: Optional[ModelConfigStore] = None,
-                 config: Optional[InvokeAIAppConfig] = None,
-                 logger: Optional[InvokeAILogger] = None
-                 ):
+    def __init__(
+        self,
+        store: Optional[ModelConfigStore] = None,
+        config: Optional[InvokeAIAppConfig] = None,
+        logger: Optional[InvokeAILogger] = None,
+    ):
         """
         Create ModelInstall object.
 
@@ -190,11 +191,12 @@ class ModelInstall(ModelInstallBase):
         },
     }
 
-    def __init__(self,
-                 store: Optional[ModelConfigStore] = None,
-                 config: Optional[InvokeAIAppConfig] = None,
-                 logger: Optional[InvokeAILogger] = None
-                 ):       # noqa D107 - use base class docstrings
+    def __init__(
+        self,
+        store: Optional[ModelConfigStore] = None,
+        config: Optional[InvokeAIAppConfig] = None,
+        logger: Optional[InvokeAILogger] = None,
+    ):  # noqa D107 - use base class docstrings
         self._config = config or InvokeAIAppConfig.get_config()
         self._logger = logger or InvokeAILogger.getLogger()
         if store is None:
@@ -213,7 +215,7 @@ class ModelInstall(ModelInstallBase):
             name=model_path.stem,
             base_model=info.base_type,
             model_type=info.model_type,
-            model_format=info.format
+            model_format=info.format,
         )
         # add 'main' specific fields
         if info.model_type == ModelType.Main and info.format == ModelFormat.Checkpoint:
@@ -227,7 +229,7 @@ class ModelInstall(ModelInstallBase):
         self._store.add_model(id, registration_data)
         return id
 
-    def install(self, model_path: Union[Path, str]) -> str:    # noqa D102
+    def install(self, model_path: Union[Path, str]) -> str:  # noqa D102
         model_path = Path(model_path)
         info: ModelProbeInfo = ModelProbe.probe(model_path)
         dest_path = self._config.models_path / info.base_model.value / info.model_type.value / model_path.name
@@ -243,22 +245,22 @@ class ModelInstall(ModelInstallBase):
             info,
         )
 
-    def unregister(self, id: str):    # noqa D102
+    def unregister(self, id: str):  # noqa D102
         self._store.del_model(id)
 
-    def delete(self, id: str):    # noqa D102
+    def delete(self, id: str):  # noqa D102
         model = self._store.get_model(id)
         rmtree(model.path)
         self.unregister(id)
 
-    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:     # noqa D102
+    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         search = ModelSearch()
         search.model_found = self._scan_install if install else self._scan_register
         self._installed = set()
         search.search([scan_dir])
         return list(self._installed)
 
-    def garbage_collect(self) -> List[str]:      # noqa D102
+    def garbage_collect(self) -> List[str]:  # noqa D102
         unregistered = list()
         for model in self._store.all_models():
             path = Path(model.path)
@@ -267,7 +269,7 @@ class ModelInstall(ModelInstallBase):
                 unregistered.append(model.id)
         return unregistered
 
-    def hash(self, model_path: Union[Path, str]) -> str:     # noqa D102
+    def hash(self, model_path: Union[Path, str]) -> str:  # noqa D102
         return FastModelHash.hash(model_path)
 
     # the following two methods are callbacks to the ModelSearch object

@@ -182,6 +182,7 @@ DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_MAX_VRAM = 0.5
 
+
 class InvokeAIAppConfig(InvokeAISettings):
     """
     Generate images using Stable Diffusion. Use "invokeai" to launch

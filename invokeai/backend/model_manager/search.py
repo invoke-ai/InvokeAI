@@ -132,7 +132,7 @@ class ModelSearch(ModelSearchBase):
         if self.search_completed:
             self.search_completed(self._model_set)
 
-    def list_models(self, directories: List[Union[Path,str]]) -> List[Path]:
+    def list_models(self, directories: List[Union[Path, str]]) -> List[Path]:
         """Return list of models found"""
         self.search(directories)
         return list(self._model_set)

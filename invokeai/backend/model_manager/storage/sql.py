@@ -307,11 +307,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
                     config=?
                 WHERE id=?;
                 """,
-                (record.base_model,
-                 record.model_type,
-                 record.name,
-                 record.path,
-                 json_serialized, key),
+                (record.base_model, record.model_type, record.name, record.path, json_serialized, key),
             )
             if self._cursor.rowcount < 1:
                 raise UnknownModelException

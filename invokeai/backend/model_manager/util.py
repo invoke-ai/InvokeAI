@@ -12,6 +12,7 @@ from diffusers import logging as diffusers_logging
 from transformers import logging as transformers_logging
 from picklescan.scanner import scan_file_path
 
+
 class SilenceWarnings(object):
     """
     Context manager that silences warnings from transformers and diffusers.
@@ -111,6 +112,7 @@ def lora_token_vector_length(checkpoint: dict) -> Optional[int]:
 
     return lora_token_vector_length
 
+
 def _fast_safetensors_reader(path: str):
     checkpoint = dict()
     device = torch.device("meta")
@@ -141,6 +143,7 @@ def _fast_safetensors_reader(path: str):
             checkpoint[key] = torch.empty(info["shape"], dtype=dtype, device=device)
 
     return checkpoint
+
 
 def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
     if str(path).endswith(".safetensors"):

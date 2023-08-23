@@ -30,6 +30,7 @@ from .util import SilenceWarnings, lora_token_vector_length
 class InvalidModelException(Exception):
     """Raised when an invalid model is encountered."""
 
+
 @dataclass
 class ModelProbeInfo(object):
     """Fields describing a probed model."""
@@ -49,9 +50,9 @@ class ModelProbeBase(ABC):
     @classmethod
     @abstractmethod
     def probe(
-            cls,
-            model: Path,
-            prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
+        cls,
+        model: Path,
+        prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
     ) -> Optional[ModelProbeInfo]:
         """
         Probe model located at path and return ModelProbeInfo object.
@@ -61,6 +62,7 @@ class ModelProbeBase(ABC):
         and returns the SchedulerPredictionType.
         """
         pass
+
 
 class ProbeBase(ABC):
     """Base model for probing checkpoint and diffusers-style models."""
@@ -102,9 +104,7 @@ class ModelProbe(ModelProbeBase):
     }
 
     @classmethod
-    def register_probe(
-        cls, format: ModelFormat, model_type: ModelType, probe_class: ProbeBase
-    ):
+    def register_probe(cls, format: ModelFormat, model_type: ModelType, probe_class: ProbeBase):
         """
         Register a probe subclass to use when interrogating a model.
 
@@ -123,13 +123,9 @@ class ModelProbe(ModelProbeBase):
         """Probe model."""
         try:
             model_type = (
-                cls.get_model_type_from_folder(model)
-                if model.is_dir()
-                else cls.get_model_type_from_checkpoint(model)
+                cls.get_model_type_from_folder(model) if model.is_dir() else cls.get_model_type_from_checkpoint(model)
             )
-            format_type = "onnx" if model_type == ModelType.ONNX \
-                else "diffusers" if model.is_dir() \
-                else "checkpoint"
+            format_type = "onnx" if model_type == ModelType.ONNX else "diffusers" if model.is_dir() else "checkpoint"
 
             probe_class = cls.PROBES[format_type].get(model_type)
             if not probe_class:
@@ -252,9 +248,11 @@ class ModelProbe(ModelProbeBase):
         if scan_result.infected_files != 0:
             raise "The model {model_name} is potentially infected by malware. Aborting import."
 
+
 # ##################################################3
 # Checkpoint probing
 # ##################################################3
+
 
 class CheckpointProbeBase(ProbeBase):
     """Base class for probing checkpoint-style models."""
