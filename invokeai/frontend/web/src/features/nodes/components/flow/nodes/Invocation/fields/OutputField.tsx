@@ -1,10 +1,4 @@
-import {
-  Flex,
-  FormControl,
-  FormLabel,
-  Spacer,
-  Tooltip,
-} from '@chakra-ui/react';
+import { Flex, FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
@@ -42,7 +36,6 @@ const OutputField = ({ nodeId, fieldName }: Props) => {
 
   return (
     <OutputFieldWrapper shouldDim={shouldDim}>
-      <Spacer />
       <Tooltip
         label={
           <FieldTooltipContent
@@ -90,6 +83,7 @@ const OutputFieldWrapper = memo(
         opacity: shouldDim ? 0.5 : 1,
         transitionProperty: 'opacity',
         transitionDuration: '0.1s',
+        justifyContent: 'flex-end',
       }}
     >
       {children}

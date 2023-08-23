@@ -31,7 +31,6 @@ import {
 } from 'features/system/store/systemSlice';
 import {
   setShouldShowProgressInViewer,
-  setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
@@ -42,6 +41,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
@@ -68,18 +68,13 @@ const selector = createSelector(
       shouldUseWatermarker,
     } = system;
 
-    const {
-      shouldUseCanvasBetaLayout,
-      shouldUseSliders,
-      shouldShowProgressInViewer,
-    } = ui;
+    const { shouldUseSliders, shouldShowProgressInViewer } = ui;
 
     const { shouldShowAdvancedOptions } = generation;
 
     return {
       shouldConfirmOnDelete,
       enableImageDebugging,
-      shouldUseCanvasBetaLayout,
       shouldUseSliders,
       shouldShowProgressInViewer,
       consoleLogLevel,
@@ -98,7 +93,6 @@ const selector = createSelector(
 type ConfigOptions = {
   shouldShowDeveloperSettings: boolean;
   shouldShowResetWebUiText: boolean;
-  shouldShowBetaLayout: boolean;
   shouldShowAdvancedOptionsSettings: boolean;
   shouldShowClearIntermediates: boolean;
   shouldShowLocalizationToggle: boolean;
@@ -113,8 +107,8 @@ type SettingsModalProps = {
 const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const [countdown, setCountdown] = useState(3);
 
-  const shouldShowBetaLayout = config?.shouldShowBetaLayout ?? true;
   const shouldShowDeveloperSettings =
     config?.shouldShowDeveloperSettings ?? true;
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
@@ -156,7 +150,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const {
     shouldConfirmOnDelete,
     enableImageDebugging,
-    shouldUseCanvasBetaLayout,
     shouldUseSliders,
     shouldShowProgressInViewer,
     consoleLogLevel,
@@ -179,7 +172,14 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     });
     onSettingsModalClose();
     onRefreshModalOpen();
+    setInterval(() => setCountdown((prev) => prev - 1), 1000);
   }, [onSettingsModalClose, onRefreshModalOpen]);
+
+  useEffect(() => {
+    if (countdown <= 0) {
+      window.location.reload();
+    }
+  }, [countdown]);
 
   const handleLogLevelChanged = useCallback(
     (v: string) => {
@@ -297,17 +297,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     )
                   }
                 />
-                {shouldShowBetaLayout && (
-                  <SettingSwitch
-                    label={t('settings.alternateCanvasLayout')}
-                    useBadge
-                    badgeLabel={t('settings.beta')}
-                    isChecked={shouldUseCanvasBetaLayout}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
-                    }
-                  />
-                )}
                 {shouldShowLocalizationToggle && (
                   <IAIMantineSelect
                     disabled={!isLocalizationEnabled}
@@ -381,6 +370,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
         isOpen={isRefreshModalOpen}
         onClose={onRefreshModalClose}
         isCentered
+        closeOnEsc={false}
       >
         <ModalOverlay backdropFilter="blur(40px)" />
         <ModalContent>
@@ -388,7 +378,9 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
           <ModalBody>
             <Flex justifyContent="center">
               <Text fontSize="lg">
-                <Text>{t('settings.resetComplete')}</Text>
+                <Text>
+                  {t('settings.resetComplete')} Reloading in {countdown}...
+                </Text>
               </Text>
             </Flex>
           </ModalBody>

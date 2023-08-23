@@ -1,9 +1,9 @@
+import { Flex } from '@chakra-ui/layout';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
+import IAIIconButton from 'common/components/IAIIconButton';
 import { addNodePopoverOpened } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { Panel } from 'reactflow';
+import { FaPlus } from 'react-icons/fa';
 
 const TopLeftPanel = () => {
   const dispatch = useAppDispatch();
@@ -12,16 +12,15 @@ const TopLeftPanel = () => {
     dispatch(addNodePopoverOpened());
   }, [dispatch]);
 
-  useHotkeys(['shift+a'], () => {
-    handleOpenAddNodePopover();
-  });
-
   return (
-    <Panel position="top-left">
-      <IAIButton aria-label="Add Node" onClick={handleOpenAddNodePopover}>
-        Add Node
-      </IAIButton>
-    </Panel>
+    <Flex sx={{ gap: 2, position: 'absolute', top: 2, insetInlineStart: 2 }}>
+      <IAIIconButton
+        tooltip="Add Node (Shift+A, Space)"
+        aria-label="Add Node"
+        icon={<FaPlus />}
+        onClick={handleOpenAddNodePopover}
+      />
+    </Flex>
   );
 };
 

@@ -238,7 +238,7 @@ const modelsFilter = <
   T extends
     | MainModelConfigEntity
     | LoRAModelConfigEntity
-    | OnnxModelConfigEntity
+    | OnnxModelConfigEntity,
 >(
   data: EntityState<T> | undefined,
   model_type: ModelType,
