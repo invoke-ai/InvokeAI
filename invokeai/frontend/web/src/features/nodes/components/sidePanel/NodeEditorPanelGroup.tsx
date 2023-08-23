@@ -1,4 +1,5 @@
 import { Flex } from '@chakra-ui/react';
+import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import { memo, useCallback, useRef, useState } from 'react';
@@ -8,7 +9,6 @@ import {
   PanelGroup,
 } from 'react-resizable-panels';
 import 'reactflow/dist/style.css';
-import WorkflowEditorControls from '../flow/panels/TopCenterPanel/WorkflowEditorControls';
 import InspectorPanel from './inspector/InspectorPanel';
 import WorkflowPanel from './workflow/WorkflowPanel';
 
@@ -26,7 +26,7 @@ const NodeEditorPanelGroup = () => {
 
   return (
     <Flex sx={{ flexDir: 'column', gap: 2, height: '100%', width: '100%' }}>
-      <WorkflowEditorControls />
+      <ProcessButtons />
       <PanelGroup
         ref={panelGroupRef}
         id="workflow-panel-group"

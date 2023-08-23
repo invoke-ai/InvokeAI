@@ -1,6 +1,6 @@
+import { Flex } from '@chakra-ui/layout';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
-import { Panel } from 'reactflow';
 import FieldTypeLegend from './FieldTypeLegend';
 import WorkflowEditorSettings from './WorkflowEditorSettings';
 
@@ -10,10 +10,10 @@ const TopRightPanel = () => {
   );
 
   return (
-    <Panel position="top-right">
+    <Flex sx={{ gap: 2, position: 'absolute', top: 2, insetInlineEnd: 2 }}>
       <WorkflowEditorSettings />
       {shouldShowFieldTypeLegend && <FieldTypeLegend />}
-    </Panel>
+    </Flex>
   );
 };
 

@@ -20,7 +20,7 @@ const WorkflowPanel = () => {
         w: 'full',
         h: 'full',
         borderRadius: 'base',
-        p: 4,
+        p: 2,
         gap: 2,
       }}
     >

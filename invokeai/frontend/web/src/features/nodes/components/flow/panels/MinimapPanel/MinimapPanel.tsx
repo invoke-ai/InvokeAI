@@ -1,6 +1,6 @@
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useColorModeValue } from '@chakra-ui/react';
+import { Flex, useColorModeValue } from '@chakra-ui/react';
 import { memo } from 'react';
 import { MiniMap } from 'reactflow';
 
@@ -29,7 +29,7 @@ const MinimapPanel = () => {
   );
 
   return (
-    <>
+    <Flex sx={{ gap: 2, position: 'absolute', bottom: 2, insetInlineEnd: 2 }}>
       {shouldShowMinimapPanel && (
         <MiniMap
           pannable
@@ -40,7 +40,7 @@ const MinimapPanel = () => {
           maskColor={maskColor}
         />
       )}
-    </>
+    </Flex>
   );
 };
 
