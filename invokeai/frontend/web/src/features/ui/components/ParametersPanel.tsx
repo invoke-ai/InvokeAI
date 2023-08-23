@@ -1,6 +1,7 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import SDXLImageToImageTabParameters from 'features/sdxl/components/SDXLImageToImageTabParameters';
 import SDXLTextToImageTabParameters from 'features/sdxl/components/SDXLTextToImageTabParameters';
 import SDXLUnifiedCanvasTabParameters from 'features/sdxl/components/SDXLUnifiedCanvasTabParameters';
@@ -62,46 +63,66 @@ const ParametersPanelWrapper = memo((props: PropsWithChildren) => {
       sx={{
         w: 'full',
         h: 'full',
-        position: 'relative',
-        borderRadius: 'base',
+        flexDir: 'column',
+        gap: 2,
       }}
     >
-      <Box
+      <ProcessButtons />
+      <Flex
+        layerStyle="first"
         sx={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          w: 'full',
+          h: 'full',
+          position: 'relative',
+          borderRadius: 'base',
+          p: 2,
         }}
       >
-        <OverlayScrollbarsComponent
-          defer
-          style={{ height: '100%', width: '100%' }}
-          options={{
-            scrollbars: {
-              visibility: 'auto',
-              autoHide: 'scroll',
-              autoHideDelay: 800,
-              theme: 'os-theme-dark',
-            },
-            overflow: {
-              x: 'hidden',
-            },
+        <Flex
+          sx={{
+            w: 'full',
+            h: 'full',
+            position: 'relative',
           }}
         >
-          <Flex
+          <Box
             sx={{
-              gap: 2,
-              flexDirection: 'column',
-              h: 'full',
-              w: 'full',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
             }}
           >
-            {props.children}
-          </Flex>
-        </OverlayScrollbarsComponent>
-      </Box>
+            <OverlayScrollbarsComponent
+              defer
+              style={{ height: '100%', width: '100%' }}
+              options={{
+                scrollbars: {
+                  visibility: 'auto',
+                  autoHide: 'scroll',
+                  autoHideDelay: 800,
+                  theme: 'os-theme-dark',
+                },
+                overflow: {
+                  x: 'hidden',
+                },
+              }}
+            >
+              <Flex
+                sx={{
+                  gap: 2,
+                  flexDirection: 'column',
+                  h: 'full',
+                  w: 'full',
+                }}
+              >
+                {props.children}
+              </Flex>
+            </OverlayScrollbarsComponent>
+          </Box>
+        </Flex>
+      </Flex>
     </Flex>
   );
 });

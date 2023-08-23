@@ -7,6 +7,11 @@ import { MdDeviceHub } from 'react-icons/md';
 import 'reactflow/dist/style.css';
 import AddNodePopover from './flow/AddNodePopover/AddNodePopover';
 import { Flow } from './flow/Flow';
+import TopLeftPanel from './flow/panels/TopLeftPanel/TopLeftPanel';
+import TopCenterPanel from './flow/panels/TopCenterPanel/TopCenterPanel';
+import TopRightPanel from './flow/panels/TopRightPanel/TopRightPanel';
+import BottomLeftPanel from './flow/panels/BottomLeftPanel/BottomLeftPanel';
+import MinimapPanel from './flow/panels/MinimapPanel/MinimapPanel';
 
 const NodeEditor = () => {
   const isReady = useAppSelector((state) => state.nodes.isReady);
@@ -40,6 +45,11 @@ const NodeEditor = () => {
           >
             <Flow />
             <AddNodePopover />
+            <TopLeftPanel />
+            <TopCenterPanel />
+            <TopRightPanel />
+            <BottomLeftPanel />
+            <MinimapPanel />
           </motion.div>
         )}
       </AnimatePresence>

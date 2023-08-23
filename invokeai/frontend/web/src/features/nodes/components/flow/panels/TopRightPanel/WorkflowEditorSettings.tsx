@@ -9,6 +9,7 @@ import {
   ModalContent,
   ModalHeader,
   ModalOverlay,
+  forwardRef,
   useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
@@ -54,7 +55,7 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const WorkflowEditorSettings = () => {
+const WorkflowEditorSettings = forwardRef((_, ref) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
   const {
@@ -103,6 +104,7 @@ const WorkflowEditorSettings = () => {
   return (
     <>
       <IAIIconButton
+        ref={ref}
         aria-label="Workflow Editor Settings"
         tooltip="Workflow Editor Settings"
         icon={<FaCog />}
@@ -170,6 +172,6 @@ const WorkflowEditorSettings = () => {
       </Modal>
     </>
   );
-};
+});
 
 export default memo(WorkflowEditorSettings);

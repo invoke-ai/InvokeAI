@@ -42,11 +42,6 @@ import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
 import CurrentImageNode from './nodes/CurrentImage/CurrentImageNode';
 import InvocationNodeWrapper from './nodes/Invocation/InvocationNodeWrapper';
 import NotesNode from './nodes/Notes/NotesNode';
-import BottomLeftPanel from './panels/BottomLeftPanel/BottomLeftPanel';
-import MinimapPanel from './panels/MinimapPanel/MinimapPanel';
-import TopCenterPanel from './panels/TopCenterPanel/TopCenterPanel';
-import TopLeftPanel from './panels/TopLeftPanel/TopLeftPanel';
-import TopRightPanel from './panels/TopRightPanel/TopRightPanel';
 
 const DELETE_KEYS = ['Delete', 'Backspace'];
 
@@ -196,11 +191,6 @@ export const Flow = () => {
       deleteKeyCode={DELETE_KEYS}
       selectionMode={selectionMode}
     >
-      <TopLeftPanel />
-      <TopCenterPanel />
-      <TopRightPanel />
-      <BottomLeftPanel />
-      <MinimapPanel />
       <Background />
     </ReactFlow>
   );

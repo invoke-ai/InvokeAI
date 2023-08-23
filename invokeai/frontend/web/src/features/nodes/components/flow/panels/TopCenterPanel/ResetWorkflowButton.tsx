@@ -6,10 +6,8 @@ import {
   AlertDialogHeader,
   AlertDialogOverlay,
   Button,
-  Divider,
   Flex,
   Text,
-  VStack,
   useDisclosure,
 } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
@@ -55,6 +53,7 @@ const ResetWorkflowButton = () => {
         aria-label={t('nodes.resetWorkflow')}
         onClick={onOpen}
         isDisabled={!nodesCount}
+        colorScheme="error"
       />
 
       <AlertDialog
