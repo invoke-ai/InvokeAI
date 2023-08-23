@@ -27,7 +27,7 @@ import {
 import { ChangeEvent, memo, useCallback } from 'react';
 import { FaCog } from 'react-icons/fa';
 import { SelectionMode } from 'reactflow';
-import ReloadSchemaButton from '../TopCenterPanel/ReloadSchemaButton';
+import ReloadNodeTemplatesButton from '../TopCenterPanel/ReloadSchemaButton';
 
 const formLabelProps: FormLabelProps = {
   fontWeight: 600,
@@ -163,7 +163,7 @@ const WorkflowEditorSettings = () => {
                 label="Validate Connections and Graph"
                 helperText="Prevent invalid connections from being made, and invalid graphs from being invoked"
               />
-              <ReloadSchemaButton />
+              <ReloadNodeTemplatesButton />
             </Flex>
           </ModalBody>
         </ModalContent>

@@ -10,6 +10,7 @@ import { memo } from 'react';
 import WorkflowGeneralTab from './WorkflowGeneralTab';
 import WorkflowLinearTab from './WorkflowLinearTab';
 import WorkflowJSONTab from './WorkflowJSONTab';
+import WorkflowEditorControls from '../../flow/panels/TopCenterPanel/WorkflowEditorControls';
 
 const WorkflowPanel = () => {
   return (
@@ -21,8 +22,12 @@ const WorkflowPanel = () => {
         h: 'full',
         borderRadius: 'base',
         p: 4,
+        gap: 2,
       }}
     >
+      <Flex gap={2}>
+        <WorkflowEditorControls />
+      </Flex>
       <Tabs
         variant="line"
         sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}

@@ -718,12 +718,12 @@
         "swapSizes": "Swap Sizes"
     },
     "nodes": {
-        "reloadSchema": "Reload Node Templates",
-        "saveGraph": "Save Workflow",
-        "loadGraph": "Load Workflow",
-        "resetGraph": "Reset Workflow",
-        "clearGraph": "Reset Graph",
-        "clearGraphDesc": "Are you sure you want to clear all nodes?",
+        "reloadNodeTemplates": "Reload Node Templates",
+        "saveWorkflow": "Save Workflow",
+        "loadWorkflow": "Load Workflow",
+        "resetWorkflow": "Reset Workflow",
+        "resetWorkflowDesc": "Are you sure you want to reset this workflow?",
+        "resetWorkflowDesc2": "Resetting the workflow will clear all nodes, edges and workflow details.",
         "zoomInNodes": "Zoom In",
         "zoomOutNodes": "Zoom Out",
         "fitViewportNodes": "Fit View",

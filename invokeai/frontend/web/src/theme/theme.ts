@@ -107,9 +107,14 @@ export const theme: ThemeOverride = {
         '0px 0px 0px 1px var(--invokeai-colors-base-150), 0px 0px 0px 3px var(--invokeai-colors-accent-500)',
       dark: '0px 0px 0px 1px var(--invokeai-colors-base-900), 0px 0px 0px 3px var(--invokeai-colors-accent-400)',
     },
-    nodeSelectedOutline: {
+    nodeSelected: {
       light: `0 0 0 2px var(--invokeai-colors-accent-400)`,
       dark: `0 0 0 2px var(--invokeai-colors-accent-500)`,
+    },
+    nodeInProgress: {
+      light:
+        '0 0 4px 2px var(--invokeai-colors-accent-500), 0 0 15px 4px var(--invokeai-colors-accent-600)',
+      dark: '0 0 4px 2px var(--invokeai-colors-accent-400), 0 0 15px 4px var(--invokeai-colors-accent-400)',
     },
   },
   colors: InvokeAIColors,

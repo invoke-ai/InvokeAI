@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { FaSyncAlt } from 'react-icons/fa';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 
-const ReloadSchemaButton = () => {
+const ReloadNodeTemplatesButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -16,13 +16,13 @@ const ReloadSchemaButton = () => {
   return (
     <IAIButton
       leftIcon={<FaSyncAlt />}
-      tooltip={t('nodes.reloadSchema')}
-      aria-label={t('nodes.reloadSchema')}
+      tooltip={t('nodes.reloadNodeTemplates')}
+      aria-label={t('nodes.reloadNodeTemplates')}
       onClick={handleReloadSchema}
     >
-      {t('nodes.reloadSchema')}
+      {t('nodes.reloadNodeTemplates')}
     </IAIButton>
   );
 };
 
-export default memo(ReloadSchemaButton);
+export default memo(ReloadNodeTemplatesButton);
