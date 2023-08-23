@@ -19,6 +19,7 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_OUTPUT,
+  CANVAS_REFINE_DENOISE_LATENTS,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
   INPAINT_IMAGE_RESIZE_UP,
@@ -33,7 +34,6 @@ import {
   MASK_RESIZE_UP,
   NEGATIVE_CONDITIONING,
   NOISE,
-  OUTPAINT_REFINE_DENOISE_LATENTS,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
@@ -67,8 +67,8 @@ export const buildCanvasSDXLOutpaintGraph = (
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
-    refineSteps,
-    refineStrength,
+    canvasRefineSteps,
+    canvasRefineStrength,
     tileSize,
     infillMethod,
   } = state.generation;
@@ -172,14 +172,14 @@ export const buildCanvasSDXLOutpaintGraph = (
           : 1 - strength,
         denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
-      [OUTPAINT_REFINE_DENOISE_LATENTS]: {
+      [CANVAS_REFINE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: OUTPAINT_REFINE_DENOISE_LATENTS,
+        id: CANVAS_REFINE_DENOISE_LATENTS,
         is_intermediate: true,
-        steps: refineSteps,
+        steps: canvasRefineSteps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
-        denoising_start: 1 - refineStrength,
+        denoising_start: 1 - canvasRefineStrength,
         denoising_end: 1,
       },
       [LATENTS_TO_IMAGE]: {
@@ -361,7 +361,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'unet',
         },
         destination: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'unet',
         },
       },
@@ -371,7 +371,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -381,7 +381,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -391,7 +391,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -401,14 +401,14 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'latents',
         },
       },
       // Decode inpainted latents to image
       {
         source: {
-          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
+          node_id: CANVAS_REFINE_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -664,7 +664,7 @@ export const buildCanvasSDXLOutpaintGraph = (
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, OUTPAINT_REFINE_DENOISE_LATENTS);
+    addSDXLRefinerToGraph(state, graph, CANVAS_REFINE_DENOISE_LATENTS);
   }
 
   // optionally add custom VAE
