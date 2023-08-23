@@ -58,12 +58,12 @@ export const theme: ThemeOverride = {
     nodeHeader: {
       bg: 'base.200',
       color: 'base.900',
-      '.chakra-ui-dark &': { bg: 'base.700', color: 'base.100' },
+      '.chakra-ui-dark &': { bg: 'base.900', color: 'base.100' },
     },
     nodeFooter: {
       bg: 'base.200',
       color: 'base.900',
-      '.chakra-ui-dark &': { bg: 'base.700', color: 'base.100' },
+      '.chakra-ui-dark &': { bg: 'base.900', color: 'base.100' },
     },
   },
   styles: {
