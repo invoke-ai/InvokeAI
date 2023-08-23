@@ -354,7 +354,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'seed',
         },
       },
-      // Image To Image Clean Up
+      // Canvas Refine
       {
         source: {
           node_id: SDXL_MODEL_LOADER,

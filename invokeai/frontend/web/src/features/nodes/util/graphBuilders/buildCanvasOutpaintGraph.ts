@@ -340,7 +340,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'seed',
         },
       },
-      // Image To Image Clean Up
+      // Canvas Refine
       {
         source: {
           node_id: MAIN_MODEL_LOADER,
