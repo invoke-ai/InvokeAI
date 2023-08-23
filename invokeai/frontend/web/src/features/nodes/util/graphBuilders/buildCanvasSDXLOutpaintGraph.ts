@@ -19,7 +19,6 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_OUTPUT,
-  COLOR_CORRECT,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
   INPAINT_IMAGE_RESIZE_UP,
@@ -29,20 +28,18 @@ import {
   LATENTS_TO_IMAGE,
   MASK_BLUR,
   MASK_COMBINE,
-  MASK_EDGE,
   MASK_FROM_ALPHA,
   MASK_RESIZE_DOWN,
   MASK_RESIZE_UP,
   NEGATIVE_CONDITIONING,
   NOISE,
+  OUTPAINT_REFINE_DENOISE_LATENTS,
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
   SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
-  SEAM_FIX_DENOISE_LATENTS,
-  SEAM_MASK_RESIZE_UP,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
@@ -70,12 +67,8 @@ export const buildCanvasSDXLOutpaintGraph = (
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
-    seamSize,
-    seamBlur,
-    seamSteps,
-    seamStrength,
-    seamLowThreshold,
-    seamHighThreshold,
+    refineSteps,
+    refineStrength,
     tileSize,
     infillMethod,
   } = state.generation;
@@ -179,23 +172,14 @@ export const buildCanvasSDXLOutpaintGraph = (
           : 1 - strength,
         denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
       },
-      [MASK_EDGE]: {
-        type: 'mask_edge',
-        id: MASK_EDGE,
-        is_intermediate: true,
-        edge_size: seamSize,
-        edge_blur: seamBlur,
-        low_threshold: seamLowThreshold,
-        high_threshold: seamHighThreshold,
-      },
-      [SEAM_FIX_DENOISE_LATENTS]: {
+      [OUTPAINT_REFINE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: SEAM_FIX_DENOISE_LATENTS,
+        id: OUTPAINT_REFINE_DENOISE_LATENTS,
         is_intermediate: true,
-        steps: seamSteps,
+        steps: refineSteps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
-        denoising_start: 1 - seamStrength,
+        denoising_start: 1 - refineStrength,
         denoising_end: 1,
       },
       [LATENTS_TO_IMAGE]: {
@@ -204,13 +188,8 @@ export const buildCanvasSDXLOutpaintGraph = (
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
-      [COLOR_CORRECT]: {
-        type: 'color_correct',
-        id: COLOR_CORRECT,
-        is_intermediate: true,
-      },
       [CANVAS_OUTPUT]: {
-        type: 'img_paste',
+        type: 'color_correct',
         id: CANVAS_OUTPUT,
         is_intermediate: !shouldAutoSave,
       },
@@ -375,14 +354,14 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'seed',
         },
       },
-      // Seam Paint
+      // Image To Image Clean Up
       {
         source: {
           node_id: SDXL_MODEL_LOADER,
           field: 'unet',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'unet',
         },
       },
@@ -392,7 +371,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -402,7 +381,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -412,7 +391,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -422,14 +401,14 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'latents',
         },
       },
       // Decode inpainted latents to image
       {
         source: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: OUTPAINT_REFINE_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -467,13 +446,6 @@ export const buildCanvasSDXLOutpaintGraph = (
     graph.nodes[MASK_RESIZE_UP] = {
       type: 'img_resize',
       id: MASK_RESIZE_UP,
-      is_intermediate: true,
-      width: scaledWidth,
-      height: scaledHeight,
-    };
-    graph.nodes[SEAM_MASK_RESIZE_UP] = {
-      type: 'img_resize',
-      id: SEAM_MASK_RESIZE_UP,
       is_intermediate: true,
       width: scaledWidth,
       height: scaledHeight,
@@ -540,37 +512,6 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
-      // Seam Paint Mask
-      {
-        source: {
-          node_id: MASK_FROM_ALPHA,
-          field: 'image',
-        },
-        destination: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_RESIZE_UP,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: SEAM_MASK_RESIZE_UP,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
-          field: 'mask',
-        },
-      },
       // Resize Results Down
       {
         source: {
@@ -609,44 +550,13 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: COLOR_CORRECT,
+          node_id: CANVAS_OUTPUT,
           field: 'reference',
         },
       },
       {
         source: {
           node_id: INPAINT_IMAGE_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      // Paste Everything Back
-      {
-        source: {
-          node_id: INPAINT_INFILL_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'base_image',
-        },
-      },
-      {
-        source: {
-          node_id: COLOR_CORRECT,
           field: 'image',
         },
         destination: {
@@ -698,27 +608,6 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
-      // Seam Paint Mask
-      {
-        source: {
-          node_id: MASK_FROM_ALPHA,
-          field: 'image',
-        },
-        destination: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
-          field: 'mask',
-        },
-      },
       // Color Correct The Inpainted Result
       {
         source: {
@@ -726,44 +615,13 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: COLOR_CORRECT,
+          node_id: CANVAS_OUTPUT,
           field: 'reference',
         },
       },
       {
         source: {
           node_id: LATENTS_TO_IMAGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_BLUR,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      // Paste Everything Back
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'base_image',
-        },
-      },
-      {
-        source: {
-          node_id: COLOR_CORRECT,
           field: 'image',
         },
         destination: {
@@ -806,7 +664,7 @@ export const buildCanvasSDXLOutpaintGraph = (
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, SEAM_FIX_DENOISE_LATENTS);
+    addSDXLRefinerToGraph(state, graph, OUTPAINT_REFINE_DENOISE_LATENTS);
   }
 
   // optionally add custom VAE

@@ -40,7 +40,6 @@ import {
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
-  SEAM_MASK_RESIZE_UP,
 } from './constants';
 
 /**
@@ -168,15 +167,6 @@ export const buildCanvasOutpaintGraph = (
         denoising_start: 1 - strength,
         denoising_end: 1,
       },
-      // [MASK_EDGE]: {
-      //   type: 'mask_edge',
-      //   id: MASK_EDGE,
-      //   is_intermediate: true,
-      //   edge_size: seamSize,
-      //   edge_blur: seamBlur,
-      //   low_threshold: seamLowThreshold,
-      //   high_threshold: seamHighThreshold,
-      // },
       [OUTPAINT_REFINE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: OUTPAINT_REFINE_DENOISE_LATENTS,
@@ -361,7 +351,6 @@ export const buildCanvasOutpaintGraph = (
           field: 'unet',
         },
       },
-
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
@@ -442,13 +431,6 @@ export const buildCanvasOutpaintGraph = (
     graph.nodes[MASK_RESIZE_UP] = {
       type: 'img_resize',
       id: MASK_RESIZE_UP,
-      is_intermediate: true,
-      width: scaledWidth,
-      height: scaledHeight,
-    };
-    graph.nodes[SEAM_MASK_RESIZE_UP] = {
-      type: 'img_resize',
-      id: SEAM_MASK_RESIZE_UP,
       is_intermediate: true,
       width: scaledWidth,
       height: scaledHeight,
