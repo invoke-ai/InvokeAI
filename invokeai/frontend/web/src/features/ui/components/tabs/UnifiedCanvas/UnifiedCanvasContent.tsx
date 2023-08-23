@@ -1,11 +1,10 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
 import IAICanvas from 'features/canvas/components/IAICanvas';
-import IAICanvasResizer from 'features/canvas/components/IAICanvasResizer';
 import IAICanvasToolbar from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
 import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
 import { useDroppableTypesafe } from 'features/dnd/hooks/typesafeHooks';
@@ -54,49 +53,27 @@ const UnifiedCanvasContent = () => {
   }, [dispatch]);
 
   return (
-    <Box
+    <Flex
+      layerStyle="first"
       ref={setDroppableRef}
       tabIndex={-1}
       sx={{
-        layerStyle: 'first',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 4,
+        p: 2,
+        borderRadius: 'base',
         w: 'full',
         h: 'full',
-        p: 4,
-        borderRadius: 'base',
       }}
     >
-      <Flex
-        sx={{
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 4,
-          w: 'full',
-          h: 'full',
-        }}
-      >
-        <IAICanvasToolbar />
-        <Flex
-          sx={{
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            w: 'full',
-            h: 'full',
-          }}
-        >
-          <Box sx={{ w: 'full', h: 'full', position: 'relative' }}>
-            {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />}
-            {isValidDrop(droppableData, active) && (
-              <IAIDropOverlay
-                isOver={isOver}
-                label="Set Canvas Initial Image"
-              />
-            )}
-          </Box>
-        </Flex>
-      </Flex>
-    </Box>
+      <IAICanvasToolbar />
+      <IAICanvas />
+      {/* {doesCanvasNeedScaling ? <IAICanvasResizer /> : <IAICanvas />} */}
+      {isValidDrop(droppableData, active) && (
+        <IAIDropOverlay isOver={isOver} label="Set Canvas Initial Image" />
+      )}
+    </Flex>
   );
 };
 
