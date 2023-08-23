@@ -623,6 +623,53 @@ export const canvasSlice = createSlice({
         }
       }
     },
+    canvasResized: (
+      state,
+      action: PayloadAction<{ width: number; height: number }>
+    ) => {
+      const { width, height } = action.payload;
+      const newStageDimensions = {
+        width: Math.floor(width),
+        height: Math.floor(height),
+      };
+
+      state.stageDimensions = newStageDimensions;
+
+      if (!state.layerState.objects.find(isCanvasBaseImage)) {
+        const newScale = calculateScale(
+          newStageDimensions.width,
+          newStageDimensions.height,
+          512,
+          512,
+          STAGE_PADDING_PERCENTAGE
+        );
+
+        const newCoordinates = calculateCoordinates(
+          newStageDimensions.width,
+          newStageDimensions.height,
+          0,
+          0,
+          512,
+          512,
+          newScale
+        );
+
+        const newBoundingBoxDimensions = { width: 512, height: 512 };
+
+        state.stageScale = newScale;
+
+        state.stageCoordinates = newCoordinates;
+        state.boundingBoxCoordinates = { x: 0, y: 0 };
+        state.boundingBoxDimensions = newBoundingBoxDimensions;
+
+        if (state.boundingBoxScaleMethod === 'auto') {
+          const scaledDimensions = getScaledBoundingBoxDimensions(
+            newBoundingBoxDimensions
+          );
+          state.scaledBoundingBoxDimensions = scaledDimensions;
+        }
+      }
+    },
     resetCanvasView: (
       state,
       action: PayloadAction<{
@@ -966,6 +1013,7 @@ export const {
   stagingAreaInitialized,
   canvasSessionIdChanged,
   setShouldAntialias,
+  canvasResized,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;
