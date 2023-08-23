@@ -113,8 +113,8 @@ export const theme: ThemeOverride = {
     },
     nodeInProgress: {
       light:
-        '0 0 4px 2px var(--invokeai-colors-accent-500), 0 0 15px 4px var(--invokeai-colors-accent-600)',
-      dark: '0 0 4px 2px var(--invokeai-colors-accent-400), 0 0 15px 4px var(--invokeai-colors-accent-400)',
+        '0 0 0 2px var(--invokeai-colors-accent-500), 0 0 10px 2px var(--invokeai-colors-accent-600)',
+      dark: '0 0 0 2px var(--invokeai-colors-yellow-400), 0 0 20px 2px var(--invokeai-colors-orange-700)',
     },
   },
   colors: InvokeAIColors,

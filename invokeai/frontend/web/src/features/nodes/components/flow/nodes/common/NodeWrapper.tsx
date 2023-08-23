@@ -77,7 +77,11 @@ const NodeWrapper = (props: NodeWrapperProps) => {
         w: width ?? NODE_WIDTH,
         transitionProperty: 'common',
         transitionDuration: '0.1s',
-        shadow: selected ? selectedShadow : undefined,
+        shadow: selected
+          ? isInProgress
+            ? undefined
+            : selectedShadow
+          : undefined,
         cursor: 'grab',
         opacity,
       }}
