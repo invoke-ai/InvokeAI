@@ -44,7 +44,7 @@ const FloatingSidePanelButtons = ({
         transform="translate(0, -50%)"
         minW={8}
         top="50%"
-        insetInlineStart="4.5rem"
+        insetInlineStart="5.13rem"
         direction="column"
         gap={2}
       >

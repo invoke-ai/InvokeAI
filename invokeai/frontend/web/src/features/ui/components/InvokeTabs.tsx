@@ -265,7 +265,7 @@ const InvokeTabs = () => {
             </Panel>
             <ResizeHandle
               onDoubleClick={resetSidePanel}
-              isCollapsed={isSidePanelCollapsed}
+              // isCollapsed={isSidePanelCollapsed}
               collapsedDirection={isSidePanelCollapsed ? 'left' : undefined}
             />
             <FloatingSidePanelButtons
@@ -282,8 +282,8 @@ const InvokeTabs = () => {
         {!NO_GALLERY_TABS.includes(activeTabName) && (
           <>
             <ResizeHandle
-              isCollapsed={isGalleryPanelCollapsed}
               onDoubleClick={resetGalleryPanel}
+              // isCollapsed={isGalleryPanelCollapsed}
               collapsedDirection={isGalleryPanelCollapsed ? 'right' : undefined}
             />
             <Panel
