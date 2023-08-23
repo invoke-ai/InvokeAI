@@ -18,7 +18,6 @@ import {
   CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPUT,
   CLIP_SKIP,
-  COLOR_CORRECT,
   DENOISE_LATENTS,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
@@ -145,17 +144,11 @@ export const buildCanvasInpaintGraph = (
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
-      [COLOR_CORRECT]: {
-        type: 'color_correct',
-        id: COLOR_CORRECT,
-        is_intermediate: true,
-        reference: canvasInitImage,
-      },
       [CANVAS_OUTPUT]: {
-        type: 'img_paste',
+        type: 'color_correct',
         id: CANVAS_OUTPUT,
         is_intermediate: !shouldAutoSave,
-        base_image: canvasInitImage,
+        reference: canvasInitImage,
       },
       [RANGE_OF_SIZE]: {
         type: 'range_of_size',
@@ -384,7 +377,7 @@ export const buildCanvasInpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: COLOR_CORRECT,
+          node_id: CANVAS_OUTPUT,
           field: 'image',
         },
       },
@@ -395,27 +388,6 @@ export const buildCanvasInpaintGraph = (
         },
         destination: {
           node_id: MASK_RESIZE_DOWN,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      // Paste Back Onto Original Image
-      {
-        source: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
           field: 'image',
         },
       },
@@ -451,27 +423,6 @@ export const buildCanvasInpaintGraph = (
       {
         source: {
           node_id: LATENTS_TO_IMAGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_BLUR,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      // Paste Back Onto Original Image
-      {
-        source: {
-          node_id: COLOR_CORRECT,
           field: 'image',
         },
         destination: {
