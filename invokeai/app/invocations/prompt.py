@@ -180,7 +180,7 @@ class PromptJoinInvocation(BaseInvocation):
     prompt_right: str = InputField(default='', description="Prompt Right", ui_component=UIComponent.Textarea)
 
     def invoke(self, context: InvocationContext) -> StringOutput:
-        return StringOutput(text=((self.prompt_left or '') + (self.prompt_right or '')))  
+        return StringOutput(value=((self.prompt_left or '') + (self.prompt_right or '')))  
 
 
 @title("Prompt Join Three")
@@ -196,7 +196,7 @@ class PromptJoinThreeInvocation(BaseInvocation):
     prompt_right: str = InputField(default='', description="Prompt Right", ui_component=UIComponent.Textarea)
 
     def invoke(self, context: InvocationContext) -> StringOutput:
-        return StringOutput(text=((self.prompt_left or '') + (self.prompt_middle or '') + (self.prompt_right or '')))  
+        return StringOutput(value=((self.prompt_left or '') + (self.prompt_middle or '') + (self.prompt_right or '')))  
 
 
 @title("Prompt Replace")
@@ -220,7 +220,7 @@ class PromptReplaceInvocation(BaseInvocation):
                 #None regex so make case insensitve 
                 pattern = "(?i)" + re.escape(pattern)
             new_prompt = re.sub(pattern, (self.replace_string or ''), new_prompt)
-        return StringOutput(text=new_prompt)  
+        return StringOutput(value=new_prompt)  
 
 
 class PTFields(BaseModel):
