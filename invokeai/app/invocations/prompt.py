@@ -1,5 +1,5 @@
 from os.path import exists
-from typing import Literal, Optional, Union, List
+from typing import Literal, Optional, Union
 
 import numpy as np
 import re, json
@@ -11,7 +11,6 @@ from pydantic import BaseModel, validator
 from invokeai.app.invocations.primitives import StringCollectionOutput, StringOutput
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, InputField, OutputField, InvocationContext, UIComponent, UIType, tags, title
 
-from .model import MainModelField, VAEModelField
 
 @title("Dynamic Prompt")
 @tags("prompt", "collection")
@@ -44,7 +43,7 @@ class PromptsFromFileInvocation(BaseInvocation):
     type: Literal["prompt_from_file"] = "prompt_from_file"
 
     # Inputs
-    file_path: str = InputField(description="Path to prompt text file", ui_type=UIType.FilePath)
+    file_path: str = InputField(description="Path to prompt text file")
     pre_prompt: Optional[str] = InputField(
         default=None, description="String to prepend to each prompt", ui_component=UIComponent.Textarea
     )
@@ -85,7 +84,7 @@ class PromptsFromFileInvocation(BaseInvocation):
         prompts = self.promptsFromFile(
             self.file_path, self.pre_prompt, self.post_prompt, self.start_line, self.max_prompts
         )
-        return StringCollectionOutput(prompt_collection=prompts)
+        return StringCollectionOutput(collection=prompts)
 
 
 class PromptsToFileInvocationOutput(BaseInvocationOutput):
@@ -98,14 +97,13 @@ class PromptsToFileInvocationOutput(BaseInvocationOutput):
 @tags("prompt", "file")
 class PromptsToFileInvocation(BaseInvocation):
     '''Save prompts to a text file'''
-    # fmt: off
+
     type: Literal['prompt_to_file'] = 'prompt_to_file'
 
-    # Inputs
-    file_path: str = InputField(description="Path to prompt text file", ui_type=UIType.FilePath)
-    prompts: Union[str, list[str], None] = InputField(default=None, description="Prompt or collection of prompts to write", ui_type=UIType.String)
+    # Inputs - Prompts should allow str and list(str) but only collection until fix available
+    file_path: str = InputField(description="Path to prompt text file")
+    prompts: Union[str, list[str], None] = InputField(default=None, description="Prompt or collection of prompts to write", ui_type=UIType.Collection)
     append: bool = InputField(default=True, description="Append or overwrite file")
-    #fmt: on
 
         
     def invoke(self, context: InvocationContext) -> PromptsToFileInvocationOutput:
@@ -182,12 +180,12 @@ class PromptJoinInvocation(BaseInvocation):
     prompt_right: str = InputField(default='', description="Prompt Right", ui_component=UIComponent.Textarea)
 
     def invoke(self, context: InvocationContext) -> StringOutput:
-        return StringOutput(prompt=((self.prompt_left or '') + (self.prompt_right or '')))  
+        return StringOutput(text=((self.prompt_left or '') + (self.prompt_right or '')))  
 
 
 @title("Prompt Join Three")
 @tags("prompt", "join")
-class PromptJoinInvocation(BaseInvocation):
+class PromptJoinThreeInvocation(BaseInvocation):
     """Joins prompt left to prompt middle to prompt right"""
 
     type: Literal["prompt_join_three"] = "prompt_join_three"
@@ -198,7 +196,7 @@ class PromptJoinInvocation(BaseInvocation):
     prompt_right: str = InputField(default='', description="Prompt Right", ui_component=UIComponent.Textarea)
 
     def invoke(self, context: InvocationContext) -> StringOutput:
-        return StringOutput(prompt=((self.prompt_left or '') + (self.prompt_middle or '') + (self.prompt_right or '')))  
+        return StringOutput(text=((self.prompt_left or '') + (self.prompt_middle or '') + (self.prompt_right or '')))  
 
 
 @title("Prompt Replace")
@@ -222,10 +220,10 @@ class PromptReplaceInvocation(BaseInvocation):
                 #None regex so make case insensitve 
                 pattern = "(?i)" + re.escape(pattern)
             new_prompt = re.sub(pattern, (self.replace_string or ''), new_prompt)
-        return StringOutput(prompt=new_prompt)  
+        return StringOutput(text=new_prompt)  
 
 
-class PTFields:
+class PTFields(BaseModel):
     """Prompt Tools Fields for an image generated in InvokeAI."""
     positive_prompt: str
     positive_style_prompt: str
