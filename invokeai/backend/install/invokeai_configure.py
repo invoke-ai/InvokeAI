@@ -354,7 +354,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         device = old_opts.device
         attention_type = old_opts.attention_type
         attention_slice_size = old_opts.attention_slice_size
-
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
@@ -609,7 +608,13 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
         new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
         new_opts.device = DEVICE_CHOICES[self.device.value[0]]
         new_opts.attention_type = ATTENTION_CHOICES[self.attention_type.value[0]]
-        new_opts.attention_slice_size = ATTENTION_SLICE_CHOICES[self.attention_slice_size.value[0]]
+        
+        # some sort of bug in npyscreen?
+        attention_slice_value = self.attention_slice_size.value
+        if type(attention_slice_value) == list:
+            attention_slice_value = attention_slice_value[0]
+        new_opts.attention_slice_size = ATTENTION_SLICE_CHOICES[attention_slice_value]
+        
         generation_options = [GENERATION_OPT_CHOICES[x] for x in self.generation_options.value]
         for v in GENERATION_OPT_CHOICES:
             setattr(new_opts, v, v in generation_options)
@@ -706,8 +711,6 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
             path.mkdir(parents=True, exist_ok=True)
     path = dest / "core"
     path.mkdir(parents=True, exist_ok=True)
-
-    maybe_create_models_yaml(root)
 
 
 def maybe_create_models_yaml(root: Path):
