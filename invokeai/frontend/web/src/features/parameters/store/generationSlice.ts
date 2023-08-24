@@ -37,8 +37,8 @@ export interface GenerationState {
   scheduler: SchedulerParam;
   maskBlur: number;
   maskBlurMethod: MaskBlurMethodParam;
-  canvasRefineSteps: number;
-  canvasRefineStrength: StrengthParam;
+  canvasCoherenceSteps: number;
+  canvasCoherenceStrength: StrengthParam;
   seed: SeedParam;
   seedWeights: string;
   shouldFitToWidthHeight: boolean;
@@ -76,8 +76,8 @@ export const initialGenerationState: GenerationState = {
   scheduler: 'euler',
   maskBlur: 16,
   maskBlurMethod: 'box',
-  canvasRefineSteps: 20,
-  canvasRefineStrength: 0.3,
+  canvasCoherenceSteps: 20,
+  canvasCoherenceStrength: 0.3,
   seed: 0,
   seedWeights: '',
   shouldFitToWidthHeight: true,
@@ -204,11 +204,11 @@ export const generationSlice = createSlice({
     setMaskBlurMethod: (state, action: PayloadAction<MaskBlurMethodParam>) => {
       state.maskBlurMethod = action.payload;
     },
-    setCanvasRefineSteps: (state, action: PayloadAction<number>) => {
-      state.canvasRefineSteps = action.payload;
+    setCanvasCoherenceSteps: (state, action: PayloadAction<number>) => {
+      state.canvasCoherenceSteps = action.payload;
     },
-    setCanvasRefineStrength: (state, action: PayloadAction<number>) => {
-      state.canvasRefineStrength = action.payload;
+    setCanvasCoherenceStrength: (state, action: PayloadAction<number>) => {
+      state.canvasCoherenceStrength = action.payload;
     },
     setTileSize: (state, action: PayloadAction<number>) => {
       state.tileSize = action.payload;
@@ -318,8 +318,8 @@ export const {
   setScheduler,
   setMaskBlur,
   setMaskBlurMethod,
-  setCanvasRefineSteps,
-  setCanvasRefineStrength,
+  setCanvasCoherenceSteps,
+  setCanvasCoherenceStrength,
   setSeed,
   setSeedWeights,
   setShouldFitToWidthHeight,

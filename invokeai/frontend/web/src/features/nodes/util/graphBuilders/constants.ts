@@ -25,9 +25,11 @@ export const INPAINT_IMAGE_RESIZE_DOWN = 'inpaint_image_resize_down';
 export const INPAINT_INFILL = 'inpaint_infill';
 export const INPAINT_INFILL_RESIZE_DOWN = 'inpaint_infill_resize_down';
 export const INPAINT_FINAL_IMAGE = 'inpaint_final_image';
-export const CANVAS_REFINE_DENOISE_LATENTS = 'canvas_refine_denoise_latents';
-export const CANVAS_REFINE_NOISE = 'canvas_refine_noise';
-export const CANVAS_REFINE_NOISE_INCREMENT = 'canvas_refine_noise_increment';
+export const CANVAS_COHERENCE_DENOISE_LATENTS =
+  'canvas_coherence_denoise_latents';
+export const CANVAS_COHERENCE_NOISE = 'canvas_coherence_noise';
+export const CANVAS_COHERENCE_NOISE_INCREMENT =
+  'canvas_coherence_noise_increment';
 export const MASK_FROM_ALPHA = 'tomask';
 export const MASK_EDGE = 'mask_edge';
 export const MASK_BLUR = 'mask_blur';

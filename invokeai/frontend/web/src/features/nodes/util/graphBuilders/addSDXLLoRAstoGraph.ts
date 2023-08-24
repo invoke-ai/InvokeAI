@@ -6,7 +6,7 @@ import {
   SDXLLoraLoaderInvocation,
 } from 'services/api/types';
 import {
-  CANVAS_REFINE_DENOISE_LATENTS,
+  CANVAS_COHERENCE_DENOISE_LATENTS,
   LORA_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
@@ -178,7 +178,7 @@ export const addSDXLLoRAsToGraph = (
             field: 'unet',
           },
           destination: {
-            node_id: CANVAS_REFINE_DENOISE_LATENTS,
+            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
             field: 'unet',
           },
         });
