@@ -127,6 +127,7 @@ export const imagesApi = api.injectEndpoints({
       ],
       transformResponse: (response: Blob) =>
         getMetadataAndWorkflowFromImageBlob(response),
+      keepUnusedDataFor: 86400, // 24 hours
     }),
     clearIntermediates: build.mutation<number, void>({
       query: () => ({ url: `images/clear-intermediates`, method: 'POST' }),
