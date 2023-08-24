@@ -12,24 +12,34 @@ import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
-import { ReactNode, memo, useCallback, useEffect } from 'react';
+import { ReactNode, memo, useCallback, useEffect, useMemo } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
+import { usePreselectedImage } from '../../features/parameters/hooks/usePreselectedImage';
 
 const DEFAULT_CONFIG = {};
 
 interface Props {
   config?: PartialAppConfig;
   headerComponent?: ReactNode;
+  selectedImage?: {
+    imageName: string;
+    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
+  };
 }
 
-const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
+const App = ({
+  config = DEFAULT_CONFIG,
+  headerComponent,
+  selectedImage,
+}: Props) => {
   const language = useAppSelector(languageSelector);
 
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
+  const { handlePreselectedImage } = usePreselectedImage();
   const handleReset = useCallback(() => {
     localStorage.clear();
     location.reload();
@@ -50,6 +60,10 @@ const App = ({ config = DEFAULT_CONFIG, headerComponent }: Props) => {
   useEffect(() => {
     dispatch(appStarted());
   }, [dispatch]);
+
+  useEffect(() => {
+    handlePreselectedImage(selectedImage);
+  }, [handlePreselectedImage, selectedImage]);
 
   return (
     <ErrorBoundary
