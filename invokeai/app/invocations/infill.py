@@ -97,7 +97,7 @@ def tile_fill_missing(im: Image.Image, tile_size: int = 16, seed: Optional[int] 
         return im
 
     # Find all invalid tiles and replace with a random valid tile
-    replace_count = (tiles_mask == False).sum()
+    replace_count = (tiles_mask == False).sum()  # noqa: E712
     rng = np.random.default_rng(seed=seed)
     tiles_all[np.logical_not(tiles_mask)] = filtered_tiles[rng.choice(filtered_tiles.shape[0], replace_count), :, :, :]
 
