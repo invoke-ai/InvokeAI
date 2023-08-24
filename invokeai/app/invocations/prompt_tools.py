@@ -1,23 +1,32 @@
-from typing import Literal, Union
+from typing import Literal, Union, Optional
 import re
 import json
 
 from pydantic import BaseModel
 
 from invokeai.app.invocations.primitives import StringOutput
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InputField, OutputField, InvocationContext, UIComponent, UIType, tags, title
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    InputField,
+    Input,
+    OutputField,
+    InvocationContext,
+    UIComponent,
+    UIType,
+    tags,
+    title,
+)
 
 
 class PromptsToFileInvocationOutput(BaseInvocationOutput):
     """Base class for invocation that writes to a file and returns nothing of use"""
-
     type: Literal["prompt_to_file_output"] = "prompt_to_file_output"
 
 @title("Prompts To File")
 @tags("prompt", "file")
 class PromptsToFileInvocation(BaseInvocation):
     '''Save prompts to a text file'''
-
     type: Literal['prompt_to_file'] = 'prompt_to_file'
 
     # Inputs - Prompts should allow str and list(str) but only collection until fix available
@@ -38,7 +47,6 @@ class PromptsToFileInvocation(BaseInvocation):
 
 class PromptPosNegOutput(BaseInvocationOutput):
     """Base class for invocations that output a posirtive and negative prompt"""
-
     type: Literal["prompt_pos_neg_output"] = "prompt_pos_neg_output"
 
     # Outputs
@@ -49,7 +57,6 @@ class PromptPosNegOutput(BaseInvocationOutput):
 @tags("prompt", "split", "negative")
 class PromptSplitNegInvocation(BaseInvocation):
     """Splits prompt into two prompts, inside [] goes into negative prompt everthing else goes into positive prompt. Each [ and ] character is replaced with a space"""
-
     type: Literal["prompt_split_neg"] = "prompt_split_neg"
 
     # Inputs
@@ -86,7 +93,6 @@ class PromptSplitNegInvocation(BaseInvocation):
 @tags("prompt", "join")
 class PromptJoinInvocation(BaseInvocation):
     """Joins prompt left to prompt right"""
-
     type: Literal["prompt_join"] = "prompt_join"
 
     # Inputs
@@ -101,7 +107,6 @@ class PromptJoinInvocation(BaseInvocation):
 @tags("prompt", "join")
 class PromptJoinThreeInvocation(BaseInvocation):
     """Joins prompt left to prompt middle to prompt right"""
-
     type: Literal["prompt_join_three"] = "prompt_join_three"
 
     # Inputs
@@ -117,7 +122,6 @@ class PromptJoinThreeInvocation(BaseInvocation):
 @tags("prompt", "replace", "regex")
 class PromptReplaceInvocation(BaseInvocation):
     """Replaces the search string with the replace string in the prompt"""
-
     type: Literal["prompt_replace"] = "prompt_replace"
 
     # Inputs
@@ -143,11 +147,11 @@ class PTFields(BaseModel):
     positive_style_prompt: str
     negative_prompt: str
     negative_style_prompt: str
+    seed: int
     width: int
     height: int
-    seed: int
-    cfg_scale: float
     steps: int
+    cfg_scale: float
 
 class PTFieldsCollectOutput(BaseInvocationOutput):
     """PTFieldsCollect Output"""
@@ -163,15 +167,15 @@ class PTFieldsCollectInvocation(BaseInvocation):
     type: Literal["pt_fields_collect"] = "pt_fields_collect"
 
     # Inputs
-    positive_prompt: str = InputField(default='', description="The positive prompt parameter")
-    positive_style_prompt: str = InputField(default='', description="The positive style prompt parameter")
-    negative_prompt: str = InputField(default='', description="The negative prompt parameter")
-    negative_style_prompt: str = InputField(default='', description="The negative prompt parameter")
-    width: int = InputField(default=512, description="The width parameter")
-    height: int = InputField(default=512, description="The height parameter")
-    seed: int = InputField(default=0, description="The seed used for noise generation")
-    cfg_scale: float = InputField(default=7.0, description="The classifier-free guidance scale parameter")
-    steps: int = InputField(default=10, description="The number of steps used for inference")
+    positive_prompt: Optional[str] = InputField(description="The positive prompt parameter", input=Input.Connection)
+    positive_style_prompt: Optional[str] = InputField(description="The positive style prompt parameter", input=Input.Connection)
+    negative_prompt: Optional[str] = InputField(description="The negative prompt parameter", input=Input.Connection)
+    negative_style_prompt: Optional[str] = InputField(description="The negative prompt parameter", input=Input.Connection)
+    seed: Optional[int] = InputField(description="The seed used for noise generation", input=Input.Connection)
+    width: Optional[int] = InputField(description="The width parameter", input=Input.Connection)
+    height: Optional[int] = InputField(description="The height parameter", input=Input.Connection)
+    steps: Optional[int] = InputField(description="The number of steps used for inference", input=Input.Connection)
+    cfg_scale: Optional[float] = InputField(description="The classifier-free guidance scale parameter", input=Input.Connection)
        
     def invoke(self, context: InvocationContext) -> PTFieldsCollectOutput:
         x:str = str(json.dumps(
@@ -180,11 +184,11 @@ class PTFieldsCollectInvocation(BaseInvocation):
                         positive_style_prompt = self.positive_style_prompt,
                         negative_prompt = self.negative_prompt,
                         negative_style_prompt = self.negative_style_prompt,
+                        seed = self.seed,
                         width = self.width,
                         height = self.height,
-                        seed = self.seed,
-                        cfg_scale = self.cfg_scale,
                         steps = self.steps,
+                        cfg_scale = self.cfg_scale,
                 ).dict()
             )
         )
@@ -200,11 +204,11 @@ class PTFieldsExpandOutput(BaseInvocationOutput):
     positive_style_prompt: str = OutputField(description="The positive style prompt parameter")
     negative_prompt: str = OutputField(description="The negative prompt parameter")
     negative_style_prompt: str = OutputField(description="The negative prompt parameter")
+    seed: int = OutputField(description="The seed used for noise generation")
     width: int = OutputField(description="The width parameter")
     height: int = OutputField(description="The height parameter")
-    seed: int = OutputField(description="The seed used for noise generation")
-    cfg_scale: float = OutputField(description="The classifier-free guidance scale parameter")
     steps: int = OutputField(description="The number of steps used for inference")
+    cfg_scale: float = OutputField(description="The classifier-free guidance scale parameter")
         
 @title("PTFields Expand")
 @tags("prompt", "file")
@@ -213,7 +217,7 @@ class PTFieldsExpandInvocation(BaseInvocation):
     type: Literal['pt_fields_expand'] = 'pt_fields_expand'
 
     # Inputs
-    pt_fields: str = InputField(default=None, description="PTFields in json Format")
+    pt_fields: str = InputField(default=None, description="PTFields in json Format", input=Input.Connection)
        
     def invoke(self, context: InvocationContext) -> PTFieldsExpandOutput:
         fields = json.loads(self.pt_fields)
