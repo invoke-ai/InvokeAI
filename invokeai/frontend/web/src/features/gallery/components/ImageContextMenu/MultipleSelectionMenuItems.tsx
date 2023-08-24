@@ -5,7 +5,7 @@ import {
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { FaFolder, FaTrash } from 'react-icons/fa';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
@@ -74,4 +74,4 @@ const MultipleSelectionMenuItems = () => {
   );
 };
 
-export default MultipleSelectionMenuItems;
+export default memo(MultipleSelectionMenuItems);

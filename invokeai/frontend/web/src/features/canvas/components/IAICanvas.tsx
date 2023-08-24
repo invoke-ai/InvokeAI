@@ -9,7 +9,7 @@ import {
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { Layer, Stage } from 'react-konva';
 import useCanvasDragMove from '../hooks/useCanvasDragMove';
 import useCanvasHotkeys from '../hooks/useCanvasHotkeys';
@@ -220,4 +220,4 @@ const IAICanvas = () => {
   );
 };
 
-export default IAICanvas;
+export default memo(IAICanvas);

@@ -397,7 +397,9 @@ export const canvasSlice = createSlice({
       const { tool, layer, brushColor, brushSize, shouldRestrictStrokesToBox } =
         state;
 
-      if (tool === 'move' || tool === 'colorPicker') return;
+      if (tool === 'move' || tool === 'colorPicker') {
+        return;
+      }
 
       const newStrokeWidth = brushSize / 2;
 
@@ -434,14 +436,18 @@ export const canvasSlice = createSlice({
     addPointToCurrentLine: (state, action: PayloadAction<number[]>) => {
       const lastLine = state.layerState.objects.findLast(isCanvasAnyLine);
 
-      if (!lastLine) return;
+      if (!lastLine) {
+        return;
+      }
 
       lastLine.points.push(...action.payload);
     },
     undo: (state) => {
       const targetState = state.pastLayerStates.pop();
 
-      if (!targetState) return;
+      if (!targetState) {
+        return;
+      }
 
       state.futureLayerStates.unshift(cloneDeep(state.layerState));
 
@@ -454,7 +460,9 @@ export const canvasSlice = createSlice({
     redo: (state) => {
       const targetState = state.futureLayerStates.shift();
 
-      if (!targetState) return;
+      if (!targetState) {
+        return;
+      }
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 

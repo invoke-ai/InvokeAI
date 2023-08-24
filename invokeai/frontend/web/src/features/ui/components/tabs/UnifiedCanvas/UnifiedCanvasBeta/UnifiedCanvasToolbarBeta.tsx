@@ -14,6 +14,7 @@ import UnifiedCanvasResetCanvas from './UnifiedCanvasToolbar/UnifiedCanvasResetC
 import UnifiedCanvasResetView from './UnifiedCanvasToolbar/UnifiedCanvasResetView';
 import UnifiedCanvasSaveToGallery from './UnifiedCanvasToolbar/UnifiedCanvasSaveToGallery';
 import UnifiedCanvasToolSelect from './UnifiedCanvasToolbar/UnifiedCanvasToolSelect';
+import { memo } from 'react';
 
 const UnifiedCanvasToolbarBeta = () => {
   return (
@@ -51,4 +52,4 @@ const UnifiedCanvasToolbarBeta = () => {
   );
 };
 
-export default UnifiedCanvasToolbarBeta;
+export default memo(UnifiedCanvasToolbarBeta);

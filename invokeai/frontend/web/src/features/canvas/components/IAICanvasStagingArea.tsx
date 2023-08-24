@@ -6,6 +6,7 @@ import { isEqual } from 'lodash-es';
 
 import { Group, Rect } from 'react-konva';
 import IAICanvasImage from './IAICanvasImage';
+import { memo } from 'react';
 
 const selector = createSelector(
   [canvasSelector],
@@ -88,4 +89,4 @@ const IAICanvasStagingArea = (props: Props) => {
   );
 };
 
-export default IAICanvasStagingArea;
+export default memo(IAICanvasStagingArea);

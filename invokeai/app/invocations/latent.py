@@ -4,6 +4,7 @@ from contextlib import ExitStack
 from typing import List, Literal, Optional, Union
 
 import einops
+import numpy as np
 import torch
 import torchvision.transforms as T
 from diffusers.image_processor import VaeImageProcessor
@@ -114,12 +115,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
     noise: Optional[LatentsField] = InputField(description=FieldDescriptions.noise, input=Input.Connection)
     steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
     cfg_scale: Union[float, List[float]] = InputField(
-        default=7.5, ge=1, description=FieldDescriptions.cfg_scale, ui_type=UIType.Float
+        default=7.5, ge=1, description=FieldDescriptions.cfg_scale, ui_type=UIType.Float, title="CFG Scale"
     )
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
-    scheduler: SAMPLER_NAME_VALUES = InputField(default="euler", description=FieldDescriptions.scheduler)
-    unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection)
+    scheduler: SAMPLER_NAME_VALUES = InputField(
+        default="euler", description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler
+    )
+    unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet")
     control: Union[ControlField, list[ControlField]] = InputField(
         default=None, description=FieldDescriptions.control, input=Input.Connection
     )
@@ -453,7 +456,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
 
 @title("Latents to Image")
-@tags("latents", "image", "vae")
+@tags("latents", "image", "vae", "l2i")
 class LatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
 
@@ -641,7 +644,7 @@ class ScaleLatentsInvocation(BaseInvocation):
 
 
 @title("Image to Latents")
-@tags("latents", "image", "vae")
+@tags("latents", "image", "vae", "i2l")
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""
 
@@ -720,3 +723,81 @@ class ImageToLatentsInvocation(BaseInvocation):
         latents = latents.to("cpu")
         context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents, seed=None)
+
+
+@title("Blend Latents")
+@tags("latents", "blend")
+class BlendLatentsInvocation(BaseInvocation):
+    """Blend two latents using a given alpha. Latents must have same size."""
+
+    type: Literal["lblend"] = "lblend"
+
+    # Inputs
+    latents_a: LatentsField = InputField(
+        description=FieldDescriptions.latents,
+        input=Input.Connection,
+    )
+    latents_b: LatentsField = InputField(
+        description=FieldDescriptions.latents,
+        input=Input.Connection,
+    )
+    alpha: float = InputField(default=0.5, description=FieldDescriptions.blend_alpha)
+
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        latents_a = context.services.latents.get(self.latents_a.latents_name)
+        latents_b = context.services.latents.get(self.latents_b.latents_name)
+
+        if latents_a.shape != latents_b.shape:
+            raise "Latents to blend must be the same size."
+
+        # TODO:
+        device = choose_torch_device()
+
+        def slerp(t, v0, v1, DOT_THRESHOLD=0.9995):
+            """
+            Spherical linear interpolation
+            Args:
+                t (float/np.ndarray): Float value between 0.0 and 1.0
+                v0 (np.ndarray): Starting vector
+                v1 (np.ndarray): Final vector
+                DOT_THRESHOLD (float): Threshold for considering the two vectors as
+                                    colineal. Not recommended to alter this.
+            Returns:
+                v2 (np.ndarray): Interpolation vector between v0 and v1
+            """
+            inputs_are_torch = False
+            if not isinstance(v0, np.ndarray):
+                inputs_are_torch = True
+                v0 = v0.detach().cpu().numpy()
+            if not isinstance(v1, np.ndarray):
+                inputs_are_torch = True
+                v1 = v1.detach().cpu().numpy()
+
+            dot = np.sum(v0 * v1 / (np.linalg.norm(v0) * np.linalg.norm(v1)))
+            if np.abs(dot) > DOT_THRESHOLD:
+                v2 = (1 - t) * v0 + t * v1
+            else:
+                theta_0 = np.arccos(dot)
+                sin_theta_0 = np.sin(theta_0)
+                theta_t = theta_0 * t
+                sin_theta_t = np.sin(theta_t)
+                s0 = np.sin(theta_0 - theta_t) / sin_theta_0
+                s1 = sin_theta_t / sin_theta_0
+                v2 = s0 * v0 + s1 * v1
+
+            if inputs_are_torch:
+                v2 = torch.from_numpy(v2).to(device)
+
+            return v2
+
+        # blend
+        blended_latents = slerp(self.alpha, latents_a, latents_b)
+
+        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+        blended_latents = blended_latents.to("cpu")
+        torch.cuda.empty_cache()
+
+        name = f"{context.graph_execution_state_id}__{self.id}"
+        # context.services.latents.set(name, resized_latents)
+        context.services.latents.save(name, blended_latents)
+        return build_latents_output(latents_name=name, latents=blended_latents)

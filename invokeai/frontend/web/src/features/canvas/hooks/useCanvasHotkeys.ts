@@ -134,7 +134,9 @@ const useInpaintingCanvasHotkeys = () => {
   useHotkeys(
     ['space'],
     (e: KeyboardEvent) => {
-      if (e.repeat) return;
+      if (e.repeat) {
+        return;
+      }
 
       canvasStage?.container().focus();
 

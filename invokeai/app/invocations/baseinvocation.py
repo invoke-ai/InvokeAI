@@ -71,6 +71,9 @@ class FieldDescriptions:
     safe_mode = "Whether or not to use safe mode"
     scribble_mode = "Whether or not to use scribble mode"
     scale_factor = "The factor by which to scale"
+    blend_alpha = (
+        "Blending factor. 0.0 = use input A only, 1.0 = use input B only, 0.5 = 50% mix of input A and input B."
+    )
     num_1 = "The first number"
     num_2 = "The second number"
     mask = "The mask to use for the operation"
@@ -140,6 +143,7 @@ class UIType(str, Enum):
     # region Misc
     FilePath = "FilePath"
     Enum = "enum"
+    Scheduler = "Scheduler"
     # endregion
 
 
@@ -389,6 +393,13 @@ class BaseInvocationOutput(BaseModel):
             toprocess.extend(next_subclasses)
         return tuple(subclasses)
 
+    class Config:
+        @staticmethod
+        def schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
+            if "required" not in schema or not isinstance(schema["required"], list):
+                schema["required"] = list()
+            schema["required"].extend(["type"])
+
 
 class RequiredConnectionException(Exception):
     """Raised when an field which requires a connection did not receive a value."""
@@ -449,6 +460,9 @@ class BaseInvocation(ABC, BaseModel):
                 schema["title"] = uiconfig.title
             if uiconfig and hasattr(uiconfig, "tags"):
                 schema["tags"] = uiconfig.tags
+            if "required" not in schema or not isinstance(schema["required"], list):
+                schema["required"] = list()
+            schema["required"].extend(["type", "id"])
 
     @abstractmethod
     def invoke(self, context: InvocationContext) -> BaseInvocationOutput:

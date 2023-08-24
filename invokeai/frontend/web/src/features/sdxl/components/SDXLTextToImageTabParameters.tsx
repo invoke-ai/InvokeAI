@@ -6,6 +6,7 @@ import ProcessButtons from 'features/parameters/components/ProcessButtons/Proces
 import TextToImageTabCoreParameters from 'features/ui/components/tabs/TextToImage/TextToImageTabCoreParameters';
 import ParamSDXLPromptArea from './ParamSDXLPromptArea';
 import ParamSDXLRefinerCollapse from './ParamSDXLRefinerCollapse';
+import { memo } from 'react';
 
 const SDXLTextToImageTabParameters = () => {
   return (
@@ -22,4 +23,4 @@ const SDXLTextToImageTabParameters = () => {
   );
 };
 
-export default SDXLTextToImageTabParameters;
+export default memo(SDXLTextToImageTabParameters);

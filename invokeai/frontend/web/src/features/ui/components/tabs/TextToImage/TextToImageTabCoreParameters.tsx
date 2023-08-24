@@ -29,11 +29,7 @@ const TextToImageTabCoreParameters = () => {
   const { shouldUseSliders, activeLabel } = useAppSelector(selector);
 
   return (
-    <IAICollapse
-      label={'General'}
-      activeLabel={activeLabel}
-      defaultIsOpen={true}
-    >
+    <IAICollapse label="General" activeLabel={activeLabel} defaultIsOpen={true}>
       <Flex
         sx={{
           flexDirection: 'column',

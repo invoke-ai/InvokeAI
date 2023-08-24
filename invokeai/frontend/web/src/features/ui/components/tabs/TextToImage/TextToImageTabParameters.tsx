@@ -9,6 +9,7 @@ import ParamSymmetryCollapse from 'features/parameters/components/Parameters/Sym
 import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
 import ParamPromptArea from '../../../../parameters/components/Parameters/Prompt/ParamPromptArea';
 import TextToImageTabCoreParameters from './TextToImageTabCoreParameters';
+import { memo } from 'react';
 
 const TextToImageTabParameters = () => {
   return (
@@ -28,4 +29,4 @@ const TextToImageTabParameters = () => {
   );
 };
 
-export default TextToImageTabParameters;
+export default memo(TextToImageTabParameters);

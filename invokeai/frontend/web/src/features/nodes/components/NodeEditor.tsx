@@ -6,9 +6,10 @@ import { memo, useState } from 'react';
 import { MdDeviceHub } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 import 'reactflow/dist/style.css';
-import NodeEditorPanelGroup from './panel/NodeEditorPanelGroup';
-import { Flow } from './Flow';
+import NodeEditorPanelGroup from './sidePanel/NodeEditorPanelGroup';
+import { Flow } from './flow/Flow';
 import { AnimatePresence, motion } from 'framer-motion';
+import AddNodePopover from './flow/AddNodePopover/AddNodePopover';
 
 const NodeEditor = () => {
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
@@ -33,7 +34,7 @@ const NodeEditor = () => {
       />
       <Panel id="node-editor-content">
         <Flex
-          layerStyle={'first'}
+          layerStyle="first"
           sx={{
             position: 'relative',
             width: 'full',
@@ -57,9 +58,10 @@ const NodeEditor = () => {
                   opacity: 0,
                   transition: { duration: 0.2 },
                 }}
-                style={{ width: '100%', height: '100%' }}
+                style={{ position: 'relative', width: '100%', height: '100%' }}
               >
                 <Flow />
+                <AddNodePopover />
               </motion.div>
             )}
           </AnimatePresence>
@@ -80,7 +82,7 @@ const NodeEditor = () => {
                 style={{ position: 'absolute', width: '100%', height: '100%' }}
               >
                 <Flex
-                  layerStyle={'first'}
+                  layerStyle="first"
                   sx={{
                     position: 'relative',
                     width: 'full',
