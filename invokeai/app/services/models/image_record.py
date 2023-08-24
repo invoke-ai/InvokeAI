@@ -53,7 +53,7 @@ class ImageRecordChanges(BaseModelExcludeNull, extra=Extra.forbid):
       - `starred`: change whether the image is starred
     """
 
-    image_category: Optional[ImageCategory] = Field(description="The image's new category.")
+    image_category: Optional[ImageCategory] = Field(default=None, description="The image's new category.")
     """The image's new category."""
     session_id: Optional[StrictStr] = Field(
         default=None,
