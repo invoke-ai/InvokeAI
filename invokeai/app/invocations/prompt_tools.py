@@ -1,3 +1,5 @@
+# 2023 skunkworxdark (https://github.com/skunkworxdark)
+
 from typing import Literal, Union, Optional
 import re
 import json
