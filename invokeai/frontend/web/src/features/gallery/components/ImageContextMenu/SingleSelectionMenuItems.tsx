@@ -230,10 +230,10 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       </MenuItem>
       {metadata?.created_by && (
         <Flex
-          padding="5px 10px"
-          // backgroundColor="gray.600"
-          // marginBottom="-5px"
-          marginTop="5px"
+          sx={{
+            padding: '5px 10px',
+            marginTop: '5px',
+          }}
         >
           <Text fontSize="xs" fontWeight="bold">
             Created by {metadata?.created_by}
