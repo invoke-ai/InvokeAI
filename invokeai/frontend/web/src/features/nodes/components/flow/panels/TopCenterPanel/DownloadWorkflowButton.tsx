@@ -2,12 +2,12 @@ import IAIIconButton from 'common/components/IAIIconButton';
 import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSave } from 'react-icons/fa';
+import { FaDownload } from 'react-icons/fa';
 
-const SaveWorkflowButton = () => {
+const DownloadWorkflowButton = () => {
   const { t } = useTranslation();
   const workflow = useWorkflow();
-  const handleSave = useCallback(() => {
+  const handleDownload = useCallback(() => {
     const blob = new Blob([JSON.stringify(workflow, null, 2)]);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -18,12 +18,12 @@ const SaveWorkflowButton = () => {
   }, [workflow]);
   return (
     <IAIIconButton
-      icon={<FaSave />}
-      tooltip={t('nodes.saveWorkflow')}
-      aria-label={t('nodes.saveWorkflow')}
-      onClick={handleSave}
+      icon={<FaDownload />}
+      tooltip={t('nodes.downloadWorkflow')}
+      aria-label={t('nodes.downloadWorkflow')}
+      onClick={handleDownload}
     />
   );
 };
 
-export default memo(SaveWorkflowButton);
+export default memo(DownloadWorkflowButton);

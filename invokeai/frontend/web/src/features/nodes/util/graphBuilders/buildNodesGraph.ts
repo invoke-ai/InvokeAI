@@ -4,6 +4,7 @@ import { cloneDeep, omit, reduce } from 'lodash-es';
 import { Graph } from 'services/api/types';
 import { AnyInvocation } from 'services/events/types';
 import { v4 as uuidv4 } from 'uuid';
+import { buildWorkflow } from '../buildWorkflow';
 
 /**
  * We need to do special handling for some fields
@@ -34,12 +35,13 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
   const { nodes, edges } = nodesState;
 
   const filteredNodes = nodes.filter(isInvocationNode);
+  const workflowJSON = JSON.stringify(buildWorkflow(nodesState));
 
   // Reduce the node editor nodes into invocation graph nodes
   const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>(
     (nodesAccumulator, node) => {
       const { id, data } = node;
-      const { type, inputs } = data;
+      const { type, inputs, isIntermediate, embedWorkflow } = data;
 
       // Transform each node's inputs to simple key-value pairs
       const transformedInputs = reduce(
@@ -58,7 +60,13 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
         type,
         id,
         ...transformedInputs,
+        is_intermediate: isIntermediate,
       };
+
+      if (embedWorkflow) {
+        // add the workflow to the node
+        Object.assign(graphNode, { workflow: workflowJSON });
+      }
 
       // Add it to the nodes object
       Object.assign(nodesAccumulator, {

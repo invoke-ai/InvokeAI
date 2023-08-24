@@ -29,13 +29,15 @@ export const $projectId = atom<string | undefined>();
  * @example
  * const { get, post, del } = $client.get();
  */
-export const $client = computed([$authToken, $baseUrl, $projectId], (authToken, baseUrl, projectId) =>
-  createClient<paths>({
-    headers: {
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      ...(projectId ? { "project-id": projectId } : {})
-    },
-    // do not include `api/v1` in the base url for this client
-    baseUrl: `${baseUrl ?? ''}`,
-  })
+export const $client = computed(
+  [$authToken, $baseUrl, $projectId],
+  (authToken, baseUrl, projectId) =>
+    createClient<paths>({
+      headers: {
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        ...(projectId ? { 'project-id': projectId } : {}),
+      },
+      // do not include `api/v1` in the base url for this client
+      baseUrl: `${baseUrl ?? ''}`,
+    })
 );

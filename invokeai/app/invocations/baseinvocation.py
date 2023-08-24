@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
+import json
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
@@ -20,7 +21,7 @@ from typing import (
     get_type_hints,
 )
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from pydantic.fields import Undefined
 from pydantic.typing import NoArgAnyCallable
 
@@ -141,9 +142,11 @@ class UIType(str, Enum):
     # endregion
 
     # region Misc
-    FilePath = "FilePath"
     Enum = "enum"
     Scheduler = "Scheduler"
+    WorkflowField = "WorkflowField"
+    IsIntermediate = "IsIntermediate"
+    MetadataField = "MetadataField"
     # endregion
 
 
@@ -507,8 +510,24 @@ class BaseInvocation(ABC, BaseModel):
 
     id: str = Field(description="The id of this node. Must be unique among all nodes.")
     is_intermediate: bool = InputField(
-        default=False, description="Whether or not this node is an intermediate node.", input=Input.Direct
+        default=False, description="Whether or not this node is an intermediate node.", ui_type=UIType.IsIntermediate
     )
+    workflow: Optional[str] = InputField(
+        default=None,
+        description="The workflow to save with the image",
+        ui_type=UIType.WorkflowField,
+    )
+
+    @validator("workflow", pre=True)
+    def validate_workflow_is_json(cls, v):
+        if v is None:
+            return None
+        try:
+            json.loads(v)
+        except json.decoder.JSONDecodeError:
+            raise ValueError("Workflow must be valid JSON")
+        return v
+
     UIConfig: ClassVar[Type[UIConfigBase]]
 
 

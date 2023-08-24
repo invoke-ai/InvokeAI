@@ -16,6 +16,7 @@ export const tagTypes = [
   'ImageNameList',
   'ImageList',
   'ImageMetadata',
+  'ImageMetadataFromFile',
   'Model',
 ];
 export type ApiFullTagDescription = FullTagDescription<
@@ -39,7 +40,7 @@ const dynamicBaseQuery: BaseQueryFn<
         headers.set('Authorization', `Bearer ${authToken}`);
       }
       if (projectId) {
-        headers.set("project-id", projectId)
+        headers.set('project-id', projectId);
       }
 
       return headers;

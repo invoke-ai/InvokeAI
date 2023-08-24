@@ -74,6 +74,7 @@
     "@nanostores/react": "^0.7.1",
     "@reduxjs/toolkit": "^1.9.5",
     "@roarr/browser-log-writer": "^1.1.5",
+    "@stevebel/png": "^1.5.1",
     "dateformat": "^5.0.3",
     "formik": "^2.4.3",
     "framer-motion": "^10.16.1",

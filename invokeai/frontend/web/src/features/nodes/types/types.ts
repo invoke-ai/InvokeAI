@@ -2,6 +2,7 @@ import {
   SchedulerParam,
   zBaseModel,
   zMainOrOnnxModel,
+  zSDXLRefinerModel,
   zScheduler,
 } from 'features/parameters/types/parameterSchemas';
 import { OpenAPIV3 } from 'openapi-types';
@@ -97,7 +98,6 @@ export const zFieldType = z.enum([
   // endregion
 
   // region Misc
-  'FilePath',
   'enum',
   'Scheduler',
   // endregion
@@ -105,8 +105,17 @@ export const zFieldType = z.enum([
 
 export type FieldType = z.infer<typeof zFieldType>;
 
+export const zReservedFieldType = z.enum([
+  'WorkflowField',
+  'IsIntermediate',
+  'MetadataField',
+]);
+
+export type ReservedFieldType = z.infer<typeof zReservedFieldType>;
+
 export const isFieldType = (value: unknown): value is FieldType =>
-  zFieldType.safeParse(value).success;
+  zFieldType.safeParse(value).success ||
+  zReservedFieldType.safeParse(value).success;
 
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
@@ -619,6 +628,11 @@ export type SchedulerInputFieldTemplate = InputFieldTemplateBase & {
   type: 'Scheduler';
 };
 
+export type WorkflowInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'WorkflowField';
+};
+
 export const isInputFieldValue = (
   field?: InputFieldValue | OutputFieldValue
 ): field is InputFieldValue => Boolean(field && field.fieldKind === 'input');
@@ -715,6 +729,47 @@ export const isInvocationFieldSchema = (
 
 export type InvocationEdgeExtra = { type: 'default' | 'collapsed' };
 
+export const zCoreMetadata = z
+  .object({
+    app_version: z.string().nullish(),
+    generation_mode: z.string().nullish(),
+    positive_prompt: z.string().nullish(),
+    negative_prompt: z.string().nullish(),
+    width: z.number().int().nullish(),
+    height: z.number().int().nullish(),
+    seed: z.number().int().nullish(),
+    rand_device: z.string().nullish(),
+    cfg_scale: z.number().nullish(),
+    steps: z.number().int().nullish(),
+    scheduler: z.string().nullish(),
+    clip_skip: z.number().int().nullish(),
+    model: zMainOrOnnxModel.nullish(),
+    controlnets: z.array(zControlField).nullish(),
+    loras: z
+      .array(
+        z.object({
+          lora: zLoRAModelField,
+          weight: z.number(),
+        })
+      )
+      .nullish(),
+    vae: zVaeModelField.nullish(),
+    strength: z.number().nullish(),
+    init_image: z.string().nullish(),
+    positive_style_prompt: z.string().nullish(),
+    negative_style_prompt: z.string().nullish(),
+    refiner_model: zSDXLRefinerModel.nullish(),
+    refiner_cfg_scale: z.number().nullish(),
+    refiner_steps: z.number().int().nullish(),
+    refiner_scheduler: z.string().nullish(),
+    refiner_positive_aesthetic_store: z.number().nullish(),
+    refiner_negative_aesthetic_store: z.number().nullish(),
+    refiner_start: z.number().nullish(),
+  })
+  .catchall(z.record(z.any()));
+
+export type CoreMetadata = z.infer<typeof zCoreMetadata>;
+
 export const zInvocationNodeData = z.object({
   id: z.string().trim().min(1),
   // no easy way to build this dynamically, and we don't want to anyways, because this will be used
@@ -725,6 +780,8 @@ export const zInvocationNodeData = z.object({
   label: z.string(),
   isOpen: z.boolean(),
   notes: z.string(),
+  embedWorkflow: z.boolean(),
+  isIntermediate: z.boolean(),
 });
 
 // Massage this to get better type safety while developing
@@ -817,9 +874,17 @@ export const zWorkflow = z.object({
   nodes: z.array(zWorkflowNode),
   edges: z.array(zWorkflowEdge),
   exposedFields: z.array(zFieldIdentifier),
+  meta: z.object({
+    version: zSemVer,
+  }),
 });
 
 export type Workflow = z.infer<typeof zWorkflow>;
+
+export type ImageMetadataAndWorkflow = {
+  metadata?: CoreMetadata;
+  workflow?: Workflow;
+};
 
 export type CurrentImageNodeData = {
   id: string;

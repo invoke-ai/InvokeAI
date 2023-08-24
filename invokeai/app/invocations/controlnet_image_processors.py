@@ -151,11 +151,6 @@ class ImageProcessorInvocation(BaseInvocation):
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(raw_image)
 
-        # FIXME: what happened to image metadata?
-        # metadata = context.services.metadata.build_metadata(
-        #     session_id=context.graph_execution_state_id, node=self
-        # )
-
         # currently can't see processed image in node UI without a showImage node,
         #    so for now setting image_type to RESULT instead of INTERMEDIATE so will get saved in gallery
         image_dto = context.services.images.create(
@@ -165,6 +160,7 @@ class ImageProcessorInvocation(BaseInvocation):
             session_id=context.graph_execution_state_id,
             node_id=self.id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         """Builds an ImageOutput and its ImageField"""

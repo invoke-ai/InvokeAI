@@ -65,6 +65,7 @@ class BlankImageInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -102,6 +103,7 @@ class ImageCropInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -154,6 +156,7 @@ class ImagePasteInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -189,6 +192,7 @@ class MaskFromAlphaInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -223,6 +227,7 @@ class ImageMultiplyInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -259,6 +264,7 @@ class ImageChannelInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -295,6 +301,7 @@ class ImageConvertInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -333,6 +340,7 @@ class ImageBlurInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -393,6 +401,7 @@ class ImageResizeInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -438,6 +447,7 @@ class ImageScaleInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -475,6 +485,7 @@ class ImageLerpInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -512,6 +523,7 @@ class ImageInverseLerpInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -555,6 +567,7 @@ class ImageNSFWBlurInvocation(BaseInvocation):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata.dict() if self.metadata else None,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -596,6 +609,7 @@ class ImageWatermarkInvocation(BaseInvocation):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata.dict() if self.metadata else None,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -644,6 +658,7 @@ class MaskEdgeInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -677,6 +692,7 @@ class MaskCombineInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -785,6 +801,7 @@ class ColorCorrectInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -827,6 +844,7 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
             node_id=self.id,
             is_intermediate=self.is_intermediate,
             session_id=context.graph_execution_state_id,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -877,6 +895,7 @@ class ImageLuminosityAdjustmentInvocation(BaseInvocation):
             node_id=self.id,
             is_intermediate=self.is_intermediate,
             session_id=context.graph_execution_state_id,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -925,6 +944,7 @@ class ImageSaturationAdjustmentInvocation(BaseInvocation):
             node_id=self.id,
             is_intermediate=self.is_intermediate,
             session_id=context.graph_execution_state_id,
+            workflow=self.workflow,
         )
 
         return ImageOutput(

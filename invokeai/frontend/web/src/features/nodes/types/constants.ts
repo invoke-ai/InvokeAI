@@ -169,11 +169,6 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     title: 'Color Collection',
     description: 'A collection of colors.',
   },
-  FilePath: {
-    color: 'base.500',
-    title: 'File Path',
-    description: 'A path to a file.',
-  },
   ONNXModelField: {
     color: 'base.500',
     title: 'ONNX Model',

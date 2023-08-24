@@ -2,7 +2,7 @@ import { Flex } from '@chakra-ui/layout';
 import { memo } from 'react';
 import LoadWorkflowButton from './LoadWorkflowButton';
 import ResetWorkflowButton from './ResetWorkflowButton';
-import SaveWorkflowButton from './SaveWorkflowButton';
+import DownloadWorkflowButton from './DownloadWorkflowButton';
 
 const TopCenterPanel = () => {
   return (
@@ -15,7 +15,7 @@ const TopCenterPanel = () => {
         transform: 'translate(-50%)',
       }}
     >
-      <SaveWorkflowButton />
+      <DownloadWorkflowButton />
       <LoadWorkflowButton />
       <ResetWorkflowButton />
     </Flex>

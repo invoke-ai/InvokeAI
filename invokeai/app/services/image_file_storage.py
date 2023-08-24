@@ -60,7 +60,7 @@ class ImageFileStorageBase(ABC):
         image: PILImageType,
         image_name: str,
         metadata: Optional[dict] = None,
-        graph: Optional[dict] = None,
+        workflow: Optional[str] = None,
         thumbnail_size: int = 256,
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
@@ -110,7 +110,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         image: PILImageType,
         image_name: str,
         metadata: Optional[dict] = None,
-        graph: Optional[dict] = None,
+        workflow: Optional[str] = None,
         thumbnail_size: int = 256,
     ) -> None:
         try:
@@ -121,8 +121,8 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
             if metadata is not None:
                 pnginfo.add_text("invokeai_metadata", json.dumps(metadata))
-            if graph is not None:
-                pnginfo.add_text("invokeai_graph", json.dumps(graph))
+            if workflow is not None:
+                pnginfo.add_text("invokeai_workflow", workflow)
 
             image.save(image_path, "PNG", pnginfo=pnginfo)
             thumbnail_name = get_thumbnail_name(image_name)

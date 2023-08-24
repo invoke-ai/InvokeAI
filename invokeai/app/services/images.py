@@ -54,6 +54,7 @@ class ImageServiceABC(ABC):
         board_id: Optional[str] = None,
         is_intermediate: bool = False,
         metadata: Optional[dict] = None,
+        workflow: Optional[str] = None,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         pass
@@ -177,6 +178,7 @@ class ImageService(ImageServiceABC):
         board_id: Optional[str] = None,
         is_intermediate: bool = False,
         metadata: Optional[dict] = None,
+        workflow: Optional[str] = None,
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -186,16 +188,16 @@ class ImageService(ImageServiceABC):
 
         image_name = self._services.names.create_image_name()
 
-        graph = None
-
-        if session_id is not None:
-            session_raw = self._services.graph_execution_manager.get_raw(session_id)
-            if session_raw is not None:
-                try:
-                    graph = get_metadata_graph_from_raw_session(session_raw)
-                except Exception as e:
-                    self._services.logger.warn(f"Failed to parse session graph: {e}")
-                    graph = None
+        # TODO: Do we want to store the graph in the image at all? I don't think so...
+        # graph = None
+        # if session_id is not None:
+        #     session_raw = self._services.graph_execution_manager.get_raw(session_id)
+        #     if session_raw is not None:
+        #         try:
+        #             graph = get_metadata_graph_from_raw_session(session_raw)
+        #         except Exception as e:
+        #             self._services.logger.warn(f"Failed to parse session graph: {e}")
+        #             graph = None
 
         (width, height) = image.size
 
@@ -217,7 +219,7 @@ class ImageService(ImageServiceABC):
             )
             if board_id is not None:
                 self._services.board_image_records.add_image_to_board(board_id=board_id, image_name=image_name)
-            self._services.image_files.save(image_name=image_name, image=image, metadata=metadata, graph=graph)
+            self._services.image_files.save(image_name=image_name, image=image, metadata=metadata, workflow=workflow)
             image_dto = self.get_dto(image_name)
 
             return image_dto

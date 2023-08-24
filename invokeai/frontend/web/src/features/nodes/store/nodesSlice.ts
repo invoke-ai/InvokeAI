@@ -245,6 +245,34 @@ const nodesSlice = createSlice({
       }
       field.label = label;
     },
+    nodeEmbedWorkflowChanged: (
+      state,
+      action: PayloadAction<{ nodeId: string; embedWorkflow: boolean }>
+    ) => {
+      const { nodeId, embedWorkflow } = action.payload;
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+
+      const node = state.nodes?.[nodeIndex];
+
+      if (!isInvocationNode(node)) {
+        return;
+      }
+      node.data.embedWorkflow = embedWorkflow;
+    },
+    nodeIsIntermediateChanged: (
+      state,
+      action: PayloadAction<{ nodeId: string; isIntermediate: boolean }>
+    ) => {
+      const { nodeId, isIntermediate } = action.payload;
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+
+      const node = state.nodes?.[nodeIndex];
+
+      if (!isInvocationNode(node)) {
+        return;
+      }
+      node.data.isIntermediate = isIntermediate;
+    },
     nodeIsOpenChanged: (
       state,
       action: PayloadAction<{ nodeId: string; isOpen: boolean }>
@@ -850,6 +878,8 @@ export const {
   addNodePopoverClosed,
   addNodePopoverToggled,
   selectionModeChanged,
+  nodeEmbedWorkflowChanged,
+  nodeIsIntermediateChanged,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
