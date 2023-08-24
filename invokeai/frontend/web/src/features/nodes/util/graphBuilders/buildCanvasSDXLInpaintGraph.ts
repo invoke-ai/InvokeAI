@@ -18,6 +18,8 @@ import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_OUTPUT,
   CANVAS_REFINE_DENOISE_LATENTS,
+  CANVAS_REFINE_NOISE,
+  CANVAS_REFINE_NOISE_INCREMENT,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
   INPAINT_IMAGE_RESIZE_UP,
@@ -145,6 +147,18 @@ export const buildCanvasSDXLInpaintGraph = (
           ? Math.min(refinerStart, 1 - strength)
           : 1 - strength,
         denoising_end: shouldUseSDXLRefiner ? refinerStart : 1,
+      },
+      [CANVAS_REFINE_NOISE]: {
+        type: 'noise',
+        id: NOISE,
+        use_cpu,
+        is_intermediate: true,
+      },
+      [CANVAS_REFINE_NOISE_INCREMENT]: {
+        type: 'add',
+        id: CANVAS_REFINE_NOISE_INCREMENT,
+        b: 1,
+        is_intermediate: true,
       },
       [CANVAS_REFINE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -310,6 +324,26 @@ export const buildCanvasSDXLInpaintGraph = (
       // Canvas Refine
       {
         source: {
+          node_id: ITERATE,
+          field: 'item',
+        },
+        destination: {
+          node_id: CANVAS_REFINE_NOISE_INCREMENT,
+          field: 'a',
+        },
+      },
+      {
+        source: {
+          node_id: CANVAS_REFINE_NOISE_INCREMENT,
+          field: 'value',
+        },
+        destination: {
+          node_id: CANVAS_REFINE_NOISE,
+          field: 'seed',
+        },
+      },
+      {
+        source: {
           node_id: SDXL_MODEL_LOADER,
           field: 'unet',
         },
@@ -340,7 +374,7 @@ export const buildCanvasSDXLInpaintGraph = (
       },
       {
         source: {
-          node_id: NOISE,
+          node_id: CANVAS_REFINE_NOISE,
           field: 'noise',
         },
         destination: {
@@ -409,11 +443,10 @@ export const buildCanvasSDXLInpaintGraph = (
       height: height,
     };
 
-    graph.nodes[NOISE] = {
-      ...(graph.nodes[NOISE] as NoiseInvocation),
-      width: scaledWidth,
-      height: scaledHeight,
-    };
+    (graph.nodes[NOISE] as NoiseInvocation).width = scaledWidth;
+    (graph.nodes[NOISE] as NoiseInvocation).height = scaledHeight;
+    (graph.nodes[CANVAS_REFINE_NOISE] as NoiseInvocation).width = scaledWidth;
+    (graph.nodes[CANVAS_REFINE_NOISE] as NoiseInvocation).height = scaledHeight;
 
     // Connect Nodes
     graph.edges.push(
@@ -482,11 +515,11 @@ export const buildCanvasSDXLInpaintGraph = (
     );
   } else {
     // Add Images To Nodes
-    graph.nodes[NOISE] = {
-      ...(graph.nodes[NOISE] as NoiseInvocation),
-      width: width,
-      height: height,
-    };
+    (graph.nodes[NOISE] as NoiseInvocation).width = width;
+    (graph.nodes[NOISE] as NoiseInvocation).height = height;
+    (graph.nodes[CANVAS_REFINE_NOISE] as NoiseInvocation).width = width;
+    (graph.nodes[CANVAS_REFINE_NOISE] as NoiseInvocation).height = height;
+
     graph.nodes[INPAINT_IMAGE] = {
       ...(graph.nodes[INPAINT_IMAGE] as ImageToLatentsInvocation),
       image: canvasInitImage,

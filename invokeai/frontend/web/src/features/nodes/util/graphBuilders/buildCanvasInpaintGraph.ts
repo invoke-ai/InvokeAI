@@ -18,6 +18,8 @@ import {
   CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPUT,
   CANVAS_REFINE_DENOISE_LATENTS,
+  CANVAS_REFINE_NOISE,
+  CANVAS_REFINE_NOISE_INCREMENT,
   CLIP_SKIP,
   DENOISE_LATENTS,
   INPAINT_IMAGE,
@@ -140,6 +142,18 @@ export const buildCanvasInpaintGraph = (
         scheduler: scheduler,
         denoising_start: 1 - strength,
         denoising_end: 1,
+      },
+      [CANVAS_REFINE_NOISE]: {
+        type: 'noise',
+        id: NOISE,
+        use_cpu,
+        is_intermediate: true,
+      },
+      [CANVAS_REFINE_NOISE_INCREMENT]: {
+        type: 'add',
+        id: CANVAS_REFINE_NOISE_INCREMENT,
+        b: 1,
+        is_intermediate: true,
       },
       [CANVAS_REFINE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -296,6 +310,26 @@ export const buildCanvasInpaintGraph = (
       // Canvas Refine
       {
         source: {
+          node_id: ITERATE,
+          field: 'item',
+        },
+        destination: {
+          node_id: CANVAS_REFINE_NOISE_INCREMENT,
+          field: 'a',
+        },
+      },
+      {
+        source: {
+          node_id: CANVAS_REFINE_NOISE_INCREMENT,
+          field: 'value',
+        },
+        destination: {
+          node_id: CANVAS_REFINE_NOISE,
+          field: 'seed',
+        },
+      },
+      {
+        source: {
           node_id: MAIN_MODEL_LOADER,
           field: 'unet',
         },
@@ -326,7 +360,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: NOISE,
+          node_id: CANVAS_REFINE_NOISE,
           field: 'noise',
         },
         destination: {
@@ -395,11 +429,10 @@ export const buildCanvasInpaintGraph = (
       height: height,
     };
 
-    graph.nodes[NOISE] = {
-      ...(graph.nodes[NOISE] as NoiseInvocation),
-      width: scaledWidth,
-      height: scaledHeight,
-    };
+    (graph.nodes[NOISE] as NoiseInvocation).width = scaledWidth;
+    (graph.nodes[NOISE] as NoiseInvocation).height = scaledHeight;
+    (graph.nodes[CANVAS_REFINE_NOISE] as NoiseInvocation).width = scaledWidth;
+    (graph.nodes[CANVAS_REFINE_NOISE] as NoiseInvocation).height = scaledHeight;
 
     // Connect Nodes
     graph.edges.push(
@@ -468,11 +501,11 @@ export const buildCanvasInpaintGraph = (
     );
   } else {
     // Add Images To Nodes
-    graph.nodes[NOISE] = {
-      ...(graph.nodes[NOISE] as NoiseInvocation),
-      width: width,
-      height: height,
-    };
+    (graph.nodes[NOISE] as NoiseInvocation).width = width;
+    (graph.nodes[NOISE] as NoiseInvocation).height = height;
+    (graph.nodes[CANVAS_REFINE_NOISE] as NoiseInvocation).width = width;
+    (graph.nodes[CANVAS_REFINE_NOISE] as NoiseInvocation).height = height;
+
     graph.nodes[INPAINT_IMAGE] = {
       ...(graph.nodes[INPAINT_IMAGE] as ImageToLatentsInvocation),
       image: canvasInitImage,
