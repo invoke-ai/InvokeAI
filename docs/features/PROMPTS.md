@@ -219,9 +219,10 @@ Definitely more blue-spherey.
 ```
 </figure>
 
+<figure markdown>
 ![blue-sphere-5-red-cube-5-hybrid](../assets/prompt-blending/blue-sphere-0.5-red-cube-0.5-hybrid.png)
-
 </figure>
+
 
 Whoa...! I see blue and red, and if I squint, spheres and cubes.
 
