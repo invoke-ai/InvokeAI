@@ -8,8 +8,8 @@ import {
 } from '@chakra-ui/react';
 import { memo } from 'react';
 import WorkflowGeneralTab from './WorkflowGeneralTab';
-import WorkflowLinearTab from './WorkflowLinearTab';
 import WorkflowJSONTab from './WorkflowJSONTab';
+import WorkflowLinearTab from './WorkflowLinearTab';
 
 const WorkflowPanel = () => {
   return (
@@ -20,7 +20,8 @@ const WorkflowPanel = () => {
         w: 'full',
         h: 'full',
         borderRadius: 'base',
-        p: 4,
+        p: 2,
+        gap: 2,
       }}
     >
       <Tabs

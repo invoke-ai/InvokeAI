@@ -30,8 +30,8 @@ export const sessionCreated = createAsyncThunk<
   CreateSessionThunkConfig
 >('api/sessionCreated', async (arg, { rejectWithValue }) => {
   const { graph } = arg;
-  const { post } = $client.get();
-  const { data, error, response } = await post('/api/v1/sessions/', {
+  const { POST } = $client.get();
+  const { data, error, response } = await POST('/api/v1/sessions/', {
     body: graph,
   });
 
@@ -72,8 +72,8 @@ export const sessionInvoked = createAsyncThunk<
   InvokedSessionThunkConfig
 >('api/sessionInvoked', async (arg, { rejectWithValue }) => {
   const { session_id } = arg;
-  const { put } = $client.get();
-  const { data, error, response } = await put(
+  const { PUT } = $client.get();
+  const { data, error, response } = await PUT(
     '/api/v1/sessions/{session_id}/invoke',
     {
       params: { query: { all: true }, path: { session_id } },
@@ -92,11 +92,12 @@ export const sessionInvoked = createAsyncThunk<
       return rejectWithValue({
         arg,
         status: response.status,
-        error: error.detail
+        error: error.detail,
       });
     }
-    if (error)
+    if (error) {
       return rejectWithValue({ arg, status: response.status, error });
+    }
   }
 });
 
@@ -122,8 +123,8 @@ export const sessionCanceled = createAsyncThunk<
   CancelSessionThunkConfig
 >('api/sessionCanceled', async (arg, { rejectWithValue }) => {
   const { session_id } = arg;
-  const { del } = $client.get();
-  const { data, error, response } = await del(
+  const { DELETE } = $client.get();
+  const { data, error, response } = await DELETE(
     '/api/v1/sessions/{session_id}/invoke',
     {
       params: {
@@ -162,8 +163,8 @@ export const listedSessions = createAsyncThunk<
   ListSessionsThunkConfig
 >('api/listSessions', async (arg, { rejectWithValue }) => {
   const { params } = arg;
-  const { get } = $client.get();
-  const { data, error, response } = await get('/api/v1/sessions/', {
+  const { GET } = $client.get();
+  const { data, error, response } = await GET('/api/v1/sessions/', {
     params,
   });
 

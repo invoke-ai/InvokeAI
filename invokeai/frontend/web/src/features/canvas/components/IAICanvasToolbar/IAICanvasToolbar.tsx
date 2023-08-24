@@ -18,7 +18,6 @@ import {
 import {
   resetCanvas,
   resetCanvasView,
-  resizeAndScaleCanvas,
   setIsMaskEnabled,
   setLayer,
   setTool,
@@ -183,7 +182,6 @@ const IAICanvasToolbar = () => {
 
   const handleResetCanvas = () => {
     dispatch(resetCanvas());
-    dispatch(resizeAndScaleCanvas());
   };
 
   const handleMergeVisible = () => {

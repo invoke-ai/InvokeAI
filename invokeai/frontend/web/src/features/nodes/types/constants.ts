@@ -23,9 +23,6 @@ export const COLLECTION_TYPES: FieldType[] = [
   'ImageCollection',
 ];
 
-export const colorTokenToCssVar = (colorToken: string) =>
-  `var(--invokeai-colors-${colorToken.split('.').join('-')}`;
-
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
   integer: {
     title: 'Integer',

@@ -1,23 +1,24 @@
-import { HStack } from '@chakra-ui/react';
-import CancelButton from 'features/parameters/components/ProcessButtons/CancelButton';
+import { Flex } from '@chakra-ui/layout';
 import { memo } from 'react';
-import { Panel } from 'reactflow';
-import NodeEditorSettings from './NodeEditorSettings';
-import ClearGraphButton from './ClearGraphButton';
-import NodeInvokeButton from './NodeInvokeButton';
-import ReloadSchemaButton from './ReloadSchemaButton';
+import LoadWorkflowButton from './LoadWorkflowButton';
+import ResetWorkflowButton from './ResetWorkflowButton';
+import SaveWorkflowButton from './SaveWorkflowButton';
 
 const TopCenterPanel = () => {
   return (
-    <Panel position="top-center">
-      <HStack>
-        <NodeInvokeButton />
-        <CancelButton />
-        <ReloadSchemaButton />
-        <ClearGraphButton />
-        <NodeEditorSettings />
-      </HStack>
-    </Panel>
+    <Flex
+      sx={{
+        gap: 2,
+        position: 'absolute',
+        top: 2,
+        insetInlineStart: '50%',
+        transform: 'translate(-50%)',
+      }}
+    >
+      <SaveWorkflowButton />
+      <LoadWorkflowButton />
+      <ResetWorkflowButton />
+    </Flex>
   );
 };
 

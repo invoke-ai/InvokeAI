@@ -170,6 +170,7 @@ class _InputField(BaseModel):
     ui_hidden: bool
     ui_type: Optional[UIType]
     ui_component: Optional[UIComponent]
+    ui_order: Optional[int]
 
 
 class _OutputField(BaseModel):
@@ -182,6 +183,7 @@ class _OutputField(BaseModel):
 
     ui_hidden: bool
     ui_type: Optional[UIType]
+    ui_order: Optional[int]
 
 
 def InputField(
@@ -215,6 +217,7 @@ def InputField(
     ui_type: Optional[UIType] = None,
     ui_component: Optional[UIComponent] = None,
     ui_hidden: bool = False,
+    ui_order: Optional[int] = None,
     **kwargs: Any,
 ) -> Any:
     """
@@ -273,6 +276,7 @@ def InputField(
         ui_type=ui_type,
         ui_component=ui_component,
         ui_hidden=ui_hidden,
+        ui_order=ui_order,
         **kwargs,
     )
 
@@ -306,6 +310,7 @@ def OutputField(
     repr: bool = True,
     ui_type: Optional[UIType] = None,
     ui_hidden: bool = False,
+    ui_order: Optional[int] = None,
     **kwargs: Any,
 ) -> Any:
     """
@@ -352,6 +357,7 @@ def OutputField(
         repr=repr,
         ui_type=ui_type,
         ui_hidden=ui_hidden,
+        ui_order=ui_order,
         **kwargs,
     )
 
@@ -380,7 +386,7 @@ class BaseInvocationOutput(BaseModel):
     """Base class for all invocation outputs"""
 
     # All outputs must include a type name like this:
-    # type: Literal['your_output_name']
+    # type: Literal['your_output_name'] # noqa f821
 
     @classmethod
     def get_all_subclasses_tuple(cls):
@@ -421,7 +427,7 @@ class BaseInvocation(ABC, BaseModel):
     """
 
     # All invocations must include a type name like this:
-    # type: Literal['your_output_name']
+    # type: Literal['your_output_name'] # noqa f821
 
     @classmethod
     def get_all_subclasses(cls):
@@ -499,7 +505,7 @@ class BaseInvocation(ABC, BaseModel):
                     raise MissingInputException(self.__fields__["type"].default, field_name)
         return self.invoke(context)
 
-    id: str = InputField(description="The id of this node. Must be unique among all nodes.")
+    id: str = Field(description="The id of this node. Must be unique among all nodes.")
     is_intermediate: bool = InputField(
         default=False, description="Whether or not this node is an intermediate node.", input=Input.Direct
     )

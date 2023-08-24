@@ -10,37 +10,49 @@ categories returned by `invokeai --help`. The file looks like this:
 [file: invokeai.yaml]
 
 InvokeAI:
-  Paths:
-    root: /home/lstein/invokeai-main
-    conf_path: configs/models.yaml
-    legacy_conf_dir: configs/stable-diffusion
-    outdir: outputs
-    autoimport_dir: null
-  Models:
-    model: stable-diffusion-1.5
-    embeddings: true
-  Memory/Performance:
-    xformers_enabled: false
-    sequential_guidance: false
-    precision: float16
-    max_cache_size: 6
-    max_vram_cache_size: 0.5
-    always_use_cpu: false
-    free_gpu_mem: false
-  Features:
-    esrgan: true
-    patchmatch: true
-    internet_available: true
-    log_tokenization: false
   Web Server:
     host: 127.0.0.1
-    port: 8081
+    port: 9090
     allow_origins: []
     allow_credentials: true
     allow_methods:
     - '*'
     allow_headers:
     - '*'
+  Features:
+    esrgan: true
+    internet_available: true
+    log_tokenization: false
+    patchmatch: true
+    ignore_missing_core_models: false
+  Paths:
+    autoimport_dir: autoimport
+    lora_dir: null
+    embedding_dir: null
+    controlnet_dir: null
+    conf_path: configs/models.yaml
+    models_dir: models
+    legacy_conf_dir: configs/stable-diffusion
+    db_dir: databases
+    outdir: /home/lstein/invokeai-main/outputs
+    use_memory_db: false
+  Logging:
+    log_handlers:
+    - console
+    log_format: plain
+    log_level: info
+  Model Cache:
+    ram: 13.5
+    vram: 0.25
+    lazy_offload: true
+  Device:
+    device: auto
+    precision: auto
+  Generation:
+    sequential_guidance: false
+    attention_type: xformers
+    attention_slice_size: auto
+    force_tiled_decode: false
 
 The default name of the configuration file is `invokeai.yaml`, located
 in INVOKEAI_ROOT. You can replace supersede this by providing any
@@ -54,24 +66,23 @@ InvokeAIAppConfig.parse_args() will parse the contents of `sys.argv`
 at initialization time. You may pass a list of strings in the optional
 `argv` argument to use instead of the system argv:
 
- conf.parse_args(argv=['--xformers_enabled'])
+ conf.parse_args(argv=['--log_tokenization'])
 
 It is also possible to set a value at initialization time. However, if
 you call parse_args() it may be overwritten.
 
- conf = InvokeAIAppConfig(xformers_enabled=True)
- conf.parse_args(argv=['--no-xformers'])
- conf.xformers_enabled
+ conf = InvokeAIAppConfig(log_tokenization=True)
+ conf.parse_args(argv=['--no-log_tokenization'])
+ conf.log_tokenization
  # False
-
 
 To avoid this, use `get_config()` to retrieve the application-wide
 configuration object. This will retain any properties set at object
 creation time:
 
- conf = InvokeAIAppConfig.get_config(xformers_enabled=True)
- conf.parse_args(argv=['--no-xformers'])
- conf.xformers_enabled
+ conf = InvokeAIAppConfig.get_config(log_tokenization=True)
+ conf.parse_args(argv=['--no-log_tokenization'])
+ conf.log_tokenization
  # True
 
 Any setting can be overwritten by setting an environment variable of
@@ -93,7 +104,7 @@ Typical usage at the top level file:
  # get global configuration and print its cache size
  conf = InvokeAIAppConfig.get_config()
  conf.parse_args()
- print(conf.max_cache_size)
+ print(conf.ram_cache_size)
 
 Typical usage in a backend module:
 
@@ -101,8 +112,7 @@ Typical usage in a backend module:
 
  # get global configuration and print its cache size value
  conf = InvokeAIAppConfig.get_config()
- print(conf.max_cache_size)
-
+ print(conf.ram_cache_size)
 
 Computed properties:
 
@@ -159,209 +169,18 @@ two configs are kept in separate sections of the config file:
 
 """
 from __future__ import annotations
-import argparse
-import pydoc
 import os
-import sys
-from argparse import ArgumentParser
-from omegaconf import OmegaConf, DictConfig, ListConfig
+from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
-from pydantic import BaseSettings, Field, parse_obj_as
-from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
+from pydantic import Field, parse_obj_as
+from typing import ClassVar, Dict, List, Literal, Union, Optional, get_type_hints
+
+from .base import InvokeAISettings
 
 INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_MAX_VRAM = 0.5
-
-
-class InvokeAISettings(BaseSettings):
-    """
-    Runtime configuration settings in which default values are
-    read from an omegaconf .yaml file.
-    """
-
-    initconf: ClassVar[DictConfig] = None
-    argparse_groups: ClassVar[Dict] = {}
-
-    def parse_args(self, argv: list = sys.argv[1:]):
-        parser = self.get_parser()
-        opt = parser.parse_args(argv)
-        for name in self.__fields__:
-            if name not in self._excluded():
-                value = getattr(opt, name)
-                if isinstance(value, ListConfig):
-                    value = list(value)
-                elif isinstance(value, DictConfig):
-                    value = dict(value)
-                setattr(self, name, value)
-
-    def to_yaml(self) -> str:
-        """
-        Return a YAML string representing our settings. This can be used
-        as the contents of `invokeai.yaml` to restore settings later.
-        """
-        cls = self.__class__
-        type = get_args(get_type_hints(cls)["type"])[0]
-        field_dict = dict({type: dict()})
-        for name, field in self.__fields__.items():
-            if name in cls._excluded_from_yaml():
-                continue
-            category = field.field_info.extra.get("category") or "Uncategorized"
-            value = getattr(self, name)
-            if category not in field_dict[type]:
-                field_dict[type][category] = dict()
-            # keep paths as strings to make it easier to read
-            field_dict[type][category][name] = str(value) if isinstance(value, Path) else value
-        conf = OmegaConf.create(field_dict)
-        return OmegaConf.to_yaml(conf)
-
-    @classmethod
-    def add_parser_arguments(cls, parser):
-        if "type" in get_type_hints(cls):
-            settings_stanza = get_args(get_type_hints(cls)["type"])[0]
-        else:
-            settings_stanza = "Uncategorized"
-
-        env_prefix = cls.Config.env_prefix if hasattr(cls.Config, "env_prefix") else settings_stanza.upper()
-
-        initconf = (
-            cls.initconf.get(settings_stanza)
-            if cls.initconf and settings_stanza in cls.initconf
-            else OmegaConf.create()
-        )
-
-        # create an upcase version of the environment in
-        # order to achieve case-insensitive environment
-        # variables (the way Windows does)
-        upcase_environ = dict()
-        for key, value in os.environ.items():
-            upcase_environ[key.upper()] = value
-
-        fields = cls.__fields__
-        cls.argparse_groups = {}
-
-        for name, field in fields.items():
-            if name not in cls._excluded():
-                current_default = field.default
-
-                category = field.field_info.extra.get("category", "Uncategorized")
-                env_name = env_prefix + "_" + name
-                if category in initconf and name in initconf.get(category):
-                    field.default = initconf.get(category).get(name)
-                if env_name.upper() in upcase_environ:
-                    field.default = upcase_environ[env_name.upper()]
-                cls.add_field_argument(parser, name, field)
-
-                field.default = current_default
-
-    @classmethod
-    def cmd_name(self, command_field: str = "type") -> str:
-        hints = get_type_hints(self)
-        if command_field in hints:
-            return get_args(hints[command_field])[0]
-        else:
-            return "Uncategorized"
-
-    @classmethod
-    def get_parser(cls) -> ArgumentParser:
-        parser = PagingArgumentParser(
-            prog=cls.cmd_name(),
-            description=cls.__doc__,
-        )
-        cls.add_parser_arguments(parser)
-        return parser
-
-    @classmethod
-    def add_subparser(cls, parser: argparse.ArgumentParser):
-        parser.add_parser(cls.cmd_name(), help=cls.__doc__)
-
-    @classmethod
-    def _excluded(self) -> List[str]:
-        # internal fields that shouldn't be exposed as command line options
-        return ["type", "initconf"]
-
-    @classmethod
-    def _excluded_from_yaml(self) -> List[str]:
-        # combination of deprecated parameters and internal ones that shouldn't be exposed as invokeai.yaml options
-        return [
-            "type",
-            "initconf",
-            "version",
-            "from_file",
-            "model",
-            "root",
-        ]
-
-    class Config:
-        env_file_encoding = "utf-8"
-        arbitrary_types_allowed = True
-        case_sensitive = True
-
-    @classmethod
-    def add_field_argument(cls, command_parser, name: str, field, default_override=None):
-        field_type = get_type_hints(cls).get(name)
-        default = (
-            default_override
-            if default_override is not None
-            else field.default
-            if field.default_factory is None
-            else field.default_factory()
-        )
-        if category := field.field_info.extra.get("category"):
-            if category not in cls.argparse_groups:
-                cls.argparse_groups[category] = command_parser.add_argument_group(category)
-            argparse_group = cls.argparse_groups[category]
-        else:
-            argparse_group = command_parser
-
-        if get_origin(field_type) == Literal:
-            allowed_values = get_args(field.type_)
-            allowed_types = set()
-            for val in allowed_values:
-                allowed_types.add(type(val))
-            allowed_types_list = list(allowed_types)
-            field_type = allowed_types_list[0] if len(allowed_types) == 1 else Union[allowed_types_list]  # type: ignore
-
-            argparse_group.add_argument(
-                f"--{name}",
-                dest=name,
-                type=field_type,
-                default=default,
-                choices=allowed_values,
-                help=field.field_info.description,
-            )
-
-        elif get_origin(field_type) == list:
-            argparse_group.add_argument(
-                f"--{name}",
-                dest=name,
-                nargs="*",
-                type=field.type_,
-                default=default,
-                action=argparse.BooleanOptionalAction if field.type_ == bool else "store",
-                help=field.field_info.description,
-            )
-        else:
-            argparse_group.add_argument(
-                f"--{name}",
-                dest=name,
-                type=field.type_,
-                default=default,
-                action=argparse.BooleanOptionalAction if field.type_ == bool else "store",
-                help=field.field_info.description,
-            )
-
-
-def _find_root() -> Path:
-    venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
-    if os.environ.get("INVOKEAI_ROOT"):
-        root = Path(os.environ["INVOKEAI_ROOT"])
-    elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]]):
-        root = (venv.parent).resolve()
-    else:
-        root = Path("~/invokeai").expanduser().resolve()
-    return root
 
 
 class InvokeAIAppConfig(InvokeAISettings):
@@ -378,6 +197,8 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     # fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
+
+    # WEB
     host                : str = Field(default="127.0.0.1", description="IP address to bind to", category='Web Server')
     port                : int = Field(default=9090, description="Port to bind to", category='Web Server')
     allow_origins       : List[str] = Field(default=[], description="Allowed CORS origins", category='Web Server')
@@ -385,20 +206,14 @@ class InvokeAIAppConfig(InvokeAISettings):
     allow_methods       : List[str] = Field(default=["*"], description="Methods allowed for CORS", category='Web Server')
     allow_headers       : List[str] = Field(default=["*"], description="Headers allowed for CORS", category='Web Server')
 
+    # FEATURES
     esrgan              : bool = Field(default=True, description="Enable/disable upscaling code", category='Features')
     internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models", category='Features')
     log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", category='Features')
     patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", category='Features')
+    ignore_missing_core_models : bool = Field(default=False, description='Ignore missing models in models/core/convert', category='Features')
 
-    always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
-    free_gpu_mem        : bool = Field(default=False, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
-    max_cache_size      : float = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching", category='Memory/Performance')
-    max_vram_cache_size : float = Field(default=2.75, ge=0, description="Amount of VRAM reserved for model storage", category='Memory/Performance')
-    precision           : Literal['auto', 'float16', 'float32', 'autocast'] = Field(default='auto', description='Floating point precision', category='Memory/Performance')
-    sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category='Memory/Performance')
-    xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
-    tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
-
+    # PATHS
     root                : Path = Field(default=None, description='InvokeAI runtime root directory', category='Paths')
     autoimport_dir      : Path = Field(default='autoimport', description='Path to a directory of models files to be imported on startup.', category='Paths')
     lora_dir            : Path = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', category='Paths')
@@ -409,16 +224,41 @@ class InvokeAIAppConfig(InvokeAISettings):
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
     db_dir              : Path = Field(default='databases', description='Path to InvokeAI databases directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
-    from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
-    ignore_missing_core_models : bool = Field(default=False, description='Ignore missing models in models/core/convert', category='Features')
+    from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
 
+    # LOGGING
     log_handlers        : List[str] = Field(default=["console"], description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>"', category="Logging")
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
     log_format          : Literal['plain', 'color', 'syslog', 'legacy'] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', category="Logging")
     log_level           : Literal["debug", "info", "warning", "error", "critical"] = Field(default="info", description="Emit logging messages at this level or  higher", category="Logging")
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", category="Other")
+
+    # CACHE
+    ram                 : Union[float, Literal["auto"]] = Field(default=6.0, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number or 'auto')", category="Model Cache", )
+    vram                : Union[float, Literal["auto"]] = Field(default=0.25, ge=0, description="Amount of VRAM reserved for model storage (floating point number or 'auto')", category="Model Cache", )
+    lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", category="Model Cache", )
+
+    # DEVICE
+    device              : Literal[tuple(["auto", "cpu", "cuda", "cuda:1", "mps"])] = Field(default="auto", description="Generation device", category="Device", )
+    precision: Literal[tuple(["auto", "float16", "float32", "autocast"])] = Field(default="auto", description="Floating point precision", category="Device", )
+
+    # GENERATION
+    sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", category="Generation", )
+    attention_type      : Literal[tuple(["auto", "normal", "xformers", "sliced", "torch-sdp"])] = Field(default="auto", description="Attention type", category="Generation", )
+    attention_slice_size: Literal[tuple(["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8])] = Field(default="auto", description='Slice size, valid when attention_type=="sliced"', category="Generation", )
+    force_tiled_decode: bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category="Generation",)
+
+    # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
+    always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", category='Memory/Performance')
+    free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", category='Memory/Performance')
+    max_cache_size      : Optional[float] = Field(default=None, gt=0, description="Maximum memory amount used by model cache for rapid switching", category='Memory/Performance')
+    max_vram_cache_size : Optional[float] = Field(default=None, ge=0, description="Amount of VRAM reserved for model storage", category='Memory/Performance')
+    xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", category='Memory/Performance')
+    tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", category='Memory/Performance')
+
+    # See InvokeAIAppConfig subclass below for CACHE and DEVICE categories
     # fmt: on
 
     class Config:
@@ -542,11 +382,6 @@ class InvokeAIAppConfig(InvokeAISettings):
         return self.precision == "float32"
 
     @property
-    def disable_xformers(self) -> bool:
-        """Return true if xformers_enabled is false"""
-        return not self.xformers_enabled
-
-    @property
     def try_patchmatch(self) -> bool:
         """Return true if patchmatch true"""
         return self.patchmatch
@@ -561,6 +396,27 @@ class InvokeAIAppConfig(InvokeAISettings):
         """invisible watermark node is always active and disabled from Web UIe"""
         return True
 
+    @property
+    def ram_cache_size(self) -> float:
+        return self.max_cache_size or self.ram
+
+    @property
+    def vram_cache_size(self) -> float:
+        return self.max_vram_cache_size or self.vram
+
+    @property
+    def use_cpu(self) -> bool:
+        return self.always_use_cpu or self.device == "cpu"
+
+    @property
+    def disable_xformers(self) -> bool:
+        """
+        Return true if enable_xformers is false (reversed logic)
+        and attention type is not set to xformers.
+        """
+        disabled_in_config = not self.xformers_enabled
+        return disabled_in_config and self.attention_type != "xformers"
+
     @staticmethod
     def find_root() -> Path:
         """
@@ -570,19 +426,19 @@ class InvokeAIAppConfig(InvokeAISettings):
         return _find_root()
 
 
-class PagingArgumentParser(argparse.ArgumentParser):
-    """
-    A custom ArgumentParser that uses pydoc to page its output.
-    It also supports reading defaults from an init file.
-    """
-
-    def print_help(self, file=None):
-        text = self.format_help()
-        pydoc.pager(text)
-
-
 def get_invokeai_config(**kwargs) -> InvokeAIAppConfig:
     """
     Legacy function which returns InvokeAIAppConfig.get_config()
     """
     return InvokeAIAppConfig.get_config(**kwargs)
+
+
+def _find_root() -> Path:
+    venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
+    if os.environ.get("INVOKEAI_ROOT"):
+        root = Path(os.environ["INVOKEAI_ROOT"])
+    elif any([(venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]]):
+        root = (venv.parent).resolve()
+    else:
+        root = Path("~/invokeai").expanduser().resolve()
+    return root
