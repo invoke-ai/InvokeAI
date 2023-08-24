@@ -254,10 +254,10 @@ class ModelInstall(ModelInstallBase):
         self.unregister(id)
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
-        search = ModelSearch()
-        search.model_found = self._scan_install if install else self._scan_register
+        callback = self._scan_install if install else self._scan_register
+        search = ModelSearch(on_model_found=callback)
         self._installed = set()
-        search.search([scan_dir])
+        search.search(scan_dir)
         return list(self._installed)
 
     def garbage_collect(self) -> List[str]:  # noqa D102

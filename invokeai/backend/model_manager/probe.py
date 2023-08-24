@@ -362,7 +362,7 @@ class LoRACheckpointProbe(CheckpointProbeBase):
         elif token_vector_length == 2048:
             return BaseModelType.StableDiffusionXL
         else:
-            raise InvalidModelException(f"Unknown LoRA type: {self.model}")
+            raise InvalidModelException(f"Unsupported LoRA type: {self.model}")
 
 
 class TextualInversionCheckpointProbe(CheckpointProbeBase):
