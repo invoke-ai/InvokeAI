@@ -1,15 +1,15 @@
-import { useState, PropsWithChildren, memo } from 'react';
-import { useSelector } from 'react-redux';
-import { createSelector } from '@reduxjs/toolkit';
-import { Flex, Image, Text } from '@chakra-ui/react';
-import { motion } from 'framer-motion';
-import { NodeProps } from 'reactflow';
-import NodeWrapper from '../common/NodeWrapper';
-import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import IAIDndImage from 'common/components/IAIDndImage';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import { stateSelector } from 'app/store/store';
+import { useState, PropsWithChildren, memo } from "react";
+import { useSelector } from "react-redux";
+import { createSelector } from "@reduxjs/toolkit";
+import { Flex, Image, Text } from "@chakra-ui/react";
+import { motion } from "framer-motion";
+import { NodeProps } from "reactflow";
+import NodeWrapper from "../common/NodeWrapper";
+import NextPrevImageButtons from "features/gallery/components/NextPrevImageButtons";
+import IAIDndImage from "common/components/IAIDndImage";
+import { IAINoContentFallback } from "common/components/IAIImageFallback";
+import { DRAG_HANDLE_CLASSNAME } from "features/nodes/types/constants";
+import { stateSelector } from "app/store/store";
 
 const selector = createSelector(stateSelector, ({ system, gallery }) => {
   const imageDTO = gallery.selection[gallery.selection.length - 1];
@@ -29,10 +29,10 @@ const CurrentImageNode = (props: NodeProps) => {
         <Image
           src={progressImage.dataURL}
           sx={{
-            w: 'full',
-            h: 'full',
-            objectFit: 'contain',
-            borderRadius: 'base',
+            w: "full",
+            h: "full",
+            objectFit: "contain",
+            borderRadius: "base",
           }}
         />
       </Wrapper>
@@ -68,31 +68,35 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
   };
 
   return (
-    <NodeWrapper nodeId={props.nodeProps.id} selected={props.nodeProps.selected} width={384}>
+    <NodeWrapper
+      nodeId={props.nodeProps.id}
+      selected={props.nodeProps.selected}
+      width={384}
+    >
       <Flex
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={DRAG_HANDLE_CLASSNAME}
         sx={{
-          position: 'relative',
-          flexDirection: 'column',
+          position: "relative",
+          flexDirection: "column",
         }}
       >
         <Flex
           layerStyle="nodeHeader"
           sx={{
-            borderTopRadius: 'base',
-            alignItems: 'center',
-            justifyContent: 'center',
+            borderTopRadius: "base",
+            alignItems: "center",
+            justifyContent: "center",
             h: 8,
           }}
         >
           <Text
             sx={{
-              fontSize: 'sm',
+              fontSize: "sm",
               fontWeight: 600,
-              color: 'base.700',
-              _dark: { color: 'base.200' },
+              color: "base.700",
+              _dark: { color: "base.200" },
             }}
           >
             Current Image
@@ -101,9 +105,9 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
         <Flex
           layerStyle="nodeBody"
           sx={{
-            w: 'full',
-            h: 'full',
-            borderBottomRadius: 'base',
+            w: "full",
+            h: "full",
+            borderBottomRadius: "base",
             p: 2,
           }}
         >
@@ -123,12 +127,12 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
                 transition: { duration: 0.1 },
               }}
               style={{
-                position: 'absolute',
+                position: "absolute",
                 top: 40,
                 left: -2,
                 right: -2,
                 bottom: 0,
-                pointerEvents: 'none',
+                pointerEvents: "none",
               }}
             >
               <NextPrevImageButtons />
