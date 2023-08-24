@@ -8,7 +8,7 @@ import {
 import {
   CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPAINT_GRAPH,
-  CANVAS_REFINE_DENOISE_LATENTS,
+  CANVAS_COHERENCE_DENOISE_LATENTS,
   CLIP_SKIP,
   LORA_LOADER,
   MAIN_MODEL_LOADER,
@@ -149,7 +149,7 @@ export const addLoRAsToGraph = (
             field: 'unet',
           },
           destination: {
-            node_id: CANVAS_REFINE_DENOISE_LATENTS,
+            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
             field: 'unet',
           },
         });
