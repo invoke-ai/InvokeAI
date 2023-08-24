@@ -1,21 +1,18 @@
 import {
-  ControlNetModelParam,
-  LoRAModelParam,
-  MainModelParam,
-  OnnxModelParam,
-  VaeModelParam,
+  SchedulerParam,
+  zBaseModel,
+  zMainOrOnnxModel,
+  zScheduler,
 } from 'features/parameters/types/parameterSchemas';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
-import { Edge, Node } from 'reactflow';
+import { Node } from 'reactflow';
+import { Graph, ImageDTO, _InputField, _OutputField } from 'services/api/types';
 import {
-  Graph,
-  ImageDTO,
-  ImageField,
-  _InputField,
-  _OutputField,
-} from 'services/api/types';
-import { AnyInvocationType, ProgressImage } from 'services/events/types';
+  AnyInvocationType,
+  AnyResult,
+  ProgressImage,
+} from 'services/events/types';
 import { O } from 'ts-toolbelt';
 import { z } from 'zod';
 
@@ -46,6 +43,10 @@ export type InvocationTemplate = {
    * Array of the invocation outputs
    */
   outputs: Record<string, OutputFieldTemplate>;
+  /**
+   * The type of this node's output
+   */
+  outputType: string; // TODO: generate a union of output types
 };
 
 export type FieldUIConfig = {
@@ -98,6 +99,7 @@ export const zFieldType = z.enum([
   // region Misc
   'FilePath',
   'enum',
+  'Scheduler',
   // endregion
 ]);
 
@@ -105,39 +107,6 @@ export type FieldType = z.infer<typeof zFieldType>;
 
 export const isFieldType = (value: unknown): value is FieldType =>
   zFieldType.safeParse(value).success;
-
-/**
- * An input field is persisted across reloads as part of the user's local state.
- *
- * An input field has three properties:
- * - `id` a unique identifier
- * - `name` the name of the field, which comes from the python dataclass
- * - `value` the field's value
- */
-export type InputFieldValue =
-  | IntegerInputFieldValue
-  | SeedInputFieldValue
-  | FloatInputFieldValue
-  | StringInputFieldValue
-  | BooleanInputFieldValue
-  | ImageInputFieldValue
-  | LatentsInputFieldValue
-  | ConditioningInputFieldValue
-  | UNetInputFieldValue
-  | ClipInputFieldValue
-  | VaeInputFieldValue
-  | ControlInputFieldValue
-  | EnumInputFieldValue
-  | MainModelInputFieldValue
-  | SDXLMainModelInputFieldValue
-  | SDXLRefinerModelInputFieldValue
-  | VaeModelInputFieldValue
-  | LoRAModelInputFieldValue
-  | ControlNetModelInputFieldValue
-  | CollectionInputFieldValue
-  | CollectionItemInputFieldValue
-  | ColorInputFieldValue
-  | ImageCollectionInputFieldValue;
 
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
@@ -167,7 +136,21 @@ export type InputFieldTemplate =
   | CollectionInputFieldTemplate
   | CollectionItemInputFieldTemplate
   | ColorInputFieldTemplate
-  | ImageCollectionInputFieldTemplate;
+  | ImageCollectionInputFieldTemplate
+  | SchedulerInputFieldTemplate;
+
+/**
+ * Indicates the kind of input(s) this field may have.
+ */
+export const zInputKind = z.enum(['connection', 'direct', 'any']);
+export type InputKind = z.infer<typeof zInputKind>;
+
+export const zFieldValueBase = z.object({
+  id: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  type: zFieldType,
+});
+export type FieldValueBase = z.infer<typeof zFieldValueBase>;
 
 /**
  * An output field is persisted across as part of the user's local state.
@@ -176,7 +159,11 @@ export type InputFieldTemplate =
  * - `id` a unique identifier
  * - `name` the name of the field, which comes from the python dataclass
  */
-export type OutputFieldValue = FieldValueBase & { fieldKind: 'output' };
+
+export const zOutputFieldValue = zFieldValueBase.extend({
+  fieldKind: z.literal('output'),
+});
+export type OutputFieldValue = z.infer<typeof zOutputFieldValue>;
 
 /**
  * An output field template is generated on each page load from the OpenAPI schema.
@@ -189,138 +176,309 @@ export type OutputFieldTemplate = {
   type: FieldType;
   title: string;
   description: string;
-};
+} & _OutputField;
 
-/**
- * Indicates the kind of input(s) this field may have.
- */
-export type InputKind = 'connection' | 'direct' | 'any';
+export const zInputFieldValueBase = zFieldValueBase.extend({
+  fieldKind: z.literal('input'),
+  label: z.string(),
+});
+export type InputFieldValueBase = z.infer<typeof zInputFieldValueBase>;
 
-export type FieldValueBase = {
-  id: string;
-  name: string;
-  type: FieldType;
-};
+export const zModelIdentifier = z.object({
+  model_name: z.string().trim().min(1),
+  base_model: zBaseModel,
+});
 
-export type InputFieldValueBase = FieldValueBase & {
-  fieldKind: 'input';
-  label: string;
-};
+export const zImageField = z.object({
+  image_name: z.string().trim().min(1),
+});
+export type ImageField = z.infer<typeof zImageField>;
 
-export type IntegerInputFieldValue = InputFieldValueBase & {
-  type: 'integer';
-  value?: number;
-};
+export const zLatentsField = z.object({
+  latents_name: z.string().trim().min(1),
+  seed: z.number().int().optional(),
+});
+export type LatentsField = z.infer<typeof zLatentsField>;
 
-export type FloatInputFieldValue = InputFieldValueBase & {
-  type: 'float';
-  value?: number;
-};
+export const zConditioningField = z.object({
+  conditioning_name: z.string().trim().min(1),
+});
+export type ConditioningField = z.infer<typeof zConditioningField>;
 
-export type SeedInputFieldValue = InputFieldValueBase & {
-  type: 'Seed';
-  value?: number;
-};
+export const zIntegerInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('integer'),
+  value: z.number().optional(),
+});
+export type IntegerInputFieldValue = z.infer<typeof zIntegerInputFieldValue>;
 
-export type StringInputFieldValue = InputFieldValueBase & {
-  type: 'string';
-  value?: string;
-};
+export const zFloatInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('float'),
+  value: z.number().optional(),
+});
+export type FloatInputFieldValue = z.infer<typeof zFloatInputFieldValue>;
 
-export type BooleanInputFieldValue = InputFieldValueBase & {
-  type: 'boolean';
-  value?: boolean;
-};
+export const zStringInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('string'),
+  value: z.string().optional(),
+});
+export type StringInputFieldValue = z.infer<typeof zStringInputFieldValue>;
 
-export type EnumInputFieldValue = InputFieldValueBase & {
-  type: 'enum';
-  value?: number | string;
-};
+export const zBooleanInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('boolean'),
+  value: z.boolean().optional(),
+});
+export type BooleanInputFieldValue = z.infer<typeof zBooleanInputFieldValue>;
 
-export type LatentsInputFieldValue = InputFieldValueBase & {
-  type: 'LatentsField';
-  value?: undefined;
-};
+export const zEnumInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('enum'),
+  value: z.union([z.string(), z.number()]).optional(),
+});
+export type EnumInputFieldValue = z.infer<typeof zEnumInputFieldValue>;
 
-export type ConditioningInputFieldValue = InputFieldValueBase & {
-  type: 'ConditioningField';
-  value?: string;
-};
+export const zLatentsInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('LatentsField'),
+  value: zLatentsField.optional(),
+});
+export type LatentsInputFieldValue = z.infer<typeof zLatentsInputFieldValue>;
 
-export type ControlInputFieldValue = InputFieldValueBase & {
-  type: 'ControlField';
-  value?: undefined;
-};
+export const zConditioningInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('ConditioningField'),
+  value: zConditioningField.optional(),
+});
+export type ConditioningInputFieldValue = z.infer<
+  typeof zConditioningInputFieldValue
+>;
 
-export type UNetInputFieldValue = InputFieldValueBase & {
-  type: 'UNetField';
-  value?: undefined;
-};
+export const zControlNetModel = zModelIdentifier;
+export type ControlNetModel = z.infer<typeof zControlNetModel>;
 
-export type ClipInputFieldValue = InputFieldValueBase & {
-  type: 'ClipField';
-  value?: undefined;
-};
+export const zControlField = zInputFieldValueBase.extend({
+  image: zImageField,
+  control_model: zControlNetModel,
+  control_weight: z.union([z.number(), z.array(z.number())]).optional(),
+  begin_step_percent: z.number().optional(),
+  end_step_percent: z.number().optional(),
+  control_mode: z
+    .enum(['balanced', 'more_prompt', 'more_control', 'unbalanced'])
+    .optional(),
+  resize_mode: z
+    .enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple'])
+    .optional(),
+});
+export type ControlField = z.infer<typeof zControlField>;
 
-export type VaeInputFieldValue = InputFieldValueBase & {
-  type: 'VaeField';
-  value?: undefined;
-};
+export const zControlInputFieldTemplate = zInputFieldValueBase.extend({
+  type: z.literal('ControlField'),
+  value: zControlField.optional(),
+});
+export type ControlInputFieldValue = z.infer<typeof zControlInputFieldTemplate>;
 
-export type ImageInputFieldValue = InputFieldValueBase & {
-  type: 'ImageField';
-  value?: ImageField;
-};
+export const zModelType = z.enum([
+  'onnx',
+  'main',
+  'vae',
+  'lora',
+  'controlnet',
+  'embedding',
+]);
+export type ModelType = z.infer<typeof zModelType>;
 
-export type ImageCollectionInputFieldValue = InputFieldValueBase & {
-  type: 'ImageCollection';
-  value?: ImageField[];
-};
+export const zSubModelType = z.enum([
+  'unet',
+  'text_encoder',
+  'text_encoder_2',
+  'tokenizer',
+  'tokenizer_2',
+  'vae',
+  'vae_decoder',
+  'vae_encoder',
+  'scheduler',
+  'safety_checker',
+]);
+export type SubModelType = z.infer<typeof zSubModelType>;
 
-export type MainModelInputFieldValue = InputFieldValueBase & {
-  type: 'MainModelField';
-  value?: MainModelParam | OnnxModelParam;
-};
+export const zModelInfo = zModelIdentifier.extend({
+  model_type: zModelType,
+  submodel: zSubModelType.optional(),
+});
+export type ModelInfo = z.infer<typeof zModelInfo>;
 
-export type SDXLMainModelInputFieldValue = InputFieldValueBase & {
-  type: 'SDXLMainModelField';
-  value?: MainModelParam | OnnxModelParam;
-};
+export const zLoraInfo = zModelInfo.extend({
+  weight: z.number().optional(),
+});
+export type LoraInfo = z.infer<typeof zLoraInfo>;
 
-export type SDXLRefinerModelInputFieldValue = InputFieldValueBase & {
-  type: 'SDXLRefinerModelField';
-  value?: MainModelParam | OnnxModelParam;
-};
+export const zUNetField = z.object({
+  unet: zModelInfo,
+  scheduler: zModelInfo,
+  loras: z.array(zLoraInfo),
+});
+export type UNetField = z.infer<typeof zUNetField>;
 
-export type VaeModelInputFieldValue = InputFieldValueBase & {
-  type: 'VaeModelField';
-  value?: VaeModelParam;
-};
+export const zUNetInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('UNetField'),
+  value: zUNetField.optional(),
+});
+export type UNetInputFieldValue = z.infer<typeof zUNetInputFieldValue>;
 
-export type LoRAModelInputFieldValue = InputFieldValueBase & {
-  type: 'LoRAModelField';
-  value?: LoRAModelParam;
-};
+export const zClipField = z.object({
+  tokenizer: zModelInfo,
+  text_encoder: zModelInfo,
+  skipped_layers: z.number(),
+  loras: z.array(zLoraInfo),
+});
+export type ClipField = z.infer<typeof zClipField>;
 
-export type ControlNetModelInputFieldValue = InputFieldValueBase & {
-  type: 'ControlNetModelField';
-  value?: ControlNetModelParam;
-};
+export const zClipInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('ClipField'),
+  value: zClipField.optional(),
+});
+export type ClipInputFieldValue = z.infer<typeof zClipInputFieldValue>;
 
-export type CollectionInputFieldValue = InputFieldValueBase & {
-  type: 'Collection';
-  value?: (string | number)[];
-};
+export const zVaeField = z.object({
+  vae: zModelInfo,
+});
+export type VaeField = z.infer<typeof zVaeField>;
 
-export type CollectionItemInputFieldValue = InputFieldValueBase & {
-  type: 'CollectionItem';
-  value?: undefined;
-};
+export const zVaeInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('VaeField'),
+  value: zVaeField.optional(),
+});
+export type VaeInputFieldValue = z.infer<typeof zVaeInputFieldValue>;
 
-export type ColorInputFieldValue = InputFieldValueBase & {
-  type: 'ColorField';
-  value?: RgbaColor;
-};
+export const zImageInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('ImageField'),
+  value: zImageField.optional(),
+});
+export type ImageInputFieldValue = z.infer<typeof zImageInputFieldValue>;
+
+export const zImageCollectionInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('ImageCollection'),
+  value: z.array(zImageField).optional(),
+});
+export type ImageCollectionInputFieldValue = z.infer<
+  typeof zImageCollectionInputFieldValue
+>;
+
+export const zMainModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('MainModelField'),
+  value: zMainOrOnnxModel.optional(),
+});
+export type MainModelInputFieldValue = z.infer<
+  typeof zMainModelInputFieldValue
+>;
+
+export const zSDXLMainModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('SDXLMainModelField'),
+  value: zMainOrOnnxModel.optional(),
+});
+export type SDXLMainModelInputFieldValue = z.infer<
+  typeof zSDXLMainModelInputFieldValue
+>;
+
+export const zSDXLRefinerModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('SDXLRefinerModelField'),
+  value: zMainOrOnnxModel.optional(), // TODO: should narrow this down to a refiner model
+});
+export type SDXLRefinerModelInputFieldValue = z.infer<
+  typeof zSDXLRefinerModelInputFieldValue
+>;
+
+export const zVaeModelField = zModelIdentifier;
+
+export const zVaeModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('VaeModelField'),
+  value: zVaeModelField.optional(),
+});
+export type VaeModelInputFieldValue = z.infer<typeof zVaeModelInputFieldValue>;
+
+export const zLoRAModelField = zModelIdentifier;
+export type LoRAModelField = z.infer<typeof zLoRAModelField>;
+
+export const zLoRAModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('LoRAModelField'),
+  value: zLoRAModelField.optional(),
+});
+export type LoRAModelInputFieldValue = z.infer<
+  typeof zLoRAModelInputFieldValue
+>;
+
+export const zControlNetModelField = zModelIdentifier;
+export type ControlNetModelField = z.infer<typeof zControlNetModelField>;
+
+export const zControlNetModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('ControlNetModelField'),
+  value: zControlNetModelField.optional(),
+});
+export type ControlNetModelInputFieldValue = z.infer<
+  typeof zControlNetModelInputFieldValue
+>;
+
+export const zCollectionInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('Collection'),
+  value: z.array(z.any()).optional(), // TODO: should this field ever have a value?
+});
+export type CollectionInputFieldValue = z.infer<
+  typeof zCollectionInputFieldValue
+>;
+
+export const zCollectionItemInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('CollectionItem'),
+  value: z.any().optional(), // TODO: should this field ever have a value?
+});
+export type CollectionItemInputFieldValue = z.infer<
+  typeof zCollectionItemInputFieldValue
+>;
+
+export const zColorField = z.object({
+  r: z.number().int().min(0).max(255),
+  g: z.number().int().min(0).max(255),
+  b: z.number().int().min(0).max(255),
+  a: z.number().int().min(0).max(255),
+});
+export type ColorField = z.infer<typeof zColorField>;
+
+export const zColorInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('ColorField'),
+  value: zColorField.optional(),
+});
+export type ColorInputFieldValue = z.infer<typeof zColorInputFieldValue>;
+
+export const zSchedulerInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('Scheduler'),
+  value: zScheduler.optional(),
+});
+export type SchedulerInputFieldValue = z.infer<
+  typeof zSchedulerInputFieldValue
+>;
+
+export const zInputFieldValue = z.discriminatedUnion('type', [
+  zIntegerInputFieldValue,
+  zFloatInputFieldValue,
+  zStringInputFieldValue,
+  zBooleanInputFieldValue,
+  zImageInputFieldValue,
+  zLatentsInputFieldValue,
+  zConditioningInputFieldValue,
+  zUNetInputFieldValue,
+  zClipInputFieldValue,
+  zVaeInputFieldValue,
+  zControlInputFieldTemplate,
+  zEnumInputFieldValue,
+  zMainModelInputFieldValue,
+  zSDXLMainModelInputFieldValue,
+  zSDXLRefinerModelInputFieldValue,
+  zVaeModelInputFieldValue,
+  zLoRAModelInputFieldValue,
+  zControlNetModelInputFieldValue,
+  zCollectionInputFieldValue,
+  zCollectionItemInputFieldValue,
+  zColorInputFieldValue,
+  zImageCollectionInputFieldValue,
+  zSchedulerInputFieldValue,
+]);
+
+export type InputFieldValue = z.infer<typeof zInputFieldValue>;
 
 export type InputFieldTemplateBase = {
   name: string;
@@ -456,6 +614,11 @@ export type ColorInputFieldTemplate = InputFieldTemplateBase & {
   type: 'ColorField';
 };
 
+export type SchedulerInputFieldTemplate = InputFieldTemplateBase & {
+  default: SchedulerParam;
+  type: 'Scheduler';
+};
+
 export const isInputFieldValue = (
   field?: InputFieldValue | OutputFieldValue
 ): field is InputFieldValue => Boolean(field && field.fieldKind === 'input');
@@ -475,11 +638,8 @@ export type TypeHints = {
 
 export type InvocationSchemaExtra = {
   output: OpenAPIV3.ReferenceObject; // the output of the invocation
-  ui?: {
-    tags?: string[];
-    title?: string;
-  };
   title: string;
+  tags?: string[];
   properties: Omit<
     NonNullable<OpenAPIV3.SchemaObject['properties']> &
       (_InputField | _OutputField),
@@ -501,6 +661,19 @@ export type InvocationBaseSchemaObject = Omit<
 > &
   InvocationSchemaExtra;
 
+export type InvocationOutputSchemaObject = Omit<
+  OpenAPIV3.SchemaObject,
+  'properties'
+> & {
+  properties: OpenAPIV3.SchemaObject['properties'] & {
+    type: Omit<OpenAPIV3.SchemaObject, 'default'> & {
+      default: string;
+    };
+  } & {
+    class: 'output';
+  };
+};
+
 export type InvocationFieldSchema = OpenAPIV3.SchemaObject & _InputField;
 
 export interface ArraySchemaObject extends InvocationBaseSchemaObject {
@@ -511,11 +684,30 @@ export interface NonArraySchemaObject extends InvocationBaseSchemaObject {
   type?: OpenAPIV3.NonArraySchemaObjectType;
 }
 
-export type InvocationSchemaObject = ArraySchemaObject | NonArraySchemaObject;
+export type InvocationSchemaObject = (
+  | ArraySchemaObject
+  | NonArraySchemaObject
+) & { class: 'invocation' };
+
+export const isSchemaObject = (
+  obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
+): obj is OpenAPIV3.SchemaObject => !('$ref' in obj);
 
 export const isInvocationSchemaObject = (
-  obj: OpenAPIV3.ReferenceObject | InvocationSchemaObject
-): obj is InvocationSchemaObject => !('$ref' in obj);
+  obj:
+    | OpenAPIV3.ReferenceObject
+    | OpenAPIV3.SchemaObject
+    | InvocationSchemaObject
+): obj is InvocationSchemaObject =>
+  'class' in obj && obj.class === 'invocation';
+
+export const isInvocationOutputSchemaObject = (
+  obj:
+    | OpenAPIV3.ReferenceObject
+    | OpenAPIV3.SchemaObject
+    | InvocationOutputSchemaObject
+): obj is InvocationOutputSchemaObject =>
+  'class' in obj && obj.class === 'output';
 
 export const isInvocationFieldSchema = (
   obj: OpenAPIV3.ReferenceObject | OpenAPIV3.SchemaObject
@@ -523,23 +715,25 @@ export const isInvocationFieldSchema = (
 
 export type InvocationEdgeExtra = { type: 'default' | 'collapsed' };
 
-export const zInputFieldValue = z.object({
-  id: z.string().trim().min(1),
-  name: z.string().trim().min(1),
-  type: zFieldType,
-  label: z.string(),
-  isExposed: z.boolean(),
-});
-
 export const zInvocationNodeData = z.object({
   id: z.string().trim().min(1),
+  // no easy way to build this dynamically, and we don't want to anyways, because this will be used
+  // to validate incoming workflows, and we want to allow community nodes.
   type: z.string().trim().min(1),
-  inputs: z.record(z.any()),
-  outputs: z.record(z.any()),
+  inputs: z.record(zInputFieldValue),
+  outputs: z.record(zOutputFieldValue),
   label: z.string(),
   isOpen: z.boolean(),
   notes: z.string(),
 });
+
+// Massage this to get better type safety while developing
+export type InvocationNodeData = Omit<
+  z.infer<typeof zInvocationNodeData>,
+  'type'
+> & {
+  type: AnyInvocationType;
+};
 
 export const zNotesNodeData = z.object({
   id: z.string().trim().min(1),
@@ -549,75 +743,83 @@ export const zNotesNodeData = z.object({
   notes: z.string(),
 });
 
+export type NotesNodeData = z.infer<typeof zNotesNodeData>;
+
+export const zWorkflowInvocationNode = z.object({
+  id: z.string().trim().min(1),
+  type: z.literal('invocation'),
+  data: zInvocationNodeData,
+  width: z.number().gt(0),
+  height: z.number().gt(0),
+  position: z.object({
+    x: z.number(),
+    y: z.number(),
+  }),
+});
+
+export const zWorkflowNotesNode = z.object({
+  id: z.string().trim().min(1),
+  type: z.literal('notes'),
+  data: zNotesNodeData,
+  width: z.number().gt(0),
+  height: z.number().gt(0),
+  position: z.object({
+    x: z.number(),
+    y: z.number(),
+  }),
+});
+
+export const zWorkflowNode = z.discriminatedUnion('type', [
+  zWorkflowInvocationNode,
+  zWorkflowNotesNode,
+]);
+
+export type WorkflowNode = z.infer<typeof zWorkflowNode>;
+
+export const zWorkflowEdge = z.object({
+  source: z.string().trim().min(1),
+  sourceHandle: z.string().trim().min(1),
+  target: z.string().trim().min(1),
+  targetHandle: z.string().trim().min(1),
+  id: z.string().trim().min(1),
+  type: z.enum(['default', 'collapsed']),
+});
+
+export const zFieldIdentifier = z.object({
+  nodeId: z.string().trim().min(1),
+  fieldName: z.string().trim().min(1),
+});
+
+export type FieldIdentifier = z.infer<typeof zFieldIdentifier>;
+
+export const zSemVer = z.string().refine((val) => {
+  const [major, minor, patch] = val.split('.');
+  return (
+    major !== undefined &&
+    minor !== undefined &&
+    patch !== undefined &&
+    Number.isInteger(Number(major)) &&
+    Number.isInteger(Number(minor)) &&
+    Number.isInteger(Number(patch))
+  );
+});
+
+export type SemVer = z.infer<typeof zSemVer>;
+
 export const zWorkflow = z.object({
-  name: z.string().trim().min(1),
+  name: z.string(),
   author: z.string(),
   description: z.string(),
   version: z.string(),
   contact: z.string(),
   tags: z.string(),
   notes: z.string(),
-  nodes: z.array(
-    z.object({
-      id: z.string().trim().min(1),
-      type: z.string().trim().min(1),
-      data: z.union([zInvocationNodeData, zNotesNodeData]),
-      width: z.number().gt(0),
-      height: z.number().gt(0),
-      position: z.object({
-        x: z.number(),
-        y: z.number(),
-      }),
-    })
-  ),
-  edges: z.array(
-    z.object({
-      source: z.string().trim().min(1),
-      sourceHandle: z.string().trim().min(1),
-      target: z.string().trim().min(1),
-      targetHandle: z.string().trim().min(1),
-      id: z.string().trim().min(1),
-      type: z.string().trim().min(1),
-    })
-  ),
+  nodes: z.array(zWorkflowNode),
+  edges: z.array(zWorkflowEdge),
+  exposedFields: z.array(zFieldIdentifier),
 });
 
-export type Workflow = {
-  name: string;
-  author: string;
-  description: string;
-  version: string;
-  contact: string;
-  tags: string;
-  notes: string;
-  nodes: Pick<
-    Node<InvocationNodeData | NotesNodeData>,
-    'id' | 'type' | 'data' | 'width' | 'height' | 'position'
-  >[];
-  edges: Pick<
-    Edge<InvocationEdgeExtra>,
-    'source' | 'sourceHandle' | 'target' | 'targetHandle' | 'id' | 'type'
-  >[];
-  exposedFields: FieldIdentifier[];
-};
-
-export type InvocationNodeData = {
-  id: string;
-  type: AnyInvocationType;
-  inputs: Record<string, InputFieldValue>;
-  outputs: Record<string, OutputFieldValue>;
-  label: string;
-  isOpen: boolean;
-  notes: string;
-};
-
-export type NotesNodeData = {
-  id: string;
-  type: 'notes';
-  label: string;
-  notes: string;
-  isOpen: boolean;
-};
+export type Workflow = z.infer<typeof zWorkflow>;
 
 export type CurrentImageNodeData = {
   id: string;
@@ -658,13 +860,19 @@ export enum NodeStatus {
 }
 
 export type NodeExecutionState = {
+  nodeId: string;
   status: NodeStatus;
   progress: number | null;
   progressImage: ProgressImage | null;
   error: string | null;
+  outputs: AnyResult[];
 };
 
-export type FieldIdentifier = {
+export type FieldComponentProps<
+  V extends InputFieldValue,
+  T extends InputFieldTemplate,
+> = {
   nodeId: string;
-  fieldName: string;
+  field: V;
+  fieldTemplate: T;
 };

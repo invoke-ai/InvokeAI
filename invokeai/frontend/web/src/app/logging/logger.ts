@@ -9,7 +9,7 @@ export const log = Roarr.child(BASE_CONTEXT);
 
 export const $logger = atom<Logger>(Roarr.child(BASE_CONTEXT));
 
-type LoggerNamespace =
+export type LoggerNamespace =
   | 'images'
   | 'models'
   | 'config'

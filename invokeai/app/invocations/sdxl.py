@@ -37,7 +37,7 @@ class SDXLRefinerModelLoaderOutput(BaseInvocationOutput):
     vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
-@title("SDXL Main Model Loader")
+@title("SDXL Main Model")
 @tags("model", "sdxl")
 class SDXLModelLoaderInvocation(BaseInvocation):
     """Loads an sdxl base model, outputting its submodels."""
@@ -122,7 +122,7 @@ class SDXLModelLoaderInvocation(BaseInvocation):
         )
 
 
-@title("SDXL Refiner Model Loader")
+@title("SDXL Refiner Model")
 @tags("model", "sdxl", "refiner")
 class SDXLRefinerModelLoaderInvocation(BaseInvocation):
     """Loads an sdxl refiner model, outputting its submodels."""

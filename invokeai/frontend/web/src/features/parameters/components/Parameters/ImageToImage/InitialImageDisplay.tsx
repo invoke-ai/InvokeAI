@@ -6,7 +6,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { FaUndo, FaUpload } from 'react-icons/fa';
 import InitialImage from './InitialImage';
 import { PostUploadAction } from 'services/api/types';
@@ -40,7 +40,7 @@ const InitialImageDisplay = () => {
 
   return (
     <Flex
-      layerStyle={'first'}
+      layerStyle="first"
       sx={{
         position: 'relative',
         flexDirection: 'column',
@@ -49,7 +49,7 @@ const InitialImageDisplay = () => {
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 'base',
-        p: 4,
+        p: 2,
         gap: 4,
       }}
     >
@@ -64,6 +64,7 @@ const InitialImageDisplay = () => {
       >
         <Text
           sx={{
+            ps: 2,
             fontWeight: 600,
             userSelect: 'none',
             color: 'base.700',
@@ -76,14 +77,14 @@ const InitialImageDisplay = () => {
         </Text>
         <Spacer />
         <IAIIconButton
-          tooltip={'Upload Initial Image'}
-          aria-label={'Upload Initial Image'}
+          tooltip="Upload Initial Image"
+          aria-label="Upload Initial Image"
           icon={<FaUpload />}
           {...getUploadButtonProps()}
         />
         <IAIIconButton
-          tooltip={'Reset Initial Image'}
-          aria-label={'Reset Initial Image'}
+          tooltip="Reset Initial Image"
+          aria-label="Reset Initial Image"
           icon={<FaUndo />}
           onClick={handleReset}
           isDisabled={isResetButtonDisabled}
@@ -95,4 +96,4 @@ const InitialImageDisplay = () => {
   );
 };
 
-export default InitialImageDisplay;
+export default memo(InitialImageDisplay);

@@ -1,6 +1,6 @@
 import { Box, chakra, Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import {
   canvasSelector,
@@ -9,7 +9,7 @@ import {
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Vector2d } from 'konva/lib/types';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { Layer, Stage } from 'react-konva';
 import useCanvasDragMove from '../hooks/useCanvasDragMove';
 import useCanvasHotkeys from '../hooks/useCanvasHotkeys';
@@ -18,6 +18,7 @@ import useCanvasMouseMove from '../hooks/useCanvasMouseMove';
 import useCanvasMouseOut from '../hooks/useCanvasMouseOut';
 import useCanvasMouseUp from '../hooks/useCanvasMouseUp';
 import useCanvasWheel from '../hooks/useCanvasZoom';
+import { canvasResized } from '../store/canvasSlice';
 import {
   setCanvasBaseLayer,
   setCanvasStage,
@@ -106,7 +107,8 @@ const IAICanvas = () => {
     shouldAntialias,
   } = useAppSelector(selector);
   useCanvasHotkeys();
-
+  const dispatch = useAppDispatch();
+  const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const canvasBaseLayerRef = useRef<Konva.Layer | null>(null);
 
@@ -137,8 +139,30 @@ const IAICanvas = () => {
   const { handleDragStart, handleDragMove, handleDragEnd } =
     useCanvasDragMove();
 
+  useEffect(() => {
+    if (!containerRef.current) {
+      return;
+    }
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentBoxSize) {
+          const { width, height } = entry.contentRect;
+          dispatch(canvasResized({ width, height }));
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [dispatch]);
+
   return (
     <Flex
+      id="canvas-container"
+      ref={containerRef}
       sx={{
         position: 'relative',
         height: '100%',
@@ -146,13 +170,18 @@ const IAICanvas = () => {
         borderRadius: 'base',
       }}
     >
-      <Box sx={{ position: 'relative' }}>
+      <Box
+        sx={{
+          position: 'absolute',
+          // top: 0,
+          // insetInlineStart: 0,
+        }}
+      >
         <ChakraStage
           tabIndex={-1}
           ref={canvasStageRefCallback}
           sx={{
             outline: 'none',
-            // boxShadow: '0px 0px 0px 1px var(--border-color-light)',
             overflow: 'hidden',
             cursor: stageCursor ? stageCursor : undefined,
             canvas: {
@@ -213,11 +242,11 @@ const IAICanvas = () => {
             />
           </Layer>
         </ChakraStage>
-        <IAICanvasStatusText />
-        <IAICanvasStagingAreaToolbar />
       </Box>
+      <IAICanvasStatusText />
+      <IAICanvasStagingAreaToolbar />
     </Flex>
   );
 };
 
-export default IAICanvas;
+export default memo(IAICanvas);

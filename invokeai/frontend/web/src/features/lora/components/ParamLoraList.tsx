@@ -5,6 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { map } from 'lodash-es';
 import ParamLora from './ParamLora';
+import { memo } from 'react';
 
 const selector = createSelector(
   stateSelector,
@@ -29,4 +30,4 @@ const ParamLoraList = () => {
   );
 };
 
-export default ParamLoraList;
+export default memo(ParamLoraList);

@@ -17,8 +17,8 @@ from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED, BUTTON3_CLICKED
 
 # minimum size for UIs
-MIN_COLS = 130
-MIN_LINES = 38
+MIN_COLS = 150
+MIN_LINES = 40
 
 
 class WindowTooSmallException(Exception):
@@ -277,6 +277,9 @@ class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
     def h_cursor_line_right(self, ch):
         self.h_exit_down("bye bye")
 
+    def h_cursor_line_left(self, ch):
+        self.h_exit_up("bye bye")
+
 
 class TextBoxInner(npyscreen.MultiLineEdit):
     def __init__(self, *args, **kwargs):
@@ -323,55 +326,6 @@ class TextBoxInner(npyscreen.MultiLineEdit):
         mouse_id, rel_x, rel_y, z, bstate = self.interpret_mouse_event(mouse_event)
         if bstate & (BUTTON2_CLICKED | BUTTON3_CLICKED):
             self.h_paste()
-
-    # def update(self, clear=True):
-    #     if clear:
-    #         self.clear()
-
-    #     HEIGHT = self.height
-    #     WIDTH = self.width
-    #     # draw box.
-    #     self.parent.curses_pad.hline(self.rely, self.relx, curses.ACS_HLINE, WIDTH)
-    #     self.parent.curses_pad.hline(
-    #         self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH
-    #     )
-    #     self.parent.curses_pad.vline(
-    #         self.rely, self.relx, curses.ACS_VLINE, self.height
-    #     )
-    #     self.parent.curses_pad.vline(
-    #         self.rely, self.relx + WIDTH, curses.ACS_VLINE, HEIGHT
-    #     )
-
-    # # draw corners
-    # self.parent.curses_pad.addch(
-    #     self.rely,
-    #     self.relx,
-    #     curses.ACS_ULCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely,
-    #     self.relx + WIDTH,
-    #     curses.ACS_URCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely + HEIGHT,
-    #     self.relx,
-    #     curses.ACS_LLCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely + HEIGHT,
-    #     self.relx + WIDTH,
-    #     curses.ACS_LRCORNER,
-    # )
-
-    # # fool our superclass into thinking drawing area is smaller - this is really hacky but it seems to work
-    # (relx, rely, height, width) = (self.relx, self.rely, self.height, self.width)
-    # self.relx += 1
-    # self.rely += 1
-    # self.height -= 1
-    # self.width -= 1
-    # super().update(clear=False)
-    # (self.relx, self.rely, self.height, self.width) = (relx, rely, height, width)
 
 
 class TextBox(npyscreen.BoxTitle):

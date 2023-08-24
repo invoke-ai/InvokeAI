@@ -21,7 +21,9 @@ export default function ParamMaskBlurMethod() {
   const { t } = useTranslation();
 
   const handleMaskBlurMethodChange = (v: string | null) => {
-    if (!v) return;
+    if (!v) {
+      return;
+    }
     dispatch(setMaskBlurMethod(v as MaskBlurMethods));
   };
 
