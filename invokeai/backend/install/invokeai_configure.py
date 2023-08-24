@@ -51,6 +51,7 @@ from invokeai.frontend.install.model_install import addModelsForm, process_and_e
 # TO DO - Move all the frontend code into invokeai.frontend.install
 from invokeai.frontend.install.widgets import (
     SingleSelectColumns,
+    SingleSelectColumnsSimple,
     MultiSelectColumns,
     CenteredButtonPress,
     FileBox,
@@ -384,7 +385,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.nextrely -= 2
         self.precision = self.add_widget_intelligent(
-            SingleSelectColumns,
+            SingleSelectColumnsSimple,
             columns=len(PRECISION_CHOICES),
             name="Precision",
             values=PRECISION_CHOICES,
@@ -405,7 +406,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.nextrely -= 2
         self.device = self.add_widget_intelligent(
-            SingleSelectColumns,
+            SingleSelectColumnsSimple,
             columns=len(DEVICE_CHOICES),
             values=DEVICE_CHOICES,
             value=DEVICE_CHOICES.index(device),
@@ -425,7 +426,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.nextrely -= 2
         self.attention_type = self.add_widget_intelligent(
-            SingleSelectColumns,
+            SingleSelectColumnsSimple,
             columns=len(ATTENTION_CHOICES),
             values=ATTENTION_CHOICES,
             value=ATTENTION_CHOICES.index(attention_type),
@@ -447,7 +448,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.nextrely -= 2
         self.attention_slice_size = self.add_widget_intelligent(
-            SingleSelectColumns,
+            SingleSelectColumnsSimple,
             columns=len(ATTENTION_SLICE_CHOICES),
             values=ATTENTION_SLICE_CHOICES,
             value=ATTENTION_SLICE_CHOICES.index(attention_slice_size),
