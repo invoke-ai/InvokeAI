@@ -126,12 +126,9 @@ export interface CanvasState {
   boundingBoxScaleMethod: BoundingBoxScale;
   brushColor: RgbaColor;
   brushSize: number;
-  canvasContainerDimensions: Dimensions;
   colorPickerColor: RgbaColor;
   cursorPosition: Vector2d | null;
-  doesCanvasNeedScaling: boolean;
   futureLayerStates: CanvasLayerState[];
-  isCanvasInitialized: boolean;
   isDrawing: boolean;
   isMaskEnabled: boolean;
   isMouseOverBoundingBox: boolean;

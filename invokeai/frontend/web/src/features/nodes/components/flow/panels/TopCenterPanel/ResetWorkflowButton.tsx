@@ -6,6 +6,7 @@ import {
   AlertDialogHeader,
   AlertDialogOverlay,
   Button,
+  Flex,
   Text,
   useDisclosure,
 } from '@chakra-ui/react';
@@ -19,7 +20,7 @@ import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 
-const ClearGraphButton = () => {
+const ResetWorkflowButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -48,10 +49,11 @@ const ClearGraphButton = () => {
     <>
       <IAIIconButton
         icon={<FaTrash />}
-        tooltip={t('nodes.clearGraph')}
-        aria-label={t('nodes.clearGraph')}
+        tooltip={t('nodes.resetWorkflow')}
+        aria-label={t('nodes.resetWorkflow')}
         onClick={onOpen}
         isDisabled={!nodesCount}
+        colorScheme="error"
       />
 
       <AlertDialog
@@ -64,18 +66,21 @@ const ClearGraphButton = () => {
 
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            {t('nodes.clearGraph')}
+            {t('nodes.resetWorkflow')}
           </AlertDialogHeader>
 
-          <AlertDialogBody>
-            <Text>{t('nodes.clearGraphDesc')}</Text>
+          <AlertDialogBody py={4}>
+            <Flex flexDir="column" gap={2}>
+              <Text>{t('nodes.resetWorkflowDesc')}</Text>
+              <Text variant="subtext">{t('nodes.resetWorkflowDesc2')}</Text>
+            </Flex>
           </AlertDialogBody>
 
           <AlertDialogFooter>
             <Button ref={cancelRef} onClick={onClose}>
               {t('common.cancel')}
             </Button>
-            <Button colorScheme="red" ml={3} onClick={handleConfirmClear}>
+            <Button colorScheme="error" ml={3} onClick={handleConfirmClear}>
               {t('common.accept')}
             </Button>
           </AlertDialogFooter>
@@ -85,4 +90,4 @@ const ClearGraphButton = () => {
   );
 };
 
-export default memo(ClearGraphButton);
+export default memo(ResetWorkflowButton);

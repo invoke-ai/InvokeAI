@@ -4,13 +4,16 @@ import {
   useColorModeValue,
   useToken,
 } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   DRAG_HANDLE_CLASSNAME,
   NODE_WIDTH,
 } from 'features/nodes/types/constants';
+import { NodeStatus } from 'features/nodes/types/types';
 import { contextMenusClosed } from 'features/ui/store/uiSlice';
-import { PropsWithChildren, memo, useCallback } from 'react';
+import { PropsWithChildren, memo, useCallback, useMemo } from 'react';
 
 type NodeWrapperProps = PropsWithChildren & {
   nodeId: string;
@@ -19,25 +22,42 @@ type NodeWrapperProps = PropsWithChildren & {
 };
 
 const NodeWrapper = (props: NodeWrapperProps) => {
-  const { width, children, selected } = props;
+  const { nodeId, width, children, selected } = props;
+
+  const selectIsInProgress = useMemo(
+    () =>
+      createSelector(
+        stateSelector,
+        ({ nodes }) =>
+          nodes.nodeExecutionStates[nodeId]?.status === NodeStatus.IN_PROGRESS
+      ),
+    [nodeId]
+  );
+
+  const isInProgress = useAppSelector(selectIsInProgress);
 
   const [
-    nodeSelectedOutlineLight,
-    nodeSelectedOutlineDark,
+    nodeSelectedLight,
+    nodeSelectedDark,
+    nodeInProgressLight,
+    nodeInProgressDark,
     shadowsXl,
     shadowsBase,
   ] = useToken('shadows', [
-    'nodeSelectedOutline.light',
-    'nodeSelectedOutline.dark',
+    'nodeSelected.light',
+    'nodeSelected.dark',
+    'nodeInProgress.light',
+    'nodeInProgress.dark',
     'shadows.xl',
     'shadows.base',
   ]);
 
   const dispatch = useAppDispatch();
 
-  const shadow = useColorModeValue(
-    nodeSelectedOutlineLight,
-    nodeSelectedOutlineDark
+  const selectedShadow = useColorModeValue(nodeSelectedLight, nodeSelectedDark);
+  const inProgressShadow = useColorModeValue(
+    nodeInProgressLight,
+    nodeInProgressDark
   );
 
   const opacity = useAppSelector((state) => state.nodes.nodeOpacity);
@@ -57,7 +77,11 @@ const NodeWrapper = (props: NodeWrapperProps) => {
         w: width ?? NODE_WIDTH,
         transitionProperty: 'common',
         transitionDuration: '0.1s',
-        shadow: selected ? shadow : undefined,
+        shadow: selected
+          ? isInProgress
+            ? undefined
+            : selectedShadow
+          : undefined,
         cursor: 'grab',
         opacity,
       }}
@@ -72,6 +96,22 @@ const NodeWrapper = (props: NodeWrapperProps) => {
           borderRadius: 'base',
           pointerEvents: 'none',
           shadow: `${shadowsXl}, ${shadowsBase}, ${shadowsBase}`,
+          zIndex: -1,
+        }}
+      />
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          insetInlineEnd: 0,
+          bottom: 0,
+          insetInlineStart: 0,
+          borderRadius: 'md',
+          pointerEvents: 'none',
+          transitionProperty: 'common',
+          transitionDuration: 'normal',
+          opacity: 0.7,
+          shadow: isInProgress ? inProgressShadow : undefined,
           zIndex: -1,
         }}
       />

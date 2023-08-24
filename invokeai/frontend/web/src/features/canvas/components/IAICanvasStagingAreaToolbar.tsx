@@ -140,11 +140,10 @@ const IAICanvasStagingAreaToolbar = () => {
       w="100%"
       align="center"
       justify="center"
-      filter="drop-shadow(0 0.5rem 1rem rgba(0,0,0))"
       onMouseOver={handleMouseOver}
       onMouseOut={handleMouseOut}
     >
-      <ButtonGroup isAttached>
+      <ButtonGroup isAttached borderRadius="base" shadow="dark-lg">
         <IAIIconButton
           tooltip={`${t('unifiedCanvas.previous')} (Left)`}
           aria-label={`${t('unifiedCanvas.previous')} (Left)`}

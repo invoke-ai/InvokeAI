@@ -1,11 +1,11 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import IAIButton from 'common/components/IAIButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaSyncAlt } from 'react-icons/fa';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 
-const ReloadSchemaButton = () => {
+const ReloadNodeTemplatesButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -14,13 +14,15 @@ const ReloadSchemaButton = () => {
   }, [dispatch]);
 
   return (
-    <IAIIconButton
-      icon={<FaSyncAlt />}
-      tooltip={t('nodes.reloadSchema')}
-      aria-label={t('nodes.reloadSchema')}
+    <IAIButton
+      leftIcon={<FaSyncAlt />}
+      tooltip={t('nodes.reloadNodeTemplates')}
+      aria-label={t('nodes.reloadNodeTemplates')}
       onClick={handleReloadSchema}
-    />
+    >
+      {t('nodes.reloadNodeTemplates')}
+    </IAIButton>
   );
 };
 
-export default memo(ReloadSchemaButton);
+export default memo(ReloadNodeTemplatesButton);

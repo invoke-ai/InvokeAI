@@ -61,11 +61,6 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       hotkey: 'O',
     },
     {
-      title: t('hotkeys.pinOptions.title'),
-      desc: t('hotkeys.pinOptions.desc'),
-      hotkey: 'Shift+O',
-    },
-    {
       title: t('hotkeys.toggleGallery.title'),
       desc: t('hotkeys.toggleGallery.desc'),
       hotkey: 'G',
@@ -135,11 +130,6 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
       title: t('hotkeys.nextImage.title'),
       desc: t('hotkeys.nextImage.desc'),
       hotkey: 'Arrow Right',
-    },
-    {
-      title: t('hotkeys.toggleGalleryPin.title'),
-      desc: t('hotkeys.toggleGalleryPin.desc'),
-      hotkey: 'Shift+G',
     },
     {
       title: t('hotkeys.increaseGalleryThumbSize.title'),
@@ -290,7 +280,7 @@ export default function HotkeysModal({ children }: HotkeysModalProps) {
     {
       title: t('hotkeys.addNodes.title'),
       desc: t('hotkeys.addNodes.desc'),
-      hotkey: 'Shift + A',
+      hotkey: 'Shift + A / Space',
     },
   ];
 

@@ -2,10 +2,7 @@ import { MenuItem } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
-import {
-  resizeAndScaleCanvas,
-  setInitialCanvasImage,
-} from 'features/canvas/store/canvasSlice';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   imagesToChangeSelected,
   isModalOpenChanged,
@@ -29,6 +26,7 @@ import {
   FaShare,
   FaTrash,
 } from 'react-icons/fa';
+import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
   useGetImageMetadataQuery,
   useStarImagesMutation,
@@ -37,7 +35,6 @@ import {
 import { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
-import { MdStar, MdStarBorder } from 'react-icons/md';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -110,7 +107,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const handleSendToCanvas = useCallback(() => {
     dispatch(sentImageToCanvas());
     dispatch(setInitialCanvasImage(imageDTO));
-    dispatch(resizeAndScaleCanvas());
     dispatch(setActiveTab('unifiedCanvas'));
 
     toaster({

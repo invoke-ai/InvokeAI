@@ -107,12 +107,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
     # Inputs
     positive_conditioning: ConditioningField = InputField(
-        description=FieldDescriptions.positive_cond, input=Input.Connection
+        description=FieldDescriptions.positive_cond, input=Input.Connection, ui_order=0
     )
     negative_conditioning: ConditioningField = InputField(
-        description=FieldDescriptions.negative_cond, input=Input.Connection
+        description=FieldDescriptions.negative_cond, input=Input.Connection, ui_order=1
     )
-    noise: Optional[LatentsField] = InputField(description=FieldDescriptions.noise, input=Input.Connection)
+    noise: Optional[LatentsField] = InputField(description=FieldDescriptions.noise, input=Input.Connection, ui_order=3)
     steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
     cfg_scale: Union[float, List[float]] = InputField(
         default=7.5, ge=1, description=FieldDescriptions.cfg_scale, ui_type=UIType.Float, title="CFG Scale"
@@ -122,11 +122,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
     scheduler: SAMPLER_NAME_VALUES = InputField(
         default="euler", description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler
     )
-    unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet")
+    unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet", ui_order=2)
     control: Union[ControlField, list[ControlField]] = InputField(
-        default=None, description=FieldDescriptions.control, input=Input.Connection
+        default=None, description=FieldDescriptions.control, input=Input.Connection, ui_order=5
     )
-    latents: Optional[LatentsField] = InputField(description=FieldDescriptions.latents, input=Input.Connection)
+    latents: Optional[LatentsField] = InputField(
+        description=FieldDescriptions.latents, input=Input.Connection, ui_order=4
+    )
     mask: Optional[ImageField] = InputField(
         default=None,
         description=FieldDescriptions.mask,
