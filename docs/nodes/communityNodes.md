@@ -30,6 +30,18 @@ To use a community node graph, download the the `.json` node graph file and load
 
 **Node Link:** https://github.com/JPPhoto/ideal-size-node
 
+<hr>
+
+### Retroize
+
+**Description:** Retroize is a collection of nodes for InvokeAI to "Retroize" images. Any image can be given a fresh coat of retro paint with these nodes, either from your gallery or from within the graph itself. It includes nodes to pixelize, quantize, palettize, and ditherize images; as well as to retrieve palettes from existing images.
+
+**Node Link:** https://github.com/Ar7ific1al/invokeai-retroizeinode/
+
+**Retroize Output Examples**
+
+![image](https://github.com/Ar7ific1al/InvokeAI_nodes_retroize/assets/2306586/de8b4fa6-324c-4c2d-b36c-297600c73974)
+
 --------------------------------
 ### Example Node Template
 
