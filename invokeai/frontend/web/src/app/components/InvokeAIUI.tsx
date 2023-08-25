@@ -7,6 +7,7 @@ import React, {
   PropsWithChildren,
   ReactNode,
   useEffect,
+  useState,
 } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
@@ -36,20 +37,19 @@ const InvokeAIUI = ({
   middleware,
   projectId,
 }: Props) => {
+  const [isReady, setIsReady] = useState(false);
   useEffect(() => {
-    // configure API client token
-    if (token) {
+    if (token && apiUrl && projectId) {
       $authToken.set(token);
-    }
-
-    // configure API client base url
-    if (apiUrl) {
       $baseUrl.set(apiUrl);
-    }
-
-    // configure API client project header
-    if (projectId) {
       $projectId.set(projectId);
+      setIsReady(true);
+    } else if (token && apiUrl) {
+      $authToken.set(token);
+      $baseUrl.set(apiUrl);
+      setIsReady(true);
+    } else {
+      setIsReady(true);
     }
 
     // reset dynamically added middlewares
@@ -81,7 +81,9 @@ const InvokeAIUI = ({
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
-              <App config={config} headerComponent={headerComponent} />
+              {isReady && (
+                <App config={config} headerComponent={headerComponent} />
+              )}
             </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>
