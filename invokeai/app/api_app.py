@@ -17,11 +17,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pydantic.schema import schema
-from invokeai.app.services.graph import update_invocations_union
 
 # noinspection PyUnresolvedReferences
 import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 import invokeai.frontend.web as web_dir
+from invokeai.app.services.graph import update_invocations_union
 from invokeai.version.invokeai_version import __version__
 from .api.dependencies import ApiDependencies
 from .api.routers import sessions, models, images, boards, board_images, app_info
@@ -211,15 +211,13 @@ def invoke_api():
 
     if app_config.dev_reload:
         try:
-            import jurigged
+            from invokeai.app.util.dev_reload import start_reloader
         except ImportError as e:
             logger.error(
                 'Can\'t start `--dev_reload` because jurigged is not found; `pip install -e ".[dev]"` to include development dependencies.',
                 exc_info=e,
             )
         else:
-            from invokeai.app.util.dev_reload import start_reloader
-
             start_reloader()
 
     port = find_port(app_config.port)
