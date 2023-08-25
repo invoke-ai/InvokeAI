@@ -1,11 +1,13 @@
 # Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 import asyncio
 import logging
+import mimetypes
 import socket
 from inspect import signature
 from pathlib import Path
 from typing import Literal
 
+import torch
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,23 +19,16 @@ from fastapi_events.middleware import EventHandlerASGIMiddleware
 from pydantic.schema import schema
 from invokeai.app.services.graph import update_invocations_union
 
-from .services.config import InvokeAIAppConfig
-from ..backend.util.logging import InvokeAILogger
-
-from invokeai.version.invokeai_version import __version__
-
+# noinspection PyUnresolvedReferences
+import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 import invokeai.frontend.web as web_dir
-import mimetypes
-
+from invokeai.version.invokeai_version import __version__
 from .api.dependencies import ApiDependencies
 from .api.routers import sessions, models, images, boards, board_images, app_info
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputField, BaseInvocationOutput, UIConfigBase
-
-import torch
-
-# noinspection PyUnresolvedReferences
-import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
+from .services.config import InvokeAIAppConfig
+from ..backend.util.logging import InvokeAILogger
 
 if torch.backends.mps.is_available():
     # noinspection PyUnresolvedReferences
@@ -223,7 +218,9 @@ def invoke_api():
                 exc_info=e,
             )
         else:
-            jurigged.watch(logger=InvokeAILogger.getLogger(name="jurigged").info)
+            from invokeai.app.util.dev_reload import start_reloader
+
+            start_reloader()
 
     port = find_port(app_config.port)
     if port != app_config.port:
