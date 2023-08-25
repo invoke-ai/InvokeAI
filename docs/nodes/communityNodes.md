@@ -22,15 +22,39 @@ To use a community node graph, download the the `.json` node graph file and load
 ![b920b710-1882-49a0-8d02-82dff2cca907](https://github.com/invoke-ai/InvokeAI/assets/25252829/7660c1ed-bf7d-4d0a-947f-1fc1679557ba)
 ![71a91805-fda5-481c-b380-264665703133](https://github.com/invoke-ai/InvokeAI/assets/25252829/f8f6a2ee-2b68-4482-87da-b90221d5c3e2)
 
-<hr>
-
 ### Ideal Size
 
 **Description:** This node calculates an ideal image size for a first pass of a multi-pass upscaling. The aim is to avoid duplication that results from choosing a size larger than the model is capable of.
 
 **Node Link:** https://github.com/JPPhoto/ideal-size-node
 
-<hr>
+
+--------------------------------
+### Retroize
+
+**Description:** Retroize is a collection of nodes for InvokeAI to "Retroize" images. Any image can be given a fresh coat of retro paint with these nodes, either from your gallery or from within the graph itself. It includes nodes to pixelize, quantize, palettize, and ditherize images; as well as to retrieve palettes from existing images.
+
+**Node Link:** https://github.com/Ar7ific1al/invokeai-retroizeinode/
+
+**Retroize Output Examples**
+
+![image](https://github.com/Ar7ific1al/InvokeAI_nodes_retroize/assets/2306586/de8b4fa6-324c-4c2d-b36c-297600c73974)
+
+--------------------------------
+### GPT2RandomPromptMaker
+
+**Description:** A node for InvokeAI utilizes the GPT-2 language model to generate random prompts based on a provided seed and context.
+
+**Node Link:** https://github.com/mickr777/GPT2RandomPromptMaker
+
+**Output Examples** 
+
+Generated Prompt: An enchanted weapon will be usable by any character regardless of their alignment.
+
+![9acf5aef-7254-40dd-95b3-8eac431dfab0 (1)](https://github.com/mickr777/InvokeAI/assets/115216705/8496ba09-bcdd-4ff7-8076-ff213b6a1e4c)
+
+
+--------------------------------
 
 ### Oobabooga
 
