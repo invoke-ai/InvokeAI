@@ -30,12 +30,39 @@ To use a community node graph, download the the `.json` node graph file and load
 
 **Node Link:** https://github.com/JPPhoto/ideal-size-node
 
+<hr>
+
+### Retroize
+
+**Description:** Retroize is a collection of nodes for InvokeAI to "Retroize" images. Any image can be given a fresh coat of retro paint with these nodes, either from your gallery or from within the graph itself. It includes nodes to pixelize, quantize, palettize, and ditherize images; as well as to retrieve palettes from existing images.
+
+**Node Link:** https://github.com/Ar7ific1al/invokeai-retroizeinode/
+
+**Retroize Output Examples**
+
+![image](https://github.com/Ar7ific1al/InvokeAI_nodes_retroize/assets/2306586/de8b4fa6-324c-4c2d-b36c-297600c73974)
+
+--------------------------------
+### GPT2RandomPromptMaker
+
+**Description:** A node for InvokeAI utilizes the GPT-2 language model to generate random prompts based on a provided seed and context.
+
+**Node Link:** https://github.com/mickr777/GPT2RandomPromptMaker
+
+**Output Examples** 
+
+Generated Prompt: An enchanted weapon will be usable by any character regardless of their alignment.
+
+![9acf5aef-7254-40dd-95b3-8eac431dfab0 (1)](https://github.com/mickr777/InvokeAI/assets/115216705/8496ba09-bcdd-4ff7-8076-ff213b6a1e4c)
+
+
+
 --------------------------------
 ### Load Video Frame
 
 **Description:** This is a video frame image provider + indexer/video creation nodes for hooking up to iterators and ranges and ControlNets and such for invokeAI node experimentation. Think animation + ControlNet outputs.
 
-**Node Link:** https://github.com/helix4u/load_video_frame/blob/main/video_frame_provider.py
+**Node Link:** https://github.com/helix4u/load_video_frame
 
 **Example Node Graph:**  https://github.com/helix4u/load_video_frame/blob/main/Example_Workflow.json
 
@@ -44,11 +71,23 @@ To use a community node graph, download the the `.json` node graph file and load
 ![Example animation](https://github.com/helix4u/load_video_frame/blob/main/testmp4_embed_converted.gif)
 [Full mp4 of Example Output test.mp4](https://github.com/helix4u/load_video_frame/blob/main/test.mp4)
 
+
+
+--------------------------------
+### Example Node Template
+
+**Description:** This node allows you to do super cool things with InvokeAI.
+
+**Node Link:** https://github.com/invoke-ai/InvokeAI/fake_node.py
+
+**Example Node Graph:**  https://github.com/invoke-ai/InvokeAI/fake_node_graph.json
+
+**Output Examples** 
+
+![Example Image](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png){: style="height:115px;width:240px"}
+
+
 ## Disclaimer
 
 The nodes linked have been developed and contributed by members of the Invoke AI community. While we strive to ensure the quality and safety of these contributions, we do not guarantee the reliability or security of the nodes. If you have issues or concerns with any of the nodes below, please raise it on GitHub or in the Discord.
-
-
-## Help
-If you run into any issues with a node, please post in the [InvokeAI Discord](https://discord.gg/ZmtBAhwWhy). 
 
