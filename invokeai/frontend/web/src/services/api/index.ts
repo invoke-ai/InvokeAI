@@ -30,22 +30,11 @@ const dynamicBaseQuery: BaseQueryFn<
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
   const baseUrl = $baseUrl.get();
-  console.log({ baseUrl })
-  if (baseUrl === undefined) {
-    return {
-      error: {
-        status: 400,
-        statusText: 'Bad Request',
-        data: 'No baseUrl set',
-      },
-    }
-  }
-
   const authToken = $authToken.get();
   const projectId = $projectId.get();
 
   const rawBaseQuery = fetchBaseQuery({
-    baseUrl: `${baseUrl ?? ''}/api/v1`,
+    baseUrl: `http://localhost:1234/api/v1`,
     prepareHeaders: (headers) => {
       if (authToken) {
         headers.set('Authorization', `Bearer ${authToken}`);
