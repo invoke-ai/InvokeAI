@@ -34,7 +34,7 @@ const dynamicBaseQuery: BaseQueryFn<
   const projectId = $projectId.get();
 
   const rawBaseQuery = fetchBaseQuery({
-    baseUrl: `http://localhost:1234/api/v1`,
+    baseUrl: `https://gen.invoker.ai/api/v1`,
     prepareHeaders: (headers) => {
       if (authToken) {
         headers.set('Authorization', `Bearer ${authToken}`);
