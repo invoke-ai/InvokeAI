@@ -43,6 +43,21 @@ To use a community node graph, download the the `.json` node graph file and load
 ![image](https://github.com/Ar7ific1al/InvokeAI_nodes_retroize/assets/2306586/de8b4fa6-324c-4c2d-b36c-297600c73974)
 
 --------------------------------
+### GPT2RandomPromptMaker
+
+**Description:** A node for InvokeAI utilizes the GPT-2 language model to generate random prompts based on a provided seed and context.
+
+**Node Link:** https://github.com/mickr777/GPT2RandomPromptMaker
+
+**Output Examples** 
+
+Generated Prompt: An enchanted weapon will be usable by any character regardless of their alignment.
+
+![9acf5aef-7254-40dd-95b3-8eac431dfab0 (1)](https://github.com/mickr777/InvokeAI/assets/115216705/8496ba09-bcdd-4ff7-8076-ff213b6a1e4c)
+
+
+
+--------------------------------
 ### Example Node Template
 
 **Description:** This node allows you to do super cool things with InvokeAI.
