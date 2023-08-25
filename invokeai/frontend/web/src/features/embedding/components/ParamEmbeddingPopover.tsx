@@ -13,7 +13,7 @@ import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSe
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { forEach } from 'lodash-es';
-import { PropsWithChildren, useCallback, useMemo, useRef } from 'react';
+import { PropsWithChildren, memo, useCallback, useMemo, useRef } from 'react';
 import { useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
 
@@ -118,7 +118,7 @@ const ParamEmbeddingPopover = (props: Props) => {
             <IAIMantineSearchableSelect
               inputRef={inputRef}
               autoFocus
-              placeholder={'Add Embedding'}
+              placeholder="Add Embedding"
               value={null}
               data={data}
               nothingFound="No matching Embeddings"
@@ -140,4 +140,4 @@ const ParamEmbeddingPopover = (props: Props) => {
   );
 };
 
-export default ParamEmbeddingPopover;
+export default memo(ParamEmbeddingPopover);

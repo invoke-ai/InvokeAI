@@ -1,11 +1,8 @@
-import { MenuItem } from '@chakra-ui/react';
+import { Flex, MenuItem, Text } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
-import {
-  resizeAndScaleCanvas,
-  setInitialCanvasImage,
-} from 'features/canvas/store/canvasSlice';
+import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   imagesToChangeSelected,
   isModalOpenChanged,
@@ -29,6 +26,7 @@ import {
   FaShare,
   FaTrash,
 } from 'react-icons/fa';
+import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
   useGetImageMetadataQuery,
   useStarImagesMutation,
@@ -37,7 +35,6 @@ import {
 import { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
-import { MdStar, MdStarBorder } from 'react-icons/md';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -110,7 +107,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const handleSendToCanvas = useCallback(() => {
     dispatch(sentImageToCanvas());
     dispatch(setInitialCanvasImage(imageDTO));
-    dispatch(resizeAndScaleCanvas());
     dispatch(setActiveTab('unifiedCanvas'));
 
     toaster({
@@ -136,11 +132,15 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   }, [copyImageToClipboard, imageDTO.image_url]);
 
   const handleStarImage = useCallback(() => {
-    if (imageDTO) starImages({ imageDTOs: [imageDTO] });
+    if (imageDTO) {
+      starImages({ imageDTOs: [imageDTO] });
+    }
   }, [starImages, imageDTO]);
 
   const handleUnstarImage = useCallback(() => {
-    if (imageDTO) unstarImages({ imageDTOs: [imageDTO] });
+    if (imageDTO) {
+      unstarImages({ imageDTOs: [imageDTO] });
+    }
   }, [unstarImages, imageDTO]);
 
   return (
@@ -228,6 +228,18 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       >
         {t('gallery.deleteImage')}
       </MenuItem>
+      {metadata?.created_by && (
+        <Flex
+          sx={{
+            padding: '5px 10px',
+            marginTop: '5px',
+          }}
+        >
+          <Text fontSize="xs" fontWeight="bold">
+            Created by {metadata?.created_by}
+          </Text>
+        </Flex>
+      )}
     </>
   );
 };

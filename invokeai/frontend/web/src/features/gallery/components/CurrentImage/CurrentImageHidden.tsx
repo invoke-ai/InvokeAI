@@ -1,4 +1,5 @@
 import { Flex } from '@chakra-ui/react';
+import { memo } from 'react';
 import { FaEyeSlash } from 'react-icons/fa';
 
 const CurrentImageHidden = () => {
@@ -18,4 +19,4 @@ const CurrentImageHidden = () => {
   );
 };
 
-export default CurrentImageHidden;
+export default memo(CurrentImageHidden);

@@ -1,12 +1,12 @@
 # Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 import asyncio
-from inspect import signature
-
 import logging
-from typing import Literal
-import uvicorn
 import socket
+from inspect import signature
+from pathlib import Path
+from typing import Literal
 
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -14,7 +14,6 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
-from pathlib import Path
 from pydantic.schema import schema
 from invokeai.app.services.graph import update_invocations_union
 
@@ -32,16 +31,18 @@ from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputField, BaseInvocationOutput, UIConfigBase
 
 import torch
+
+# noinspection PyUnresolvedReferences
 import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 
 if torch.backends.mps.is_available():
+    # noinspection PyUnresolvedReferences
     import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
 
 
 app_config = InvokeAIAppConfig.get_config()
 app_config.parse_args()
 logger = InvokeAILogger.getLogger(config=app_config)
-
 
 # fix for windows mimetypes registry entries being borked
 # see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
@@ -124,6 +125,7 @@ def custom_openapi():
 
     output_schemas = schema(output_types, ref_prefix="#/components/schemas/")
     for schema_key, output_schema in output_schemas["definitions"].items():
+        output_schema["class"] = "output"
         openapi_schema["components"]["schemas"][schema_key] = output_schema
 
         # TODO: note that we assume the schema_key here is the TYPE.__name__
@@ -132,8 +134,8 @@ def custom_openapi():
 
     # Add Node Editor UI helper schemas
     ui_config_schemas = schema([UIConfigBase, _InputField, _OutputField], ref_prefix="#/components/schemas/")
-    for schema_key, output_schema in ui_config_schemas["definitions"].items():
-        openapi_schema["components"]["schemas"][schema_key] = output_schema
+    for schema_key, ui_config_schema in ui_config_schemas["definitions"].items():
+        openapi_schema["components"]["schemas"][schema_key] = ui_config_schema
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
@@ -145,8 +147,8 @@ def custom_openapi():
 
         invoker_schema = openapi_schema["components"]["schemas"][invoker_name]
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
-
         invoker_schema["output"] = outputs_ref
+        invoker_schema["class"] = "invocation"
 
     from invokeai.backend.model_management.models import get_model_config_enums
 
@@ -211,6 +213,17 @@ def invoke_api():
     from invokeai.backend.install.check_root import check_invokeai_root
 
     check_invokeai_root(app_config)  # note, may exit with an exception if root not set up
+
+    if app_config.dev_reload:
+        try:
+            import jurigged
+        except ImportError as e:
+            logger.error(
+                'Can\'t start `--dev_reload` because jurigged is not found; `pip install -e ".[dev]"` to include development dependencies.',
+                exc_info=e,
+            )
+        else:
+            jurigged.watch(logger=InvokeAILogger.getLogger(name="jurigged").info)
 
     port = find_port(app_config.port)
     if port != app_config.port:

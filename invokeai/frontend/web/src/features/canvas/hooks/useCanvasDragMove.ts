@@ -32,13 +32,17 @@ const useCanvasDrag = () => {
 
   return {
     handleDragStart: useCallback(() => {
-      if (!((tool === 'move' || isStaging) && !isMovingBoundingBox)) return;
+      if (!((tool === 'move' || isStaging) && !isMovingBoundingBox)) {
+        return;
+      }
       dispatch(setIsMovingStage(true));
     }, [dispatch, isMovingBoundingBox, isStaging, tool]),
 
     handleDragMove: useCallback(
       (e: KonvaEventObject<MouseEvent>) => {
-        if (!((tool === 'move' || isStaging) && !isMovingBoundingBox)) return;
+        if (!((tool === 'move' || isStaging) && !isMovingBoundingBox)) {
+          return;
+        }
 
         const newCoordinates = { x: e.target.x(), y: e.target.y() };
 
@@ -48,7 +52,9 @@ const useCanvasDrag = () => {
     ),
 
     handleDragEnd: useCallback(() => {
-      if (!((tool === 'move' || isStaging) && !isMovingBoundingBox)) return;
+      if (!((tool === 'move' || isStaging) && !isMovingBoundingBox)) {
+        return;
+      }
       dispatch(setIsMovingStage(false));
     }, [dispatch, isMovingBoundingBox, isStaging, tool]),
   };

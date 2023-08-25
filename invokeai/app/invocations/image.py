@@ -8,7 +8,7 @@ import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from invokeai.app.invocations.metadata import CoreMetadata
-from invokeai.app.invocations.primitives import ImageField, ImageOutput
+from invokeai.app.invocations.primitives import ColorField, ImageField, ImageOutput
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
@@ -38,6 +38,39 @@ class ShowImageInvocation(BaseInvocation):
             image=ImageField(image_name=self.image.image_name),
             width=image.width,
             height=image.height,
+        )
+
+
+@title("Blank Image")
+@tags("image")
+class BlankImageInvocation(BaseInvocation):
+    """Creates a blank image and forwards it to the pipeline"""
+
+    # Metadata
+    type: Literal["blank_image"] = "blank_image"
+
+    # Inputs
+    width: int = InputField(default=512, description="The width of the image")
+    height: int = InputField(default=512, description="The height of the image")
+    mode: Literal["RGB", "RGBA"] = InputField(default="RGB", description="The mode of the image")
+    color: ColorField = InputField(default=ColorField(r=0, g=0, b=0, a=255), description="The color of the image")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = Image.new(mode=self.mode, size=(self.width, self.height), color=self.color.tuple())
+
+        image_dto = context.services.images.create(
+            image=image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            node_id=self.id,
+            session_id=context.graph_execution_state_id,
+            is_intermediate=self.is_intermediate,
+        )
+
+        return ImageOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=image_dto.width,
+            height=image_dto.height,
         )
 
 

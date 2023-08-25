@@ -16,7 +16,7 @@ import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 import ImageMetadataActions from './ImageMetadataActions';
-import ImageMetadataJSON from './ImageMetadataJSON';
+import DataViewer from './DataViewer';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -79,21 +79,21 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         <TabPanels>
           <TabPanel>
             {metadata ? (
-              <ImageMetadataJSON jsonObject={metadata} label="Core Metadata" />
+              <DataViewer data={metadata} label="Core Metadata" />
             ) : (
               <IAINoContentFallback label="No core metadata found" />
             )}
           </TabPanel>
           <TabPanel>
             {image ? (
-              <ImageMetadataJSON jsonObject={image} label="Image Details" />
+              <DataViewer data={image} label="Image Details" />
             ) : (
               <IAINoContentFallback label="No image details found" />
             )}
           </TabPanel>
           <TabPanel>
             {graph ? (
-              <ImageMetadataJSON jsonObject={graph} label="Graph" />
+              <DataViewer data={graph} label="Graph" />
             ) : (
               <IAINoContentFallback label="No graph found" />
             )}

@@ -477,13 +477,13 @@ def test_graph_expands_subgraph():
     n1_2 = SubtractInvocation(id="2", b=3)
     n1.graph.add_node(n1_1)
     n1.graph.add_node(n1_2)
-    n1.graph.add_edge(create_edge("1", "a", "2", "a"))
+    n1.graph.add_edge(create_edge("1", "value", "2", "a"))
 
     g.add_node(n1)
 
     n2 = AddInvocation(id="2", b=5)
     g.add_node(n2)
-    g.add_edge(create_edge("1.2", "a", "2", "a"))
+    g.add_edge(create_edge("1.2", "value", "2", "a"))
 
     dg = g.nx_graph_flat()
     assert set(dg.nodes) == set(["1.1", "1.2", "2"])
@@ -500,14 +500,14 @@ def test_graph_subgraph_t2i():
 
     g.add_node(n1)
 
-    n2 = IntegerInvocation(id="2", a=512)
-    n3 = IntegerInvocation(id="3", a=256)
+    n2 = IntegerInvocation(id="2", value=512)
+    n3 = IntegerInvocation(id="3", value=256)
 
     g.add_node(n2)
     g.add_node(n3)
 
-    g.add_edge(create_edge("2", "a", "1.width", "a"))
-    g.add_edge(create_edge("3", "a", "1.height", "a"))
+    g.add_edge(create_edge("2", "value", "1.width", "value"))
+    g.add_edge(create_edge("3", "value", "1.height", "value"))
 
     n4 = ShowImageInvocation(id="4")
     g.add_node(n4)

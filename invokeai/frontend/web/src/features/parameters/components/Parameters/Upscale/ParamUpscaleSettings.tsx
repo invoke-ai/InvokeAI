@@ -5,7 +5,7 @@ import IAIButton from 'common/components/IAIButton';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAIPopover from 'common/components/IAIPopover';
 import { selectIsBusy } from 'features/system/store/systemSelectors';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaExpandArrowsAlt } from 'react-icons/fa';
 import { ImageDTO } from 'services/api/types';
@@ -59,4 +59,4 @@ const ParamUpscalePopover = (props: Props) => {
   );
 };
 
-export default ParamUpscalePopover;
+export default memo(ParamUpscalePopover);

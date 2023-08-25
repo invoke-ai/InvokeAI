@@ -88,8 +88,12 @@ const GalleryImage = (props: HoverableImageProps) => {
   }, []);
 
   const starIcon = useMemo(() => {
-    if (imageDTO?.starred) return <MdStar size="20" />;
-    if (!imageDTO?.starred && isHovered) return <MdStarBorder size="20" />;
+    if (imageDTO?.starred) {
+      return <MdStar size="20" />;
+    }
+    if (!imageDTO?.starred && isHovered) {
+      return <MdStarBorder size="20" />;
+    }
   }, [imageDTO?.starred, isHovered]);
 
   if (!imageDTO) {
