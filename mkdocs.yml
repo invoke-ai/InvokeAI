@@ -98,6 +98,15 @@ plugins:
           'installation/INSTALLING_MODELS.md': 'installation/050_INSTALLING_MODELS.md'
           'installation/INSTALL_PATCHMATCH.md': 'installation/060_INSTALL_PATCHMATCH.md'
 
+extra_javascript:
+  - https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js
+  - javascripts/tablesort.js
+
+extra:
+  analytics:
+    provider: google
+    property: G-2X4JR4S4FB
+
 nav:
     - Home: 'index.md'
     - Installation:
@@ -118,9 +127,14 @@ nav:
         - Manual Installation on Windows: 'installation/deprecated_documentation/INSTALL_WINDOWS.md'
         - Installing Invoke with pip: 'installation/deprecated_documentation/INSTALL_PCP.md'
         - Source Installer: 'installation/deprecated_documentation/INSTALL_SOURCE.md'
-    - Community Nodes:
+    - Nodes:
       - Community Nodes: 'nodes/communityNodes.md'
-      - Overview: 'nodes/overview.md'
+      - Example Workflows: 'nodes/exampleWorkflows.md'
+      - Nodes Overview: 'nodes/overview.md'
+      - List of Default Nodes: 'nodes/defaultNodes.md'
+      - Node Editor Usage: 'nodes/NODES.md'
+      - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
+      - Contributing Nodes: 'nodes/contributingNodes.md'
     - Features:
       - Overview: 'features/index.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
@@ -130,13 +144,12 @@ nav:
       - Image-to-Image: 'features/IMG2IMG.md'
       - Controlling Logging: 'features/LOGGING.md'
       - Model Merging: 'features/MODEL_MERGING.md'
-      - Nodes Editor (Experimental): 'features/NODES.md'
-      - NSFW Checker: 'features/NSFW.md'
+      - Using Nodes : './nodes/overview'
+      - NSFW Checker: 'features/WATERMARK+NSFW.md'
       - Postprocessing: 'features/POSTPROCESS.md'
       - Prompting Features: 'features/PROMPTS.md'
       - Training: 'features/TRAINING.md'
       - Unified Canvas: 'features/UNIFIED_CANVAS.md'
-      - Variations: 'features/VARIATIONS.md'
       - InvokeAI Web Server: 'features/WEB.md'
       - WebUI Hotkeys: "features/WEBUIHOTKEYS.md"
       - Other: 'features/OTHER.md'
@@ -148,6 +161,7 @@ nav:
         - Frontend Documentation: 'contributing/contribution_guides/development_guides/contributingToFrontend.md'
         - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
+      - Nodes: 'contributing/INVOCATIONS.md'
       - Translation: 'contributing/contribution_guides/translation.md'
       - Tutorials: 'contributing/contribution_guides/tutorials.md'
     - Changelog: 'CHANGELOG.md'
@@ -158,6 +172,7 @@ nav:
       - Outpainting: 'deprecated/OUTPAINTING.md'
     - Help:
       - Getting Started: 'help/gettingStartedWithAI.md'
+      - Diffusion Overview: 'help/diffusion.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
     - Other:
       - Contributors: 'other/CONTRIBUTORS.md'

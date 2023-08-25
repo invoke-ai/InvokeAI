@@ -1,8 +1,4 @@
-import { logger } from 'app/logging/logger';
-import { parseify } from 'common/util/serialize';
-import { reduce } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
-import { isSchemaObject } from '../types/typeGuards';
 import {
   BooleanInputFieldTemplate,
   ClipInputFieldTemplate,
@@ -24,15 +20,14 @@ import {
   LatentsInputFieldTemplate,
   LoRAModelInputFieldTemplate,
   MainModelInputFieldTemplate,
-  OutputFieldTemplate,
   SDXLMainModelInputFieldTemplate,
   SDXLRefinerModelInputFieldTemplate,
+  SchedulerInputFieldTemplate,
   StringInputFieldTemplate,
   UNetInputFieldTemplate,
   VaeInputFieldTemplate,
   VaeModelInputFieldTemplate,
   isFieldType,
-  isInvocationFieldSchema,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -400,6 +395,19 @@ const buildColorInputFieldTemplate = ({
   return template;
 };
 
+const buildSchedulerInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): SchedulerInputFieldTemplate => {
+  const template: SchedulerInputFieldTemplate = {
+    ...baseField,
+    type: 'Scheduler',
+    default: schemaObject.default ?? 'euler',
+  };
+
+  return template;
+};
+
 export const getFieldType = (
   schemaObject: InvocationFieldSchema
 ): FieldType => {
@@ -459,7 +467,7 @@ export const buildInputFieldTemplate = (
   const fieldType = getFieldType(fieldSchema);
   // console.log('input fieldType', fieldType);
 
-  const { input, ui_hidden, ui_component, ui_type } = fieldSchema;
+  const { input, ui_hidden, ui_component, ui_type, ui_order } = fieldSchema;
 
   const extra = {
     input,
@@ -467,6 +475,7 @@ export const buildInputFieldTemplate = (
     ui_component,
     ui_type,
     required: nodeSchema.required?.includes(name) ?? false,
+    ui_order,
   };
 
   const baseField = {
@@ -606,68 +615,11 @@ export const buildInputFieldTemplate = (
       baseField,
     });
   }
+  if (fieldType === 'Scheduler') {
+    return buildSchedulerInputFieldTemplate({
+      schemaObject: fieldSchema,
+      baseField,
+    });
+  }
   return;
-};
-
-/**
- * Builds invocation output fields from an invocation's output reference object.
- * @param openAPI The OpenAPI schema
- * @param refObject The output reference object
- * @returns A record of outputs
- */
-export const buildOutputFieldTemplates = (
-  refObject: OpenAPIV3.ReferenceObject,
-  openAPI: OpenAPIV3.Document
-): Record<string, OutputFieldTemplate> => {
-  // extract output schema name from ref
-  const outputSchemaName = refObject.$ref.split('/').slice(-1)[0];
-
-  if (!outputSchemaName) {
-    logger('nodes').error(
-      { refObject: parseify(refObject) },
-      'No output schema name found in ref object'
-    );
-    throw 'No output schema name found in ref object';
-  }
-
-  // get the output schema itself
-  const outputSchema = openAPI.components?.schemas?.[outputSchemaName];
-  if (!outputSchema) {
-    logger('nodes').error({ outputSchemaName }, 'Output schema not found');
-    throw 'Output schema not found';
-  }
-
-  // console.log('output', outputSchema);
-  if (isSchemaObject(outputSchema)) {
-    // console.log('isSchemaObject');
-    const outputFields = reduce(
-      outputSchema.properties as OpenAPIV3.SchemaObject,
-      (outputsAccumulator, property, propertyName) => {
-        if (
-          !['type', 'id'].includes(propertyName) &&
-          !['object'].includes(property.type) && // TODO: handle objects?
-          isInvocationFieldSchema(property)
-        ) {
-          const fieldType = getFieldType(property);
-          // console.log('output fieldType', fieldType);
-          outputsAccumulator[propertyName] = {
-            fieldKind: 'output',
-            name: propertyName,
-            title: property.title ?? '',
-            description: property.description ?? '',
-            type: fieldType,
-          };
-        } else {
-          // console.warn('Unhandled OUTPUT property', property);
-        }
-
-        return outputsAccumulator;
-      },
-      {} as Record<string, OutputFieldTemplate>
-    );
-
-    return outputFields;
-  }
-
-  return {};
 };

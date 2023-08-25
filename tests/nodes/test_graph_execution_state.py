@@ -116,14 +116,14 @@ def test_graph_state_expands_iterator(mock_services):
     graph.add_node(AddInvocation(id="3", b=1))
     graph.add_edge(create_edge("0", "collection", "1", "collection"))
     graph.add_edge(create_edge("1", "item", "2", "a"))
-    graph.add_edge(create_edge("2", "a", "3", "a"))
+    graph.add_edge(create_edge("2", "value", "3", "a"))
 
     g = GraphExecutionState(graph=graph)
     while not g.is_complete():
         invoke_next(g, mock_services)
 
     prepared_add_nodes = g.source_prepared_mapping["3"]
-    results = set([g.results[n].a for n in prepared_add_nodes])
+    results = set([g.results[n].value for n in prepared_add_nodes])
     expected = set([1, 11, 21])
     assert results == expected
 

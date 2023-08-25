@@ -233,7 +233,7 @@ class SDXLPromptInvocationBase:
                 dtype_for_device_getter=torch_dtype,
                 truncate_long_prompts=True,  # TODO:
                 returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,  # TODO: clip skip
-                requires_pooled=True,
+                requires_pooled=get_pooled,
             )
 
             conjunction = Compel.parse_prompt_string(prompt)

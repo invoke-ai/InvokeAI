@@ -21,7 +21,7 @@ class AddInvocation(BaseInvocation):
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        return IntegerOutput(a=self.a + self.b)
+        return IntegerOutput(value=self.a + self.b)
 
 
 @title("Subtract Integers")
@@ -36,7 +36,7 @@ class SubtractInvocation(BaseInvocation):
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        return IntegerOutput(a=self.a - self.b)
+        return IntegerOutput(value=self.a - self.b)
 
 
 @title("Multiply Integers")
@@ -51,7 +51,7 @@ class MultiplyInvocation(BaseInvocation):
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        return IntegerOutput(a=self.a * self.b)
+        return IntegerOutput(value=self.a * self.b)
 
 
 @title("Divide Integers")
@@ -66,7 +66,7 @@ class DivideInvocation(BaseInvocation):
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        return IntegerOutput(a=int(self.a / self.b))
+        return IntegerOutput(value=int(self.a / self.b))
 
 
 @title("Random Integer")
@@ -81,4 +81,4 @@ class RandomIntInvocation(BaseInvocation):
     high: int = InputField(default=np.iinfo(np.int32).max, description="The exclusive high value")
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        return IntegerOutput(a=np.random.randint(self.low, self.high))
+        return IntegerOutput(value=np.random.randint(self.low, self.high))

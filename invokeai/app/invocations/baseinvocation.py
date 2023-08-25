@@ -71,6 +71,9 @@ class FieldDescriptions:
     safe_mode = "Whether or not to use safe mode"
     scribble_mode = "Whether or not to use scribble mode"
     scale_factor = "The factor by which to scale"
+    blend_alpha = (
+        "Blending factor. 0.0 = use input A only, 1.0 = use input B only, 0.5 = 50% mix of input A and input B."
+    )
     num_1 = "The first number"
     num_2 = "The second number"
     mask = "The mask to use for the operation"
@@ -140,6 +143,7 @@ class UIType(str, Enum):
     # region Misc
     FilePath = "FilePath"
     Enum = "enum"
+    Scheduler = "Scheduler"
     # endregion
 
 
@@ -166,6 +170,7 @@ class _InputField(BaseModel):
     ui_hidden: bool
     ui_type: Optional[UIType]
     ui_component: Optional[UIComponent]
+    ui_order: Optional[int]
 
 
 class _OutputField(BaseModel):
@@ -178,6 +183,7 @@ class _OutputField(BaseModel):
 
     ui_hidden: bool
     ui_type: Optional[UIType]
+    ui_order: Optional[int]
 
 
 def InputField(
@@ -211,6 +217,7 @@ def InputField(
     ui_type: Optional[UIType] = None,
     ui_component: Optional[UIComponent] = None,
     ui_hidden: bool = False,
+    ui_order: Optional[int] = None,
     **kwargs: Any,
 ) -> Any:
     """
@@ -269,6 +276,7 @@ def InputField(
         ui_type=ui_type,
         ui_component=ui_component,
         ui_hidden=ui_hidden,
+        ui_order=ui_order,
         **kwargs,
     )
 
@@ -302,6 +310,7 @@ def OutputField(
     repr: bool = True,
     ui_type: Optional[UIType] = None,
     ui_hidden: bool = False,
+    ui_order: Optional[int] = None,
     **kwargs: Any,
 ) -> Any:
     """
@@ -348,6 +357,7 @@ def OutputField(
         repr=repr,
         ui_type=ui_type,
         ui_hidden=ui_hidden,
+        ui_order=ui_order,
         **kwargs,
     )
 
@@ -376,7 +386,7 @@ class BaseInvocationOutput(BaseModel):
     """Base class for all invocation outputs"""
 
     # All outputs must include a type name like this:
-    # type: Literal['your_output_name']
+    # type: Literal['your_output_name'] # noqa f821
 
     @classmethod
     def get_all_subclasses_tuple(cls):
@@ -388,6 +398,13 @@ class BaseInvocationOutput(BaseModel):
             subclasses.extend(next_subclasses)
             toprocess.extend(next_subclasses)
         return tuple(subclasses)
+
+    class Config:
+        @staticmethod
+        def schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
+            if "required" not in schema or not isinstance(schema["required"], list):
+                schema["required"] = list()
+            schema["required"].extend(["type"])
 
 
 class RequiredConnectionException(Exception):
@@ -410,7 +427,7 @@ class BaseInvocation(ABC, BaseModel):
     """
 
     # All invocations must include a type name like this:
-    # type: Literal['your_output_name']
+    # type: Literal['your_output_name'] # noqa f821
 
     @classmethod
     def get_all_subclasses(cls):
@@ -449,6 +466,9 @@ class BaseInvocation(ABC, BaseModel):
                 schema["title"] = uiconfig.title
             if uiconfig and hasattr(uiconfig, "tags"):
                 schema["tags"] = uiconfig.tags
+            if "required" not in schema or not isinstance(schema["required"], list):
+                schema["required"] = list()
+            schema["required"].extend(["type", "id"])
 
     @abstractmethod
     def invoke(self, context: InvocationContext) -> BaseInvocationOutput:
@@ -485,7 +505,7 @@ class BaseInvocation(ABC, BaseModel):
                     raise MissingInputException(self.__fields__["type"].default, field_name)
         return self.invoke(context)
 
-    id: str = InputField(description="The id of this node. Must be unique among all nodes.")
+    id: str = Field(description="The id of this node. Must be unique among all nodes.")
     is_intermediate: bool = InputField(
         default=False, description="Whether or not this node is an intermediate node.", input=Input.Direct
     )

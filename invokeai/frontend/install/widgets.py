@@ -17,8 +17,8 @@ from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED, BUTTON3_CLICKED
 
 # minimum size for UIs
-MIN_COLS = 130
-MIN_LINES = 38
+MIN_COLS = 150
+MIN_LINES = 40
 
 
 class WindowTooSmallException(Exception):
@@ -177,6 +177,8 @@ class FloatTitleSlider(npyscreen.TitleText):
 
 
 class SelectColumnBase:
+    """Base class for selection widget arranged in columns."""
+
     def make_contained_widgets(self):
         self._my_widgets = []
         column_width = self.width // self.columns
@@ -253,6 +255,7 @@ class MultiSelectColumns(SelectColumnBase, npyscreen.MultiSelect):
 class SingleSelectWithChanged(npyscreen.SelectOne):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.on_changed = None
 
     def h_select(self, ch):
         super().h_select(ch)
@@ -260,7 +263,9 @@ class SingleSelectWithChanged(npyscreen.SelectOne):
             self.on_changed(self.value)
 
 
-class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
+class SingleSelectColumnsSimple(SelectColumnBase, SingleSelectWithChanged):
+    """Row of radio buttons. Spacebar to select."""
+
     def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
         self.columns = columns
         self.value_cnt = len(values)
@@ -268,14 +273,18 @@ class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
         self.on_changed = None
         super().__init__(screen, values=values, **keywords)
 
-    def when_value_edited(self):
-        self.h_select(self.cursor_line)
+    def h_cursor_line_right(self, ch):
+        self.h_exit_down("bye bye")
+
+    def h_cursor_line_left(self, ch):
+        self.h_exit_up("bye bye")
+
+
+class SingleSelectColumns(SingleSelectColumnsSimple):
+    """Row of radio buttons. When tabbing over a selection, it is auto selected."""
 
     def when_cursor_moved(self):
         self.h_select(self.cursor_line)
-
-    def h_cursor_line_right(self, ch):
-        self.h_exit_down("bye bye")
 
 
 class TextBoxInner(npyscreen.MultiLineEdit):
@@ -323,55 +332,6 @@ class TextBoxInner(npyscreen.MultiLineEdit):
         mouse_id, rel_x, rel_y, z, bstate = self.interpret_mouse_event(mouse_event)
         if bstate & (BUTTON2_CLICKED | BUTTON3_CLICKED):
             self.h_paste()
-
-    # def update(self, clear=True):
-    #     if clear:
-    #         self.clear()
-
-    #     HEIGHT = self.height
-    #     WIDTH = self.width
-    #     # draw box.
-    #     self.parent.curses_pad.hline(self.rely, self.relx, curses.ACS_HLINE, WIDTH)
-    #     self.parent.curses_pad.hline(
-    #         self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH
-    #     )
-    #     self.parent.curses_pad.vline(
-    #         self.rely, self.relx, curses.ACS_VLINE, self.height
-    #     )
-    #     self.parent.curses_pad.vline(
-    #         self.rely, self.relx + WIDTH, curses.ACS_VLINE, HEIGHT
-    #     )
-
-    # # draw corners
-    # self.parent.curses_pad.addch(
-    #     self.rely,
-    #     self.relx,
-    #     curses.ACS_ULCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely,
-    #     self.relx + WIDTH,
-    #     curses.ACS_URCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely + HEIGHT,
-    #     self.relx,
-    #     curses.ACS_LLCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely + HEIGHT,
-    #     self.relx + WIDTH,
-    #     curses.ACS_LRCORNER,
-    # )
-
-    # # fool our superclass into thinking drawing area is smaller - this is really hacky but it seems to work
-    # (relx, rely, height, width) = (self.relx, self.rely, self.height, self.width)
-    # self.relx += 1
-    # self.rely += 1
-    # self.height -= 1
-    # self.width -= 1
-    # super().update(clear=False)
-    # (self.relx, self.rely, self.height, self.width) = (relx, rely, height, width)
 
 
 class TextBox(npyscreen.BoxTitle):

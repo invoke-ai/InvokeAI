@@ -35,18 +35,17 @@ access.
 
 ## Backend
 
-The backend is contained within the `./invokeai/backend` folder structure. To
-get started however please install the development dependencies.
+The backend is contained within the `./invokeai/backend` and `./invokeai/app` directories.
+To get started please install the development dependencies.
 
 From the root of the repository run the following command. Note the use of `"`.
 
 ```zsh
-pip install ".[test]"
+pip install ".[dev,test]"
 ```
 
-This in an optional group of packages which is defined within the
-`pyproject.toml` and will be required for testing the changes you make the the
-code.
+These are optional groups of packages which are defined within the `pyproject.toml`
+and will be required for testing the changes you make to the code.
 
 ### Running Tests
 
@@ -75,6 +74,20 @@ pytest --cov; open ./coverage/html/index.html
     ![html-overview](../assets/contributing/html-overview.png)
 
     ![html-detail](../assets/contributing/html-detail.png)
+
+### Reloading Changes
+
+Experimenting with changes to the Python source code is a drag if you have to re-start the server —
+and re-load those multi-gigabyte models —
+after every change.
+
+For a faster development workflow, add the `--dev_reload` flag when starting the server.
+The server will watch for changes to all the Python files in the `invokeai` directory and apply those changes to the
+running server on the fly.
+
+This will allow you to avoid restarting the server (and reloading models) in most cases, but there are some caveats; see
+the [jurigged documentation](https://github.com/breuleux/jurigged#caveats) for details.
+
 
 ## Front End
 

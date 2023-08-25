@@ -6,7 +6,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 const selector = createSelector(
@@ -66,7 +66,7 @@ const BoardAutoAddSelect = () => {
       label="Auto-Add Board"
       inputRef={inputRef}
       autoFocus
-      placeholder={'Select a Board'}
+      placeholder="Select a Board"
       value={autoAddBoardId}
       data={boards}
       nothingFound="No matching Boards"
@@ -81,4 +81,4 @@ const BoardAutoAddSelect = () => {
   );
 };
 
-export default BoardAutoAddSelect;
+export default memo(BoardAutoAddSelect);

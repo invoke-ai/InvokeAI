@@ -25,14 +25,15 @@ export const INPAINT_IMAGE_RESIZE_DOWN = 'inpaint_image_resize_down';
 export const INPAINT_INFILL = 'inpaint_infill';
 export const INPAINT_INFILL_RESIZE_DOWN = 'inpaint_infill_resize_down';
 export const INPAINT_FINAL_IMAGE = 'inpaint_final_image';
-export const SEAM_FIX_DENOISE_LATENTS = 'seam_fix_denoise_latents';
+export const CANVAS_COHERENCE_DENOISE_LATENTS =
+  'canvas_coherence_denoise_latents';
+export const CANVAS_COHERENCE_NOISE = 'canvas_coherence_noise';
+export const CANVAS_COHERENCE_NOISE_INCREMENT =
+  'canvas_coherence_noise_increment';
 export const MASK_FROM_ALPHA = 'tomask';
 export const MASK_EDGE = 'mask_edge';
 export const MASK_BLUR = 'mask_blur';
 export const MASK_COMBINE = 'mask_combine';
-export const SEAM_MASK_COMBINE = 'seam_mask_combine';
-export const SEAM_MASK_RESIZE_UP = 'seam_mask_resize_up';
-export const SEAM_MASK_RESIZE_DOWN = 'seam_mask_resize_down';
 export const MASK_RESIZE_UP = 'mask_resize_up';
 export const MASK_RESIZE_DOWN = 'mask_resize_down';
 export const COLOR_CORRECT = 'color_correct';

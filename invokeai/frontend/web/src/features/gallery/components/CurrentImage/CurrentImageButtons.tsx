@@ -26,7 +26,7 @@ import {
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -323,4 +323,4 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   );
 };
 
-export default CurrentImageButtons;
+export default memo(CurrentImageButtons);
