@@ -30,6 +30,12 @@ To use a community node graph, download the the `.json` node graph file and load
 
 **Node Link:** https://github.com/JPPhoto/ideal-size-node
 
+<hr>
+
+### Oobabooga
+
+** Description:** asks a local LLM running in Oobabooga's Text-Generation-Webui to write a prompt based on the user input.
+
 --------------------------------
 ### Example Node Template
 
