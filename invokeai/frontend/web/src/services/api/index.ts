@@ -7,6 +7,7 @@ import {
   fetchBaseQuery,
 } from '@reduxjs/toolkit/query/react';
 import { $authToken, $baseUrl, $projectId } from 'services/api/client';
+import { undefined } from 'zod';
 
 export const tagTypes = [
   'Board',
@@ -29,6 +30,17 @@ const dynamicBaseQuery: BaseQueryFn<
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
   const baseUrl = $baseUrl.get();
+  console.log({ baseUrl })
+  if (baseUrl === undefined) {
+    return {
+      error: {
+        status: 400,
+        statusText: 'Bad Request',
+        data: 'No baseUrl set',
+      },
+    }
+  }
+
   const authToken = $authToken.get();
   const projectId = $projectId.get();
 

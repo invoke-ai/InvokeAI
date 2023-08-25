@@ -39,6 +39,7 @@ const InvokeAIUI = ({
 }: Props) => {
   const [isReady, setIsReady] = useState(false);
   useEffect(() => {
+    console.log({ apiUrl });
     if (token && apiUrl && projectId) {
       $authToken.set(token);
       $baseUrl.set(apiUrl);
@@ -49,6 +50,7 @@ const InvokeAIUI = ({
       $baseUrl.set(apiUrl);
       setIsReady(true);
     } else {
+      $baseUrl.set('');
       setIsReady(true);
     }
 
