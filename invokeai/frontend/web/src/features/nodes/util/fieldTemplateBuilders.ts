@@ -467,7 +467,7 @@ export const buildInputFieldTemplate = (
   const fieldType = getFieldType(fieldSchema);
   // console.log('input fieldType', fieldType);
 
-  const { input, ui_hidden, ui_component, ui_type } = fieldSchema;
+  const { input, ui_hidden, ui_component, ui_type, ui_order } = fieldSchema;
 
   const extra = {
     input,
@@ -475,6 +475,7 @@ export const buildInputFieldTemplate = (
     ui_component,
     ui_type,
     required: nodeSchema.required?.includes(name) ?? false,
+    ui_order,
   };
 
   const baseField = {

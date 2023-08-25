@@ -32,6 +32,10 @@ const selector = createSelector(
     }
 
     if (activeTabName === 'nodes' && nodes.shouldValidateGraph) {
+      if (!nodes.nodes.length) {
+        reasons.push('No nodes in graph');
+      }
+
       nodes.nodes.forEach((node) => {
         if (!isInvocationNode(node)) {
           return;

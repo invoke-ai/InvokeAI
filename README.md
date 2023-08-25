@@ -43,7 +43,7 @@ Web Interface, interactive Command Line Interface, and also serves as
 the foundation for multiple commercial products.
 
 **Quick links**: [[How to
-  Install](https://invoke-ai.github.io/InvokeAI/#installation)] [<a
+  Install](https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/)] [<a
   href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a
   href="https://invoke-ai.github.io/InvokeAI/">Documentation and
   Tutorials</a>] [<a
@@ -81,7 +81,7 @@ Table of Contents 📝
 ## Quick Start
 
 For full installation and upgrade instructions, please see:
-[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/)
 
 If upgrading from version 2.3, please read [Migrating a 2.3 root
 directory to 3.0](#migrating-to-3) first.

@@ -49,7 +49,7 @@ const InitialImageDisplay = () => {
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 'base',
-        p: 4,
+        p: 2,
         gap: 4,
       }}
     >
@@ -64,6 +64,7 @@ const InitialImageDisplay = () => {
       >
         <Text
           sx={{
+            ps: 2,
             fontWeight: 600,
             userSelect: 'none',
             color: 'base.700',

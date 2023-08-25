@@ -18,7 +18,6 @@ import { FaImages, FaServer } from 'react-icons/fa';
 import { galleryViewChanged } from '../store/gallerySlice';
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
-import GalleryPinButton from './GalleryPinButton';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 
@@ -75,7 +74,6 @@ const ImageGalleryContent = () => {
             onToggle={onToggleBoardList}
           />
           <GallerySettingsPopover />
-          <GalleryPinButton />
         </Flex>
         <Box>
           <BoardsList isOpen={isBoardListOpen} />

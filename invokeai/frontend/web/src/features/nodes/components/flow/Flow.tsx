@@ -1,5 +1,8 @@
 import { useToken } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { contextMenusClosed } from 'features/ui/store/uiSlice';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -39,11 +42,6 @@ import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
 import CurrentImageNode from './nodes/CurrentImage/CurrentImageNode';
 import InvocationNodeWrapper from './nodes/Invocation/InvocationNodeWrapper';
 import NotesNode from './nodes/Notes/NotesNode';
-import BottomLeftPanel from './panels/BottomLeftPanel/BottomLeftPanel';
-import MinimapPanel from './panels/MinimapPanel/MinimapPanel';
-import TopCenterPanel from './panels/TopCenterPanel/TopCenterPanel';
-import TopLeftPanel from './panels/TopLeftPanel/TopLeftPanel';
-import TopRightPanel from './panels/TopRightPanel/TopRightPanel';
 
 const DELETE_KEYS = ['Delete', 'Backspace'];
 
@@ -61,14 +59,24 @@ const nodeTypes = {
 // TODO: can we support reactflow? if not, we could style the attribution so it matches the app
 const proOptions: ProOptions = { hideAttribution: true };
 
+const selector = createSelector(
+  stateSelector,
+  ({ nodes }) => {
+    const { shouldSnapToGrid, selectionMode } = nodes;
+    return {
+      shouldSnapToGrid,
+      selectionMode,
+    };
+  },
+  defaultSelectorOptions
+);
+
 export const Flow = () => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((state) => state.nodes.nodes);
   const edges = useAppSelector((state) => state.nodes.edges);
   const viewport = useAppSelector((state) => state.nodes.viewport);
-  const shouldSnapToGrid = useAppSelector(
-    (state) => state.nodes.shouldSnapToGrid
-  );
+  const { shouldSnapToGrid, selectionMode } = useAppSelector(selector);
 
   const isValidConnection = useIsValidConnection();
 
@@ -181,12 +189,8 @@ export const Flow = () => {
       style={{ borderRadius }}
       onPaneClick={handlePaneClick}
       deleteKeyCode={DELETE_KEYS}
+      selectionMode={selectionMode}
     >
-      <TopLeftPanel />
-      <TopCenterPanel />
-      <TopRightPanel />
-      <BottomLeftPanel />
-      <MinimapPanel />
       <Background />
     </ReactFlow>
   );

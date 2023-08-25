@@ -1,14 +1,14 @@
-import { Box, Flex, Spinner, SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, Spinner } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'features/dnd/types';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
+import {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'features/dnd/types';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -21,7 +21,7 @@ import {
 
 type Props = {
   controlNet: ControlNetConfig;
-  height: SystemStyleObject['h'];
+  isSmall?: boolean;
 };
 
 const selector = createSelector(
@@ -36,15 +36,14 @@ const selector = createSelector(
   defaultSelectorOptions
 );
 
-const ControlNetImagePreview = (props: Props) => {
-  const { height } = props;
+const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
   const {
     controlImage: controlImageName,
     processedControlImage: processedControlImageName,
     processorType,
     isEnabled,
     controlNetId,
-  } = props.controlNet;
+  } = controlNet;
 
   const dispatch = useAppDispatch();
 
@@ -109,7 +108,7 @@ const ControlNetImagePreview = (props: Props) => {
       sx={{
         position: 'relative',
         w: 'full',
-        h: height,
+        h: isSmall ? 28 : 366, // magic no touch
         alignItems: 'center',
         justifyContent: 'center',
         pointerEvents: isEnabled ? 'auto' : 'none',
