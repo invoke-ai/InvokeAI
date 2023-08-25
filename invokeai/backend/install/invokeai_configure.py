@@ -50,7 +50,6 @@ from invokeai.frontend.install.model_install import addModelsForm, process_and_e
 
 # TO DO - Move all the frontend code into invokeai.frontend.install
 from invokeai.frontend.install.widgets import (
-    SingleSelectColumns,
     SingleSelectColumnsSimple,
     MultiSelectColumns,
     CenteredButtonPress,
@@ -409,7 +408,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             SingleSelectColumnsSimple,
             columns=len(DEVICE_CHOICES),
             values=DEVICE_CHOICES,
-            value=DEVICE_CHOICES.index(device),
+            value=[DEVICE_CHOICES.index(device)],
             begin_entry_at=3,
             relx=30,
             max_height=2,
@@ -429,7 +428,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             SingleSelectColumnsSimple,
             columns=len(ATTENTION_CHOICES),
             values=ATTENTION_CHOICES,
-            value=ATTENTION_CHOICES.index(attention_type),
+            value=[ATTENTION_CHOICES.index(attention_type)],
             begin_entry_at=3,
             max_height=2,
             relx=30,
@@ -451,14 +450,13 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             SingleSelectColumnsSimple,
             columns=len(ATTENTION_SLICE_CHOICES),
             values=ATTENTION_SLICE_CHOICES,
-            value=ATTENTION_SLICE_CHOICES.index(attention_slice_size),
+            value=[ATTENTION_SLICE_CHOICES.index(attention_slice_size)],
             relx=30,
             hidden=attention_type != "sliced",
             max_height=2,
             max_width=110,
             scroll_exit=True,
         )
-
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
             name="Model RAM cache size (GB). Make this at least large enough to hold a single full model.",
@@ -609,13 +607,7 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
         new_opts.precision = PRECISION_CHOICES[self.precision.value[0]]
         new_opts.device = DEVICE_CHOICES[self.device.value[0]]
         new_opts.attention_type = ATTENTION_CHOICES[self.attention_type.value[0]]
-
-        # some sort of bug in npyscreen?
-        attention_slice_value = self.attention_slice_size.value
-        if type(attention_slice_value) == list:
-            attention_slice_value = attention_slice_value[0]
-        new_opts.attention_slice_size = ATTENTION_SLICE_CHOICES[attention_slice_value]
-
+        new_opts.attention_slice_size = ATTENTION_SLICE_CHOICES[self.attention_slice_size.value[0]]
         generation_options = [GENERATION_OPT_CHOICES[x] for x in self.generation_options.value]
         for v in GENERATION_OPT_CHOICES:
             setattr(new_opts, v, v in generation_options)

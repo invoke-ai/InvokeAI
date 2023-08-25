@@ -264,15 +264,14 @@ class SingleSelectWithChanged(npyscreen.SelectOne):
 
 
 class SingleSelectColumnsSimple(SelectColumnBase, SingleSelectWithChanged):
+    """Row of radio buttons. Spacebar to select."""
+
     def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
         self.columns = columns
         self.value_cnt = len(values)
         self.rows = math.ceil(self.value_cnt / self.columns)
         self.on_changed = None
         super().__init__(screen, values=values, **keywords)
-
-    def when_value_edited(self):
-        self.h_select(self.cursor_line)
 
     def h_cursor_line_right(self, ch):
         self.h_exit_down("bye bye")
@@ -282,6 +281,8 @@ class SingleSelectColumnsSimple(SelectColumnBase, SingleSelectWithChanged):
 
 
 class SingleSelectColumns(SingleSelectColumnsSimple):
+    """Row of radio buttons. When tabbing over a selection, it is auto selected."""
+
     def when_cursor_moved(self):
         self.h_select(self.cursor_line)
 
