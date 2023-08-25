@@ -31,18 +31,18 @@ To use a community node graph, download the the `.json` node graph file and load
 **Node Link:** https://github.com/JPPhoto/ideal-size-node
 
 --------------------------------
-### Example Node Template
+### Load Video Frame
 
-**Description:** This node allows you to do super cool things with InvokeAI.
+**Description:** This is a video frame image provider + indexer/video creation nodes for hooking up to iterators and ranges and ControlNets and such for invokeAI node experimentation. Think animation + ControlNet outputs.
 
-**Node Link:** https://github.com/invoke-ai/InvokeAI/fake_node.py
+**Node Link:** https://github.com/helix4u/load_video_frame/blob/main/video_frame_provider.py
 
-**Example Node Graph:**  https://github.com/invoke-ai/InvokeAI/fake_node_graph.json
+**Example Node Graph:**  https://github.com/helix4u/load_video_frame/blob/main/Example_Workflow.json
 
-**Output Examples** 
+**Output Example:** 
 
-![Example Image](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png){: style="height:115px;width:240px"}
-
+![Example animation](https://github.com/helix4u/load_video_frame/blob/main/testmp4_embed_converted.gif)
+[Full mp4 of Example Output test.mp4](https://github.com/helix4u/load_video_frame/blob/main/test.mp4)
 
 ## Disclaimer
 
