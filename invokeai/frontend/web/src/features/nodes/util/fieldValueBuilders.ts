@@ -49,7 +49,7 @@ export const buildInputFieldValue = (
     fieldValue.value = [];
   }
 
-  if (template.type === 'InpaintMaskField') {
+  if (template.type === 'DenoiseMaskField') {
     fieldValue.value = undefined;
   }
 

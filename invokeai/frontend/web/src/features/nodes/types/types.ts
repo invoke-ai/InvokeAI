@@ -64,7 +64,7 @@ export const zFieldType = z.enum([
   'string',
   'array',
   'ImageField',
-  'InpaintMaskField',
+  'DenoiseMaskField',
   'LatentsField',
   'ConditioningField',
   'ControlField',
@@ -121,7 +121,7 @@ export type InputFieldTemplate =
   | StringInputFieldTemplate
   | BooleanInputFieldTemplate
   | ImageInputFieldTemplate
-  | InpaintMaskInputFieldTemplate
+  | DenoiseMaskInputFieldTemplate
   | LatentsInputFieldTemplate
   | ConditioningInputFieldTemplate
   | UNetInputFieldTemplate
@@ -207,11 +207,11 @@ export const zConditioningField = z.object({
 });
 export type ConditioningField = z.infer<typeof zConditioningField>;
 
-export const zInpaintMaskField = z.object({
+export const zDenoiseMaskField = z.object({
   mask_name: z.string().trim().min(1),
   masked_latents_name: z.string().trim().min(1).optional(),
 });
-export type InpaintMaskFieldValue = z.infer<typeof zInpaintMaskField>;
+export type DenoiseMaskFieldValue = z.infer<typeof zDenoiseMaskField>;
 
 export const zIntegerInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('integer'),
@@ -249,12 +249,12 @@ export const zLatentsInputFieldValue = zInputFieldValueBase.extend({
 });
 export type LatentsInputFieldValue = z.infer<typeof zLatentsInputFieldValue>;
 
-export const zInpaintMaskInputFieldValue = zInputFieldValueBase.extend({
-  type: z.literal('InpaintMaskField'),
-  value: zInpaintMaskField.optional(),
+export const zDenoiseMaskInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('DenoiseMaskField'),
+  value: zDenoiseMaskField.optional(),
 });
-export type InpaintMaskInputFieldValue = z.infer<
-  typeof zInpaintMaskInputFieldValue
+export type DenoiseMaskInputFieldValue = z.infer<
+  typeof zDenoiseMaskInputFieldValue
 >;
 
 export const zConditioningInputFieldValue = zInputFieldValueBase.extend({
@@ -475,7 +475,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zBooleanInputFieldValue,
   zImageInputFieldValue,
   zLatentsInputFieldValue,
-  zInpaintMaskInputFieldValue,
+  zDenoiseMaskInputFieldValue,
   zConditioningInputFieldValue,
   zUNetInputFieldValue,
   zClipInputFieldValue,
@@ -549,9 +549,9 @@ export type ImageCollectionInputFieldTemplate = InputFieldTemplateBase & {
   type: 'ImageCollection';
 };
 
-export type InpaintMaskInputFieldTemplate = InputFieldTemplateBase & {
+export type DenoiseMaskInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
-  type: 'InpaintMaskField';
+  type: 'DenoiseMaskField';
 };
 
 export type LatentsInputFieldTemplate = InputFieldTemplateBase & {

@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
-  CreateInpaintMaskInvocation,
+  CreateDenoiseMaskInvocation,
   ImageBlurInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
@@ -139,7 +139,7 @@ export const buildCanvasSDXLInpaintGraph = (
         is_intermediate: true,
       },
       [INPAINT_CREATE_MASK]: {
-        type: 'create_inpaint_mask',
+        type: 'create_denoise_mask',
         id: INPAINT_CREATE_MASK,
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
@@ -312,11 +312,11 @@ export const buildCanvasSDXLInpaintGraph = (
       {
         source: {
           node_id: INPAINT_CREATE_MASK,
-          field: 'inpaint_mask',
+          field: 'denoise_mask',
         },
         destination: {
           node_id: SDXL_DENOISE_LATENTS,
-          field: 'mask',
+          field: 'denoise_mask',
         },
       },
       // Iterate
@@ -560,7 +560,7 @@ export const buildCanvasSDXLInpaintGraph = (
       image: canvasMaskImage,
     };
     graph.nodes[INPAINT_CREATE_MASK] = {
-      ...(graph.nodes[INPAINT_CREATE_MASK] as CreateInpaintMaskInvocation),
+      ...(graph.nodes[INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
       image: canvasInitImage,
     };
 

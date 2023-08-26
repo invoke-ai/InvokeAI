@@ -10,10 +10,10 @@ import ColorInputField from './inputs/ColorInputField';
 import ConditioningInputField from './inputs/ConditioningInputField';
 import ControlInputField from './inputs/ControlInputField';
 import ControlNetModelInputField from './inputs/ControlNetModelInputField';
+import DenoiseMaskInputField from './inputs/DenoiseMaskInputField';
 import EnumInputField from './inputs/EnumInputField';
 import ImageCollectionInputField from './inputs/ImageCollectionInputField';
 import ImageInputField from './inputs/ImageInputField';
-import InpaintMaskInputField from './inputs/InpaintMaskInputField';
 import LatentsInputField from './inputs/LatentsInputField';
 import LoRAModelInputField from './inputs/LoRAModelInputField';
 import MainModelInputField from './inputs/MainModelInputField';
@@ -107,11 +107,11 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   }
 
   if (
-    field?.type === 'InpaintMaskField' &&
-    fieldTemplate?.type === 'InpaintMaskField'
+    field?.type === 'DenoiseMaskField' &&
+    fieldTemplate?.type === 'DenoiseMaskField'
   ) {
     return (
-      <InpaintMaskInputField
+      <DenoiseMaskInputField
         nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}

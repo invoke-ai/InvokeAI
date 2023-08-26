@@ -155,7 +155,7 @@ export const buildCanvasOutpaintGraph = (
         is_intermediate: true,
       },
       [INPAINT_CREATE_MASK]: {
-        type: 'create_inpaint_mask',
+        type: 'create_denoise_mask',
         id: INPAINT_CREATE_MASK,
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
@@ -338,11 +338,11 @@ export const buildCanvasOutpaintGraph = (
       {
         source: {
           node_id: INPAINT_CREATE_MASK,
-          field: 'inpaint_mask',
+          field: 'denoise_mask',
         },
         destination: {
           node_id: DENOISE_LATENTS,
-          field: 'mask',
+          field: 'denoise_mask',
         },
       },
       // Iterate

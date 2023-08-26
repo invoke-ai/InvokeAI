@@ -8,12 +8,12 @@ import {
   ConditioningInputFieldTemplate,
   ControlInputFieldTemplate,
   ControlNetModelInputFieldTemplate,
+  DenoiseMaskInputFieldTemplate,
   EnumInputFieldTemplate,
   FieldType,
   FloatInputFieldTemplate,
   ImageCollectionInputFieldTemplate,
   ImageInputFieldTemplate,
-  InpaintMaskInputFieldTemplate,
   InputFieldTemplateBase,
   IntegerInputFieldTemplate,
   InvocationFieldSchema,
@@ -264,13 +264,13 @@ const buildImageCollectionInputFieldTemplate = ({
   return template;
 };
 
-const buildInpaintMaskInputFieldTemplate = ({
+const buildDenoiseMaskInputFieldTemplate = ({
   schemaObject,
   baseField,
-}: BuildInputFieldArg): InpaintMaskInputFieldTemplate => {
-  const template: InpaintMaskInputFieldTemplate = {
+}: BuildInputFieldArg): DenoiseMaskInputFieldTemplate => {
+  const template: DenoiseMaskInputFieldTemplate = {
     ...baseField,
-    type: 'InpaintMaskField',
+    type: 'DenoiseMaskField',
     default: schemaObject.default ?? undefined,
   };
 
@@ -512,8 +512,8 @@ export const buildInputFieldTemplate = (
       baseField,
     });
   }
-  if (fieldType === 'InpaintMaskField') {
-    return buildInpaintMaskInputFieldTemplate({
+  if (fieldType === 'DenoiseMaskField') {
+    return buildDenoiseMaskInputFieldTemplate({
       schemaObject: fieldSchema,
       baseField,
     });
