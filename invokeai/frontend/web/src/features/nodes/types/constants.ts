@@ -62,7 +62,7 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
   DenoiseMaskField: {
     title: 'Denoise Mask',
     description: 'Denoise Mask may be passed between nodes',
-    color: 'purple.500',
+    color: 'red.300',
   },
   LatentsField: {
     title: 'Latents',
