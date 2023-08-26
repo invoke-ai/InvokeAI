@@ -1607,6 +1607,11 @@ export type components = {
        */
       type: "create_denoise_mask";
       /**
+       * Vae
+       * @description VAE
+       */
+      vae?: components["schemas"]["VaeField"];
+      /**
        * Image
        * @description Image which will be masked
        */
@@ -1616,11 +1621,6 @@ export type components = {
        * @description The mask to use when pasting
        */
       mask?: components["schemas"]["ImageField"];
-      /**
-       * Vae
-       * @description VAE
-       */
-      vae?: components["schemas"]["VaeField"];
       /**
        * Tiled
        * @description Processing using overlapping tiles (reduce memory consumption)
@@ -2995,6 +2995,11 @@ export type components = {
        * @enum {string}
        */
       resample_mode?: "nearest" | "box" | "bilinear" | "hamming" | "bicubic" | "lanczos";
+      /**
+       * Metadata
+       * @description Optional core metadata to be written to image
+       */
+      metadata?: components["schemas"]["CoreMetadata"];
     };
     /**
      * Image Saturation Adjustment
@@ -6408,18 +6413,6 @@ export type components = {
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
-     * StableDiffusionXLModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
      * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -6431,6 +6424,18 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionXLModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;

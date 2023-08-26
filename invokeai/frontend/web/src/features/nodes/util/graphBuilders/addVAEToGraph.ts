@@ -31,6 +31,11 @@ export const addVAEToGraph = (
   modelLoaderNodeId: string = MAIN_MODEL_LOADER
 ): void => {
   const { vae } = state.generation;
+  const { boundingBoxScaleMethod } = state.canvas;
+
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(
+    boundingBoxScaleMethod
+  );
 
   const isAutoVae = !vae;
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
@@ -77,7 +82,7 @@ export const addVAEToGraph = (
         field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
       },
       destination: {
-        node_id: CANVAS_OUTPUT,
+        node_id: isUsingScaledDimensions ? LATENTS_TO_IMAGE : CANVAS_OUTPUT,
         field: 'vae',
       },
     });

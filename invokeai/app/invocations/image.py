@@ -375,6 +375,11 @@ class ImageResizeInvocation(BaseInvocation):
     width: int = InputField(default=512, ge=64, multiple_of=8, description="The width to resize to (px)")
     height: int = InputField(default=512, ge=64, multiple_of=8, description="The height to resize to (px)")
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
+    metadata: CoreMetadata = InputField(
+        default=None,
+        description=FieldDescriptions.core_metadata,
+        ui_hidden=True,
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
