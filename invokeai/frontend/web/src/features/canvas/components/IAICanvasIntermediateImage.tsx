@@ -4,7 +4,7 @@ import { systemSelector } from 'features/system/store/systemSelectors';
 import { ImageConfig } from 'konva/lib/shapes/Image';
 import { isEqual } from 'lodash-es';
 
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
 import { canvasSelector } from '../store/canvasSelectors';
 
@@ -66,4 +66,4 @@ const IAICanvasIntermediateImage = (props: Props) => {
   ) : null;
 };
 
-export default IAICanvasIntermediateImage;
+export default memo(IAICanvasIntermediateImage);

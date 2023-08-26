@@ -1,7 +1,7 @@
 import { FlexProps, Grid, forwardRef } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, memo } from 'react';
 
 type ListContainerProps = PropsWithChildren & FlexProps;
 const ListContainer = forwardRef((props: ListContainerProps, ref) => {
@@ -23,4 +23,4 @@ const ListContainer = forwardRef((props: ListContainerProps, ref) => {
   );
 });
 
-export default ListContainer;
+export default memo(ListContainer);

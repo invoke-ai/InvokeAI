@@ -1,4 +1,5 @@
 import { Flex } from '@chakra-ui/react';
+import { memo } from 'react';
 import CancelButton from './CancelButton';
 import InvokeButton from './InvokeButton';
 
@@ -7,11 +8,11 @@ import InvokeButton from './InvokeButton';
  */
 const ProcessButtons = () => {
   return (
-    <Flex gap={2}>
+    <Flex layerStyle="first" sx={{ gap: 2, borderRadius: 'base', p: 2 }}>
       <InvokeButton />
       <CancelButton />
     </Flex>
   );
 };
 
-export default ProcessButtons;
+export default memo(ProcessButtons);

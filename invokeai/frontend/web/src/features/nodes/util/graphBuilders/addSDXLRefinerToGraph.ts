@@ -33,7 +33,9 @@ export const addSDXLRefinerToGraph = (
     refinerStart,
   } = state.sdxl;
 
-  if (!refinerModel) return;
+  if (!refinerModel) {
+    return;
+  }
 
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
     | MetadataAccumulatorInvocation

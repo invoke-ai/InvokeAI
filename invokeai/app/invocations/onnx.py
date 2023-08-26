@@ -169,7 +169,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
         ui_type=UIType.Float,
     )
     scheduler: SAMPLER_NAME_VALUES = InputField(
-        default="euler", description=FieldDescriptions.scheduler, input=Input.Direct
+        default="euler", description=FieldDescriptions.scheduler, input=Input.Direct, ui_type=UIType.Scheduler
     )
     precision: PRECISION_VALUES = InputField(default="tensor(float16)", description=FieldDescriptions.precision)
     unet: UNetField = InputField(
@@ -406,7 +406,7 @@ class OnnxModelField(BaseModel):
     model_type: ModelType = Field(description="Model Type")
 
 
-@title("ONNX Model Loader")
+@title("ONNX Main Model")
 @tags("onnx", "model")
 class OnnxModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""

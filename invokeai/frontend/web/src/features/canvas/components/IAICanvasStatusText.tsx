@@ -7,6 +7,7 @@ import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
 import roundToHundreth from '../util/roundToHundreth';
 import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
+import { memo } from 'react';
 
 const warningColor = 'var(--invokeai-colors-warning-500)';
 
@@ -162,4 +163,4 @@ const IAICanvasStatusText = () => {
   );
 };
 
-export default IAICanvasStatusText;
+export default memo(IAICanvasStatusText);
