@@ -8,27 +8,21 @@ import numpy as np
 import torch
 import torchvision.transforms as T
 from diffusers.image_processor import VaeImageProcessor
-from diffusers.models.attention_processor import (
-    AttnProcessor2_0,
-    LoRAAttnProcessor2_0,
-    LoRAXFormersAttnProcessor,
-    XFormersAttnProcessor,
-)
+from diffusers.models.attention_processor import (AttnProcessor2_0,
+                                                  LoRAAttnProcessor2_0,
+                                                  LoRAXFormersAttnProcessor,
+                                                  XFormersAttnProcessor)
 from diffusers.schedulers import DPMSolverSDEScheduler
 from diffusers.schedulers import SchedulerMixin as Scheduler
 from pydantic import validator
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.metadata import CoreMetadata
-from invokeai.app.invocations.primitives import (
-    DenoiseMaskField,
-    DenoiseMaskOutput,
-    ImageField,
-    ImageOutput,
-    LatentsField,
-    LatentsOutput,
-    build_latents_output,
-)
+from invokeai.app.invocations.primitives import (DenoiseMaskField,
+                                                 DenoiseMaskOutput, ImageField,
+                                                 ImageOutput, LatentsField,
+                                                 LatentsOutput,
+                                                 build_latents_output)
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
@@ -37,16 +31,16 @@ from ...backend.model_management.lora import ModelPatcher
 from ...backend.model_management.models import BaseModelType
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
-    ConditioningData,
-    ControlNetData,
-    StableDiffusionGeneratorPipeline,
-    image_resized_to_grid_as_tensor,
-)
-from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
+    ConditioningData, ControlNetData, StableDiffusionGeneratorPipeline,
+    image_resized_to_grid_as_tensor)
+from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import \
+    PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
 from ..models.image import ImageCategory, ResourceOrigin
-from .baseinvocation import BaseInvocation, FieldDescriptions, Input, InputField, InvocationContext, UIType, tags, title
+from .baseinvocation import (BaseInvocation, FieldDescriptions, Input,
+                             InputField, InvocationContext, UIType, tags,
+                             title)
 from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
 from .model import ModelInfo, UNetField, VaeField
@@ -66,14 +60,15 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
     type: Literal["create_denoise_mask"] = "create_denoise_mask"
 
     # Inputs
-    image: Optional[ImageField] = InputField(default=None, description="Image which will be masked")
-    mask: ImageField = InputField(description="The mask to use when pasting")
     vae: VaeField = InputField(
         description=FieldDescriptions.vae,
         input=Input.Connection,
+        ui_order=0
     )
-    tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
-    fp32: bool = InputField(default=DEFAULT_PRECISION == "float32", description=FieldDescriptions.fp32)
+    image: Optional[ImageField] = InputField(default=None, description="Image which will be masked", ui_order=1)
+    mask: ImageField = InputField(description="The mask to use when pasting", ui_order=2)
+    tiled: bool = InputField(default=False, description=FieldDescriptions.tiled, ui_order=3)
+    fp32: bool = InputField(default=DEFAULT_PRECISION == "float32", description=FieldDescriptions.fp32, ui_order=4)
 
     def prep_mask_tensor(self, mask_image):
         if mask_image.mode != "L":
