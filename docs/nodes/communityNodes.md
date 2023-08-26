@@ -53,6 +53,19 @@ Generated Prompt: An enchanted weapon will be usable by any character regardless
 
 ![9acf5aef-7254-40dd-95b3-8eac431dfab0 (1)](https://github.com/mickr777/InvokeAI/assets/115216705/8496ba09-bcdd-4ff7-8076-ff213b6a1e4c)
 
+--------------------------------
+### Load Video Frame
+
+**Description:** This is a video frame image provider + indexer/video creation nodes for hooking up to iterators and ranges and ControlNets and such for invokeAI node experimentation. Think animation + ControlNet outputs.
+
+**Node Link:** https://github.com/helix4u/load_video_frame
+
+**Example Node Graph:**  https://github.com/helix4u/load_video_frame/blob/main/Example_Workflow.json
+
+**Output Example:** 
+=======
+![Example animation](https://github.com/helix4u/load_video_frame/blob/main/testmp4_embed_converted.gif)
+[Full mp4 of Example Output test.mp4](https://github.com/helix4u/load_video_frame/blob/main/test.mp4)
 
 --------------------------------
 
@@ -83,6 +96,7 @@ a Text-Generation-Webui instance (might work remotely too, but I never tried it)
 This node works best with SDXL models, especially as the style can be described independantly of the LLM's output.
 
 --------------------------------
+
 ### Example Node Template
 
 **Description:** This node allows you to do super cool things with InvokeAI.
