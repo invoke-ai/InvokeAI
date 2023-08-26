@@ -9,6 +9,7 @@ import {
   CANVAS_TEXT_TO_IMAGE_GRAPH,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
+  INPAINT_CREATE_MASK,
   INPAINT_IMAGE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
@@ -114,6 +115,16 @@ export const addVAEToGraph = (
         },
         destination: {
           node_id: INPAINT_IMAGE,
+          field: 'vae',
+        },
+      },
+      {
+        source: {
+          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
           field: 'vae',
         },
       },

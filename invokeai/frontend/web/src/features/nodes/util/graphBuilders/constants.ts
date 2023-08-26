@@ -25,6 +25,7 @@ export const INPAINT_IMAGE_RESIZE_DOWN = 'inpaint_image_resize_down';
 export const INPAINT_INFILL = 'inpaint_infill';
 export const INPAINT_INFILL_RESIZE_DOWN = 'inpaint_infill_resize_down';
 export const INPAINT_FINAL_IMAGE = 'inpaint_final_image';
+export const INPAINT_CREATE_MASK = 'inpaint_create_mask';
 export const CANVAS_COHERENCE_DENOISE_LATENTS =
   'canvas_coherence_denoise_latents';
 export const CANVAS_COHERENCE_NOISE = 'canvas_coherence_noise';
