@@ -110,40 +110,6 @@ export const isFieldType = (value: unknown): value is FieldType =>
   zFieldType.safeParse(value).success;
 
 /**
- * An input field is persisted across reloads as part of the user's local state.
- *
- * An input field has three properties:
- * - `id` a unique identifier
- * - `name` the name of the field, which comes from the python dataclass
- * - `value` the field's value
- */
-export type InputFieldValue =
-  | IntegerInputFieldValue
-  | SeedInputFieldValue
-  | FloatInputFieldValue
-  | StringInputFieldValue
-  | BooleanInputFieldValue
-  | ImageInputFieldValue
-  | InpaintMaskFieldValue
-  | LatentsInputFieldValue
-  | ConditioningInputFieldValue
-  | UNetInputFieldValue
-  | ClipInputFieldValue
-  | VaeInputFieldValue
-  | ControlInputFieldValue
-  | EnumInputFieldValue
-  | MainModelInputFieldValue
-  | SDXLMainModelInputFieldValue
-  | SDXLRefinerModelInputFieldValue
-  | VaeModelInputFieldValue
-  | LoRAModelInputFieldValue
-  | ControlNetModelInputFieldValue
-  | CollectionInputFieldValue
-  | CollectionItemInputFieldValue
-  | ColorInputFieldValue
-  | ImageCollectionInputFieldValue;
-
-/**
  * An input field template is generated on each page load from the OpenAPI schema.
  *
  * The template provides the field type and other field metadata (e.g. title, description,
@@ -241,6 +207,12 @@ export const zConditioningField = z.object({
 });
 export type ConditioningField = z.infer<typeof zConditioningField>;
 
+export const zInpaintMaskField = z.object({
+  mask_name: z.string().trim().min(1),
+  masked_latents_name: z.string().trim().min(1).optional(),
+});
+export type InpaintMaskFieldValue = z.infer<typeof zInpaintMaskField>;
+
 export const zIntegerInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('integer'),
   value: z.number().optional(),
@@ -276,6 +248,14 @@ export const zLatentsInputFieldValue = zInputFieldValueBase.extend({
   value: zLatentsField.optional(),
 });
 export type LatentsInputFieldValue = z.infer<typeof zLatentsInputFieldValue>;
+
+export const zInpaintMaskInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('InpaintMaskField'),
+  value: zInpaintMaskField.optional(),
+});
+export type InpaintMaskInputFieldValue = z.infer<
+  typeof zInpaintMaskInputFieldValue
+>;
 
 export const zConditioningInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('ConditioningField'),
@@ -495,6 +475,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zBooleanInputFieldValue,
   zImageInputFieldValue,
   zLatentsInputFieldValue,
+  zInpaintMaskInputFieldValue,
   zConditioningInputFieldValue,
   zUNetInputFieldValue,
   zClipInputFieldValue,

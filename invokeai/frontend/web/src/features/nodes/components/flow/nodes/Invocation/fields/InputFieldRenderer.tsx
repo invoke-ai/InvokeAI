@@ -13,6 +13,7 @@ import ControlNetModelInputField from './inputs/ControlNetModelInputField';
 import EnumInputField from './inputs/EnumInputField';
 import ImageCollectionInputField from './inputs/ImageCollectionInputField';
 import ImageInputField from './inputs/ImageInputField';
+import InpaintMaskInputField from './inputs/InpaintMaskInputField';
 import LatentsInputField from './inputs/LatentsInputField';
 import LoRAModelInputField from './inputs/LoRAModelInputField';
 import MainModelInputField from './inputs/MainModelInputField';
@@ -98,6 +99,19 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   ) {
     return (
       <LatentsInputField
+        nodeId={nodeId}
+        field={field}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  if (
+    field?.type === 'InpaintMaskField' &&
+    fieldTemplate?.type === 'InpaintMaskField'
+  ) {
+    return (
+      <InpaintMaskInputField
         nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
