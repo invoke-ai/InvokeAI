@@ -31,7 +31,7 @@ const FieldTitle = forwardRef((props: Props, ref) => {
 
   const handleSubmit = useCallback(
     async (newTitle: string) => {
-      if (newTitle === label || newTitle === fieldTemplateTitle) {
+      if (newTitle && (newTitle === label || newTitle === fieldTemplateTitle)) {
         return;
       }
       setLocalTitle(newTitle || fieldTemplateTitle || 'Unknown Field');

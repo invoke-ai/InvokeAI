@@ -1,16 +1,13 @@
-import { memo } from 'react';
-import { Panel } from 'reactflow';
-import ViewportControls from './ViewportControls';
-import NodeOpacitySlider from './NodeOpacitySlider';
 import { Flex } from '@chakra-ui/react';
+import { memo } from 'react';
+import NodeOpacitySlider from './NodeOpacitySlider';
+import ViewportControls from './ViewportControls';
 
 const BottomLeftPanel = () => (
-  <Panel position="bottom-left">
-    <Flex sx={{ gap: 2 }}>
-      <ViewportControls />
-      <NodeOpacitySlider />
-    </Flex>
-  </Panel>
+  <Flex sx={{ gap: 2, position: 'absolute', bottom: 2, insetInlineStart: 2 }}>
+    <ViewportControls />
+    <NodeOpacitySlider />
+  </Flex>
 );
 
 export default memo(BottomLeftPanel);

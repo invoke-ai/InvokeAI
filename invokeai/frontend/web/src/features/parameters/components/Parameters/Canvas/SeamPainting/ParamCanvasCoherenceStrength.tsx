@@ -1,36 +1,36 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISlider from 'common/components/IAISlider';
-import { setSeamSteps } from 'features/parameters/store/generationSlice';
+import { setCanvasCoherenceStrength } from 'features/parameters/store/generationSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const ParamSeamSteps = () => {
+const ParamCanvasCoherenceStrength = () => {
   const dispatch = useAppDispatch();
-  const seamSteps = useAppSelector(
-    (state: RootState) => state.generation.seamSteps
+  const canvasCoherenceStrength = useAppSelector(
+    (state: RootState) => state.generation.canvasCoherenceStrength
   );
   const { t } = useTranslation();
 
   return (
     <IAISlider
-      label={t('parameters.seamSteps')}
+      label={t('parameters.coherenceStrength')}
       min={0}
-      max={100}
-      step={1}
+      max={1}
+      step={0.01}
       sliderNumberInputProps={{ max: 999 }}
-      value={seamSteps}
+      value={canvasCoherenceStrength}
       onChange={(v) => {
-        dispatch(setSeamSteps(v));
+        dispatch(setCanvasCoherenceStrength(v));
       }}
       withInput
       withSliderMarks
       withReset
       handleReset={() => {
-        dispatch(setSeamSteps(20));
+        dispatch(setCanvasCoherenceStrength(0.3));
       }}
     />
   );
 };
 
-export default memo(ParamSeamSteps);
+export default memo(ParamCanvasCoherenceStrength);

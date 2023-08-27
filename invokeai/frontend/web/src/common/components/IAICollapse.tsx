@@ -34,14 +34,10 @@ const IAICollapse = (props: IAIToggleCollapseProps) => {
           gap: 2,
           borderTopRadius: 'base',
           borderBottomRadius: isOpen ? 0 : 'base',
-          bg: isOpen
-            ? mode('base.200', 'base.750')(colorMode)
-            : mode('base.150', 'base.800')(colorMode),
+          bg: mode('base.250', 'base.750')(colorMode),
           color: mode('base.900', 'base.100')(colorMode),
           _hover: {
-            bg: isOpen
-              ? mode('base.250', 'base.700')(colorMode)
-              : mode('base.200', 'base.750')(colorMode),
+            bg: mode('base.300', 'base.700')(colorMode),
           },
           fontSize: 'sm',
           fontWeight: 600,
@@ -90,9 +86,10 @@ const IAICollapse = (props: IAIToggleCollapseProps) => {
       <Collapse in={isOpen} animateOpacity style={{ overflow: 'unset' }}>
         <Box
           sx={{
-            p: 4,
+            p: 2,
+            pt: 3,
             borderBottomRadius: 'base',
-            bg: 'base.100',
+            bg: 'base.150',
             _dark: {
               bg: 'base.800',
             },
