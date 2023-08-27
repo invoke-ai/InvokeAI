@@ -412,8 +412,8 @@ class SeamlessModeInvocation(BaseInvocation):
     unet: UNetField = InputField(
         description=FieldDescriptions.unet, input=Input.Connection, title="UNet"
     )
-    vae_model: VAEModelField = InputField(
-        description=FieldDescriptions.vae_model, input=Input.Direct, ui_type=UIType.VaeModel, title="VAE"
+    vae: VaeField = InputField(
+        description=FieldDescriptions.vae_model, input=Input.Any, title="VAE"
     )
     seamless_y: bool = InputField(default=True, input=Input.Any, description="Specify whether Y axis is seamless")
     seamless_x: bool = InputField(default=True, input=Input.Any, description="Specify whether X axis is seamless")
