@@ -50,7 +50,7 @@ from invokeai.frontend.install.model_install import addModelsForm, process_and_e
 
 # TO DO - Move all the frontend code into invokeai.frontend.install
 from invokeai.frontend.install.widgets import (
-    SingleSelectColumns,
+    SingleSelectColumnsSimple,
     MultiSelectColumns,
     CenteredButtonPress,
     FileBox,
@@ -354,7 +354,6 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         device = old_opts.device
         attention_type = old_opts.attention_type
         attention_slice_size = old_opts.attention_slice_size
-
         self.nextrely += 1
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
@@ -385,7 +384,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.nextrely -= 2
         self.precision = self.add_widget_intelligent(
-            SingleSelectColumns,
+            SingleSelectColumnsSimple,
             columns=len(PRECISION_CHOICES),
             name="Precision",
             values=PRECISION_CHOICES,
@@ -406,10 +405,10 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.nextrely -= 2
         self.device = self.add_widget_intelligent(
-            SingleSelectColumns,
+            SingleSelectColumnsSimple,
             columns=len(DEVICE_CHOICES),
             values=DEVICE_CHOICES,
-            value=DEVICE_CHOICES.index(device),
+            value=[DEVICE_CHOICES.index(device)],
             begin_entry_at=3,
             relx=30,
             max_height=2,
@@ -426,10 +425,10 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.nextrely -= 2
         self.attention_type = self.add_widget_intelligent(
-            SingleSelectColumns,
+            SingleSelectColumnsSimple,
             columns=len(ATTENTION_CHOICES),
             values=ATTENTION_CHOICES,
-            value=ATTENTION_CHOICES.index(attention_type),
+            value=[ATTENTION_CHOICES.index(attention_type)],
             begin_entry_at=3,
             max_height=2,
             relx=30,
@@ -448,17 +447,16 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.nextrely -= 2
         self.attention_slice_size = self.add_widget_intelligent(
-            SingleSelectColumns,
+            SingleSelectColumnsSimple,
             columns=len(ATTENTION_SLICE_CHOICES),
             values=ATTENTION_SLICE_CHOICES,
-            value=ATTENTION_SLICE_CHOICES.index(attention_slice_size),
+            value=[ATTENTION_SLICE_CHOICES.index(attention_slice_size)],
             relx=30,
             hidden=attention_type != "sliced",
             max_height=2,
             max_width=110,
             scroll_exit=True,
         )
-
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
             name="Model RAM cache size (GB). Make this at least large enough to hold a single full model.",
@@ -706,8 +704,6 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
             path.mkdir(parents=True, exist_ok=True)
     path = dest / "core"
     path.mkdir(parents=True, exist_ok=True)
-
-    maybe_create_models_yaml(root)
 
 
 def maybe_create_models_yaml(root: Path):

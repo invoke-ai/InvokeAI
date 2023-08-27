@@ -1454,6 +1454,11 @@ export type components = {
        */
       generation_mode: string;
       /**
+       * Created By
+       * @description The name of the creator of the image
+       */
+      created_by?: string;
+      /**
        * Positive Prompt
        * @description The positive prompt parameter
        */
@@ -6320,17 +6325,17 @@ export type components = {
      */
     ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
-    /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
