@@ -33,6 +33,7 @@ class UNetField(BaseModel):
     unet: ModelInfo = Field(description="Info to load unet submodel")
     scheduler: ModelInfo = Field(description="Info to load scheduler submodel")
     loras: List[LoraInfo] = Field(description="Loras to apply on model loading")
+    seamless_axes: List[str] = Field(default_factory=list, description="Axes(\"x\" and \"y\") to which apply seamless")
 
 
 class ClipField(BaseModel):
@@ -387,4 +388,46 @@ class VaeLoaderInvocation(BaseInvocation):
                     model_type=model_type,
                 )
             )
+        )
+
+
+class SeamlessModeOutput(BaseInvocationOutput):
+    """Modified Seamless Model output"""
+
+    type: Literal["seamless_output"] = "seamless_output"
+
+    # Outputs
+    unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
+
+@title("Seamless")
+@tags("seamless", "model")
+class SeamlessModeInvocation(BaseInvocation):
+    """Apply seamless mode to unet."""
+
+    type: Literal["seamless"] = "seamless"
+
+    # Inputs
+    unet: UNetField = InputField(
+        description=FieldDescriptions.unet, input=Input.Connection, title="UNet"
+    )
+
+    seamless_y: bool = InputField(default=True, input=Input.Any, description="Specify whether Y axis is seamless")
+    seamless_x: bool = InputField(default=True, input=Input.Any, description="Specify whether X axis is seamless")
+
+
+    def invoke(self, context: InvocationContext) -> SeamlessModeOutput:
+        # Conditionally append 'x' and 'y' based on seamless_x and seamless_y       
+        unet = copy.deepcopy(self.unet)
+        
+        seamless_axes_list = []
+
+        if self.seamless_x:
+            seamless_axes_list.append('x')
+        if self.seamless_y:
+            seamless_axes_list.append('y')
+
+        unet.seamless_axes = seamless_axes_list
+
+        return SeamlessModeOutput(
+            unet=unet,
         )
