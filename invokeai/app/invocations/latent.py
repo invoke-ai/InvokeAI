@@ -102,7 +102,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
                 context=context,
             )
 
-            img_mask = tv_resize(mask, image.shape[-2:], T.InterpolationMode.BILINEAR)
+            img_mask = tv_resize(mask, image.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
             masked_image = image * torch.where(img_mask < 0.5, 0.0, 1.0)
             # TODO:
             masked_latents = ImageToLatentsInvocation.vae_encode(vae_info, self.fp32, self.tiled, masked_image.clone())
@@ -404,7 +404,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             return None, None
 
         mask = context.services.latents.get(self.denoise_mask.mask_name)
-        mask = tv_resize(mask, latents.shape[-2:], T.InterpolationMode.BILINEAR)
+        mask = tv_resize(mask, latents.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
         if self.denoise_mask.masked_latents_name is not None:
             masked_latents = context.services.latents.get(self.denoise_mask.masked_latents_name)
         else:
