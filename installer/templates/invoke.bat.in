@@ -6,6 +6,17 @@ setlocal
 call .venv\Scripts\activate.bat
 set INVOKEAI_ROOT=.
 
+
+for /f "tokens=2 delims=: " %%a in ('pip show invokeai ^| find "Version"') do set LOCAL_VERSION=%%a
+for /f %%a in ('curl -s "https://api.github.com/repos/invoke-ai/InvokeAI/releases/latest" ^| findstr "tag_name"') do set line=%%a
+set LATEST_RELEASE=!line:*"v"=!
+
+if not "!LOCAL_VERSION!"=="!LATEST_RELEASE!" (
+    set UPDATE_AVAILABLE=true
+) else (
+    set UPDATE_AVAILABLE=false
+)
+
 :start
 echo Desired action:
 echo 1. Generate images with the browser-based interface
@@ -16,7 +27,13 @@ echo 5. Download and install models
 echo 6. Change InvokeAI startup options
 echo 7. Re-run the configure script to fix a broken install or to complete a major upgrade
 echo 8. Open the developer console
-echo 9. Update InvokeAI
+
+if "!UPDATE_AVAILABLE!"=="true" (
+    echo 9. !! Update InvokeAI - New Release Available !!
+) else (
+    echo 9. Update InvokeAI
+)
+
 echo 10. Command-line help
 echo Q - Quit
 set /P choice="Please enter 1-10, Q: [1] "

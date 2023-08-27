@@ -25,6 +25,12 @@ cd "$scriptdir"
 export INVOKEAI_ROOT="$scriptdir"
 PARAMS=$@
 
+
+LOCAL_VERSION=$(pip show invokeai | awk -F': ' '/Version: /{print $2}')
+LATEST_RELEASE=$(curl --silent "https://api.github.com/repos/invoke-ai/InvokeAI/releases/latest" | grep '"tag_name":' | cut -d'"' -f4 | sed 's/^v//')
+
+[[ "$LOCAL_VERSION" != "$LATEST_RELEASE" ]] && UPDATE_AVAILABLE="true" || UPDATE_AVAILABLE="false"
+
 # Check to see if dialog is installed (it seems to be fairly standard, but good to check regardless) and if the user has passed the --no-tui argument to disable the dialog TUI
 tui=true
 if command -v dialog &>/dev/null; then
@@ -92,7 +98,11 @@ do_choice() {
         ;;
     9)
         clear
-        printf "Update InvokeAI\n"
+        if [ "$UPDATE_AVAILABLE" = true ]; then
+            printf "!! Update InvokeAI - New Release Available (v%s) !!\n" "$LATEST_VERSION"
+        else
+            printf "Update InvokeAI\n"
+        fi
         python -m invokeai.frontend.install.invokeai_update
         ;;
     10)
@@ -114,18 +124,32 @@ do_choice() {
     clear
 }
 
-# Dialog-based TUI for launcing Invoke functions
+# Dialog-based TUI for launching Invoke functions
 do_dialog() {
-    options=(
-        1 "Generate images with a browser-based interface"
-        2 "Explore InvokeAI nodes using a command-line interface"
-        3 "Textual inversion training"
-        4 "Merge models (diffusers type only)"
-        5 "Download and install models"
-        6 "Change InvokeAI startup options"
-        7 "Re-run the configure script to fix a broken install or to complete a major upgrade"
-        8 "Open the developer console"
-        9 "Update InvokeAI")
+
+    if [ "$UPDATE_AVAILABLE" = true ]; then
+        options=(
+            1 "Generate images with a browser-based interface"
+            2 "Explore InvokeAI nodes using a command-line interface"
+            3 "Textual inversion training"
+            4 "Merge models (diffusers type only)"
+            5 "Download and install models"
+            6 "Change InvokeAI startup options"
+            7 "Re-run the configure script to fix a broken install or to complete a major upgrade"
+            8 "Open the developer console"
+            9 "!! Update InvokeAI - New Release Available !! ")
+    else 
+        options=(
+            1 "Generate images with a browser-based interface"
+            2 "Explore InvokeAI nodes using a command-line interface"
+            3 "Textual inversion training"
+            4 "Merge models (diffusers type only)"
+            5 "Download and install models"
+            6 "Change InvokeAI startup options"
+            7 "Re-run the configure script to fix a broken install or to complete a major upgrade"
+            8 "Open the developer console"
+            9 "Update InvokeAI")
+    fi
 
     choice=$(dialog --clear \
         --backtitle "\Zb\Zu\Z3InvokeAI" \
@@ -156,7 +180,11 @@ do_line_input() {
     printf "6: Change InvokeAI startup options\n"
     printf "7: Re-run the configure script to fix a broken install\n"
     printf "8: Open the developer console\n"
-    printf "9: Update InvokeAI\n"
+    if [ "$UPDATE_AVAILABLE" = true ]; then
+        printf "9: !! Update InvokeAI - New Release Available (v%s) !!\n" "$LATEST_VERSION"
+    else
+        printf "9: Update InvokeAI\n"
+    fi
     printf "10: Command-line help\n"
     printf "Q: Quit\n\n"
     read -p "Please enter 1-10, Q: [1] " yn
