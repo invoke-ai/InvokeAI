@@ -33,7 +33,7 @@ from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 
 from ...backend.model_management.models import BaseModelType
 from ...backend.model_management.lora import ModelPatcher
-from ...backend.model_management.seamless import set_unet_seamless
+from ...backend.model_management.seamless import set_unet_seamless, set_vae_seamless
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ConditioningData,
@@ -491,7 +491,7 @@ class LatentsToImageInvocation(BaseInvocation):
             context=context,
         )
 
-        with vae_info as vae:
+        with set_vae_seamless(vae_info.context.model, self.vae.seamless_axes), vae_info as vae:
             latents = latents.to(vae.device)
             if self.fp32:
                 vae.to(dtype=torch.float32)

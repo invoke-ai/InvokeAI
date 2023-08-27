@@ -46,6 +46,7 @@ class ClipField(BaseModel):
 class VaeField(BaseModel):
     # TODO: better naming?
     vae: ModelInfo = Field(description="Info to load vae submodel")
+    seamless_axes: List[str] = Field(default_factory=list, description="Axes(\"x\" and \"y\") to which apply seamless")
 
 
 class ModelLoaderOutput(BaseInvocationOutput):
@@ -398,6 +399,7 @@ class SeamlessModeOutput(BaseInvocationOutput):
 
     # Outputs
     unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
+    vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 @title("Seamless")
 @tags("seamless", "model")
@@ -410,7 +412,9 @@ class SeamlessModeInvocation(BaseInvocation):
     unet: UNetField = InputField(
         description=FieldDescriptions.unet, input=Input.Connection, title="UNet"
     )
-
+    vae_model: VAEModelField = InputField(
+        description=FieldDescriptions.vae_model, input=Input.Direct, ui_type=UIType.VaeModel, title="VAE"
+    )
     seamless_y: bool = InputField(default=True, input=Input.Any, description="Specify whether Y axis is seamless")
     seamless_x: bool = InputField(default=True, input=Input.Any, description="Specify whether X axis is seamless")
 
@@ -418,6 +422,7 @@ class SeamlessModeInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> SeamlessModeOutput:
         # Conditionally append 'x' and 'y' based on seamless_x and seamless_y       
         unet = copy.deepcopy(self.unet)
+        vae = copy.deepcopy(self.vae)
         
         seamless_axes_list = []
 
@@ -427,7 +432,9 @@ class SeamlessModeInvocation(BaseInvocation):
             seamless_axes_list.append('y')
 
         unet.seamless_axes = seamless_axes_list
-
+        vae.seamless_axes = seamless_axes_list
+        
         return SeamlessModeOutput(
             unet=unet,
+            vae=vae
         )
