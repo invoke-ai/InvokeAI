@@ -144,7 +144,7 @@ def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool = Tr
     w, h = trim_to_multiple_of(*image.size, multiple_of=multiple_of)
     transformation = T.Compose(
         [
-            T.Resize((h, w), T.InterpolationMode.LANCZOS, antialias=False),
+            T.Resize((h, w), T.InterpolationMode.LANCZOS, antialias=True),
             T.ToTensor(),
         ]
     )
