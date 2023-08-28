@@ -37,7 +37,9 @@ export const addSeamlessToLinearGraph = (
     graph.id === SDXL_TEXT_TO_IMAGE_GRAPH ||
     graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH ||
     graph.id === SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH ||
-    graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH
+    graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH ||
+    graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
+    graph.id === SDXL_CANVAS_OUTPAINT_GRAPH
   ) {
     denoisingNodeId = SDXL_DENOISE_LATENTS;
   }
