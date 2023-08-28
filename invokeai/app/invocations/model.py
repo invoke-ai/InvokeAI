@@ -404,7 +404,7 @@ class SeamlessModeOutput(BaseInvocationOutput):
 @title("Seamless")
 @tags("seamless", "model")
 class SeamlessModeInvocation(BaseInvocation):
-    """Apply seamless mode to unet."""
+    """Applies the seamless transformation to the Model UNet and VAE."""
 
     type: Literal["seamless"] = "seamless"
 
