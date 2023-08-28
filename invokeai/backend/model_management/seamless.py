@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import TypeVar
+from typing import Union
 import diffusers
 import torch.nn as nn
 from diffusers.models import UNet2DModel, AutoencoderKL
@@ -24,7 +24,7 @@ def _conv_forward_asymmetric(self, input, weight, bias):
     )
 
 
-ModelType = TypeVar("ModelType", UNet2DModel, AutoencoderKL)
+ModelType = Union[UNet2DModel, AutoencoderKL]
 
 
 @contextmanager

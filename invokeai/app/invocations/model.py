@@ -410,8 +410,8 @@ class SeamlessModeInvocation(BaseInvocation):
     type: Literal["seamless"] = "seamless"
 
     # Inputs
-    unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet")
-    vae: VaeField = InputField(description=FieldDescriptions.vae_model, input=Input.Any, title="VAE")
+    unet: Optional[UNetField] = InputField(default=None, description=FieldDescriptions.unet, input=Input.Connection, title="UNet")
+    vae: Optional[VaeField] = InputField(default=None, description=FieldDescriptions.vae_model, input=Input.Any, title="VAE")
     seamless_y: bool = InputField(default=True, input=Input.Any, description="Specify whether Y axis is seamless")
     seamless_x: bool = InputField(default=True, input=Input.Any, description="Specify whether X axis is seamless")
 
@@ -427,7 +427,9 @@ class SeamlessModeInvocation(BaseInvocation):
         if self.seamless_y:
             seamless_axes_list.append("y")
 
-        unet.seamless_axes = seamless_axes_list
-        vae.seamless_axes = seamless_axes_list
+        if unet is not None:
+            unet.seamless_axes = seamless_axes_list
+        if vae is not None:
+            vae.seamless_axes = seamless_axes_list
 
         return SeamlessModeOutput(unet=unet, vae=vae)
