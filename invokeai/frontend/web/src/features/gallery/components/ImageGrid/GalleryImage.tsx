@@ -8,7 +8,7 @@ import {
   ImageDraggableData,
   TypesafeDraggableData,
 } from 'features/dnd/types';
-import { useMultiselect } from 'features/gallery/hooks/useMultiselect.ts';
+import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { MouseEvent, memo, useCallback, useMemo, useState } from 'react';
 import { FaTrash } from 'react-icons/fa';
 import { MdStar, MdStarBorder } from 'react-icons/md';

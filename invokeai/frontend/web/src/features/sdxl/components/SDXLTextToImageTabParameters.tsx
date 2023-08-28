@@ -2,6 +2,7 @@ import ParamDynamicPromptsCollapse from 'features/dynamicPrompts/components/Para
 import ParamLoraCollapse from 'features/lora/components/ParamLoraCollapse';
 import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
 import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/ParamNoiseCollapse';
+import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
 import TextToImageTabCoreParameters from 'features/ui/components/tabs/TextToImage/TextToImageTabCoreParameters';
 import { memo } from 'react';
 import ParamSDXLPromptArea from './ParamSDXLPromptArea';
@@ -17,6 +18,7 @@ const SDXLTextToImageTabParameters = () => {
       <ParamLoraCollapse />
       <ParamDynamicPromptsCollapse />
       <ParamNoiseCollapse />
+      <ParamSeamlessCollapse />
     </>
   );
 };

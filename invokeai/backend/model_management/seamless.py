@@ -1,4 +1,10 @@
+from __future__ import annotations
+
+from contextlib import contextmanager
+from typing import List, Union
+
 import torch.nn as nn
+from diffusers.models import AutoencoderKL, UNet2DModel
 
 
 def _conv_forward_asymmetric(self, input, weight, bias):
@@ -18,15 +24,13 @@ def _conv_forward_asymmetric(self, input, weight, bias):
     )
 
 
-def configure_model_padding(model, seamless, seamless_axes):
-    """
-    Modifies the 2D convolution layers to use a circular padding mode based on
-    the `seamless` and `seamless_axes` options.
-    """
-    # TODO: get an explicit interface for this in diffusers: https://github.com/huggingface/diffusers/issues/556
-    for m in model.modules():
-        if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
-            if seamless:
+@contextmanager
+def set_seamless(model: Union[UNet2DModel, AutoencoderKL], seamless_axes: List[str]):
+    try:
+        to_restore = []
+
+        for m in model.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 m.asymmetric_padding_mode = {}
                 m.asymmetric_padding = {}
                 m.asymmetric_padding_mode["x"] = "circular" if ("x" in seamless_axes) else "constant"
@@ -43,10 +47,16 @@ def configure_model_padding(model, seamless, seamless_axes):
                     m._reversed_padding_repeated_twice[2],
                     m._reversed_padding_repeated_twice[3],
                 )
+
+                to_restore.append((m, m._conv_forward))
                 m._conv_forward = _conv_forward_asymmetric.__get__(m, nn.Conv2d)
-            else:
-                m._conv_forward = nn.Conv2d._conv_forward.__get__(m, nn.Conv2d)
-                if hasattr(m, "asymmetric_padding_mode"):
-                    del m.asymmetric_padding_mode
-                if hasattr(m, "asymmetric_padding"):
-                    del m.asymmetric_padding
+
+        yield
+
+    finally:
+        for module, orig_conv_forward in to_restore:
+            module._conv_forward = orig_conv_forward
+            if hasattr(m, "asymmetric_padding_mode"):
+                del m.asymmetric_padding_mode
+            if hasattr(m, "asymmetric_padding"):
+                del m.asymmetric_padding

@@ -1,11 +1,15 @@
 import { RootState } from 'app/store/store';
-import { MetadataAccumulatorInvocation } from 'services/api/types';
+import {
+  MetadataAccumulatorInvocation,
+  SeamlessModeInvocation,
+} from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
 import {
   CANVAS_OUTPUT,
   LATENTS_TO_IMAGE,
   MASK_BLUR,
   METADATA_ACCUMULATOR,
+  REFINER_SEAMLESS,
   SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
   SDXL_CANVAS_INPAINT_GRAPH,
   SDXL_CANVAS_OUTPAINT_GRAPH,
@@ -21,7 +25,8 @@ import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 export const addSDXLRefinerToGraph = (
   state: RootState,
   graph: NonNullableGraph,
-  baseNodeId: string
+  baseNodeId: string,
+  modelLoaderNodeId?: string
 ): void => {
   const {
     refinerModel,
@@ -32,6 +37,8 @@ export const addSDXLRefinerToGraph = (
     refinerCFGScale,
     refinerStart,
   } = state.sdxl;
+
+  const { seamlessXAxis, seamlessYAxis } = state.generation;
 
   if (!refinerModel) {
     return;
@@ -53,6 +60,10 @@ export const addSDXLRefinerToGraph = (
     metadataAccumulator.refiner_steps = refinerSteps;
   }
 
+  const modelLoaderId = modelLoaderNodeId
+    ? modelLoaderNodeId
+    : SDXL_MODEL_LOADER;
+
   // Construct Style Prompt
   const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
     craftSDXLStylePrompt(state, true);
@@ -65,10 +76,7 @@ export const addSDXLRefinerToGraph = (
 
   graph.edges = graph.edges.filter(
     (e) =>
-      !(
-        e.source.node_id === SDXL_MODEL_LOADER &&
-        ['vae'].includes(e.source.field)
-      )
+      !(e.source.node_id === modelLoaderId && ['vae'].includes(e.source.field))
   );
 
   graph.nodes[SDXL_REFINER_MODEL_LOADER] = {
@@ -98,8 +106,39 @@ export const addSDXLRefinerToGraph = (
     denoising_end: 1,
   };
 
-  graph.edges.push(
-    {
+  // Add Seamless To Refiner
+  if (seamlessXAxis || seamlessYAxis) {
+    graph.nodes[REFINER_SEAMLESS] = {
+      id: REFINER_SEAMLESS,
+      type: 'seamless',
+      seamless_x: seamlessXAxis,
+      seamless_y: seamlessYAxis,
+    } as SeamlessModeInvocation;
+
+    graph.edges.push(
+      {
+        source: {
+          node_id: SDXL_REFINER_MODEL_LOADER,
+          field: 'unet',
+        },
+        destination: {
+          node_id: REFINER_SEAMLESS,
+          field: 'unet',
+        },
+      },
+      {
+        source: {
+          node_id: REFINER_SEAMLESS,
+          field: 'unet',
+        },
+        destination: {
+          node_id: SDXL_REFINER_DENOISE_LATENTS,
+          field: 'unet',
+        },
+      }
+    );
+  } else {
+    graph.edges.push({
       source: {
         node_id: SDXL_REFINER_MODEL_LOADER,
         field: 'unet',
@@ -108,7 +147,10 @@ export const addSDXLRefinerToGraph = (
         node_id: SDXL_REFINER_DENOISE_LATENTS,
         field: 'unet',
       },
-    },
+    });
+  }
+
+  graph.edges.push(
     {
       source: {
         node_id: SDXL_REFINER_MODEL_LOADER,

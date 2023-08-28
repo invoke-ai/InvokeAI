@@ -761,3 +761,18 @@ class ControlNetModel(ModelMixin, ConfigMixin, FromOriginalControlnetMixin):
 
 diffusers.ControlNetModel = ControlNetModel
 diffusers.models.controlnet.ControlNetModel = ControlNetModel
+
+
+# patch LoRACompatibleConv to use original Conv2D forward function
+# this needed to make work seamless patch
+# NOTE: with this patch, torch.compile crashes on 2.0 torch(already fixed in nightly)
+# https://github.com/huggingface/diffusers/pull/4315
+# https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/lora.py#L96C18-L96C18
+def new_LoRACompatibleConv_forward(self, x):
+    if self.lora_layer is None:
+        return super(diffusers.models.lora.LoRACompatibleConv, self).forward(x)
+    else:
+        return super(diffusers.models.lora.LoRACompatibleConv, self).forward(x) + self.lora_layer(x)
+
+
+diffusers.models.lora.LoRACompatibleConv.forward = new_LoRACompatibleConv_forward
