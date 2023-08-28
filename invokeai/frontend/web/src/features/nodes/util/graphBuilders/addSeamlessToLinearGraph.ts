@@ -2,8 +2,13 @@ import { RootState } from 'app/store/store';
 import { SeamlessModeInvocation } from 'services/api/types';
 import { NonNullableGraph } from '../../types/types';
 import {
+  CANVAS_IMAGE_TO_IMAGE_GRAPH,
+  CANVAS_TEXT_TO_IMAGE_GRAPH,
   DENOISE_LATENTS,
   IMAGE_TO_IMAGE_GRAPH,
+  SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
+  SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
+  SDXL_DENOISE_LATENTS,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
@@ -25,6 +30,15 @@ export const addSeamlessToLinearGraph = (
     seamless_y: seamlessYAxis,
   } as SeamlessModeInvocation;
 
+  let denoisingNodeId = DENOISE_LATENTS;
+
+  if (
+    graph.id === 'SDXL_TEXT_TO_IMAGE_GRAPH' ||
+    graph.id === 'SDXL_IMAGE_TO_IMAGE_GRAPH'
+  ) {
+    denoisingNodeId = SDXL_DENOISE_LATENTS;
+  }
+
   graph.edges = graph.edges.filter(
     (e) =>
       !(
@@ -41,7 +55,11 @@ export const addSeamlessToLinearGraph = (
     graph.id === TEXT_TO_IMAGE_GRAPH ||
     graph.id === IMAGE_TO_IMAGE_GRAPH ||
     graph.id === SDXL_TEXT_TO_IMAGE_GRAPH ||
-    graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH
+    graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH ||
+    graph.id === CANVAS_TEXT_TO_IMAGE_GRAPH ||
+    graph.id === CANVAS_IMAGE_TO_IMAGE_GRAPH ||
+    graph.id === SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH ||
+    graph.id == SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH
   ) {
     graph.edges.push(
       {
@@ -70,7 +88,7 @@ export const addSeamlessToLinearGraph = (
           field: 'unet',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: denoisingNodeId,
           field: 'unet',
         },
       }
