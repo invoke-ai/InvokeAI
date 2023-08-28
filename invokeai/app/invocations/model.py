@@ -398,8 +398,8 @@ class SeamlessModeOutput(BaseInvocationOutput):
     type: Literal["seamless_output"] = "seamless_output"
 
     # Outputs
-    unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
-    vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
+    unet: Optional[UNetField] = OutputField(description=FieldDescriptions.unet, title="UNet")
+    vae: Optional[VaeField] = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 @title("Seamless")
 @tags("seamless", "model")
