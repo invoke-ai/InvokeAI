@@ -12,12 +12,12 @@ import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
-import { ReactNode, memo, useCallback, useEffect, useMemo } from 'react';
+import { ReactNode, memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
+import { usePreselectedImage } from '../../features/parameters/hooks/usePreselectedImage';
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
-import { usePreselectedImage } from '../../features/parameters/hooks/usePreselectedImage';
 
 const DEFAULT_CONFIG = {};
 

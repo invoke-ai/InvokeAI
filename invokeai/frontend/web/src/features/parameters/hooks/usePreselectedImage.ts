@@ -1,16 +1,16 @@
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { useCallback, useMemo, useState } from 'react';
+import { t } from 'i18next';
+import { useCallback, useState } from 'react';
+import { useAppToaster } from '../../../app/components/Toaster';
+import { useAppDispatch } from '../../../app/store/storeHooks';
 import {
   useGetImageDTOQuery,
   useGetImageMetadataQuery,
 } from '../../../services/api/endpoints/images';
-import { useAppDispatch } from '../../../app/store/storeHooks';
 import { setInitialCanvasImage } from '../../canvas/store/canvasSlice';
 import { setActiveTab } from '../../ui/store/uiSlice';
-import { useRecallParameters } from './useRecallParameters';
 import { initialImageSelected } from '../store/actions';
-import { useAppToaster } from '../../../app/components/Toaster';
-import { t } from 'i18next';
+import { useRecallParameters } from './useRecallParameters';
 
 type SelectedImage = {
   imageName: string;
@@ -26,7 +26,7 @@ export const usePreselectedImage = () => {
   const { recallAllParameters } = useRecallParameters();
   const toaster = useAppToaster();
 
-  const { currentData: selectedImageDto, isError } = useGetImageDTOQuery(
+  const { currentData: selectedImageDto } = useGetImageDTOQuery(
     imageNameForDto ?? skipToken
   );
 
@@ -37,8 +37,8 @@ export const usePreselectedImage = () => {
   const handlePreselectedImage = useCallback(
     (selectedImage?: SelectedImage) => {
       if (!selectedImage) {
-return;
-}
+        return;
+      }
 
       if (selectedImage.action === 'sendToCanvas') {
         setImageNameForDto(selectedImage?.imageName);
