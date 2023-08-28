@@ -29,10 +29,7 @@ def set_seamless(model: Union[UNet2DConditionModel, AutoencoderKL], seamless_axe
     try:
         to_restore = []
 
-        #print("try seamless")
-
         for m_name, m in model.named_modules():
-
             if isinstance(model, UNet2DConditionModel):
                 if ".attentions." in m_name:
                     continue
