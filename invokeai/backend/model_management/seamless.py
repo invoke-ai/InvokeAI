@@ -6,6 +6,7 @@ import diffusers
 import torch.nn as nn
 from diffusers.models import UNet2DModel, AutoencoderKL
 
+
 def _conv_forward_asymmetric(self, input, weight, bias):
     """
     Patch for Conv2d._conv_forward that supports asymmetric padding
@@ -23,13 +24,14 @@ def _conv_forward_asymmetric(self, input, weight, bias):
     )
 
 
-ModelType = TypeVar('ModelType', UNet2DModel, AutoencoderKL)
+ModelType = TypeVar("ModelType", UNet2DModel, AutoencoderKL)
+
 
 @contextmanager
 def set_seamless(model: ModelType, seamless_axes):
     try:
-        to_restore = []  
-        
+        to_restore = []
+
         for m in model.modules():
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
                 m.asymmetric_padding_mode = {}
@@ -64,4 +66,6 @@ def set_seamless(model: ModelType, seamless_axes):
             if hasattr(m, "asymmetric_padding"):
                 del m.asymmetric_padding
             if isinstance(m, diffusers.models.lora.LoRACompatibleConv):
-                m.forward = diffusers.models.lora.LoRACompatibleConv.forward.__get__(m,diffusers.models.lora.LoRACompatibleConv) 
+                m.forward = diffusers.models.lora.LoRACompatibleConv.forward.__get__(
+                    m, diffusers.models.lora.LoRACompatibleConv
+                )
