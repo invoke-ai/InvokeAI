@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
+  CreateDenoiseMaskInvocation,
   ImageBlurInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
@@ -15,13 +16,14 @@ import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
-  CANVAS_INPAINT_GRAPH,
-  CANVAS_OUTPUT,
   CANVAS_COHERENCE_DENOISE_LATENTS,
   CANVAS_COHERENCE_NOISE,
   CANVAS_COHERENCE_NOISE_INCREMENT,
+  CANVAS_INPAINT_GRAPH,
+  CANVAS_OUTPUT,
   CLIP_SKIP,
   DENOISE_LATENTS,
+  INPAINT_CREATE_MASK,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
   INPAINT_IMAGE_RESIZE_UP,
@@ -124,6 +126,12 @@ export const buildCanvasInpaintGraph = (
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
+        is_intermediate: true,
+        fp32: vaePrecision === 'fp32' ? true : false,
+      },
+      [INPAINT_CREATE_MASK]: {
+        type: 'create_denoise_mask',
+        id: INPAINT_CREATE_MASK,
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
@@ -276,14 +284,25 @@ export const buildCanvasInpaintGraph = (
           field: 'latents',
         },
       },
+      // Create Inpaint Mask
       {
         source: {
           node_id: MASK_BLUR,
           field: 'image',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: INPAINT_CREATE_MASK,
           field: 'mask',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'denoise_mask',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'denoise_mask',
         },
       },
       // Iterate
@@ -459,6 +478,16 @@ export const buildCanvasInpaintGraph = (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      },
       // Color Correct The Inpainted Result
       {
         source: {
@@ -515,6 +544,10 @@ export const buildCanvasInpaintGraph = (
     graph.nodes[MASK_BLUR] = {
       ...(graph.nodes[MASK_BLUR] as ImageBlurInvocation),
       image: canvasMaskImage,
+    };
+    graph.nodes[INPAINT_CREATE_MASK] = {
+      ...(graph.nodes[INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
+      image: canvasInitImage,
     };
 
     graph.edges.push(

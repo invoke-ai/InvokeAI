@@ -15,6 +15,7 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_OUTPUT,
+  LATENTS_TO_IMAGE,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
@@ -49,7 +50,15 @@ export const buildCanvasSDXLTextToImageGraph = (
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const { shouldAutoSave } = state.canvas;
+  const {
+    scaledBoundingBoxDimensions,
+    boundingBoxScaleMethod,
+    shouldAutoSave,
+  } = state.canvas;
+
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(
+    boundingBoxScaleMethod
+  );
 
   const { shouldUseSDXLRefiner, refinerStart, shouldConcatSDXLStylePrompt } =
     state.sdxl;
@@ -136,17 +145,15 @@ export const buildCanvasSDXLTextToImageGraph = (
         type: 'noise',
         id: NOISE,
         is_intermediate: true,
-        width,
-        height,
+        width: !isUsingScaledDimensions
+          ? width
+          : scaledBoundingBoxDimensions.width,
+        height: !isUsingScaledDimensions
+          ? height
+          : scaledBoundingBoxDimensions.height,
         use_cpu,
       },
       [t2lNode.id]: t2lNode,
-      [CANVAS_OUTPUT]: {
-        type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
-        id: CANVAS_OUTPUT,
-        is_intermediate: !shouldAutoSave,
-        fp32: vaePrecision === 'fp32' ? true : false,
-      },
     },
     edges: [
       // Connect Model Loader to UNet and CLIP
@@ -231,19 +238,67 @@ export const buildCanvasSDXLTextToImageGraph = (
           field: 'noise',
         },
       },
-      // Decode Denoised Latents To Image
+    ],
+  };
+
+  // Decode Latents To Image & Handle Scaled Before Processing
+  if (isUsingScaledDimensions) {
+    graph.nodes[LATENTS_TO_IMAGE] = {
+      id: LATENTS_TO_IMAGE,
+      type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
+      is_intermediate: true,
+      fp32: vaePrecision === 'fp32' ? true : false,
+    };
+
+    graph.nodes[CANVAS_OUTPUT] = {
+      id: CANVAS_OUTPUT,
+      type: 'img_resize',
+      is_intermediate: !shouldAutoSave,
+      width: width,
+      height: height,
+    };
+
+    graph.edges.push(
       {
         source: {
           node_id: SDXL_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
-          node_id: CANVAS_OUTPUT,
+          node_id: LATENTS_TO_IMAGE,
           field: 'latents',
         },
       },
-    ],
-  };
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'image',
+        },
+      }
+    );
+  } else {
+    graph.nodes[CANVAS_OUTPUT] = {
+      type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
+      id: CANVAS_OUTPUT,
+      is_intermediate: !shouldAutoSave,
+      fp32: vaePrecision === 'fp32' ? true : false,
+    };
+
+    graph.edges.push({
+      source: {
+        node_id: SDXL_DENOISE_LATENTS,
+        field: 'latents',
+      },
+      destination: {
+        node_id: CANVAS_OUTPUT,
+        field: 'latents',
+      },
+    });
+  }
 
   // add metadata accumulator, which is only mostly populated - some fields are added later
   graph.nodes[METADATA_ACCUMULATOR] = {
@@ -251,8 +306,10 @@ export const buildCanvasSDXLTextToImageGraph = (
     type: 'metadata_accumulator',
     generation_mode: 'txt2img',
     cfg_scale,
-    height,
-    width,
+    width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+    height: !isUsingScaledDimensions
+      ? height
+      : scaledBoundingBoxDimensions.height,
     positive_prompt: '', // set in addDynamicPromptsToGraph
     negative_prompt: negativePrompt,
     model,
