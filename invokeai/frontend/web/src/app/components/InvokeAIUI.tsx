@@ -10,7 +10,6 @@ import React, {
 } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import { $authToken, $baseUrl, $projectId } from 'services/api/client';
 import { socketMiddleware } from 'services/events/middleware';
 import Loading from '../../common/components/Loading/Loading';
 import '../../i18n';
@@ -42,21 +41,6 @@ const InvokeAIUI = ({
   selectedImage,
 }: Props) => {
   useEffect(() => {
-    // configure API client token
-    if (token) {
-      $authToken.set(token);
-    }
-
-    // configure API client base url
-    if (apiUrl) {
-      $baseUrl.set(apiUrl);
-    }
-
-    // configure API client project header
-    if (projectId) {
-      $projectId.set(projectId);
-    }
-
     // reset dynamically added middlewares
     resetMiddlewares();
 
@@ -71,14 +55,7 @@ const InvokeAIUI = ({
     } else {
       addMiddleware(socketMiddleware());
     }
-
-    return () => {
-      // Reset the API client token and base url on unmount
-      $baseUrl.set(undefined);
-      $authToken.set(undefined);
-      $projectId.set(undefined);
-    };
-  }, [apiUrl, token, middleware, projectId]);
+  }, [middleware]);
 
   return (
     <React.StrictMode>
@@ -90,6 +67,9 @@ const InvokeAIUI = ({
                 config={config}
                 headerComponent={headerComponent}
                 selectedImage={selectedImage}
+                apiUrl={apiUrl}
+                token={token}
+                projectId={projectId}
               />
             </AppDndContext>
           </ThemeLocaleProvider>

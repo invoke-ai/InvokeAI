@@ -19,6 +19,7 @@ import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
 import { api } from '../../services/api';
+import { $authToken, $baseUrl, $projectId } from 'services/api/client';
 
 const DEFAULT_CONFIG = {};
 
@@ -29,12 +30,18 @@ interface Props {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
+  apiUrl?: string;
+  token?: string;
+  projectId?: string;
 }
 
 const App = ({
   config = DEFAULT_CONFIG,
   headerComponent,
   selectedImage,
+  apiUrl,
+  token,
+  projectId,
 }: Props) => {
   const language = useAppSelector(languageSelector);
 
@@ -46,6 +53,31 @@ const App = ({
     location.reload();
     return false;
   }, []);
+
+  useEffect(() => {
+    // configure API client token
+    if (token) {
+      $authToken.set(token);
+    }
+
+    // configure API client base url
+    if (apiUrl) {
+      $baseUrl.set(apiUrl);
+    }
+
+    // configure API client project header
+    if (projectId) {
+      $projectId.set(projectId);
+    }
+
+    return () => {
+      // Reset the API client token and base url on unmount
+      $baseUrl.set(undefined);
+      $authToken.set(undefined);
+      $projectId.set(undefined);
+      dispatch(api.util.resetApiState());
+    };
+  }, [apiUrl, token, projectId, dispatch]);
 
   useEffect(() => {
     i18n.changeLanguage(language);
@@ -65,12 +97,6 @@ const App = ({
   useEffect(() => {
     handlePreselectedImage(selectedImage);
   }, [handlePreselectedImage, selectedImage]);
-
-  useEffect(() => {
-    return () => {
-      dispatch(api.util.resetApiState());
-    };
-  });
 
   return (
     <ErrorBoundary
