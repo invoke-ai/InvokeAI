@@ -83,7 +83,7 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
         }}
       >
         <Flex
-          layerStyle='nodeHeader'
+          layerStyle="nodeHeader"
           sx={{
             borderTopRadius: 'base',
             alignItems: 'center',
@@ -103,7 +103,7 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
           </Text>
         </Flex>
         <Flex
-          layerStyle='nodeBody'
+          layerStyle="nodeBody"
           sx={{
             w: 'full',
             h: 'full',
@@ -114,7 +114,7 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
           {props.children}
           {isHovering && (
             <motion.div
-              key='nextPrevButtons'
+              key="nextPrevButtons"
               initial={{
                 opacity: 0,
               }}
