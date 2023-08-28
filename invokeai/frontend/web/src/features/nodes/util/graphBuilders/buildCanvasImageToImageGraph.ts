@@ -2,11 +2,7 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
-import {
-  ImageDTO,
-  ImageResizeInvocation,
-  ImageToLatentsInvocation,
-} from 'services/api/types';
+import { ImageDTO, ImageToLatentsInvocation } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
@@ -19,12 +15,13 @@ import {
   CLIP_SKIP,
   DENOISE_LATENTS,
   IMAGE_TO_LATENTS,
+  IMG2IMG_RESIZE,
+  LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  RESIZE,
 } from './constants';
 
 /**
@@ -43,6 +40,7 @@ export const buildCanvasImageToImageGraph = (
     scheduler,
     steps,
     img2imgStrength: strength,
+    vaePrecision,
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
@@ -51,7 +49,15 @@ export const buildCanvasImageToImageGraph = (
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
 
-  const { shouldAutoSave } = state.canvas;
+  const {
+    scaledBoundingBoxDimensions,
+    boundingBoxScaleMethod,
+    shouldAutoSave,
+  } = state.canvas;
+
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(
+    boundingBoxScaleMethod
+  );
 
   if (!model) {
     log.error('No model found in state');
@@ -104,15 +110,17 @@ export const buildCanvasImageToImageGraph = (
         id: NOISE,
         is_intermediate: true,
         use_cpu,
+        width: !isUsingScaledDimensions
+          ? width
+          : scaledBoundingBoxDimensions.width,
+        height: !isUsingScaledDimensions
+          ? height
+          : scaledBoundingBoxDimensions.height,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
         id: IMAGE_TO_LATENTS,
         is_intermediate: true,
-        // must be set manually later, bc `fit` parameter may require a resize node inserted
-        // image: {
-        //   image_name: initialImage.image_name,
-        // },
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -214,82 +222,84 @@ export const buildCanvasImageToImageGraph = (
           field: 'latents',
         },
       },
-      // Decode the denoised latents to an image
+    ],
+  };
+
+  // Decode Latents To Image & Handle Scaled Before Processing
+  if (isUsingScaledDimensions) {
+    graph.nodes[IMG2IMG_RESIZE] = {
+      id: IMG2IMG_RESIZE,
+      type: 'img_resize',
+      is_intermediate: true,
+      image: initialImage,
+      width: scaledBoundingBoxDimensions.width,
+      height: scaledBoundingBoxDimensions.height,
+    };
+    graph.nodes[LATENTS_TO_IMAGE] = {
+      id: LATENTS_TO_IMAGE,
+      type: 'l2i',
+      is_intermediate: true,
+      fp32: vaePrecision === 'fp32' ? true : false,
+    };
+    graph.nodes[CANVAS_OUTPUT] = {
+      id: CANVAS_OUTPUT,
+      type: 'img_resize',
+      is_intermediate: !shouldAutoSave,
+      width: width,
+      height: height,
+    };
+
+    graph.edges.push(
+      {
+        source: {
+          node_id: IMG2IMG_RESIZE,
+          field: 'image',
+        },
+        destination: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'image',
+        },
+      },
       {
         source: {
           node_id: DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
-          node_id: CANVAS_OUTPUT,
+          node_id: LATENTS_TO_IMAGE,
           field: 'latents',
         },
       },
-    ],
-  };
-
-  // handle `fit`
-  if (initialImage.width !== width || initialImage.height !== height) {
-    // The init image needs to be resized to the specified width and height before being passed to `IMAGE_TO_LATENTS`
-
-    // Create a resize node, explicitly setting its image
-    const resizeNode: ImageResizeInvocation = {
-      id: RESIZE,
-      type: 'img_resize',
-      image: {
-        image_name: initialImage.image_name,
-      },
-      is_intermediate: true,
-      width,
-      height,
-    };
-
-    graph.nodes[RESIZE] = resizeNode;
-
-    // The `RESIZE` node then passes its image to `IMAGE_TO_LATENTS`
-    graph.edges.push({
-      source: { node_id: RESIZE, field: 'image' },
-      destination: {
-        node_id: IMAGE_TO_LATENTS,
-        field: 'image',
-      },
-    });
-
-    // The `RESIZE` node also passes its width and height to `NOISE`
-    graph.edges.push({
-      source: { node_id: RESIZE, field: 'width' },
-      destination: {
-        node_id: NOISE,
-        field: 'width',
-      },
-    });
-
-    graph.edges.push({
-      source: { node_id: RESIZE, field: 'height' },
-      destination: {
-        node_id: NOISE,
-        field: 'height',
-      },
-    });
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'image',
+        },
+      }
+    );
   } else {
-    // We are not resizing, so we need to set the image on the `IMAGE_TO_LATENTS` node explicitly
-    (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image = {
-      image_name: initialImage.image_name,
+    graph.nodes[CANVAS_OUTPUT] = {
+      type: 'l2i',
+      id: CANVAS_OUTPUT,
+      is_intermediate: !shouldAutoSave,
+      fp32: vaePrecision === 'fp32' ? true : false,
     };
 
-    // Pass the image's dimensions to the `NOISE` node
+    (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image =
+      initialImage;
+
     graph.edges.push({
-      source: { node_id: IMAGE_TO_LATENTS, field: 'width' },
-      destination: {
-        node_id: NOISE,
-        field: 'width',
+      source: {
+        node_id: DENOISE_LATENTS,
+        field: 'latents',
       },
-    });
-    graph.edges.push({
-      source: { node_id: IMAGE_TO_LATENTS, field: 'height' },
       destination: {
-        node_id: NOISE,
-        field: 'height',
+        node_id: CANVAS_OUTPUT,
+        field: 'latents',
       },
     });
   }
@@ -300,8 +310,10 @@ export const buildCanvasImageToImageGraph = (
     type: 'metadata_accumulator',
     generation_mode: 'img2img',
     cfg_scale,
-    height,
-    width,
+    width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+    height: !isUsingScaledDimensions
+      ? height
+      : scaledBoundingBoxDimensions.height,
     positive_prompt: '', // set in addDynamicPromptsToGraph
     negative_prompt: negativePrompt,
     model,
