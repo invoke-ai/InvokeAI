@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Union
+from typing import Union, List
 import diffusers
 import torch.nn as nn
 from diffusers.models import UNet2DModel, AutoencoderKL
@@ -24,11 +24,8 @@ def _conv_forward_asymmetric(self, input, weight, bias):
     )
 
 
-ModelType = Union[UNet2DModel, AutoencoderKL]
-
-
 @contextmanager
-def set_seamless(model: ModelType, seamless_axes):
+def set_seamless(model: Union[UNet2DModel, AutoencoderKL], seamless_axes: List[str]):
     try:
         to_restore = []
 
@@ -53,8 +50,6 @@ def set_seamless(model: ModelType, seamless_axes):
 
                 to_restore.append((m, m._conv_forward))
                 m._conv_forward = _conv_forward_asymmetric.__get__(m, nn.Conv2d)
-                if isinstance(m, diffusers.models.lora.LoRACompatibleConv) and m.lora_layer is None:
-                    m.forward = nn.Conv2d.forward.__get__(m, nn.Conv2d)
 
         yield
 
@@ -65,7 +60,3 @@ def set_seamless(model: ModelType, seamless_axes):
                 del m.asymmetric_padding_mode
             if hasattr(m, "asymmetric_padding"):
                 del m.asymmetric_padding
-            if isinstance(m, diffusers.models.lora.LoRACompatibleConv):
-                m.forward = diffusers.models.lora.LoRACompatibleConv.forward.__get__(
-                    m, diffusers.models.lora.LoRACompatibleConv
-                )
