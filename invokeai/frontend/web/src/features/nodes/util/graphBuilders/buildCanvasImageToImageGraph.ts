@@ -87,9 +87,9 @@ export const buildCanvasImageToImageGraph = (
   const graph: NonNullableGraph = {
     id: CANVAS_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
+      [modelLoaderNodeId]: {
         type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+        id: modelLoaderNodeId,
         is_intermediate: true,
         model,
       },
@@ -148,7 +148,7 @@ export const buildCanvasImageToImageGraph = (
       // Connect Model Loader to CLIP Skip and UNet
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -158,7 +158,7 @@ export const buildCanvasImageToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {

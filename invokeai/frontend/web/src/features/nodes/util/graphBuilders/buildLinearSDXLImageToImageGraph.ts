@@ -99,9 +99,9 @@ export const buildLinearSDXLImageToImageGraph = (
   const graph: NonNullableGraph = {
     id: SDXL_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
-      [SDXL_MODEL_LOADER]: {
+      [modelLoaderNodeId]: {
         type: 'sdxl_model_loader',
-        id: SDXL_MODEL_LOADER,
+        id: modelLoaderNodeId,
         model,
       },
       [POSITIVE_CONDITIONING]: {
@@ -151,7 +151,7 @@ export const buildLinearSDXLImageToImageGraph = (
       // Connect Model Loader to UNet, CLIP & VAE
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -161,7 +161,7 @@ export const buildLinearSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -171,7 +171,7 @@ export const buildLinearSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip2',
         },
         destination: {
@@ -181,7 +181,7 @@ export const buildLinearSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -191,7 +191,7 @@ export const buildLinearSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip2',
         },
         destination: {

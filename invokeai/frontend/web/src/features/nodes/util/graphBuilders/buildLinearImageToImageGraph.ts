@@ -94,9 +94,9 @@ export const buildLinearImageToImageGraph = (
   const graph: NonNullableGraph = {
     id: IMAGE_TO_IMAGE_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
+      [modelLoaderNodeId]: {
         type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+        id: modelLoaderNodeId,
         model,
       },
       [CLIP_SKIP]: {
@@ -147,7 +147,7 @@ export const buildLinearImageToImageGraph = (
       // Connect Model Loader to UNet and CLIP Skip
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -157,7 +157,7 @@ export const buildLinearImageToImageGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
