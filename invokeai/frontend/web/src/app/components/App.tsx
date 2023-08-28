@@ -29,14 +29,12 @@ interface Props {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
-  projectId?: string;
 }
 
 const App = ({
   config = DEFAULT_CONFIG,
   headerComponent,
   selectedImage,
-  projectId,
 }: Props) => {
   const language = useAppSelector(languageSelector);
 
@@ -54,12 +52,6 @@ const App = ({
   }, [language]);
 
   useEffect(() => {
-    if (projectId) {
-dispatch(api.util.resetApiState());
-}
-  }, [projectId, dispatch]);
-
-  useEffect(() => {
     if (size(config)) {
       logger.info({ config }, 'Received config');
       dispatch(configChanged(config));
@@ -73,6 +65,12 @@ dispatch(api.util.resetApiState());
   useEffect(() => {
     handlePreselectedImage(selectedImage);
   }, [handlePreselectedImage, selectedImage]);
+
+  useEffect(() => {
+    return () => {
+      dispatch(api.util.resetApiState());
+    };
+  });
 
   return (
     <ErrorBoundary

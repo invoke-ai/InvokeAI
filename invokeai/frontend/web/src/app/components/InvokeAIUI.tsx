@@ -90,7 +90,6 @@ const InvokeAIUI = ({
                 config={config}
                 headerComponent={headerComponent}
                 selectedImage={selectedImage}
-                projectId={projectId}
               />
             </AppDndContext>
           </ThemeLocaleProvider>
