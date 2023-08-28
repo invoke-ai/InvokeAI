@@ -410,8 +410,12 @@ class SeamlessModeInvocation(BaseInvocation):
     type: Literal["seamless"] = "seamless"
 
     # Inputs
-    unet: Optional[UNetField] = InputField(default=None, description=FieldDescriptions.unet, input=Input.Connection, title="UNet")
-    vae: Optional[VaeField] = InputField(default=None, description=FieldDescriptions.vae_model, input=Input.Any, title="VAE")
+    unet: Optional[UNetField] = InputField(
+        default=None, description=FieldDescriptions.unet, input=Input.Connection, title="UNet"
+    )
+    vae: Optional[VaeField] = InputField(
+        default=None, description=FieldDescriptions.vae_model, input=Input.Any, title="VAE"
+    )
     seamless_y: bool = InputField(default=True, input=Input.Any, description="Specify whether Y axis is seamless")
     seamless_x: bool = InputField(default=True, input=Input.Any, description="Specify whether X axis is seamless")
 
