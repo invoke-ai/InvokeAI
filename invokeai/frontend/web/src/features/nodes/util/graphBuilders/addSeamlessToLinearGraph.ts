@@ -33,8 +33,8 @@ export const addSeamlessToLinearGraph = (
   let denoisingNodeId = DENOISE_LATENTS;
 
   if (
-    graph.id === 'SDXL_TEXT_TO_IMAGE_GRAPH' ||
-    graph.id === 'SDXL_IMAGE_TO_IMAGE_GRAPH'
+    graph.id === SDXL_TEXT_TO_IMAGE_GRAPH ||
+    graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH
   ) {
     denoisingNodeId = SDXL_DENOISE_LATENTS;
   }
