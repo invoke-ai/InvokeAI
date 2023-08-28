@@ -72,7 +72,7 @@ class LoRAModelField(BaseModel):
     base_model: BaseModelType = Field(description="Base model")
 
 
-@title("Main Model Loader")
+@title("Main Model")
 @tags("model")
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
@@ -179,7 +179,7 @@ class LoraLoaderOutput(BaseInvocationOutput):
     # fmt: on
 
 
-@title("LoRA Loader")
+@title("LoRA")
 @tags("lora", "model")
 class LoraLoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
@@ -257,7 +257,7 @@ class SDXLLoraLoaderOutput(BaseInvocationOutput):
     # fmt: on
 
 
-@title("SDXL LoRA Loader")
+@title("SDXL LoRA")
 @tags("sdxl", "lora", "model")
 class SDXLLoraLoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
@@ -356,7 +356,7 @@ class VaeLoaderOutput(BaseInvocationOutput):
     vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
-@title("VAE Loader")
+@title("VAE")
 @tags("vae", "model")
 class VaeLoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""

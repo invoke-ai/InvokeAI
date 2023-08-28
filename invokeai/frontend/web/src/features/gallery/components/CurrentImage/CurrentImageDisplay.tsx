@@ -2,6 +2,7 @@ import { Flex } from '@chakra-ui/react';
 
 import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
+import { memo } from 'react';
 
 const CurrentImageDisplay = () => {
   return (
@@ -22,4 +23,4 @@ const CurrentImageDisplay = () => {
   );
 };
 
-export default CurrentImageDisplay;
+export default memo(CurrentImageDisplay);

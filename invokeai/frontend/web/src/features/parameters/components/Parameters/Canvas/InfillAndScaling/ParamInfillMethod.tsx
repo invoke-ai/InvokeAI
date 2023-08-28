@@ -27,7 +27,9 @@ const ParamInfillMethod = () => {
 
   const { data: appConfigData, isLoading } = useGetAppConfigQuery();
 
-  const infill_methods = appConfigData?.infill_methods;
+  const infill_methods = appConfigData?.infill_methods.filter(
+    (method) => method !== 'lama'
+  );
 
   const { t } = useTranslation();
 

@@ -5,6 +5,7 @@ import { modelsApi } from 'services/api/endpoints/models';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { appSocketConnected, socketConnected } from 'services/events/actions';
 import { startAppListening } from '../..';
+import { size } from 'lodash-es';
 
 export const addSocketConnectedEventListener = () => {
   startAppListening({
@@ -18,7 +19,7 @@ export const addSocketConnectedEventListener = () => {
 
       const { disabledTabs } = config;
 
-      if (!nodes.schema && !disabledTabs.includes('nodes')) {
+      if (!size(nodes.nodeTemplates) && !disabledTabs.includes('nodes')) {
         dispatch(receivedOpenAPISchema());
       }
 
