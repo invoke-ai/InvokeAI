@@ -7,6 +7,7 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -22,6 +23,7 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
+  SEAMLESS,
 } from './constants';
 
 /**
@@ -44,6 +46,8 @@ export const buildCanvasImageToImageGraph = (
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   // The bounding box determines width and height, not the width and height params
@@ -63,6 +67,8 @@ export const buildCanvasImageToImageGraph = (
     log.error('No model found in state');
     throw new Error('No model found in state');
   }
+
+  let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
@@ -340,11 +346,17 @@ export const buildCanvasImageToImageGraph = (
     },
   });
 
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
+
   // add LoRA support
   addLoRAsToGraph(state, graph, DENOISE_LATENTS);
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);

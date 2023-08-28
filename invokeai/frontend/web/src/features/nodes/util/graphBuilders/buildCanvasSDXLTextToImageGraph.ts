@@ -11,6 +11,7 @@ import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -21,9 +22,11 @@ import {
   NOISE,
   ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
+  REFINER_SEAMLESS,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
+  SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
@@ -45,6 +48,8 @@ export const buildCanvasSDXLTextToImageGraph = (
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   // The bounding box determines width and height, not the width and height params
@@ -74,7 +79,7 @@ export const buildCanvasSDXLTextToImageGraph = (
 
   const isUsingOnnxModel = model.model_type === 'onnx';
 
-  const modelLoaderNodeId = isUsingOnnxModel
+  let modelLoaderNodeId = isUsingOnnxModel
     ? ONNX_MODEL_LOADER
     : SDXL_MODEL_LOADER;
 
@@ -334,9 +339,16 @@ export const buildCanvasSDXLTextToImageGraph = (
     },
   });
 
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
+
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
+    modelLoaderNodeId = REFINER_SEAMLESS;
   }
 
   // add LoRA support
