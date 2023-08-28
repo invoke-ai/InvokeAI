@@ -270,9 +270,12 @@ new Invocation ready to be used.
 
 ![resize node editor](../assets/contributing/resize_node_editor.png)
 
-# Advanced
+## Contributing Nodes
+Once you've created a Node, the next step is to share it with the community! The best way to do this is to submit a Pull Request to add the Node to the [Community Nodes](nodes/communityNodes) list. If you're not sure how to do that, take a look a at our [contributing nodes overview](contributingNodes). 
 
-## Custom Input Fields
+## Advanced
+
+### Custom Input Fields
 
 Now that you know how to create your own Invocations, let us dive into slightly
 more advanced topics.
@@ -352,7 +355,7 @@ input field.
 We will discuss the `Config` class in extra detail later in this guide and how
 you can use it to make your Invocations more robust.
 
-## Custom Output Types
+### Custom Output Types
 
 Like with custom inputs, sometimes you might find yourself needing custom
 outputs that InvokeAI does not provide. We can easily set one up.
@@ -396,7 +399,7 @@ All set. We now have an output type that requires what we need to create a
 blank_image. And if you noticed it, we even used the `Config` class to ensure
 the fields are required.
 
-## Custom Configuration
+### Custom Configuration
 
 As you might have noticed when making inputs and outputs, we used a class called
 `Config` from _pydantic_ to further customize them. Because our inputs and
@@ -492,7 +495,7 @@ later time.
 
 # **[TODO]**
 
-## Custom Components For Frontend
+### Custom Components For Frontend
 
 Every backend input type should have a corresponding frontend component so the
 UI knows what to render when you use a particular field type.
@@ -513,7 +516,7 @@ now.
 
 ---
 
-# OLD -- TO BE DELETED OR MOVED LATER
+<!-- # OLD -- TO BE DELETED OR MOVED LATER
 
 ---
 
@@ -787,4 +790,5 @@ With the customization in place, the schema will now show these properties as
 required, obviating the need for extensive null checks in client code.
 
 See this `pydantic` issue for discussion on this solution:
-<https://github.com/pydantic/pydantic/discussions/4577>
+<https://github.com/pydantic/pydantic/discussions/4577> -->
+

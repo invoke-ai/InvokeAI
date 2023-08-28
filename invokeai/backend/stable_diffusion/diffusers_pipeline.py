@@ -144,7 +144,7 @@ def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool = Tr
     w, h = trim_to_multiple_of(*image.size, multiple_of=multiple_of)
     transformation = T.Compose(
         [
-            T.Resize((h, w), T.InterpolationMode.LANCZOS),
+            T.Resize((h, w), T.InterpolationMode.LANCZOS, antialias=True),
             T.ToTensor(),
         ]
     )
@@ -358,6 +358,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         callback: Callable[[PipelineIntermediateState], None] = None,
         control_data: List[ControlNetData] = None,
         mask: Optional[torch.Tensor] = None,
+        masked_latents: Optional[torch.Tensor] = None,
         seed: Optional[int] = None,
     ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
         if init_timestep.shape[0] == 0:
@@ -376,28 +377,28 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
         if mask is not None:
+            # if no noise provided, noisify unmasked area based on seed(or 0 as fallback)
+            if noise is None:
+                noise = torch.randn(
+                    orig_latents.shape,
+                    dtype=torch.float32,
+                    device="cpu",
+                    generator=torch.Generator(device="cpu").manual_seed(seed or 0),
+                ).to(device=orig_latents.device, dtype=orig_latents.dtype)
+
+                latents = self.scheduler.add_noise(latents, noise, batched_t)
+                latents = torch.lerp(
+                    orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
+                )
+
             if is_inpainting_model(self.unet):
-                # You'd think the inpainting model wouldn't be paying attention to the area it is going to repaint
-                # (that's why there's a mask!) but it seems to really want that blanked out.
-                # masked_latents = latents * torch.where(mask < 0.5, 1, 0) TODO: inpaint/outpaint/infill
+                if masked_latents is None:
+                    raise Exception("Source image required for inpaint mask when inpaint model used!")
 
-                # TODO: we should probably pass this in so we don't have to try/finally around setting it.
-                self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(self._unet_forward, mask, orig_latents)
+                self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(
+                    self._unet_forward, mask, masked_latents
+                )
             else:
-                # if no noise provided, noisify unmasked area based on seed(or 0 as fallback)
-                if noise is None:
-                    noise = torch.randn(
-                        orig_latents.shape,
-                        dtype=torch.float32,
-                        device="cpu",
-                        generator=torch.Generator(device="cpu").manual_seed(seed or 0),
-                    ).to(device=orig_latents.device, dtype=orig_latents.dtype)
-
-                    latents = self.scheduler.add_noise(latents, noise, batched_t)
-                    latents = torch.lerp(
-                        orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
-                    )
-
                 additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise))
 
         try:

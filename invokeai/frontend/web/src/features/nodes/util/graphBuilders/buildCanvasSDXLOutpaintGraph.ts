@@ -18,10 +18,11 @@ import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
-  CANVAS_OUTPUT,
   CANVAS_COHERENCE_DENOISE_LATENTS,
   CANVAS_COHERENCE_NOISE,
   CANVAS_COHERENCE_NOISE_INCREMENT,
+  CANVAS_OUTPUT,
+  INPAINT_CREATE_MASK,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
   INPAINT_IMAGE_RESIZE_UP,
@@ -155,6 +156,12 @@ export const buildCanvasSDXLOutpaintGraph = (
         id: NOISE,
         use_cpu,
         is_intermediate: true,
+      },
+      [INPAINT_CREATE_MASK]: {
+        type: 'create_denoise_mask',
+        id: INPAINT_CREATE_MASK,
+        is_intermediate: true,
+        fp32: vaePrecision === 'fp32' ? true : false,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -331,14 +338,25 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'latents',
         },
       },
+      // Create Inpaint Mask
       {
         source: {
           node_id: MASK_BLUR,
           field: 'image',
         },
         destination: {
-          node_id: SDXL_DENOISE_LATENTS,
+          node_id: INPAINT_CREATE_MASK,
           field: 'mask',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'denoise_mask',
+        },
+        destination: {
+          node_id: SDXL_DENOISE_LATENTS,
+          field: 'denoise_mask',
         },
       },
       // Iterate
@@ -537,6 +555,16 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      },
       // Take combined mask and resize and then blur
       {
         source: {
@@ -652,6 +680,16 @@ export const buildCanvasSDXLOutpaintGraph = (
         },
         destination: {
           node_id: MASK_BLUR,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
           field: 'image',
         },
       },
