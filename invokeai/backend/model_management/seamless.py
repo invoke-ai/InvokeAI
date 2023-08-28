@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Union, List
-import diffusers
+from typing import List, Union
+
 import torch.nn as nn
-from diffusers.models import UNet2DModel, AutoencoderKL
+from diffusers.models import AutoencoderKL, UNet2DModel
 
 
 def _conv_forward_asymmetric(self, input, weight, bias):
