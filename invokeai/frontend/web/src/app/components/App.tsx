@@ -18,6 +18,7 @@ import { usePreselectedImage } from '../../features/parameters/hooks/usePreselec
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
+import { api } from '../../services/api';
 
 const DEFAULT_CONFIG = {};
 
@@ -28,12 +29,14 @@ interface Props {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
+  projectId?: string;
 }
 
 const App = ({
   config = DEFAULT_CONFIG,
   headerComponent,
   selectedImage,
+  projectId,
 }: Props) => {
   const language = useAppSelector(languageSelector);
 
@@ -49,6 +52,12 @@ const App = ({
   useEffect(() => {
     i18n.changeLanguage(language);
   }, [language]);
+
+  useEffect(() => {
+    if (projectId) {
+dispatch(api.util.resetApiState());
+}
+  }, [projectId, dispatch]);
 
   useEffect(() => {
     if (size(config)) {
