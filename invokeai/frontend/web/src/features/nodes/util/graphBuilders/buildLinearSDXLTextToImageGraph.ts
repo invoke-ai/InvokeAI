@@ -7,6 +7,7 @@ import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -15,9 +16,11 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
+  REFINER_SEAMLESS,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
   SDXL_TEXT_TO_IMAGE_GRAPH,
+  SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
@@ -38,6 +41,8 @@ export const buildLinearSDXLTextToImageGraph = (
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
     vaePrecision,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   const {
@@ -60,6 +65,9 @@ export const buildLinearSDXLTextToImageGraph = (
   // Construct Style Prompt
   const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
     craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+
+  // Model Loader ID
+  let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -244,16 +252,23 @@ export const buildLinearSDXLTextToImageGraph = (
     },
   });
 
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
+
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
+    modelLoaderNodeId = REFINER_SEAMLESS;
   }
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
+  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);

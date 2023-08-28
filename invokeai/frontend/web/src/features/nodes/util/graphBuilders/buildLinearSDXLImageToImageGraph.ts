@@ -11,6 +11,7 @@ import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -20,10 +21,12 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
+  REFINER_SEAMLESS,
   RESIZE,
   SDXL_DENOISE_LATENTS,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_MODEL_LOADER,
+  SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
@@ -49,6 +52,8 @@ export const buildLinearSDXLImageToImageGraph = (
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
     vaePrecision,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   const {
@@ -78,6 +83,9 @@ export const buildLinearSDXLImageToImageGraph = (
     log.error('No model found in state');
     throw new Error('No model found in state');
   }
+
+  // Model Loader ID
+  let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
@@ -351,15 +359,23 @@ export const buildLinearSDXLImageToImageGraph = (
     },
   });
 
-  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
+    modelLoaderNodeId = REFINER_SEAMLESS;
   }
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
+
+  // Add LoRA Support
+  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
