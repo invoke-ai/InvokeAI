@@ -1,3 +1,7 @@
+# copied from https://github.com/tencent-ailab/IP-Adapter (Apache License 2.0)
+#   and modified as needed
+
+# tencent-ailab comment:
 # modified from https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/attention_processor.py
 import torch
 import torch.nn as nn
@@ -74,8 +78,8 @@ class AttnProcessor(nn.Module):
         hidden_states = hidden_states / attn.rescale_output_factor
 
         return hidden_states
-    
-    
+
+
 class IPAttnProcessor(nn.Module):
     r"""
     Attention processor for IP-Adapater.
@@ -134,7 +138,7 @@ class IPAttnProcessor(nn.Module):
             encoder_hidden_states = hidden_states
         elif attn.norm_cross:
             encoder_hidden_states = attn.norm_encoder_hidden_states(encoder_hidden_states)
-            
+
         # split hidden states
         encoder_hidden_states, ip_hidden_states = encoder_hidden_states[:, :self.text_context_len, :], encoder_hidden_states[:, self.text_context_len:, :]
 
@@ -148,18 +152,18 @@ class IPAttnProcessor(nn.Module):
         attention_probs = attn.get_attention_scores(query, key, attention_mask)
         hidden_states = torch.bmm(attention_probs, value)
         hidden_states = attn.batch_to_head_dim(hidden_states)
-        
+
         # for ip-adapter
         ip_key = self.to_k_ip(ip_hidden_states)
         ip_value = self.to_v_ip(ip_hidden_states)
-        
+
         ip_key = attn.head_to_batch_dim(ip_key)
         ip_value = attn.head_to_batch_dim(ip_value)
-        
+
         ip_attention_probs = attn.get_attention_scores(query, ip_key, None)
         ip_hidden_states = torch.bmm(ip_attention_probs, ip_value)
         ip_hidden_states = attn.batch_to_head_dim(ip_hidden_states)
-        
+
         hidden_states = hidden_states + self.scale * ip_hidden_states
 
         # linear proj
@@ -176,8 +180,8 @@ class IPAttnProcessor(nn.Module):
         hidden_states = hidden_states / attn.rescale_output_factor
 
         return hidden_states
-    
-    
+
+
 class AttnProcessor2_0(torch.nn.Module):
     r"""
     Processor for implementing scaled dot-product attention (enabled by default if you're using PyTorch 2.0).
@@ -264,8 +268,8 @@ class AttnProcessor2_0(torch.nn.Module):
         hidden_states = hidden_states / attn.rescale_output_factor
 
         return hidden_states
-    
-    
+
+
 class IPAttnProcessor2_0(torch.nn.Module):
     r"""
     Attention processor for IP-Adapater for PyTorch 2.0.
@@ -355,11 +359,11 @@ class IPAttnProcessor2_0(torch.nn.Module):
 
         hidden_states = hidden_states.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
         hidden_states = hidden_states.to(query.dtype)
-        
+
         # for ip-adapter
         ip_key = self.to_k_ip(ip_hidden_states)
         ip_value = self.to_v_ip(ip_hidden_states)
-        
+
         ip_key = ip_key.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
         ip_value = ip_value.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
 
@@ -368,10 +372,10 @@ class IPAttnProcessor2_0(torch.nn.Module):
         ip_hidden_states = F.scaled_dot_product_attention(
             query, ip_key, ip_value, attn_mask=None, dropout_p=0.0, is_causal=False
         )
-        
+
         ip_hidden_states = ip_hidden_states.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
         ip_hidden_states = ip_hidden_states.to(query.dtype)
-        
+
         hidden_states = hidden_states + self.scale * ip_hidden_states
 
         # linear proj
