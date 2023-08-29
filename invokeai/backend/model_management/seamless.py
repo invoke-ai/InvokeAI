@@ -71,7 +71,6 @@ def set_seamless(model: Union[UNet2DConditionModel, AutoencoderKL], seamless_axe
             """
 
             if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
-                print(f"applied - {m_name}")
                 m.asymmetric_padding_mode = {}
                 m.asymmetric_padding = {}
                 m.asymmetric_padding_mode["x"] = "circular" if ("x" in seamless_axes) else "constant"
