@@ -1,3 +1,6 @@
+# copied from https://github.com/tencent-ailab/IP-Adapter (Apache License 2.0)
+#   and modified as needed
+
 import inspect
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
