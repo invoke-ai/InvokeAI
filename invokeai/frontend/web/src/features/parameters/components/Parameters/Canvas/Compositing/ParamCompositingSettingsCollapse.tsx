@@ -1,7 +1,8 @@
-import { Divider, Flex, Text } from '@chakra-ui/react';
+import { Divider, Flex } from '@chakra-ui/react';
 import IAICollapse from 'common/components/IAICollapse';
-import { PropsWithChildren, memo } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import SubParametersWrapper from '../../SubParametersWrapper';
 import ParamCanvasCoherenceSteps from './CoherencePass/ParamCanvasCoherenceSteps';
 import ParamCanvasCoherenceStrength from './CoherencePass/ParamCanvasCoherenceStrength';
 import ParamMaskBlur from './MaskAdjustment/ParamMaskBlur';
@@ -13,45 +14,18 @@ const ParamCompositingSettingsCollapse = () => {
   return (
     <IAICollapse label={t('parameters.compositingSettingsHeader')}>
       <Flex sx={{ flexDirection: 'column', gap: 2 }}>
-        <CompositingSettingsWrapper>
-          <Text fontSize="sm" fontWeight="bold">
-            {t('parameters.maskAdjustmentsHeader')}
-          </Text>
+        <SubParametersWrapper label={t('parameters.maskAdjustmentsHeader')}>
           <ParamMaskBlur />
           <ParamMaskBlurMethod />
-        </CompositingSettingsWrapper>
+        </SubParametersWrapper>
         <Divider />
-        <CompositingSettingsWrapper>
-          <Text fontSize="sm" fontWeight="bold">
-            {t('parameters.coherencePassHeader')}
-          </Text>
+        <SubParametersWrapper label={t('parameters.coherencePassHeader')}>
           <ParamCanvasCoherenceSteps />
           <ParamCanvasCoherenceStrength />
-        </CompositingSettingsWrapper>
+        </SubParametersWrapper>
       </Flex>
     </IAICollapse>
   );
 };
-
-const CompositingSettingsWrapper = memo((props: PropsWithChildren) => (
-  <Flex
-    sx={{
-      flexDir: 'column',
-      gap: 2,
-      bg: 'base.100',
-      px: 4,
-      pt: 2,
-      pb: 4,
-      borderRadius: 'base',
-      _dark: {
-        bg: 'base.750',
-      },
-    }}
-  >
-    {props.children}
-  </Flex>
-));
-
-CompositingSettingsWrapper.displayName = 'CompositingSettingsWrapper';
 
 export default memo(ParamCompositingSettingsCollapse);
