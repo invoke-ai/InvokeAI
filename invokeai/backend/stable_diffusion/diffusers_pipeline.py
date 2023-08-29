@@ -359,6 +359,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         callback: Callable[[PipelineIntermediateState], None] = None,
         control_data: List[ControlNetData] = None,
         ip_adapter_image: Optional[PIL.Image] = None,
+        ip_adapter_strength: float = 1.0,
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
         seed: Optional[int] = None,
@@ -411,6 +412,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 additional_guidance=additional_guidance,
                 control_data=control_data,
                 ip_adapter_image=ip_adapter_image,
+                ip_adapter_strength=ip_adapter_strength,
                 callback=callback,
             )
         finally:
@@ -431,6 +433,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
         ip_adapter_image: Optional[PIL.Image] = None,
+        ip_adapter_strength: float = 1.0,
         callback: Callable[[PipelineIntermediateState], None] = None,
     ):
 
@@ -463,6 +466,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                                    ip_adapter_model_path,   # hardwiring to manually downloaded loc for first pass
                                    "cuda")                  # hardwiring CUDA GPU for first pass
             # IP-Adapter ==> add additional cross-attention layers to UNet model here?
+            ip_adapter.set_scale(ip_adapter_strength)
             print("ip_adapter:", ip_adapter)
 
             # get image embedding from CLIP and ImageProjModel

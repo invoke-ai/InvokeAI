@@ -192,7 +192,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         default=None,
         description=FieldDescriptions.mask,
     )
-    ip_adapter_image: Optional[ImageField] = InputField(input=Input.Connection)
+    ip_adapter_image: Optional[ImageField] = InputField(input=Input.Connection, title="IP Adapter Image", ui_order=6)
+    ip_adapter_strength: float = InputField(default=1.0, ge=0, le=2, ui_type=UIType.Float,
+                                            title="IP Adapter Strength", ui_order=7)
 
     @validator("cfg_scale")
     def ge_one(cls, v):
@@ -515,6 +517,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     conditioning_data=conditioning_data,
                     control_data=control_data,  # list[ControlNetData],
                     ip_adapter_image=unwrapped_ip_adapter_image,
+                    ip_adapter_strength=self.ip_adapter_strength,
                     callback=step_callback,
                 )
 
