@@ -2,7 +2,7 @@ import { Flex, Text } from '@chakra-ui/react';
 import { ReactNode, memo } from 'react';
 
 type SubParameterWrapperProps = {
-  children: ReactNode[];
+  children: ReactNode | ReactNode[];
   label?: string;
 };
 
