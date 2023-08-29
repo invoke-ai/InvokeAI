@@ -4,11 +4,11 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
+import { memo } from 'react';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 import ParamDynamicPromptsCombinatorial from './ParamDynamicPromptsCombinatorial';
 import ParamDynamicPromptsToggle from './ParamDynamicPromptsEnabled';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
-import { memo } from 'react';
 
 const selector = createSelector(
   stateSelector,
@@ -32,7 +32,7 @@ const ParamDynamicPromptsCollapse = () => {
 
   return (
     <IAICollapse label="Dynamic Prompts" activeLabel={activeLabel}>
-      <Flex sx={{ gap: 2, flexDir: 'column' }}>
+      <Flex sx={{ gap: 2, flexDir: 'column', pb: 2 }}>
         <ParamDynamicPromptsToggle />
         <ParamDynamicPromptsCombinatorial />
         <ParamDynamicPromptsMaxPrompts />

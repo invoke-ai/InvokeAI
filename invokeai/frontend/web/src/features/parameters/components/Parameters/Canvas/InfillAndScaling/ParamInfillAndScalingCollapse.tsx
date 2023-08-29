@@ -14,7 +14,7 @@ const ParamInfillCollapse = () => {
 
   return (
     <IAICollapse label={t('parameters.infillScalingHeader')}>
-      <Flex sx={{ gap: 2, flexDirection: 'column' }}>
+      <Flex sx={{ gap: 2, flexDirection: 'column', pb: 2 }}>
         <ParamInfillMethod />
         <ParamInfillTilesize />
         <ParamScaleBeforeProcessing />
