@@ -14,8 +14,9 @@ const selector = createSelector(
   [stateSelector, isStagingSelector],
   ({ canvas, generation }, isStaging) => {
     const { boundingBoxDimensions } = canvas;
-    const { aspectRatio } = generation;
+    const { model, aspectRatio } = generation;
     return {
+      model,
       boundingBoxDimensions,
       isStaging,
       aspectRatio,
@@ -26,8 +27,12 @@ const selector = createSelector(
 
 const ParamBoundingBoxWidth = () => {
   const dispatch = useAppDispatch();
-  const { boundingBoxDimensions, isStaging, aspectRatio } =
+  const { model, boundingBoxDimensions, isStaging, aspectRatio } =
     useAppSelector(selector);
+
+  const initial = ['sdxl', 'sdxl-refiner'].includes(model?.base_model as string)
+    ? 1024
+    : 512;
 
   const { t } = useTranslation();
 
@@ -53,14 +58,14 @@ const ParamBoundingBoxWidth = () => {
     dispatch(
       setBoundingBoxDimensions({
         ...boundingBoxDimensions,
-        width: Math.floor(512),
+        width: Math.floor(initial),
       })
     );
     if (aspectRatio) {
-      const newHeight = roundToMultiple(512 / aspectRatio, 64);
+      const newHeight = roundToMultiple(initial / aspectRatio, 64);
       dispatch(
         setBoundingBoxDimensions({
-          width: Math.floor(512),
+          width: Math.floor(initial),
           height: newHeight,
         })
       );
