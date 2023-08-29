@@ -122,7 +122,7 @@ class CompelInvocation(BaseInvocation):
             conjunction = Compel.parse_prompt_string(self.prompt)
 
             if context.services.configuration.log_tokenization:
-                log_tokenization_for_prompt_object(conjunction, tokenizer)
+                log_tokenization_for_conjunction(conjunction, tokenizer)
 
             c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
 
