@@ -32,7 +32,7 @@ const ParamDynamicPromptsCollapse = () => {
 
   return (
     <IAICollapse label="Dynamic Prompts" activeLabel={activeLabel}>
-      <Flex sx={{ gap: 2, flexDir: 'column', pb: 2, px: 2 }}>
+      <Flex sx={{ gap: 2, flexDir: 'column' }}>
         <ParamDynamicPromptsToggle />
         <ParamDynamicPromptsCombinatorial />
         <ParamDynamicPromptsMaxPrompts />

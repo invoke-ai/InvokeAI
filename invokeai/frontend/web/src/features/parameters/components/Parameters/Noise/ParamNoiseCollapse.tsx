@@ -42,7 +42,7 @@ const ParamNoiseCollapse = () => {
       label={t('parameters.noiseSettings')}
       activeLabel={activeLabel}
     >
-      <Flex sx={{ gap: 2, flexDirection: 'column', px: 2, pb: 2 }}>
+      <Flex sx={{ gap: 2, flexDirection: 'column' }}>
         <ParamNoiseToggle />
         <ParamCpuNoiseToggle />
         {isPerlinNoiseEnabled && <ParamPerlinNoise />}

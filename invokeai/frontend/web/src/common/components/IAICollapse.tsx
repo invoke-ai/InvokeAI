@@ -86,8 +86,8 @@ const IAICollapse = (props: IAIToggleCollapseProps) => {
       <Collapse in={isOpen} animateOpacity style={{ overflow: 'unset' }}>
         <Box
           sx={{
-            p: 2,
-            pt: 3,
+            p: 4,
+            pb: 4,
             borderBottomRadius: 'base',
             bg: 'base.150',
             _dark: {

@@ -37,8 +37,6 @@ const ImageToImageTabCoreParameters = () => {
         sx={{
           flexDirection: 'column',
           gap: 3,
-          px: 2,
-          pb: 2,
         }}
       >
         {shouldUseSliders ? (

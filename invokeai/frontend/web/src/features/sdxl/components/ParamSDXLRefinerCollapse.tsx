@@ -32,7 +32,7 @@ const ParamSDXLRefinerCollapse = () => {
 
   return (
     <IAICollapse label="Refiner" activeLabel={activeLabel}>
-      <Flex sx={{ gap: 2, flexDir: 'column', px: 2, pb: 2 }}>
+      <Flex sx={{ gap: 2, flexDir: 'column' }}>
         <ParamUseSDXLRefiner />
         <ParamSDXLRefinerModelSelect />
         <Flex gap={2} flexDirection={shouldUseSliders ? 'column' : 'row'}>

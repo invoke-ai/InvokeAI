@@ -29,7 +29,7 @@ export default function ParamAdvancedCollapse() {
 
   return (
     <IAICollapse label="Advanced" activeLabel={activeLabel}>
-      <Flex sx={{ flexDir: 'column', gap: 2, px: 2, pb: 2 }}>
+      <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <ParamClipSkip />
       </Flex>
     </IAICollapse>
