@@ -10,8 +10,8 @@ import {
   TypesafeDroppableData,
 } from 'features/dnd/types';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FaUndo } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { FaSave, FaUndo } from 'react-icons/fa';
+import { imagesApi, useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
 import {
@@ -26,11 +26,13 @@ type Props = {
 
 const selector = createSelector(
   stateSelector,
-  ({ controlNet }) => {
+  ({ controlNet, gallery }) => {
     const { pendingControlImages } = controlNet;
+    const { autoAddBoardId } = gallery;
 
     return {
       pendingControlImages,
+      autoAddBoardId,
     };
   },
   defaultSelectorOptions
@@ -47,7 +49,7 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
 
   const dispatch = useAppDispatch();
 
-  const { pendingControlImages } = useAppSelector(selector);
+  const { pendingControlImages, autoAddBoardId } = useAppSelector(selector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
@@ -62,6 +64,43 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
   const handleResetControlImage = useCallback(() => {
     dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
   }, [controlNetId, dispatch]);
+
+  const handleSaveControlImage = useCallback(() => {
+    if (!processedControlImage) {
+      return;
+    }
+
+    dispatch(
+      imagesApi.endpoints.addImageToBoard.initiate({
+        board_id: autoAddBoardId,
+        imageDTO: {
+          ...processedControlImage,
+          is_intermediate: false,
+        },
+      })
+    );
+
+    // THIS PART WORKS
+    // fetch(processedControlImage.image_url)
+    //   .then((res) => res.blob())
+    //   .then((blob) => {
+    //     dispatch(
+    //       imagesApi.endpoints.uploadImage.initiate({
+    //         file: new File([blob], processedControlImage.image_name, {
+    //           type: 'image/png',
+    //         }),
+    //         image_category: processedControlImage.image_category,
+    //         is_intermediate: false,
+    //         board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+    //         postUploadAction: {
+    //           type: 'TOAST',
+    //           toastOptions: { title: 'Processed Image Saved to Assets' },
+    //         },
+    //       })
+    //     );
+    //   });
+  }, [processedControlImage, autoAddBoardId, dispatch]);
+
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
   }, []);
@@ -122,11 +161,19 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
         isDropDisabled={shouldShowProcessedImage || !isEnabled}
         postUploadAction={postUploadAction}
       >
-        <IAIDndImageIcon
-          onClick={handleResetControlImage}
-          icon={controlImage ? <FaUndo /> : undefined}
-          tooltip="Reset Control Image"
-        />
+        <>
+          <IAIDndImageIcon
+            onClick={handleResetControlImage}
+            icon={controlImage ? <FaUndo /> : undefined}
+            tooltip="Reset Control Image"
+          />
+          <IAIDndImageIcon
+            onClick={handleSaveControlImage}
+            icon={controlImage ? <FaSave size={16} /> : undefined}
+            tooltip="Save Control Image"
+            styleOverrides={{ marginTop: 6 }}
+          />
+        </>
       </IAIDndImage>
 
       <Box
