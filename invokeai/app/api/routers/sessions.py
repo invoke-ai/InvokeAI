@@ -96,7 +96,7 @@ async def list_incomplete_batches() -> list[BatchProcessResponse]:
 
 @session_router.get(
     "/batch",
-    operation_id="list__batches",
+    operation_id="list_batches",
     responses={200: {"model": list[BatchProcessResponse]}},
 )
 async def list_batches() -> list[BatchProcessResponse]:
