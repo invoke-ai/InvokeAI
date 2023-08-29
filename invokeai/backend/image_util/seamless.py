@@ -20,7 +20,8 @@ def _conv_forward_asymmetric(self, input, weight, bias):
 
 def configure_model_padding(model, seamless, seamless_axes):
     """
-    Modifies the 2D convolution layers to use a circular padding mode based on the `seamless` and `seamless_axes` options.
+    Modifies the 2D convolution layers to use a circular padding mode based on
+    the `seamless` and `seamless_axes` options.
     """
     # TODO: get an explicit interface for this in diffusers: https://github.com/huggingface/diffusers/issues/556
     for m in model.modules():

@@ -116,16 +116,15 @@ class CompelInvocation(BaseInvocation):
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=torch_dtype,
-                truncate_long_prompts=True,
+                truncate_long_prompts=False,
             )
 
             conjunction = Compel.parse_prompt_string(self.prompt)
-            prompt: Union[FlattenedPrompt, Blend] = conjunction.prompts[0]
 
             if context.services.configuration.log_tokenization:
-                log_tokenization_for_prompt_object(prompt, tokenizer)
+                log_tokenization_for_conjunction(conjunction, tokenizer)
 
-            c, options = compel.build_conditioning_tensor_for_prompt_object(prompt)
+            c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
 
             ec = InvokeAIDiffuserComponent.ExtraConditioningInfo(
                 tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
@@ -231,7 +230,7 @@ class SDXLPromptInvocationBase:
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=torch_dtype,
-                truncate_long_prompts=True,  # TODO:
+                truncate_long_prompts=False,  # TODO:
                 returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,  # TODO: clip skip
                 requires_pooled=get_pooled,
             )
@@ -240,8 +239,7 @@ class SDXLPromptInvocationBase:
 
             if context.services.configuration.log_tokenization:
                 # TODO: better logging for and syntax
-                for prompt_obj in conjunction.prompts:
-                    log_tokenization_for_prompt_object(prompt_obj, tokenizer)
+                log_tokenization_for_conjunction(conjunction, tokenizer)
 
             # TODO: ask for optimizations? to not run text_encoder twice
             c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)

@@ -63,7 +63,7 @@ export const addDynamicPromptsToGraph = (
       {
         source: {
           node_id: DYNAMIC_PROMPT,
-          field: 'prompt_collection',
+          field: 'collection',
         },
         destination: {
           node_id: ITERATE,

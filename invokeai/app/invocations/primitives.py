@@ -296,6 +296,25 @@ class ImageCollectionInvocation(BaseInvocation):
 
 # endregion
 
+# region DenoiseMask
+
+
+class DenoiseMaskField(BaseModel):
+    """An inpaint mask field"""
+
+    mask_name: str = Field(description="The name of the mask image")
+    masked_latents_name: Optional[str] = Field(description="The name of the masked image latents")
+
+
+class DenoiseMaskOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single image"""
+
+    type: Literal["denoise_mask_output"] = "denoise_mask_output"
+    denoise_mask: DenoiseMaskField = OutputField(description="Mask for denoise model run")
+
+
+# endregion
+
 # region Latents
 
 
