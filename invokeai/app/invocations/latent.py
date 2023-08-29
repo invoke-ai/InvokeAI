@@ -34,6 +34,7 @@ from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 
 from ...backend.model_management.lora import ModelPatcher
+from ...backend.model_management.seamless import set_seamless
 from ...backend.model_management.models import BaseModelType
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
@@ -456,7 +457,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             )
             with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
                 unet_info.context.model, _lora_loader()
-            ), unet_info as unet:
+            ), set_seamless(unet_info.context.model, self.unet.seamless_axes), unet_info as unet:
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
                     noise = noise.to(device=unet.device, dtype=unet.dtype)
@@ -549,7 +550,7 @@ class LatentsToImageInvocation(BaseInvocation):
             context=context,
         )
 
-        with vae_info as vae:
+        with set_seamless(vae_info.context.model, self.vae.seamless_axes), vae_info as vae:
             latents = latents.to(vae.device)
             if self.fp32:
                 vae.to(dtype=torch.float32)

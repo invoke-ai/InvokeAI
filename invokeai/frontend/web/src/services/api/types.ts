@@ -130,6 +130,7 @@ export type ESRGANInvocation = s['ESRGANInvocation'];
 export type DivideInvocation = s['DivideInvocation'];
 export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
+export type SeamlessModeInvocation = s['SeamlessModeInvocation'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = s['ControlNetInvocation'];

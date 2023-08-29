@@ -10,6 +10,7 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -24,6 +25,7 @@ import {
   NOISE,
   ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
+  SEAMLESS,
 } from './constants';
 
 /**
@@ -44,6 +46,8 @@ export const buildCanvasTextToImageGraph = (
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   // The bounding box determines width and height, not the width and height params
@@ -70,7 +74,7 @@ export const buildCanvasTextToImageGraph = (
 
   const isUsingOnnxModel = model.model_type === 'onnx';
 
-  const modelLoaderNodeId = isUsingOnnxModel
+  let modelLoaderNodeId = isUsingOnnxModel
     ? ONNX_MODEL_LOADER
     : MAIN_MODEL_LOADER;
 
@@ -320,6 +324,12 @@ export const buildCanvasTextToImageGraph = (
       field: 'metadata',
     },
   });
+
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
 
   // optionally add custom VAE
   addVAEToGraph(state, graph, modelLoaderNodeId);
