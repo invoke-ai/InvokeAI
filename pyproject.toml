@@ -36,7 +36,7 @@ dependencies = [
   "albumentations",
   "click",
   "clip_anytorch",  # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
-  "compel~=2.0.0",
+  "compel~=2.0.2",
   "controlnet-aux>=0.0.6",
   "timm==0.6.13",   # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "datasets",
