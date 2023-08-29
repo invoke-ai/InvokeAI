@@ -2,7 +2,10 @@ import { ButtonGroup, Flex } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import { setAspectRatio } from 'features/parameters/store/generationSlice';
+import {
+  setAspectRatio,
+  setShouldLockAspectRatio,
+} from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
 
 const aspectRatios = [
@@ -34,7 +37,10 @@ export default function ParamAspectRatio() {
             isDisabled={
               activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
             }
-            onClick={() => dispatch(setAspectRatio(ratio.value))}
+            onClick={() => {
+              dispatch(setAspectRatio(ratio.value));
+              dispatch(setShouldLockAspectRatio(false));
+            }}
           >
             {ratio.name}
           </IAIButton>

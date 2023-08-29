@@ -1,22 +1,54 @@
 import { Flex, Spacer, Text } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import { toggleSize } from 'features/parameters/store/generationSlice';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
+import {
+  setAspectRatio,
+  setShouldLockAspectRatio,
+  toggleSize,
+} from 'features/parameters/store/generationSlice';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FaLock } from 'react-icons/fa';
 import { MdOutlineSwapVert } from 'react-icons/md';
+import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
 import ParamAspectRatio from './ParamAspectRatio';
 import ParamHeight from './ParamHeight';
 import ParamWidth from './ParamWidth';
-import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
+
+const sizeOptsSelector = createSelector(
+  [generationSelector, activeTabNameSelector],
+  (generation, activeTabName) => {
+    const { shouldFitToWidthHeight, shouldLockAspectRatio, width, height } =
+      generation;
+
+    return {
+      activeTabName,
+      shouldFitToWidthHeight,
+      shouldLockAspectRatio,
+      width,
+      height,
+    };
+  }
+);
 
 export default function ParamSize() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const shouldFitToWidthHeight = useAppSelector(
-    (state: RootState) => state.generation.shouldFitToWidthHeight
-  );
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const {
+    activeTabName,
+    shouldFitToWidthHeight,
+    shouldLockAspectRatio,
+    width,
+    height,
+  } = useAppSelector(sizeOptsSelector);
+
+  const handleLockRatio = useCallback(() => {
+    dispatch(setAspectRatio(width / height));
+    dispatch(setShouldLockAspectRatio(!shouldLockAspectRatio));
+  }, [shouldLockAspectRatio, width, height, dispatch]);
+
   return (
     <Flex
       sx={{
@@ -56,6 +88,17 @@ export default function ParamSize() {
             activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
           }
           onClick={() => dispatch(toggleSize())}
+        />
+        <IAIIconButton
+          tooltip={t('ui.lockRatio')}
+          aria-label={t('ui.lockRatio')}
+          size="sm"
+          icon={<FaLock />}
+          isChecked={shouldLockAspectRatio}
+          isDisabled={
+            activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
+          }
+          onClick={handleLockRatio}
         />
       </Flex>
       <Flex gap={2} alignItems="center">

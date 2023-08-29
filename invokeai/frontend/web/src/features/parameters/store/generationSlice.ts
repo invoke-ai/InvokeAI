@@ -62,6 +62,7 @@ export interface GenerationState {
   shouldUseCpuNoise: boolean;
   shouldShowAdvancedOptions: boolean;
   aspectRatio: number | null;
+  shouldLockAspectRatio: boolean;
 }
 
 export const initialGenerationState: GenerationState = {
@@ -101,6 +102,7 @@ export const initialGenerationState: GenerationState = {
   shouldUseCpuNoise: true,
   shouldShowAdvancedOptions: false,
   aspectRatio: null,
+  shouldLockAspectRatio: false,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -272,6 +274,15 @@ export const generationSlice = createSlice({
         state.height = roundToMultiple(state.width / newAspectRatio, 8);
       }
     },
+    setShouldLockAspectRatio: (state, action: PayloadAction<boolean>) => {
+      if (
+        action.payload === false &&
+        ![null, 2 / 3, 16 / 9, 1 / 1].includes(state.aspectRatio)
+      ) {
+        state.aspectRatio = null;
+      }
+      state.shouldLockAspectRatio = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -342,6 +353,7 @@ export const {
   shouldUseCpuNoiseChanged,
   setShouldShowAdvancedOptions,
   setAspectRatio,
+  setShouldLockAspectRatio,
   vaePrecisionChanged,
 } = generationSlice.actions;
 

@@ -714,7 +714,8 @@
     "ui": {
         "showProgressImages": "Show Progress Images",
         "hideProgressImages": "Hide Progress Images",
-        "swapSizes": "Swap Sizes"
+        "swapSizes": "Swap Sizes",
+        "lockRatio": "Lock Ratio"
     },
     "nodes": {
         "reloadNodeTemplates": "Reload Node Templates",
