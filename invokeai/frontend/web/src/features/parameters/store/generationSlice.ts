@@ -5,6 +5,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 
+import { mappedAspectRatios } from '../components/Parameters/Core/ParamAspectRatio';
 import { clipSkipMap } from '../types/constants';
 import {
   CfgScaleParam,
@@ -152,7 +153,7 @@ export const generationSlice = createSlice({
     },
     toggleSize: (state) => {
       const [width, height] = [state.width, state.height];
-      if (![null, 2 / 3, 16 / 9, 1 / 1].includes(height / width)) {
+      if (!mappedAspectRatios.includes(height / width)) {
         state.aspectRatio = null;
       }
       state.width = height;
@@ -280,7 +281,7 @@ export const generationSlice = createSlice({
     setShouldLockAspectRatio: (state, action: PayloadAction<boolean>) => {
       if (
         action.payload === false &&
-        ![null, 2 / 3, 16 / 9, 1 / 1].includes(state.aspectRatio)
+        !mappedAspectRatios.includes(state.aspectRatio)
       ) {
         state.aspectRatio = null;
       }
