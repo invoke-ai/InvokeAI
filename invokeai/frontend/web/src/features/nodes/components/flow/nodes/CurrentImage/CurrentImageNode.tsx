@@ -1,13 +1,15 @@
-import { Flex, Image, Text } from '@chakra-ui/react';
+import { useState, PropsWithChildren, memo } from 'react';
+import { useSelector } from 'react-redux';
 import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { Flex, Image, Text } from '@chakra-ui/react';
+import { motion } from 'framer-motion';
+import { NodeProps } from 'reactflow';
+import NodeWrapper from '../common/NodeWrapper';
+import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import { PropsWithChildren, memo } from 'react';
-import { useSelector } from 'react-redux';
-import { NodeProps } from 'reactflow';
-import NodeWrapper from '../common/NodeWrapper';
+import { stateSelector } from 'app/store/store';
 
 const selector = createSelector(stateSelector, ({ system, gallery }) => {
   const imageDTO = gallery.selection[gallery.selection.length - 1];
@@ -54,44 +56,90 @@ const CurrentImageNode = (props: NodeProps) => {
 
 export default memo(CurrentImageNode);
 
-const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => (
-  <NodeWrapper
-    nodeId={props.nodeProps.data.id}
-    selected={props.nodeProps.selected}
-    width={384}
-  >
-    <Flex
-      className={DRAG_HANDLE_CLASSNAME}
-      sx={{
-        flexDirection: 'column',
-      }}
+const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
+  const [isHovering, setIsHovering] = useState(false);
+
+  const handleMouseEnter = () => {
+    setIsHovering(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovering(false);
+  };
+
+  return (
+    <NodeWrapper
+      nodeId={props.nodeProps.id}
+      selected={props.nodeProps.selected}
+      width={384}
     >
       <Flex
-        layerStyle="nodeHeader"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className={DRAG_HANDLE_CLASSNAME}
         sx={{
-          borderTopRadius: 'base',
-          alignItems: 'center',
-          justifyContent: 'center',
-          h: 8,
+          position: 'relative',
+          flexDirection: 'column',
         }}
       >
-        <Text
+        <Flex
+          layerStyle="nodeHeader"
           sx={{
-            fontSize: 'sm',
-            fontWeight: 600,
-            color: 'base.700',
-            _dark: { color: 'base.200' },
+            borderTopRadius: 'base',
+            alignItems: 'center',
+            justifyContent: 'center',
+            h: 8,
           }}
         >
-          Current Image
-        </Text>
+          <Text
+            sx={{
+              fontSize: 'sm',
+              fontWeight: 600,
+              color: 'base.700',
+              _dark: { color: 'base.200' },
+            }}
+          >
+            Current Image
+          </Text>
+        </Flex>
+        <Flex
+          layerStyle="nodeBody"
+          sx={{
+            w: 'full',
+            h: 'full',
+            borderBottomRadius: 'base',
+            p: 2,
+          }}
+        >
+          {props.children}
+          {isHovering && (
+            <motion.div
+              key="nextPrevButtons"
+              initial={{
+                opacity: 0,
+              }}
+              animate={{
+                opacity: 1,
+                transition: { duration: 0.1 },
+              }}
+              exit={{
+                opacity: 0,
+                transition: { duration: 0.1 },
+              }}
+              style={{
+                position: 'absolute',
+                top: 40,
+                left: -2,
+                right: -2,
+                bottom: 0,
+                pointerEvents: 'none',
+              }}
+            >
+              <NextPrevImageButtons />
+            </motion.div>
+          )}
+        </Flex>
       </Flex>
-      <Flex
-        layerStyle="nodeBody"
-        sx={{ w: 'full', h: 'full', borderBottomRadius: 'base', p: 2 }}
-      >
-        {props.children}
-      </Flex>
-    </Flex>
-  </NodeWrapper>
-);
+    </NodeWrapper>
+  );
+};
