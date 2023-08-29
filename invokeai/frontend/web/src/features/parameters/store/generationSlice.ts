@@ -5,6 +5,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import { ImageDTO } from 'services/api/types';
 
+import { flipBoundingBoxAxes } from 'features/canvas/store/canvasSlice';
 import { mappedAspectRatios } from '../components/Parameters/Core/ParamAspectRatio';
 import { clipSkipMap } from '../types/constants';
 import {
@@ -311,6 +312,9 @@ export const generationSlice = createSlice({
       if (!advancedOptionsStatus) {
         state.clipSkip = 0;
       }
+    });
+    builder.addCase(flipBoundingBoxAxes, (state) => {
+      state.aspectRatio = null;
     });
   },
 });
