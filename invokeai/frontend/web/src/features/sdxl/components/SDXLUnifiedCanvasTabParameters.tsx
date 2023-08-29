@@ -5,6 +5,7 @@ import ParamMaskAdjustmentCollapse from 'features/parameters/components/Paramete
 import ParamCanvasCoherencePassCollapse from 'features/parameters/components/Parameters/Canvas/SeamPainting/ParamCanvasCoherencePassCollapse';
 import ParamControlNetCollapse from 'features/parameters/components/Parameters/ControlNet/ParamControlNetCollapse';
 import ParamNoiseCollapse from 'features/parameters/components/Parameters/Noise/ParamNoiseCollapse';
+import ParamSeamlessCollapse from 'features/parameters/components/Parameters/Seamless/ParamSeamlessCollapse';
 import ParamSDXLPromptArea from './ParamSDXLPromptArea';
 import ParamSDXLRefinerCollapse from './ParamSDXLRefinerCollapse';
 import SDXLUnifiedCanvasTabCoreParameters from './SDXLUnifiedCanvasTabCoreParameters';
@@ -22,6 +23,7 @@ export default function SDXLUnifiedCanvasTabParameters() {
       <ParamMaskAdjustmentCollapse />
       <ParamInfillAndScalingCollapse />
       <ParamCanvasCoherencePassCollapse />
+      <ParamSeamlessCollapse />
     </>
   );
 }

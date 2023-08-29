@@ -8,6 +8,7 @@ import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -19,9 +20,11 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
+  REFINER_SEAMLESS,
   SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
+  SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
@@ -44,6 +47,8 @@ export const buildCanvasSDXLImageToImageGraph = (
     clipSkip,
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   const {
@@ -71,6 +76,9 @@ export const buildCanvasSDXLImageToImageGraph = (
     throw new Error('No model found in state');
   }
 
+  // Model Loader ID
+  let modelLoaderNodeId = SDXL_MODEL_LOADER;
+
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
@@ -92,9 +100,9 @@ export const buildCanvasSDXLImageToImageGraph = (
   const graph: NonNullableGraph = {
     id: SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
-      [SDXL_MODEL_LOADER]: {
+      [modelLoaderNodeId]: {
         type: 'sdxl_model_loader',
-        id: SDXL_MODEL_LOADER,
+        id: modelLoaderNodeId,
         model,
       },
       [POSITIVE_CONDITIONING]: {
@@ -144,7 +152,7 @@ export const buildCanvasSDXLImageToImageGraph = (
       // Connect Model Loader To UNet & CLIP
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -154,7 +162,7 @@ export const buildCanvasSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -164,7 +172,7 @@ export const buildCanvasSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip2',
         },
         destination: {
@@ -174,7 +182,7 @@ export const buildCanvasSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -184,7 +192,7 @@ export const buildCanvasSDXLImageToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip2',
         },
         destination: {
@@ -351,16 +359,23 @@ export const buildCanvasSDXLImageToImageGraph = (
     },
   });
 
-  // add LoRA support
-  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
+    modelLoaderNodeId = REFINER_SEAMLESS;
   }
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
+
+  // add LoRA support
+  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
