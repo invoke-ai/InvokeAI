@@ -1,4 +1,4 @@
-import { Flex, MenuItem, Spinner, Text } from '@chakra-ui/react';
+import { Flex, MenuItem, Spinner } from '@chakra-ui/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
@@ -249,18 +249,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       >
         {t('gallery.deleteImage')}
       </MenuItem>
-      {metadata?.created_by && (
-        <Flex
-          sx={{
-            padding: '5px 10px',
-            marginTop: '5px',
-          }}
-        >
-          <Text fontSize="xs" fontWeight="bold">
-            Created by {metadata?.created_by}
-          </Text>
-        </Flex>
-      )}
     </>
   );
 };
