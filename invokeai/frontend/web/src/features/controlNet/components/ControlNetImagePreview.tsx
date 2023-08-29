@@ -11,7 +11,11 @@ import {
 } from 'features/dnd/types';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { FaSave, FaUndo } from 'react-icons/fa';
-import { imagesApi, useGetImageDTOQuery } from 'services/api/endpoints/images';
+import {
+  useAddImageToBoardMutation,
+  useChangeImageIsIntermediateMutation,
+  useGetImageDTOQuery,
+} from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
 import {
@@ -61,6 +65,9 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
     processedControlImageName ?? skipToken
   );
 
+  const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();
+  const [addToBoard] = useAddImageToBoardMutation();
+
   const handleResetControlImage = useCallback(() => {
     dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
   }, [controlNetId, dispatch]);
@@ -70,36 +77,13 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
       return;
     }
 
-    dispatch(
-      imagesApi.endpoints.addImageToBoard.initiate({
-        board_id: autoAddBoardId,
-        imageDTO: {
-          ...processedControlImage,
-          is_intermediate: false,
-        },
-      })
-    );
+    changeIsIntermediate({
+      imageDTO: processedControlImage,
+      is_intermediate: false,
+    });
 
-    // THIS PART WORKS
-    // fetch(processedControlImage.image_url)
-    //   .then((res) => res.blob())
-    //   .then((blob) => {
-    //     dispatch(
-    //       imagesApi.endpoints.uploadImage.initiate({
-    //         file: new File([blob], processedControlImage.image_name, {
-    //           type: 'image/png',
-    //         }),
-    //         image_category: processedControlImage.image_category,
-    //         is_intermediate: false,
-    //         board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-    //         postUploadAction: {
-    //           type: 'TOAST',
-    //           toastOptions: { title: 'Processed Image Saved to Assets' },
-    //         },
-    //       })
-    //     );
-    //   });
-  }, [processedControlImage, autoAddBoardId, dispatch]);
+    addToBoard({ imageDTO: processedControlImage, board_id: autoAddBoardId });
+  }, [processedControlImage, autoAddBoardId, changeIsIntermediate, addToBoard]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
