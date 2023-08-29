@@ -180,11 +180,19 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
           isUploadDisabled={true}
           isDropDisabled={!isEnabled}
         >
-          <IAIDndImageIcon
-            onClick={handleResetControlImage}
-            icon={controlImage ? <FaUndo /> : undefined}
-            tooltip="Reset Control Image"
-          />
+          <>
+            <IAIDndImageIcon
+              onClick={handleResetControlImage}
+              icon={controlImage ? <FaUndo /> : undefined}
+              tooltip="Reset Control Image"
+            />
+            <IAIDndImageIcon
+              onClick={handleSaveControlImage}
+              icon={controlImage ? <FaSave size={16} /> : undefined}
+              tooltip="Save Control Image"
+              styleOverrides={{ marginTop: 6 }}
+            />
+          </>
         </IAIDndImage>
       </Box>
       {pendingControlImages.includes(controlNetId) && (
