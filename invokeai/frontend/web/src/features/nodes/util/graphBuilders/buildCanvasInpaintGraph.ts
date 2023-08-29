@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
+  CreateDenoiseMaskInvocation,
   ImageBlurInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
@@ -12,16 +13,18 @@ import {
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
-  CANVAS_INPAINT_GRAPH,
-  CANVAS_OUTPUT,
   CANVAS_COHERENCE_DENOISE_LATENTS,
   CANVAS_COHERENCE_NOISE,
   CANVAS_COHERENCE_NOISE_INCREMENT,
+  CANVAS_INPAINT_GRAPH,
+  CANVAS_OUTPUT,
   CLIP_SKIP,
   DENOISE_LATENTS,
+  INPAINT_CREATE_MASK,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
   INPAINT_IMAGE_RESIZE_UP,
@@ -36,6 +39,7 @@ import {
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
+  SEAMLESS,
 } from './constants';
 
 /**
@@ -66,6 +70,8 @@ export const buildCanvasInpaintGraph = (
     canvasCoherenceSteps,
     canvasCoherenceStrength,
     clipSkip,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   if (!model) {
@@ -83,6 +89,8 @@ export const buildCanvasInpaintGraph = (
     shouldAutoSave,
   } = state.canvas;
 
+  let modelLoaderNodeId = MAIN_MODEL_LOADER;
+
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : shouldUseCpuNoise;
@@ -90,9 +98,9 @@ export const buildCanvasInpaintGraph = (
   const graph: NonNullableGraph = {
     id: CANVAS_INPAINT_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
+      [modelLoaderNodeId]: {
         type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+        id: modelLoaderNodeId,
         is_intermediate: true,
         model,
       },
@@ -124,6 +132,12 @@ export const buildCanvasInpaintGraph = (
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
+        is_intermediate: true,
+        fp32: vaePrecision === 'fp32' ? true : false,
+      },
+      [INPAINT_CREATE_MASK]: {
+        type: 'create_denoise_mask',
+        id: INPAINT_CREATE_MASK,
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
@@ -196,7 +210,7 @@ export const buildCanvasInpaintGraph = (
       // Connect Model Loader to CLIP Skip and UNet
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -206,7 +220,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -276,14 +290,25 @@ export const buildCanvasInpaintGraph = (
           field: 'latents',
         },
       },
+      // Create Inpaint Mask
       {
         source: {
           node_id: MASK_BLUR,
           field: 'image',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: INPAINT_CREATE_MASK,
           field: 'mask',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'denoise_mask',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'denoise_mask',
         },
       },
       // Iterate
@@ -330,7 +355,7 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -459,6 +484,16 @@ export const buildCanvasInpaintGraph = (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      },
       // Color Correct The Inpainted Result
       {
         source: {
@@ -516,6 +551,10 @@ export const buildCanvasInpaintGraph = (
       ...(graph.nodes[MASK_BLUR] as ImageBlurInvocation),
       image: canvasMaskImage,
     };
+    graph.nodes[INPAINT_CREATE_MASK] = {
+      ...(graph.nodes[INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
+      image: canvasInitImage,
+    };
 
     graph.edges.push(
       // Color Correct The Inpainted Result
@@ -562,11 +601,17 @@ export const buildCanvasInpaintGraph = (
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
   }
 
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
+
   // Add VAE
-  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS, MAIN_MODEL_LOADER);
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);

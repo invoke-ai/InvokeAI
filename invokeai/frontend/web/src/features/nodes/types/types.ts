@@ -65,6 +65,7 @@ export const zFieldType = z.enum([
   'string',
   'array',
   'ImageField',
+  'DenoiseMaskField',
   'LatentsField',
   'ConditioningField',
   'ControlField',
@@ -129,6 +130,7 @@ export type InputFieldTemplate =
   | StringInputFieldTemplate
   | BooleanInputFieldTemplate
   | ImageInputFieldTemplate
+  | DenoiseMaskInputFieldTemplate
   | LatentsInputFieldTemplate
   | ConditioningInputFieldTemplate
   | UNetInputFieldTemplate
@@ -214,6 +216,12 @@ export const zConditioningField = z.object({
 });
 export type ConditioningField = z.infer<typeof zConditioningField>;
 
+export const zDenoiseMaskField = z.object({
+  mask_name: z.string().trim().min(1),
+  masked_latents_name: z.string().trim().min(1).optional(),
+});
+export type DenoiseMaskFieldValue = z.infer<typeof zDenoiseMaskField>;
+
 export const zIntegerInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('integer'),
   value: z.number().optional(),
@@ -249,6 +257,14 @@ export const zLatentsInputFieldValue = zInputFieldValueBase.extend({
   value: zLatentsField.optional(),
 });
 export type LatentsInputFieldValue = z.infer<typeof zLatentsInputFieldValue>;
+
+export const zDenoiseMaskInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('DenoiseMaskField'),
+  value: zDenoiseMaskField.optional(),
+});
+export type DenoiseMaskInputFieldValue = z.infer<
+  typeof zDenoiseMaskInputFieldValue
+>;
 
 export const zConditioningInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('ConditioningField'),
@@ -468,6 +484,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zBooleanInputFieldValue,
   zImageInputFieldValue,
   zLatentsInputFieldValue,
+  zDenoiseMaskInputFieldValue,
   zConditioningInputFieldValue,
   zUNetInputFieldValue,
   zClipInputFieldValue,
@@ -539,6 +556,11 @@ export type ImageInputFieldTemplate = InputFieldTemplateBase & {
 export type ImageCollectionInputFieldTemplate = InputFieldTemplateBase & {
   default: ImageField[];
   type: 'ImageCollection';
+};
+
+export type DenoiseMaskInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'DenoiseMaskField';
 };
 
 export type LatentsInputFieldTemplate = InputFieldTemplateBase & {
