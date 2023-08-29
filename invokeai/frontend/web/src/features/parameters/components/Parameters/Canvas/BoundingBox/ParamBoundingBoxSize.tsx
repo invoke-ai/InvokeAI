@@ -80,7 +80,16 @@ export default function ParamBoundingBoxSize() {
           size="sm"
           icon={<MdOutlineSwapVert />}
           fontSize={20}
-          onClick={() => dispatch(flipBoundingBoxAxes())}
+          onClick={() => {
+            dispatch(flipBoundingBoxAxes());
+            if (
+              ![null, 2 / 3, 16 / 9, 1 / 1].includes(
+                boundingBoxDimensions.height / boundingBoxDimensions.width
+              )
+            ) {
+              dispatch(setAspectRatio(null));
+            }
+          }}
         />
         <IAIIconButton
           tooltip={t('ui.lockRatio')}
