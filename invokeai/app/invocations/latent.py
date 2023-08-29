@@ -52,8 +52,9 @@ from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
 from .model import ModelInfo, UNetField, VaeField
 
-DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
+
+DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
 SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
 
@@ -191,6 +192,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         default=None,
         description=FieldDescriptions.mask,
     )
+    ip_adapter_image: Optional[ImageField] = InputField(input=Input.Connection)
 
     @validator("cfg_scale")
     def ge_one(cls, v):
@@ -476,6 +478,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 pipeline = self.create_pipeline(unet, scheduler)
                 conditioning_data = self.get_conditioning_data(context, scheduler, unet, seed)
 
+                if self.ip_adapter_image is not None:
+                    print("ip_adapter_image:", self.ip_adapter_image)
+                    unwrapped_ip_adapter_image = context.services.images.get_pil_image(self.ip_adapter_image.image_name)
+                    print("unwrapped ip_adapter_image:", unwrapped_ip_adapter_image)
+                else:
+                    unwrapped_ip_adapter_image = None
+
                 control_data = self.prep_control_data(
                     model=pipeline,
                     context=context,
@@ -504,7 +513,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     masked_latents=masked_latents,
                     num_inference_steps=num_inference_steps,
                     conditioning_data=conditioning_data,
-                    control_data=control_data,  # list[ControlNetData]
+                    control_data=control_data,  # list[ControlNetData],
+                    ip_adapter_image=unwrapped_ip_adapter_image,
                     callback=step_callback,
                 )
 
