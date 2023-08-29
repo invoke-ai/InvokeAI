@@ -13,7 +13,9 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaLock } from 'react-icons/fa';
 import { MdOutlineSwapVert } from 'react-icons/md';
-import ParamAspectRatio from '../../Core/ParamAspectRatio';
+import ParamAspectRatio, {
+  mappedAspectRatios,
+} from '../../Core/ParamAspectRatio';
 import ParamBoundingBoxHeight from './ParamBoundingBoxHeight';
 import ParamBoundingBoxWidth from './ParamBoundingBoxWidth';
 
@@ -39,11 +41,42 @@ export default function ParamBoundingBoxSize() {
     useAppSelector(sizeOptsSelector);
 
   const handleLockRatio = useCallback(() => {
-    dispatch(
-      setAspectRatio(boundingBoxDimensions.width / boundingBoxDimensions.height)
-    );
-    dispatch(setShouldLockAspectRatio(!shouldLockAspectRatio));
+    if (shouldLockAspectRatio) {
+      dispatch(setShouldLockAspectRatio(false));
+      if (
+        !mappedAspectRatios.includes(
+          boundingBoxDimensions.width / boundingBoxDimensions.height
+        )
+      ) {
+        dispatch(setAspectRatio(null));
+      } else {
+        dispatch(
+          setAspectRatio(
+            boundingBoxDimensions.width / boundingBoxDimensions.height
+          )
+        );
+      }
+    } else {
+      dispatch(setShouldLockAspectRatio(true));
+      dispatch(
+        setAspectRatio(
+          boundingBoxDimensions.width / boundingBoxDimensions.height
+        )
+      );
+    }
   }, [shouldLockAspectRatio, boundingBoxDimensions, dispatch]);
+
+  const handleToggleSize = useCallback(() => {
+    dispatch(flipBoundingBoxAxes());
+    dispatch(setAspectRatio(null));
+    if (shouldLockAspectRatio) {
+      dispatch(
+        setAspectRatio(
+          boundingBoxDimensions.height / boundingBoxDimensions.width
+        )
+      );
+    }
+  }, [dispatch, shouldLockAspectRatio, boundingBoxDimensions]);
 
   return (
     <Flex
@@ -80,16 +113,7 @@ export default function ParamBoundingBoxSize() {
           size="sm"
           icon={<MdOutlineSwapVert />}
           fontSize={20}
-          onClick={() => {
-            dispatch(flipBoundingBoxAxes());
-            if (
-              ![null, 2 / 3, 16 / 9, 1 / 1].includes(
-                boundingBoxDimensions.height / boundingBoxDimensions.width
-              )
-            ) {
-              dispatch(setAspectRatio(null));
-            }
-          }}
+          onClick={handleToggleSize}
         />
         <IAIIconButton
           tooltip={t('ui.lockRatio')}

@@ -15,6 +15,8 @@ const aspectRatios = [
   { name: '1:1', value: 1 / 1 },
 ];
 
+export const mappedAspectRatios = aspectRatios.map((ar) => ar.value);
+
 export default function ParamAspectRatio() {
   const aspectRatio = useAppSelector(
     (state: RootState) => state.generation.aspectRatio

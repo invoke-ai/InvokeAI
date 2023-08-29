@@ -152,9 +152,6 @@ export const generationSlice = createSlice({
     },
     toggleSize: (state) => {
       const [width, height] = [state.width, state.height];
-      if (![null, 2 / 3, 16 / 9, 1 / 1].includes(height / width)) {
-        state.aspectRatio = null;
-      }
       state.width = height;
       state.height = width;
     },
@@ -278,12 +275,6 @@ export const generationSlice = createSlice({
       }
     },
     setShouldLockAspectRatio: (state, action: PayloadAction<boolean>) => {
-      if (
-        action.payload === false &&
-        ![null, 2 / 3, 16 / 9, 1 / 1].includes(state.aspectRatio)
-      ) {
-        state.aspectRatio = null;
-      }
       state.shouldLockAspectRatio = action.payload;
     },
   },

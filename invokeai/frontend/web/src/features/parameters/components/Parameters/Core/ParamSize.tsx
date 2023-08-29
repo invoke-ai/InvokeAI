@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { FaLock } from 'react-icons/fa';
 import { MdOutlineSwapVert } from 'react-icons/md';
 import { activeTabNameSelector } from '../../../../ui/store/uiSelectors';
-import ParamAspectRatio from './ParamAspectRatio';
+import ParamAspectRatio, { mappedAspectRatios } from './ParamAspectRatio';
 import ParamHeight from './ParamHeight';
 import ParamWidth from './ParamWidth';
 
@@ -45,9 +45,26 @@ export default function ParamSize() {
   } = useAppSelector(sizeOptsSelector);
 
   const handleLockRatio = useCallback(() => {
-    dispatch(setAspectRatio(width / height));
-    dispatch(setShouldLockAspectRatio(!shouldLockAspectRatio));
+    if (shouldLockAspectRatio) {
+      dispatch(setShouldLockAspectRatio(false));
+      if (!mappedAspectRatios.includes(width / height)) {
+        dispatch(setAspectRatio(null));
+      } else {
+        dispatch(setAspectRatio(width / height));
+      }
+    } else {
+      dispatch(setShouldLockAspectRatio(true));
+      dispatch(setAspectRatio(width / height));
+    }
   }, [shouldLockAspectRatio, width, height, dispatch]);
+
+  const handleToggleSize = useCallback(() => {
+    dispatch(toggleSize());
+    dispatch(setAspectRatio(null));
+    if (shouldLockAspectRatio) {
+      dispatch(setAspectRatio(height / width));
+    }
+  }, [dispatch, shouldLockAspectRatio, width, height]);
 
   return (
     <Flex
@@ -87,7 +104,7 @@ export default function ParamSize() {
           isDisabled={
             activeTabName === 'img2img' ? !shouldFitToWidthHeight : false
           }
-          onClick={() => dispatch(toggleSize())}
+          onClick={handleToggleSize}
         />
         <IAIIconButton
           tooltip={t('ui.lockRatio')}
