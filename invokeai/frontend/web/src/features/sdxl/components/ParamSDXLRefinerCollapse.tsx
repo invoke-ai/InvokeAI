@@ -4,6 +4,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
+import { memo } from 'react';
 import ParamSDXLRefinerCFGScale from './SDXLRefiner/ParamSDXLRefinerCFGScale';
 import ParamSDXLRefinerModelSelect from './SDXLRefiner/ParamSDXLRefinerModelSelect';
 import ParamSDXLRefinerNegativeAestheticScore from './SDXLRefiner/ParamSDXLRefinerNegativeAestheticScore';
@@ -12,7 +13,6 @@ import ParamSDXLRefinerScheduler from './SDXLRefiner/ParamSDXLRefinerScheduler';
 import ParamSDXLRefinerStart from './SDXLRefiner/ParamSDXLRefinerStart';
 import ParamSDXLRefinerSteps from './SDXLRefiner/ParamSDXLRefinerSteps';
 import ParamUseSDXLRefiner from './SDXLRefiner/ParamUseSDXLRefiner';
-import { memo } from 'react';
 
 const selector = createSelector(
   stateSelector,
@@ -32,7 +32,7 @@ const ParamSDXLRefinerCollapse = () => {
 
   return (
     <IAICollapse label="Refiner" activeLabel={activeLabel}>
-      <Flex sx={{ gap: 2, flexDir: 'column' }}>
+      <Flex sx={{ gap: 2, flexDir: 'column', px: 2, pb: 2 }}>
         <ParamUseSDXLRefiner />
         <ParamSDXLRefinerModelSelect />
         <Flex gap={2} flexDirection={shouldUseSliders ? 'column' : 'row'}>

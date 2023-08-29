@@ -50,7 +50,7 @@ const ParamSeamlessCollapse = () => {
       label={t('parameters.seamlessTiling')}
       activeLabel={activeLabel}
     >
-      <Flex sx={{ gap: 5 }}>
+      <Flex sx={{ gap: 5, px: 2 }}>
         <Box flexGrow={1}>
           <ParamSeamlessXAxis />
         </Box>
