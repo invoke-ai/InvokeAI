@@ -570,6 +570,7 @@
         "useSlidersForAll": "Use Sliders For All Options",
         "showProgressInViewer": "Show Progress Images in Viewer",
         "antialiasProgressImages": "Antialias Progress Images",
+        "autoChangeDimensions": "Update W/H To Model Defaults On Change",
         "resetWebUI": "Reset Web UI",
         "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
         "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",

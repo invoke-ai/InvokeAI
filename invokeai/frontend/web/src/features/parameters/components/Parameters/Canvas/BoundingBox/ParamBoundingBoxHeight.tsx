@@ -71,7 +71,7 @@ const ParamBoundingBoxWidth = () => {
     <IAISlider
       label={t('parameters.boundingBoxHeight')}
       min={64}
-      max={1024}
+      max={1536}
       step={64}
       value={boundingBoxDimensions.height}
       onChange={handleChangeHeight}
