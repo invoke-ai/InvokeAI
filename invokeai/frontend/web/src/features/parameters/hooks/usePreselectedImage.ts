@@ -1,4 +1,5 @@
 import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { CoreMetadata } from 'features/nodes/types/types';
 import { t } from 'i18next';
 import { useCallback, useState } from 'react';
 import { useAppToaster } from '../../../app/components/Toaster';
@@ -64,7 +65,7 @@ export const usePreselectedImage = () => {
       if (selectedImage.action === 'useAllParameters') {
         setImageNameForMetadata(selectedImage?.imageName);
         if (selectedImageMetadata) {
-          recallAllParameters(selectedImageMetadata.metadata);
+          recallAllParameters(selectedImageMetadata.metadata as CoreMetadata);
         }
       }
     },

@@ -755,6 +755,7 @@ export const zCoreMetadata = z
   .object({
     app_version: z.string().nullish(),
     generation_mode: z.string().nullish(),
+    created_by: z.string().nullish(),
     positive_prompt: z.string().nullish(),
     negative_prompt: z.string().nullish(),
     width: z.number().int().nullish(),
