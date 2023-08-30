@@ -8,9 +8,9 @@ title: Installing Manually
 
 </figure>
 
-!!! warning "This is for advanced Users"
+!!! warning "This is for Advanced Users"
 
-    **python experience is mandatory**
+    **Python experience is mandatory**
 
 ## Introduction
 

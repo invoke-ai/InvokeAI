@@ -30,10 +30,6 @@ image output.
 ### * [Image-to-Image Guide](IMG2IMG.md)
 Use a seed image to build new creations in the CLI.
 
-### * [Generating Variations](VARIATIONS.md)
-Have an image you like and want to generate many more like it? Variations
-are the ticket.
-
 ## Model Management
 
 ### * [Model Installation](../installation/050_INSTALLING_MODELS.md)

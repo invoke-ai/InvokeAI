@@ -55,7 +55,7 @@ async def get_version() -> AppVersion:
 
 @app_router.get("/config", operation_id="get_config", status_code=200, response_model=AppConfig)
 async def get_config() -> AppConfig:
-    infill_methods = ["tile"]
+    infill_methods = ["tile", "lama"]
     if PatchMatch.patchmatch_available():
         infill_methods.append("patchmatch")
 

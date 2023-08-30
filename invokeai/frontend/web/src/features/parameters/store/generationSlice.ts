@@ -37,12 +37,8 @@ export interface GenerationState {
   scheduler: SchedulerParam;
   maskBlur: number;
   maskBlurMethod: MaskBlurMethodParam;
-  seamSize: number;
-  seamBlur: number;
-  seamSteps: number;
-  seamStrength: StrengthParam;
-  seamLowThreshold: number;
-  seamHighThreshold: number;
+  canvasCoherenceSteps: number;
+  canvasCoherenceStrength: StrengthParam;
   seed: SeedParam;
   seedWeights: string;
   shouldFitToWidthHeight: boolean;
@@ -80,12 +76,8 @@ export const initialGenerationState: GenerationState = {
   scheduler: 'euler',
   maskBlur: 16,
   maskBlurMethod: 'box',
-  seamSize: 16,
-  seamBlur: 8,
-  seamSteps: 20,
-  seamStrength: 0.7,
-  seamLowThreshold: 100,
-  seamHighThreshold: 200,
+  canvasCoherenceSteps: 20,
+  canvasCoherenceStrength: 0.3,
   seed: 0,
   seedWeights: '',
   shouldFitToWidthHeight: true,
@@ -212,23 +204,11 @@ export const generationSlice = createSlice({
     setMaskBlurMethod: (state, action: PayloadAction<MaskBlurMethodParam>) => {
       state.maskBlurMethod = action.payload;
     },
-    setSeamSize: (state, action: PayloadAction<number>) => {
-      state.seamSize = action.payload;
+    setCanvasCoherenceSteps: (state, action: PayloadAction<number>) => {
+      state.canvasCoherenceSteps = action.payload;
     },
-    setSeamBlur: (state, action: PayloadAction<number>) => {
-      state.seamBlur = action.payload;
-    },
-    setSeamSteps: (state, action: PayloadAction<number>) => {
-      state.seamSteps = action.payload;
-    },
-    setSeamStrength: (state, action: PayloadAction<number>) => {
-      state.seamStrength = action.payload;
-    },
-    setSeamLowThreshold: (state, action: PayloadAction<number>) => {
-      state.seamLowThreshold = action.payload;
-    },
-    setSeamHighThreshold: (state, action: PayloadAction<number>) => {
-      state.seamHighThreshold = action.payload;
+    setCanvasCoherenceStrength: (state, action: PayloadAction<number>) => {
+      state.canvasCoherenceStrength = action.payload;
     },
     setTileSize: (state, action: PayloadAction<number>) => {
       state.tileSize = action.payload;
@@ -338,12 +318,8 @@ export const {
   setScheduler,
   setMaskBlur,
   setMaskBlurMethod,
-  setSeamSize,
-  setSeamBlur,
-  setSeamSteps,
-  setSeamStrength,
-  setSeamLowThreshold,
-  setSeamHighThreshold,
+  setCanvasCoherenceSteps,
+  setCanvasCoherenceStrength,
   setSeed,
   setSeedWeights,
   setShouldFitToWidthHeight,

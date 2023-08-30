@@ -4,80 +4,6 @@ title: Prompting-Features
 
 # :octicons-command-palette-24: Prompting-Features
 
-## **Negative and Unconditioned Prompts**
-
-Any words between a pair of square brackets will instruct Stable
-Diffusion to attempt to ban the concept from the generated image. The
-same effect is achieved by placing words in the "Negative Prompts"
-textbox in the Web UI.
-
-```text
-this is a test prompt [not really] to make you understand [cool] how this works.
-```
-
-In the above statement, the words 'not really cool` will be ignored by Stable
-Diffusion.
-
-Here's a prompt that depicts what it does.
-
-original prompt:
-
-`#!bash "A fantastical translucent pony made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve"`
-
-`#!bash parameters: steps=20, dimensions=512x768, CFG=7.5, Scheduler=k_euler_a, seed=1654590180`
-
-<figure markdown>
-
-![step1](../assets/negative_prompt_walkthru/step1.png)
-
-</figure>
-
-That image has a woman, so if we want the horse without a rider, we can
-influence the image not to have a woman by putting [woman] in the prompt, like
-this:
-
-`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman]"`
-(same parameters as above)
-
-<figure markdown>
-
-![step2](../assets/negative_prompt_walkthru/step2.png)
-
-</figure>
-
-That's nice - but say we also don't want the image to be quite so blue. We can
-add "blue" to the list of negative prompts, so it's now [woman blue]:
-
-`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue]"`
-(same parameters as above)
-
-<figure markdown>
-
-![step3](../assets/negative_prompt_walkthru/step3.png)
-
-</figure>
-
-Getting close - but there's no sense in having a saddle when our horse doesn't
-have a rider, so we'll add one more negative prompt: [woman blue saddle].
-
-`#!bash "A fantastical translucent poney made of water and foam, ethereal, radiant, hyperalism, scottish folklore, digital painting, artstation, concept art, smooth, 8 k frostbite 3 engine, ultra detailed, art by artgerm and greg rutkowski and magali villeneuve [woman blue saddle]"`
-(same parameters as above)
-
-<figure markdown>
-
-![step4](../assets/negative_prompt_walkthru/step4.png)
-
-</figure>
-
-!!! notes "Notes about this feature:"
-
-    * The only requirement for words to be ignored is that they are in between a pair of square brackets.
-    * You can provide multiple words within the same bracket.
-    * You can provide multiple brackets with multiple words in different places of your prompt. That works just fine.
-    * To improve typical anatomy problems, you can add negative prompts like `[bad anatomy, extra legs, extra arms, extra fingers, poorly drawn hands, poorly drawn feet, disfigured, out of frame, tiling, bad art, deformed, mutated]`.
-
----
-
 ## **Prompt Syntax Features**
 
 The InvokeAI prompting language has the following features:
@@ -102,9 +28,6 @@ The following syntax is recognised:
   `a tall thin man (picking (apricots)1.3)1.1`. (`+` is equivalent to 1.1, `++`
   is pow(1.1,2), `+++` is pow(1.1,3), etc; `-` means 0.9, `--` means pow(0.9,2),
   etc.)
-- attention also applies to `[unconditioning]` so
-  `a tall thin man picking apricots [(ladder)0.01]` will _very gently_ nudge SD
-  away from trying to draw the man on a ladder
 
 You can use this to increase or decrease the amount of something. Starting from
 this prompt of `a man picking apricots from a tree`, let's see what happens if
@@ -150,7 +73,7 @@ Or, alternatively, with more man:
 | ---------------------------------------------- | ---------------------------------------------- | ---------------------------------------------- | ---------------------------------------------- |
 | ![](../assets/prompt_syntax/mountain-man1.png) | ![](../assets/prompt_syntax/mountain-man2.png) | ![](../assets/prompt_syntax/mountain-man3.png) | ![](../assets/prompt_syntax/mountain-man4.png) |
 
-### Blending between prompts
+### Prompt Blending
 
 - `("a tall thin man picking apricots", "a tall thin man picking pears").blend(1,1)`
 - The existing prompt blending using `:<weight>` will continue to be supported -
@@ -167,6 +90,24 @@ Or, alternatively, with more man:
 
 See the section below on "Prompt Blending" for more information about how this
 works.
+
+### Prompt Conjunction  
+Join multiple clauses together to create a conjoined prompt. Each clause will be passed to CLIP separately. 
+
+For example, the prompt: 
+
+```bash
+"A mystical valley surround by towering granite cliffs, watercolor, warm"
+```
+
+Can be used with .and():
+```bash
+("A mystical valley", "surround by towering granite cliffs", "watercolor", "warm").and()
+```
+
+Each will give you different results - try them out and see what you prefer!
+
+
 
 ### Cross-Attention Control ('prompt2prompt')
 
@@ -190,7 +131,7 @@ For example, consider the prompt `a cat.swap(dog) playing with a ball in the for
 
       - For multiple word swaps, use parentheses: `a (fluffy cat).swap(barking dog) playing with a ball in the forest`.
       - To swap a comma, use quotes: `a ("fluffy, grey cat").swap("big, barking dog") playing with a ball in the forest`.
-- Supports options `t_start` and `t_end` (each 0-1) loosely corresponding to bloc97's `prompt_edit_tokens_start/_end` but with the math swapped to make it easier to
+- Supports options `t_start` and `t_end` (each 0-1) loosely corresponding to (bloc97's)[(https://github.com/bloc97/CrossAttentionControl)] `prompt_edit_tokens_start/_end` but with the math swapped to make it easier to
   intuitively understand. `t_start` and `t_end` are used to control on which steps cross-attention control should run. With the default values `t_start=0` and `t_end=1`, cross-attention control is active on every step of image generation. Other values can be used to turn cross-attention control off for part of the image generation process.
     - For example, if doing a diffusion with 10 steps for the prompt is `a cat.swap(dog, t_start=0.3, t_end=1.0) playing with a ball in the forest`, the first 3 steps will be run as `a cat playing with a ball in the forest`, while the last 7 steps will run as `a dog playing with a ball in the forest`, but the pixels that represent `dog` will be locked to the pixels that would have represented `cat` if the `cat` prompt had been used instead.
     - Conversely, for `a cat.swap(dog, t_start=0, t_end=0.7) playing with a ball in the forest`, the first 7 steps will run as `a dog playing with a ball in the forest` with the pixels that represent `dog` locked to the same pixels that would have represented `cat` if the `cat` prompt was being used instead. The final 3 steps will just run `a cat playing with a ball in the forest`.
@@ -201,7 +142,7 @@ Prompt2prompt `.swap()` is not compatible with xformers, which will be temporari
 The `prompt2prompt` code is based off
 [bloc97's colab](https://github.com/bloc97/CrossAttentionControl).
 
-### Escaping parantheses () and speech marks ""
+### Escaping parentheses () and speech marks ""
 
 If the model you are using has parentheses () or speech marks "" as part of its
 syntax, you will need to "escape" these using a backslash, so that`(my_keyword)`
@@ -212,23 +153,16 @@ the parentheses as part of the prompt syntax and it will get confused.
 
 ## **Prompt Blending**
 
-You may blend together different sections of the prompt to explore the AI's
+You may blend together prompts to explore the AI's
 latent semantic space and generate interesting (and often surprising!)
 variations. The syntax is:
 
 ```bash
-blue sphere:0.25 red cube:0.75 hybrid
+("prompt #1", "prompt #2").blend(0.25, 0.75)
 ```
 
-This will tell the sampler to blend 25% of the concept of a blue sphere with 75%
-of the concept of a red cube. The blend weights can use any combination of
-integers and floating point numbers, and they do not need to add up to 1.
-Everything to the left of the `:XX` up to the previous `:XX` is used for
-merging, so the overall effect is:
-
-```bash
-0.25 * "blue sphere" + 0.75 * "white duck" + hybrid
-```
+This will tell the sampler to blend 25% of the concept of prompt #1 with 75%
+of the concept of prompt #2. It is recommended to keep the sum of the weights to around 1.0, but interesting things might happen if you go outside of this range.
 
 Because you are exploring the "mind" of the AI, the AI's way of mixing two
 concepts may not match yours, leading to surprising effects. To illustrate, here
@@ -236,13 +170,14 @@ are three images generated using various combinations of blend weights. As
 usual, unless you fix the seed, the prompts will give you different results each
 time you run them.
 
-<figure markdown>
+Let's examine how this affects image generation results:
 
-### "blue sphere, red cube, hybrid"
 
-</figure>
+```bash
+"blue sphere, red cube, hybrid"
+```
 
-This example doesn't use melding at all and represents the default way of mixing
+This example doesn't use blending at all and represents the default way of mixing
 concepts.
 
 <figure markdown>
@@ -251,55 +186,47 @@ concepts.
 
 </figure>
 
-It's interesting to see how the AI expressed the concept of "cube" as the four
-quadrants of the enclosing frame. If you look closely, there is depth there, so
-the enclosing frame is actually a cube.
+It's interesting to see how the AI expressed the concept of "cube" within the sphere. If you look closely, there is depth there, so the enclosing frame is actually a cube.
 
 <figure markdown>
 
-### "blue sphere:0.25 red cube:0.75 hybrid"
+```bash
+("blue sphere", "red cube").blend(0.25, 0.75)
+```
 
 ![blue-sphere-25-red-cube-75](../assets/prompt-blending/blue-sphere-0.25-red-cube-0.75-hybrid.png)
 
 </figure>
 
-Now that's interesting. We get neither a blue sphere nor a red cube, but a red
-sphere embedded in a brick wall, which represents a melding of concepts within
-the AI's "latent space" of semantic representations. Where is Ludwig
-Wittgenstein when you need him?
+Now that's interesting. We get an image with a resemblance of a red cube, with a hint of blue shadows which represents a melding of concepts within the AI's "latent space" of semantic representations. 
 
 <figure markdown>
 
-### "blue sphere:0.75 red cube:0.25 hybrid"
+```bash
+("blue sphere", "red cube").blend(0.75, 0.25)
+```
 
 ![blue-sphere-75-red-cube-25](../assets/prompt-blending/blue-sphere-0.75-red-cube-0.25-hybrid.png)
 
 </figure>
 
-Definitely more blue-spherey. The cube is gone entirely, but it's really cool
-abstract art.
+Definitely more blue-spherey. 
 
 <figure markdown>
 
-### "blue sphere:0.5 red cube:0.5 hybrid"
+```bash
+("blue sphere", "red cube").blend(0.5, 0.5)
+```
+</figure>
 
+<figure markdown>
 ![blue-sphere-5-red-cube-5-hybrid](../assets/prompt-blending/blue-sphere-0.5-red-cube-0.5-hybrid.png)
-
 </figure>
 
-Whoa...! I see blue and red, but no spheres or cubes. Is the word "hybrid"
-summoning up the concept of some sort of scifi creature? Let's find out.
 
-<figure markdown>
+Whoa...! I see blue and red, and if I squint, spheres and cubes.
 
-### "blue sphere:0.5 red cube:0.5"
 
-![blue-sphere-5-red-cube-5](../assets/prompt-blending/blue-sphere-0.5-red-cube-0.5.png)
-
-</figure>
-
-Indeed, removing the word "hybrid" produces an image that is more like what we'd
-expect.
 
 ## Dynamic Prompts
 

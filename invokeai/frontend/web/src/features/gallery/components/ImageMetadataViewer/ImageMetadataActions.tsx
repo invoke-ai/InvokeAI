@@ -69,6 +69,9 @@ const ImageMetadataActions = (props: Props) => {
 
   return (
     <>
+      {metadata.created_by && (
+        <ImageMetadataItem label="Created By" value={metadata.created_by} />
+      )}
       {metadata.generation_mode && (
         <ImageMetadataItem
           label="Generation Mode"

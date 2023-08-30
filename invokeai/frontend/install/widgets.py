@@ -177,6 +177,8 @@ class FloatTitleSlider(npyscreen.TitleText):
 
 
 class SelectColumnBase:
+    """Base class for selection widget arranged in columns."""
+
     def make_contained_widgets(self):
         self._my_widgets = []
         column_width = self.width // self.columns
@@ -253,6 +255,7 @@ class MultiSelectColumns(SelectColumnBase, npyscreen.MultiSelect):
 class SingleSelectWithChanged(npyscreen.SelectOne):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.on_changed = None
 
     def h_select(self, ch):
         super().h_select(ch)
@@ -260,7 +263,9 @@ class SingleSelectWithChanged(npyscreen.SelectOne):
             self.on_changed(self.value)
 
 
-class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
+class SingleSelectColumnsSimple(SelectColumnBase, SingleSelectWithChanged):
+    """Row of radio buttons. Spacebar to select."""
+
     def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
         self.columns = columns
         self.value_cnt = len(values)
@@ -268,17 +273,18 @@ class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
         self.on_changed = None
         super().__init__(screen, values=values, **keywords)
 
-    def when_value_edited(self):
-        self.h_select(self.cursor_line)
-
-    def when_cursor_moved(self):
-        self.h_select(self.cursor_line)
-
     def h_cursor_line_right(self, ch):
         self.h_exit_down("bye bye")
 
     def h_cursor_line_left(self, ch):
         self.h_exit_up("bye bye")
+
+
+class SingleSelectColumns(SingleSelectColumnsSimple):
+    """Row of radio buttons. When tabbing over a selection, it is auto selected."""
+
+    def when_cursor_moved(self):
+        self.h_select(self.cursor_line)
 
 
 class TextBoxInner(npyscreen.MultiLineEdit):

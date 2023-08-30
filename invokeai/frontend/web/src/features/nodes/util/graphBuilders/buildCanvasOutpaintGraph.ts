@@ -14,14 +14,18 @@ import {
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
+  CANVAS_COHERENCE_DENOISE_LATENTS,
+  CANVAS_COHERENCE_NOISE,
+  CANVAS_COHERENCE_NOISE_INCREMENT,
   CANVAS_OUTPAINT_GRAPH,
   CANVAS_OUTPUT,
   CLIP_SKIP,
-  COLOR_CORRECT,
   DENOISE_LATENTS,
+  INPAINT_CREATE_MASK,
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
   INPAINT_IMAGE_RESIZE_UP,
@@ -32,7 +36,6 @@ import {
   MAIN_MODEL_LOADER,
   MASK_BLUR,
   MASK_COMBINE,
-  MASK_EDGE,
   MASK_FROM_ALPHA,
   MASK_RESIZE_DOWN,
   MASK_RESIZE_UP,
@@ -41,10 +44,7 @@ import {
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
-  SEAM_FIX_DENOISE_LATENTS,
-  SEAM_MASK_COMBINE,
-  SEAM_MASK_RESIZE_DOWN,
-  SEAM_MASK_RESIZE_UP,
+  SEAMLESS,
 } from './constants';
 
 /**
@@ -72,15 +72,13 @@ export const buildCanvasOutpaintGraph = (
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
-    seamSize,
-    seamBlur,
-    seamSteps,
-    seamStrength,
-    seamLowThreshold,
-    seamHighThreshold,
+    canvasCoherenceSteps,
+    canvasCoherenceStrength,
     tileSize,
     infillMethod,
     clipSkip,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   if (!model) {
@@ -98,6 +96,8 @@ export const buildCanvasOutpaintGraph = (
     shouldAutoSave,
   } = state.canvas;
 
+  let modelLoaderNodeId = MAIN_MODEL_LOADER;
+
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : shouldUseCpuNoise;
@@ -105,9 +105,9 @@ export const buildCanvasOutpaintGraph = (
   const graph: NonNullableGraph = {
     id: CANVAS_OUTPAINT_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
+      [modelLoaderNodeId]: {
         type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+        id: modelLoaderNodeId,
         is_intermediate: true,
         model,
       },
@@ -141,23 +141,12 @@ export const buildCanvasOutpaintGraph = (
         is_intermediate: true,
         mask2: canvasMaskImage,
       },
-      [SEAM_MASK_COMBINE]: {
-        type: 'mask_combine',
-        id: MASK_COMBINE,
-        is_intermediate: true,
-      },
       [MASK_BLUR]: {
         type: 'img_blur',
         id: MASK_BLUR,
         is_intermediate: true,
         radius: maskBlur,
         blur_type: maskBlurMethod,
-      },
-      [INPAINT_INFILL]: {
-        type: 'infill_tile',
-        id: INPAINT_INFILL,
-        is_intermediate: true,
-        tile_size: tileSize,
       },
       [INPAINT_IMAGE]: {
         type: 'i2l',
@@ -171,6 +160,12 @@ export const buildCanvasOutpaintGraph = (
         use_cpu,
         is_intermediate: true,
       },
+      [INPAINT_CREATE_MASK]: {
+        type: 'create_denoise_mask',
+        id: INPAINT_CREATE_MASK,
+        is_intermediate: true,
+        fp32: vaePrecision === 'fp32' ? true : false,
+      },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: DENOISE_LATENTS,
@@ -181,23 +176,26 @@ export const buildCanvasOutpaintGraph = (
         denoising_start: 1 - strength,
         denoising_end: 1,
       },
-      [MASK_EDGE]: {
-        type: 'mask_edge',
-        id: MASK_EDGE,
+      [CANVAS_COHERENCE_NOISE]: {
+        type: 'noise',
+        id: NOISE,
+        use_cpu,
         is_intermediate: true,
-        edge_size: seamSize,
-        edge_blur: seamBlur,
-        low_threshold: seamLowThreshold,
-        high_threshold: seamHighThreshold,
       },
-      [SEAM_FIX_DENOISE_LATENTS]: {
-        type: 'denoise_latents',
-        id: SEAM_FIX_DENOISE_LATENTS,
+      [CANVAS_COHERENCE_NOISE_INCREMENT]: {
+        type: 'add',
+        id: CANVAS_COHERENCE_NOISE_INCREMENT,
+        b: 1,
         is_intermediate: true,
-        steps: seamSteps,
+      },
+      [CANVAS_COHERENCE_DENOISE_LATENTS]: {
+        type: 'denoise_latents',
+        id: CANVAS_COHERENCE_DENOISE_LATENTS,
+        is_intermediate: true,
+        steps: canvasCoherenceSteps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
-        denoising_start: 1 - seamStrength,
+        denoising_start: 1 - canvasCoherenceStrength,
         denoising_end: 1,
       },
       [LATENTS_TO_IMAGE]: {
@@ -206,13 +204,8 @@ export const buildCanvasOutpaintGraph = (
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
-      [COLOR_CORRECT]: {
-        type: 'color_correct',
-        id: COLOR_CORRECT,
-        is_intermediate: true,
-      },
       [CANVAS_OUTPUT]: {
-        type: 'img_paste',
+        type: 'color_correct',
         id: CANVAS_OUTPUT,
         is_intermediate: !shouldAutoSave,
       },
@@ -235,7 +228,7 @@ export const buildCanvasOutpaintGraph = (
       // Connect Model Loader To UNet & Clip Skip
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -245,7 +238,7 @@ export const buildCanvasOutpaintGraph = (
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -337,14 +330,25 @@ export const buildCanvasOutpaintGraph = (
           field: 'latents',
         },
       },
+      // Create Inpaint Mask
       {
         source: {
           node_id: MASK_BLUR,
           field: 'image',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: INPAINT_CREATE_MASK,
           field: 'mask',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'denoise_mask',
+        },
+        destination: {
+          node_id: DENOISE_LATENTS,
+          field: 'denoise_mask',
         },
       },
       // Iterate
@@ -368,14 +372,34 @@ export const buildCanvasOutpaintGraph = (
           field: 'seed',
         },
       },
-      // Seam Paint
+      // Canvas Refine
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: ITERATE,
+          field: 'item',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_NOISE_INCREMENT,
+          field: 'a',
+        },
+      },
+      {
+        source: {
+          node_id: CANVAS_COHERENCE_NOISE_INCREMENT,
+          field: 'value',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_NOISE,
+          field: 'seed',
+        },
+      },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
           field: 'unet',
         },
       },
@@ -385,7 +409,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -395,17 +419,17 @@ export const buildCanvasOutpaintGraph = (
           field: 'conditioning',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
       {
         source: {
-          node_id: NOISE,
+          node_id: CANVAS_COHERENCE_NOISE,
           field: 'noise',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -415,14 +439,14 @@ export const buildCanvasOutpaintGraph = (
           field: 'latents',
         },
         destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
           field: 'latents',
         },
       },
       // Decode the result from Inpaint
       {
         source: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -439,6 +463,23 @@ export const buildCanvasOutpaintGraph = (
       type: 'infill_patchmatch',
       id: INPAINT_INFILL,
       is_intermediate: true,
+    };
+  }
+
+  if (infillMethod === 'lama') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_lama',
+      id: INPAINT_INFILL,
+      is_intermediate: true,
+    };
+  }
+
+  if (infillMethod === 'tile') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_tile',
+      id: INPAINT_INFILL,
+      is_intermediate: true,
+      tile_size: tileSize,
     };
   }
 
@@ -459,13 +500,6 @@ export const buildCanvasOutpaintGraph = (
     graph.nodes[MASK_RESIZE_UP] = {
       type: 'img_resize',
       id: MASK_RESIZE_UP,
-      is_intermediate: true,
-      width: scaledWidth,
-      height: scaledHeight,
-    };
-    graph.nodes[SEAM_MASK_RESIZE_UP] = {
-      type: 'img_resize',
-      id: SEAM_MASK_RESIZE_UP,
       is_intermediate: true,
       width: scaledWidth,
       height: scaledHeight,
@@ -491,19 +525,13 @@ export const buildCanvasOutpaintGraph = (
       width: width,
       height: height,
     };
-    graph.nodes[SEAM_MASK_RESIZE_DOWN] = {
-      type: 'img_resize',
-      id: SEAM_MASK_RESIZE_DOWN,
-      is_intermediate: true,
-      width: width,
-      height: height,
-    };
 
-    graph.nodes[NOISE] = {
-      ...(graph.nodes[NOISE] as NoiseInvocation),
-      width: scaledWidth,
-      height: scaledHeight,
-    };
+    (graph.nodes[NOISE] as NoiseInvocation).width = scaledWidth;
+    (graph.nodes[NOISE] as NoiseInvocation).height = scaledHeight;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width =
+      scaledWidth;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height =
+      scaledHeight;
 
     // Connect Nodes
     graph.edges.push(
@@ -515,6 +543,16 @@ export const buildCanvasOutpaintGraph = (
         },
         destination: {
           node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
           field: 'image',
         },
       },
@@ -537,57 +575,6 @@ export const buildCanvasOutpaintGraph = (
         destination: {
           node_id: MASK_BLUR,
           field: 'image',
-        },
-      },
-      // Seam Paint Mask
-      {
-        source: {
-          node_id: MASK_FROM_ALPHA,
-          field: 'image',
-        },
-        destination: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_RESIZE_UP,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: SEAM_MASK_RESIZE_UP,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
-          field: 'mask',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_BLUR,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'mask1',
-        },
-      },
-      {
-        source: {
-          node_id: SEAM_MASK_RESIZE_UP,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'mask2',
         },
       },
       // Resize Results Down
@@ -613,16 +600,6 @@ export const buildCanvasOutpaintGraph = (
       },
       {
         source: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_RESIZE_DOWN,
-          field: 'image',
-        },
-      },
-      {
-        source: {
           node_id: INPAINT_INFILL,
           field: 'image',
         },
@@ -638,7 +615,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: COLOR_CORRECT,
+          node_id: CANVAS_OUTPUT,
           field: 'reference',
         },
       },
@@ -648,44 +625,13 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: SEAM_MASK_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      // Paste Everything Back
-      {
-        source: {
-          node_id: INPAINT_INFILL_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'base_image',
-        },
-      },
-      {
-        source: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-        destination: {
           node_id: CANVAS_OUTPUT,
           field: 'image',
         },
       },
       {
         source: {
-          node_id: SEAM_MASK_RESIZE_DOWN,
+          node_id: MASK_RESIZE_DOWN,
           field: 'image',
         },
         destination: {
@@ -702,11 +648,12 @@ export const buildCanvasOutpaintGraph = (
         | InfillPatchMatchInvocation),
       image: canvasInitImage,
     };
-    graph.nodes[NOISE] = {
-      ...(graph.nodes[NOISE] as NoiseInvocation),
-      width: width,
-      height: height,
-    };
+
+    (graph.nodes[NOISE] as NoiseInvocation).width = width;
+    (graph.nodes[NOISE] as NoiseInvocation).height = height;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width = width;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height = height;
+
     graph.nodes[INPAINT_IMAGE] = {
       ...(graph.nodes[INPAINT_IMAGE] as ImageToLatentsInvocation),
       image: canvasInitImage,
@@ -727,45 +674,14 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
       },
-      // Seam Paint Mask
       {
         source: {
-          node_id: MASK_FROM_ALPHA,
+          node_id: INPAINT_INFILL,
           field: 'image',
         },
         destination: {
-          node_id: MASK_EDGE,
+          node_id: INPAINT_CREATE_MASK,
           field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_FIX_DENOISE_LATENTS,
-          field: 'mask',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_FROM_ALPHA,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'mask1',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_EDGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'mask2',
         },
       },
       // Color Correct The Inpainted Result
@@ -775,7 +691,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: COLOR_CORRECT,
+          node_id: CANVAS_OUTPUT,
           field: 'reference',
         },
       },
@@ -785,44 +701,13 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: SEAM_MASK_COMBINE,
-          field: 'image',
-        },
-        destination: {
-          node_id: COLOR_CORRECT,
-          field: 'mask',
-        },
-      },
-      // Paste Everything Back
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'base_image',
-        },
-      },
-      {
-        source: {
-          node_id: COLOR_CORRECT,
-          field: 'image',
-        },
-        destination: {
           node_id: CANVAS_OUTPUT,
           field: 'image',
         },
       },
       {
         source: {
-          node_id: SEAM_MASK_COMBINE,
+          node_id: MASK_BLUR,
           field: 'image',
         },
         destination: {
@@ -853,11 +738,17 @@ export const buildCanvasOutpaintGraph = (
     (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
   }
 
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
+
   // Add VAE
-  addVAEToGraph(state, graph, MAIN_MODEL_LOADER);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS, MAIN_MODEL_LOADER);
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);

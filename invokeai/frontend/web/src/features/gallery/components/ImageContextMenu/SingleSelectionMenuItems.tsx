@@ -1,4 +1,4 @@
-import { MenuItem } from '@chakra-ui/react';
+import { Flex, MenuItem, Text } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -228,6 +228,18 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       >
         {t('gallery.deleteImage')}
       </MenuItem>
+      {metadata?.created_by && (
+        <Flex
+          sx={{
+            padding: '5px 10px',
+            marginTop: '5px',
+          }}
+        >
+          <Text fontSize="xs" fontWeight="bold">
+            Created by {metadata?.created_by}
+          </Text>
+        </Flex>
+      )}
     </>
   );
 };

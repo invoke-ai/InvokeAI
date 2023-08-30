@@ -10,8 +10,12 @@ import {
   TypesafeDroppableData,
 } from 'features/dnd/types';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FaUndo } from 'react-icons/fa';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { FaSave, FaUndo } from 'react-icons/fa';
+import {
+  useAddImageToBoardMutation,
+  useChangeImageIsIntermediateMutation,
+  useGetImageDTOQuery,
+} from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
 import {
@@ -26,11 +30,13 @@ type Props = {
 
 const selector = createSelector(
   stateSelector,
-  ({ controlNet }) => {
+  ({ controlNet, gallery }) => {
     const { pendingControlImages } = controlNet;
+    const { autoAddBoardId } = gallery;
 
     return {
       pendingControlImages,
+      autoAddBoardId,
     };
   },
   defaultSelectorOptions
@@ -47,7 +53,7 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
 
   const dispatch = useAppDispatch();
 
-  const { pendingControlImages } = useAppSelector(selector);
+  const { pendingControlImages, autoAddBoardId } = useAppSelector(selector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
@@ -59,9 +65,26 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
     processedControlImageName ?? skipToken
   );
 
+  const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();
+  const [addToBoard] = useAddImageToBoardMutation();
+
   const handleResetControlImage = useCallback(() => {
     dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
   }, [controlNetId, dispatch]);
+
+  const handleSaveControlImage = useCallback(() => {
+    if (!processedControlImage) {
+      return;
+    }
+
+    changeIsIntermediate({
+      imageDTO: processedControlImage,
+      is_intermediate: false,
+    });
+
+    addToBoard({ imageDTO: processedControlImage, board_id: autoAddBoardId });
+  }, [processedControlImage, autoAddBoardId, changeIsIntermediate, addToBoard]);
+
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
   }, []);
@@ -122,11 +145,19 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
         isDropDisabled={shouldShowProcessedImage || !isEnabled}
         postUploadAction={postUploadAction}
       >
-        <IAIDndImageIcon
-          onClick={handleResetControlImage}
-          icon={controlImage ? <FaUndo /> : undefined}
-          tooltip="Reset Control Image"
-        />
+        <>
+          <IAIDndImageIcon
+            onClick={handleResetControlImage}
+            icon={controlImage ? <FaUndo /> : undefined}
+            tooltip="Reset Control Image"
+          />
+          <IAIDndImageIcon
+            onClick={handleSaveControlImage}
+            icon={controlImage ? <FaSave size={16} /> : undefined}
+            tooltip="Save Control Image"
+            styleOverrides={{ marginTop: 6 }}
+          />
+        </>
       </IAIDndImage>
 
       <Box
@@ -149,11 +180,19 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
           isUploadDisabled={true}
           isDropDisabled={!isEnabled}
         >
-          <IAIDndImageIcon
-            onClick={handleResetControlImage}
-            icon={controlImage ? <FaUndo /> : undefined}
-            tooltip="Reset Control Image"
-          />
+          <>
+            <IAIDndImageIcon
+              onClick={handleResetControlImage}
+              icon={controlImage ? <FaUndo /> : undefined}
+              tooltip="Reset Control Image"
+            />
+            <IAIDndImageIcon
+              onClick={handleSaveControlImage}
+              icon={controlImage ? <FaSave size={16} /> : undefined}
+              tooltip="Save Control Image"
+              styleOverrides={{ marginTop: 6 }}
+            />
+          </>
         </IAIDndImage>
       </Box>
       {pendingControlImages.includes(controlNetId) && (

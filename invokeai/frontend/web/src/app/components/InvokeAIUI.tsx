@@ -26,6 +26,10 @@ interface Props extends PropsWithChildren {
   headerComponent?: ReactNode;
   middleware?: Middleware[];
   projectId?: string;
+  selectedImage?: {
+    imageName: string;
+    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
+  };
 }
 
 const InvokeAIUI = ({
@@ -35,6 +39,7 @@ const InvokeAIUI = ({
   headerComponent,
   middleware,
   projectId,
+  selectedImage,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -81,7 +86,11 @@ const InvokeAIUI = ({
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
-              <App config={config} headerComponent={headerComponent} />
+              <App
+                config={config}
+                headerComponent={headerComponent}
+                selectedImage={selectedImage}
+              />
             </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>
