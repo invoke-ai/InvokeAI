@@ -102,6 +102,7 @@ export const initialNodesState: NodesState = {
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
   mouseOverField: null,
+  mouseOverNode: null,
   nodesToCopy: [],
   edgesToCopy: [],
   selectionMode: SelectionMode.Partial,
@@ -665,6 +666,9 @@ const nodesSlice = createSlice({
     ) => {
       state.mouseOverField = action.payload;
     },
+    mouseOverNodeChanged: (state, action: PayloadAction<string | null>) => {
+      state.mouseOverNode = action.payload;
+    },
     selectedAll: (state) => {
       state.nodes = applyNodeChanges(
         state.nodes.map((n) => ({ id: n.id, type: 'select', selected: true })),
@@ -887,6 +891,7 @@ export const {
   selectionModeChanged,
   nodeEmbedWorkflowChanged,
   nodeIsIntermediateChanged,
+  mouseOverNodeChanged,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

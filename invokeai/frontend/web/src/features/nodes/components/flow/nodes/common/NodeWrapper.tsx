@@ -7,6 +7,8 @@ import {
 import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
+import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import {
   DRAG_HANDLE_CLASSNAME,
   NODE_WIDTH,
@@ -23,6 +25,8 @@ type NodeWrapperProps = PropsWithChildren & {
 
 const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
+  const { isMouseOverNode, handleMouseOut, handleMouseOver } =
+    useMouseOverNode(nodeId);
 
   const selectIsInProgress = useMemo(
     () =>
@@ -36,25 +40,16 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const isInProgress = useAppSelector(selectIsInProgress);
 
-  const [
-    nodeSelectedLight,
-    nodeSelectedDark,
-    nodeInProgressLight,
-    nodeInProgressDark,
-    shadowsXl,
-    shadowsBase,
-  ] = useToken('shadows', [
-    'nodeSelected.light',
-    'nodeSelected.dark',
-    'nodeInProgress.light',
-    'nodeInProgress.dark',
-    'shadows.xl',
-    'shadows.base',
-  ]);
+  const [nodeInProgressLight, nodeInProgressDark, shadowsXl, shadowsBase] =
+    useToken('shadows', [
+      'nodeInProgress.light',
+      'nodeInProgress.dark',
+      'shadows.xl',
+      'shadows.base',
+    ]);
 
   const dispatch = useAppDispatch();
 
-  const selectedShadow = useColorModeValue(nodeSelectedLight, nodeSelectedDark);
   const inProgressShadow = useColorModeValue(
     nodeInProgressLight,
     nodeInProgressDark
@@ -69,6 +64,8 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   return (
     <Box
       onClick={handleClick}
+      onMouseEnter={handleMouseOver}
+      onMouseLeave={handleMouseOut}
       className={DRAG_HANDLE_CLASSNAME}
       sx={{
         h: 'full',
@@ -77,11 +74,6 @@ const NodeWrapper = (props: NodeWrapperProps) => {
         w: width ?? NODE_WIDTH,
         transitionProperty: 'common',
         transitionDuration: '0.1s',
-        shadow: selected
-          ? isInProgress
-            ? undefined
-            : selectedShadow
-          : undefined,
         cursor: 'grab',
         opacity,
       }}
@@ -116,6 +108,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
         }}
       />
       {children}
+      <NodeSelectionOverlay isSelected={selected} isHovered={isMouseOverNode} />
     </Box>
   );
 };

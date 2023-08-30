@@ -4,9 +4,9 @@ import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSe
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { fieldVaeModelValueChanged } from 'features/nodes/store/nodesSlice';
 import {
+  FieldComponentProps,
   VaeModelInputFieldTemplate,
   VaeModelInputFieldValue,
-  FieldComponentProps,
 } from 'features/nodes/types/types';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToVAEModelParam } from 'features/parameters/util/modelIdToVAEModelParam';
@@ -88,10 +88,6 @@ const VaeModelInputFieldComponent = (
       className="nowheel nodrag"
       itemComponent={IAIMantineSelectItemWithTooltip}
       tooltip={selectedVaeModel?.description}
-      label={
-        selectedVaeModel?.base_model &&
-        MODEL_TYPE_MAP[selectedVaeModel?.base_model]
-      }
       value={selectedVaeModel?.id ?? 'default'}
       placeholder="Default"
       data={data}
