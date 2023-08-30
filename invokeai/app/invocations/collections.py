@@ -8,11 +8,10 @@ from pydantic import validator
 from invokeai.app.invocations.primitives import IntegerCollectionOutput
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, tags, title
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, node
 
 
-@title("Integer Range")
-@tags("collection", "integer", "range")
+@node(title="Integer Range", tags=["collection", "integer", "range"], category="collections")
 class RangeInvocation(BaseInvocation):
     """Creates a range of numbers from start to stop with step"""
 
@@ -33,8 +32,7 @@ class RangeInvocation(BaseInvocation):
         return IntegerCollectionOutput(collection=list(range(self.start, self.stop, self.step)))
 
 
-@title("Integer Range of Size")
-@tags("range", "integer", "size", "collection")
+@node(title="Integer Range of Size", tags=["collection", "integer", "size", "range"], category="collections")
 class RangeOfSizeInvocation(BaseInvocation):
     """Creates a range from start to start + size with step"""
 
@@ -49,8 +47,7 @@ class RangeOfSizeInvocation(BaseInvocation):
         return IntegerCollectionOutput(collection=list(range(self.start, self.start + self.size, self.step)))
 
 
-@title("Random Range")
-@tags("range", "integer", "random", "collection")
+@node(title="Random Range", tags=["range", "integer", "random", "collection"], category="collections")
 class RandomRangeInvocation(BaseInvocation):
     """Creates a collection of random numbers"""
 

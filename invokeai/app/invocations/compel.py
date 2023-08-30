@@ -26,6 +26,7 @@ from .baseinvocation import (
     InvocationContext,
     OutputField,
     UIComponent,
+    category,
     tags,
     title,
 )
@@ -44,8 +45,9 @@ class ConditioningFieldData:
 #    PerpNeg = "perp_neg"
 
 
-@title("Compel Prompt")
+@title("Prompt")
 @tags("prompt", "compel")
+@category("conditioning")
 class CompelInvocation(BaseInvocation):
     """Parse prompt using compel package to conditioning."""
 
@@ -265,8 +267,9 @@ class SDXLPromptInvocationBase:
         return c, c_pooled, ec
 
 
-@title("SDXL Compel Prompt")
+@title("SDXL Prompt")
 @tags("sdxl", "compel", "prompt")
+@category("conditioning")
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
 
@@ -324,8 +327,9 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
         )
 
 
-@title("SDXL Refiner Compel Prompt")
+@title("SDXL Refiner Prompt")
 @tags("sdxl", "compel", "prompt")
+@category("conditioning")
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
 
@@ -381,6 +385,7 @@ class ClipSkipInvocationOutput(BaseInvocationOutput):
 
 @title("CLIP Skip")
 @tags("clipskip", "clip", "skip")
+@category("conditioning")
 class ClipSkipInvocation(BaseInvocation):
     """Skip layers in clip text_encoder model."""
 

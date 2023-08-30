@@ -8,11 +8,12 @@ from PIL import Image, ImageOps
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, tags, title
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, category, tags, title
 
 
 @title("OpenCV Inpaint")
 @tags("opencv", "inpaint")
+@category("inpaint")
 class CvInpaintInvocation(BaseInvocation):
     """Simple inpaint using opencv."""
 

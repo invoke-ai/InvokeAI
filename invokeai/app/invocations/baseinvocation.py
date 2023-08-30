@@ -372,8 +372,9 @@ class UIConfigBase(BaseModel):
     decorators, though you may add this class to a node definition to specify the title and tags.
     """
 
-    tags: Optional[list[str]] = Field(default_factory=None, description="The tags to display in the UI")
-    title: Optional[str] = Field(default=None, description="The display name of the node")
+    tags: Optional[list[str]] = Field(default_factory=None, description="The node's tags")
+    title: Optional[str] = Field(default=None, description="The node's display name")
+    category: Optional[str] = Field(default=None, description="The node's category")
 
 
 class InvocationContext:
@@ -469,6 +470,8 @@ class BaseInvocation(ABC, BaseModel):
                 schema["title"] = uiconfig.title
             if uiconfig and hasattr(uiconfig, "tags"):
                 schema["tags"] = uiconfig.tags
+            if uiconfig and hasattr(uiconfig, "category"):
+                schema["category"] = uiconfig.category
             if "required" not in schema or not isinstance(schema["required"], list):
                 schema["required"] = list()
             schema["required"].extend(["type", "id"])
@@ -555,6 +558,42 @@ def tags(*tags: str) -> Callable[[Type[T]], Type[T]]:
         if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconf_name:
             cls.UIConfig = type(uiconf_name, (UIConfigBase,), dict())
         cls.UIConfig.tags = list(tags)
+        return cls
+
+    return wrapper
+
+
+def category(category: str) -> Callable[[Type[T]], Type[T]]:
+    """Adds a category to the invocation. This is used to group invocations in the UI."""
+
+    def wrapper(cls: Type[T]) -> Type[T]:
+        uiconf_name = cls.__qualname__ + ".UIConfig"
+        if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconf_name:
+            cls.UIConfig = type(uiconf_name, (UIConfigBase,), dict())
+        cls.UIConfig.category = category
+        return cls
+
+    return wrapper
+
+
+def node(
+    title: Optional[str] = None, tags: Optional[list[str]] = None, category: Optional[str] = None
+) -> Callable[[Type[T]], Type[T]]:
+    """
+    Adds metadata to the invocation as a decorator.
+
+    :param Optional[str] title: Adds a title to the node. Use if the auto-generated title isn't quite right. Defaults to None.
+    :param Optional[list[str]] tags: Adds tags to the node. Nodes may be searched for by their tags. Defaults to None.
+    :param Optional[str] category: Adds a category to the node. Used to group the nodes in the UI. Defaults to None.
+    """
+
+    def wrapper(cls: Type[T]) -> Type[T]:
+        uiconf_name = cls.__qualname__ + ".UIConfig"
+        if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconf_name:
+            cls.UIConfig = type(uiconf_name, (UIConfigBase,), dict())
+        cls.UIConfig.title = title
+        cls.UIConfig.tags = tags
+        cls.UIConfig.category = category
         return cls
 
     return wrapper
