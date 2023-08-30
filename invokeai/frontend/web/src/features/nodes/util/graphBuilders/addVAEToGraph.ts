@@ -149,16 +149,21 @@ export const addVAEToGraph = (
   }
 
   if (shouldUseSDXLRefiner) {
-    graph.edges.push({
-      source: {
-        node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-        field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
-      },
-      destination: {
-        node_id: SDXL_REFINER_INPAINT_CREATE_MASK,
-        field: 'vae',
-      },
-    });
+    if (
+      graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
+      graph.id === SDXL_CANVAS_OUTPAINT_GRAPH
+    ) {
+      graph.edges.push({
+        source: {
+          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        },
+        destination: {
+          node_id: SDXL_REFINER_INPAINT_CREATE_MASK,
+          field: 'vae',
+        },
+      });
+    }
   }
 
   if (vae && metadataAccumulator) {
