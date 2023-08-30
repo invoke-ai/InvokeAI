@@ -2,7 +2,6 @@ import { Box, Flex, FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useDoesInputHaveValue } from 'features/nodes/hooks/useDoesInputHaveValue';
-import { useFieldInputKind } from 'features/nodes/hooks/useFieldInputKind';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import { useIsMouseOverField } from 'features/nodes/hooks/useIsMouseOverField';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
@@ -21,7 +20,6 @@ interface Props {
 const InputField = ({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'input');
   const doesFieldHaveValue = useDoesInputHaveValue(nodeId, fieldName);
-  const input = useFieldInputKind(nodeId, fieldName);
 
   const {
     isConnected,
@@ -72,7 +70,6 @@ const InputField = ({ nodeId, fieldName }: Props) => {
       shouldDim={shouldDim}
     >
       <FormControl
-        as={Flex}
         isInvalid={isMissingInput}
         isDisabled={isConnected}
         sx={{
@@ -101,7 +98,6 @@ const InputField = ({ nodeId, fieldName }: Props) => {
               <FormLabel
                 sx={{
                   mb: 0,
-                  width: input === 'connection' ? 'auto' : '25%',
                   flexShrink: 0,
                   flexGrow: 0,
                 }}
@@ -117,11 +113,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
             </Tooltip>
           )}
         </FieldContextMenu>
-        <Box
-          sx={{
-            width: input === 'connection' ? 'auto' : '75%',
-          }}
-        >
+        <Box>
           <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
         </Box>
       </FormControl>
