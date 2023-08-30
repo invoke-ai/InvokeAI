@@ -166,27 +166,7 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
         imageDTO={controlImage}
         isDropDisabled={shouldShowProcessedImage || !isEnabled}
         postUploadAction={postUploadAction}
-      >
-        <>
-          <IAIDndImageIcon
-            onClick={handleResetControlImage}
-            icon={controlImage ? <FaUndo /> : undefined}
-            tooltip="Reset Control Image"
-          />
-          <IAIDndImageIcon
-            onClick={handleSaveControlImage}
-            icon={controlImage ? <FaSave size={16} /> : undefined}
-            tooltip="Save Control Image"
-            styleOverrides={{ marginTop: 6 }}
-          />
-          <IAIDndImageIcon
-            onClick={handleSetControlImageToDimensions}
-            icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
-            tooltip="Set Control Image Dimensions To W/H"
-            styleOverrides={{ marginTop: 12 }}
-          />
-        </>
-      </IAIDndImage>
+      />
 
       <Box
         sx={{
@@ -207,28 +187,29 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
           imageDTO={processedControlImage}
           isUploadDisabled={true}
           isDropDisabled={!isEnabled}
-        >
-          <>
-            <IAIDndImageIcon
-              onClick={handleResetControlImage}
-              icon={controlImage ? <FaUndo /> : undefined}
-              tooltip="Reset Control Image"
-            />
-            <IAIDndImageIcon
-              onClick={handleSaveControlImage}
-              icon={controlImage ? <FaSave size={16} /> : undefined}
-              tooltip="Save Control Image"
-              styleOverrides={{ marginTop: 6 }}
-            />
-            <IAIDndImageIcon
-              onClick={handleSetControlImageToDimensions}
-              icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
-              tooltip="Set Control Image Dimensions To W/H"
-              styleOverrides={{ marginTop: 12 }}
-            />
-          </>
-        </IAIDndImage>
+        />
       </Box>
+
+      <>
+        <IAIDndImageIcon
+          onClick={handleResetControlImage}
+          icon={controlImage ? <FaUndo /> : undefined}
+          tooltip="Reset Control Image"
+        />
+        <IAIDndImageIcon
+          onClick={handleSaveControlImage}
+          icon={controlImage ? <FaSave size={16} /> : undefined}
+          tooltip="Save Control Image"
+          styleOverrides={{ marginTop: 6 }}
+        />
+        <IAIDndImageIcon
+          onClick={handleSetControlImageToDimensions}
+          icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
+          tooltip="Set Control Image Dimensions To W/H"
+          styleOverrides={{ marginTop: 12 }}
+        />
+      </>
+
       {pendingControlImages.includes(controlNetId) && (
         <Flex
           sx={{
