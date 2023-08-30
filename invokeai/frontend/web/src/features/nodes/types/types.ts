@@ -1,3 +1,4 @@
+import { store } from 'app/store/store';
 import {
   SchedulerParam,
   zBaseModel,
@@ -5,9 +6,11 @@ import {
   zSDXLRefinerModel,
   zScheduler,
 } from 'features/parameters/types/parameterSchemas';
+import { keyBy } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Node } from 'reactflow';
+import { JsonObject } from 'type-fest';
 import { Graph, ImageDTO, _InputField, _OutputField } from 'services/api/types';
 import {
   AnyInvocationType,
@@ -224,7 +227,7 @@ export type DenoiseMaskFieldValue = z.infer<typeof zDenoiseMaskField>;
 
 export const zIntegerInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('integer'),
-  value: z.number().optional(),
+  value: z.number().int().optional(),
 });
 export type IntegerInputFieldValue = z.infer<typeof zIntegerInputFieldValue>;
 
@@ -825,28 +828,38 @@ export const zNotesNodeData = z.object({
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 
+const zPosition = z
+  .object({
+    x: z.number(),
+    y: z.number(),
+  })
+  .default({ x: 0, y: 0 });
+
+const zDimension = z.number().gt(0).nullish();
+
 export const zWorkflowInvocationNode = z.object({
   id: z.string().trim().min(1),
   type: z.literal('invocation'),
   data: zInvocationNodeData,
-  width: z.number().gt(0),
-  height: z.number().gt(0),
-  position: z.object({
-    x: z.number(),
-    y: z.number(),
-  }),
+  width: zDimension,
+  height: zDimension,
+  position: zPosition,
 });
+
+export type WorkflowInvocationNode = z.infer<typeof zWorkflowInvocationNode>;
+
+export const isWorkflowInvocationNode = (
+  val: unknown
+): val is WorkflowInvocationNode =>
+  zWorkflowInvocationNode.safeParse(val).success;
 
 export const zWorkflowNotesNode = z.object({
   id: z.string().trim().min(1),
   type: z.literal('notes'),
   data: zNotesNodeData,
-  width: z.number().gt(0),
-  height: z.number().gt(0),
-  position: z.object({
-    x: z.number(),
-    y: z.number(),
-  }),
+  width: zDimension,
+  height: zDimension,
+  position: zPosition,
 });
 
 export const zWorkflowNode = z.discriminatedUnion('type', [
@@ -886,20 +899,75 @@ export const zSemVer = z.string().refine((val) => {
 
 export type SemVer = z.infer<typeof zSemVer>;
 
+export type WorkflowWarning = {
+  message: string;
+  issues: string[];
+  data: JsonObject;
+};
+
 export const zWorkflow = z.object({
-  name: z.string(),
-  author: z.string(),
-  description: z.string(),
-  version: z.string(),
-  contact: z.string(),
-  tags: z.string(),
-  notes: z.string(),
-  nodes: z.array(zWorkflowNode),
-  edges: z.array(zWorkflowEdge),
-  exposedFields: z.array(zFieldIdentifier),
-  meta: z.object({
-    version: zSemVer,
-  }),
+  name: z.string().default(''),
+  author: z.string().default(''),
+  description: z.string().default(''),
+  version: z.string().default(''),
+  contact: z.string().default(''),
+  tags: z.string().default(''),
+  notes: z.string().default(''),
+  nodes: z.array(zWorkflowNode).default([]),
+  edges: z.array(zWorkflowEdge).default([]),
+  exposedFields: z.array(zFieldIdentifier).default([]),
+  meta: z
+    .object({
+      version: zSemVer,
+    })
+    .default({ version: '1.0.0' }),
+});
+
+export const zValidatedWorkflow = zWorkflow.transform((workflow) => {
+  const nodeTemplates = store.getState().nodes.nodeTemplates;
+  const { nodes, edges } = workflow;
+  const warnings: WorkflowWarning[] = [];
+  const invocationNodes = nodes.filter(isWorkflowInvocationNode);
+  const keyedNodes = keyBy(invocationNodes, 'id');
+  invocationNodes.forEach((node, i) => {
+    const nodeTemplate = nodeTemplates[node.data.type];
+    if (!nodeTemplate) {
+      warnings.push({
+        message: `Node "${node.data.label || node.data.id}" skipped`,
+        issues: [`Unable to find template for type "${node.data.type}"`],
+        data: node,
+      });
+      delete nodes[i];
+    }
+  });
+  edges.forEach((edge, i) => {
+    const sourceNode = keyedNodes[edge.source];
+    const targetNode = keyedNodes[edge.target];
+    const issues: string[] = [];
+    if (!sourceNode) {
+      issues.push(`Output node ${edge.source} does not exist`);
+    } else if (!(edge.sourceHandle in sourceNode.data.outputs)) {
+      issues.push(
+        `Output field "${edge.source}.${edge.sourceHandle}" does not exist`
+      );
+    }
+    if (!targetNode) {
+      issues.push(`Input node ${edge.target} does not exist`);
+    } else if (!(edge.targetHandle in targetNode.data.inputs)) {
+      issues.push(
+        `Input field "${edge.target}.${edge.targetHandle}" does not exist`
+      );
+    }
+    if (issues.length) {
+      delete edges[i];
+      warnings.push({
+        message: `Edge "${edge.sourceHandle} -> ${edge.targetHandle}" skipped`,
+        issues,
+        data: edge,
+      });
+    }
+  });
+  return { workflow, warnings };
 });
 
 export type Workflow = z.infer<typeof zWorkflow>;

@@ -589,7 +589,7 @@ const nodesSlice = createSlice({
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
-      state.workflow.exposedFields = [];
+      state.workflow = cloneDeep(initialWorkflow);
     },
     shouldValidateGraphChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldValidateGraph = action.payload;

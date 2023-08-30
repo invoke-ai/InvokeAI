@@ -68,7 +68,7 @@ export const parseSchema = (
 
   const invocations = filteredSchemas.reduce<
     Record<string, InvocationTemplate>
-  >((acc, schema) => {
+  >((invocationsAccumulator, schema) => {
     const type = schema.properties.type.default;
     const title = schema.title.replace('Invocation', '');
     const tags = schema.tags ?? [];
@@ -133,7 +133,7 @@ export const parseSchema = (
         );
 
         if (!field) {
-          logger('nodes').warn(
+          logger('nodes').debug(
             {
               node: type,
               fieldName: propertyName,
@@ -154,17 +154,17 @@ export const parseSchema = (
     const outputSchemaName = schema.output.$ref.split('/').pop();
 
     if (!outputSchemaName) {
-      logger('nodes').error(
+      logger('nodes').warn(
         { outputRefObject: parseify(schema.output) },
         'No output schema name found in ref object'
       );
-      throw 'No output schema name found in ref object';
+      return invocationsAccumulator;
     }
 
     const outputSchema = openAPI.components?.schemas?.[outputSchemaName];
     if (!outputSchema) {
-      logger('nodes').error({ outputSchemaName }, 'Output schema not found');
-      throw 'Output schema not found';
+      logger('nodes').warn({ outputSchemaName }, 'Output schema not found');
+      return invocationsAccumulator;
     }
 
     if (!isInvocationOutputSchemaObject(outputSchema)) {
@@ -172,7 +172,7 @@ export const parseSchema = (
         { outputSchema: parseify(outputSchema) },
         'Invalid output schema'
       );
-      throw 'Invalid output schema';
+      return invocationsAccumulator;
     }
 
     const outputType = outputSchema.properties.type.default;
@@ -203,18 +203,19 @@ export const parseSchema = (
             { fieldName: propertyName, fieldType, field: parseify(property) },
             'Skipping unknown output field type'
           );
-        } else {
-          outputsAccumulator[propertyName] = {
-            fieldKind: 'output',
-            name: propertyName,
-            title: property.title ?? '',
-            description: property.description ?? '',
-            type: fieldType,
-            ui_hidden: property.ui_hidden ?? false,
-            ui_type: property.ui_type,
-            ui_order: property.ui_order,
-          };
+          return outputsAccumulator;
         }
+
+        outputsAccumulator[propertyName] = {
+          fieldKind: 'output',
+          name: propertyName,
+          title: property.title ?? '',
+          description: property.description ?? '',
+          type: fieldType,
+          ui_hidden: property.ui_hidden ?? false,
+          ui_type: property.ui_type,
+          ui_order: property.ui_order,
+        };
 
         return outputsAccumulator;
       },
@@ -231,9 +232,9 @@ export const parseSchema = (
       outputType,
     };
 
-    Object.assign(acc, { [type]: invocation });
+    Object.assign(invocationsAccumulator, { [type]: invocation });
 
-    return acc;
+    return invocationsAccumulator;
   }, {});
 
   return invocations;
