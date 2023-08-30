@@ -15,6 +15,7 @@ import {
   useAddImageToBoardMutation,
   useChangeImageIsIntermediateMutation,
   useGetImageDTOQuery,
+  useRemoveImageFromBoardMutation,
 } from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
 import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
@@ -67,23 +68,36 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
 
   const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();
   const [addToBoard] = useAddImageToBoardMutation();
-
+  const [removeFromBoard] = useRemoveImageFromBoardMutation();
   const handleResetControlImage = useCallback(() => {
     dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
   }, [controlNetId, dispatch]);
 
-  const handleSaveControlImage = useCallback(() => {
+  const handleSaveControlImage = useCallback(async () => {
     if (!processedControlImage) {
       return;
     }
 
-    changeIsIntermediate({
+    await changeIsIntermediate({
       imageDTO: processedControlImage,
       is_intermediate: false,
-    });
+    }).unwrap();
 
-    addToBoard({ imageDTO: processedControlImage, board_id: autoAddBoardId });
-  }, [processedControlImage, autoAddBoardId, changeIsIntermediate, addToBoard]);
+    if (autoAddBoardId !== 'none') {
+      addToBoard({
+        imageDTO: processedControlImage,
+        board_id: autoAddBoardId,
+      });
+    } else {
+      removeFromBoard({ imageDTO: processedControlImage });
+    }
+  }, [
+    processedControlImage,
+    changeIsIntermediate,
+    autoAddBoardId,
+    addToBoard,
+    removeFromBoard,
+  ]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
