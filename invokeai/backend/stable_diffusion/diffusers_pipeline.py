@@ -558,11 +558,21 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         # compute the previous noisy sample x_t -> x_t-1
         step_output = self.scheduler.step(noise_pred, timestep, latents, **conditioning_data.scheduler_args)
 
+        # TODO: issue to diffusers?
+        # undo internal counter increment done by scheduler.step, so timestep can be resolved as before call
+        # this needed to be able call scheduler.add_noise with current timestep
+        if self.scheduler.order == 2:
+            self.scheduler._index_counter[timestep.item()] -= 1
+
         # TODO: this additional_guidance extension point feels redundant with InvokeAIDiffusionComponent.
         #    But the way things are now, scheduler runs _after_ that, so there was
         #    no way to use it to apply an operation that happens after the last scheduler.step.
         for guidance in additional_guidance:
             step_output = guidance(step_output, timestep, conditioning_data)
+
+        # restore internal counter
+        if self.scheduler.order == 2:
+            self.scheduler._index_counter[timestep.item()] += 1
 
         return step_output
 
