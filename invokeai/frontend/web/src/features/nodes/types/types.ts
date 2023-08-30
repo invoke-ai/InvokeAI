@@ -870,14 +870,25 @@ export const zWorkflowNode = z.discriminatedUnion('type', [
 
 export type WorkflowNode = z.infer<typeof zWorkflowNode>;
 
-export const zWorkflowEdge = z.object({
+export const zDefaultWorkflowEdge = z.object({
   source: z.string().trim().min(1),
   sourceHandle: z.string().trim().min(1),
   target: z.string().trim().min(1),
   targetHandle: z.string().trim().min(1),
   id: z.string().trim().min(1),
-  type: z.enum(['default', 'collapsed']),
+  type: z.literal('default'),
 });
+export const zCollapsedWorkflowEdge = z.object({
+  source: z.string().trim().min(1),
+  target: z.string().trim().min(1),
+  id: z.string().trim().min(1),
+  type: z.literal('collapsed'),
+});
+
+export const zWorkflowEdge = z.union([
+  zDefaultWorkflowEdge,
+  zCollapsedWorkflowEdge,
+]);
 
 export const zFieldIdentifier = z.object({
   nodeId: z.string().trim().min(1),
@@ -947,22 +958,30 @@ export const zValidatedWorkflow = zWorkflow.transform((workflow) => {
     const issues: string[] = [];
     if (!sourceNode) {
       issues.push(`Output node ${edge.source} does not exist`);
-    } else if (!(edge.sourceHandle in sourceNode.data.outputs)) {
+    } else if (
+      edge.type === 'default' &&
+      !(edge.sourceHandle in sourceNode.data.outputs)
+    ) {
       issues.push(
         `Output field "${edge.source}.${edge.sourceHandle}" does not exist`
       );
     }
     if (!targetNode) {
       issues.push(`Input node ${edge.target} does not exist`);
-    } else if (!(edge.targetHandle in targetNode.data.inputs)) {
+    } else if (
+      edge.type === 'default' &&
+      !(edge.targetHandle in targetNode.data.inputs)
+    ) {
       issues.push(
         `Input field "${edge.target}.${edge.targetHandle}" does not exist`
       );
     }
     if (issues.length) {
       delete edges[i];
+      const src = edge.type === 'default' ? edge.sourceHandle : edge.source;
+      const tgt = edge.type === 'default' ? edge.targetHandle : edge.target;
       warnings.push({
-        message: `Edge "${edge.sourceHandle} -> ${edge.targetHandle}" skipped`,
+        message: `Edge "${src} -> ${tgt}" skipped`,
         issues,
         data: edge,
       });
