@@ -11,7 +11,7 @@ sd-1/main/stable-diffusion-inpainting:
 sd-2/main/stable-diffusion-2-1:
    description: Stable Diffusion version 2.1 diffusers model, trained on 768 pixel images (5.21 GB)
    repo_id: stabilityai/stable-diffusion-2-1
-   recommended: True
+   recommended: False
 sd-2/main/stable-diffusion-2-inpainting:
    description: Stable Diffusion version 2.0 inpainting model (5.21 GB)
    repo_id: stabilityai/stable-diffusion-2-inpainting
@@ -19,19 +19,19 @@ sd-2/main/stable-diffusion-2-inpainting:
 sdxl/main/stable-diffusion-xl-base-1-0:
    description: Stable Diffusion XL base model (12 GB)
    repo_id: stabilityai/stable-diffusion-xl-base-1.0
-   recommended: False
+   recommended: True
 sdxl-refiner/main/stable-diffusion-xl-refiner-1-0:
    description: Stable Diffusion XL refiner model (12 GB)
    repo_id: stabilityai/stable-diffusion-xl-refiner-1.0
-   recommended: false
+   recommended: False
 sdxl/vae/sdxl-1-0-vae-fix:
    description: Fine tuned version of the SDXL-1.0 VAE
    repo_id: madebyollin/sdxl-vae-fp16-fix
-   recommended: true
+   recommended: True
 sd-1/main/Analog-Diffusion:
    description: An SD-1.5 model trained on diverse analog photographs (2.13 GB)
    repo_id: wavymulder/Analog-Diffusion
-   recommended: false
+   recommended: False
 sd-1/main/Deliberate:
    description: Versatile model that produces detailed images up to 768px (4.27 GB)
    repo_id: XpucT/Deliberate

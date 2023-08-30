@@ -492,10 +492,10 @@ def _parse_legacy_yamlfile(root: Path, initfile: Path) -> ModelPaths:
     loras = paths.get("lora_dir", "loras")
     controlnets = paths.get("controlnet_dir", "controlnets")
     return ModelPaths(
-        models=root / models,
-        embeddings=root / embeddings,
-        loras=root / loras,
-        controlnets=root / controlnets,
+        models=root / models if models else None,
+        embeddings=root / embeddings if embeddings else None,
+        loras=root / loras if loras else None,
+        controlnets=root / controlnets if controlnets else None,
     )
 
 
