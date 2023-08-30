@@ -4,10 +4,12 @@ import { reduce } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { AnyInvocationType } from 'services/events/types';
 import {
+  FieldType,
   InputFieldTemplate,
   InvocationSchemaObject,
   InvocationTemplate,
   OutputFieldTemplate,
+  isFieldType,
   isInvocationFieldSchema,
   isInvocationOutputSchemaObject,
   isInvocationSchemaObject,
@@ -16,23 +18,35 @@ import { buildInputFieldTemplate, getFieldType } from './fieldTemplateBuilders';
 
 const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'metadata'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
+const RESERVED_FIELD_TYPES = [
+  'WorkflowField',
+  'MetadataField',
+  'IsIntermediate',
+];
 
 const invocationDenylist: AnyInvocationType[] = [
   'graph',
   'metadata_accumulator',
 ];
 
-const isAllowedInputField = (nodeType: string, fieldName: string) => {
+const isReservedInputField = (nodeType: string, fieldName: string) => {
   if (RESERVED_INPUT_FIELD_NAMES.includes(fieldName)) {
-    return false;
+    return true;
   }
   if (nodeType === 'collect' && fieldName === 'collection') {
-    return false;
+    return true;
   }
   if (nodeType === 'iterate' && fieldName === 'index') {
-    return false;
+    return true;
   }
-  return true;
+  return false;
+};
+
+const isReservedFieldType = (fieldType: FieldType) => {
+  if (RESERVED_FIELD_TYPES.includes(fieldType)) {
+    return true;
+  }
+  return false;
 };
 
 const isAllowedOutputField = (nodeType: string, fieldName: string) => {
@@ -54,7 +68,7 @@ export const parseSchema = (
 
   const invocations = filteredSchemas.reduce<
     Record<string, InvocationTemplate>
-  >((acc, schema) => {
+  >((invocationsAccumulator, schema) => {
     const type = schema.properties.type.default;
     const title = schema.title.replace('Invocation', '');
     const tags = schema.tags ?? [];
@@ -62,10 +76,14 @@ export const parseSchema = (
 
     const inputs = reduce(
       schema.properties,
-      (inputsAccumulator, property, propertyName) => {
-        if (!isAllowedInputField(type, propertyName)) {
+      (
+        inputsAccumulator: Record<string, InputFieldTemplate>,
+        property,
+        propertyName
+      ) => {
+        if (isReservedInputField(type, propertyName)) {
           logger('nodes').trace(
-            { type, propertyName, property: parseify(property) },
+            { node: type, fieldName: propertyName, field: parseify(property) },
             'Skipped reserved input field'
           );
           return inputsAccumulator;
@@ -73,37 +91,80 @@ export const parseSchema = (
 
         if (!isInvocationFieldSchema(property)) {
           logger('nodes').warn(
-            { type, propertyName, property: parseify(property) },
+            { node: type, propertyName, property: parseify(property) },
             'Unhandled input property'
           );
           return inputsAccumulator;
         }
 
-        const field = buildInputFieldTemplate(schema, property, propertyName);
+        const fieldType = getFieldType(property);
 
-        if (field) {
-          inputsAccumulator[propertyName] = field;
+        if (!isFieldType(fieldType)) {
+          logger('nodes').warn(
+            {
+              node: type,
+              fieldName: propertyName,
+              fieldType,
+              field: parseify(property),
+            },
+            'Skipping unknown input field type'
+          );
+          return inputsAccumulator;
         }
 
+        if (isReservedFieldType(fieldType)) {
+          logger('nodes').trace(
+            {
+              node: type,
+              fieldName: propertyName,
+              fieldType,
+              field: parseify(property),
+            },
+            'Skipping reserved field type'
+          );
+          return inputsAccumulator;
+        }
+
+        const field = buildInputFieldTemplate(
+          schema,
+          property,
+          propertyName,
+          fieldType
+        );
+
+        if (!field) {
+          logger('nodes').debug(
+            {
+              node: type,
+              fieldName: propertyName,
+              fieldType,
+              field: parseify(property),
+            },
+            'Skipping input field with no template'
+          );
+          return inputsAccumulator;
+        }
+
+        inputsAccumulator[propertyName] = field;
         return inputsAccumulator;
       },
-      {} as Record<string, InputFieldTemplate>
+      {}
     );
 
     const outputSchemaName = schema.output.$ref.split('/').pop();
 
     if (!outputSchemaName) {
-      logger('nodes').error(
+      logger('nodes').warn(
         { outputRefObject: parseify(schema.output) },
         'No output schema name found in ref object'
       );
-      throw 'No output schema name found in ref object';
+      return invocationsAccumulator;
     }
 
     const outputSchema = openAPI.components?.schemas?.[outputSchemaName];
     if (!outputSchema) {
-      logger('nodes').error({ outputSchemaName }, 'Output schema not found');
-      throw 'Output schema not found';
+      logger('nodes').warn({ outputSchemaName }, 'Output schema not found');
+      return invocationsAccumulator;
     }
 
     if (!isInvocationOutputSchemaObject(outputSchema)) {
@@ -111,7 +172,7 @@ export const parseSchema = (
         { outputSchema: parseify(outputSchema) },
         'Invalid output schema'
       );
-      throw 'Invalid output schema';
+      return invocationsAccumulator;
     }
 
     const outputType = outputSchema.properties.type.default;
@@ -136,6 +197,15 @@ export const parseSchema = (
         }
 
         const fieldType = getFieldType(property);
+
+        if (!isFieldType(fieldType)) {
+          logger('nodes').warn(
+            { fieldName: propertyName, fieldType, field: parseify(property) },
+            'Skipping unknown output field type'
+          );
+          return outputsAccumulator;
+        }
+
         outputsAccumulator[propertyName] = {
           fieldKind: 'output',
           name: propertyName,
@@ -162,9 +232,9 @@ export const parseSchema = (
       outputType,
     };
 
-    Object.assign(acc, { [type]: invocation });
+    Object.assign(invocationsAccumulator, { [type]: invocation });
 
-    return acc;
+    return invocationsAccumulator;
   }, {});
 
   return invocations;

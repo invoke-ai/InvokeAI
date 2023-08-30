@@ -4,13 +4,11 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
-import { isInvocationNode } from 'features/nodes/types/types';
+import { InvocationTemplate, NodeData } from 'features/nodes/types/types';
 import { memo } from 'react';
-import { ImageOutput } from 'services/api/types';
-import { AnyResult } from 'services/events/types';
+import NotesTextarea from '../../flow/nodes/Invocation/NotesTextarea';
+import NodeTitle from '../../flow/nodes/common/NodeTitle';
 import ScrollableContent from '../ScrollableContent';
-import ImageOutputPreview from './outputs/ImageOutputPreview';
 
 const selector = createSelector(
   stateSelector,
@@ -26,28 +24,28 @@ const selector = createSelector(
       ? nodes.nodeTemplates[lastSelectedNode.data.type]
       : undefined;
 
-    const nes =
-      nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
-
     return {
-      node: lastSelectedNode,
+      data: lastSelectedNode?.data,
       template: lastSelectedNodeTemplate,
-      nes,
     };
   },
   defaultSelectorOptions
 );
 
-const InspectorOutputsTab = () => {
-  const { node, template, nes } = useAppSelector(selector);
+const InspectorDetailsTab = () => {
+  const { data, template } = useAppSelector(selector);
 
-  if (!node || !nes || !isInvocationNode(node)) {
+  if (!template || !data) {
     return <IAINoContentFallback label="No node selected" icon={null} />;
   }
 
-  if (nes.outputs.length === 0) {
-    return <IAINoContentFallback label="No outputs recorded" icon={null} />;
-  }
+  return <Content data={data} template={template} />;
+};
+
+export default memo(InspectorDetailsTab);
+
+const Content = (props: { data: NodeData; template: InvocationTemplate }) => {
+  const { data } = props;
 
   return (
     <Box
@@ -60,31 +58,17 @@ const InspectorOutputsTab = () => {
       <ScrollableContent>
         <Flex
           sx={{
-            position: 'relative',
             flexDir: 'column',
-            alignItems: 'flex-start',
+            position: 'relative',
             p: 1,
             gap: 2,
-            h: 'full',
             w: 'full',
           }}
         >
-          {template?.outputType === 'image_output' ? (
-            nes.outputs.map((result, i) => (
-              <ImageOutputPreview
-                key={getKey(result, i)}
-                output={result as ImageOutput}
-              />
-            ))
-          ) : (
-            <DataViewer data={nes.outputs} label="Node Outputs" />
-          )}
+          <NodeTitle nodeId={data.id} />
+          <NotesTextarea nodeId={data.id} />
         </Flex>
       </ScrollableContent>
     </Box>
   );
 };
-
-export default memo(InspectorOutputsTab);
-
-const getKey = (result: AnyResult, i: number) => `${result.type}-${i}`;

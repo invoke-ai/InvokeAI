@@ -31,8 +31,8 @@ from .baseinvocation import (
     OutputField,
     UIComponent,
     UIType,
-    tags,
-    title,
+    invocation,
+    invocation_output,
 )
 from .controlnet_image_processors import ControlField
 from .latent import SAMPLER_NAME_VALUES, LatentsField, LatentsOutput, build_latents_output, get_scheduler
@@ -56,11 +56,8 @@ ORT_TO_NP_TYPE = {
 PRECISION_VALUES = Literal[tuple(list(ORT_TO_NP_TYPE.keys()))]
 
 
-@title("ONNX Prompt (Raw)")
-@tags("onnx", "prompt")
+@invocation("prompt_onnx", title="ONNX Prompt (Raw)", tags=["prompt", "onnx"], category="conditioning")
 class ONNXPromptInvocation(BaseInvocation):
-    type: Literal["prompt_onnx"] = "prompt_onnx"
-
     prompt: str = InputField(default="", description=FieldDescriptions.raw_prompt, ui_component=UIComponent.Textarea)
     clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
@@ -141,14 +138,15 @@ class ONNXPromptInvocation(BaseInvocation):
 
 
 # Text to image
-@title("ONNX Text to Latents")
-@tags("latents", "inference", "txt2img", "onnx")
+@invocation(
+    "t2l_onnx",
+    title="ONNX Text to Latents",
+    tags=["latents", "inference", "txt2img", "onnx"],
+    category="latents",
+)
 class ONNXTextToLatentsInvocation(BaseInvocation):
     """Generates latents from conditionings."""
 
-    type: Literal["t2l_onnx"] = "t2l_onnx"
-
-    # Inputs
     positive_conditioning: ConditioningField = InputField(
         description=FieldDescriptions.positive_cond,
         input=Input.Connection,
@@ -316,14 +314,15 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
 
 # Latent to image
-@title("ONNX Latents to Image")
-@tags("latents", "image", "vae", "onnx")
+@invocation(
+    "l2i_onnx",
+    title="ONNX Latents to Image",
+    tags=["latents", "image", "vae", "onnx"],
+    category="image",
+)
 class ONNXLatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
 
-    type: Literal["l2i_onnx"] = "l2i_onnx"
-
-    # Inputs
     latents: LatentsField = InputField(
         description=FieldDescriptions.denoised_latents,
         input=Input.Connection,
@@ -376,6 +375,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata.dict() if self.metadata else None,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -385,17 +385,14 @@ class ONNXLatentsToImageInvocation(BaseInvocation):
         )
 
 
+@invocation_output("model_loader_output_onnx")
 class ONNXModelLoaderOutput(BaseInvocationOutput):
     """Model loader output"""
-
-    # fmt: off
-    type: Literal["model_loader_output_onnx"] = "model_loader_output_onnx"
 
     unet: UNetField = OutputField(default=None, description=FieldDescriptions.unet, title="UNet")
     clip: ClipField = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
     vae_decoder: VaeField = OutputField(default=None, description=FieldDescriptions.vae, title="VAE Decoder")
     vae_encoder: VaeField = OutputField(default=None, description=FieldDescriptions.vae, title="VAE Encoder")
-    # fmt: on
 
 
 class OnnxModelField(BaseModel):
@@ -406,14 +403,10 @@ class OnnxModelField(BaseModel):
     model_type: ModelType = Field(description="Model Type")
 
 
-@title("ONNX Main Model")
-@tags("onnx", "model")
+@invocation("onnx_model_loader", title="ONNX Main Model", tags=["onnx", "model"], category="model")
 class OnnxModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
-    type: Literal["onnx_model_loader"] = "onnx_model_loader"
-
-    # Inputs
     model: OnnxModelField = InputField(
         description=FieldDescriptions.onnx_main_model, input=Input.Direct, ui_type=UIType.ONNXModel
     )

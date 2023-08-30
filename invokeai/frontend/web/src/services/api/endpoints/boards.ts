@@ -19,7 +19,7 @@ export const boardsApi = api.injectEndpoints({
      */
     listBoards: build.query<OffsetPaginatedResults_BoardDTO_, ListBoardsArg>({
       query: (arg) => ({ url: 'boards/', params: arg }),
-      providesTags: (result, error, arg) => {
+      providesTags: (result) => {
         // any list of boards
         const tags: ApiFullTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
 
@@ -42,7 +42,7 @@ export const boardsApi = api.injectEndpoints({
         url: 'boards/',
         params: { all: true },
       }),
-      providesTags: (result, error, arg) => {
+      providesTags: (result) => {
         // any list of boards
         const tags: ApiFullTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
 

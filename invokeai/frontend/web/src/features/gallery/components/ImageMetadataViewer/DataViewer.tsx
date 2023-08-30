@@ -2,7 +2,7 @@ import { Box, Flex, IconButton, Tooltip } from '@chakra-ui/react';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
-import { FaCopy, FaSave } from 'react-icons/fa';
+import { FaCopy, FaDownload } from 'react-icons/fa';
 
 type Props = {
   label: string;
@@ -23,7 +23,7 @@ const DataViewer = (props: Props) => {
     navigator.clipboard.writeText(dataString);
   }, [dataString]);
 
-  const handleSave = useCallback(() => {
+  const handleDownload = useCallback(() => {
     const blob = new Blob([dataString]);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -73,13 +73,13 @@ const DataViewer = (props: Props) => {
       </Box>
       <Flex sx={{ position: 'absolute', top: 0, insetInlineEnd: 0, p: 2 }}>
         {withDownload && (
-          <Tooltip label={`Save ${label} JSON`}>
+          <Tooltip label={`Download ${label} JSON`}>
             <IconButton
-              aria-label={`Save ${label} JSON`}
-              icon={<FaSave />}
+              aria-label={`Download ${label} JSON`}
+              icon={<FaDownload />}
               variant="ghost"
               opacity={0.7}
-              onClick={handleSave}
+              onClick={handleDownload}
             />
           </Tooltip>
         )}

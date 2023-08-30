@@ -1,12 +1,12 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { SelectItem } from '@mantine/core';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import { fieldRefinerModelValueChanged } from 'features/nodes/store/nodesSlice';
 import {
+  FieldComponentProps,
   SDXLRefinerModelInputFieldTemplate,
   SDXLRefinerModelInputFieldValue,
-  FieldComponentProps,
 } from 'features/nodes/types/types';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToMainModelParam } from 'features/parameters/util/modelIdToMainModelParam';
@@ -101,20 +101,17 @@ const RefinerModelInputFieldComponent = (
         value={selectedModel?.id}
         placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
         data={data}
-        error={data.length === 0}
+        error={!selectedModel}
         disabled={data.length === 0}
         onChange={handleChangeModel}
         sx={{
+          width: '100%',
           '.mantine-Select-dropdown': {
             width: '16rem !important',
           },
         }}
       />
-      {isSyncModelEnabled && (
-        <Box mt={7}>
-          <SyncModelsButton className="nodrag" iconMode />
-        </Box>
-      )}
+      {isSyncModelEnabled && <SyncModelsButton className="nodrag" iconMode />}
     </Flex>
   );
 };

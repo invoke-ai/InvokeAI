@@ -5,7 +5,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useMemo } from 'react';
 import { isInvocationNode } from '../types/types';
 
-export const useIsIntermediate = (nodeId: string) => {
+export const useEmbedWorkflow = (nodeId: string) => {
   const selector = useMemo(
     () =>
       createSelector(
@@ -15,13 +15,13 @@ export const useIsIntermediate = (nodeId: string) => {
           if (!isInvocationNode(node)) {
             return false;
           }
-          return node.data.isIntermediate;
+          return node.data.embedWorkflow;
         },
         defaultSelectorOptions
       ),
     [nodeId]
   );
 
-  const is_intermediate = useAppSelector(selector);
-  return is_intermediate;
+  const embedWorkflow = useAppSelector(selector);
+  return embedWorkflow;
 };

@@ -9,14 +9,12 @@ import {
   Tabs,
   Text,
 } from '@chakra-ui/react';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { memo } from 'react';
-import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
+import { useGetImageMetadataFromFileQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
-import { useDebounce } from 'use-debounce';
-import ImageMetadataActions from './ImageMetadataActions';
 import DataViewer from './DataViewer';
+import ImageMetadataActions from './ImageMetadataActions';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -29,18 +27,15 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   //   dispatch(setShouldShowImageDetails(false));
   // });
 
-  const [debouncedMetadataQueryArg, debounceState] = useDebounce(
+  const { metadata, workflow } = useGetImageMetadataFromFileQuery(
     image.image_name,
-    500
+    {
+      selectFromResult: (res) => ({
+        metadata: res?.currentData?.metadata,
+        workflow: res?.currentData?.workflow,
+      }),
+    }
   );
-
-  const { currentData } = useGetImageMetadataQuery(
-    debounceState.isPending()
-      ? skipToken
-      : debouncedMetadataQueryArg ?? skipToken
-  );
-  const metadata = currentData?.metadata;
-  const graph = currentData?.graph;
 
   return (
     <Flex
@@ -71,17 +66,17 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
       >
         <TabList>
-          <Tab>Core Metadata</Tab>
+          <Tab>Metadata</Tab>
           <Tab>Image Details</Tab>
-          <Tab>Graph</Tab>
+          <Tab>Workflow</Tab>
         </TabList>
 
         <TabPanels>
           <TabPanel>
             {metadata ? (
-              <DataViewer data={metadata} label="Core Metadata" />
+              <DataViewer data={metadata} label="Metadata" />
             ) : (
-              <IAINoContentFallback label="No core metadata found" />
+              <IAINoContentFallback label="No metadata found" />
             )}
           </TabPanel>
           <TabPanel>
@@ -92,10 +87,10 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
             )}
           </TabPanel>
           <TabPanel>
-            {graph ? (
-              <DataViewer data={graph} label="Graph" />
+            {workflow ? (
+              <DataViewer data={workflow} label="Workflow" />
             ) : (
-              <IAINoContentFallback label="No graph found" />
+              <IAINoContentFallback label="No workflow found" />
             )}
           </TabPanel>
         </TabPanels>

@@ -719,7 +719,7 @@
     },
     "nodes": {
         "reloadNodeTemplates": "Reload Node Templates",
-        "saveWorkflow": "Save Workflow",
+        "downloadWorkflow": "Download Workflow JSON",
         "loadWorkflow": "Load Workflow",
         "resetWorkflow": "Reset Workflow",
         "resetWorkflowDesc": "Are you sure you want to reset this workflow?",

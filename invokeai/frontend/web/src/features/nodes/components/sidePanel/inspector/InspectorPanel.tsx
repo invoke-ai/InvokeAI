@@ -10,6 +10,7 @@ import { memo } from 'react';
 import InspectorDataTab from './InspectorDataTab';
 import InspectorOutputsTab from './InspectorOutputsTab';
 import InspectorTemplateTab from './InspectorTemplateTab';
+// import InspectorDetailsTab from './InspectorDetailsTab';
 
 const InspectorPanel = () => {
   return (
@@ -29,12 +30,16 @@ const InspectorPanel = () => {
         sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
       >
         <TabList>
+          {/* <Tab>Details</Tab> */}
           <Tab>Outputs</Tab>
           <Tab>Data</Tab>
           <Tab>Template</Tab>
         </TabList>
 
         <TabPanels>
+          {/* <TabPanel>
+            <InspectorDetailsTab />
+          </TabPanel> */}
           <TabPanel>
             <InspectorOutputsTab />
           </TabPanel>
