@@ -5,12 +5,15 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
+import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
+import { setHeight, setWidth } from 'features/parameters/store/generationSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FaSave, FaUndo } from 'react-icons/fa';
+import { FaRulerVertical, FaSave, FaUndo } from 'react-icons/fa';
 import {
   useAddImageToBoardMutation,
   useChangeImageIsIntermediateMutation,
@@ -55,6 +58,7 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
   const dispatch = useAppDispatch();
 
   const { pendingControlImages, autoAddBoardId } = useAppSelector(selector);
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
@@ -98,6 +102,24 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
     addToBoard,
     removeFromBoard,
   ]);
+
+  const handleSetControlImageToDimensions = useCallback(() => {
+    if (!processedControlImage) {
+      return;
+    }
+
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(
+        setBoundingBoxDimensions({
+          width: processedControlImage.width,
+          height: processedControlImage.height,
+        })
+      );
+    } else {
+      dispatch(setWidth(processedControlImage.width));
+      dispatch(setHeight(processedControlImage.height));
+    }
+  }, [processedControlImage, activeTabName, dispatch]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
@@ -158,21 +180,7 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
         imageDTO={controlImage}
         isDropDisabled={shouldShowProcessedImage || !isEnabled}
         postUploadAction={postUploadAction}
-      >
-        <>
-          <IAIDndImageIcon
-            onClick={handleResetControlImage}
-            icon={controlImage ? <FaUndo /> : undefined}
-            tooltip="Reset Control Image"
-          />
-          <IAIDndImageIcon
-            onClick={handleSaveControlImage}
-            icon={controlImage ? <FaSave size={16} /> : undefined}
-            tooltip="Save Control Image"
-            styleOverrides={{ marginTop: 6 }}
-          />
-        </>
-      </IAIDndImage>
+      />
 
       <Box
         sx={{
@@ -193,22 +201,29 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
           imageDTO={processedControlImage}
           isUploadDisabled={true}
           isDropDisabled={!isEnabled}
-        >
-          <>
-            <IAIDndImageIcon
-              onClick={handleResetControlImage}
-              icon={controlImage ? <FaUndo /> : undefined}
-              tooltip="Reset Control Image"
-            />
-            <IAIDndImageIcon
-              onClick={handleSaveControlImage}
-              icon={controlImage ? <FaSave size={16} /> : undefined}
-              tooltip="Save Control Image"
-              styleOverrides={{ marginTop: 6 }}
-            />
-          </>
-        </IAIDndImage>
+        />
       </Box>
+
+      <>
+        <IAIDndImageIcon
+          onClick={handleResetControlImage}
+          icon={controlImage ? <FaUndo /> : undefined}
+          tooltip="Reset Control Image"
+        />
+        <IAIDndImageIcon
+          onClick={handleSaveControlImage}
+          icon={controlImage ? <FaSave size={16} /> : undefined}
+          tooltip="Save Control Image"
+          styleOverrides={{ marginTop: 6 }}
+        />
+        <IAIDndImageIcon
+          onClick={handleSetControlImageToDimensions}
+          icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
+          tooltip="Set Control Image Dimensions To W/H"
+          styleOverrides={{ marginTop: 12 }}
+        />
+      </>
+
       {pendingControlImages.includes(controlNetId) && (
         <Flex
           sx={{

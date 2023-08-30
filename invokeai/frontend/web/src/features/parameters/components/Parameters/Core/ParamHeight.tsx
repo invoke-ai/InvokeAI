@@ -11,16 +11,15 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   [stateSelector],
   ({ generation, hotkeys, config }) => {
-    const { initial, min, sliderMax, inputMax, fineStep, coarseStep } =
-      config.sd.height;
-    const { height } = generation;
+    const { min, sliderMax, inputMax, fineStep, coarseStep } = config.sd.height;
+    const { model, height } = generation;
     const { aspectRatio } = generation;
 
     const step = hotkeys.shift ? fineStep : coarseStep;
 
     return {
+      model,
       height,
-      initial,
       min,
       sliderMax,
       inputMax,
@@ -37,10 +36,14 @@ type ParamHeightProps = Omit<
 >;
 
 const ParamHeight = (props: ParamHeightProps) => {
-  const { height, initial, min, sliderMax, inputMax, step, aspectRatio } =
+  const { model, height, min, sliderMax, inputMax, step, aspectRatio } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+
+  const initial = ['sdxl', 'sdxl-refiner'].includes(model?.base_model as string)
+    ? 1024
+    : 512;
 
   const handleChange = useCallback(
     (v: number) => {
