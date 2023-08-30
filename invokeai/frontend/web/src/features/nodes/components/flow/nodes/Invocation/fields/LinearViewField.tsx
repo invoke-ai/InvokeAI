@@ -74,7 +74,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
         </FormLabel>
         <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
       </FormControl>
-      <SelectionOverlay isSelected={false} isHovered={isMouseOverField} />
+      {/* <SelectionOverlay isSelected={false} isHovered={isMouseOverField} /> */}
     </Flex>
   );
 };

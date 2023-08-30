@@ -161,7 +161,7 @@ const InputFieldWrapper = memo(
         }}
       >
         {children}
-        <SelectionOverlay isSelected={false} isHovered={isMouseOverField} />
+        {/* <SelectionOverlay isSelected={false} isHovered={isMouseOverField} /> */}
       </Flex>
     );
   }
