@@ -93,8 +93,10 @@ const VaeModelInputFieldComponent = (
       data={data}
       onChange={handleChangeModel}
       disabled={data.length === 0}
+      error={!selectedVaeModel}
       clearable
       sx={{
+        width: '100%',
         '.mantine-Select-dropdown': {
           width: '16rem !important',
         },

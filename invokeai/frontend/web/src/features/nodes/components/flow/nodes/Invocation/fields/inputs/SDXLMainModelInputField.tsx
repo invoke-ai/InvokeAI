@@ -128,10 +128,11 @@ const ModelInputFieldComponent = (
         value={selectedModel?.id}
         placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
         data={data}
-        error={data.length === 0}
+        error={!selectedModel}
         disabled={data.length === 0}
         onChange={handleChangeModel}
         sx={{
+          width: '100%',
           '.mantine-Select-dropdown': {
             width: '16rem !important',
           },
