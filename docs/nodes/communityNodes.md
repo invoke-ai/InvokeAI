@@ -97,6 +97,24 @@ This node works best with SDXL models, especially as the style can be described 
 
 --------------------------------
 
+### Text font to Image
+
+**Description:** text font to text image node for InvokeAI, download a font to use (or if in font cache uses it from there), the text is always resized to the image size, but can control that with padding, optional 2nd line
+
+**Node Link:** https://github.com/mickr777/textfontimage
+
+**Output Examples**
+
+![a3609d48-d9b7-41f0-b280-063d857986fb](https://github.com/mickr777/InvokeAI/assets/115216705/c21b0af3-d9c6-4c16-9152-846a23effd36)
+
+Results after using the depth controlnet
+
+![9133eabb-bcda-4326-831e-1b641228b178](https://github.com/mickr777/InvokeAI/assets/115216705/915f1a53-968e-43eb-aa61-07cd8f1a733a)
+![4f9a3fa8-9be9-4236-8a3e-fcec66decd2a](https://github.com/mickr777/InvokeAI/assets/115216705/821ef89e-8a60-44f5-b94e-471a9d8690cc)
+![babd69c4-9d60-4a55-a834-5e8397f62610](https://github.com/mickr777/InvokeAI/assets/115216705/2befcb6d-49f4-4bfd-b5fc-1fee19274f89)
+
+--------------------------------
+
 ### Example Node Template
 
 **Description:** This node allows you to do super cool things with InvokeAI.
