@@ -128,6 +128,16 @@ export const addSDXLRefinerToGraph = (
       },
       {
         source: {
+          node_id: SDXL_REFINER_MODEL_LOADER,
+          field: 'vae',
+        },
+        destination: {
+          node_id: REFINER_SEAMLESS,
+          field: 'vae',
+        },
+      },
+      {
+        source: {
           node_id: REFINER_SEAMLESS,
           field: 'unet',
         },
