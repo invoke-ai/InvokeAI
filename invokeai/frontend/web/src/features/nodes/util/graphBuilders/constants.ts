@@ -56,8 +56,9 @@ export const SDXL_REFINER_POSITIVE_CONDITIONING =
 export const SDXL_REFINER_NEGATIVE_CONDITIONING =
   'sdxl_refiner_negative_conditioning';
 export const SDXL_REFINER_DENOISE_LATENTS = 'sdxl_refiner_denoise_latents';
+export const SDXL_REFINER_INPAINT_CREATE_MASK = 'refiner_inpaint_create_mask';
 export const SEAMLESS = 'seamless';
-export const REFINER_SEAMLESS = 'refiner_seamless';
+export const SDXL_REFINER_SEAMLESS = 'refiner_seamless';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';

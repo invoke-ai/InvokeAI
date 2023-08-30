@@ -21,11 +21,11 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  REFINER_SEAMLESS,
   RESIZE,
   SDXL_DENOISE_LATENTS,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
@@ -369,7 +369,7 @@ export const buildLinearSDXLImageToImageGraph = (
   if (shouldUseSDXLRefiner) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
     if (seamlessXAxis || seamlessYAxis) {
-      modelLoaderNodeId = REFINER_SEAMLESS;
+      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }
   }
 

@@ -36,10 +36,10 @@ import {
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
-  REFINER_SEAMLESS,
   SDXL_CANVAS_INPAINT_GRAPH,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
@@ -628,10 +628,11 @@ export const buildCanvasSDXLInpaintGraph = (
       state,
       graph,
       CANVAS_COHERENCE_DENOISE_LATENTS,
-      modelLoaderNodeId
+      modelLoaderNodeId,
+      canvasInitImage
     );
     if (seamlessXAxis || seamlessYAxis) {
-      modelLoaderNodeId = REFINER_SEAMLESS;
+      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }
   }
 

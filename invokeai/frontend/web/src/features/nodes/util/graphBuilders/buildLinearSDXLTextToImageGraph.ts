@@ -16,9 +16,9 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  REFINER_SEAMLESS,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_SEAMLESS,
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
 } from './constants';
@@ -262,7 +262,7 @@ export const buildLinearSDXLTextToImageGraph = (
   if (shouldUseSDXLRefiner) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
     if (seamlessXAxis || seamlessYAxis) {
-      modelLoaderNodeId = REFINER_SEAMLESS;
+      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }
   }
 

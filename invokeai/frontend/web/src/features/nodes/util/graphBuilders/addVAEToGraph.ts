@@ -20,6 +20,7 @@ import {
   SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
+  SDXL_REFINER_INPAINT_CREATE_MASK,
   SDXL_TEXT_TO_IMAGE_GRAPH,
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
@@ -32,6 +33,7 @@ export const addVAEToGraph = (
 ): void => {
   const { vae } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
+  const { shouldUseSDXLRefiner } = state.sdxl;
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
@@ -144,6 +146,19 @@ export const addVAEToGraph = (
         },
       }
     );
+  }
+
+  if (shouldUseSDXLRefiner) {
+    graph.edges.push({
+      source: {
+        node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+        field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+      },
+      destination: {
+        node_id: SDXL_REFINER_INPAINT_CREATE_MASK,
+        field: 'vae',
+      },
+    });
   }
 
   if (vae && metadataAccumulator) {
