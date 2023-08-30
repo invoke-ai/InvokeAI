@@ -49,12 +49,15 @@ from ...backend.util.devices import choose_precision, choose_torch_device
 from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
+    BaseInvocationOutput,
     FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
+    OutputField,
     UIType,
     invocation,
+    invocation_output,
 )
 from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
@@ -64,6 +67,23 @@ DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
 
 SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
+
+
+@invocation_output("scheduler_output")
+class SchedulerOutput(BaseInvocationOutput):
+    scheduler: SAMPLER_NAME_VALUES = OutputField(description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler)
+
+
+@invocation("scheduler", title="Scheduler", tags=["scheduler"], category="latents")
+class SchedulerInvocation(BaseInvocation):
+    """Selects a scheduler."""
+
+    scheduler: SAMPLER_NAME_VALUES = InputField(
+        default="euler", description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler
+    )
+
+    def invoke(self, context: InvocationContext) -> SchedulerOutput:
+        return SchedulerOutput(scheduler=self.scheduler)
 
 
 @invocation("create_denoise_mask", title="Create Denoise Mask", tags=["mask", "denoise"], category="latents")
