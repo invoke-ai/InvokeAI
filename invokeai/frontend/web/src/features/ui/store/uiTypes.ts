@@ -21,6 +21,7 @@ export interface UIState {
   shouldHidePreview: boolean;
   shouldShowProgressInViewer: boolean;
   shouldShowEmbeddingPicker: boolean;
+  shouldAutoChangeDimensions: boolean;
   favoriteSchedulers: SchedulerParam[];
   globalContextMenuCloseTrigger: number;
   panels: Record<string, string>;
