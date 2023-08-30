@@ -261,7 +261,9 @@ export const buildLinearSDXLTextToImageGraph = (
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
-    modelLoaderNodeId = REFINER_SEAMLESS;
+    if (seamlessXAxis || seamlessYAxis) {
+      modelLoaderNodeId = REFINER_SEAMLESS;
+    }
   }
 
   // optionally add custom VAE

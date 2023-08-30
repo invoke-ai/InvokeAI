@@ -630,7 +630,9 @@ export const buildCanvasSDXLInpaintGraph = (
       CANVAS_COHERENCE_DENOISE_LATENTS,
       modelLoaderNodeId
     );
-    modelLoaderNodeId = REFINER_SEAMLESS;
+    if (seamlessXAxis || seamlessYAxis) {
+      modelLoaderNodeId = REFINER_SEAMLESS;
+    }
   }
 
   // optionally add custom VAE
