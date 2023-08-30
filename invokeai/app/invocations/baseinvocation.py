@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
-import json
+import re
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
     Any,
     Callable,
     ClassVar,
+    Literal,
     Mapping,
     Optional,
     Type,
@@ -22,7 +24,7 @@ from typing import (
 )
 
 from pydantic import BaseModel, Field, validator
-from pydantic.fields import Undefined
+from pydantic.fields import Undefined, ModelField
 from pydantic.typing import NoArgAnyCallable
 
 if TYPE_CHECKING:
@@ -368,8 +370,7 @@ def OutputField(
 class UIConfigBase(BaseModel):
     """
     Provides additional node configuration to the UI.
-    This is used internally by the @tags and @title decorator logic. You probably want to use those
-    decorators, though you may add this class to a node definition to specify the title and tags.
+    This is used internally by the @invocation decorator logic. Do not use this directly.
     """
 
     tags: Optional[list[str]] = Field(default_factory=None, description="The node's tags")
@@ -387,10 +388,11 @@ class InvocationContext:
 
 
 class BaseInvocationOutput(BaseModel):
-    """Base class for all invocation outputs"""
+    """
+    Base class for all invocation outputs.
 
-    # All outputs must include a type name like this:
-    # type: Literal['your_output_name'] # noqa f821
+    All invocation outputs must use the `@invocation_output` decorator to provide their unique type.
+    """
 
     @classmethod
     def get_all_subclasses_tuple(cls):
@@ -426,12 +428,12 @@ class MissingInputException(Exception):
 
 
 class BaseInvocation(ABC, BaseModel):
-    """A node to process inputs and produce outputs.
-    May use dependency injection in __init__ to receive providers.
     """
+    A node to process inputs and produce outputs.
+    May use dependency injection in __init__ to receive providers.
 
-    # All invocations must include a type name like this:
-    # type: Literal['your_output_name'] # noqa f821
+    All invocations must use the `@invocation` decorator to provide their unique type.
+    """
 
     @classmethod
     def get_all_subclasses(cls):
@@ -511,9 +513,11 @@ class BaseInvocation(ABC, BaseModel):
                     raise MissingInputException(self.__fields__["type"].default, field_name)
         return self.invoke(context)
 
-    id: str = Field(description="The id of this node. Must be unique among all nodes.")
+    id: str = Field(
+        description="The id of this instance of an invocation. Must be unique among all instances of invocations."
+    )
     is_intermediate: bool = InputField(
-        default=False, description="Whether or not this node is an intermediate node.", ui_type=UIType.IsIntermediate
+        default=False, description="Whether or not this is an intermediate invocation.", ui_type=UIType.IsIntermediate
     )
     workflow: Optional[str] = InputField(
         default=None,
@@ -534,66 +538,85 @@ class BaseInvocation(ABC, BaseModel):
     UIConfig: ClassVar[Type[UIConfigBase]]
 
 
-T = TypeVar("T", bound=BaseInvocation)
+GenericBaseInvocation = TypeVar("GenericBaseInvocation", bound=BaseInvocation)
 
 
-def title(title: str) -> Callable[[Type[T]], Type[T]]:
-    """Adds a title to the invocation. Use this to override the default title generation, which is based on the class name."""
-
-    def wrapper(cls: Type[T]) -> Type[T]:
-        uiconf_name = cls.__qualname__ + ".UIConfig"
-        if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconf_name:
-            cls.UIConfig = type(uiconf_name, (UIConfigBase,), dict())
-        cls.UIConfig.title = title
-        return cls
-
-    return wrapper
-
-
-def tags(*tags: str) -> Callable[[Type[T]], Type[T]]:
-    """Adds tags to the invocation. Use this to improve the streamline finding the invocation in the UI."""
-
-    def wrapper(cls: Type[T]) -> Type[T]:
-        uiconf_name = cls.__qualname__ + ".UIConfig"
-        if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconf_name:
-            cls.UIConfig = type(uiconf_name, (UIConfigBase,), dict())
-        cls.UIConfig.tags = list(tags)
-        return cls
-
-    return wrapper
-
-
-def category(category: str) -> Callable[[Type[T]], Type[T]]:
-    """Adds a category to the invocation. This is used to group invocations in the UI."""
-
-    def wrapper(cls: Type[T]) -> Type[T]:
-        uiconf_name = cls.__qualname__ + ".UIConfig"
-        if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconf_name:
-            cls.UIConfig = type(uiconf_name, (UIConfigBase,), dict())
-        cls.UIConfig.category = category
-        return cls
-
-    return wrapper
-
-
-def node(
-    title: Optional[str] = None, tags: Optional[list[str]] = None, category: Optional[str] = None
-) -> Callable[[Type[T]], Type[T]]:
+def invocation(
+    invocation_type: str, title: Optional[str] = None, tags: Optional[list[str]] = None, category: Optional[str] = None
+) -> Callable[[Type[GenericBaseInvocation]], Type[GenericBaseInvocation]]:
     """
-    Adds metadata to the invocation as a decorator.
+    Adds metadata to an invocation.
 
-    :param Optional[str] title: Adds a title to the node. Use if the auto-generated title isn't quite right. Defaults to None.
-    :param Optional[list[str]] tags: Adds tags to the node. Nodes may be searched for by their tags. Defaults to None.
-    :param Optional[str] category: Adds a category to the node. Used to group the nodes in the UI. Defaults to None.
+    :param str invocation_type: The type of the invocation. Must be unique among all invocations.
+    :param Optional[str] title: Adds a title to the invocation. Use if the auto-generated title isn't quite right. Defaults to None.
+    :param Optional[list[str]] tags: Adds tags to the invocation. Invocations may be searched for by their tags. Defaults to None.
+    :param Optional[str] category: Adds a category to the invocation. Used to group the invocations in the UI. Defaults to None.
     """
 
-    def wrapper(cls: Type[T]) -> Type[T]:
+    def wrapper(cls: Type[GenericBaseInvocation]) -> Type[GenericBaseInvocation]:
+        # Validate invocation types on creation of invocation classes
+        # TODO: ensure unique?
+        if re.compile(r"^\S+$").match(invocation_type) is None:
+            raise ValueError(f'"invocation_type" must consist of non-whitespace characters, got "{invocation_type}"')
+
+        # Add OpenAPI schema extras
         uiconf_name = cls.__qualname__ + ".UIConfig"
         if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconf_name:
             cls.UIConfig = type(uiconf_name, (UIConfigBase,), dict())
-        cls.UIConfig.title = title
-        cls.UIConfig.tags = tags
-        cls.UIConfig.category = category
+        if title is not None:
+            cls.UIConfig.title = title
+        if tags is not None:
+            cls.UIConfig.tags = tags
+        if category is not None:
+            cls.UIConfig.category = category
+
+        # Add the invocation type to the pydantic model of the invocation
+        invocation_type_annotation = Literal[invocation_type]  # type: ignore
+        invocation_type_field = ModelField.infer(
+            name="type",
+            value=invocation_type,
+            annotation=invocation_type_annotation,
+            class_validators=None,
+            config=cls.__config__,
+        )
+        cls.__fields__.update({"type": invocation_type_field})
+        cls.__annotations__.update({"type": invocation_type_annotation})
+
+        return cls
+
+    return wrapper
+
+
+GenericBaseInvocationOutput = TypeVar("GenericBaseInvocationOutput", bound=BaseInvocationOutput)
+
+
+def invocation_output(
+    output_type: str,
+) -> Callable[[Type[GenericBaseInvocationOutput]], Type[GenericBaseInvocationOutput]]:
+    """
+    Adds metadata to an invocation output.
+
+    :param str output_type: The type of the invocation output. Must be unique among all invocation outputs.
+    """
+
+    def wrapper(cls: Type[GenericBaseInvocationOutput]) -> Type[GenericBaseInvocationOutput]:
+        # Validate output types on creation of invocation output classes
+        # TODO: ensure unique?
+        if re.compile(r"^\S+$").match(output_type) is None:
+            raise ValueError(f'"output_type" must consist of non-whitespace characters, got "{output_type}"')
+
+        # Add the output type to the pydantic model of the invocation output
+        output_type_annotation = Literal[output_type]  # type: ignore
+        output_type_field = ModelField.infer(
+            name="type",
+            value=output_type,
+            annotation=output_type_annotation,
+            class_validators=None,
+            config=cls.__config__,
+        )
+        cls.__fields__.update({"type": output_type_field})
+        cls.__annotations__.update({"type": output_type_annotation})
+
         return cls
 
     return wrapper

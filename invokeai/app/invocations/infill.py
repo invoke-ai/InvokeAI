@@ -12,7 +12,7 @@ from invokeai.backend.image_util.lama import LaMA
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
 from ..models.image import ImageCategory, ResourceOrigin
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, tags, title
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 
 def infill_methods() -> list[str]:
@@ -116,14 +116,10 @@ def tile_fill_missing(im: Image.Image, tile_size: int = 16, seed: Optional[int] 
     return si
 
 
-@title("Solid Color Infill")
-@tags("image", "inpaint")
+@invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint")
 class InfillColorInvocation(BaseInvocation):
     """Infills transparent areas of an image with a solid color"""
 
-    type: Literal["infill_rgba"] = "infill_rgba"
-
-    # Inputs
     image: ImageField = InputField(description="The image to infill")
     color: ColorField = InputField(
         default=ColorField(r=127, g=127, b=127, a=255),
@@ -155,14 +151,10 @@ class InfillColorInvocation(BaseInvocation):
         )
 
 
-@title("Tile Infill")
-@tags("image", "inpaint")
+@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint")
 class InfillTileInvocation(BaseInvocation):
     """Infills transparent areas of an image with tiles of the image"""
 
-    type: Literal["infill_tile"] = "infill_tile"
-
-    # Input
     image: ImageField = InputField(description="The image to infill")
     tile_size: int = InputField(default=32, ge=1, description="The tile size (px)")
     seed: int = InputField(
@@ -195,14 +187,10 @@ class InfillTileInvocation(BaseInvocation):
         )
 
 
-@title("PatchMatch Infill")
-@tags("image", "inpaint")
+@invocation("infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint")
 class InfillPatchMatchInvocation(BaseInvocation):
     """Infills transparent areas of an image using the PatchMatch algorithm"""
 
-    type: Literal["infill_patchmatch"] = "infill_patchmatch"
-
-    # Inputs
     image: ImageField = InputField(description="The image to infill")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -230,14 +218,10 @@ class InfillPatchMatchInvocation(BaseInvocation):
         )
 
 
-@title("LaMa Infill")
-@tags("image", "inpaint")
+@invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint")
 class LaMaInfillInvocation(BaseInvocation):
     """Infills transparent areas of an image using the LaMa model"""
 
-    type: Literal["infill_lama"] = "infill_lama"
-
-    # Inputs
     image: ImageField = InputField(description="The image to infill")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:

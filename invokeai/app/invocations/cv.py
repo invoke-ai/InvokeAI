@@ -1,6 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Literal
 
 import cv2 as cv
 import numpy
@@ -8,18 +7,18 @@ from PIL import Image, ImageOps
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, category, tags, title
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 
-@title("OpenCV Inpaint")
-@tags("opencv", "inpaint")
-@category("inpaint")
+@invocation(
+    "cv_inpaint",
+    title="OpenCV Inpaint",
+    tags=["opencv", "inpaint"],
+    category="inpaint",
+)
 class CvInpaintInvocation(BaseInvocation):
     """Simple inpaint using opencv."""
 
-    type: Literal["cv_inpaint"] = "cv_inpaint"
-
-    # Inputs
     image: ImageField = InputField(description="The image to inpaint")
     mask: ImageField = InputField(description="The mask to use when inpainting")
 
