@@ -367,7 +367,12 @@ export const buildCanvasSDXLImageToImageGraph = (
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
+    addSDXLRefinerToGraph(
+      state,
+      graph,
+      SDXL_DENOISE_LATENTS,
+      modelLoaderNodeId
+    );
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }

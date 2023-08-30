@@ -46,6 +46,10 @@ export const addSDXLRefinerToGraph = (
   const { seamlessXAxis, seamlessYAxis, vaePrecision } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
 
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(
+    boundingBoxScaleMethod
+  );
+
   if (!refinerModel) {
     return;
   }
@@ -220,33 +224,6 @@ export const addSDXLRefinerToGraph = (
   );
 
   if (
-    graph.id === SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH ||
-    graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH
-  ) {
-    graph.edges.push({
-      source: {
-        node_id: SDXL_REFINER_DENOISE_LATENTS,
-        field: 'latents',
-      },
-      destination: {
-        node_id: CANVAS_OUTPUT,
-        field: 'latents',
-      },
-    });
-  } else {
-    graph.edges.push({
-      source: {
-        node_id: SDXL_REFINER_DENOISE_LATENTS,
-        field: 'latents',
-      },
-      destination: {
-        node_id: LATENTS_TO_IMAGE,
-        field: 'latents',
-      },
-    });
-  }
-
-  if (
     graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
     graph.id === SDXL_CANVAS_OUTPAINT_GRAPH
   ) {
@@ -257,7 +234,7 @@ export const addSDXLRefinerToGraph = (
       fp32: vaePrecision === 'fp32' ? true : false,
     };
 
-    if (['auto', 'manual'].includes(boundingBoxScaleMethod)) {
+    if (isUsingScaledDimensions) {
       graph.edges.push({
         source: {
           node_id: INPAINT_IMAGE_RESIZE_UP,
@@ -299,5 +276,32 @@ export const addSDXLRefinerToGraph = (
         },
       }
     );
+  }
+
+  if (
+    graph.id === SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH ||
+    graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH
+  ) {
+    graph.edges.push({
+      source: {
+        node_id: SDXL_REFINER_DENOISE_LATENTS,
+        field: 'latents',
+      },
+      destination: {
+        node_id: isUsingScaledDimensions ? LATENTS_TO_IMAGE : CANVAS_OUTPUT,
+        field: 'latents',
+      },
+    });
+  } else {
+    graph.edges.push({
+      source: {
+        node_id: SDXL_REFINER_DENOISE_LATENTS,
+        field: 'latents',
+      },
+      destination: {
+        node_id: LATENTS_TO_IMAGE,
+        field: 'latents',
+      },
+    });
   }
 };
