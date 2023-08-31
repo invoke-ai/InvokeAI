@@ -302,6 +302,29 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
         add_time_ids = torch.tensor([original_size + crop_coords + target_size])
 
+        # [1, 77, 768], [1, 154, 1280]
+        if c1.shape[1] < c2.shape[1]:
+            c1 = torch.cat(
+                [
+                    c1,
+                    torch.zeros(
+                        (c1.shape[0], c2.shape[1] - c1.shape[1], c1.shape[2]), device=c1.device, dtype=c1.dtype
+                    ),
+                ],
+                dim=1,
+            )
+
+        elif c1.shape[1] > c2.shape[1]:
+            c2 = torch.cat(
+                [
+                    c2,
+                    torch.zeros(
+                        (c2.shape[0], c1.shape[1] - c2.shape[1], c2.shape[2]), device=c2.device, dtype=c2.dtype
+                    ),
+                ],
+                dim=1,
+            )
+
         conditioning_data = ConditioningFieldData(
             conditionings=[
                 SDXLConditioningInfo(
