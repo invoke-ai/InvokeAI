@@ -280,7 +280,7 @@ export type ConditioningInputFieldValue = z.infer<
 export const zControlNetModel = zModelIdentifier;
 export type ControlNetModel = z.infer<typeof zControlNetModel>;
 
-export const zControlField = zInputFieldValueBase.extend({
+export const zControlField = z.object({
   image: zImageField,
   control_model: zControlNetModel,
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
@@ -295,11 +295,11 @@ export const zControlField = zInputFieldValueBase.extend({
 });
 export type ControlField = z.infer<typeof zControlField>;
 
-export const zControlInputFieldTemplate = zInputFieldValueBase.extend({
+export const zControlInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('ControlField'),
   value: zControlField.optional(),
 });
-export type ControlInputFieldValue = z.infer<typeof zControlInputFieldTemplate>;
+export type ControlInputFieldValue = z.infer<typeof zControlInputFieldValue>;
 
 export const zModelType = z.enum([
   'onnx',
@@ -492,7 +492,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zUNetInputFieldValue,
   zClipInputFieldValue,
   zVaeInputFieldValue,
-  zControlInputFieldTemplate,
+  zControlInputFieldValue,
   zEnumInputFieldValue,
   zMainModelInputFieldValue,
   zSDXLMainModelInputFieldValue,
