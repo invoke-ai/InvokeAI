@@ -561,7 +561,7 @@ class MaskEdgeInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        mask = context.services.images.get_pil_image(self.image.image_name)
+        mask = context.services.images.get_pil_image(self.image.image_name).convert("L")
 
         npimg = numpy.asarray(mask, dtype=numpy.uint8)
         npgradient = numpy.uint8(255 * (1.0 - numpy.floor(numpy.abs(0.5 - numpy.float32(npimg) / 255.0) * 2.0)))
@@ -696,8 +696,13 @@ class ColorCorrectInvocation(BaseInvocation):
         # Blur the mask out (into init image) by specified amount
         if self.mask_blur_radius > 0:
             nm = numpy.asarray(pil_init_mask, dtype=numpy.uint8)
+            inverted_nm = 255 - nm
+            dilation_size = int(round(self.mask_blur_radius) + 20)
+            dilating_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilation_size, dilation_size))
+            inverted_dilated_nm = cv2.dilate(inverted_nm, dilating_kernel)
+            dilated_nm = 255 - inverted_dilated_nm
             nmd = cv2.erode(
-                nm,
+                dilated_nm,
                 kernel=numpy.ones((3, 3), dtype=numpy.uint8),
                 iterations=int(self.mask_blur_radius / 2),
             )
