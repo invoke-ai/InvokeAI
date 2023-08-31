@@ -12,17 +12,21 @@ export const buildWorkflow = (nodesState: NodesState): Workflow => {
     edges: [],
   };
 
-  nodes.forEach((node) => {
-    const result = zWorkflowNode.safeParse(node);
-    if (!result.success) {
-      const { message } = fromZodError(result.error, {
-        prefix: 'Unable to parse node',
-      });
-      logger('nodes').warn({ node: parseify(node) }, message);
-      return;
-    }
-    workflow.nodes.push(result.data);
-  });
+  nodes
+    .filter((n) =>
+      ['invocation', 'notes'].includes(n.type ?? '__UNKNOWN_NODE_TYPE__')
+    )
+    .forEach((node) => {
+      const result = zWorkflowNode.safeParse(node);
+      if (!result.success) {
+        const { message } = fromZodError(result.error, {
+          prefix: 'Unable to parse node',
+        });
+        logger('nodes').warn({ node: parseify(node) }, message);
+        return;
+      }
+      workflow.nodes.push(result.data);
+    });
 
   edges.forEach((edge) => {
     const result = zWorkflowEdge.safeParse(edge);
