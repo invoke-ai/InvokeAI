@@ -15,8 +15,8 @@ from .baseinvocation import (
     InvocationContext,
     OutputField,
     UIType,
-    tags,
-    title,
+    invocation,
+    invocation_output,
 )
 
 
@@ -27,7 +27,6 @@ CONTROLNET_RESIZE_VALUES = Literal[
     "fill_resize",
     "just_resize_simple",
 ]
-
 
 class ControlNetModelField(BaseModel):
     """ControlNet model field"""
@@ -61,7 +60,7 @@ class ControlField(BaseModel):
                 raise ValueError("Control weights must be within -1 to 2 range")
         return v
 
-
+@invocation_output("control_output")
 class ControlOutput(BaseInvocationOutput):
     """node output for ControlNet info"""
 
@@ -71,8 +70,8 @@ class ControlOutput(BaseInvocationOutput):
     control: ControlField = OutputField(description=FieldDescriptions.control)
 
 
-@title("ControlNet")
-@tags("controlnet")
+
+@invocation("controlnet", title="ControlNet", tags=["controlnet"], category="controlnet")
 class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
 
