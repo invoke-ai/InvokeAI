@@ -286,30 +286,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         unet,
         scheduler,
     ) -> StableDiffusionGeneratorPipeline:
-        # TODO:
-        # configure_model_padding(
-        #    unet,
-        #    self.seamless,
-        #    self.seamless_axes,
-        # )
-
-        class FakeVae:
-            class FakeVaeConfig:
-                def __init__(self):
-                    self.block_out_channels = [0]
-
-            def __init__(self):
-                self.config = FakeVae.FakeVaeConfig()
-
         return StableDiffusionGeneratorPipeline(
-            vae=FakeVae(),  # TODO: oh...
-            text_encoder=None,
-            tokenizer=None,
             unet=unet,
             scheduler=scheduler,
-            safety_checker=None,
-            feature_extractor=None,
-            requires_safety_checker=False,
         )
 
     def prep_control_data(
