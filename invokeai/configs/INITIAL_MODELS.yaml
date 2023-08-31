@@ -4,7 +4,7 @@ sd-1/main/stable-diffusion-v1-5:
    repo_id: runwayml/stable-diffusion-v1-5
    recommended: True
    default: True
-sd-1/main/stable-diffusion-inpainting:
+sd-1/main/stable-diffusion-v1-5-inpainting:
    description: RunwayML SD 1.5 model optimized for inpainting, diffusers version (4.27 GB)
    repo_id: runwayml/stable-diffusion-inpainting
    recommended: True
