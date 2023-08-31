@@ -60,7 +60,7 @@ from .baseinvocation import (
     invocation_output,
 )
 from .compel import ConditioningField
-from .controlnet_image_processors import ControlField
+from .control_adapter import ControlField
 from .model import ModelInfo, UNetField, VaeField
 
 

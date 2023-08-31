@@ -34,7 +34,7 @@ from .baseinvocation import (
     invocation,
     invocation_output,
 )
-from .controlnet_image_processors import ControlField
+from .control_adapter import ControlField
 from .latent import SAMPLER_NAME_VALUES, LatentsField, LatentsOutput, build_latents_output, get_scheduler
 from .model import ClipField, ModelInfo, UNetField, VaeField
 
