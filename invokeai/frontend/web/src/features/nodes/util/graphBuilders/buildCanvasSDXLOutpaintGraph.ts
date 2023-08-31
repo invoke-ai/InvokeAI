@@ -2,7 +2,6 @@ import { logger } from 'app/logging/logger';
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import {
-  ImageBlurInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
   InfillPatchMatchInvocation,
@@ -20,6 +19,8 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
+  CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+  CANVAS_COHERENCE_MASK_EDGE,
   CANVAS_COHERENCE_NOISE,
   CANVAS_COHERENCE_NOISE_INCREMENT,
   CANVAS_OUTPUT,
@@ -31,7 +32,6 @@ import {
   INPAINT_INFILL_RESIZE_DOWN,
   ITERATE,
   LATENTS_TO_IMAGE,
-  MASK_BLUR,
   MASK_COMBINE,
   MASK_FROM_ALPHA,
   MASK_RESIZE_DOWN,
@@ -72,7 +72,6 @@ export const buildCanvasSDXLOutpaintGraph = (
     shouldUseNoiseSettings,
     shouldUseCpuNoise,
     maskBlur,
-    maskBlurMethod,
     canvasCoherenceSteps,
     canvasCoherenceStrength,
     tileSize,
@@ -102,6 +101,10 @@ export const buildCanvasSDXLOutpaintGraph = (
     boundingBoxScaleMethod,
     shouldAutoSave,
   } = state.canvas;
+
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(
+    boundingBoxScaleMethod
+  );
 
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
@@ -145,13 +148,6 @@ export const buildCanvasSDXLOutpaintGraph = (
         is_intermediate: true,
         mask2: canvasMaskImage,
       },
-      [MASK_BLUR]: {
-        type: 'img_blur',
-        id: MASK_BLUR,
-        is_intermediate: true,
-        radius: maskBlur,
-        blur_type: maskBlurMethod,
-      },
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
@@ -193,6 +189,21 @@ export const buildCanvasSDXLOutpaintGraph = (
         id: CANVAS_COHERENCE_NOISE_INCREMENT,
         b: 1,
         is_intermediate: true,
+      },
+      [CANVAS_COHERENCE_MASK_EDGE]: {
+        type: 'mask_edge',
+        id: CANVAS_COHERENCE_MASK_EDGE,
+        is_intermediate: true,
+        edge_blur: maskBlur,
+        edge_size: maskBlur * 2,
+        low_threshold: 100,
+        high_threshold: 200,
+      },
+      [CANVAS_COHERENCE_INPAINT_CREATE_MASK]: {
+        type: 'create_denoise_mask',
+        id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+        is_intermediate: true,
+        fp32: vaePrecision === 'fp32' ? true : false,
       },
       [CANVAS_COHERENCE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -348,7 +359,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       // Create Inpaint Mask
       {
         source: {
-          node_id: MASK_BLUR,
+          node_id: isUsingScaledDimensions ? MASK_RESIZE_UP : MASK_COMBINE,
           field: 'image',
         },
         destination: {
@@ -363,6 +374,27 @@ export const buildCanvasSDXLOutpaintGraph = (
         },
         destination: {
           node_id: SDXL_DENOISE_LATENTS,
+          field: 'denoise_mask',
+        },
+      },
+      // Create Coherence Mask
+      {
+        source: {
+          node_id: CANVAS_COHERENCE_MASK_EDGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'mask',
+        },
+      },
+      {
+        source: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'denoise_mask',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
           field: 'denoise_mask',
         },
       },
@@ -410,7 +442,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -473,7 +505,6 @@ export const buildCanvasSDXLOutpaintGraph = (
   };
 
   // Add Infill Nodes
-
   if (infillMethod === 'patchmatch') {
     graph.nodes[INPAINT_INFILL] = {
       type: 'infill_patchmatch',
@@ -500,7 +531,7 @@ export const buildCanvasSDXLOutpaintGraph = (
   }
 
   // Handle Scale Before Processing
-  if (['auto', 'manual'].includes(boundingBoxScaleMethod)) {
+  if (isUsingScaledDimensions) {
     const scaledWidth: number = scaledBoundingBoxDimensions.width;
     const scaledHeight: number = scaledBoundingBoxDimensions.height;
 
@@ -572,6 +603,16 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      },
       // Take combined mask and resize and then blur
       {
         source: {
@@ -589,7 +630,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: MASK_BLUR,
+          node_id: CANVAS_COHERENCE_MASK_EDGE,
           field: 'image',
         },
       },
@@ -674,19 +715,26 @@ export const buildCanvasSDXLOutpaintGraph = (
       ...(graph.nodes[INPAINT_IMAGE] as ImageToLatentsInvocation),
       image: canvasInitImage,
     };
-    graph.nodes[MASK_BLUR] = {
-      ...(graph.nodes[MASK_BLUR] as ImageBlurInvocation),
-    };
 
     graph.edges.push(
       // Take combined mask and plug it to blur
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      },
       {
         source: {
           node_id: MASK_COMBINE,
           field: 'image',
         },
         destination: {
-          node_id: MASK_BLUR,
+          node_id: CANVAS_COHERENCE_MASK_EDGE,
           field: 'image',
         },
       },
@@ -696,7 +744,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
         destination: {
-          node_id: INPAINT_CREATE_MASK,
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
           field: 'image',
         },
       },
@@ -723,7 +771,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
       {
         source: {
-          node_id: MASK_BLUR,
+          node_id: MASK_COMBINE,
           field: 'image',
         },
         destination: {
@@ -734,7 +782,7 @@ export const buildCanvasSDXLOutpaintGraph = (
     );
   }
 
-  // Handle seed
+  // Handle Seed
   if (shouldRandomizeSeed) {
     // Random int node to generate the starting seed
     const randomIntNode: RandomIntInvocation = {

@@ -2,6 +2,7 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { MetadataAccumulatorInvocation } from 'services/api/types';
 import {
+  CANVAS_COHERENCE_INPAINT_CREATE_MASK,
   CANVAS_IMAGE_TO_IMAGE_GRAPH,
   CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPAINT_GRAPH,
@@ -132,6 +133,16 @@ export const addVAEToGraph = (
         },
         destination: {
           node_id: INPAINT_CREATE_MASK,
+          field: 'vae',
+        },
+      },
+      {
+        source: {
+          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
           field: 'vae',
         },
       },

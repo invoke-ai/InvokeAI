@@ -6,6 +6,7 @@ import {
   ImageBlurInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
+  MaskEdgeInvocation,
   NoiseInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
@@ -18,6 +19,8 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
+  CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+  CANVAS_COHERENCE_MASK_EDGE,
   CANVAS_COHERENCE_NOISE,
   CANVAS_COHERENCE_NOISE_INCREMENT,
   CANVAS_INPAINT_GRAPH,
@@ -89,6 +92,10 @@ export const buildCanvasInpaintGraph = (
     shouldAutoSave,
   } = state.canvas;
 
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(
+    boundingBoxScaleMethod
+  );
+
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
   const use_cpu = shouldUseNoiseSettings
@@ -135,17 +142,17 @@ export const buildCanvasInpaintGraph = (
         is_intermediate: true,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
-      [INPAINT_CREATE_MASK]: {
-        type: 'create_denoise_mask',
-        id: INPAINT_CREATE_MASK,
-        is_intermediate: true,
-        fp32: vaePrecision === 'fp32' ? true : false,
-      },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
         use_cpu,
         is_intermediate: true,
+      },
+      [INPAINT_CREATE_MASK]: {
+        type: 'create_denoise_mask',
+        id: INPAINT_CREATE_MASK,
+        is_intermediate: true,
+        fp32: vaePrecision === 'fp32' ? true : false,
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -169,9 +176,24 @@ export const buildCanvasInpaintGraph = (
         b: 1,
         is_intermediate: true,
       },
+      [CANVAS_COHERENCE_MASK_EDGE]: {
+        type: 'mask_edge',
+        id: CANVAS_COHERENCE_MASK_EDGE,
+        is_intermediate: true,
+        edge_blur: maskBlur,
+        edge_size: maskBlur * 2,
+        low_threshold: 100,
+        high_threshold: 200,
+      },
+      [CANVAS_COHERENCE_INPAINT_CREATE_MASK]: {
+        type: 'create_denoise_mask',
+        id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+        is_intermediate: true,
+        fp32: vaePrecision === 'fp32' ? true : false,
+      },
       [CANVAS_COHERENCE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: DENOISE_LATENTS,
+        id: CANVAS_COHERENCE_DENOISE_LATENTS,
         is_intermediate: true,
         steps: canvasCoherenceSteps,
         cfg_scale: cfg_scale,
@@ -311,6 +333,27 @@ export const buildCanvasInpaintGraph = (
           field: 'denoise_mask',
         },
       },
+      // Create Coherence Mask
+      {
+        source: {
+          node_id: CANVAS_COHERENCE_MASK_EDGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'mask',
+        },
+      },
+      {
+        source: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'denoise_mask',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+          field: 'denoise_mask',
+        },
+      },
       // Iterate
       {
         source: {
@@ -418,7 +461,7 @@ export const buildCanvasInpaintGraph = (
   };
 
   // Handle Scale Before Processing
-  if (['auto', 'manual'].includes(boundingBoxScaleMethod)) {
+  if (isUsingScaledDimensions) {
     const scaledWidth: number = scaledBoundingBoxDimensions.width;
     const scaledHeight: number = scaledBoundingBoxDimensions.height;
 
@@ -494,6 +537,26 @@ export const buildCanvasInpaintGraph = (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: MASK_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_MASK_EDGE,
+          field: 'image',
+        },
+      },
       // Color Correct The Inpainted Result
       {
         source: {
@@ -554,6 +617,16 @@ export const buildCanvasInpaintGraph = (
     graph.nodes[INPAINT_CREATE_MASK] = {
       ...(graph.nodes[INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
       image: canvasInitImage,
+    };
+    graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
+      ...(graph.nodes[
+        CANVAS_COHERENCE_INPAINT_CREATE_MASK
+      ] as CreateDenoiseMaskInvocation),
+      image: canvasInitImage,
+    };
+    graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
+      ...(graph.nodes[CANVAS_COHERENCE_MASK_EDGE] as MaskEdgeInvocation),
+      image: canvasMaskImage,
     };
 
     graph.edges.push(

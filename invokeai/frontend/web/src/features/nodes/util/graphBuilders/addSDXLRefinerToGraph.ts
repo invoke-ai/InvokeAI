@@ -10,7 +10,8 @@ import {
   CANVAS_OUTPUT,
   INPAINT_IMAGE_RESIZE_UP,
   LATENTS_TO_IMAGE,
-  MASK_BLUR,
+  MASK_COMBINE,
+  MASK_RESIZE_UP,
   METADATA_ACCUMULATOR,
   SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
   SDXL_CANVAS_INPAINT_GRAPH,
@@ -257,7 +258,7 @@ export const addSDXLRefinerToGraph = (
     graph.edges.push(
       {
         source: {
-          node_id: MASK_BLUR,
+          node_id: isUsingScaledDimensions ? MASK_RESIZE_UP : MASK_COMBINE,
           field: 'image',
         },
         destination: {
