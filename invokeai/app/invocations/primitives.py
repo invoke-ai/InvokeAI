@@ -109,7 +109,7 @@ class IntegerCollectionInvocation(BaseInvocation):
     """A collection of integer primitive values"""
 
     collection: list[int] = InputField(
-        default=0, description="The collection of integer values", ui_type=UIType.IntegerCollection
+        default_factory=list, description="The collection of integer values", ui_type=UIType.IntegerCollection
     )
 
     def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
@@ -261,7 +261,7 @@ class ImageCollectionInvocation(BaseInvocation):
     """A collection of image primitive values"""
 
     collection: list[ImageField] = InputField(
-        default=0, description="The collection of image values", ui_type=UIType.ImageCollection
+        default_factory=list, description="The collection of image values", ui_type=UIType.ImageCollection
     )
 
     def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
@@ -451,7 +451,9 @@ class ConditioningCollectionInvocation(BaseInvocation):
     """A collection of conditioning tensor primitive values"""
 
     collection: list[ConditioningField] = InputField(
-        default=0, description="The collection of conditioning tensors", ui_type=UIType.ConditioningCollection
+        default_factory=list,
+        description="The collection of conditioning tensors",
+        ui_type=UIType.ConditioningCollection,
     )
 
     def invoke(self, context: InvocationContext) -> ConditioningCollectionOutput:
