@@ -17,176 +17,284 @@ export const KIND_MAP = {
 export const COLLECTION_TYPES: FieldType[] = [
   'Collection',
   'IntegerCollection',
+  'BooleanCollection',
   'FloatCollection',
   'StringCollection',
-  'BooleanCollection',
   'ImageCollection',
+  'LatentsCollection',
+  'ConditioningCollection',
+  'ControlCollection',
+  'ColorCollection',
 ];
 
+export const POLYMORPHIC_TYPES = [
+  'IntegerPolymorphic',
+  'BooleanPolymorphic',
+  'FloatPolymorphic',
+  'StringPolymorphic',
+  'ImagePolymorphic',
+  'LatentsPolymorphic',
+  'ConditioningPolymorphic',
+  'ControlPolymorphic',
+  'ColorPolymorphic',
+];
+
+export const COLLECTION_MAP = {
+  integer: 'IntegerCollection',
+  boolean: 'BooleanCollection',
+  number: 'FloatCollection',
+  float: 'FloatCollection',
+  string: 'StringCollection',
+  ImageField: 'ImageCollection',
+  LatentsField: 'LatentsCollection',
+  ConditioningField: 'ConditioningCollection',
+  ControlField: 'ControlCollection',
+  ColorField: 'ColorCollection',
+};
+export const isCollectionItemType = (
+  itemType: string | undefined
+): itemType is keyof typeof COLLECTION_MAP =>
+  Boolean(itemType && itemType in COLLECTION_MAP);
+
+export const SINGLE_TO_POLYMORPHIC_MAP = {
+  integer: 'IntegerPolymorphic',
+  boolean: 'BooleanPolymorphic',
+  number: 'FloatPolymorphic',
+  float: 'FloatPolymorphic',
+  string: 'StringPolymorphic',
+  ImageField: 'ImagePolymorphic',
+  LatentsField: 'LatentsPolymorphic',
+  ConditioningField: 'ConditioningPolymorphic',
+  ControlField: 'ControlPolymorphic',
+  ColorField: 'ColorPolymorphic',
+};
+
+export const POLYMORPHIC_TO_SINGLE_MAP = {
+  IntegerPolymorphic: 'integer',
+  BooleanPolymorphic: 'boolean',
+  FloatPolymorphic: 'float',
+  StringPolymorphic: 'string',
+  ImagePolymorphic: 'ImageField',
+  LatentsPolymorphic: 'LatentsField',
+  ConditioningPolymorphic: 'ConditioningField',
+  ControlPolymorphic: 'ControlField',
+  ColorPolymorphic: 'ColorField',
+};
+
+export const isPolymorphicItemType = (
+  itemType: string | undefined
+): itemType is keyof typeof SINGLE_TO_POLYMORPHIC_MAP =>
+  Boolean(itemType && itemType in SINGLE_TO_POLYMORPHIC_MAP);
+
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
-  integer: {
-    title: 'Integer',
-    description: 'Integers are whole numbers, without a decimal point.',
-    color: 'red.500',
-  },
-  float: {
-    title: 'Float',
-    description: 'Floats are numbers with a decimal point.',
-    color: 'orange.500',
-  },
-  string: {
-    title: 'String',
-    description: 'Strings are text.',
-    color: 'yellow.500',
-  },
   boolean: {
-    title: 'Boolean',
     color: 'green.500',
     description: 'Booleans are true or false.',
+    title: 'Boolean',
   },
-  enum: {
-    title: 'Enum',
-    description: 'Enums are values that may be one of a number of options.',
-    color: 'blue.500',
+  BooleanCollection: {
+    color: 'green.500',
+    description: 'A collection of booleans.',
+    title: 'Boolean Collection',
   },
-  array: {
-    title: 'Array',
-    description: 'Enums are values that may be one of a number of options.',
-    color: 'base.500',
-  },
-  ImageField: {
-    title: 'Image',
-    description: 'Images may be passed between nodes.',
-    color: 'purple.500',
-  },
-  DenoiseMaskField: {
-    title: 'Denoise Mask',
-    description: 'Denoise Mask may be passed between nodes',
-    color: 'base.500',
-  },
-  LatentsField: {
-    title: 'Latents',
-    description: 'Latents may be passed between nodes.',
-    color: 'pink.500',
-  },
-  LatentsCollection: {
-    title: 'Latents Collection',
-    description: 'Latents may be passed between nodes.',
-    color: 'pink.500',
-  },
-  ConditioningField: {
-    color: 'cyan.500',
-    title: 'Conditioning',
-    description: 'Conditioning may be passed between nodes.',
-  },
-  ConditioningCollection: {
-    color: 'cyan.500',
-    title: 'Conditioning Collection',
-    description: 'Conditioning may be passed between nodes.',
-  },
-  ImageCollection: {
-    title: 'Image Collection',
-    description: 'A collection of images.',
-    color: 'base.300',
-  },
-  UNetField: {
-    color: 'red.500',
-    title: 'UNet',
-    description: 'UNet submodel.',
+  BooleanPolymorphic: {
+    color: 'green.500',
+    description: 'A collection of booleans.',
+    title: 'Boolean Polymorphic',
   },
   ClipField: {
-    color: 'green.500',
-    title: 'Clip',
+    color: 'green.300',
     description: 'Tokenizer and text_encoder submodels.',
-  },
-  VaeField: {
-    color: 'blue.500',
-    title: 'Vae',
-    description: 'Vae submodel.',
-  },
-  ControlField: {
-    color: 'cyan.500',
-    title: 'Control',
-    description: 'Control info passed between nodes.',
-  },
-  MainModelField: {
-    color: 'teal.500',
-    title: 'Model',
-    description: 'TODO',
-  },
-  SDXLRefinerModelField: {
-    color: 'teal.500',
-    title: 'Refiner Model',
-    description: 'TODO',
-  },
-  VaeModelField: {
-    color: 'teal.500',
-    title: 'VAE',
-    description: 'TODO',
-  },
-  LoRAModelField: {
-    color: 'teal.500',
-    title: 'LoRA',
-    description: 'TODO',
-  },
-  ControlNetModelField: {
-    color: 'teal.500',
-    title: 'ControlNet',
-    description: 'TODO',
-  },
-  Scheduler: {
-    color: 'base.500',
-    title: 'Scheduler',
-    description: 'TODO',
+    title: 'Clip',
   },
   Collection: {
     color: 'base.500',
-    title: 'Collection',
     description: 'TODO',
+    title: 'Collection',
   },
   CollectionItem: {
     color: 'base.500',
-    title: 'Collection Item',
     description: 'TODO',
+    title: 'Collection Item',
+  },
+  ColorCollection: {
+    color: 'pink.300',
+    description: 'A collection of colors.',
+    title: 'Color Collection',
   },
   ColorField: {
-    title: 'Color',
+    color: 'pink.300',
     description: 'A RGBA color.',
-    color: 'base.500',
+    title: 'Color',
   },
-  BooleanCollection: {
-    title: 'Boolean Collection',
-    description: 'A collection of booleans.',
-    color: 'green.500',
+  ColorPolymorphic: {
+    color: 'pink.300',
+    description: 'A collection of colors.',
+    title: 'Color Polymorphic',
   },
-  IntegerCollection: {
-    title: 'Integer Collection',
-    description: 'A collection of integers.',
-    color: 'red.500',
+  ConditioningCollection: {
+    color: 'cyan.500',
+    description: 'Conditioning may be passed between nodes.',
+    title: 'Conditioning Collection',
+  },
+  ConditioningField: {
+    color: 'cyan.500',
+    description: 'Conditioning may be passed between nodes.',
+    title: 'Conditioning',
+  },
+  ConditioningPolymorphic: {
+    color: 'cyan.500',
+    description: 'Conditioning may be passed between nodes.',
+    title: 'Conditioning Polymorphic',
+  },
+  ControlCollection: {
+    color: 'teal.500',
+    description: 'Control info passed between nodes.',
+    title: 'Control Collection',
+  },
+  ControlField: {
+    color: 'teal.500',
+    description: 'Control info passed between nodes.',
+    title: 'Control',
+  },
+  ControlNetModelField: {
+    color: 'teal.500',
+    description: 'TODO',
+    title: 'ControlNet',
+  },
+  ControlPolymorphic: {
+    color: 'teal.500',
+    description: 'Control info passed between nodes.',
+    title: 'Control Polymorphic',
+  },
+  DenoiseMaskField: {
+    color: 'blue.300',
+    description: 'Denoise Mask may be passed between nodes',
+    title: 'Denoise Mask',
+  },
+  enum: {
+    color: 'blue.500',
+    description: 'Enums are values that may be one of a number of options.',
+    title: 'Enum',
+  },
+  float: {
+    color: 'orange.500',
+    description: 'Floats are numbers with a decimal point.',
+    title: 'Float',
   },
   FloatCollection: {
     color: 'orange.500',
-    title: 'Float Collection',
     description: 'A collection of floats.',
+    title: 'Float Collection',
   },
-  ColorCollection: {
-    color: 'base.500',
-    title: 'Color Collection',
-    description: 'A collection of colors.',
+  FloatPolymorphic: {
+    color: 'orange.500',
+    description: 'A collection of floats.',
+    title: 'Float Polymorphic',
+  },
+  ImageCollection: {
+    color: 'purple.500',
+    description: 'A collection of images.',
+    title: 'Image Collection',
+  },
+  ImageField: {
+    color: 'purple.500',
+    description: 'Images may be passed between nodes.',
+    title: 'Image',
+  },
+  ImagePolymorphic: {
+    color: 'purple.500',
+    description: 'A collection of images.',
+    title: 'Image Polymorphic',
+  },
+  integer: {
+    color: 'red.500',
+    description: 'Integers are whole numbers, without a decimal point.',
+    title: 'Integer',
+  },
+  IntegerCollection: {
+    color: 'red.500',
+    description: 'A collection of integers.',
+    title: 'Integer Collection',
+  },
+  IntegerPolymorphic: {
+    color: 'red.500',
+    description: 'A collection of integers.',
+    title: 'Integer Polymorphic',
+  },
+  LatentsCollection: {
+    color: 'pink.500',
+    description: 'Latents may be passed between nodes.',
+    title: 'Latents Collection',
+  },
+  LatentsField: {
+    color: 'pink.500',
+    description: 'Latents may be passed between nodes.',
+    title: 'Latents',
+  },
+  LatentsPolymorphic: {
+    color: 'pink.500',
+    description: 'Latents may be passed between nodes.',
+    title: 'Latents Polymorphic',
+  },
+  LoRAModelField: {
+    color: 'teal.300',
+    description: 'TODO',
+    title: 'LoRA',
+  },
+  MainModelField: {
+    color: 'teal.300',
+    description: 'TODO',
+    title: 'Model',
   },
   ONNXModelField: {
-    color: 'base.500',
-    title: 'ONNX Model',
+    color: 'teal.300',
     description: 'ONNX model field.',
+    title: 'ONNX Model',
+  },
+  Scheduler: {
+    color: 'base.500',
+    description: 'TODO',
+    title: 'Scheduler',
   },
   SDXLMainModelField: {
-    color: 'base.500',
-    title: 'SDXL Model',
+    color: 'teal.300',
     description: 'SDXL model field.',
+    title: 'SDXL Model',
+  },
+  SDXLRefinerModelField: {
+    color: 'teal.300',
+    description: 'TODO',
+    title: 'Refiner Model',
+  },
+  string: {
+    color: 'yellow.500',
+    description: 'Strings are text.',
+    title: 'String',
   },
   StringCollection: {
     color: 'yellow.500',
-    title: 'String Collection',
     description: 'A collection of strings.',
+    title: 'String Collection',
+  },
+  StringPolymorphic: {
+    color: 'yellow.500',
+    description: 'A collection of strings.',
+    title: 'String Polymorphic',
+  },
+  UNetField: {
+    color: 'red.300',
+    description: 'UNet submodel.',
+    title: 'UNet',
+  },
+  VaeField: {
+    color: 'blue.300',
+    description: 'Vae submodel.',
+    title: 'Vae',
+  },
+  VaeModelField: {
+    color: 'teal.300',
+    description: 'TODO',
+    title: 'VAE',
   },
 };

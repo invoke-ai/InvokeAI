@@ -100,9 +100,7 @@ class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
 
     image: ImageField = InputField(description="The control image")
-    control_model: ControlNetModelField = InputField(
-        default="lllyasviel/sd-controlnet-canny", description=FieldDescriptions.controlnet_model, input=Input.Direct
-    )
+    control_model: ControlNetModelField = InputField(description=FieldDescriptions.controlnet_model, input=Input.Direct)
     control_weight: Union[float, List[float]] = InputField(
         default=1.0, description="The weight given to the ControlNet", ui_type=UIType.Float
     )

@@ -14,7 +14,6 @@ from .baseinvocation import (
     InvocationContext,
     OutputField,
     UIComponent,
-    UIType,
     invocation,
     invocation_output,
 )
@@ -40,7 +39,9 @@ class BooleanOutput(BaseInvocationOutput):
 class BooleanCollectionOutput(BaseInvocationOutput):
     """Base class for nodes that output a collection of booleans"""
 
-    collection: list[bool] = OutputField(description="The output boolean collection", ui_type=UIType.BooleanCollection)
+    collection: list[bool] = OutputField(
+        description="The output boolean collection",
+    )
 
 
 @invocation("boolean", title="Boolean Primitive", tags=["primitives", "boolean"], category="primitives")
@@ -62,9 +63,7 @@ class BooleanInvocation(BaseInvocation):
 class BooleanCollectionInvocation(BaseInvocation):
     """A collection of boolean primitive values"""
 
-    collection: list[bool] = InputField(
-        default_factory=list, description="The collection of boolean values", ui_type=UIType.BooleanCollection
-    )
+    collection: list[bool] = InputField(default_factory=list, description="The collection of boolean values")
 
     def invoke(self, context: InvocationContext) -> BooleanCollectionOutput:
         return BooleanCollectionOutput(collection=self.collection)
@@ -86,7 +85,9 @@ class IntegerOutput(BaseInvocationOutput):
 class IntegerCollectionOutput(BaseInvocationOutput):
     """Base class for nodes that output a collection of integers"""
 
-    collection: list[int] = OutputField(description="The int collection", ui_type=UIType.IntegerCollection)
+    collection: list[int] = OutputField(
+        description="The int collection",
+    )
 
 
 @invocation("integer", title="Integer Primitive", tags=["primitives", "integer"], category="primitives")
@@ -108,9 +109,7 @@ class IntegerInvocation(BaseInvocation):
 class IntegerCollectionInvocation(BaseInvocation):
     """A collection of integer primitive values"""
 
-    collection: list[int] = InputField(
-        default_factory=list, description="The collection of integer values", ui_type=UIType.IntegerCollection
-    )
+    collection: list[int] = InputField(default_factory=list, description="The collection of integer values")
 
     def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
         return IntegerCollectionOutput(collection=self.collection)
@@ -132,7 +131,9 @@ class FloatOutput(BaseInvocationOutput):
 class FloatCollectionOutput(BaseInvocationOutput):
     """Base class for nodes that output a collection of floats"""
 
-    collection: list[float] = OutputField(description="The float collection", ui_type=UIType.FloatCollection)
+    collection: list[float] = OutputField(
+        description="The float collection",
+    )
 
 
 @invocation("float", title="Float Primitive", tags=["primitives", "float"], category="primitives")
@@ -154,9 +155,7 @@ class FloatInvocation(BaseInvocation):
 class FloatCollectionInvocation(BaseInvocation):
     """A collection of float primitive values"""
 
-    collection: list[float] = InputField(
-        default_factory=list, description="The collection of float values", ui_type=UIType.FloatCollection
-    )
+    collection: list[float] = InputField(default_factory=list, description="The collection of float values")
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         return FloatCollectionOutput(collection=self.collection)
@@ -178,7 +177,9 @@ class StringOutput(BaseInvocationOutput):
 class StringCollectionOutput(BaseInvocationOutput):
     """Base class for nodes that output a collection of strings"""
 
-    collection: list[str] = OutputField(description="The output strings", ui_type=UIType.StringCollection)
+    collection: list[str] = OutputField(
+        description="The output strings",
+    )
 
 
 @invocation("string", title="String Primitive", tags=["primitives", "string"], category="primitives")
@@ -200,9 +201,7 @@ class StringInvocation(BaseInvocation):
 class StringCollectionInvocation(BaseInvocation):
     """A collection of string primitive values"""
 
-    collection: list[str] = InputField(
-        default_factory=list, description="The collection of string values", ui_type=UIType.StringCollection
-    )
+    collection: list[str] = InputField(default_factory=list, description="The collection of string values")
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
         return StringCollectionOutput(collection=self.collection)
@@ -232,7 +231,9 @@ class ImageOutput(BaseInvocationOutput):
 class ImageCollectionOutput(BaseInvocationOutput):
     """Base class for nodes that output a collection of images"""
 
-    collection: list[ImageField] = OutputField(description="The output images", ui_type=UIType.ImageCollection)
+    collection: list[ImageField] = OutputField(
+        description="The output images",
+    )
 
 
 @invocation("image", title="Image Primitive", tags=["primitives", "image"], category="primitives")
@@ -260,9 +261,7 @@ class ImageInvocation(BaseInvocation):
 class ImageCollectionInvocation(BaseInvocation):
     """A collection of image primitive values"""
 
-    collection: list[ImageField] = InputField(
-        default_factory=list, description="The collection of image values", ui_type=UIType.ImageCollection
-    )
+    collection: list[ImageField] = InputField(default_factory=list, description="The collection of image values")
 
     def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
         return ImageCollectionOutput(collection=self.collection)
@@ -316,7 +315,6 @@ class LatentsCollectionOutput(BaseInvocationOutput):
 
     collection: list[LatentsField] = OutputField(
         description=FieldDescriptions.latents,
-        ui_type=UIType.LatentsCollection,
     )
 
 
@@ -342,7 +340,7 @@ class LatentsCollectionInvocation(BaseInvocation):
     """A collection of latents tensor primitive values"""
 
     collection: list[LatentsField] = InputField(
-        description="The collection of latents tensors", ui_type=UIType.LatentsCollection
+        description="The collection of latents tensors",
     )
 
     def invoke(self, context: InvocationContext) -> LatentsCollectionOutput:
@@ -385,7 +383,9 @@ class ColorOutput(BaseInvocationOutput):
 class ColorCollectionOutput(BaseInvocationOutput):
     """Base class for nodes that output a collection of colors"""
 
-    collection: list[ColorField] = OutputField(description="The output colors", ui_type=UIType.ColorCollection)
+    collection: list[ColorField] = OutputField(
+        description="The output colors",
+    )
 
 
 @invocation("color", title="Color Primitive", tags=["primitives", "color"], category="primitives")
@@ -422,7 +422,6 @@ class ConditioningCollectionOutput(BaseInvocationOutput):
 
     collection: list[ConditioningField] = OutputField(
         description="The output conditioning tensors",
-        ui_type=UIType.ConditioningCollection,
     )
 
 
@@ -453,7 +452,6 @@ class ConditioningCollectionInvocation(BaseInvocation):
     collection: list[ConditioningField] = InputField(
         default_factory=list,
         description="The collection of conditioning tensors",
-        ui_type=UIType.ConditioningCollection,
     )
 
     def invoke(self, context: InvocationContext) -> ConditioningCollectionOutput:

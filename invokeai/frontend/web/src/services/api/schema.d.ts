@@ -1397,9 +1397,8 @@ export type components = {
       /**
        * Control Model
        * @description ControlNet model to load
-       * @default lllyasviel/sd-controlnet-canny
        */
-      control_model?: components["schemas"]["ControlNetModelField"];
+      control_model: components["schemas"]["ControlNetModelField"];
       /**
        * Control Weight
        * @description The weight given to the ControlNet
@@ -5806,12 +5805,12 @@ export type components = {
        */
       target_height?: number;
       /**
-       * Clip
+       * CLIP 1
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip?: components["schemas"]["ClipField"];
       /**
-       * Clip2
+       * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip2?: components["schemas"]["ClipField"];
@@ -5855,7 +5854,7 @@ export type components = {
        */
       weight?: number;
       /**
-       * UNET
+       * UNet
        * @description UNet (scheduler, LoRAs)
        */
       unet?: components["schemas"]["UNetField"];
@@ -6998,7 +6997,7 @@ export type components = {
      * If a field should be provided a data type that does not exactly match the python type of the field,     use this to provide the type that should be used instead. See the node development docs for detail     on adding a new field type, which involves client-side changes.
      * @enum {string}
      */
-    UIType: "integer" | "float" | "boolean" | "string" | "array" | "ImageField" | "LatentsField" | "ConditioningField" | "ControlField" | "ColorField" | "ImageCollection" | "ConditioningCollection" | "ColorCollection" | "LatentsCollection" | "IntegerCollection" | "FloatCollection" | "StringCollection" | "BooleanCollection" | "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VaeModelField" | "LoRAModelField" | "ControlNetModelField" | "UNetField" | "VaeField" | "ClipField" | "Collection" | "CollectionItem" | "enum" | "Scheduler" | "WorkflowField" | "IsIntermediate" | "MetadataField";
+    UIType: "boolean" | "ColorField" | "ConditioningField" | "ControlField" | "float" | "ImageField" | "integer" | "LatentsField" | "string" | "BooleanCollection" | "ColorCollection" | "ConditioningCollection" | "ControlCollection" | "FloatCollection" | "ImageCollection" | "IntegerCollection" | "LatentsCollection" | "StringCollection" | "BooleanPolymorphic" | "ColorPolymorphic" | "ConditioningPolymorphic" | "ControlPolymorphic" | "FloatPolymorphic" | "ImagePolymorphic" | "IntegerPolymorphic" | "LatentsPolymorphic" | "StringPolymorphic" | "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VaeModelField" | "LoRAModelField" | "ControlNetModelField" | "UNetField" | "VaeField" | "ClipField" | "Collection" | "CollectionItem" | "enum" | "Scheduler" | "WorkflowField" | "IsIntermediate" | "MetadataField";
     /**
      * UIComponent
      * @description The type of UI component to use for a field, used to override the default components, which are     inferred from the field type.
@@ -7020,6 +7019,8 @@ export type components = {
       ui_component?: components["schemas"]["UIComponent"];
       /** Ui Order */
       ui_order?: number;
+      /** Item Default */
+      item_default?: unknown;
     };
     /**
      * _OutputField
@@ -7042,6 +7043,12 @@ export type components = {
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    /**
      * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -7059,12 +7066,6 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
   };
   responses: never;
   parameters: never;

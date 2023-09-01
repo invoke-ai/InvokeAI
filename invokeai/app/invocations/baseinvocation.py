@@ -105,24 +105,39 @@ class UIType(str, Enum):
     """
 
     # region Primitives
-    Integer = "integer"
-    Float = "float"
     Boolean = "boolean"
-    String = "string"
-    Array = "array"
-    Image = "ImageField"
-    Latents = "LatentsField"
+    Color = "ColorField"
     Conditioning = "ConditioningField"
     Control = "ControlField"
-    Color = "ColorField"
-    ImageCollection = "ImageCollection"
-    ConditioningCollection = "ConditioningCollection"
-    ColorCollection = "ColorCollection"
-    LatentsCollection = "LatentsCollection"
-    IntegerCollection = "IntegerCollection"
-    FloatCollection = "FloatCollection"
-    StringCollection = "StringCollection"
+    Float = "float"
+    Image = "ImageField"
+    Integer = "integer"
+    Latents = "LatentsField"
+    String = "string"
+    # endregion
+
+    # region Collection Primitives
     BooleanCollection = "BooleanCollection"
+    ColorCollection = "ColorCollection"
+    ConditioningCollection = "ConditioningCollection"
+    ControlCollection = "ControlCollection"
+    FloatCollection = "FloatCollection"
+    ImageCollection = "ImageCollection"
+    IntegerCollection = "IntegerCollection"
+    LatentsCollection = "LatentsCollection"
+    StringCollection = "StringCollection"
+    # endregion
+
+    # region Polymorphic Primitives
+    BooleanPolymorphic = "BooleanPolymorphic"
+    ColorPolymorphic = "ColorPolymorphic"
+    ConditioningPolymorphic = "ConditioningPolymorphic"
+    ControlPolymorphic = "ControlPolymorphic"
+    FloatPolymorphic = "FloatPolymorphic"
+    ImagePolymorphic = "ImagePolymorphic"
+    IntegerPolymorphic = "IntegerPolymorphic"
+    LatentsPolymorphic = "LatentsPolymorphic"
+    StringPolymorphic = "StringPolymorphic"
     # endregion
 
     # region Models
@@ -176,6 +191,7 @@ class _InputField(BaseModel):
     ui_type: Optional[UIType]
     ui_component: Optional[UIComponent]
     ui_order: Optional[int]
+    item_default: Optional[Any]
 
 
 class _OutputField(BaseModel):
@@ -223,6 +239,7 @@ def InputField(
     ui_component: Optional[UIComponent] = None,
     ui_hidden: bool = False,
     ui_order: Optional[int] = None,
+    item_default: Optional[Any] = None,
     **kwargs: Any,
 ) -> Any:
     """
@@ -249,6 +266,11 @@ def InputField(
       For this case, you could provide `UIComponent.Textarea`.
 
     : param bool ui_hidden: [False] Specifies whether or not this field should be hidden in the UI.
+
+    : param int ui_order: [None] Specifies the order in which this field should be rendered in the UI. \
+
+    : param bool item_default: [None] Specifies the default item value, if this is a collection input. \
+      Ignored for non-collection fields..
     """
     return Field(
         *args,
@@ -282,6 +304,7 @@ def InputField(
         ui_component=ui_component,
         ui_hidden=ui_hidden,
         ui_order=ui_order,
+        item_default=item_default,
         **kwargs,
     )
 
@@ -332,6 +355,8 @@ def OutputField(
       `UIType.SDXLMainModelField` to indicate that the field is an SDXL main model field.
 
     : param bool ui_hidden: [False] Specifies whether or not this field should be hidden in the UI. \
+
+    : param int ui_order: [None] Specifies the order in which this field should be rendered in the UI. \
     """
     return Field(
         *args,
