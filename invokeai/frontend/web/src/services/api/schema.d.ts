@@ -3520,6 +3520,19 @@ export type components = {
        */
       image?: components["schemas"]["ImageField"];
       /**
+       * Downscale
+       * @description Run patchmatch on downscaled image to speedup infill
+       * @default 2
+       */
+      downscale?: number;
+      /**
+       * Resample Mode
+       * @description The resampling mode
+       * @default bicubic
+       * @enum {string}
+       */
+      resample_mode?: "nearest" | "box" | "bilinear" | "hamming" | "bicubic" | "lanczos";
+      /**
        * Type
        * @default infill_patchmatch
        * @enum {string}

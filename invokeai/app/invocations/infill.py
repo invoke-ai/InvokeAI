@@ -14,7 +14,7 @@ from invokeai.backend.image_util.patchmatch import PatchMatch
 
 from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
-from .image import PIL_RESAMPLING_MODES, PIL_RESAMPLING_MAP
+from .image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 
 
 def infill_methods() -> list[str]:
@@ -194,8 +194,10 @@ class InfillPatchMatchInvocation(BaseInvocation):
     """Infills transparent areas of an image using the PatchMatch algorithm"""
 
     image: ImageField = InputField(description="The image to infill")
-    downscale: float = InputField(default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill")
-    resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
+    downscale: Optional[float] = InputField(
+        default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill"
+    )
+    resample_mode: Optional[PIL_RESAMPLING_MODES] = InputField(default="bicubic", description="The resampling mode")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name).convert("RGBA")
@@ -221,7 +223,7 @@ class InfillPatchMatchInvocation(BaseInvocation):
         )
 
         infilled.paste(image, (0, 0), mask=image.split()[-1])
-        #image.paste(infilled, (0, 0), mask=image.split()[-1])
+        # image.paste(infilled, (0, 0), mask=image.split()[-1])
 
         image_dto = context.services.images.create(
             image=infilled,
