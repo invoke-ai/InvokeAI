@@ -16,22 +16,18 @@ from invokeai.app.invocations.baseinvocation import (
     InvocationContext,
     UIComponent,
     UIType,
-    tags,
-    title,
+    invocation,
+    invocation_output,
 )
 
-
+@invocation_output("prompt_to_file_output")
 class PromptsToFileInvocationOutput(BaseInvocationOutput):
     """Base class for invocation that writes to a file and returns nothing of use"""
-    type: Literal["prompt_to_file_output"] = "prompt_to_file_output"
 
-@title("Prompts To File")
-@tags("prompt", "file")
+@invocation("prompt_to_file", title="Prompts To File", tags=["prompt", "file"], category="prompt")
 class PromptsToFileInvocation(BaseInvocation):
     '''Save prompts to a text file'''
-    type: Literal['prompt_to_file'] = 'prompt_to_file'
 
-    # Inputs - Prompts should allow str and list(str) but only collection until fix available
     file_path: str = InputField(description="Path to prompt text file")
     prompts: Union[str, list[str], None] = InputField(default=None, description="Prompt or collection of prompts to write", ui_type=UIType.Collection)
     append: bool = InputField(default=True, description="Append or overwrite file")
@@ -46,22 +42,17 @@ class PromptsToFileInvocation(BaseInvocation):
  
         return PromptsToFileInvocationOutput()
 
-
+@invocation_output("prompt_pos_neg_output")
 class PromptPosNegOutput(BaseInvocationOutput):
     """Base class for invocations that output a posirtive and negative prompt"""
-    type: Literal["prompt_pos_neg_output"] = "prompt_pos_neg_output"
 
-    # Outputs
     positive_prompt: str = OutputField(description="Positive prompt")
     negative_prompt: str = OutputField(description="Negative prompt")
 
-@title("Prompt Spilt Negative")
-@tags("prompt", "split", "negative")
+@invocation("prompt_split_neg", title="Prompt Spilt Negative", tags=["prompt", "split", "negative"], category="prompt")
 class PromptSplitNegInvocation(BaseInvocation):
     """Splits prompt into two prompts, inside [] goes into negative prompt everthing else goes into positive prompt. Each [ and ] character is replaced with a space"""
-    type: Literal["prompt_split_neg"] = "prompt_split_neg"
 
-    # Inputs
     prompt: str = InputField(default='', description="Prompt to split")
 
     def invoke(self, context: InvocationContext) -> PromptPosNegOutput:
@@ -91,13 +82,10 @@ class PromptSplitNegInvocation(BaseInvocation):
         return PromptPosNegOutput(positive_prompt=p_prompt, negative_prompt=n_prompt)
     
 
-@title("Prompt Join")
-@tags("prompt", "join")
+@invocation("prompt_join", title="Prompt Join", tags=["prompt", "join"], category="prompt")
 class PromptJoinInvocation(BaseInvocation):
     """Joins prompt left to prompt right"""
-    type: Literal["prompt_join"] = "prompt_join"
 
-    # Inputs
     prompt_left: str = InputField(default='', description="Prompt Left", ui_component=UIComponent.Textarea)
     prompt_right: str = InputField(default='', description="Prompt Right", ui_component=UIComponent.Textarea)
 
@@ -105,28 +93,22 @@ class PromptJoinInvocation(BaseInvocation):
         return StringOutput(value=((self.prompt_left or '') + (self.prompt_right or '')))  
 
 
-@title("Prompt Join Three")
-@tags("prompt", "join")
+@invocation("prompt_join_three", title="Prompt Join Three", tags=["prompt", "join"], category="prompt")
 class PromptJoinThreeInvocation(BaseInvocation):
     """Joins prompt left to prompt middle to prompt right"""
-    type: Literal["prompt_join_three"] = "prompt_join_three"
 
-    # Inputs
     prompt_left: str = InputField(default='', description="Prompt Left", ui_component=UIComponent.Textarea)
-    prompt_middle: str = InputField(default='', description="Prompt Middle)", ui_component=UIComponent.Textarea)
+    prompt_middle: str = InputField(default='', description="Prompt Middle", ui_component=UIComponent.Textarea)
     prompt_right: str = InputField(default='', description="Prompt Right", ui_component=UIComponent.Textarea)
 
     def invoke(self, context: InvocationContext) -> StringOutput:
         return StringOutput(value=((self.prompt_left or '') + (self.prompt_middle or '') + (self.prompt_right or '')))  
 
 
-@title("Prompt Replace")
-@tags("prompt", "replace", "regex")
+@invocation("prompt_replace", title="Prompt Replace", tags=["prompt", "replace", "regex"], category="prompt")
 class PromptReplaceInvocation(BaseInvocation):
     """Replaces the search string with the replace string in the prompt"""
-    type: Literal["prompt_replace"] = "prompt_replace"
 
-    # Inputs
     prompt: str = InputField(default='', description="Prompt to work on", ui_component=UIComponent.Textarea)
     search_string : str = InputField(default='', description="String to search for", ui_component=UIComponent.Textarea)
     replace_string : str = InputField(default='', description="String to replace the search", ui_component=UIComponent.Textarea)
@@ -155,20 +137,16 @@ class PTFields(BaseModel):
     steps: int
     cfg_scale: float
 
+@invocation_output("pt_fields_collect_output")
 class PTFieldsCollectOutput(BaseInvocationOutput):
     """PTFieldsCollect Output"""
-    type: Literal["pt_fields_collect_output"] = "pt_fields_collect_output"
 
-    # Outputs
     pt_fields: str = OutputField(description="PTFields in Json Format")
 
-@title("PTFields Collect")
-@tags("prompt", "file")
+@invocation("pt_fields_collect", title="PTFields Collect", tags=["prompt", "fields", "file"], category="prompt")
 class PTFieldsCollectInvocation(BaseInvocation):
-    """Prompt Tools Fields for an image generated in InvokeAI."""
-    type: Literal["pt_fields_collect"] = "pt_fields_collect"
+    """Collect Prompt Tools Fields for an image generated in InvokeAI."""
 
-    # Inputs
     positive_prompt: Optional[str] = InputField(description="The positive prompt parameter", input=Input.Connection)
     positive_style_prompt: Optional[str] = InputField(description="The positive style prompt parameter", input=Input.Connection)
     negative_prompt: Optional[str] = InputField(description="The negative prompt parameter", input=Input.Connection)
@@ -197,11 +175,10 @@ class PTFieldsCollectInvocation(BaseInvocation):
         return PTFieldsCollectOutput(pt_fields=x)
 
 
+@invocation_output("pt_fields_expand_output")
 class PTFieldsExpandOutput(BaseInvocationOutput):
-    """Prompt Tools Fields for an image generated in InvokeAI."""
-    type: Literal["pt_fields_expand_output"] = "pt_fields_expand_output"    
+    """Expand Prompt Tools Fields for an image generated in InvokeAI."""
 
-    # Outputs
     positive_prompt: str = OutputField(description="The positive prompt parameter")
     positive_style_prompt: str = OutputField(description="The positive style prompt parameter")
     negative_prompt: str = OutputField(description="The negative prompt parameter")
@@ -212,13 +189,10 @@ class PTFieldsExpandOutput(BaseInvocationOutput):
     steps: int = OutputField(description="The number of steps used for inference")
     cfg_scale: float = OutputField(description="The classifier-free guidance scale parameter")
         
-@title("PTFields Expand")
-@tags("prompt", "file")
+@invocation("pt_fields_expand", title="PTFields Expand", tags=["prompt", "fields", "file"], category="prompt")
 class PTFieldsExpandInvocation(BaseInvocation):
     '''Save Expand PTFields into individual items'''
-    type: Literal['pt_fields_expand'] = 'pt_fields_expand'
 
-    # Inputs
     pt_fields: str = InputField(default=None, description="PTFields in json Format", input=Input.Connection)
        
     def invoke(self, context: InvocationContext) -> PTFieldsExpandOutput:
