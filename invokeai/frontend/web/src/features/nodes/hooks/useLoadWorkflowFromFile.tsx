@@ -3,7 +3,7 @@ import { useLogger } from 'app/logging/useLogger';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { parseify } from 'common/util/serialize';
 import { workflowLoaded } from 'features/nodes/store/nodesSlice';
-import { zWorkflow } from 'features/nodes/types/types';
+import { zValidatedWorkflow } from 'features/nodes/types/types';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
@@ -24,52 +24,65 @@ export const useLoadWorkflowFromFile = () => {
 
         try {
           const parsedJSON = JSON.parse(String(rawJSON));
-          const result = zWorkflow.safeParse(parsedJSON);
+          const result = zValidatedWorkflow.safeParse(parsedJSON);
 
           if (!result.success) {
-            const message = fromZodError(result.error, {
+            const { message } = fromZodError(result.error, {
               prefix: 'Workflow Validation Error',
-            }).toString();
+            });
+
             logger.error({ error: parseify(result.error) }, message);
 
             dispatch(
               addToast(
                 makeToast({
                   title: 'Unable to Validate Workflow',
-                  description: (
-                    <WorkflowValidationErrorContent error={result.error} />
-                  ),
                   status: 'error',
                   duration: 5000,
                 })
               )
             );
+            reader.abort();
             return;
           }
+          dispatch(workflowLoaded(result.data.workflow));
 
-          dispatch(workflowLoaded(result.data));
+          if (!result.data.warnings.length) {
+            dispatch(
+              addToast(
+                makeToast({
+                  title: 'Workflow Loaded',
+                  status: 'success',
+                })
+              )
+            );
+            reader.abort();
+            return;
+          }
 
           dispatch(
             addToast(
               makeToast({
-                title: 'Workflow Loaded',
-                status: 'success',
+                title: 'Workflow Loaded with Warnings',
+                status: 'warning',
               })
             )
           );
+          result.data.warnings.forEach(({ message, ...rest }) => {
+            logger.warn(rest, message);
+          });
+
           reader.abort();
-        } catch (error) {
+        } catch {
           // file reader error
-          if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: 'Unable to Load Workflow',
-                  status: 'error',
-                })
-              )
-            );
-          }
+          dispatch(
+            addToast(
+              makeToast({
+                title: 'Unable to Load Workflow',
+                status: 'error',
+              })
+            )
+          );
         }
       };
 

@@ -59,6 +59,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: 'Images may be passed between nodes.',
     color: 'purple.500',
   },
+  DenoiseMaskField: {
+    title: 'Denoise Mask',
+    description: 'Denoise Mask may be passed between nodes',
+    color: 'base.500',
+  },
   LatentsField: {
     title: 'Latents',
     description: 'Latents may be passed between nodes.',
@@ -168,11 +173,6 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'base.500',
     title: 'Color Collection',
     description: 'A collection of colors.',
-  },
-  FilePath: {
-    color: 'base.500',
-    title: 'File Path',
-    description: 'A path to a file.',
   },
   ONNXModelField: {
     color: 'base.500',

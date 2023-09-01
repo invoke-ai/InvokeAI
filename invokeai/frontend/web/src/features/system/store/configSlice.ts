@@ -9,7 +9,6 @@ export const initialConfigState: AppConfig = {
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
   disabledSDFeatures: [
     'variation',
-    'seamless',
     'symmetry',
     'hires',
     'perlinNoise',

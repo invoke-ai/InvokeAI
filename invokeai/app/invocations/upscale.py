@@ -11,7 +11,7 @@ from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, title, tags
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?
@@ -23,14 +23,10 @@ ESRGAN_MODELS = Literal[
 ]
 
 
-@title("Upscale (RealESRGAN)")
-@tags("esrgan", "upscale")
+@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan")
 class ESRGANInvocation(BaseInvocation):
     """Upscales an image using RealESRGAN."""
 
-    type: Literal["esrgan"] = "esrgan"
-
-    # Inputs
     image: ImageField = InputField(description="The input image")
     model_name: ESRGAN_MODELS = InputField(default="RealESRGAN_x4plus.pth", description="The Real-ESRGAN model to use")
 
@@ -110,6 +106,7 @@ class ESRGANInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(

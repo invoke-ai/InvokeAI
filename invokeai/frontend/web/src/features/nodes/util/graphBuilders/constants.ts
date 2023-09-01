@@ -17,6 +17,7 @@ export const CLIP_SKIP = 'clip_skip';
 export const IMAGE_TO_LATENTS = 'image_to_latents';
 export const LATENTS_TO_LATENTS = 'latents_to_latents';
 export const RESIZE = 'resize_image';
+export const IMG2IMG_RESIZE = 'img2img_resize';
 export const CANVAS_OUTPUT = 'canvas_output';
 export const INPAINT_IMAGE = 'inpaint_image';
 export const SCALED_INPAINT_IMAGE = 'scaled_inpaint_image';
@@ -25,6 +26,7 @@ export const INPAINT_IMAGE_RESIZE_DOWN = 'inpaint_image_resize_down';
 export const INPAINT_INFILL = 'inpaint_infill';
 export const INPAINT_INFILL_RESIZE_DOWN = 'inpaint_infill_resize_down';
 export const INPAINT_FINAL_IMAGE = 'inpaint_final_image';
+export const INPAINT_CREATE_MASK = 'inpaint_create_mask';
 export const CANVAS_COHERENCE_DENOISE_LATENTS =
   'canvas_coherence_denoise_latents';
 export const CANVAS_COHERENCE_NOISE = 'canvas_coherence_noise';
@@ -54,6 +56,9 @@ export const SDXL_REFINER_POSITIVE_CONDITIONING =
 export const SDXL_REFINER_NEGATIVE_CONDITIONING =
   'sdxl_refiner_negative_conditioning';
 export const SDXL_REFINER_DENOISE_LATENTS = 'sdxl_refiner_denoise_latents';
+export const SDXL_REFINER_INPAINT_CREATE_MASK = 'refiner_inpaint_create_mask';
+export const SEAMLESS = 'seamless';
+export const SDXL_REFINER_SEAMLESS = 'refiner_seamless';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';

@@ -1,16 +1,11 @@
-import { Box, Flex, FormControl, FormLabel, Tooltip } from '@chakra-ui/react';
-import SelectionOverlay from 'common/components/SelectionOverlay';
+import { Box, Flex, FormControl, FormLabel } from '@chakra-ui/react';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useDoesInputHaveValue } from 'features/nodes/hooks/useDoesInputHaveValue';
-import { useFieldInputKind } from 'features/nodes/hooks/useFieldInputKind';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
-import { useIsMouseOverField } from 'features/nodes/hooks/useIsMouseOverField';
-import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { PropsWithChildren, memo, useMemo } from 'react';
+import EditableFieldTitle from './EditableFieldTitle';
 import FieldContextMenu from './FieldContextMenu';
 import FieldHandle from './FieldHandle';
-import FieldTitle from './FieldTitle';
-import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
 
 interface Props {
@@ -21,7 +16,6 @@ interface Props {
 const InputField = ({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'input');
   const doesFieldHaveValue = useDoesInputHaveValue(nodeId, fieldName);
-  const input = useFieldInputKind(nodeId, fieldName);
 
   const {
     isConnected,
@@ -51,11 +45,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
 
   if (fieldTemplate?.fieldKind !== 'input') {
     return (
-      <InputFieldWrapper
-        nodeId={nodeId}
-        fieldName={fieldName}
-        shouldDim={shouldDim}
-      >
+      <InputFieldWrapper shouldDim={shouldDim}>
         <FormControl
           sx={{ color: 'error.400', textAlign: 'left', fontSize: 'sm' }}
         >
@@ -66,19 +56,14 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   }
 
   return (
-    <InputFieldWrapper
-      nodeId={nodeId}
-      fieldName={fieldName}
-      shouldDim={shouldDim}
-    >
+    <InputFieldWrapper shouldDim={shouldDim}>
       <FormControl
-        as={Flex}
         isInvalid={isMissingInput}
         isDisabled={isConnected}
         sx={{
           alignItems: 'stretch',
           justifyContent: 'space-between',
-          ps: 2,
+          ps: fieldTemplate.input === 'direct' ? 0 : 2,
           gap: 2,
           h: 'full',
           w: 'full',
@@ -86,42 +71,27 @@ const InputField = ({ nodeId, fieldName }: Props) => {
       >
         <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
           {(ref) => (
-            <Tooltip
-              label={
-                <FieldTooltipContent
-                  nodeId={nodeId}
-                  fieldName={fieldName}
-                  kind="input"
-                />
-              }
-              openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
-              placement="top"
-              hasArrow
+            <FormLabel
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                mb: 0,
+                px: 1,
+                gap: 2,
+              }}
             >
-              <FormLabel
-                sx={{
-                  mb: 0,
-                  width: input === 'connection' ? 'auto' : '25%',
-                  flexShrink: 0,
-                  flexGrow: 0,
-                }}
-              >
-                <FieldTitle
-                  ref={ref}
-                  nodeId={nodeId}
-                  fieldName={fieldName}
-                  kind="input"
-                  isMissingInput={isMissingInput}
-                />
-              </FormLabel>
-            </Tooltip>
+              <EditableFieldTitle
+                ref={ref}
+                nodeId={nodeId}
+                fieldName={fieldName}
+                kind="input"
+                isMissingInput={isMissingInput}
+                withTooltip
+              />
+            </FormLabel>
           )}
         </FieldContextMenu>
-        <Box
-          sx={{
-            width: input === 'connection' ? 'auto' : '75%',
-          }}
-        >
+        <Box>
           <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
         </Box>
       </FormControl>
@@ -143,19 +113,12 @@ export default memo(InputField);
 
 type InputFieldWrapperProps = PropsWithChildren<{
   shouldDim: boolean;
-  nodeId: string;
-  fieldName: string;
 }>;
 
 const InputFieldWrapper = memo(
-  ({ shouldDim, nodeId, fieldName, children }: InputFieldWrapperProps) => {
-    const { isMouseOverField, handleMouseOver, handleMouseOut } =
-      useIsMouseOverField(nodeId, fieldName);
-
+  ({ shouldDim, children }: InputFieldWrapperProps) => {
     return (
       <Flex
-        onMouseOver={handleMouseOver}
-        onMouseOut={handleMouseOut}
         sx={{
           position: 'relative',
           minH: 8,
@@ -169,7 +132,6 @@ const InputFieldWrapper = memo(
         }}
       >
         {children}
-        <SelectionOverlay isSelected={false} isHovered={isMouseOverField} />
       </Flex>
     );
   }

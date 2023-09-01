@@ -10,6 +10,7 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -22,6 +23,7 @@ import {
   NOISE,
   ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
+  SEAMLESS,
   TEXT_TO_IMAGE_GRAPH,
 } from './constants';
 
@@ -42,6 +44,8 @@ export const buildLinearTextToImageGraph = (
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
     vaePrecision,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   const use_cpu = shouldUseNoiseSettings
@@ -55,7 +59,7 @@ export const buildLinearTextToImageGraph = (
 
   const isUsingOnnxModel = model.model_type === 'onnx';
 
-  const modelLoaderNodeId = isUsingOnnxModel
+  let modelLoaderNodeId = isUsingOnnxModel
     ? ONNX_MODEL_LOADER
     : MAIN_MODEL_LOADER;
 
@@ -257,6 +261,12 @@ export const buildLinearTextToImageGraph = (
       field: 'metadata',
     },
   });
+
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
 
   // optionally add custom VAE
   addVAEToGraph(state, graph, modelLoaderNodeId);
