@@ -40,6 +40,7 @@ from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ConditioningData,
     ControlNetData,
+    IPAdapterData,
     StableDiffusionGeneratorPipeline,
     image_resized_to_grid_as_tensor,
 )
@@ -216,9 +217,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         default=None,
         description=FieldDescriptions.mask,
     )
-    ip_adapter_image: Optional[ImageField] = InputField(input=Input.Connection, title="IP Adapter Image", ui_order=6)
-    ip_adapter_strength: float = InputField(default=1.0, ge=0, le=2, ui_type=UIType.Float,
-                                            title="IP Adapter Strength", ui_order=7)
+    # ip_adapter_image: Optional[ImageField] = InputField(input=Input.Connection, title="IP Adapter Image", ui_order=6)
+    # ip_adapter_strength: float = InputField(default=1.0, ge=0, le=2, ui_type=UIType.Float,
+    #                                        title="IP Adapter Strength", ui_order=7)
 
     @validator("cfg_scale")
     def ge_one(cls, v):
@@ -340,57 +341,71 @@ class DenoiseLatentsInvocation(BaseInvocation):
         else:
             control_list = None
         if control_list is None:
-            control_data = None
+            controlnet_data = None
+            ip_adapter_data = None
             # from above handling, any control that is not None should now be of type list[ControlField]
         else:
             # FIXME: add checks to skip entry if model or image is None
             #        and if weight is None, populate with default 1.0?
-            control_data = []
-            control_models = []
+            controlnet_data = []
+            ip_adapter_data = []
+            # control_models = []
             for control_info in control_list:
-                control_model = exit_stack.enter_context(
-                    context.services.model_manager.get_model(
-                        model_name=control_info.control_model.model_name,
-                        model_type=ModelType.ControlNet,
-                        base_model=control_info.control_model.base_model,
-                        context=context,
+                if control_info.control_type == "ControlNet":
+                    control_model = exit_stack.enter_context(
+                        context.services.model_manager.get_model(
+                            model_name=control_info.control_model.model_name,
+                            model_type=ModelType.ControlNet,
+                            base_model=control_info.control_model.base_model,
+                            context=context,
+                        )
                     )
-                )
 
-                control_models.append(control_model)
-                control_image_field = control_info.image
-                input_image = context.services.images.get_pil_image(control_image_field.image_name)
-                # self.image.image_type, self.image.image_name
-                # FIXME: still need to test with different widths, heights, devices, dtypes
-                #        and add in batch_size, num_images_per_prompt?
-                #        and do real check for classifier_free_guidance?
-                # prepare_control_image should return torch.Tensor of shape(batch_size, 3, height, width)
-                control_image = prepare_control_image(
-                    image=input_image,
-                    do_classifier_free_guidance=do_classifier_free_guidance,
-                    width=control_width_resize,
-                    height=control_height_resize,
-                    # batch_size=batch_size * num_images_per_prompt,
-                    # num_images_per_prompt=num_images_per_prompt,
-                    device=control_model.device,
-                    dtype=control_model.dtype,
-                    control_mode=control_info.control_mode,
-                    resize_mode=control_info.resize_mode,
-                )
-                control_item = ControlNetData(
-                    model=control_model,
-                    image_tensor=control_image,
-                    weight=control_info.control_weight,
-                    begin_step_percent=control_info.begin_step_percent,
-                    end_step_percent=control_info.end_step_percent,
-                    control_mode=control_info.control_mode,
-                    # any resizing needed should currently be happening in prepare_control_image(),
-                    #    but adding resize_mode to ControlNetData in case needed in the future
-                    resize_mode=control_info.resize_mode,
-                )
-                control_data.append(control_item)
-                # MultiControlNetModel has been refactored out, just need list[ControlNetData]
-        return control_data
+                    # control_models.append(control_model)
+                    control_image_field = control_info.image
+                    input_image = context.services.images.get_pil_image(control_image_field.image_name)
+                    # self.image.image_type, self.image.image_name
+                    # FIXME: still need to test with different widths, heights, devices, dtypes
+                    #        and add in batch_size, num_images_per_prompt?
+                    #        and do real check for classifier_free_guidance?
+                    # prepare_control_image should return torch.Tensor of shape(batch_size, 3, height, width)
+                    control_image = prepare_control_image(
+                        image=input_image,
+                        do_classifier_free_guidance=do_classifier_free_guidance,
+                        width=control_width_resize,
+                        height=control_height_resize,
+                        # batch_size=batch_size * num_images_per_prompt,
+                        # num_images_per_prompt=num_images_per_prompt,
+                        device=control_model.device,
+                        dtype=control_model.dtype,
+                        control_mode=control_info.control_mode,
+                        resize_mode=control_info.resize_mode,
+                    )
+                    control_item = ControlNetData(
+                        model=control_model, # model object
+                        image_tensor=control_image,
+                        weight=control_info.control_weight,
+                        begin_step_percent=control_info.begin_step_percent,
+                        end_step_percent=control_info.end_step_percent,
+                        control_mode=control_info.control_mode,
+                        # any resizing needed should currently be happening in prepare_control_image(),
+                        #    but adding resize_mode to ControlNetData in case needed in the future
+                        resize_mode=control_info.resize_mode,
+                    )
+                    controlnet_data.append(control_item)
+                    # MultiControlNetModel has been refactored out, just need list[ControlNetData]
+                elif control_info.control_type == "IP-Adapter":
+                    control_image_field = control_info.image
+                    input_image = context.services.images.get_pil_image(control_image_field.image_name)
+                    control_item = IPAdapterData(
+                        ip_adapter_model=control_info.ip_adapter_model,  # name of model (NOT model object)
+                        image_encoder_model=control_info.image_encoder_model, # name of model (NOT model obj)
+                        image=input_image,
+                        weight=control_info.control_weight,
+                    )
+                    ip_adapter_data.append(control_item)
+
+        return controlnet_data, ip_adapter_data
 
     # original idea by https://github.com/AmericanPresidentJimmyCarter
     # TODO: research more for second order schedulers timesteps
@@ -499,14 +514,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 pipeline = self.create_pipeline(unet, scheduler)
                 conditioning_data = self.get_conditioning_data(context, scheduler, unet, seed)
 
-                if self.ip_adapter_image is not None:
-                    print("ip_adapter_image:", self.ip_adapter_image)
-                    unwrapped_ip_adapter_image = context.services.images.get_pil_image(self.ip_adapter_image.image_name)
-                    print("unwrapped ip_adapter_image:", unwrapped_ip_adapter_image)
-                else:
-                    unwrapped_ip_adapter_image = None
+                # if self.ip_adapter_image is not None:
+                #     print("ip_adapter_image:", self.ip_adapter_image)
+                #     unwrapped_ip_adapter_image = context.services.images.get_pil_image(self.ip_adapter_image.image_name)
+                #     print("unwrapped ip_adapter_image:", unwrapped_ip_adapter_image)
+                # else:
+                #     unwrapped_ip_adapter_image = None
 
-                control_data = self.prep_control_data(
+                controlnet_data, ip_adapter_data = self.prep_control_data(
                     model=pipeline,
                     context=context,
                     control_input=self.control,
@@ -515,6 +530,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     do_classifier_free_guidance=True,
                     exit_stack=exit_stack,
                 )
+                print("controlnet_data:", controlnet_data)
+                print("ip_adapter_data:", ip_adapter_data)
 
                 num_inference_steps, timesteps, init_timestep = self.init_scheduler(
                     scheduler,
@@ -534,9 +551,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     masked_latents=masked_latents,
                     num_inference_steps=num_inference_steps,
                     conditioning_data=conditioning_data,
-                    control_data=control_data,  # list[ControlNetData],
-                    ip_adapter_image=unwrapped_ip_adapter_image,
-                    ip_adapter_strength=self.ip_adapter_strength,
+                    control_data=controlnet_data,  # list[ControlNetData],
+                    ip_adapter_data=ip_adapter_data,  # list[IPAdapterData],
+#                    ip_adapter_image=unwrapped_ip_adapter_image,
+#                    ip_adapter_strength=self.ip_adapter_strength,
                     callback=step_callback,
                 )
 
