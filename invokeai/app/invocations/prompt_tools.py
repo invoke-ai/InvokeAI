@@ -143,7 +143,7 @@ class PTFieldsCollectOutput(BaseInvocationOutput):
 
     pt_fields: str = OutputField(description="PTFields in Json Format")
 
-@invocation("pt_fields_collect", title="PTFields Collect", tags=["prompt", "fields", "file"], category="prompt")
+@invocation("pt_fields_collect", title="PTFields Collect", tags=["prompt", "fields"], category="prompt")
 class PTFieldsCollectInvocation(BaseInvocation):
     """Collect Prompt Tools Fields for an image generated in InvokeAI."""
 
@@ -189,7 +189,7 @@ class PTFieldsExpandOutput(BaseInvocationOutput):
     steps: int = OutputField(description="The number of steps used for inference")
     cfg_scale: float = OutputField(description="The classifier-free guidance scale parameter")
         
-@invocation("pt_fields_expand", title="PTFields Expand", tags=["prompt", "fields", "file"], category="prompt")
+@invocation("pt_fields_expand", title="PTFields Expand", tags=["prompt", "fields"], category="prompt")
 class PTFieldsExpandInvocation(BaseInvocation):
     '''Save Expand PTFields into individual items'''
 
