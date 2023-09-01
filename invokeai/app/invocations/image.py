@@ -770,87 +770,42 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
 
 
 @invocation(
-    "img_luminosity_adjust",
-    title="Adjust Image Luminosity",
-    tags=["image", "luminosity", "hsl"],
+    "img_channel_adjust",
+    title="Adjust Image Channel",
+    tags=["image", "red", "green", "blue", "alpha", "cyan", "magenta", "yellow", "black", "hue", "saturation", "luminosity", "value", "RGB", "RGBA", "CYMK", "YCbCr", "LAB", "HSV", "HSL"],
     category="image",
 )
-class ImageLuminosityAdjustmentInvocation(BaseInvocation):
-    """Adjusts the Luminosity (Value) of an image."""
+class ImageChannelAdjustmentInvocation(BaseInvocation):
+    """Adjusts any channel of an image in any format."""
 
     image: ImageField = InputField(description="The image to adjust")
-    luminosity: float = InputField(
-        default=1.0, ge=0, le=1, description="The factor by which to adjust the luminosity (value)"
-    )
+    mode: Literal["RGB", "RGBA", "CYMK", "YCbCr", "LAB", "HSV"] = InputField(description="The color mode to convert to before adjusting")
+    channel: int = InputField(default=0, ge=0, le=3, description="Which channel to adjust")
+    method: Literal["Multiply", "Offset"] = InputField(description="The type of adjustment to perform")
+    adjustment: float = InputField(default=1.0, ge=-255, le=255, description="The amount to adjust the channel by")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_image = context.services.images.get_pil_image(self.image.image_name)
 
-        # Convert PIL image to OpenCV format (numpy array), note color channel
-        # ordering is changed from RGB to BGR
-        image = numpy.array(pil_image.convert("RGB"))[:, :, ::-1]
+        # limit to 3 channels unless RGBA or CMYK
+        if not (self.mode == "RGBA" or self.mode == "CMYK"):
+            self.channel = min(self.channel, 2)
 
-        # Convert image to HSV color space
-        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        # Convert PIL image to new format
+        converted_image = numpy.array(pil_image.convert(self.mode))
+        image_channel = converted_image[:, :, self.channel]
 
-        # Adjust the luminosity (value)
-        hsv_image[:, :, 2] = numpy.clip(hsv_image[:, :, 2] * self.luminosity, 0, 255)
+        # Adjust the channel value
+        if self.method == "Offset":
+            image_channel = numpy.clip(image_channel + self.adjustment, 0, 255)
+        else:
+            image_channel = numpy.clip(image_channel * self.adjustment, -255, 255) % 256
+        
+        # Put the channel back into the image
+        converted_image[:, :, self.channel] = image_channel
 
-        # Convert image back to BGR color space
-        image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
-
-        # Convert back to PIL format and to original color mode
-        pil_image = Image.fromarray(image[:, :, ::-1], "RGB").convert("RGBA")
-
-        image_dto = context.services.images.create(
-            image=pil_image,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            is_intermediate=self.is_intermediate,
-            session_id=context.graph_execution_state_id,
-            workflow=self.workflow,
-        )
-
-        return ImageOutput(
-            image=ImageField(
-                image_name=image_dto.image_name,
-            ),
-            width=image_dto.width,
-            height=image_dto.height,
-        )
-
-
-@invocation(
-    "img_saturation_adjust",
-    title="Adjust Image Saturation",
-    tags=["image", "saturation", "hsl"],
-    category="image",
-)
-class ImageSaturationAdjustmentInvocation(BaseInvocation):
-    """Adjusts the Saturation of an image."""
-
-    image: ImageField = InputField(description="The image to adjust")
-    saturation: float = InputField(default=1.0, ge=0, le=1, description="The factor by which to adjust the saturation")
-
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        pil_image = context.services.images.get_pil_image(self.image.image_name)
-
-        # Convert PIL image to OpenCV format (numpy array), note color channel
-        # ordering is changed from RGB to BGR
-        image = numpy.array(pil_image.convert("RGB"))[:, :, ::-1]
-
-        # Convert image to HSV color space
-        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
-        # Adjust the saturation
-        hsv_image[:, :, 1] = numpy.clip(hsv_image[:, :, 1] * self.saturation, 0, 255)
-
-        # Convert image back to BGR color space
-        image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
-
-        # Convert back to PIL format and to original color mode
-        pil_image = Image.fromarray(image[:, :, ::-1], "RGB").convert("RGBA")
+        # Convert back to RGBA format and output
+        pil_image = Image.fromarray(converted_image, mode=self.mode).convert("RGBA")
 
         image_dto = context.services.images.create(
             image=pil_image,
