@@ -52,7 +52,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
 
   const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    imageDTO.image_name,
+    imageDTO,
     {
       selectFromResult: (res) => ({
         isLoading: res.isFetching,
