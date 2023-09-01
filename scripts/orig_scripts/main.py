@@ -411,7 +411,7 @@ class ImageLogger(Callback):
         self.batch_freq = batch_frequency
         self.max_images = max_images
         self.logger_log_images = {}
-        self.log_steps = [2**n for n in range(int(np.log2(self.batch_freq)) + 1)]
+        self.log_steps = [2 ** n for n in range(int(np.log2(self.batch_freq)) + 1)]
         if not increase_log_steps:
             self.log_steps = [self.batch_freq]
         self.clamp = clamp
@@ -518,7 +518,7 @@ class CUDACallback(Callback):
             rank_zero_info(f"Average Epoch time: {epoch_time:.2f} seconds")
 
             if torch.cuda.is_available():
-                max_memory = torch.cuda.max_memory_allocated(trainer.root_gpu) / 2**20
+                max_memory = torch.cuda.max_memory_allocated(trainer.root_gpu) / 2 ** 20
                 max_memory = trainer.training_type_plugin.reduce(max_memory)
                 rank_zero_info(f"Average Peak memory {max_memory:.2f}MiB")
         except AttributeError:
