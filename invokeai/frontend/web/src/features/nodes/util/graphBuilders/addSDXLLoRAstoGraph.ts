@@ -11,10 +11,10 @@ import {
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
-  REFINER_SEAMLESS,
   SDXL_CANVAS_INPAINT_GRAPH,
   SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_INPAINT_CREATE_MASK,
   SEAMLESS,
 } from './constants';
 
@@ -41,7 +41,9 @@ export const addSDXLLoRAsToGraph = (
   // Handle Seamless Plugs
   const unetLoaderId = modelLoaderNodeId;
   let clipLoaderId = modelLoaderNodeId;
-  if ([SEAMLESS, REFINER_SEAMLESS].includes(modelLoaderNodeId)) {
+  if (
+    [SEAMLESS, SDXL_REFINER_INPAINT_CREATE_MASK].includes(modelLoaderNodeId)
+  ) {
     clipLoaderId = SDXL_MODEL_LOADER;
   }
 

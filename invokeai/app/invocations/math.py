@@ -1,22 +1,16 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Literal
-
 import numpy as np
 
 from invokeai.app.invocations.primitives import IntegerOutput
 
-from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, tags, title
+from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, invocation
 
 
-@title("Add Integers")
-@tags("math")
+@invocation("add", title="Add Integers", tags=["math", "add"], category="math")
 class AddInvocation(BaseInvocation):
     """Adds two numbers"""
 
-    type: Literal["add"] = "add"
-
-    # Inputs
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
@@ -24,14 +18,10 @@ class AddInvocation(BaseInvocation):
         return IntegerOutput(value=self.a + self.b)
 
 
-@title("Subtract Integers")
-@tags("math")
+@invocation("sub", title="Subtract Integers", tags=["math", "subtract"], category="math")
 class SubtractInvocation(BaseInvocation):
     """Subtracts two numbers"""
 
-    type: Literal["sub"] = "sub"
-
-    # Inputs
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
@@ -39,14 +29,10 @@ class SubtractInvocation(BaseInvocation):
         return IntegerOutput(value=self.a - self.b)
 
 
-@title("Multiply Integers")
-@tags("math")
+@invocation("mul", title="Multiply Integers", tags=["math", "multiply"], category="math")
 class MultiplyInvocation(BaseInvocation):
     """Multiplies two numbers"""
 
-    type: Literal["mul"] = "mul"
-
-    # Inputs
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
@@ -54,14 +40,10 @@ class MultiplyInvocation(BaseInvocation):
         return IntegerOutput(value=self.a * self.b)
 
 
-@title("Divide Integers")
-@tags("math")
+@invocation("div", title="Divide Integers", tags=["math", "divide"], category="math")
 class DivideInvocation(BaseInvocation):
     """Divides two numbers"""
 
-    type: Literal["div"] = "div"
-
-    # Inputs
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
@@ -69,14 +51,10 @@ class DivideInvocation(BaseInvocation):
         return IntegerOutput(value=int(self.a / self.b))
 
 
-@title("Random Integer")
-@tags("math")
+@invocation("rand_int", title="Random Integer", tags=["math", "random"], category="math")
 class RandomIntInvocation(BaseInvocation):
     """Outputs a single random integer."""
 
-    type: Literal["rand_int"] = "rand_int"
-
-    # Inputs
     low: int = InputField(default=0, description="The inclusive low value")
     high: int = InputField(default=np.iinfo(np.int32).max, description="The exclusive high value")
 

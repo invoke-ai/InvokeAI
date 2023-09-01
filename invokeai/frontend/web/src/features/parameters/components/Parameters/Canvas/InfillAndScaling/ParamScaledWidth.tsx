@@ -4,15 +4,18 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
 import { canvasSelector } from 'features/canvas/store/canvasSelectors';
 import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
-  [canvasSelector],
-  (canvas) => {
+  [canvasSelector, generationSelector],
+  (canvas, generation) => {
     const { boundingBoxScaleMethod, scaledBoundingBoxDimensions } = canvas;
+    const { model } = generation;
 
     return {
+      model,
       scaledBoundingBoxDimensions,
       isManual: boundingBoxScaleMethod === 'manual',
     };
@@ -22,7 +25,12 @@ const selector = createSelector(
 
 const ParamScaledWidth = () => {
   const dispatch = useAppDispatch();
-  const { isManual, scaledBoundingBoxDimensions } = useAppSelector(selector);
+  const { model, isManual, scaledBoundingBoxDimensions } =
+    useAppSelector(selector);
+
+  const initial = ['sdxl', 'sdxl-refiner'].includes(model?.base_model as string)
+    ? 1024
+    : 512;
 
   const { t } = useTranslation();
 
@@ -39,7 +47,7 @@ const ParamScaledWidth = () => {
     dispatch(
       setScaledBoundingBoxDimensions({
         ...scaledBoundingBoxDimensions,
-        width: Math.floor(512),
+        width: Math.floor(initial),
       })
     );
   };
@@ -49,7 +57,7 @@ const ParamScaledWidth = () => {
       isDisabled={!isManual}
       label={t('parameters.scaledWidth')}
       min={64}
-      max={1024}
+      max={1536}
       step={64}
       value={scaledBoundingBoxDimensions.width}
       onChange={handleChangeScaledWidth}

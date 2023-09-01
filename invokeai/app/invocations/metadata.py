@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Optional
 
 from pydantic import Field
 
@@ -8,8 +8,8 @@ from invokeai.app.invocations.baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    tags,
-    title,
+    invocation,
+    invocation_output,
 )
 from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
@@ -91,20 +91,16 @@ class ImageMetadata(BaseModelExcludeNull):
     graph: Optional[dict] = Field(default=None, description="The graph that created the image")
 
 
+@invocation_output("metadata_accumulator_output")
 class MetadataAccumulatorOutput(BaseInvocationOutput):
     """The output of the MetadataAccumulator node"""
-
-    type: Literal["metadata_accumulator_output"] = "metadata_accumulator_output"
 
     metadata: CoreMetadata = OutputField(description="The core metadata for the image")
 
 
-@title("Metadata Accumulator")
-@tags("metadata")
+@invocation("metadata_accumulator", title="Metadata Accumulator", tags=["metadata"], category="metadata")
 class MetadataAccumulatorInvocation(BaseInvocation):
     """Outputs a Core Metadata Object"""
-
-    type: Literal["metadata_accumulator"] = "metadata_accumulator"
 
     generation_mode: str = InputField(
         description="The generation mode that output this image",

@@ -15,7 +15,7 @@ export const useIsIntermediate = (nodeId: string) => {
           if (!isInvocationNode(node)) {
             return false;
           }
-          return Boolean(node.data.inputs.is_intermediate?.value);
+          return node.data.isIntermediate;
         },
         defaultSelectorOptions
       ),

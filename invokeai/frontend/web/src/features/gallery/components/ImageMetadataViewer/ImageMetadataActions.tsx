@@ -1,10 +1,10 @@
+import { CoreMetadata } from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useCallback } from 'react';
-import { UnsafeImageMetadata } from 'services/api/types';
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {
-  metadata?: UnsafeImageMetadata['metadata'];
+  metadata?: CoreMetadata;
 };
 
 const ImageMetadataActions = (props: Props) => {
@@ -94,14 +94,14 @@ const ImageMetadataActions = (props: Props) => {
           onClick={handleRecallNegativePrompt}
         />
       )}
-      {metadata.seed !== undefined && (
+      {metadata.seed !== undefined && metadata.seed !== null && (
         <ImageMetadataItem
           label="Seed"
           value={metadata.seed}
           onClick={handleRecallSeed}
         />
       )}
-      {metadata.model !== undefined && (
+      {metadata.model !== undefined && metadata.model !== null && (
         <ImageMetadataItem
           label="Model"
           value={metadata.model.model_name}
@@ -150,7 +150,7 @@ const ImageMetadataActions = (props: Props) => {
           onClick={handleRecallSteps}
         />
       )}
-      {metadata.cfg_scale !== undefined && (
+      {metadata.cfg_scale !== undefined && metadata.cfg_scale !== null && (
         <ImageMetadataItem
           label="CFG scale"
           value={metadata.cfg_scale}
