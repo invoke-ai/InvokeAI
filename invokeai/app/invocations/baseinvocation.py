@@ -580,8 +580,9 @@ def invocation(
             config=cls.__config__,
         )
         cls.__fields__.update({"type": invocation_type_field})
-        cls.__annotations__.update({"type": invocation_type_annotation})
-
+        # to support 3.9, 3.10 and 3.11, as described in https://docs.python.org/3/howto/annotations.html
+        if annotations := cls.__dict__.get("__annotations__", None):
+            annotations.update({"type": invocation_type_annotation})
         return cls
 
     return wrapper
@@ -617,8 +618,7 @@ def invocation_output(
         cls.__fields__.update({"type": output_type_field})
 
         # to support 3.9, 3.10 and 3.11, as described in https://docs.python.org/3/howto/annotations.html
-        annotations = cls.__dict__.get("__annotations__", None)
-        if annotations:
+        if annotations := cls.__dict__.get("__annotations__", None):
             annotations.update({"type": output_type_annotation})
 
         return cls
