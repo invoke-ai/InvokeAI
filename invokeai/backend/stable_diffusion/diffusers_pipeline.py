@@ -34,7 +34,7 @@ from .diffusion import (
     BasicConditioningInfo,
 )
 from ..util import normalize_device, auto_detect_slice_size
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus, IPAdapterXL
 
 
 @dataclass
@@ -467,10 +467,25 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             #       and how to undo if ip_adapter_image is removed
             #   Should reimplement to use existing model management context etc.
             #
-            ip_adapter = IPAdapter(self,                    # IPAdapter first arg is StableDiffusionPipeline
-                                   ip_adapter_info.image_encoder_model,
-                                   ip_adapter_info.ip_adapter_model,
-                                   self.unet.device)
+            if "sdxl" in ip_adapter_info.ip_adapter_model:
+                print("using IPAdapterXL")
+                ip_adapter = IPAdapterXL(self,
+                                         ip_adapter_info.image_encoder_model,
+                                         ip_adapter_info.ip_adapter_model,
+                                         self.unet.device)
+            elif "plus" in ip_adapter_info.ip_adapter_model:
+                print("using IPAdapterPlus")
+                ip_adapter = IPAdapterPlus(self,               # IPAdapterPlus first arg is StableDiffusionPipeline
+                                           ip_adapter_info.image_encoder_model,
+                                           ip_adapter_info.ip_adapter_model,
+                                           self.unet.device,
+                                           num_tokens=16)
+            else:
+                print("using IPAdapter")
+                ip_adapter = IPAdapter(self,                    # IPAdapter first arg is StableDiffusionPipeline
+                                       ip_adapter_info.image_encoder_model,
+                                       ip_adapter_info.ip_adapter_model,
+                                       self.unet.device)
             # IP-Adapter ==> add additional cross-attention layers to UNet model here?
             ip_adapter.set_scale(ip_adapter_info.weight)
             print("ip_adapter:", ip_adapter)
