@@ -617,11 +617,7 @@ def invocation_output(
         cls.__fields__.update({"type": output_type_field})
 
         # to support 3.9, 3.10 and 3.11, as described in https://docs.python.org/3/howto/annotations.html
-        annotations = (
-            cls.__dict__.get("__annotations__", None)
-            if isinstance(cls, type)
-            else getattr(cls, "__annotations__", None)
-        )
+        annotations = cls.__dict__.get("__annotations__", None)
         if annotations:
             annotations.update({"type": output_type_annotation})
 
