@@ -35,13 +35,12 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |Inverse Lerp Image 			| Inverse linear interpolation of all pixels of an image|
 |Image Primitive 			| An image primitive value|
 |Lerp Image 			| Linear interpolation of all pixels of an image|
-|Image Luminosity Adjustment 			| Adjusts the Luminosity (Value) of an image.|
+|Image Channel Adjustment 			| Adjusts any channel of an image in any color format.|
 |Multiply Images 			| Multiplies two images together using `PIL.ImageChops.multiply()`.|
 |Blur NSFW Image 			| Add blur to NSFW-flagged images|
 |Paste Image 			| Pastes an image into another image.|
 |ImageProcessor 			| Base class for invocations that preprocess images for ControlNet|
 |Resize Image 			| Resizes an image to specific dimensions|
-|Image Saturation Adjustment 			| Adjusts the Saturation of an image.|
 |Scale Image 			| Scales an image by a factor|
 |Image to Latents 			| Encodes an image into latents.|
 |Add Invisible Watermark 			| Add an invisible watermark to an image|
