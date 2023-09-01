@@ -772,7 +772,7 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
 @invocation(
     "img_channel_adjust",
     title="Adjust Image Channel",
-    tags=["image", "red", "green", "blue", "alpha", "cyan", "magenta", "yellow", "black", "hue", "saturation", "luminosity", "value", "RGB", "RGBA", "CYMK", "YCbCr", "LAB", "HSV", "HSL"],
+    tags=["image", "red", "green", "blue", "alpha", "cyan", "magenta", "yellow", "black", "hue", "saturation", "luminosity", "value"],
     category="image",
 )
 class ImageChannelAdjustmentInvocation(BaseInvocation):
