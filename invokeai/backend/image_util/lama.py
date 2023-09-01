@@ -53,5 +53,6 @@ class LaMA:
 
         del model
         gc.collect()
+        torch.cuda.empty_cache()
 
         return infilled_image
