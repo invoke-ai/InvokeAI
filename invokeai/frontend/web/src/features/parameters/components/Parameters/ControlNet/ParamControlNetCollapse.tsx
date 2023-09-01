@@ -68,7 +68,7 @@ const ParamControlNetCollapse = () => {
   }
 
   return (
-    <IAICollapse label="ControlNet" activeLabel={activeLabel}>
+    <IAICollapse label="Control Adapters" activeLabel={activeLabel}>
       <Flex sx={{ flexDir: 'column', gap: 2 }}>
         <Flex
           sx={{

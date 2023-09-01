@@ -1,12 +1,16 @@
+import { store } from 'app/store/store';
 import {
   SchedulerParam,
   zBaseModel,
   zMainOrOnnxModel,
+  zSDXLRefinerModel,
   zScheduler,
 } from 'features/parameters/types/parameterSchemas';
+import { keyBy } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Node } from 'reactflow';
+import { JsonObject } from 'type-fest';
 import { Graph, ImageDTO, _InputField, _OutputField } from 'services/api/types';
 import {
   AnyInvocationType,
@@ -64,6 +68,7 @@ export const zFieldType = z.enum([
   'string',
   'array',
   'ImageField',
+  'DenoiseMaskField',
   'LatentsField',
   'ConditioningField',
   'ControlField',
@@ -97,7 +102,6 @@ export const zFieldType = z.enum([
   // endregion
 
   // region Misc
-  'FilePath',
   'enum',
   'Scheduler',
   // endregion
@@ -105,8 +109,17 @@ export const zFieldType = z.enum([
 
 export type FieldType = z.infer<typeof zFieldType>;
 
+export const zReservedFieldType = z.enum([
+  'WorkflowField',
+  'IsIntermediate',
+  'MetadataField',
+]);
+
+export type ReservedFieldType = z.infer<typeof zReservedFieldType>;
+
 export const isFieldType = (value: unknown): value is FieldType =>
-  zFieldType.safeParse(value).success;
+  zFieldType.safeParse(value).success ||
+  zReservedFieldType.safeParse(value).success;
 
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
@@ -120,6 +133,7 @@ export type InputFieldTemplate =
   | StringInputFieldTemplate
   | BooleanInputFieldTemplate
   | ImageInputFieldTemplate
+  | DenoiseMaskInputFieldTemplate
   | LatentsInputFieldTemplate
   | ConditioningInputFieldTemplate
   | UNetInputFieldTemplate
@@ -205,9 +219,15 @@ export const zConditioningField = z.object({
 });
 export type ConditioningField = z.infer<typeof zConditioningField>;
 
+export const zDenoiseMaskField = z.object({
+  mask_name: z.string().trim().min(1),
+  masked_latents_name: z.string().trim().min(1).optional(),
+});
+export type DenoiseMaskFieldValue = z.infer<typeof zDenoiseMaskField>;
+
 export const zIntegerInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('integer'),
-  value: z.number().optional(),
+  value: z.number().int().optional(),
 });
 export type IntegerInputFieldValue = z.infer<typeof zIntegerInputFieldValue>;
 
@@ -241,6 +261,14 @@ export const zLatentsInputFieldValue = zInputFieldValueBase.extend({
 });
 export type LatentsInputFieldValue = z.infer<typeof zLatentsInputFieldValue>;
 
+export const zDenoiseMaskInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('DenoiseMaskField'),
+  value: zDenoiseMaskField.optional(),
+});
+export type DenoiseMaskInputFieldValue = z.infer<
+  typeof zDenoiseMaskInputFieldValue
+>;
+
 export const zConditioningInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('ConditioningField'),
   value: zConditioningField.optional(),
@@ -252,7 +280,7 @@ export type ConditioningInputFieldValue = z.infer<
 export const zControlNetModel = zModelIdentifier;
 export type ControlNetModel = z.infer<typeof zControlNetModel>;
 
-export const zControlField = zInputFieldValueBase.extend({
+export const zControlField = z.object({
   image: zImageField,
   control_model: zControlNetModel,
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
@@ -267,11 +295,11 @@ export const zControlField = zInputFieldValueBase.extend({
 });
 export type ControlField = z.infer<typeof zControlField>;
 
-export const zControlInputFieldTemplate = zInputFieldValueBase.extend({
+export const zControlInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('ControlField'),
   value: zControlField.optional(),
 });
-export type ControlInputFieldValue = z.infer<typeof zControlInputFieldTemplate>;
+export type ControlInputFieldValue = z.infer<typeof zControlInputFieldValue>;
 
 export const zModelType = z.enum([
   'onnx',
@@ -459,11 +487,12 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zBooleanInputFieldValue,
   zImageInputFieldValue,
   zLatentsInputFieldValue,
+  zDenoiseMaskInputFieldValue,
   zConditioningInputFieldValue,
   zUNetInputFieldValue,
   zClipInputFieldValue,
   zVaeInputFieldValue,
-  zControlInputFieldTemplate,
+  zControlInputFieldValue,
   zEnumInputFieldValue,
   zMainModelInputFieldValue,
   zSDXLMainModelInputFieldValue,
@@ -530,6 +559,11 @@ export type ImageInputFieldTemplate = InputFieldTemplateBase & {
 export type ImageCollectionInputFieldTemplate = InputFieldTemplateBase & {
   default: ImageField[];
   type: 'ImageCollection';
+};
+
+export type DenoiseMaskInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'DenoiseMaskField';
 };
 
 export type LatentsInputFieldTemplate = InputFieldTemplateBase & {
@@ -619,6 +653,11 @@ export type SchedulerInputFieldTemplate = InputFieldTemplateBase & {
   type: 'Scheduler';
 };
 
+export type WorkflowInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'WorkflowField';
+};
+
 export const isInputFieldValue = (
   field?: InputFieldValue | OutputFieldValue
 ): field is InputFieldValue => Boolean(field && field.fieldKind === 'input');
@@ -639,6 +678,7 @@ export type TypeHints = {
 export type InvocationSchemaExtra = {
   output: OpenAPIV3.ReferenceObject; // the output of the invocation
   title: string;
+  category?: string;
   tags?: string[];
   properties: Omit<
     NonNullable<OpenAPIV3.SchemaObject['properties']> &
@@ -715,6 +755,48 @@ export const isInvocationFieldSchema = (
 
 export type InvocationEdgeExtra = { type: 'default' | 'collapsed' };
 
+export const zCoreMetadata = z
+  .object({
+    app_version: z.string().nullish(),
+    generation_mode: z.string().nullish(),
+    created_by: z.string().nullish(),
+    positive_prompt: z.string().nullish(),
+    negative_prompt: z.string().nullish(),
+    width: z.number().int().nullish(),
+    height: z.number().int().nullish(),
+    seed: z.number().int().nullish(),
+    rand_device: z.string().nullish(),
+    cfg_scale: z.number().nullish(),
+    steps: z.number().int().nullish(),
+    scheduler: z.string().nullish(),
+    clip_skip: z.number().int().nullish(),
+    model: zMainOrOnnxModel.nullish(),
+    controlnets: z.array(zControlField).nullish(),
+    loras: z
+      .array(
+        z.object({
+          lora: zLoRAModelField,
+          weight: z.number(),
+        })
+      )
+      .nullish(),
+    vae: zVaeModelField.nullish(),
+    strength: z.number().nullish(),
+    init_image: z.string().nullish(),
+    positive_style_prompt: z.string().nullish(),
+    negative_style_prompt: z.string().nullish(),
+    refiner_model: zSDXLRefinerModel.nullish(),
+    refiner_cfg_scale: z.number().nullish(),
+    refiner_steps: z.number().int().nullish(),
+    refiner_scheduler: z.string().nullish(),
+    refiner_positive_aesthetic_store: z.number().nullish(),
+    refiner_negative_aesthetic_store: z.number().nullish(),
+    refiner_start: z.number().nullish(),
+  })
+  .catchall(z.record(z.any()));
+
+export type CoreMetadata = z.infer<typeof zCoreMetadata>;
+
 export const zInvocationNodeData = z.object({
   id: z.string().trim().min(1),
   // no easy way to build this dynamically, and we don't want to anyways, because this will be used
@@ -725,6 +807,8 @@ export const zInvocationNodeData = z.object({
   label: z.string(),
   isOpen: z.boolean(),
   notes: z.string(),
+  embedWorkflow: z.boolean(),
+  isIntermediate: z.boolean(),
 });
 
 // Massage this to get better type safety while developing
@@ -745,28 +829,38 @@ export const zNotesNodeData = z.object({
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 
+const zPosition = z
+  .object({
+    x: z.number(),
+    y: z.number(),
+  })
+  .default({ x: 0, y: 0 });
+
+const zDimension = z.number().gt(0).nullish();
+
 export const zWorkflowInvocationNode = z.object({
   id: z.string().trim().min(1),
   type: z.literal('invocation'),
   data: zInvocationNodeData,
-  width: z.number().gt(0),
-  height: z.number().gt(0),
-  position: z.object({
-    x: z.number(),
-    y: z.number(),
-  }),
+  width: zDimension,
+  height: zDimension,
+  position: zPosition,
 });
+
+export type WorkflowInvocationNode = z.infer<typeof zWorkflowInvocationNode>;
+
+export const isWorkflowInvocationNode = (
+  val: unknown
+): val is WorkflowInvocationNode =>
+  zWorkflowInvocationNode.safeParse(val).success;
 
 export const zWorkflowNotesNode = z.object({
   id: z.string().trim().min(1),
   type: z.literal('notes'),
   data: zNotesNodeData,
-  width: z.number().gt(0),
-  height: z.number().gt(0),
-  position: z.object({
-    x: z.number(),
-    y: z.number(),
-  }),
+  width: zDimension,
+  height: zDimension,
+  position: zPosition,
 });
 
 export const zWorkflowNode = z.discriminatedUnion('type', [
@@ -776,14 +870,25 @@ export const zWorkflowNode = z.discriminatedUnion('type', [
 
 export type WorkflowNode = z.infer<typeof zWorkflowNode>;
 
-export const zWorkflowEdge = z.object({
+export const zDefaultWorkflowEdge = z.object({
   source: z.string().trim().min(1),
   sourceHandle: z.string().trim().min(1),
   target: z.string().trim().min(1),
   targetHandle: z.string().trim().min(1),
   id: z.string().trim().min(1),
-  type: z.enum(['default', 'collapsed']),
+  type: z.literal('default'),
 });
+export const zCollapsedWorkflowEdge = z.object({
+  source: z.string().trim().min(1),
+  target: z.string().trim().min(1),
+  id: z.string().trim().min(1),
+  type: z.literal('collapsed'),
+});
+
+export const zWorkflowEdge = z.union([
+  zDefaultWorkflowEdge,
+  zCollapsedWorkflowEdge,
+]);
 
 export const zFieldIdentifier = z.object({
   nodeId: z.string().trim().min(1),
@@ -806,20 +911,91 @@ export const zSemVer = z.string().refine((val) => {
 
 export type SemVer = z.infer<typeof zSemVer>;
 
+export type WorkflowWarning = {
+  message: string;
+  issues: string[];
+  data: JsonObject;
+};
+
 export const zWorkflow = z.object({
-  name: z.string(),
-  author: z.string(),
-  description: z.string(),
-  version: z.string(),
-  contact: z.string(),
-  tags: z.string(),
-  notes: z.string(),
-  nodes: z.array(zWorkflowNode),
-  edges: z.array(zWorkflowEdge),
-  exposedFields: z.array(zFieldIdentifier),
+  name: z.string().default(''),
+  author: z.string().default(''),
+  description: z.string().default(''),
+  version: z.string().default(''),
+  contact: z.string().default(''),
+  tags: z.string().default(''),
+  notes: z.string().default(''),
+  nodes: z.array(zWorkflowNode).default([]),
+  edges: z.array(zWorkflowEdge).default([]),
+  exposedFields: z.array(zFieldIdentifier).default([]),
+  meta: z
+    .object({
+      version: zSemVer,
+    })
+    .default({ version: '1.0.0' }),
+});
+
+export const zValidatedWorkflow = zWorkflow.transform((workflow) => {
+  const nodeTemplates = store.getState().nodes.nodeTemplates;
+  const { nodes, edges } = workflow;
+  const warnings: WorkflowWarning[] = [];
+  const invocationNodes = nodes.filter(isWorkflowInvocationNode);
+  const keyedNodes = keyBy(invocationNodes, 'id');
+  invocationNodes.forEach((node, i) => {
+    const nodeTemplate = nodeTemplates[node.data.type];
+    if (!nodeTemplate) {
+      warnings.push({
+        message: `Node "${node.data.label || node.data.id}" skipped`,
+        issues: [`Unable to find template for type "${node.data.type}"`],
+        data: node,
+      });
+      delete nodes[i];
+    }
+  });
+  edges.forEach((edge, i) => {
+    const sourceNode = keyedNodes[edge.source];
+    const targetNode = keyedNodes[edge.target];
+    const issues: string[] = [];
+    if (!sourceNode) {
+      issues.push(`Output node ${edge.source} does not exist`);
+    } else if (
+      edge.type === 'default' &&
+      !(edge.sourceHandle in sourceNode.data.outputs)
+    ) {
+      issues.push(
+        `Output field "${edge.source}.${edge.sourceHandle}" does not exist`
+      );
+    }
+    if (!targetNode) {
+      issues.push(`Input node ${edge.target} does not exist`);
+    } else if (
+      edge.type === 'default' &&
+      !(edge.targetHandle in targetNode.data.inputs)
+    ) {
+      issues.push(
+        `Input field "${edge.target}.${edge.targetHandle}" does not exist`
+      );
+    }
+    if (issues.length) {
+      delete edges[i];
+      const src = edge.type === 'default' ? edge.sourceHandle : edge.source;
+      const tgt = edge.type === 'default' ? edge.targetHandle : edge.target;
+      warnings.push({
+        message: `Edge "${src} -> ${tgt}" skipped`,
+        issues,
+        data: edge,
+      });
+    }
+  });
+  return { workflow, warnings };
 });
 
 export type Workflow = z.infer<typeof zWorkflow>;
+
+export type ImageMetadataAndWorkflow = {
+  metadata?: CoreMetadata;
+  workflow?: Workflow;
+};
 
 export type CurrentImageNodeData = {
   id: string;

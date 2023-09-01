@@ -7,6 +7,7 @@ import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -17,7 +18,9 @@ import {
   POSITIVE_CONDITIONING,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_SEAMLESS,
   SDXL_TEXT_TO_IMAGE_GRAPH,
+  SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
 
@@ -38,6 +41,8 @@ export const buildLinearSDXLTextToImageGraph = (
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
     vaePrecision,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   const {
@@ -61,6 +66,9 @@ export const buildLinearSDXLTextToImageGraph = (
   const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
     craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
 
+  // Model Loader ID
+  let modelLoaderNodeId = SDXL_MODEL_LOADER;
+
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
    * full graph here as a template. Then use the parameters from app state and set friendlier node
@@ -74,9 +82,9 @@ export const buildLinearSDXLTextToImageGraph = (
   const graph: NonNullableGraph = {
     id: SDXL_TEXT_TO_IMAGE_GRAPH,
     nodes: {
-      [SDXL_MODEL_LOADER]: {
+      [modelLoaderNodeId]: {
         type: 'sdxl_model_loader',
-        id: SDXL_MODEL_LOADER,
+        id: modelLoaderNodeId,
         model,
       },
       [POSITIVE_CONDITIONING]: {
@@ -117,7 +125,7 @@ export const buildLinearSDXLTextToImageGraph = (
       // Connect Model Loader to UNet, VAE & CLIP
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
@@ -127,7 +135,7 @@ export const buildLinearSDXLTextToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -137,7 +145,7 @@ export const buildLinearSDXLTextToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip2',
         },
         destination: {
@@ -147,7 +155,7 @@ export const buildLinearSDXLTextToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -157,7 +165,7 @@ export const buildLinearSDXLTextToImageGraph = (
       },
       {
         source: {
-          node_id: SDXL_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip2',
         },
         destination: {
@@ -244,16 +252,25 @@ export const buildLinearSDXLTextToImageGraph = (
     },
   });
 
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
+
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
+    if (seamlessXAxis || seamlessYAxis) {
+      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
+    }
   }
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, SDXL_MODEL_LOADER);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, SDXL_MODEL_LOADER);
+  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);

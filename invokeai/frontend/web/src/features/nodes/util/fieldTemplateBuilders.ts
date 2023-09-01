@@ -8,6 +8,7 @@ import {
   ConditioningInputFieldTemplate,
   ControlInputFieldTemplate,
   ControlNetModelInputFieldTemplate,
+  DenoiseMaskInputFieldTemplate,
   EnumInputFieldTemplate,
   FieldType,
   FloatInputFieldTemplate,
@@ -27,7 +28,6 @@ import {
   UNetInputFieldTemplate,
   VaeInputFieldTemplate,
   VaeModelInputFieldTemplate,
-  isFieldType,
 } from '../types/types';
 
 export type BaseFieldProperties = 'name' | 'title' | 'description';
@@ -263,6 +263,19 @@ const buildImageCollectionInputFieldTemplate = ({
   return template;
 };
 
+const buildDenoiseMaskInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): DenoiseMaskInputFieldTemplate => {
+  const template: DenoiseMaskInputFieldTemplate = {
+    ...baseField,
+    type: 'DenoiseMaskField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildLatentsInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -408,9 +421,7 @@ const buildSchedulerInputFieldTemplate = ({
   return template;
 };
 
-export const getFieldType = (
-  schemaObject: InvocationFieldSchema
-): FieldType => {
+export const getFieldType = (schemaObject: InvocationFieldSchema): string => {
   let fieldType = '';
 
   const { ui_type } = schemaObject;
@@ -446,10 +457,6 @@ export const getFieldType = (
     }
   }
 
-  if (!isFieldType(fieldType)) {
-    throw `Field type "${fieldType}" is unknown!`;
-  }
-
   return fieldType;
 };
 
@@ -461,12 +468,9 @@ export const getFieldType = (
 export const buildInputFieldTemplate = (
   nodeSchema: InvocationSchemaObject,
   fieldSchema: InvocationFieldSchema,
-  name: string
+  name: string,
+  fieldType: FieldType
 ) => {
-  // console.log('input', schemaObject);
-  const fieldType = getFieldType(fieldSchema);
-  // console.log('input fieldType', fieldType);
-
   const { input, ui_hidden, ui_component, ui_type, ui_order } = fieldSchema;
 
   const extra = {
@@ -494,6 +498,12 @@ export const buildInputFieldTemplate = (
   }
   if (fieldType === 'ImageCollection') {
     return buildImageCollectionInputFieldTemplate({
+      schemaObject: fieldSchema,
+      baseField,
+    });
+  }
+  if (fieldType === 'DenoiseMaskField') {
+    return buildDenoiseMaskInputFieldTemplate({
       schemaObject: fieldSchema,
       baseField,
     });

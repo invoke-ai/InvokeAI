@@ -143,6 +143,8 @@ export const useBuildNodeData = () => {
           isOpen: true,
           label: '',
           notes: '',
+          embedWorkflow: false,
+          isIntermediate: true,
         },
       };
 

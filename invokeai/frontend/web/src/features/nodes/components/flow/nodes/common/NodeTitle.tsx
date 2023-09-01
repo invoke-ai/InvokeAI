@@ -27,9 +27,11 @@ const NodeTitle = ({ nodeId, title }: Props) => {
   const handleSubmit = useCallback(
     async (newTitle: string) => {
       dispatch(nodeLabelChanged({ nodeId, label: newTitle }));
-      setLocalTitle(newTitle || title || 'Problem Setting Title');
+      setLocalTitle(
+        newTitle || title || templateTitle || 'Problem Setting Title'
+      );
     },
-    [nodeId, dispatch, title]
+    [dispatch, nodeId, title, templateTitle]
   );
 
   const handleChange = useCallback((newTitle: string) => {

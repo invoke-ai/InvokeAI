@@ -41,7 +41,7 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
               flexDirection: 'column',
               w: 'full',
               h: 'full',
-              py: 1,
+              py: 2,
               gap: 1,
               borderBottomRadius: withFooter ? 0 : 'base',
             }}

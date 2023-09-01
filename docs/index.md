@@ -49,9 +49,9 @@ title: Home
 [![github stars badge]][github stars link]
 [![github forks badge]][github forks link]
 
-[![CI checks on main badge]][ci checks on main link]
+<!-- [![CI checks on main badge]][ci checks on main link]
 [![CI checks on dev badge]][ci checks on dev link]
-<!-- [![latest commit to dev badge]][latest commit to dev link] -->
+[![latest commit to dev badge]][latest commit to dev link] -->
 
 [![github open issues badge]][github open issues link]
 [![github open prs badge]][github open prs link]

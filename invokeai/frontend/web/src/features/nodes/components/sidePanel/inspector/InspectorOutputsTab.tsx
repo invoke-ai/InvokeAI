@@ -4,12 +4,13 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { isInvocationNode } from 'features/nodes/types/types';
 import { memo } from 'react';
-import ImageOutputPreview from './outputs/ImageOutputPreview';
-import ScrollableContent from '../ScrollableContent';
+import { ImageOutput } from 'services/api/types';
 import { AnyResult } from 'services/events/types';
-import StringOutputPreview from './outputs/StringOutputPreview';
-import NumberOutputPreview from './outputs/NumberOutputPreview';
+import ScrollableContent from '../ScrollableContent';
+import ImageOutputPreview from './outputs/ImageOutputPreview';
 
 const selector = createSelector(
   stateSelector,
@@ -21,11 +22,16 @@ const selector = createSelector(
       (node) => node.id === lastSelectedNodeId
     );
 
+    const lastSelectedNodeTemplate = lastSelectedNode
+      ? nodes.nodeTemplates[lastSelectedNode.data.type]
+      : undefined;
+
     const nes =
       nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
 
     return {
       node: lastSelectedNode,
+      template: lastSelectedNodeTemplate,
       nes,
     };
   },
@@ -33,9 +39,9 @@ const selector = createSelector(
 );
 
 const InspectorOutputsTab = () => {
-  const { node, nes } = useAppSelector(selector);
+  const { node, template, nes } = useAppSelector(selector);
 
-  if (!node || !nes) {
+  if (!node || !nes || !isInvocationNode(node)) {
     return <IAINoContentFallback label="No node selected" icon={null} />;
   }
 
@@ -63,33 +69,16 @@ const InspectorOutputsTab = () => {
             w: 'full',
           }}
         >
-          {nes.outputs.map((result, i) => {
-            if (result.type === 'string_output') {
-              return (
-                <StringOutputPreview key={getKey(result, i)} output={result} />
-              );
-            }
-            if (result.type === 'float_output') {
-              return (
-                <NumberOutputPreview key={getKey(result, i)} output={result} />
-              );
-            }
-            if (result.type === 'integer_output') {
-              return (
-                <NumberOutputPreview key={getKey(result, i)} output={result} />
-              );
-            }
-            if (result.type === 'image_output') {
-              return (
-                <ImageOutputPreview key={getKey(result, i)} output={result} />
-              );
-            }
-            return (
-              <pre key={getKey(result, i)}>
-                {JSON.stringify(result, null, 2)}
-              </pre>
-            );
-          })}
+          {template?.outputType === 'image_output' ? (
+            nes.outputs.map((result, i) => (
+              <ImageOutputPreview
+                key={getKey(result, i)}
+                output={result as ImageOutput}
+              />
+            ))
+          ) : (
+            <DataViewer data={nes.outputs} label="Node Outputs" />
+          )}
         </Flex>
       </ScrollableContent>
     </Box>
