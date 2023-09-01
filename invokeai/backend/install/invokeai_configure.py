@@ -496,7 +496,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
                 scroll_exit=True,
             )
         else:
-            self.vram_cache_size = DummyWidgetValue.zero
+            self.vram = DummyWidgetValue.zero
         self.nextrely += 1
         self.outdir = self.add_widget_intelligent(
             FileBox,
