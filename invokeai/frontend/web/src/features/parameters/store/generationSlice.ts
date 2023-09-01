@@ -47,7 +47,8 @@ export interface GenerationState {
   shouldUseNoiseSettings: boolean;
   steps: StepsParam;
   threshold: number;
-  tileSize: number;
+  infillTileSize: number;
+  infillPatchmatchDownscaleSize: number;
   variationAmount: number;
   width: WidthParam;
   shouldUseSymmetry: boolean;
@@ -87,7 +88,8 @@ export const initialGenerationState: GenerationState = {
   shouldUseNoiseSettings: false,
   steps: 50,
   threshold: 0,
-  tileSize: 32,
+  infillTileSize: 32,
+  infillPatchmatchDownscaleSize: 2,
   variationAmount: 0.1,
   width: 512,
   shouldUseSymmetry: false,
@@ -212,11 +214,17 @@ export const generationSlice = createSlice({
     setCanvasCoherenceStrength: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceStrength = action.payload;
     },
-    setTileSize: (state, action: PayloadAction<number>) => {
-      state.tileSize = action.payload;
-    },
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
+    },
+    setInfillTileSize: (state, action: PayloadAction<number>) => {
+      state.infillTileSize = action.payload;
+    },
+    setInfillPatchmatchDownscaleSize: (
+      state,
+      action: PayloadAction<number>
+    ) => {
+      state.infillPatchmatchDownscaleSize = action.payload;
     },
     setShouldUseSymmetry: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSymmetry = action.payload;
@@ -332,7 +340,8 @@ export const {
   setShouldRandomizeSeed,
   setSteps,
   setThreshold,
-  setTileSize,
+  setInfillTileSize,
+  setInfillPatchmatchDownscaleSize,
   setVariationAmount,
   setShouldUseSymmetry,
   setHorizontalSymmetrySteps,

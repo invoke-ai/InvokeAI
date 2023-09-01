@@ -74,7 +74,7 @@ export const buildCanvasSDXLOutpaintGraph = (
     maskBlur,
     canvasCoherenceSteps,
     canvasCoherenceStrength,
-    tileSize,
+    infillTileSize,
     infillMethod,
     seamlessXAxis,
     seamlessYAxis,
@@ -510,6 +510,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       type: 'infill_patchmatch',
       id: INPAINT_INFILL,
       is_intermediate: true,
+      downscale: infillPatchmatchDownscaleSize,
     };
   }
 
@@ -534,7 +535,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       type: 'infill_tile',
       id: INPAINT_INFILL,
       is_intermediate: true,
-      tile_size: tileSize,
+      tile_size: infillTileSize,
     };
   }
 

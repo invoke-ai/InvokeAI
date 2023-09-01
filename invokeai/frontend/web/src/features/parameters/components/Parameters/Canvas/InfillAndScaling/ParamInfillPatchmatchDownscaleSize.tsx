@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
-import { setInfillTileSize } from 'features/parameters/store/generationSlice';
+import { setInfillPatchmatchDownscaleSize } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 
 import { useTranslation } from 'react-i18next';
@@ -11,41 +11,42 @@ import { useTranslation } from 'react-i18next';
 const selector = createSelector(
   [generationSelector],
   (parameters) => {
-    const { infillTileSize, infillMethod } = parameters;
+    const { infillPatchmatchDownscaleSize, infillMethod } = parameters;
 
     return {
-      infillTileSize,
+      infillPatchmatchDownscaleSize,
       infillMethod,
     };
   },
   defaultSelectorOptions
 );
 
-const ParamInfillTileSize = () => {
+const ParamInfillPatchmatchDownscaleSize = () => {
   const dispatch = useAppDispatch();
-  const { infillTileSize, infillMethod } = useAppSelector(selector);
+  const { infillPatchmatchDownscaleSize, infillMethod } =
+    useAppSelector(selector);
 
   const { t } = useTranslation();
 
   const handleChange = useCallback(
     (v: number) => {
-      dispatch(setInfillTileSize(v));
+      dispatch(setInfillPatchmatchDownscaleSize(v));
     },
     [dispatch]
   );
 
   const handleReset = useCallback(() => {
-    dispatch(setInfillTileSize(32));
+    dispatch(setInfillPatchmatchDownscaleSize(2));
   }, [dispatch]);
 
   return (
     <IAISlider
-      isDisabled={infillMethod !== 'tile'}
-      label={t('parameters.tileSize')}
-      min={16}
-      max={64}
-      sliderNumberInputProps={{ max: 256 }}
-      value={infillTileSize}
+      isDisabled={infillMethod !== 'patchmatch'}
+      label={t('parameters.patchmatchDownScaleSize')}
+      min={1}
+      max={10}
+      sliderNumberInputProps={{ max: 10 }}
+      value={infillPatchmatchDownscaleSize}
       onChange={handleChange}
       withInput
       withSliderMarks
@@ -55,4 +56,4 @@ const ParamInfillTileSize = () => {
   );
 };
 
-export default memo(ParamInfillTileSize);
+export default memo(ParamInfillPatchmatchDownscaleSize);

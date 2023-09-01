@@ -520,6 +520,7 @@
         "scaledHeight": "Scaled H",
         "infillMethod": "Infill Method",
         "tileSize": "Tile Size",
+        "patchmatchDownScaleSize": "Downscale",
         "boundingBoxHeader": "Bounding Box",
         "seamCorrectionHeader": "Seam Correction",
         "infillScalingHeader": "Infill and Scaling",
