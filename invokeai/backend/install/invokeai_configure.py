@@ -594,7 +594,8 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
             "vram",
             "outdir",
         ]:
-            setattr(new_opts, attr, getattr(self, attr).value)
+            if hasattr(self, attr):
+                setattr(new_opts, attr, getattr(self, attr).value)
 
         for attr in self.autoimport_dirs:
             directory = Path(self.autoimport_dirs[attr].value)
