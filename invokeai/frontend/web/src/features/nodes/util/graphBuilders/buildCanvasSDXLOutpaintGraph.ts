@@ -521,6 +521,14 @@ export const buildCanvasSDXLOutpaintGraph = (
     };
   }
 
+  if (infillMethod === 'cv2') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_cv2',
+      id: INPAINT_INFILL,
+      is_intermediate: true,
+    };
+  }
+
   if (infillMethod === 'tile') {
     graph.nodes[INPAINT_INFILL] = {
       type: 'infill_tile',
