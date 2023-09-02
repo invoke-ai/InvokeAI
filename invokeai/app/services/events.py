@@ -9,14 +9,16 @@ from invokeai.app.services.model_manager_service import (
     SubModelType,
     ModelInfo,
 )
+from invokeai.backend.model_manager.download import DownloadJobBase
 
 
 class EventServiceBase:
+    """Basic event bus, to have an empty stand-in when not needed."""
+
     session_event: str = "session_event"
 
-    """Basic event bus, to have an empty stand-in when not needed"""
-
     def dispatch(self, event_name: str, payload: Any) -> None:
+        """Dispatch an event."""
         pass
 
     def __emit_session_event(self, event_name: str, payload: dict) -> None:
@@ -186,4 +188,16 @@ class EventServiceBase:
                 error_type=error_type,
                 error=error,
             ),
+        )
+
+    def emit_model_download_event (
+            self,
+            job: DownloadJobBase
+    ):
+        """Emit event when the status of a download job changes."""
+        self.dispatch(  # use dispatch() directly here because we are not a session event.
+            event_name="download_job_event",
+            payload=dict(
+                job=job
+            )
         )
