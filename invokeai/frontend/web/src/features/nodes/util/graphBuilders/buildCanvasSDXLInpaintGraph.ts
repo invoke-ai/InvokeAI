@@ -605,16 +605,8 @@ export const buildCanvasSDXLInpaintGraph = (
   }
 
   // Handle Coherence Mode
-  if (canvasCoherenceMode === 'edge') {
-    graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
-      type: 'mask_edge',
-      id: CANVAS_COHERENCE_MASK_EDGE,
-      is_intermediate: true,
-      edge_blur: maskBlur,
-      edge_size: maskBlur * 2,
-      low_threshold: 100,
-      high_threshold: 200,
-    };
+  if (canvasCoherenceMode !== 'unmasked') {
+    // Create Mask If Coherence Mode Is Not Full
     graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
       type: 'create_denoise_mask',
       id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
@@ -622,9 +614,65 @@ export const buildCanvasSDXLInpaintGraph = (
       fp32: vaePrecision === 'fp32' ? true : false,
     };
 
+    // Handle Image Input For Mask Creation
     if (isUsingScaledDimensions) {
-      graph.edges.push(
-        {
+      graph.edges.push({
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      });
+    } else {
+      graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
+        ...(graph.nodes[
+          CANVAS_COHERENCE_INPAINT_CREATE_MASK
+        ] as CreateDenoiseMaskInvocation),
+        image: canvasInitImage,
+      };
+    }
+
+    // Create Mask If Coherence Mode Is Mask
+    if (canvasCoherenceMode === 'mask') {
+      if (isUsingScaledDimensions) {
+        graph.edges.push({
+          source: {
+            node_id: MASK_RESIZE_UP,
+            field: 'image',
+          },
+          destination: {
+            node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+            field: 'mask',
+          },
+        });
+      } else {
+        graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
+          ...(graph.nodes[
+            CANVAS_COHERENCE_INPAINT_CREATE_MASK
+          ] as CreateDenoiseMaskInvocation),
+          mask: canvasMaskImage,
+        };
+      }
+    }
+
+    // Create Mask Edge If Coherence Mode Is Edge
+    if (canvasCoherenceMode === 'edge') {
+      graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
+        type: 'mask_edge',
+        id: CANVAS_COHERENCE_MASK_EDGE,
+        is_intermediate: true,
+        edge_blur: maskBlur,
+        edge_size: maskBlur * 2,
+        low_threshold: 100,
+        high_threshold: 200,
+      };
+
+      // Handle Scaled Dimensions For Mask Edge
+      if (isUsingScaledDimensions) {
+        graph.edges.push({
           source: {
             node_id: MASK_RESIZE_UP,
             field: 'image',
@@ -633,33 +681,15 @@ export const buildCanvasSDXLInpaintGraph = (
             node_id: CANVAS_COHERENCE_MASK_EDGE,
             field: 'image',
           },
-        },
-        {
-          source: {
-            node_id: INPAINT_IMAGE_RESIZE_UP,
-            field: 'image',
-          },
-          destination: {
-            node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-            field: 'image',
-          },
-        }
-      );
-    } else {
-      graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
-        ...(graph.nodes[
-          CANVAS_COHERENCE_INPAINT_CREATE_MASK
-        ] as CreateDenoiseMaskInvocation),
-        image: canvasInitImage,
-      };
-      graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
-        ...(graph.nodes[CANVAS_COHERENCE_MASK_EDGE] as MaskEdgeInvocation),
-        image: canvasMaskImage,
-      };
-    }
+        });
+      } else {
+        graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
+          ...(graph.nodes[CANVAS_COHERENCE_MASK_EDGE] as MaskEdgeInvocation),
+          image: canvasMaskImage,
+        };
+      }
 
-    graph.edges.push(
-      {
+      graph.edges.push({
         source: {
           node_id: CANVAS_COHERENCE_MASK_EDGE,
           field: 'image',
@@ -668,18 +698,20 @@ export const buildCanvasSDXLInpaintGraph = (
           node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
           field: 'mask',
         },
+      });
+    }
+
+    // Plug Denoise Mask To Coherence Denoise Latents
+    graph.edges.push({
+      source: {
+        node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+        field: 'denoise_mask',
       },
-      {
-        source: {
-          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-          field: 'denoise_mask',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 'denoise_mask',
-        },
-      }
-    );
+      destination: {
+        node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+        field: 'denoise_mask',
+      },
+    });
   }
 
   // Handle Seed

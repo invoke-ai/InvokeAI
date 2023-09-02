@@ -421,7 +421,7 @@ export const isValidMaskBlurMethod = (
 /**
  * Zod schema for a Canvas Coherence Mode method parameter
  */
-export const zCanvasCoherenceMode = z.enum(['full', 'edge']);
+export const zCanvasCoherenceMode = z.enum(['unmasked', 'mask', 'edge']);
 /**
  * Type alias for Canvas Coherence Mode parameter, inferred from its zod schema
  */

@@ -9,8 +9,9 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const coherenceModeSelectData: IAISelectDataType[] = [
-  { label: 'Full', value: 'full' },
-  { label: 'Edge', value: 'edge' },
+  { label: 'Unmasked', value: 'unmasked' },
+  { label: 'Mask', value: 'mask' },
+  { label: 'Mask Edge', value: 'edge' },
 ];
 
 const ParamCanvasCoherenceMode = () => {
