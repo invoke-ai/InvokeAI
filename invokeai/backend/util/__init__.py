@@ -10,7 +10,6 @@ from .devices import (  # noqa: F401
     normalize_device,
     torch_dtype,
 )
-from .log import write_log  # noqa: F401
 from .util import (  # noqa: F401
     ask_user,
     download_with_resume,
