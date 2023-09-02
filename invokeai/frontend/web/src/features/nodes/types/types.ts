@@ -1,4 +1,3 @@
-import { store } from 'app/store/store';
 import {
   SchedulerParam,
   zBaseModel,
@@ -10,7 +9,6 @@ import { keyBy } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Node } from 'reactflow';
-import { JsonObject } from 'type-fest';
 import { Graph, ImageDTO, _InputField, _OutputField } from 'services/api/types';
 import {
   AnyInvocationType,
@@ -18,6 +16,7 @@ import {
   ProgressImage,
 } from 'services/events/types';
 import { O } from 'ts-toolbelt';
+import { JsonObject } from 'type-fest';
 import { z } from 'zod';
 
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
@@ -936,22 +935,10 @@ export const zWorkflow = z.object({
 });
 
 export const zValidatedWorkflow = zWorkflow.transform((workflow) => {
-  const nodeTemplates = store.getState().nodes.nodeTemplates;
   const { nodes, edges } = workflow;
   const warnings: WorkflowWarning[] = [];
   const invocationNodes = nodes.filter(isWorkflowInvocationNode);
   const keyedNodes = keyBy(invocationNodes, 'id');
-  invocationNodes.forEach((node, i) => {
-    const nodeTemplate = nodeTemplates[node.data.type];
-    if (!nodeTemplate) {
-      warnings.push({
-        message: `Node "${node.data.label || node.data.id}" skipped`,
-        issues: [`Unable to find template for type "${node.data.type}"`],
-        data: node,
-      });
-      delete nodes[i];
-    }
-  });
   edges.forEach((edge, i) => {
     const sourceNode = keyedNodes[edge.source];
     const targetNode = keyedNodes[edge.target];
