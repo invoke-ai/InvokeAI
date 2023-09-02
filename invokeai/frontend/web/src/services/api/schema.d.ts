@@ -1678,15 +1678,15 @@ export type components = {
        */
       refiner_scheduler?: string;
       /**
-       * Refiner Positive Aesthetic Store
+       * Refiner Positive Aesthetic Score
        * @description The aesthetic score used for the refiner
        */
-      refiner_positive_aesthetic_store?: number;
+      refiner_positive_aesthetic_score?: number;
       /**
-       * Refiner Negative Aesthetic Store
+       * Refiner Negative Aesthetic Score
        * @description The aesthetic score used for the refiner
        */
-      refiner_negative_aesthetic_store?: number;
+      refiner_negative_aesthetic_score?: number;
       /**
        * Refiner Start
        * @description The start value used for refiner denoising
@@ -4627,15 +4627,15 @@ export type components = {
        */
       refiner_scheduler?: string;
       /**
-       * Refiner Positive Aesthetic Store
+       * Refiner Positive Aesthetic Score
        * @description The aesthetic score used for the refiner
        */
-      refiner_positive_aesthetic_store?: number;
+      refiner_positive_aesthetic_score?: number;
       /**
-       * Refiner Negative Aesthetic Store
+       * Refiner Negative Aesthetic Score
        * @description The aesthetic score used for the refiner
        */
-      refiner_negative_aesthetic_store?: number;
+      refiner_negative_aesthetic_score?: number;
       /**
        * Refiner Start
        * @description The start value used for refiner denoising
@@ -5852,12 +5852,12 @@ export type components = {
        */
       target_height?: number;
       /**
-       * Clip
+       * CLIP 1
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip?: components["schemas"]["ClipField"];
       /**
-       * Clip2
+       * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip2?: components["schemas"]["ClipField"];
@@ -5901,7 +5901,7 @@ export type components = {
        */
       weight?: number;
       /**
-       * UNET
+       * UNet
        * @description UNet (scheduler, LoRAs)
        */
       unet?: components["schemas"]["UNetField"];
@@ -7082,12 +7082,6 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -7100,17 +7094,23 @@ export type components = {
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusionOnnxModelFormat
+     * StableDiffusion1ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
      * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
   };
   responses: never;
   parameters: never;
