@@ -265,7 +265,7 @@ class InvokeAICrossAttentionMixin:
         if q.shape[1] <= 4096:  # (512x512) max q.shape[1]: 4096
             return self.einsum_lowest_level(q, k, v, None, None, None)
         else:
-            slice_size = math.floor(2 ** 30 / (q.shape[0] * q.shape[1]))
+            slice_size = math.floor(2**30 / (q.shape[0] * q.shape[1]))
             return self.einsum_op_slice_dim1(q, k, v, slice_size)
 
     def einsum_op_mps_v2(self, q, k, v):

@@ -101,13 +101,15 @@ const ImageMetadataActions = (props: Props) => {
           onClick={handleRecallSeed}
         />
       )}
-      {metadata.model !== undefined && metadata.model !== null && (
-        <ImageMetadataItem
-          label="Model"
-          value={metadata.model.model_name}
-          onClick={handleRecallModel}
-        />
-      )}
+      {metadata.model !== undefined &&
+        metadata.model !== null &&
+        metadata.model.model_name && (
+          <ImageMetadataItem
+            label="Model"
+            value={metadata.model.model_name}
+            onClick={handleRecallModel}
+          />
+        )}
       {metadata.width && (
         <ImageMetadataItem
           label="Width"

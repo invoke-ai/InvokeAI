@@ -1,8 +1,9 @@
-import { store } from 'app/store/store';
 import {
   SchedulerParam,
   zBaseModel,
+  zMainModel,
   zMainOrOnnxModel,
+  zOnnxModel,
   zSDXLRefinerModel,
   zScheduler,
 } from 'features/parameters/types/parameterSchemas';
@@ -10,7 +11,6 @@ import { keyBy } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Node } from 'reactflow';
-import { JsonObject } from 'type-fest';
 import { Graph, ImageDTO, _InputField, _OutputField } from 'services/api/types';
 import {
   AnyInvocationType,
@@ -18,6 +18,7 @@ import {
   ProgressImage,
 } from 'services/events/types';
 import { O } from 'ts-toolbelt';
+import { JsonObject } from 'type-fest';
 import { z } from 'zod';
 
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
@@ -770,12 +771,14 @@ export const zCoreMetadata = z
     steps: z.number().int().nullish(),
     scheduler: z.string().nullish(),
     clip_skip: z.number().int().nullish(),
-    model: zMainOrOnnxModel.nullish(),
-    controlnets: z.array(zControlField).nullish(),
+    model: z
+      .union([zMainModel.deepPartial(), zOnnxModel.deepPartial()])
+      .nullish(),
+    controlnets: z.array(zControlField.deepPartial()).nullish(),
     loras: z
       .array(
         z.object({
-          lora: zLoRAModelField,
+          lora: zLoRAModelField.deepPartial(),
           weight: z.number(),
         })
       )
@@ -785,15 +788,15 @@ export const zCoreMetadata = z
     init_image: z.string().nullish(),
     positive_style_prompt: z.string().nullish(),
     negative_style_prompt: z.string().nullish(),
-    refiner_model: zSDXLRefinerModel.nullish(),
+    refiner_model: zSDXLRefinerModel.deepPartial().nullish(),
     refiner_cfg_scale: z.number().nullish(),
     refiner_steps: z.number().int().nullish(),
     refiner_scheduler: z.string().nullish(),
-    refiner_positive_aesthetic_store: z.number().nullish(),
-    refiner_negative_aesthetic_store: z.number().nullish(),
+    refiner_positive_aesthetic_score: z.number().nullish(),
+    refiner_negative_aesthetic_score: z.number().nullish(),
     refiner_start: z.number().nullish(),
   })
-  .catchall(z.record(z.any()));
+  .passthrough();
 
 export type CoreMetadata = z.infer<typeof zCoreMetadata>;
 
@@ -936,22 +939,10 @@ export const zWorkflow = z.object({
 });
 
 export const zValidatedWorkflow = zWorkflow.transform((workflow) => {
-  const nodeTemplates = store.getState().nodes.nodeTemplates;
   const { nodes, edges } = workflow;
   const warnings: WorkflowWarning[] = [];
   const invocationNodes = nodes.filter(isWorkflowInvocationNode);
   const keyedNodes = keyBy(invocationNodes, 'id');
-  invocationNodes.forEach((node, i) => {
-    const nodeTemplate = nodeTemplates[node.data.type];
-    if (!nodeTemplate) {
-      warnings.push({
-        message: `Node "${node.data.label || node.data.id}" skipped`,
-        issues: [`Unable to find template for type "${node.data.type}"`],
-        data: node,
-      });
-      delete nodes[i];
-    }
-  });
   edges.forEach((edge, i) => {
     const sourceNode = keyedNodes[edge.source];
     const targetNode = keyedNodes[edge.target];
