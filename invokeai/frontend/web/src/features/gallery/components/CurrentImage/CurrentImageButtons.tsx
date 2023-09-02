@@ -110,7 +110,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   );
 
   const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    lastSelectedImage?.image_name ?? skipToken,
+    lastSelectedImage ?? skipToken,
     {
       selectFromResult: (res) => ({
         isLoading: res.isFetching,
