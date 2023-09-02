@@ -240,7 +240,7 @@ class SDXLLoraLoaderOutput(BaseInvocationOutput):
     """SDXL LoRA Loader Output"""
 
     unet: Optional[UNetField] = OutputField(default=None, description=FieldDescriptions.unet, title="UNet")
-    clip: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
+    clip: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP 1")
     clip2: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP 2")
 
 
