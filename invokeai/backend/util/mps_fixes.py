@@ -1,7 +1,7 @@
 import math
-import torch
-import diffusers
 
+import diffusers
+import torch
 
 if torch.backends.mps.is_available():
     torch.empty = torch.zeros

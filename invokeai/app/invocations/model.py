@@ -249,7 +249,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: LoRAModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA")
-    weight: float = Field(default=0.75, description=FieldDescriptions.lora_weight)
+    weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = Field(
         default=None, description=FieldDescriptions.unet, input=Input.Connection, title="UNET"
     )
