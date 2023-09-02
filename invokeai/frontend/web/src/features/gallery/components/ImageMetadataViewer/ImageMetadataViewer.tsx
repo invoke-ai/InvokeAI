@@ -27,15 +27,12 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   //   dispatch(setShouldShowImageDetails(false));
   // });
 
-  const { metadata, workflow } = useGetImageMetadataFromFileQuery(
-    image.image_name,
-    {
-      selectFromResult: (res) => ({
-        metadata: res?.currentData?.metadata,
-        workflow: res?.currentData?.workflow,
-      }),
-    }
-  );
+  const { metadata, workflow } = useGetImageMetadataFromFileQuery(image, {
+    selectFromResult: (res) => ({
+      metadata: res?.currentData?.metadata,
+      workflow: res?.currentData?.workflow,
+    }),
+  });
 
   return (
     <Flex
