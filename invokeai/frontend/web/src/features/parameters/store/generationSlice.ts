@@ -7,6 +7,7 @@ import { ImageDTO } from 'services/api/types';
 
 import { clipSkipMap } from '../types/constants';
 import {
+  CanvasCoherenceModeParam,
   CfgScaleParam,
   HeightParam,
   MainModelParam,
@@ -37,6 +38,7 @@ export interface GenerationState {
   scheduler: SchedulerParam;
   maskBlur: number;
   maskBlurMethod: MaskBlurMethodParam;
+  canvasCoherenceMode: CanvasCoherenceModeParam;
   canvasCoherenceSteps: number;
   canvasCoherenceStrength: StrengthParam;
   seed: SeedParam;
@@ -78,6 +80,7 @@ export const initialGenerationState: GenerationState = {
   scheduler: 'euler',
   maskBlur: 16,
   maskBlurMethod: 'box',
+  canvasCoherenceMode: 'edge',
   canvasCoherenceSteps: 20,
   canvasCoherenceStrength: 0.3,
   seed: 0,
@@ -208,6 +211,12 @@ export const generationSlice = createSlice({
     setMaskBlurMethod: (state, action: PayloadAction<MaskBlurMethodParam>) => {
       state.maskBlurMethod = action.payload;
     },
+    setCanvasCoherenceMode: (
+      state,
+      action: PayloadAction<CanvasCoherenceModeParam>
+    ) => {
+      state.canvasCoherenceMode = action.payload;
+    },
     setCanvasCoherenceSteps: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceSteps = action.payload;
     },
@@ -331,6 +340,7 @@ export const {
   setScheduler,
   setMaskBlur,
   setMaskBlurMethod,
+  setCanvasCoherenceMode,
   setCanvasCoherenceSteps,
   setCanvasCoherenceStrength,
   setSeed,

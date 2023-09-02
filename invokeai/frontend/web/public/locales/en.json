@@ -511,6 +511,7 @@
         "maskBlur": "Blur",
         "maskBlurMethod": "Blur Method",
         "coherencePassHeader": "Coherence Pass",
+        "coherenceMode": "Mode",
         "coherenceSteps": "Steps",
         "coherenceStrength": "Strength",
         "seamLowThreshold": "Low",

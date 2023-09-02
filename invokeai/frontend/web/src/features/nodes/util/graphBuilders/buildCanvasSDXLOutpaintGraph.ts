@@ -72,9 +72,11 @@ export const buildCanvasSDXLOutpaintGraph = (
     shouldUseNoiseSettings,
     shouldUseCpuNoise,
     maskBlur,
+    canvasCoherenceMode,
     canvasCoherenceSteps,
     canvasCoherenceStrength,
     infillTileSize,
+    infillPatchmatchDownscaleSize,
     infillMethod,
     seamlessXAxis,
     seamlessYAxis,
@@ -189,21 +191,6 @@ export const buildCanvasSDXLOutpaintGraph = (
         id: CANVAS_COHERENCE_NOISE_INCREMENT,
         b: 1,
         is_intermediate: true,
-      },
-      [CANVAS_COHERENCE_MASK_EDGE]: {
-        type: 'mask_edge',
-        id: CANVAS_COHERENCE_MASK_EDGE,
-        is_intermediate: true,
-        edge_blur: maskBlur,
-        edge_size: maskBlur * 2,
-        low_threshold: 100,
-        high_threshold: 200,
-      },
-      [CANVAS_COHERENCE_INPAINT_CREATE_MASK]: {
-        type: 'create_denoise_mask',
-        id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-        is_intermediate: true,
-        fp32: vaePrecision === 'fp32' ? true : false,
       },
       [CANVAS_COHERENCE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -377,27 +364,6 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'denoise_mask',
         },
       },
-      // Create Coherence Mask
-      {
-        source: {
-          node_id: CANVAS_COHERENCE_MASK_EDGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-          field: 'mask',
-        },
-      },
-      {
-        source: {
-          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-          field: 'denoise_mask',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 'denoise_mask',
-        },
-      },
       // Iterate
       {
         source: {
@@ -488,6 +454,16 @@ export const buildCanvasSDXLOutpaintGraph = (
         destination: {
           node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
           field: 'latents',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'image',
         },
       },
       // Decode inpainted latents to image
@@ -602,26 +578,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: INPAINT_CREATE_MASK,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-          field: 'image',
-        },
-      },
+
       // Take combined mask and resize and then blur
       {
         source: {
@@ -633,16 +590,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
-      {
-        source: {
-          node_id: MASK_RESIZE_UP,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_MASK_EDGE,
-          field: 'image',
-        },
-      },
+
       // Resize Results Down
       {
         source: {
@@ -726,37 +674,6 @@ export const buildCanvasSDXLOutpaintGraph = (
     };
 
     graph.edges.push(
-      // Take combined mask and plug it to blur
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: INPAINT_CREATE_MASK,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: MASK_COMBINE,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_MASK_EDGE,
-          field: 'image',
-        },
-      },
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-          field: 'image',
-        },
-      },
       // Color Correct The Inpainted Result
       {
         source: {
@@ -786,6 +703,82 @@ export const buildCanvasSDXLOutpaintGraph = (
         destination: {
           node_id: CANVAS_OUTPUT,
           field: 'mask',
+        },
+      }
+    );
+  }
+
+  // Handle Coherence Mode
+  if (canvasCoherenceMode === 'edge') {
+    graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
+      type: 'mask_edge',
+      id: CANVAS_COHERENCE_MASK_EDGE,
+      is_intermediate: true,
+      edge_blur: maskBlur,
+      edge_size: maskBlur * 2,
+      low_threshold: 100,
+      high_threshold: 200,
+    };
+    graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
+      type: 'create_denoise_mask',
+      id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+      is_intermediate: true,
+      fp32: vaePrecision === 'fp32' ? true : false,
+    };
+
+    if (isUsingScaledDimensions) {
+      graph.edges.push({
+        source: {
+          node_id: MASK_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_MASK_EDGE,
+          field: 'image',
+        },
+      });
+    } else {
+      graph.edges.push({
+        source: {
+          node_id: MASK_COMBINE,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_MASK_EDGE,
+          field: 'image',
+        },
+      });
+    }
+
+    graph.edges.push(
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: CANVAS_COHERENCE_MASK_EDGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'mask',
+        },
+      },
+      {
+        source: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'denoise_mask',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+          field: 'denoise_mask',
         },
       }
     );

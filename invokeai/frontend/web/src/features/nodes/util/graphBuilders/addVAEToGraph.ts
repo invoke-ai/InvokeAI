@@ -32,7 +32,7 @@ export const addVAEToGraph = (
   graph: NonNullableGraph,
   modelLoaderNodeId: string = MAIN_MODEL_LOADER
 ): void => {
-  const { vae } = state.generation;
+  const { vae, canvasCoherenceMode } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
   const { shouldUseSDXLRefiner } = state.sdxl;
 
@@ -142,21 +142,25 @@ export const addVAEToGraph = (
           field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
         },
         destination: {
-          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-          field: 'vae',
-        },
-      },
-      {
-        source: {
-          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
-        },
-        destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'vae',
         },
       }
     );
+
+    // Handle Coherence Mode
+    if (canvasCoherenceMode === 'edge') {
+      graph.edges.push({
+        source: {
+          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'vae',
+        },
+      });
+    }
   }
 
   if (shouldUseSDXLRefiner) {
