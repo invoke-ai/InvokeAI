@@ -60,7 +60,7 @@ class Config:
     thumbnail_path = None
 
     def find_and_load(self):
-        """find the yaml config file and load"""
+        """Find the yaml config file and load"""
         root = app_config.root_path
         if not self.confirm_and_load(os.path.abspath(root)):
             print("\r\nSpecify custom database and outputs paths:")
@@ -70,7 +70,7 @@ class Config:
         self.thumbnail_path = os.path.join(self.outputs_path, "thumbnails")
 
     def confirm_and_load(self, invoke_root):
-        """Validates a yaml path exists, confirms the user wants to use it and loads config."""
+        """Validate a yaml path exists, confirms the user wants to use it and loads config."""
         yaml_path = os.path.join(invoke_root, self.YAML_FILENAME)
         if os.path.exists(yaml_path):
             db_dir, outdir = self.load_paths_from_yaml(yaml_path)
@@ -337,33 +337,24 @@ class InvokeAIMetadataParser:
 
     def map_scheduler(self, old_scheduler):
         """Convert the legacy sampler names to matching 3.0 schedulers"""
+
+        # this was more elegant as a case statement, but that's not available in python 3.9
         if old_scheduler is None:
             return None
-
-        match (old_scheduler):
-            case "ddim":
-                return "ddim"
-            case "plms":
-                return "pnmd"
-            case "k_lms":
-                return "lms"
-            case "k_dpm_2":
-                return "kdpm_2"
-            case "k_dpm_2_a":
-                return "kdpm_2_a"
-            case "dpmpp_2":
-                return "dpmpp_2s"
-            case "k_dpmpp_2":
-                return "dpmpp_2m"
-            case "k_dpmpp_2_a":
-                return None  # invalid, in 2.3.x, selecting this sample would just fallback to last run or plms if new session
-            case "k_euler":
-                return "euler"
-            case "k_euler_a":
-                return "euler_a"
-            case "k_heun":
-                return "heun"
-        return None
+        scheduler_map = dict(
+            ddim="ddim",
+            plms="pnmd",
+            k_lms="lms",
+            k_dpm_2="kdpm_2",
+            k_dpm_2_a="kdpm_2_a",
+            dpmpp_2="dpmpp_2s",
+            k_dpmpp_2="dpmpp_2m",
+            k_dpmpp_2_a=None,  # invalid, in 2.3.x, selecting this sample would just fallback to last run or plms if new session
+            k_euler="euler",
+            k_euler_a="euler_a",
+            k_heun="heun",
+        )
+        return scheduler_map.get(old_scheduler)
 
     def split_prompt(self, raw_prompt: str):
         """Split the unified prompt strings by extracting all negative prompt blocks out into the negative prompt."""
@@ -524,27 +515,27 @@ class MediaImportProcessor:
                 "5) Create/add to board named 'IMPORT' with a the original file app_version appended (.e.g IMPORT_2.2.5)."
             )
             input_option = input("Specify desired board option: ")
-            match (input_option):
-                case "1":
-                    if len(board_names) < 1:
-                        print("\r\nThere are no existing board names to choose from. Select another option!")
-                        continue
-                    board_name = self.select_item_from_list(
-                        board_names, "board name", True, "Cancel, go back and choose a different board option."
-                    )
-                    if board_name is not None:
+            # This was more elegant as a case statement, but not supported in python 3.9
+            if input_option == "1":
+                if len(board_names) < 1:
+                    print("\r\nThere are no existing board names to choose from. Select another option!")
+                    continue
+                board_name = self.select_item_from_list(
+                    board_names, "board name", True, "Cancel, go back and choose a different board option."
+                )
+                if board_name is not None:
+                    return board_name
+            elif input_option == "2":
+                while True:
+                    board_name = input("Specify new/existing board name: ")
+                    if board_name:
                         return board_name
-                case "2":
-                    while True:
-                        board_name = input("Specify new/existing board name: ")
-                        if board_name:
-                            return board_name
-                case "3":
-                    return "IMPORT"
-                case "4":
-                    return f"IMPORT_{timestamp_string}"
-                case "5":
-                    return "IMPORT_APPVERSION"
+            elif input_option == "3":
+                return "IMPORT"
+            elif input_option == "4":
+                return f"IMPORT_{timestamp_string}"
+            elif input_option == "5":
+                return "IMPORT_APPVERSION"
 
     def select_item_from_list(self, items, entity_name, allow_cancel, cancel_string):
         """A general function to render a list of items to select in the console, prompt the user for a selection and ensure a valid entry is selected."""

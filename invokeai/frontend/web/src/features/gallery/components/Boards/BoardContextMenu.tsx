@@ -15,6 +15,7 @@ import { BoardDTO } from 'services/api/types';
 import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
+import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 
 type Props = {
   board?: BoardDTO;
@@ -33,12 +34,16 @@ const BoardContextMenu = ({
 
   const selector = useMemo(
     () =>
-      createSelector(stateSelector, ({ gallery, system }) => {
-        const isAutoAdd = gallery.autoAddBoardId === board_id;
-        const isProcessing = system.isProcessing;
-        const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
-        return { isAutoAdd, isProcessing, autoAssignBoardOnClick };
-      }),
+      createSelector(
+        stateSelector,
+        ({ gallery, system }) => {
+          const isAutoAdd = gallery.autoAddBoardId === board_id;
+          const isProcessing = system.isProcessing;
+          const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
+          return { isAutoAdd, isProcessing, autoAssignBoardOnClick };
+        },
+        defaultSelectorOptions
+      ),
     [board_id]
   );
 

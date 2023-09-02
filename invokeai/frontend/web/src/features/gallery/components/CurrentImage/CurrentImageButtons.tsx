@@ -9,20 +9,24 @@ import {
   MenuButton,
   MenuList,
 } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { stateSelector } from 'app/store/store';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIIconButton from 'common/components/IAIIconButton';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
+  setActiveTab,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
@@ -37,12 +41,12 @@ import {
   FaSeedling,
   FaShareAlt,
 } from 'react-icons/fa';
+import { MdDeviceHub } from 'react-icons/md';
 import {
   useGetImageDTOQuery,
-  useGetImageMetadataQuery,
+  useGetImageMetadataFromFileQuery,
 } from 'services/api/endpoints/images';
 import { menuListMotionProps } from 'theme/components/menu';
-import { useDebounce } from 'use-debounce';
 import { sentImageToImg2Img } from '../../store/actions';
 import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
 
@@ -101,22 +105,36 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   const { recallBothPrompts, recallSeed, recallAllParameters } =
     useRecallParameters();
 
-  const [debouncedMetadataQueryArg, debounceState] = useDebounce(
-    lastSelectedImage,
-    500
-  );
-
   const { currentData: imageDTO } = useGetImageDTOQuery(
     lastSelectedImage?.image_name ?? skipToken
   );
 
-  const { currentData: metadataData } = useGetImageMetadataQuery(
-    debounceState.isPending()
-      ? skipToken
-      : debouncedMetadataQueryArg?.image_name ?? skipToken
+  const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
+    lastSelectedImage ?? skipToken,
+    {
+      selectFromResult: (res) => ({
+        isLoading: res.isFetching,
+        metadata: res?.currentData?.metadata,
+        workflow: res?.currentData?.workflow,
+      }),
+    }
   );
 
-  const metadata = metadataData?.metadata;
+  const handleLoadWorkflow = useCallback(() => {
+    if (!workflow) {
+      return;
+    }
+    dispatch(workflowLoaded(workflow));
+    dispatch(setActiveTab('nodes'));
+    dispatch(
+      addToast(
+        makeToast({
+          title: 'Workflow Loaded',
+          status: 'success',
+        })
+      )
+    );
+  }, [dispatch, workflow]);
 
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);
@@ -152,6 +170,8 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   ]);
 
   useHotkeys('p', handleUsePrompt, [imageDTO]);
+
+  useHotkeys('w', handleLoadWorkflow, [workflow]);
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
@@ -259,22 +279,31 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
 
         <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
           <IAIIconButton
+            isLoading={isLoading}
+            icon={<MdDeviceHub />}
+            tooltip={`${t('nodes.loadWorkflow')} (W)`}
+            aria-label={`${t('nodes.loadWorkflow')} (W)`}
+            isDisabled={!workflow}
+            onClick={handleLoadWorkflow}
+          />
+          <IAIIconButton
+            isLoading={isLoading}
             icon={<FaQuoteRight />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
             isDisabled={!metadata?.positive_prompt}
             onClick={handleUsePrompt}
           />
-
           <IAIIconButton
+            isLoading={isLoading}
             icon={<FaSeedling />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
             isDisabled={!metadata?.seed}
             onClick={handleUseSeed}
           />
-
           <IAIIconButton
+            isLoading={isLoading}
             icon={<FaAsterisk />}
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}

@@ -1,13 +1,20 @@
-import { Flex, FormControl, FormLabel, Icon, Tooltip } from '@chakra-ui/react';
+import {
+  Flex,
+  FormControl,
+  FormLabel,
+  Icon,
+  Spacer,
+  Tooltip,
+} from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
-import SelectionOverlay from 'common/components/SelectionOverlay';
-import { useIsMouseOverField } from 'features/nodes/hooks/useIsMouseOverField';
+import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
+import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/nodesSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { memo, useCallback } from 'react';
 import { FaInfoCircle, FaTrash } from 'react-icons/fa';
-import FieldTitle from './FieldTitle';
+import EditableFieldTitle from './EditableFieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
 
@@ -18,8 +25,8 @@ type Props = {
 
 const LinearViewField = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
-  const { isMouseOverField, handleMouseOut, handleMouseOver } =
-    useIsMouseOverField(nodeId, fieldName);
+  const { isMouseOverNode, handleMouseOut, handleMouseOver } =
+    useMouseOverNode(nodeId);
 
   const handleRemoveField = useCallback(() => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
@@ -27,8 +34,8 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
 
   return (
     <Flex
-      onMouseOver={handleMouseOver}
-      onMouseOut={handleMouseOut}
+      onMouseEnter={handleMouseOver}
+      onMouseLeave={handleMouseOut}
       layerStyle="second"
       sx={{
         position: 'relative',
@@ -42,11 +49,15 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
           sx={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
             mb: 0,
           }}
         >
-          <FieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />
+          <EditableFieldTitle
+            nodeId={nodeId}
+            fieldName={fieldName}
+            kind="input"
+          />
+          <Spacer />
           <Tooltip
             label={
               <FieldTooltipContent
@@ -74,7 +85,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
         </FormLabel>
         <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
       </FormControl>
-      <SelectionOverlay isSelected={false} isHovered={isMouseOverField} />
+      <NodeSelectionOverlay isSelected={false} isHovered={isMouseOverNode} />
     </Flex>
   );
 };

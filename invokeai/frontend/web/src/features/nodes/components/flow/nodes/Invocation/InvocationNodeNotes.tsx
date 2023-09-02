@@ -1,7 +1,5 @@
 import {
   Flex,
-  FormControl,
-  FormLabel,
   Icon,
   Modal,
   ModalBody,
@@ -14,16 +12,14 @@ import {
   Tooltip,
   useDisclosure,
 } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import IAITextarea from 'common/components/IAITextarea';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
 import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';
-import { nodeNotesChanged } from 'features/nodes/store/nodesSlice';
 import { isInvocationNodeData } from 'features/nodes/types/types';
-import { ChangeEvent, memo, useCallback } from 'react';
+import { memo, useMemo } from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
+import NotesTextarea from './NotesTextarea';
 
 interface Props {
   nodeId: string;
@@ -80,13 +76,29 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
   const data = useNodeData(nodeId);
   const nodeTemplate = useNodeTemplate(nodeId);
 
+  const title = useMemo(() => {
+    if (data?.label && nodeTemplate?.title) {
+      return `${data.label} (${nodeTemplate.title})`;
+    }
+
+    if (data?.label && !nodeTemplate) {
+      return data.label;
+    }
+
+    if (!data?.label && nodeTemplate) {
+      return nodeTemplate.title;
+    }
+
+    return 'Unknown Node';
+  }, [data, nodeTemplate]);
+
   if (!isInvocationNodeData(data)) {
     return <Text sx={{ fontWeight: 600 }}>Unknown Node</Text>;
   }
 
   return (
     <Flex sx={{ flexDir: 'column' }}>
-      <Text sx={{ fontWeight: 600 }}>{nodeTemplate?.title}</Text>
+      <Text sx={{ fontWeight: 600 }}>{title}</Text>
       <Text sx={{ opacity: 0.7, fontStyle: 'oblique 5deg' }}>
         {nodeTemplate?.description}
       </Text>
@@ -96,29 +108,3 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
 });
 
 TooltipContent.displayName = 'TooltipContent';
-
-const NotesTextarea = memo(({ nodeId }: { nodeId: string }) => {
-  const dispatch = useAppDispatch();
-  const data = useNodeData(nodeId);
-  const handleNotesChanged = useCallback(
-    (e: ChangeEvent<HTMLTextAreaElement>) => {
-      dispatch(nodeNotesChanged({ nodeId, notes: e.target.value }));
-    },
-    [dispatch, nodeId]
-  );
-  if (!isInvocationNodeData(data)) {
-    return null;
-  }
-  return (
-    <FormControl>
-      <FormLabel>Notes</FormLabel>
-      <IAITextarea
-        value={data?.notes}
-        onChange={handleNotesChanged}
-        rows={10}
-      />
-    </FormControl>
-  );
-});
-
-NotesTextarea.displayName = 'NodesTextarea';

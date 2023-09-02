@@ -22,10 +22,10 @@ import {
   NOISE,
   ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
-  REFINER_SEAMLESS,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
@@ -347,8 +347,15 @@ export const buildCanvasSDXLTextToImageGraph = (
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
-    modelLoaderNodeId = REFINER_SEAMLESS;
+    addSDXLRefinerToGraph(
+      state,
+      graph,
+      SDXL_DENOISE_LATENTS,
+      modelLoaderNodeId
+    );
+    if (seamlessXAxis || seamlessYAxis) {
+      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
+    }
   }
 
   // add LoRA support

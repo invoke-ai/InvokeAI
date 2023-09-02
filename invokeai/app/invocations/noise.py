@@ -1,6 +1,5 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) & the InvokeAI Team
 
-from typing import Literal
 
 import torch
 from pydantic import validator
@@ -16,8 +15,8 @@ from .baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    tags,
-    title,
+    invocation,
+    invocation_output,
 )
 
 """
@@ -62,12 +61,10 @@ Nodes
 """
 
 
+@invocation_output("noise_output")
 class NoiseOutput(BaseInvocationOutput):
     """Invocation noise output"""
 
-    type: Literal["noise_output"] = "noise_output"
-
-    # Inputs
     noise: LatentsField = OutputField(default=None, description=FieldDescriptions.noise)
     width: int = OutputField(description=FieldDescriptions.width)
     height: int = OutputField(description=FieldDescriptions.height)
@@ -81,14 +78,10 @@ def build_noise_output(latents_name: str, latents: torch.Tensor, seed: int):
     )
 
 
-@title("Noise")
-@tags("latents", "noise")
+@invocation("noise", title="Noise", tags=["latents", "noise"], category="latents")
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""
 
-    type: Literal["noise"] = "noise"
-
-    # Inputs
     seed: int = InputField(
         ge=0,
         le=SEED_MAX,

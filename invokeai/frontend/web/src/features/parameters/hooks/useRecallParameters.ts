@@ -1,5 +1,6 @@
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { CoreMetadata } from 'features/nodes/types/types';
 import {
   refinerModelChanged,
   setNegativeStylePromptSDXL,
@@ -13,7 +14,7 @@ import {
 } from 'features/sdxl/store/sdxlSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageDTO, UnsafeImageMetadata } from 'services/api/types';
+import { ImageDTO } from 'services/api/types';
 import { initialImageSelected, modelSelected } from '../store/actions';
 import {
   setCfgScale,
@@ -317,7 +318,7 @@ export const useRecallParameters = () => {
   );
 
   const recallAllParameters = useCallback(
-    (metadata: UnsafeImageMetadata['metadata'] | undefined) => {
+    (metadata: CoreMetadata | undefined) => {
       if (!metadata) {
         allParameterNotSetToast();
         return;
@@ -340,8 +341,8 @@ export const useRecallParameters = () => {
         refiner_cfg_scale,
         refiner_steps,
         refiner_scheduler,
-        refiner_positive_aesthetic_store,
-        refiner_negative_aesthetic_store,
+        refiner_positive_aesthetic_score,
+        refiner_negative_aesthetic_score,
         refiner_start,
       } = metadata;
 
@@ -402,21 +403,21 @@ export const useRecallParameters = () => {
 
       if (
         isValidSDXLRefinerPositiveAestheticScore(
-          refiner_positive_aesthetic_store
+          refiner_positive_aesthetic_score
         )
       ) {
         dispatch(
-          setRefinerPositiveAestheticScore(refiner_positive_aesthetic_store)
+          setRefinerPositiveAestheticScore(refiner_positive_aesthetic_score)
         );
       }
 
       if (
         isValidSDXLRefinerNegativeAestheticScore(
-          refiner_negative_aesthetic_store
+          refiner_negative_aesthetic_score
         )
       ) {
         dispatch(
-          setRefinerNegativeAestheticScore(refiner_negative_aesthetic_store)
+          setRefinerNegativeAestheticScore(refiner_negative_aesthetic_score)
         );
       }
 

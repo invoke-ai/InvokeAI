@@ -46,6 +46,7 @@ if [[ $(python -c 'from importlib.util import find_spec; print(find_spec("build"
     pip install --user build
 fi
 
+rm -r ../build
 python -m build --wheel --outdir dist/ ../.
 
 # ----------------------

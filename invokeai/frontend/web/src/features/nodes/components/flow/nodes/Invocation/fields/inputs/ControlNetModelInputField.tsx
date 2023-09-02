@@ -92,6 +92,7 @@ const ControlNetModelInputFieldComponent = (
       error={!selectedModel}
       data={data}
       onChange={handleValueChanged}
+      sx={{ width: '100%' }}
     />
   );
 };
