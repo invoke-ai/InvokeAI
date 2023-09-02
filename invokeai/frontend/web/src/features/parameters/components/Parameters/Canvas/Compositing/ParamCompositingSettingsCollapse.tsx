@@ -15,15 +15,15 @@ const ParamCompositingSettingsCollapse = () => {
   return (
     <IAICollapse label={t('parameters.compositingSettingsHeader')}>
       <Flex sx={{ flexDirection: 'column', gap: 2 }}>
-        <SubParametersWrapper label={t('parameters.maskAdjustmentsHeader')}>
-          <ParamMaskBlur />
-          <ParamMaskBlurMethod />
-        </SubParametersWrapper>
-        <Divider />
         <SubParametersWrapper label={t('parameters.coherencePassHeader')}>
           <ParamCanvasCoherenceMode />
           <ParamCanvasCoherenceSteps />
           <ParamCanvasCoherenceStrength />
+        </SubParametersWrapper>
+        <Divider />
+        <SubParametersWrapper label={t('parameters.maskAdjustmentsHeader')}>
+          <ParamMaskBlur />
+          <ParamMaskBlurMethod />
         </SubParametersWrapper>
       </Flex>
     </IAICollapse>
