@@ -464,8 +464,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 latents = context.services.latents.get(self.latents.latents_name)
                 if seed is None:
                     seed = self.latents.seed
-            else:
+
+                if noise is not None and noise.shape[1:] != latents.shape[1:]:
+                    raise Exception(f"Incompatable 'noise' and 'latents' shapes: {latents.shape=} {noise.shape=}")
+
+            elif noise is not None:
                 latents = torch.zeros_like(noise)
+            else:
+                raise Exception("'latents' or 'noise' must be provided!")
 
             if seed is None:
                 seed = 0

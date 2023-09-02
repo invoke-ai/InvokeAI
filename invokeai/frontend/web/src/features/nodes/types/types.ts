@@ -1,4 +1,3 @@
-import { store } from 'app/store/store';
 import {
   SchedulerParam,
   zBaseModel,
@@ -10,7 +9,6 @@ import { keyBy } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { RgbaColor } from 'react-colorful';
 import { Node } from 'reactflow';
-import { JsonObject } from 'type-fest';
 import { Graph, ImageDTO, _InputField, _OutputField } from 'services/api/types';
 import {
   AnyInvocationType,
@@ -18,6 +16,7 @@ import {
   ProgressImage,
 } from 'services/events/types';
 import { O } from 'ts-toolbelt';
+import { JsonObject } from 'type-fest';
 import { z } from 'zod';
 
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
@@ -280,7 +279,7 @@ export type ConditioningInputFieldValue = z.infer<
 export const zControlNetModel = zModelIdentifier;
 export type ControlNetModel = z.infer<typeof zControlNetModel>;
 
-export const zControlField = zInputFieldValueBase.extend({
+export const zControlField = z.object({
   image: zImageField,
   control_model: zControlNetModel,
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
@@ -295,11 +294,11 @@ export const zControlField = zInputFieldValueBase.extend({
 });
 export type ControlField = z.infer<typeof zControlField>;
 
-export const zControlInputFieldTemplate = zInputFieldValueBase.extend({
+export const zControlInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('ControlField'),
   value: zControlField.optional(),
 });
-export type ControlInputFieldValue = z.infer<typeof zControlInputFieldTemplate>;
+export type ControlInputFieldValue = z.infer<typeof zControlInputFieldValue>;
 
 export const zModelType = z.enum([
   'onnx',
@@ -492,7 +491,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zUNetInputFieldValue,
   zClipInputFieldValue,
   zVaeInputFieldValue,
-  zControlInputFieldTemplate,
+  zControlInputFieldValue,
   zEnumInputFieldValue,
   zMainModelInputFieldValue,
   zSDXLMainModelInputFieldValue,
@@ -936,22 +935,10 @@ export const zWorkflow = z.object({
 });
 
 export const zValidatedWorkflow = zWorkflow.transform((workflow) => {
-  const nodeTemplates = store.getState().nodes.nodeTemplates;
   const { nodes, edges } = workflow;
   const warnings: WorkflowWarning[] = [];
   const invocationNodes = nodes.filter(isWorkflowInvocationNode);
   const keyedNodes = keyBy(invocationNodes, 'id');
-  invocationNodes.forEach((node, i) => {
-    const nodeTemplate = nodeTemplates[node.data.type];
-    if (!nodeTemplate) {
-      warnings.push({
-        message: `Node "${node.data.label || node.data.id}" skipped`,
-        issues: [`Unable to find template for type "${node.data.type}"`],
-        data: node,
-      });
-      delete nodes[i];
-    }
-  });
   edges.forEach((edge, i) => {
     const sourceNode = keyedNodes[edge.source];
     const targetNode = keyedNodes[edge.target];
