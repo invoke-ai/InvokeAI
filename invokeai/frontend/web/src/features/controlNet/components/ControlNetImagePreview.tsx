@@ -104,22 +104,22 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
   ]);
 
   const handleSetControlImageToDimensions = useCallback(() => {
-    if (!processedControlImage) {
+    if (!controlImage) {
       return;
     }
 
     if (activeTabName === 'unifiedCanvas') {
       dispatch(
         setBoundingBoxDimensions({
-          width: processedControlImage.width,
-          height: processedControlImage.height,
+          width: controlImage.width,
+          height: controlImage.height,
         })
       );
     } else {
-      dispatch(setWidth(processedControlImage.width));
-      dispatch(setHeight(processedControlImage.height));
+      dispatch(setWidth(controlImage.width));
+      dispatch(setHeight(controlImage.height));
     }
-  }, [processedControlImage, activeTabName, dispatch]);
+  }, [controlImage, activeTabName, dispatch]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
