@@ -1,7 +1,9 @@
 import {
   SchedulerParam,
   zBaseModel,
+  zMainModel,
   zMainOrOnnxModel,
+  zOnnxModel,
   zSDXLRefinerModel,
   zScheduler,
 } from 'features/parameters/types/parameterSchemas';
@@ -769,12 +771,14 @@ export const zCoreMetadata = z
     steps: z.number().int().nullish(),
     scheduler: z.string().nullish(),
     clip_skip: z.number().int().nullish(),
-    model: zMainOrOnnxModel.nullish(),
-    controlnets: z.array(zControlField).nullish(),
+    model: z
+      .union([zMainModel.deepPartial(), zOnnxModel.deepPartial()])
+      .nullish(),
+    controlnets: z.array(zControlField.deepPartial()).nullish(),
     loras: z
       .array(
         z.object({
-          lora: zLoRAModelField,
+          lora: zLoRAModelField.deepPartial(),
           weight: z.number(),
         })
       )
@@ -784,15 +788,15 @@ export const zCoreMetadata = z
     init_image: z.string().nullish(),
     positive_style_prompt: z.string().nullish(),
     negative_style_prompt: z.string().nullish(),
-    refiner_model: zSDXLRefinerModel.nullish(),
+    refiner_model: zSDXLRefinerModel.deepPartial().nullish(),
     refiner_cfg_scale: z.number().nullish(),
     refiner_steps: z.number().int().nullish(),
     refiner_scheduler: z.string().nullish(),
-    refiner_positive_aesthetic_store: z.number().nullish(),
-    refiner_negative_aesthetic_store: z.number().nullish(),
+    refiner_positive_aesthetic_score: z.number().nullish(),
+    refiner_negative_aesthetic_score: z.number().nullish(),
     refiner_start: z.number().nullish(),
   })
-  .catchall(z.record(z.any()));
+  .passthrough();
 
 export type CoreMetadata = z.infer<typeof zCoreMetadata>;
 

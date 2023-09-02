@@ -279,8 +279,8 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     crop_left: int = InputField(default=0, description="")
     target_width: int = InputField(default=1024, description="")
     target_height: int = InputField(default=1024, description="")
-    clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
-    clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
+    clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 1")
+    clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 2")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
