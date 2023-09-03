@@ -196,6 +196,38 @@ Results after using the depth controlnet
 
 --------------------------------
 
+### Prompt Tools 
+
+**Description:** A set of InvokeAI nodes that add general prompt manipulation tools.  These where written to accompany the PromptsFromFile node and other prompt generation nodes.
+
+1. PromptJoin - Joins to prompts into one.
+2. PromptReplace - performs a search and replace on a prompt. With the option of using regex.
+3. PromptSplitNeg - splits a prompt into positive and negative using the old V2 method of [] for negative.
+4. PromptToFile - saves a prompt or collection of prompts to a file. one per line. There is an append/overwrite option.
+5. PTFieldsCollect - Converts image generation fields into a Json format string that can be passed to Prompt to file. 
+6. PTFieldsExpand - Takes Json string and converts it to individual generation parameters This can be fed from the Prompts to file node.
+7. PromptJoinThree -  Joins 3 prompt together.
+
+See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md
+
+**Node Link:** https://github.com/skunkworxdark/Prompt-tools-nodes
+
+--------------------------------
+
+### XY Image to Grid and Images to Grids nodes
+
+**Description:** Image to grid nodes and supporting tools.
+
+1. "Images To Grids" node - Takes a collection of images and creates a grid(s) of images. If there are more images than the size of a single grid then mutilple grids will be created until it runs out of images.
+2. "XYImage To Grid" node - Converts a collection of XYImages into a labeled Grid of images.  The XYImages collection has to be built using the supporoting nodes. See example node setups for more details.
+   
+
+See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/README.md
+
+**Node Link:** https://github.com/skunkworxdark/XYGrid_nodes
+
+--------------------------------
+
 ### Example Node Template
 
 **Description:** This node allows you to do super cool things with InvokeAI.
