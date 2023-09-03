@@ -22,12 +22,26 @@ To use a community node graph, download the the `.json` node graph file and load
 ![b920b710-1882-49a0-8d02-82dff2cca907](https://github.com/invoke-ai/InvokeAI/assets/25252829/7660c1ed-bf7d-4d0a-947f-1fc1679557ba)
 ![71a91805-fda5-481c-b380-264665703133](https://github.com/invoke-ai/InvokeAI/assets/25252829/f8f6a2ee-2b68-4482-87da-b90221d5c3e2)
 
+--------------------------------
 ### Ideal Size
 
 **Description:** This node calculates an ideal image size for a first pass of a multi-pass upscaling. The aim is to avoid duplication that results from choosing a size larger than the model is capable of.
 
 **Node Link:** https://github.com/JPPhoto/ideal-size-node
 
+--------------------------------
+### Film Grain
+
+**Description:** This node adds a film grain effect to the input image based on the weights, seeds, and blur radii parameters. It works with RGB input images only.
+
+**Node Link:** https://github.com/JPPhoto/film-grain-node
+
+--------------------------------
+### Image Picker
+
+**Description:** This InvokeAI node takes in a collection of images and randomly chooses one. This can be useful when you have a number of poses to choose from for a ControlNet node, or a number of input images for another purpose.
+
+**Node Link:** https://github.com/JPPhoto/film-grain-node](https://github.com/JPPhoto/image-picker-node/
 
 --------------------------------
 ### Retroize
