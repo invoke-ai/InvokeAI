@@ -443,6 +443,17 @@ const nodesSlice = createSlice({
       }
       node.data.notes = notes;
     },
+    nodeExclusivelySelected: (state, action: PayloadAction<string>) => {
+      const nodeId = action.payload;
+      state.nodes = applyNodeChanges(
+        state.nodes.map((n) => ({
+          id: n.id,
+          type: 'select',
+          selected: n.id === nodeId ? true : false,
+        })),
+        state.nodes
+      );
+    },
     selectedNodesChanged: (state, action: PayloadAction<string[]>) => {
       state.selectedNodes = action.payload;
     },
@@ -892,6 +903,7 @@ export const {
   nodeEmbedWorkflowChanged,
   nodeIsIntermediateChanged,
   mouseOverNodeChanged,
+  nodeExclusivelySelected,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;
