@@ -779,7 +779,7 @@ class ImageChannelAdjustmentInvocation(BaseInvocation):
     """Adjusts any channel of an image in any format."""
 
     image: ImageField = InputField(description="The image to adjust")
-    mode: Literal["RGB", "RGBA", "CYMK", "YCbCr", "LAB", "HSV"] = InputField(description="The color mode to convert to before adjusting")
+    mode: Literal["RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV"] = InputField(description="The color mode to convert to before adjusting")
     channel: int = InputField(default=0, ge=0, le=3, description="Which channel to adjust")
     method: Literal["Multiply", "Offset"] = InputField(description="The type of adjustment to perform")
     adjustment: float = InputField(default=1.0, ge=-255, le=255, description="The amount to adjust the channel by")
