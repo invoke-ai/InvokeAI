@@ -28,7 +28,7 @@ export default function AdvancedAddCheckpoint(
 
   const advancedAddCheckpointForm = useForm<CheckpointModelConfig>({
     initialValues: {
-      model_name: model_path?.split('\\').splice(-1)[0]?.split('.')[0] ?? '',
+      model_name: model_path?.match(/[^\\/]+$/)?.[0]?.split('.')[0] ?? '',
       base_model: 'sd-1',
       model_type: 'main',
       path: model_path ? model_path : '',
@@ -102,13 +102,16 @@ export default function AdvancedAddCheckpoint(
           {...advancedAddCheckpointForm.getInputProps('path')}
           onBlur={(e) => {
             if (advancedAddCheckpointForm.values['model_name'] === '') {
-              advancedAddCheckpointForm.setFieldValue(
-                'model_name',
-                e.currentTarget.value
-                  .split('\\')
-                  .splice(-1)[0]
-                  ?.split('.')[0] as string
-              );
+              const modelName = e.currentTarget.value
+                .match(/[^\\/]+$/)?.[0]
+                ?.split('.')[0];
+
+              if (modelName) {
+                advancedAddCheckpointForm.setFieldValue(
+                  'model_name',
+                  modelName as string
+                );
+              }
             }
           }}
         />

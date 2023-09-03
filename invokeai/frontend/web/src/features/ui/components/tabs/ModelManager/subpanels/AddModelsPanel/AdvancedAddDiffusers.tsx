@@ -25,7 +25,7 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
 
   const advancedAddDiffusersForm = useForm<DiffusersModelConfig>({
     initialValues: {
-      model_name: model_path?.split('\\').splice(-1)[0] ?? '',
+      model_name: model_path?.match(/[^\\/]+$/)?.[0] ?? '',
       base_model: 'sd-1',
       model_type: 'main',
       path: model_path ? model_path : '',
@@ -94,10 +94,13 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
           {...advancedAddDiffusersForm.getInputProps('path')}
           onBlur={(e) => {
             if (advancedAddDiffusersForm.values['model_name'] === '') {
-              advancedAddDiffusersForm.setFieldValue(
-                'model_name',
-                e.currentTarget.value.split('\\').splice(-1)[0] as string
-              );
+              const modelName = e.currentTarget.value.match(/[^\\/]+$/)?.[0];
+              if (modelName) {
+                advancedAddDiffusersForm.setFieldValue(
+                  'model_name',
+                  modelName as string
+                );
+              }
             }
           }}
         />
