@@ -11,6 +11,7 @@ import { DiffusersModelConfig } from 'services/api/types';
 import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
 import BaseModelSelect from '../shared/BaseModelSelect';
 import ModelVariantSelect from '../shared/ModelVariantSelect';
+import { getModelName } from './util';
 
 type AdvancedAddDiffusersProps = {
   model_path?: string;
@@ -25,7 +26,7 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
 
   const advancedAddDiffusersForm = useForm<DiffusersModelConfig>({
     initialValues: {
-      model_name: model_path?.match(/[^\\/]+$/)?.[0] ?? '',
+      model_name: model_path ? getModelName(model_path, false) : '',
       base_model: 'sd-1',
       model_type: 'main',
       path: model_path ? model_path : '',
@@ -94,7 +95,7 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
           {...advancedAddDiffusersForm.getInputProps('path')}
           onBlur={(e) => {
             if (advancedAddDiffusersForm.values['model_name'] === '') {
-              const modelName = e.currentTarget.value.match(/[^\\/]+$/)?.[0];
+              const modelName = getModelName(e.currentTarget.value, false);
               if (modelName) {
                 advancedAddDiffusersForm.setFieldValue(
                   'model_name',
