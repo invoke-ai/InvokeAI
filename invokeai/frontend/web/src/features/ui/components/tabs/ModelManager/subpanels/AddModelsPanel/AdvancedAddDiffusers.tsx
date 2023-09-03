@@ -1,10 +1,10 @@
 import { Flex } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
-import { makeToast } from 'features/system/util/makeToast';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
 import IAIMantineTextInput from 'common/components/IAIMantineInput';
 import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { useTranslation } from 'react-i18next';
 import { useAddMainModelsMutation } from 'services/api/endpoints/models';
 import { DiffusersModelConfig } from 'services/api/types';
@@ -92,6 +92,14 @@ export default function AdvancedAddDiffusers(props: AdvancedAddDiffusersProps) {
           label="Model Location"
           placeholder="Provide the path to a local folder where your Diffusers Model is stored"
           {...advancedAddDiffusersForm.getInputProps('path')}
+          onBlur={(e) => {
+            if (advancedAddDiffusersForm.values['model_name'] === '') {
+              advancedAddDiffusersForm.setFieldValue(
+                'model_name',
+                e.currentTarget.value.split('\\').splice(-1)[0] as string
+              );
+            }
+          }}
         />
         <IAIMantineTextInput
           label="Description"
