@@ -35,7 +35,8 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |Inverse Lerp Image 			| Inverse linear interpolation of all pixels of an image|
 |Image Primitive 			| An image primitive value|
 |Lerp Image 			| Linear interpolation of all pixels of an image|
-|Image Channel Adjustment 			| Adjusts any channel of an image in any color format.|
+|Offset Image Channel 			| Add to or subtract from an image color channel by a uniform value.|
+|Multiply Image Channel 			| Multiply or Invert an image color channel by a scalar value.|
 |Multiply Images 			| Multiplies two images together using `PIL.ImageChops.multiply()`.|
 |Blur NSFW Image 			| Add blur to NSFW-flagged images|
 |Paste Image 			| Pastes an image into another image.|
