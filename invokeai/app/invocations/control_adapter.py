@@ -1,17 +1,17 @@
-from builtins import bool, float
-from typing import Dict, List, Literal, Optional, Union
+from builtins import float
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, validator
+
 from invokeai.app.invocations.primitives import ImageField
 
 from ...backend.model_management import BaseModelType
-
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     FieldDescriptions,
-    InputField,
     Input,
+    InputField,
     InvocationContext,
     OutputField,
     UIType,
@@ -80,7 +80,7 @@ class ControlOutput(BaseInvocationOutput):
     control: ControlField = OutputField(description=FieldDescriptions.control)
 
 
-@invocation("controlnet", title="ControlNet", tags=["controlnet"], category="controlnet")
+@invocation("controlnet", title="ControlNet", tags=["controlnet"], category="controlnet", version="1.0.0")
 class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
 
@@ -122,20 +122,18 @@ class ControlNetInvocation(BaseInvocation):
 
 
 IP_ADAPTER_MODELS = Literal[
-    "models_ip_adapter/models/ip-adapter_sd15.bin",
-    "models_ip_adapter/models/ip-adapter-plus_sd15.bin",
-    "models_ip_adapter/models/ip-adapter-plus-face_sd15.bin",
-    "models_ip_adapter/sdxl_models/ip-adapter_sdxl.bin",
+    "models/core/ip_adapters/sd-1/ip-adapter_sd15.bin",
+    "models/core/ip_adapters/sd-1/ip-adapter-plus_sd15.bin",
+    "models/core/ip_adapters/sd-1/ip-adapter-plus-face_sd15.bin",
+    "models/core/ip_adapters/sdxl/ip-adapter_sdxl.bin",
 ]
 
 IP_ADAPTER_IMAGE_ENCODER_MODELS = Literal[
-    "models_ip_adapter/models/image_encoder/",
-    "./models_ip_adapter/models/image_encoder/",
-    "models_ip_adapter/sdxl_models/image_encoder/",
+    "models/core/ip_adapters/sd-1/image_encoder/", "models/core/ip_adapters/sdxl/image_encoder"
 ]
 
 
-@invocation("ipadapter", title="IP-Adapter", tags=["ipadapter"], category="ipadapter")
+@invocation("ipadapter", title="IP-Adapter", tags=["ipadapter"], category="ipadapter", version="1.0.0")
 class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes"""
 
@@ -147,10 +145,10 @@ class IPAdapterInvocation(BaseInvocation):
     #    default="lllyasviel/sd-controlnet-canny", description=FieldDescriptions.controlnet_model, input=Input.Direct
     # )
     ip_adapter_model: IP_ADAPTER_MODELS = InputField(
-        default="./models_ip_adapter/models/ip-adapter_sd15.bin", description="The IP-Adapter model"
+        default="models/core/ip_adapters/sd-1/ip-adapter_sd15.bin", description="The IP-Adapter model"
     )
     image_encoder_model: IP_ADAPTER_IMAGE_ENCODER_MODELS = InputField(
-        default="./models_ip_adapter/models/image_encoder/", description="The image encoder model"
+        default="models/core/ip_adapters/sd-1/image_encoder/", description="The image encoder model"
     )
     control_weight: Union[float, List[float]] = InputField(
         default=1.0, description="The weight given to the ControlNet", ui_type=UIType.Float
