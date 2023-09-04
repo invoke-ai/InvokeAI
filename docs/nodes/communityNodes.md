@@ -207,6 +207,8 @@ Results after using the depth controlnet
 5. PTFieldsCollect - Converts image generation fields into a Json format string that can be passed to Prompt to file. 
 6. PTFieldsExpand - Takes Json string and converts it to individual generation parameters This can be fed from the Prompts to file node.
 7. PromptJoinThree -  Joins 3 prompt together.
+8. PromptStrength - This take a string and float and outputs another string in the format of (string)strength like the weighted format of compel. 
+9. PromptStrengthCombine - This takes a collection of prompt strength strings and outputs a string in the .and() or .blend() format that can be fed into a proper prompt node.
 
 See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md
 
