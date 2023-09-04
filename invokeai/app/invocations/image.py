@@ -844,7 +844,8 @@ class ImageChannelMultiplyInvocation(BaseInvocation):
 
     image: ImageField = InputField(description="The image to adjust")
     channel: COLOR_CHANNELS = InputField(description="Which channel to adjust")
-    scale: float = InputField(default=1.0, description="The amount to scale the channel by. Negative values will invert the channel.")
+    scale: float = InputField(default=1.0, ge=0.0, description="The amount to scale the channel by.")
+    invert_channel: bool = InputField(default=False, description="Invert the channel after scaling")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_image = context.services.images.get_pil_image(self.image.image_name)
@@ -858,7 +859,11 @@ class ImageChannelMultiplyInvocation(BaseInvocation):
         image_channel = converted_image[:, :, channel_number]
 
         # Adjust the value, clipping to 0..255
-        image_channel = numpy.clip(image_channel * self.scale, -255, 255) % 256
+        image_channel = numpy.clip(image_channel * self.scale, 0, 255)
+
+        # Invert the channel if requested
+        if self.invert_channel:
+            image_channel = 255 - image_channel
         
         # Put the channel back into the image
         converted_image[:, :, channel_number] = image_channel
