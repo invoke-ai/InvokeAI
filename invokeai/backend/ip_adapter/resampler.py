@@ -1,6 +1,7 @@
 # copied from https://github.com/tencent-ailab/IP-Adapter (Apache License 2.0)
 
-# tencent ailab comment: modified from https://github.com/mlfoundations/open_flamingo/blob/main/open_flamingo/src/helpers.py
+# tencent ailab comment: modified from
+# https://github.com/mlfoundations/open_flamingo/blob/main/open_flamingo/src/helpers.py
 import math
 
 import torch

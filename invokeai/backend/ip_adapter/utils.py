@@ -1,18 +1,16 @@
 # copied from https://github.com/tencent-ailab/IP-Adapter (Apache License 2.0)
 #   and modified as needed
 
-import inspect
-import warnings
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import PIL.Image
 import torch
 import torch.nn.functional as F
-from diffusers.utils import is_compiled_module
-from diffusers.pipelines.controlnet.multicontrolnet import MultiControlNetModel
 from diffusers.models import ControlNetModel
+from diffusers.pipelines.controlnet.multicontrolnet import MultiControlNetModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
+from diffusers.utils import is_compiled_module
 
 
 def is_torch2_available():
@@ -59,7 +57,8 @@ def generate(
         prompt (`str` or `List[str]`, *optional*):
             The prompt or prompts to guide the image generation. If not defined, one has to pass `prompt_embeds`.
             instead.
-        image (`torch.FloatTensor`, `PIL.Image.Image`, `np.ndarray`, `List[torch.FloatTensor]`, `List[PIL.Image.Image]`, `List[np.ndarray]`,:
+        image (`torch.FloatTensor`, `PIL.Image.Image`, `np.ndarray`, `List[torch.FloatTensor]`, `List[PIL.Image.Image]`,
+        `List[np.ndarray]`,:
                 `List[List[torch.FloatTensor]]`, `List[List[np.ndarray]]` or `List[List[PIL.Image.Image]]`):
             The ControlNet input condition. ControlNet uses this input condition to generate guidance to Unet. If
             the type is specified as `Torch.FloatTensor`, it is passed to ControlNet as is. `PIL.Image.Image` can

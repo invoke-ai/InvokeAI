@@ -1,1 +1,1 @@
-from .ip_adapter import IPAdapter, IPAdapterXL, IPAdapterPlus
+from .ip_adapter import IPAdapter, IPAdapterPlus, IPAdapterXL

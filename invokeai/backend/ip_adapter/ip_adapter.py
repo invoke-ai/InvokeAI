@@ -1,13 +1,11 @@
 # copied from https://github.com/tencent-ailab/IP-Adapter (Apache License 2.0)
 #   and modified as needed
 
-import os
 from typing import List
 
 import torch
-from diffusers import StableDiffusionPipeline
-from transformers import CLIPVisionModelWithProjection, CLIPImageProcessor
 from PIL import Image
+from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 # FIXME: Getting errors when trying to use PyTorch 2.0 versions of IPAttnProcessor and AttnProcessor
 #   so for now falling back to the default versions
@@ -16,7 +14,7 @@ from PIL import Image
 #     from .attention_processor import IPAttnProcessor2_0 as IPAttnProcessor, AttnProcessor2_0 as AttnProcessor
 # else:
 #     from .attention_processor import IPAttnProcessor, AttnProcessor
-from .attention_processor import IPAttnProcessor, AttnProcessor
+from .attention_processor import AttnProcessor, IPAttnProcessor
 from .resampler import Resampler
 
 
