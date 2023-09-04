@@ -1,34 +1,34 @@
 # continuous integration
-/.github/workflows/  @lstein @blessedcoolant
+/.github/workflows/  @lstein @blessedcoolant @hipsterusername
 
 # documentation
 /docs/ @lstein @blessedcoolant @hipsterusername @Millu
-/mkdocs.yml @lstein  @blessedcoolant
+/mkdocs.yml @lstein  @blessedcoolant @hipsterusername
 
 # nodes
-/invokeai/app/ @Kyle0654 @blessedcoolant @psychedelicious @brandonrising 
+/invokeai/app/ @Kyle0654 @blessedcoolant @psychedelicious @brandonrising @hipsterusername
 
 # installation and configuration
-/pyproject.toml  @lstein @blessedcoolant
-/docker/  @lstein @blessedcoolant
-/scripts/ @ebr @lstein
-/installer/ @lstein @ebr
-/invokeai/assets @lstein @ebr
-/invokeai/configs @lstein
-/invokeai/version @lstein @blessedcoolant
+/pyproject.toml  @lstein @blessedcoolant @hipsterusername
+/docker/  @lstein @blessedcoolant @hipsterusername
+/scripts/ @ebr @lstein @hipsterusername
+/installer/ @lstein @ebr @hipsterusername
+/invokeai/assets @lstein @ebr @hipsterusername
+/invokeai/configs @lstein @hipsterusername
+/invokeai/version @lstein @blessedcoolant @hipsterusername
 
 # web ui
-/invokeai/frontend @blessedcoolant @psychedelicious @lstein @maryhipp
-/invokeai/backend @blessedcoolant @psychedelicious @lstein @maryhipp
+/invokeai/frontend @blessedcoolant @psychedelicious @lstein @maryhipp @hipsterusername
+/invokeai/backend @blessedcoolant @psychedelicious @lstein @maryhipp @hipsterusername
 
 # generation, model management, postprocessing
-/invokeai/backend  @damian0815 @lstein @blessedcoolant @gregghelt2 @StAlKeR7779 @brandonrising @ryanjdick
+/invokeai/backend  @damian0815 @lstein @blessedcoolant @gregghelt2 @StAlKeR7779 @brandonrising @ryanjdick @hipsterusername
 
 # front ends
-/invokeai/frontend/CLI @lstein
-/invokeai/frontend/install @lstein @ebr  
-/invokeai/frontend/merge @lstein @blessedcoolant 
-/invokeai/frontend/training @lstein @blessedcoolant 
-/invokeai/frontend/web @psychedelicious @blessedcoolant @maryhipp 
+/invokeai/frontend/CLI @lstein @hipsterusername
+/invokeai/frontend/install @lstein @ebr @hipsterusername 
+/invokeai/frontend/merge @lstein @blessedcoolant @hipsterusername
+/invokeai/frontend/training @lstein @blessedcoolant @hipsterusername
+/invokeai/frontend/web @psychedelicious @blessedcoolant @maryhipp @hipsterusername
 
 
