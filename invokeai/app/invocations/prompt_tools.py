@@ -26,7 +26,7 @@ class PromptsToFileInvocationOutput(BaseInvocationOutput):
     """Base class for invocation that writes to a file and returns nothing of use"""
 
 
-@invocation("prompt_to_file", title="Prompts To File", tags=["prompt", "file"], category="prompt")
+@invocation("prompt_to_file", title="Prompts To File", tags=["prompt", "file"], category="prompt", version="1.0.0")
 class PromptsToFileInvocation(BaseInvocation):
     """Save prompts to a text file"""
 
@@ -55,7 +55,13 @@ class PromptPosNegOutput(BaseInvocationOutput):
     negative_prompt: str = OutputField(description="Negative prompt")
 
 
-@invocation("prompt_split_neg", title="Prompt Split Negative", tags=["prompt", "split", "negative"], category="prompt")
+@invocation(
+    "prompt_split_neg",
+    title="Prompt Split Negative",
+    tags=["prompt", "split", "negative"],
+    category="prompt",
+    version="1.0.0",
+)
 class PromptSplitNegInvocation(BaseInvocation):
     """Splits prompt into two prompts, inside [] goes into negative prompt everthing else goes into positive prompt. Each [ and ] character is replaced with a space"""
 
@@ -88,7 +94,7 @@ class PromptSplitNegInvocation(BaseInvocation):
         return PromptPosNegOutput(positive_prompt=p_prompt, negative_prompt=n_prompt)
 
 
-@invocation("prompt_join", title="Prompt Join", tags=["prompt", "join"], category="prompt")
+@invocation("prompt_join", title="Prompt Join", tags=["prompt", "join"], category="prompt", version="1.0.0")
 class PromptJoinInvocation(BaseInvocation):
     """Joins prompt left to prompt right"""
 
@@ -99,7 +105,7 @@ class PromptJoinInvocation(BaseInvocation):
         return StringOutput(value=((self.prompt_left or "") + (self.prompt_right or "")))
 
 
-@invocation("prompt_join_three", title="Prompt Join Three", tags=["prompt", "join"], category="prompt")
+@invocation("prompt_join_three", title="Prompt Join Three", tags=["prompt", "join"], category="prompt", version="1.0.0")
 class PromptJoinThreeInvocation(BaseInvocation):
     """Joins prompt left to prompt middle to prompt right"""
 
@@ -111,7 +117,9 @@ class PromptJoinThreeInvocation(BaseInvocation):
         return StringOutput(value=((self.prompt_left or "") + (self.prompt_middle or "") + (self.prompt_right or "")))
 
 
-@invocation("prompt_replace", title="Prompt Replace", tags=["prompt", "replace", "regex"], category="prompt")
+@invocation(
+    "prompt_replace", title="Prompt Replace", tags=["prompt", "replace", "regex"], category="prompt", version="1.0.0"
+)
 class PromptReplaceInvocation(BaseInvocation):
     """Replaces the search string with the replace string in the prompt"""
 
@@ -156,7 +164,9 @@ class PTFieldsCollectOutput(BaseInvocationOutput):
     pt_fields: str = OutputField(description="PTFields in Json Format")
 
 
-@invocation("pt_fields_collect", title="PTFields Collect", tags=["prompt", "fields"], category="prompt")
+@invocation(
+    "pt_fields_collect", title="PTFields Collect", tags=["prompt", "fields"], category="prompt", version="1.0.0"
+)
 class PTFieldsCollectInvocation(BaseInvocation):
     """Collect Prompt Tools Fields for an image generated in InvokeAI."""
 
@@ -210,7 +220,7 @@ class PTFieldsExpandOutput(BaseInvocationOutput):
     cfg_scale: float = OutputField(description="The classifier-free guidance scale parameter")
 
 
-@invocation("pt_fields_expand", title="PTFields Expand", tags=["prompt", "fields"], category="prompt")
+@invocation("pt_fields_expand", title="PTFields Expand", tags=["prompt", "fields"], category="prompt", version="1.0.0")
 class PTFieldsExpandInvocation(BaseInvocation):
     """Save Expand PTFields into individual items"""
 
@@ -232,7 +242,7 @@ class PTFieldsExpandInvocation(BaseInvocation):
         )
 
 
-@invocation("prompt_strength", title="Prompt Strength", tags=["prompt"], category="prompt")
+@invocation("prompt_strength", title="Prompt Strength", tags=["prompt"], category="prompt", version="1.0.0")
 class PromptStrengthInvocation(BaseInvocation):
     """Takes a prompt string and float strength and outputs a new string in the format of (prompt)strength"""
 
@@ -246,7 +256,13 @@ class PromptStrengthInvocation(BaseInvocation):
 COMBINE_TYPE = Literal[".and", ".blend"]
 
 
-@invocation("prompt_strengths_combine", title="Prompt Strengths Combine", tags=["prompt", "combine"], category="prompt")
+@invocation(
+    "prompt_strengths_combine",
+    title="Prompt Strengths Combine",
+    tags=["prompt", "combine"],
+    category="prompt",
+    version="1.0.0",
+)
 class PromptStrengthsCombineInvocation(BaseInvocation):
     """Takes a collection of prompt strength strings and converts it into a combined .and() or .blend() structure. Blank prompts are ignored"""
 
