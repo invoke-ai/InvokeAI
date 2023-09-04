@@ -773,22 +773,66 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
         )
 
 
-COLOR_CHANNELS = Literal["Red (RGBA)", "Green (RGBA)", "Blue (RGBA)", "Alpha (RGBA)",
-                         "Cyan (CMYK)", "Magenta (CMYK)", "Yellow (CMYK)", "Black (CMYK)",
-                         "Hue (HSV)", "Saturation (HSV)", "Value (HSV)",
-                         "Luminosity (LAB)", "A (LAB)", "B (LAB)",
-                         "Y (YCbCr)", "Cb (YCbCr)", "Cr (YCbCr)"]
+COLOR_CHANNELS = Literal[
+    "Red (RGBA)",
+    "Green (RGBA)",
+    "Blue (RGBA)",
+    "Alpha (RGBA)",
+    "Cyan (CMYK)",
+    "Magenta (CMYK)",
+    "Yellow (CMYK)",
+    "Black (CMYK)",
+    "Hue (HSV)",
+    "Saturation (HSV)",
+    "Value (HSV)",
+    "Luminosity (LAB)",
+    "A (LAB)",
+    "B (LAB)",
+    "Y (YCbCr)",
+    "Cb (YCbCr)",
+    "Cr (YCbCr)",
+]
 
-CHANNEL_FORMATS = {"Red (RGBA)": ("RGBA", 0), "Green (RGBA)": ("RGBA", 1), "Blue (RGBA)": ("RGBA", 2), "Alpha (RGBA)": ("RGBA", 3),
-                     "Cyan (CMYK)": ("CMYK", 0), "Magenta (CMYK)": ("CMYK", 1), "Yellow (CMYK)": ("CMYK", 2), "Black (CMYK)": ("CMYK", 3),
-                     "Hue (HSV)": ("HSV", 0), "Saturation (HSV)": ("HSV", 1), "Value (HSV)": ("HSV", 2),
-                     "Luminosity (LAB)": ("LAB", 0), "A (LAB)": ("LAB", 1), "B (LAB)": ("LAB", 2),
-                     "Y (YCbCr)": ("YCbCr", 0), "Cb (YCbCr)": ("YCbCr", 1), "Cr (YCbCr)": ("YCbCr", 2)}
+CHANNEL_FORMATS = {
+    "Red (RGBA)": ("RGBA", 0),
+    "Green (RGBA)": ("RGBA", 1),
+    "Blue (RGBA)": ("RGBA", 2),
+    "Alpha (RGBA)": ("RGBA", 3),
+    "Cyan (CMYK)": ("CMYK", 0),
+    "Magenta (CMYK)": ("CMYK", 1),
+    "Yellow (CMYK)": ("CMYK", 2),
+    "Black (CMYK)": ("CMYK", 3),
+    "Hue (HSV)": ("HSV", 0),
+    "Saturation (HSV)": ("HSV", 1),
+    "Value (HSV)": ("HSV", 2),
+    "Luminosity (LAB)": ("LAB", 0),
+    "A (LAB)": ("LAB", 1),
+    "B (LAB)": ("LAB", 2),
+    "Y (YCbCr)": ("YCbCr", 0),
+    "Cb (YCbCr)": ("YCbCr", 1),
+    "Cr (YCbCr)": ("YCbCr", 2),
+}
+
 
 @invocation(
     "img_channel_offset",
     title="Offset Image Channel",
-    tags=["image", "offset", "red", "green", "blue", "alpha", "cyan", "magenta", "yellow", "black", "hue", "saturation", "luminosity", "value"],
+    tags=[
+        "image",
+        "offset",
+        "red",
+        "green",
+        "blue",
+        "alpha",
+        "cyan",
+        "magenta",
+        "yellow",
+        "black",
+        "hue",
+        "saturation",
+        "luminosity",
+        "value",
+    ],
     category="image",
     version="1.0.0",
 )
@@ -812,7 +856,7 @@ class ImageChannelOffsetInvocation(BaseInvocation):
 
         # Adjust the value, clipping to 0..255
         image_channel = numpy.clip(image_channel + self.offset, 0, 255)
-        
+
         # Put the channel back into the image
         converted_image[:, :, channel_number] = image_channel
 
@@ -841,7 +885,24 @@ class ImageChannelOffsetInvocation(BaseInvocation):
 @invocation(
     "img_channel_multiply",
     title="Multiply Image Channel",
-    tags=["image", "invert", "scale", "multiply", "red", "green", "blue", "alpha", "cyan", "magenta", "yellow", "black", "hue", "saturation", "luminosity", "value"],
+    tags=[
+        "image",
+        "invert",
+        "scale",
+        "multiply",
+        "red",
+        "green",
+        "blue",
+        "alpha",
+        "cyan",
+        "magenta",
+        "yellow",
+        "black",
+        "hue",
+        "saturation",
+        "luminosity",
+        "value",
+    ],
     category="image",
     version="1.0.0",
 )
@@ -870,7 +931,7 @@ class ImageChannelMultiplyInvocation(BaseInvocation):
         # Invert the channel if requested
         if self.invert_channel:
             image_channel = 255 - image_channel
-        
+
         # Put the channel back into the image
         converted_image[:, :, channel_number] = image_channel
 
