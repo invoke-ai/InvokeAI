@@ -341,8 +341,8 @@ export const useRecallParameters = () => {
         refiner_cfg_scale,
         refiner_steps,
         refiner_scheduler,
-        refiner_positive_aesthetic_store,
-        refiner_negative_aesthetic_store,
+        refiner_positive_aesthetic_score,
+        refiner_negative_aesthetic_score,
         refiner_start,
       } = metadata;
 
@@ -403,21 +403,21 @@ export const useRecallParameters = () => {
 
       if (
         isValidSDXLRefinerPositiveAestheticScore(
-          refiner_positive_aesthetic_store
+          refiner_positive_aesthetic_score
         )
       ) {
         dispatch(
-          setRefinerPositiveAestheticScore(refiner_positive_aesthetic_store)
+          setRefinerPositiveAestheticScore(refiner_positive_aesthetic_score)
         );
       }
 
       if (
         isValidSDXLRefinerNegativeAestheticScore(
-          refiner_negative_aesthetic_store
+          refiner_negative_aesthetic_score
         )
       ) {
         dispatch(
-          setRefinerNegativeAestheticScore(refiner_negative_aesthetic_store)
+          setRefinerNegativeAestheticScore(refiner_negative_aesthetic_score)
         );
       }
 

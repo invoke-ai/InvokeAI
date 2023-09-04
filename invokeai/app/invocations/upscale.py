@@ -23,7 +23,7 @@ ESRGAN_MODELS = Literal[
 ]
 
 
-@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan")
+@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.0.0")
 class ESRGANInvocation(BaseInvocation):
     """Upscales an image using RealESRGAN."""
 

@@ -76,7 +76,7 @@ class SchedulerOutput(BaseInvocationOutput):
     scheduler: SAMPLER_NAME_VALUES = OutputField(description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler)
 
 
-@invocation("scheduler", title="Scheduler", tags=["scheduler"], category="latents")
+@invocation("scheduler", title="Scheduler", tags=["scheduler"], category="latents", version="1.0.0")
 class SchedulerInvocation(BaseInvocation):
     """Selects a scheduler."""
 
@@ -88,7 +88,9 @@ class SchedulerInvocation(BaseInvocation):
         return SchedulerOutput(scheduler=self.scheduler)
 
 
-@invocation("create_denoise_mask", title="Create Denoise Mask", tags=["mask", "denoise"], category="latents")
+@invocation(
+    "create_denoise_mask", title="Create Denoise Mask", tags=["mask", "denoise"], category="latents", version="1.0.0"
+)
 class CreateDenoiseMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
 
@@ -188,6 +190,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
+    version="1.0.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -210,12 +213,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
     )
     unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet", ui_order=2)
     control: Union[ControlField, list[ControlField]] = InputField(
-        default=None, description=FieldDescriptions.control, input=Input.Connection, ui_order=5
+        default=None,
+        description=FieldDescriptions.control,
+        input=Input.Connection,
+        ui_order=5,
     )
     latents: Optional[LatentsField] = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     denoise_mask: Optional[DenoiseMaskField] = InputField(
-        default=None,
-        description=FieldDescriptions.mask,
+        default=None, description=FieldDescriptions.mask, input=Input.Connection, ui_order=6
     )
     # ip_adapter_image: Optional[ImageField] = InputField(input=Input.Connection, title="IP Adapter Image", ui_order=6)
     # ip_adapter_strength: float = InputField(default=1.0, ge=0, le=2, ui_type=UIType.Float,
@@ -322,7 +327,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         # really only need model for dtype and device
         model: StableDiffusionGeneratorPipeline,
-        control_input: List[ControlField],
+        control_input: Union[ControlField, List[ControlField]],
         latents_shape: List[int],
         exit_stack: ExitStack,
         do_classifier_free_guidance: bool = True,
@@ -573,7 +578,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=result_latents, seed=seed)
 
 
-@invocation("l2i", title="Latents to Image", tags=["latents", "image", "vae", "l2i"], category="latents")
+@invocation(
+    "l2i", title="Latents to Image", tags=["latents", "image", "vae", "l2i"], category="latents", version="1.0.0"
+)
 class LatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
 
@@ -670,7 +677,7 @@ class LatentsToImageInvocation(BaseInvocation):
 LATENTS_INTERPOLATION_MODE = Literal["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"]
 
 
-@invocation("lresize", title="Resize Latents", tags=["latents", "resize"], category="latents")
+@invocation("lresize", title="Resize Latents", tags=["latents", "resize"], category="latents", version="1.0.0")
 class ResizeLatentsInvocation(BaseInvocation):
     """Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8."""
 
@@ -714,7 +721,7 @@ class ResizeLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=resized_latents, seed=self.latents.seed)
 
 
-@invocation("lscale", title="Scale Latents", tags=["latents", "resize"], category="latents")
+@invocation("lscale", title="Scale Latents", tags=["latents", "resize"], category="latents", version="1.0.0")
 class ScaleLatentsInvocation(BaseInvocation):
     """Scales latents by a given factor."""
 
@@ -750,7 +757,9 @@ class ScaleLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=resized_latents, seed=self.latents.seed)
 
 
-@invocation("i2l", title="Image to Latents", tags=["latents", "image", "vae", "i2l"], category="latents")
+@invocation(
+    "i2l", title="Image to Latents", tags=["latents", "image", "vae", "i2l"], category="latents", version="1.0.0"
+)
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""
 
@@ -830,7 +839,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=latents, seed=None)
 
 
-@invocation("lblend", title="Blend Latents", tags=["latents", "blend"], category="latents")
+@invocation("lblend", title="Blend Latents", tags=["latents", "blend"], category="latents", version="1.0.0")
 class BlendLatentsInvocation(BaseInvocation):
     """Blend two latents using a given alpha. Latents must have same size."""
 
