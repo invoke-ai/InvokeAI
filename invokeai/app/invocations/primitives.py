@@ -261,7 +261,7 @@ class ImageInvocation(BaseInvocation):
 class ImageCollectionInvocation(BaseInvocation):
     """A collection of image primitive values"""
 
-    collection: list[ImageField] = InputField(default_factory=list, description="The collection of image values")
+    collection: list[ImageField] = InputField(description="The collection of image values")
 
     def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
         return ImageCollectionOutput(collection=self.collection)
