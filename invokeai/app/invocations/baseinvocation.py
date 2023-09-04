@@ -32,6 +32,10 @@ if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
 
 
+class InvalidVersionError(ValueError):
+    pass
+
+
 class FieldDescriptions:
     denoising_start = "When to start denoising, expressed a percentage of total steps"
     denoising_end = "When to stop denoising, expressed a percentage of total steps"
@@ -605,7 +609,10 @@ def invocation(
         if category is not None:
             cls.UIConfig.category = category
         if version is not None:
-            semver.Version.parse(version)  # raises ValueError if invalid semver
+            try:
+                semver.Version.parse(version)
+            except ValueError as e:
+                raise InvalidVersionError(f'Invalid version string for node "{invocation_type}": "{version}"') from e
             cls.UIConfig.version = version
 
         # Add the invocation type to the pydantic model of the invocation
