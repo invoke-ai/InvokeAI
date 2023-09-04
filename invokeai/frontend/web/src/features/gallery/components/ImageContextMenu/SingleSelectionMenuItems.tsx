@@ -7,12 +7,9 @@ import {
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
 import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
@@ -36,6 +33,7 @@ import {
 } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import { workflowLoadRequested } from 'features/nodes/store/actions';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -102,16 +100,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     if (!workflow) {
       return;
     }
-    dispatch(workflowLoaded(workflow));
-    dispatch(setActiveTab('nodes'));
-    dispatch(
-      addToast(
-        makeToast({
-          title: 'Workflow Loaded',
-          status: 'success',
-        })
-      )
-    );
+    dispatch(workflowLoadRequested(workflow));
   }, [dispatch, workflow]);
 
   const handleSendToImageToImage = useCallback(() => {

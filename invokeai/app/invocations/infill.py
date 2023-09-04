@@ -118,7 +118,7 @@ def tile_fill_missing(im: Image.Image, tile_size: int = 16, seed: Optional[int] 
     return si
 
 
-@invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint")
+@invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
 class InfillColorInvocation(BaseInvocation):
     """Infills transparent areas of an image with a solid color"""
 
@@ -153,7 +153,7 @@ class InfillColorInvocation(BaseInvocation):
         )
 
 
-@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint")
+@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
 class InfillTileInvocation(BaseInvocation):
     """Infills transparent areas of an image with tiles of the image"""
 
@@ -189,7 +189,9 @@ class InfillTileInvocation(BaseInvocation):
         )
 
 
-@invocation("infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint")
+@invocation(
+    "infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0"
+)
 class InfillPatchMatchInvocation(BaseInvocation):
     """Infills transparent areas of an image using the PatchMatch algorithm"""
 
@@ -242,7 +244,7 @@ class InfillPatchMatchInvocation(BaseInvocation):
         )
 
 
-@invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint")
+@invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
 class LaMaInfillInvocation(BaseInvocation):
     """Infills transparent areas of an image using the LaMa model"""
 

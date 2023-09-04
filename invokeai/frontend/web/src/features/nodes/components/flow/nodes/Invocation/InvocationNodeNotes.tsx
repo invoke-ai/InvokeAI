@@ -12,6 +12,7 @@ import {
   Tooltip,
   useDisclosure,
 } from '@chakra-ui/react';
+import { compare } from 'compare-versions';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
 import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
@@ -20,6 +21,7 @@ import { isInvocationNodeData } from 'features/nodes/types/types';
 import { memo, useMemo } from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
 import NotesTextarea from './NotesTextarea';
+import { useDoNodeVersionsMatch } from 'features/nodes/hooks/useDoNodeVersionsMatch';
 
 interface Props {
   nodeId: string;
@@ -29,6 +31,7 @@ const InvocationNodeNotes = ({ nodeId }: Props) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const label = useNodeLabel(nodeId);
   const title = useNodeTemplateTitle(nodeId);
+  const doVersionsMatch = useDoNodeVersionsMatch(nodeId);
 
   return (
     <>
@@ -50,7 +53,11 @@ const InvocationNodeNotes = ({ nodeId }: Props) => {
         >
           <Icon
             as={FaInfoCircle}
-            sx={{ boxSize: 4, w: 8, color: 'base.400' }}
+            sx={{
+              boxSize: 4,
+              w: 8,
+              color: doVersionsMatch ? 'base.400' : 'error.400',
+            }}
           />
         </Flex>
       </Tooltip>
@@ -92,16 +99,59 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
     return 'Unknown Node';
   }, [data, nodeTemplate]);
 
+  const versionComponent = useMemo(() => {
+    if (!isInvocationNodeData(data) || !nodeTemplate) {
+      return null;
+    }
+
+    if (!data.version) {
+      return (
+        <Text as="span" sx={{ color: 'error.500' }}>
+          Version unknown
+        </Text>
+      );
+    }
+
+    if (!nodeTemplate.version) {
+      return (
+        <Text as="span" sx={{ color: 'error.500' }}>
+          Version {data.version} (unknown template)
+        </Text>
+      );
+    }
+
+    if (compare(data.version, nodeTemplate.version, '<')) {
+      return (
+        <Text as="span" sx={{ color: 'error.500' }}>
+          Version {data.version} (update node)
+        </Text>
+      );
+    }
+
+    if (compare(data.version, nodeTemplate.version, '>')) {
+      return (
+        <Text as="span" sx={{ color: 'error.500' }}>
+          Version {data.version} (update app)
+        </Text>
+      );
+    }
+
+    return <Text as="span">Version {data.version}</Text>;
+  }, [data, nodeTemplate]);
+
   if (!isInvocationNodeData(data)) {
     return <Text sx={{ fontWeight: 600 }}>Unknown Node</Text>;
   }
 
   return (
     <Flex sx={{ flexDir: 'column' }}>
-      <Text sx={{ fontWeight: 600 }}>{title}</Text>
+      <Text as="span" sx={{ fontWeight: 600 }}>
+        {title}
+      </Text>
       <Text sx={{ opacity: 0.7, fontStyle: 'oblique 5deg' }}>
         {nodeTemplate?.description}
       </Text>
+      {versionComponent}
       {data?.notes && <Text>{data.notes}</Text>}
     </Flex>
   );
