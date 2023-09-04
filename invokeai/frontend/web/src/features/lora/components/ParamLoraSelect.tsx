@@ -9,7 +9,7 @@ import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectI
 import { loraAdded } from 'features/lora/store/loraSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { forEach } from 'lodash-es';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 
 const selector = createSelector(
@@ -54,12 +54,9 @@ const ParamLoRASelect = () => {
       });
     });
 
-    // Sort Alphabetically
-    data.sort((a, b) =>
-      a.label && b.label ? (a.label?.localeCompare(b.label) ? 1 : -1) : -1
-    );
+    data.sort((a, b) => (a.label && !b.label ? 1 : -1));
 
-    return data.sort((a, b) => (a.disabled && !b.disabled ? -1 : 1));
+    return data.sort((a, b) => (a.disabled && !b.disabled ? 1 : -1));
   }, [loras, loraModels, currentMainModel?.base_model]);
 
   const handleChange = useCallback(
@@ -105,4 +102,4 @@ const ParamLoRASelect = () => {
   );
 };
 
-export default ParamLoRASelect;
+export default memo(ParamLoRASelect);

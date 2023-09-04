@@ -1,50 +1,60 @@
 import { Box, Flex, Image, Text } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { MoveBoardDropData } from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import InvokeAILogoImage from 'assets/images/logo.png';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
-import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { RemoveFromBoardDropData } from 'features/dnd/types';
+import {
+  autoAddBoardIdChanged,
+  boardIdSelected,
+} from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import AutoAddIcon from '../AutoAddIcon';
 import BoardContextMenu from '../BoardContextMenu';
+
 interface Props {
   isSelected: boolean;
 }
 
 const selector = createSelector(
   stateSelector,
-  ({ gallery }) => {
-    const { autoAddBoardId } = gallery;
-    return { autoAddBoardId };
+  ({ gallery, system }) => {
+    const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
+    const { isProcessing } = system;
+    return { autoAddBoardId, autoAssignBoardOnClick, isProcessing };
   },
   defaultSelectorOptions
 );
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const { autoAddBoardId } = useAppSelector(selector);
-  const boardName = useBoardName(undefined);
+  const { autoAddBoardId, autoAssignBoardOnClick, isProcessing } =
+    useAppSelector(selector);
+  const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
-    dispatch(boardIdSelected(undefined));
-  }, [dispatch]);
+    dispatch(boardIdSelected('none'));
+    if (autoAssignBoardOnClick && !isProcessing) {
+      dispatch(autoAddBoardIdChanged('none'));
+    }
+  }, [dispatch, autoAssignBoardOnClick, isProcessing]);
   const [isHovered, setIsHovered] = useState(false);
+
   const handleMouseOver = useCallback(() => {
     setIsHovered(true);
   }, []);
+
   const handleMouseOut = useCallback(() => {
     setIsHovered(false);
   }, []);
 
-  const droppableData: MoveBoardDropData = useMemo(
+  const droppableData: RemoveFromBoardDropData = useMemo(
     () => ({
       id: 'no_board',
-      actionType: 'MOVE_BOARD',
-      context: { boardId: undefined },
+      actionType: 'REMOVE_FROM_BOARD',
     }),
     []
   );
@@ -64,7 +74,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
           h: 'full',
         }}
       >
-        <BoardContextMenu>
+        <BoardContextMenu board_id="none">
           {(ref) => (
             <Flex
               ref={ref}
@@ -91,17 +101,6 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                   alignItems: 'center',
                 }}
               >
-                {/* <Icon
-                  boxSize={12}
-                  as={FaBucket}
-                  sx={{
-                    opacity: 0.7,
-                    color: 'base.500',
-                    _dark: {
-                      color: 'base.500',
-                    },
-                  }}
-                /> */}
                 <Image
                   src={InvokeAILogoImage}
                   alt="invoke-ai-logo"
@@ -117,19 +116,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                   }}
                 />
               </Flex>
-              {/* <Flex
-                sx={{
-                  position: 'absolute',
-                  insetInlineEnd: 0,
-                  top: 0,
-                  p: 1,
-                }}
-              >
-                <Badge variant="solid" sx={BASE_BADGE_STYLES}>
-                  {totalImages}/{totalAssets}
-                </Badge>
-              </Flex> */}
-              {!autoAddBoardId && <AutoAddIcon />}
+              {autoAddBoardId === 'none' && <AutoAddIcon />}
               <Flex
                 sx={{
                   position: 'absolute',
@@ -169,4 +156,4 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
 
 NoBoardBoard.displayName = 'HoverableBoard';
 
-export default NoBoardBoard;
+export default memo(NoBoardBoard);

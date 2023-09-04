@@ -1,16 +1,14 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
+  ControlNetConfig,
   ResizeModes,
   controlNetResizeModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
 type ParamControlNetResizeModeProps = {
-  controlNetId: string;
+  controlNet: ControlNetConfig;
 };
 
 const RESIZE_MODE_DATA = [
@@ -22,23 +20,8 @@ const RESIZE_MODE_DATA = [
 export default function ParamControlNetResizeMode(
   props: ParamControlNetResizeModeProps
 ) {
-  const { controlNetId } = props;
+  const { resizeMode, isEnabled, controlNetId } = props.controlNet;
   const dispatch = useAppDispatch();
-  const selector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ controlNet }) => {
-          const { resizeMode, isEnabled } =
-            controlNet.controlNets[controlNetId];
-          return { resizeMode, isEnabled };
-        },
-        defaultSelectorOptions
-      ),
-    [controlNetId]
-  );
-
-  const { resizeMode, isEnabled } = useAppSelector(selector);
 
   const handleResizeModeChange = useCallback(
     (resizeMode: ResizeModes) => {

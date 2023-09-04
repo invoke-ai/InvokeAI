@@ -30,8 +30,8 @@ export const sessionCreated = createAsyncThunk<
   CreateSessionThunkConfig
 >('api/sessionCreated', async (arg, { rejectWithValue }) => {
   const { graph } = arg;
-  const { post } = $client.get();
-  const { data, error, response } = await post('/api/v1/sessions/', {
+  const { POST } = $client.get();
+  const { data, error, response } = await POST('/api/v1/sessions/', {
     body: graph,
   });
 
@@ -60,6 +60,9 @@ type InvokedSessionThunkConfig = {
 const isErrorWithStatus = (error: unknown): error is { status: number } =>
   isObject(error) && 'status' in error;
 
+const isErrorWithDetail = (error: unknown): error is { detail: string } =>
+  isObject(error) && 'detail' in error;
+
 /**
  * `SessionsService.invokeSession()` thunk
  */
@@ -69,8 +72,8 @@ export const sessionInvoked = createAsyncThunk<
   InvokedSessionThunkConfig
 >('api/sessionInvoked', async (arg, { rejectWithValue }) => {
   const { session_id } = arg;
-  const { put } = $client.get();
-  const { data, error, response } = await put(
+  const { PUT } = $client.get();
+  const { error, response } = await PUT(
     '/api/v1/sessions/{session_id}/invoke',
     {
       params: { query: { all: true }, path: { session_id } },
@@ -82,10 +85,20 @@ export const sessionInvoked = createAsyncThunk<
       return rejectWithValue({
         arg,
         status: response.status,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         error: (error as any).body.detail,
       });
     }
-    return rejectWithValue({ arg, status: response.status, error });
+    if (isErrorWithDetail(error) && response.status === 403) {
+      return rejectWithValue({
+        arg,
+        status: response.status,
+        error: error.detail,
+      });
+    }
+    if (error) {
+      return rejectWithValue({ arg, status: response.status, error });
+    }
   }
 });
 
@@ -111,15 +124,12 @@ export const sessionCanceled = createAsyncThunk<
   CancelSessionThunkConfig
 >('api/sessionCanceled', async (arg, { rejectWithValue }) => {
   const { session_id } = arg;
-  const { del } = $client.get();
-  const { data, error, response } = await del(
-    '/api/v1/sessions/{session_id}/invoke',
-    {
-      params: {
-        path: { session_id },
-      },
-    }
-  );
+  const { DELETE } = $client.get();
+  const { data, error } = await DELETE('/api/v1/sessions/{session_id}/invoke', {
+    params: {
+      path: { session_id },
+    },
+  });
 
   if (error) {
     return rejectWithValue({ arg, error });
@@ -151,8 +161,8 @@ export const listedSessions = createAsyncThunk<
   ListSessionsThunkConfig
 >('api/listSessions', async (arg, { rejectWithValue }) => {
   const { params } = arg;
-  const { get } = $client.get();
-  const { data, error, response } = await get('/api/v1/sessions/', {
+  const { GET } = $client.get();
+  const { data, error } = await GET('/api/v1/sessions/', {
     params,
   });
 

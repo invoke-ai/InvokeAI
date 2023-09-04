@@ -18,18 +18,15 @@ import { FaImages, FaServer } from 'react-icons/fa';
 import { galleryViewChanged } from '../store/gallerySlice';
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
-import GalleryPinButton from './GalleryPinButton';
 import GallerySettingsPopover from './GallerySettingsPopover';
-import BatchImageGrid from './ImageGrid/BatchImageGrid';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 
 const selector = createSelector(
   [stateSelector],
   (state) => {
-    const { selectedBoardId, galleryView } = state.gallery;
+    const { galleryView } = state.gallery;
 
     return {
-      selectedBoardId,
       galleryView,
     };
   },
@@ -39,10 +36,10 @@ const selector = createSelector(
 const ImageGalleryContent = () => {
   const resizeObserverRef = useRef<HTMLDivElement>(null);
   const galleryGridRef = useRef<HTMLDivElement>(null);
-  const { selectedBoardId, galleryView } = useAppSelector(selector);
+  const { galleryView } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } =
-    useDisclosure();
+    useDisclosure({ defaultIsOpen: true });
 
   const handleClickImages = useCallback(() => {
     dispatch(galleryViewChanged('images'));
@@ -54,11 +51,13 @@ const ImageGalleryContent = () => {
 
   return (
     <VStack
+      layerStyle="first"
       sx={{
         flexDirection: 'column',
         h: 'full',
         w: 'full',
         borderRadius: 'base',
+        p: 2,
       }}
     >
       <Box sx={{ w: 'full' }}>
@@ -75,7 +74,6 @@ const ImageGalleryContent = () => {
             onToggle={onToggleBoardList}
           />
           <GallerySettingsPopover />
-          <GalleryPinButton />
         </Flex>
         <Box>
           <BoardsList isOpen={isBoardListOpen} />
@@ -130,12 +128,7 @@ const ImageGalleryContent = () => {
             </TabList>
           </Tabs>
         </Flex>
-
-        {selectedBoardId === 'batch' ? (
-          <BatchImageGrid />
-        ) : (
-          <GalleryImageGrid />
-        )}
+        <GalleryImageGrid />
       </Flex>
     </VStack>
   );

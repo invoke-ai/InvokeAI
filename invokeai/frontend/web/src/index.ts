@@ -6,3 +6,4 @@ export { default as ParamMainModelSelect } from './features/parameters/component
 export { default as InvokeAiLogoComponent } from './features/system/components/InvokeAILogoComponent';
 export { default as SettingsModal } from './features/system/components/SettingsModal/SettingsModal';
 export { default as StatusIndicator } from './features/system/components/StatusIndicator';
+export { theme as theme } from './theme/theme';

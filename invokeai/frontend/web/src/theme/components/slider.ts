@@ -22,8 +22,8 @@ const invokeAIFilledTrack = defineStyle((props) => {
 
 const invokeAIThumb = defineStyle((props) => {
   return {
-    w: 2,
-    h: 4,
+    w: props.orientation === 'horizontal' ? 2 : 4,
+    h: props.orientation === 'horizontal' ? 4 : 2,
     bg: mode('base.50', 'base.100')(props),
   };
 });

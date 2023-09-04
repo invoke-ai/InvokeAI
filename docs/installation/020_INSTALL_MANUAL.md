@@ -8,9 +8,9 @@ title: Installing Manually
 
 </figure>
 
-!!! warning "This is for advanced Users"
+!!! warning "This is for Advanced Users"
 
-    **python experience is mandatory**
+    **Python experience is mandatory**
 
 ## Introduction
 
@@ -148,7 +148,7 @@ manager, please follow these steps:
     === "CUDA (NVidia)"
 
         ```bash
-        pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+        pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
         ```
 
     === "ROCm (AMD)"
@@ -192,8 +192,10 @@ manager, please follow these steps:
     your outputs.
 
     ```terminal
-    invokeai-configure
+    invokeai-configure --root .
     ```
+	
+	Don't miss the dot at the end of the command!
 
     The script `invokeai-configure` will interactively guide you through the
     process of downloading and installing the weights files needed for InvokeAI.
@@ -225,12 +227,6 @@ manager, please follow these steps:
 
         !!! warning "Make sure that the virtual environment is activated, which should create `(.venv)` in front of your prompt!"
 
-        === "CLI"
-
-            ```bash
-            invokeai
-            ```
-
         === "local Webserver"
 
             ```bash
@@ -241,6 +237,12 @@ manager, please follow these steps:
 
             ```bash
             invokeai --web --host 0.0.0.0
+            ```
+
+        === "CLI"
+
+            ```bash
+            invokeai
             ```
 
         If you choose the run the web interface, point your browser at
@@ -310,7 +312,7 @@ installation protocol (important!)
 
     === "CUDA (NVidia)"
         ```bash
-        pip install -e .[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+        pip install -e .[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
         ```
 
     === "ROCm (AMD)"
@@ -354,7 +356,7 @@ you can do so using this unsupported recipe:
 mkdir ~/invokeai
 conda create -n invokeai python=3.10
 conda activate invokeai
-pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
 invokeai-configure --root ~/invokeai
 invokeai --root ~/invokeai --web
 ```

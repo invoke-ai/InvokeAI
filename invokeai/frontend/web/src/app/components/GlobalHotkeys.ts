@@ -1,26 +1,21 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
+import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { requestCanvasRescale } from 'features/canvas/store/thunks/requestCanvasScale';
-import { shiftKeyPressed } from 'features/ui/store/hotkeysSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
-  setActiveTab,
-  toggleGalleryPanel,
-  toggleParametersPanel,
-  togglePinGalleryPanel,
-  togglePinParametersPanel,
-} from 'features/ui/store/uiSlice';
+  ctrlKeyPressed,
+  metaKeyPressed,
+  shiftKeyPressed,
+} from 'features/ui/store/hotkeysSlice';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
 import React, { memo } from 'react';
 import { isHotkeyPressed, useHotkeys } from 'react-hotkeys-hook';
 
 const globalHotkeysSelector = createSelector(
-  [(state: RootState) => state.hotkeys, (state: RootState) => state.ui],
-  (hotkeys, ui) => {
-    const { shift } = hotkeys;
-    const { shouldPinParametersPanel, shouldPinGallery } = ui;
-    return { shift, shouldPinGallery, shouldPinParametersPanel };
+  [stateSelector],
+  ({ hotkeys }) => {
+    const { shift, ctrl, meta } = hotkeys;
+    return { shift, ctrl, meta };
   },
   {
     memoizeOptions: {
@@ -37,10 +32,7 @@ const globalHotkeysSelector = createSelector(
  */
 const GlobalHotkeys: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { shift, shouldPinParametersPanel, shouldPinGallery } = useAppSelector(
-    globalHotkeysSelector
-  );
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const { shift, ctrl, meta } = useAppSelector(globalHotkeysSelector);
 
   useHotkeys(
     '*',
@@ -50,38 +42,20 @@ const GlobalHotkeys: React.FC = () => {
       } else {
         shift && dispatch(shiftKeyPressed(false));
       }
+      if (isHotkeyPressed('ctrl')) {
+        !ctrl && dispatch(ctrlKeyPressed(true));
+      } else {
+        ctrl && dispatch(ctrlKeyPressed(false));
+      }
+      if (isHotkeyPressed('meta')) {
+        !meta && dispatch(metaKeyPressed(true));
+      } else {
+        meta && dispatch(metaKeyPressed(false));
+      }
     },
     { keyup: true, keydown: true },
-    [shift]
+    [shift, ctrl, meta]
   );
-
-  useHotkeys('o', () => {
-    dispatch(toggleParametersPanel());
-    if (activeTabName === 'unifiedCanvas' && shouldPinParametersPanel) {
-      dispatch(requestCanvasRescale());
-    }
-  });
-
-  useHotkeys(['shift+o'], () => {
-    dispatch(togglePinParametersPanel());
-    if (activeTabName === 'unifiedCanvas') {
-      dispatch(requestCanvasRescale());
-    }
-  });
-
-  useHotkeys('g', () => {
-    dispatch(toggleGalleryPanel());
-    if (activeTabName === 'unifiedCanvas' && shouldPinGallery) {
-      dispatch(requestCanvasRescale());
-    }
-  });
-
-  useHotkeys(['shift+g'], () => {
-    dispatch(togglePinGalleryPanel());
-    if (activeTabName === 'unifiedCanvas') {
-      dispatch(requestCanvasRescale());
-    }
-  });
 
   useHotkeys('1', () => {
     dispatch(setActiveTab('txt2img'));
@@ -97,6 +71,10 @@ const GlobalHotkeys: React.FC = () => {
 
   useHotkeys('4', () => {
     dispatch(setActiveTab('nodes'));
+  });
+
+  useHotkeys('5', () => {
+    dispatch(setActiveTab('modelManager'));
   });
 
   return null;

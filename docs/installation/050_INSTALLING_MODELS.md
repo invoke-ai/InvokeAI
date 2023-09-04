@@ -124,7 +124,7 @@ installation. Examples:
 invokeai-model-install --list controlnet
 
 # (install the model at the indicated URL)
-invokeai-model-install --add http://civitai.com/2860
+invokeai-model-install --add https://civitai.com/api/download/models/128713
 
 # (delete the named model)
 invokeai-model-install --delete sd-1/main/analog-diffusion

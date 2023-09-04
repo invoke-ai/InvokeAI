@@ -11,20 +11,20 @@ import {
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { ImageUsage } from 'app/contexts/AddImageToBoardContext';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIButton from 'common/components/IAIButton';
-import ImageUsageMessage from 'features/imageDeletion/components/ImageUsageMessage';
-import { getImageUsage } from 'features/imageDeletion/store/imageDeletionSelectors';
+import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
+import { getImageUsage } from 'features/deleteImageModal/store/selectors';
+import { ImageUsage } from 'features/deleteImageModal/store/types';
 import { some } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useListAllImageNamesForBoardQuery } from 'services/api/endpoints/boards';
 import {
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
-  useListAllImageNamesForBoardQuery,
-} from 'services/api/endpoints/boards';
+} from 'services/api/endpoints/images';
 import { BoardDTO } from 'services/api/types';
 
 type Props = {
@@ -32,7 +32,7 @@ type Props = {
   setBoardToDelete: (board?: BoardDTO) => void;
 };
 
-const DeleteImageModal = (props: Props) => {
+const DeleteBoardModal = (props: Props) => {
   const { boardToDelete, setBoardToDelete } = props;
   const { t } = useTranslation();
   const canRestoreDeletedImagesFromBin = useAppSelector(
@@ -49,13 +49,10 @@ const DeleteImageModal = (props: Props) => {
         );
 
         const imageUsageSummary: ImageUsage = {
-          isInitialImage: some(allImageUsage, (usage) => usage.isInitialImage),
-          isCanvasImage: some(allImageUsage, (usage) => usage.isCanvasImage),
-          isNodesImage: some(allImageUsage, (usage) => usage.isNodesImage),
-          isControlNetImage: some(
-            allImageUsage,
-            (usage) => usage.isControlNetImage
-          ),
+          isInitialImage: some(allImageUsage, (i) => i.isInitialImage),
+          isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
+          isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
+          isControlNetImage: some(allImageUsage, (i) => i.isControlNetImage),
         };
         return { imageUsageSummary };
       }),
@@ -176,4 +173,4 @@ const DeleteImageModal = (props: Props) => {
   );
 };
 
-export default memo(DeleteImageModal);
+export default memo(DeleteBoardModal);

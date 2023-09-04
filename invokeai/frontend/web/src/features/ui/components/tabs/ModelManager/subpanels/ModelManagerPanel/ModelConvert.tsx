@@ -47,13 +47,11 @@ export default function ModelConvert(props: ModelConvertProps) {
   };
 
   const modelConvertHandler = () => {
-    const responseBody = {
+    const queryArg = {
       base_model: model.base_model,
       model_name: model.model_name,
-      params: {
-        convert_dest_directory:
-          saveLocation === 'Custom' ? customSaveLocation : undefined,
-      },
+      convert_dest_directory:
+        saveLocation === 'Custom' ? customSaveLocation : undefined,
     };
 
     if (saveLocation === 'Custom' && customSaveLocation === '') {
@@ -74,14 +72,14 @@ export default function ModelConvert(props: ModelConvertProps) {
           title: `${t('modelManager.convertingModelBegin')}: ${
             model.model_name
           }`,
-          status: 'success',
+          status: 'info',
         })
       )
     );
 
-    convertModel(responseBody)
+    convertModel(queryArg)
       .unwrap()
-      .then((_) => {
+      .then(() => {
         dispatch(
           addToast(
             makeToast({
@@ -91,7 +89,7 @@ export default function ModelConvert(props: ModelConvertProps) {
           )
         );
       })
-      .catch((_) => {
+      .catch(() => {
         dispatch(
           addToast(
             makeToast({
@@ -113,7 +111,7 @@ export default function ModelConvert(props: ModelConvertProps) {
       acceptButtonText={`${t('modelManager.convert')}`}
       triggerComponent={
         <IAIButton
-          size={'sm'}
+          size="sm"
           aria-label={t('modelManager.convertToDiffusers')}
           className=" modal-close-btn"
           isLoading={isLoading}

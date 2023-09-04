@@ -14,16 +14,15 @@ export type Rect = Coordinates & Dimensions;
 
 export interface UIState {
   activeTab: number;
-  shouldPinParametersPanel: boolean;
-  shouldShowParametersPanel: boolean;
   shouldShowImageDetails: boolean;
   shouldUseCanvasBetaLayout: boolean;
   shouldShowExistingModelsInSearch: boolean;
   shouldUseSliders: boolean;
   shouldHidePreview: boolean;
-  shouldPinGallery: boolean;
-  shouldShowGallery: boolean;
   shouldShowProgressInViewer: boolean;
   shouldShowEmbeddingPicker: boolean;
+  shouldAutoChangeDimensions: boolean;
   favoriteSchedulers: SchedulerParam[];
+  globalContextMenuCloseTrigger: number;
+  panels: Record<string, string>;
 }

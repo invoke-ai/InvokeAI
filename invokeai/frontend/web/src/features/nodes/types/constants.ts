@@ -1,168 +1,313 @@
 import { FieldType, FieldUIConfig } from './types';
 
 export const HANDLE_TOOLTIP_OPEN_DELAY = 500;
+export const COLOR_TOKEN_VALUE = 500;
+export const NODE_WIDTH = 320;
+export const NODE_MIN_WIDTH = 320;
+export const DRAG_HANDLE_CLASSNAME = 'node-drag-handle';
 
-export const FIELD_TYPE_MAP: Record<string, FieldType> = {
-  integer: 'integer',
-  float: 'float',
-  number: 'float',
-  string: 'string',
-  boolean: 'boolean',
-  enum: 'enum',
-  ImageField: 'image',
-  image_collection: 'image_collection',
-  LatentsField: 'latents',
-  ConditioningField: 'conditioning',
-  UNetField: 'unet',
-  ClipField: 'clip',
-  VaeField: 'vae',
-  model: 'model',
-  refiner_model: 'refiner_model',
-  vae_model: 'vae_model',
-  lora_model: 'lora_model',
-  controlnet_model: 'controlnet_model',
-  ControlNetModelField: 'controlnet_model',
-  array: 'array',
-  item: 'item',
-  ColorField: 'color',
-  ControlField: 'control',
-  control: 'control',
-  cfg_scale: 'float',
-  control_weight: 'float',
+export const IMAGE_FIELDS = ['ImageField', 'ImageCollection'];
+export const FOOTER_FIELDS = IMAGE_FIELDS;
+
+export const KIND_MAP = {
+  input: 'inputs' as const,
+  output: 'outputs' as const,
 };
 
-const COLOR_TOKEN_VALUE = 500;
+export const COLLECTION_TYPES: FieldType[] = [
+  'Collection',
+  'IntegerCollection',
+  'BooleanCollection',
+  'FloatCollection',
+  'StringCollection',
+  'ImageCollection',
+  'LatentsCollection',
+  'ConditioningCollection',
+  'ControlCollection',
+  'ColorCollection',
+];
 
-const getColorTokenCssVariable = (color: string) =>
-  `var(--invokeai-colors-${color}-${COLOR_TOKEN_VALUE})`;
+export const POLYMORPHIC_TYPES = [
+  'IntegerPolymorphic',
+  'BooleanPolymorphic',
+  'FloatPolymorphic',
+  'StringPolymorphic',
+  'ImagePolymorphic',
+  'LatentsPolymorphic',
+  'ConditioningPolymorphic',
+  'ControlPolymorphic',
+  'ColorPolymorphic',
+];
+
+export const MODEL_TYPES = [
+  'ControlNetModelField',
+  'LoRAModelField',
+  'MainModelField',
+  'ONNXModelField',
+  'SDXLMainModelField',
+  'SDXLRefinerModelField',
+  'VaeModelField',
+  'UNetField',
+  'VaeField',
+  'ClipField',
+];
+
+export const COLLECTION_MAP = {
+  integer: 'IntegerCollection',
+  boolean: 'BooleanCollection',
+  number: 'FloatCollection',
+  float: 'FloatCollection',
+  string: 'StringCollection',
+  ImageField: 'ImageCollection',
+  LatentsField: 'LatentsCollection',
+  ConditioningField: 'ConditioningCollection',
+  ControlField: 'ControlCollection',
+  ColorField: 'ColorCollection',
+};
+export const isCollectionItemType = (
+  itemType: string | undefined
+): itemType is keyof typeof COLLECTION_MAP =>
+  Boolean(itemType && itemType in COLLECTION_MAP);
+
+export const SINGLE_TO_POLYMORPHIC_MAP = {
+  integer: 'IntegerPolymorphic',
+  boolean: 'BooleanPolymorphic',
+  number: 'FloatPolymorphic',
+  float: 'FloatPolymorphic',
+  string: 'StringPolymorphic',
+  ImageField: 'ImagePolymorphic',
+  LatentsField: 'LatentsPolymorphic',
+  ConditioningField: 'ConditioningPolymorphic',
+  ControlField: 'ControlPolymorphic',
+  ColorField: 'ColorPolymorphic',
+};
+
+export const POLYMORPHIC_TO_SINGLE_MAP = {
+  IntegerPolymorphic: 'integer',
+  BooleanPolymorphic: 'boolean',
+  FloatPolymorphic: 'float',
+  StringPolymorphic: 'string',
+  ImagePolymorphic: 'ImageField',
+  LatentsPolymorphic: 'LatentsField',
+  ConditioningPolymorphic: 'ConditioningField',
+  ControlPolymorphic: 'ControlField',
+  ColorPolymorphic: 'ColorField',
+};
+
+export const isPolymorphicItemType = (
+  itemType: string | undefined
+): itemType is keyof typeof SINGLE_TO_POLYMORPHIC_MAP =>
+  Boolean(itemType && itemType in SINGLE_TO_POLYMORPHIC_MAP);
 
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
-  integer: {
-    color: 'red',
-    colorCssVar: getColorTokenCssVariable('red'),
-    title: 'Integer',
-    description: 'Integers are whole numbers, without a decimal point.',
-  },
-  float: {
-    color: 'orange',
-    colorCssVar: getColorTokenCssVariable('orange'),
-    title: 'Float',
-    description: 'Floats are numbers with a decimal point.',
-  },
-  string: {
-    color: 'yellow',
-    colorCssVar: getColorTokenCssVariable('yellow'),
-    title: 'String',
-    description: 'Strings are text.',
-  },
   boolean: {
-    color: 'green',
-    colorCssVar: getColorTokenCssVariable('green'),
-    title: 'Boolean',
+    color: 'green.500',
     description: 'Booleans are true or false.',
+    title: 'Boolean',
+  },
+  BooleanCollection: {
+    color: 'green.500',
+    description: 'A collection of booleans.',
+    title: 'Boolean Collection',
+  },
+  BooleanPolymorphic: {
+    color: 'green.500',
+    description: 'A collection of booleans.',
+    title: 'Boolean Polymorphic',
+  },
+  ClipField: {
+    color: 'green.500',
+    description: 'Tokenizer and text_encoder submodels.',
+    title: 'Clip',
+  },
+  Collection: {
+    color: 'base.500',
+    description: 'TODO',
+    title: 'Collection',
+  },
+  CollectionItem: {
+    color: 'base.500',
+    description: 'TODO',
+    title: 'Collection Item',
+  },
+  ColorCollection: {
+    color: 'pink.300',
+    description: 'A collection of colors.',
+    title: 'Color Collection',
+  },
+  ColorField: {
+    color: 'pink.300',
+    description: 'A RGBA color.',
+    title: 'Color',
+  },
+  ColorPolymorphic: {
+    color: 'pink.300',
+    description: 'A collection of colors.',
+    title: 'Color Polymorphic',
+  },
+  ConditioningCollection: {
+    color: 'cyan.500',
+    description: 'Conditioning may be passed between nodes.',
+    title: 'Conditioning Collection',
+  },
+  ConditioningField: {
+    color: 'cyan.500',
+    description: 'Conditioning may be passed between nodes.',
+    title: 'Conditioning',
+  },
+  ConditioningPolymorphic: {
+    color: 'cyan.500',
+    description: 'Conditioning may be passed between nodes.',
+    title: 'Conditioning Polymorphic',
+  },
+  ControlCollection: {
+    color: 'teal.500',
+    description: 'Control info passed between nodes.',
+    title: 'Control Collection',
+  },
+  ControlField: {
+    color: 'teal.500',
+    description: 'Control info passed between nodes.',
+    title: 'Control',
+  },
+  ControlNetModelField: {
+    color: 'teal.500',
+    description: 'TODO',
+    title: 'ControlNet',
+  },
+  ControlPolymorphic: {
+    color: 'teal.500',
+    description: 'Control info passed between nodes.',
+    title: 'Control Polymorphic',
+  },
+  DenoiseMaskField: {
+    color: 'blue.300',
+    description: 'Denoise Mask may be passed between nodes',
+    title: 'Denoise Mask',
   },
   enum: {
-    color: 'blue',
-    colorCssVar: getColorTokenCssVariable('blue'),
-    title: 'Enum',
+    color: 'blue.500',
     description: 'Enums are values that may be one of a number of options.',
+    title: 'Enum',
   },
-  image: {
-    color: 'purple',
-    colorCssVar: getColorTokenCssVariable('purple'),
-    title: 'Image',
-    description: 'Images may be passed between nodes.',
+  float: {
+    color: 'orange.500',
+    description: 'Floats are numbers with a decimal point.',
+    title: 'Float',
   },
-  image_collection: {
-    color: 'purple',
-    colorCssVar: getColorTokenCssVariable('purple'),
-    title: 'Image Collection',
+  FloatCollection: {
+    color: 'orange.500',
+    description: 'A collection of floats.',
+    title: 'Float Collection',
+  },
+  FloatPolymorphic: {
+    color: 'orange.500',
+    description: 'A collection of floats.',
+    title: 'Float Polymorphic',
+  },
+  ImageCollection: {
+    color: 'purple.500',
     description: 'A collection of images.',
+    title: 'Image Collection',
   },
-  latents: {
-    color: 'pink',
-    colorCssVar: getColorTokenCssVariable('pink'),
-    title: 'Latents',
+  ImageField: {
+    color: 'purple.500',
+    description: 'Images may be passed between nodes.',
+    title: 'Image',
+  },
+  ImagePolymorphic: {
+    color: 'purple.500',
+    description: 'A collection of images.',
+    title: 'Image Polymorphic',
+  },
+  integer: {
+    color: 'red.500',
+    description: 'Integers are whole numbers, without a decimal point.',
+    title: 'Integer',
+  },
+  IntegerCollection: {
+    color: 'red.500',
+    description: 'A collection of integers.',
+    title: 'Integer Collection',
+  },
+  IntegerPolymorphic: {
+    color: 'red.500',
+    description: 'A collection of integers.',
+    title: 'Integer Polymorphic',
+  },
+  LatentsCollection: {
+    color: 'pink.500',
     description: 'Latents may be passed between nodes.',
+    title: 'Latents Collection',
   },
-  conditioning: {
-    color: 'cyan',
-    colorCssVar: getColorTokenCssVariable('cyan'),
-    title: 'Conditioning',
-    description: 'Conditioning may be passed between nodes.',
+  LatentsField: {
+    color: 'pink.500',
+    description: 'Latents may be passed between nodes.',
+    title: 'Latents',
   },
-  unet: {
-    color: 'red',
-    colorCssVar: getColorTokenCssVariable('red'),
-    title: 'UNet',
-    description: 'UNet submodel.',
+  LatentsPolymorphic: {
+    color: 'pink.500',
+    description: 'Latents may be passed between nodes.',
+    title: 'Latents Polymorphic',
   },
-  clip: {
-    color: 'green',
-    colorCssVar: getColorTokenCssVariable('green'),
-    title: 'Clip',
-    description: 'Tokenizer and text_encoder submodels.',
-  },
-  vae: {
-    color: 'blue',
-    colorCssVar: getColorTokenCssVariable('blue'),
-    title: 'Vae',
-    description: 'Vae submodel.',
-  },
-  control: {
-    color: 'cyan',
-    colorCssVar: getColorTokenCssVariable('cyan'), // TODO: no free color left
-    title: 'Control',
-    description: 'Control info passed between nodes.',
-  },
-  model: {
-    color: 'teal',
-    colorCssVar: getColorTokenCssVariable('teal'),
-    title: 'Model',
-    description: 'Models are models.',
-  },
-  refiner_model: {
-    color: 'teal',
-    colorCssVar: getColorTokenCssVariable('teal'),
-    title: 'Refiner Model',
-    description: 'Models are models.',
-  },
-  vae_model: {
-    color: 'teal',
-    colorCssVar: getColorTokenCssVariable('teal'),
-    title: 'VAE',
-    description: 'Models are models.',
-  },
-  lora_model: {
-    color: 'teal',
-    colorCssVar: getColorTokenCssVariable('teal'),
+  LoRAModelField: {
+    color: 'teal.500',
+    description: 'TODO',
     title: 'LoRA',
-    description: 'Models are models.',
   },
-  controlnet_model: {
-    color: 'teal',
-    colorCssVar: getColorTokenCssVariable('teal'),
-    title: 'ControlNet',
-    description: 'Models are models.',
+  MainModelField: {
+    color: 'teal.500',
+    description: 'TODO',
+    title: 'Model',
   },
-  array: {
-    color: 'gray',
-    colorCssVar: getColorTokenCssVariable('gray'),
-    title: 'Array',
-    description: 'TODO: Array type description.',
+  ONNXModelField: {
+    color: 'teal.500',
+    description: 'ONNX model field.',
+    title: 'ONNX Model',
   },
-  item: {
-    color: 'gray',
-    colorCssVar: getColorTokenCssVariable('gray'),
-    title: 'Collection Item',
-    description: 'TODO: Collection Item type description.',
+  Scheduler: {
+    color: 'base.500',
+    description: 'TODO',
+    title: 'Scheduler',
   },
-  color: {
-    color: 'gray',
-    colorCssVar: getColorTokenCssVariable('gray'),
-    title: 'Color',
-    description: 'A RGBA color.',
+  SDXLMainModelField: {
+    color: 'teal.500',
+    description: 'SDXL model field.',
+    title: 'SDXL Model',
+  },
+  SDXLRefinerModelField: {
+    color: 'teal.500',
+    description: 'TODO',
+    title: 'Refiner Model',
+  },
+  string: {
+    color: 'yellow.500',
+    description: 'Strings are text.',
+    title: 'String',
+  },
+  StringCollection: {
+    color: 'yellow.500',
+    description: 'A collection of strings.',
+    title: 'String Collection',
+  },
+  StringPolymorphic: {
+    color: 'yellow.500',
+    description: 'A collection of strings.',
+    title: 'String Polymorphic',
+  },
+  UNetField: {
+    color: 'red.500',
+    description: 'UNet submodel.',
+    title: 'UNet',
+  },
+  VaeField: {
+    color: 'blue.500',
+    description: 'Vae submodel.',
+    title: 'Vae',
+  },
+  VaeModelField: {
+    color: 'teal.500',
+    description: 'TODO',
+    title: 'VAE',
   },
 };
-
-export const NODE_MIN_WIDTH = 250;

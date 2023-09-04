@@ -2,8 +2,8 @@ import { UseToastOptions } from '@chakra-ui/react';
 import { PayloadAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { InvokeLogLevel } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { t } from 'i18next';
+import { get, startCase, upperFirst } from 'lodash-es';
 import { LogLevelName } from 'roarr';
 import {
   isAnySessionRejected,
@@ -25,7 +25,7 @@ import {
 import { ProgressImage } from 'services/events/types';
 import { makeToast } from '../util/makeToast';
 import { LANGUAGES } from './constants';
-import { startCase } from 'lodash-es';
+import { zPydanticValidationError } from './zodSchemas';
 
 export type CancelStrategy = 'immediate' | 'scheduled';
 
@@ -68,10 +68,6 @@ export interface SystemState {
    */
   wereModelsReceived: boolean;
   /**
-   * Whether or not the OpenAPI schema was received and parsed
-   */
-  wasSchemaParsed: boolean;
-  /**
    * The console output logging level
    */
   consoleLogLevel: InvokeLogLevel;
@@ -86,7 +82,6 @@ export interface SystemState {
   shouldAntialiasProgressImage: boolean;
   language: keyof typeof LANGUAGES;
   isUploading: boolean;
-  isNodesEnabled: boolean;
   shouldUseNSFWChecker: boolean;
   shouldUseWatermarker: boolean;
 }
@@ -112,7 +107,6 @@ export const initialSystemState: SystemState = {
   isCancelScheduled: false,
   subscribedNodeIds: [],
   wereModelsReceived: false,
-  wasSchemaParsed: false,
   consoleLogLevel: 'debug',
   shouldLogToConsole: true,
   statusTranslationKey: 'common.statusDisconnected',
@@ -120,7 +114,6 @@ export const initialSystemState: SystemState = {
   isPersisted: false,
   language: 'en',
   isUploading: false,
-  isNodesEnabled: false,
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
 };
@@ -194,9 +187,6 @@ export const systemSlice = createSlice({
     },
     progressImageSet(state, action: PayloadAction<ProgressImage | null>) {
       state.progressImage = action.payload;
-    },
-    setIsNodesEnabled(state, action: PayloadAction<boolean>) {
-      state.isNodesEnabled = action.payload;
     },
     shouldUseNSFWCheckerChanged(state, action: PayloadAction<boolean>) {
       state.shouldUseNSFWChecker = action.payload;
@@ -343,13 +333,6 @@ export const systemSlice = createSlice({
       );
     });
 
-    /**
-     * OpenAPI schema was parsed
-     */
-    builder.addCase(nodeTemplatesBuilt, (state) => {
-      state.wasSchemaParsed = true;
-    });
-
     // *** Matchers - must be after all cases ***
 
     /**
@@ -365,12 +348,35 @@ export const systemSlice = createSlice({
       state.statusTranslationKey = 'common.statusConnected';
       state.progressImage = null;
 
+      let errorDescription = undefined;
+      const duration = 5000;
+
+      if (action.payload?.status === 422) {
+        const result = zPydanticValidationError.safeParse(action.payload);
+        if (result.success) {
+          result.data.error.detail.map((e) => {
+            state.toastQueue.push(
+              makeToast({
+                title: upperFirst(e.msg),
+                status: 'error',
+                description: `Path:
+                ${e.loc.slice(3).join('.')}`,
+                duration,
+              })
+            );
+          });
+          return;
+        }
+      } else if (action.payload?.error) {
+        errorDescription = action.payload?.error;
+      }
+
       state.toastQueue.push(
         makeToast({
           title: t('toast.serverError'),
           status: 'error',
-          description:
-            action.payload?.status === 422 ? 'Validation Error' : undefined,
+          description: get(errorDescription, 'detail', 'Unknown Error'),
+          duration,
         })
       );
     });
@@ -418,7 +424,6 @@ export const {
   shouldAntialiasProgressImageChanged,
   languageChanged,
   progressImageSet,
-  setIsNodesEnabled,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } = systemSlice.actions;

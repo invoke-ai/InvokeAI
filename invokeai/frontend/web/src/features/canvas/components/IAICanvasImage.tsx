@@ -4,6 +4,7 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import useImage from 'use-image';
 import { CanvasImage } from '../store/canvasTypes';
 import { $authToken } from 'services/api/client';
+import { memo } from 'react';
 
 type IAICanvasImageProps = {
   canvasImage: CanvasImage;
@@ -25,4 +26,4 @@ const IAICanvasImage = (props: IAICanvasImageProps) => {
   return <Image x={x} y={y} image={image} listening={false} />;
 };
 
-export default IAICanvasImage;
+export default memo(IAICanvasImage);

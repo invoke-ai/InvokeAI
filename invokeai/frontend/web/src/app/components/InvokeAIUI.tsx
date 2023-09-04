@@ -1,3 +1,6 @@
+import { Middleware } from '@reduxjs/toolkit';
+import { store } from 'app/store/store';
+import { PartialAppConfig } from 'app/types/invokeai';
 import React, {
   lazy,
   memo,
@@ -6,18 +9,12 @@ import React, {
   useEffect,
 } from 'react';
 import { Provider } from 'react-redux';
-import { store } from 'app/store/store';
-
-import Loading from '../../common/components/Loading/Loading';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import { PartialAppConfig } from 'app/types/invokeai';
-
-import '../../i18n';
+import { $authToken, $baseUrl, $projectId } from 'services/api/client';
 import { socketMiddleware } from 'services/events/middleware';
-import { Middleware } from '@reduxjs/toolkit';
-import ImageDndContext from './ImageDnd/ImageDndContext';
-import { AddImageToBoardContextProvider } from '../contexts/AddImageToBoardContext';
-import { $authToken, $baseUrl } from 'services/api/client';
+import Loading from '../../common/components/Loading/Loading';
+import '../../i18n';
+import AppDndContext from '../../features/dnd/components/AppDndContext';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -28,6 +25,11 @@ interface Props extends PropsWithChildren {
   config?: PartialAppConfig;
   headerComponent?: ReactNode;
   middleware?: Middleware[];
+  projectId?: string;
+  selectedImage?: {
+    imageName: string;
+    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
+  };
 }
 
 const InvokeAIUI = ({
@@ -36,6 +38,8 @@ const InvokeAIUI = ({
   config,
   headerComponent,
   middleware,
+  projectId,
+  selectedImage,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -46,6 +50,11 @@ const InvokeAIUI = ({
     // configure API client base url
     if (apiUrl) {
       $baseUrl.set(apiUrl);
+    }
+
+    // configure API client project header
+    if (projectId) {
+      $projectId.set(projectId);
     }
 
     // reset dynamically added middlewares
@@ -67,19 +76,22 @@ const InvokeAIUI = ({
       // Reset the API client token and base url on unmount
       $baseUrl.set(undefined);
       $authToken.set(undefined);
+      $projectId.set(undefined);
     };
-  }, [apiUrl, token, middleware]);
+  }, [apiUrl, token, middleware, projectId]);
 
   return (
     <React.StrictMode>
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
-            <ImageDndContext>
-              <AddImageToBoardContextProvider>
-                <App config={config} headerComponent={headerComponent} />
-              </AddImageToBoardContextProvider>
-            </ImageDndContext>
+            <AppDndContext>
+              <App
+                config={config}
+                headerComponent={headerComponent}
+                selectedImage={selectedImage}
+              />
+            </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>
       </Provider>

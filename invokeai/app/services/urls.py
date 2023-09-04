@@ -20,6 +20,6 @@ class LocalUrlService(UrlServiceBase):
 
         # These paths are determined by the routes in invokeai/app/api/routers/images.py
         if thumbnail:
-            return f"{self._base_url}/images/{image_basename}/thumbnail"
+            return f"{self._base_url}/images/i/{image_basename}/thumbnail"
 
-        return f"{self._base_url}/images/{image_basename}/full"
+        return f"{self._base_url}/images/i/{image_basename}/full"

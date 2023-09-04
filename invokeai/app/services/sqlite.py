@@ -49,7 +49,8 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
 
     def _parse_item(self, item: str) -> T:
         item_type = get_args(self.__orig_class__)[0]
-        return parse_raw_as(item_type, item)
+        parsed = parse_raw_as(item_type, item)
+        return parsed
 
     def set(self, item: T):
         try:

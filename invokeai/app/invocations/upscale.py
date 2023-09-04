@@ -1,18 +1,17 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) & the InvokeAI Team
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal
 
 import cv2 as cv
 import numpy as np
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from PIL import Image
-from pydantic import Field
 from realesrgan import RealESRGANer
+from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
-from invokeai.app.models.image import ImageCategory, ImageField, ResourceOrigin
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 
-from .baseinvocation import BaseInvocation, InvocationConfig, InvocationContext
-from .image import ImageOutput
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?
@@ -24,17 +23,12 @@ ESRGAN_MODELS = Literal[
 ]
 
 
+@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.0.0")
 class ESRGANInvocation(BaseInvocation):
     """Upscales an image using RealESRGAN."""
 
-    type: Literal["esrgan"] = "esrgan"
-    image: Union[ImageField, None] = Field(default=None, description="The input image")
-    model_name: ESRGAN_MODELS = Field(default="RealESRGAN_x4plus.pth", description="The Real-ESRGAN model to use")
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Upscale (RealESRGAN)", "tags": ["image", "upscale", "realesrgan"]},
-        }
+    image: ImageField = InputField(description="The input image")
+    model_name: ESRGAN_MODELS = InputField(default="RealESRGAN_x4plus.pth", description="The Real-ESRGAN model to use")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
@@ -112,6 +106,7 @@ class ESRGANInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            workflow=self.workflow,
         )
 
         return ImageOutput(

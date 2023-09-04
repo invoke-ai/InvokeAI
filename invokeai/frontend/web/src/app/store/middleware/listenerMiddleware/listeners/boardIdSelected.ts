@@ -10,6 +10,7 @@ import {
 } from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
+import { imagesSelectors } from 'services/api/util';
 
 export const addBoardIdSelectedListener = () => {
   startAppListening({
@@ -52,8 +53,9 @@ export const addBoardIdSelectedListener = () => {
           queryArgs
         )(getState());
 
-        if (boardImagesData?.ids.length) {
-          dispatch(imageSelected((boardImagesData.ids[0] as string) ?? null));
+        if (boardImagesData) {
+          const firstImage = imagesSelectors.selectAll(boardImagesData)[0];
+          dispatch(imageSelected(firstImage ?? null));
         } else {
           // board has no images - deselect
           dispatch(imageSelected(null));

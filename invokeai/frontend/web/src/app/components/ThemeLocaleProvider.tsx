@@ -3,7 +3,7 @@ import {
   createLocalStorageManager,
   extendTheme,
 } from '@chakra-ui/react';
-import { ReactNode, useEffect, useMemo } from 'react';
+import { ReactNode, memo, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { theme as invokeAITheme } from 'theme/theme';
 
@@ -46,4 +46,4 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
   );
 }
 
-export default ThemeLocaleProvider;
+export default memo(ThemeLocaleProvider);

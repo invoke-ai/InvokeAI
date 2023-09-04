@@ -26,6 +26,8 @@ export const addCanvasSavedToGalleryListener = () => {
         return;
       }
 
+      const { autoAddBoardId } = state.gallery;
+
       dispatch(
         imagesApi.endpoints.uploadImage.initiate({
           file: new File([blob], 'savedCanvas.png', {
@@ -33,7 +35,7 @@ export const addCanvasSavedToGalleryListener = () => {
           }),
           image_category: 'general',
           is_intermediate: false,
-          board_id: state.gallery.autoAddBoardId,
+          board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
           crop_visible: true,
           postUploadAction: {
             type: 'TOAST',

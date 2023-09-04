@@ -1,73 +1,57 @@
 import io
-from typing import Literal, Optional, Any
+from typing import Literal, Optional
 
-# from PIL.Image import Image
-import PIL.Image
-from matplotlib.ticker import MaxNLocator
-from matplotlib.figure import Figure
-
-from pydantic import BaseModel, Field
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
+import PIL.Image
 from easing_functions import (
-    LinearInOut,
-    QuadEaseInOut,
-    QuadEaseIn,
-    QuadEaseOut,
-    CubicEaseInOut,
-    CubicEaseIn,
-    CubicEaseOut,
-    QuarticEaseInOut,
-    QuarticEaseIn,
-    QuarticEaseOut,
-    QuinticEaseInOut,
-    QuinticEaseIn,
-    QuinticEaseOut,
-    SineEaseInOut,
-    SineEaseIn,
-    SineEaseOut,
-    CircularEaseIn,
-    CircularEaseInOut,
-    CircularEaseOut,
-    ExponentialEaseInOut,
-    ExponentialEaseIn,
-    ExponentialEaseOut,
-    ElasticEaseIn,
-    ElasticEaseInOut,
-    ElasticEaseOut,
     BackEaseIn,
     BackEaseInOut,
     BackEaseOut,
     BounceEaseIn,
     BounceEaseInOut,
     BounceEaseOut,
+    CircularEaseIn,
+    CircularEaseInOut,
+    CircularEaseOut,
+    CubicEaseIn,
+    CubicEaseInOut,
+    CubicEaseOut,
+    ElasticEaseIn,
+    ElasticEaseInOut,
+    ElasticEaseOut,
+    ExponentialEaseIn,
+    ExponentialEaseInOut,
+    ExponentialEaseOut,
+    LinearInOut,
+    QuadEaseIn,
+    QuadEaseInOut,
+    QuadEaseOut,
+    QuarticEaseIn,
+    QuarticEaseInOut,
+    QuarticEaseOut,
+    QuinticEaseIn,
+    QuinticEaseInOut,
+    QuinticEaseOut,
+    SineEaseIn,
+    SineEaseInOut,
+    SineEaseOut,
 )
+from matplotlib.ticker import MaxNLocator
 
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    InvocationContext,
-    InvocationConfig,
-)
-from ...backend.util.logging import InvokeAILogger
-from .collections import FloatCollectionOutput
+from invokeai.app.invocations.primitives import FloatCollectionOutput
+
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 
+@invocation("float_range", title="Float Range", tags=["math", "range"], category="math", version="1.0.0")
 class FloatLinearRangeInvocation(BaseInvocation):
     """Creates a range"""
 
-    type: Literal["float_range"] = "float_range"
-
-    # Inputs
-    start: float = Field(default=5, description="The first value of the range")
-    stop: float = Field(default=10, description="The last value of the range")
-    steps: int = Field(default=30, description="number of values to interpolate over (including start and stop)")
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Linear Range (Float)", "tags": ["math", "float", "linear", "range"]},
-        }
+    start: float = InputField(default=5, description="The first value of the range")
+    stop: float = InputField(default=10, description="The last value of the range")
+    steps: int = InputField(default=30, description="number of values to interpolate over (including start and stop)")
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         param_list = list(np.linspace(self.start, self.stop, self.steps))
@@ -108,37 +92,28 @@ EASING_FUNCTIONS_MAP = {
     "BounceInOut": BounceEaseInOut,
 }
 
-EASING_FUNCTION_KEYS: Any = Literal[tuple(list(EASING_FUNCTIONS_MAP.keys()))]
+EASING_FUNCTION_KEYS = Literal[tuple(list(EASING_FUNCTIONS_MAP.keys()))]
 
 
 # actually I think for now could just use CollectionOutput (which is list[Any]
+@invocation("step_param_easing", title="Step Param Easing", tags=["step", "easing"], category="step", version="1.0.0")
 class StepParamEasingInvocation(BaseInvocation):
     """Experimental per-step parameter easing for denoising steps"""
 
-    type: Literal["step_param_easing"] = "step_param_easing"
-
-    # Inputs
-    # fmt: off
-    easing: EASING_FUNCTION_KEYS = Field(default="Linear", description="The easing function to use")
-    num_steps: int = Field(default=20, description="number of denoising steps")
-    start_value: float = Field(default=0.0, description="easing starting value")
-    end_value: float = Field(default=1.0, description="easing ending value")
-    start_step_percent: float = Field(default=0.0, description="fraction of steps at which to start easing")
-    end_step_percent: float = Field(default=1.0, description="fraction of steps after which to end easing")
+    easing: EASING_FUNCTION_KEYS = InputField(default="Linear", description="The easing function to use")
+    num_steps: int = InputField(default=20, description="number of denoising steps")
+    start_value: float = InputField(default=0.0, description="easing starting value")
+    end_value: float = InputField(default=1.0, description="easing ending value")
+    start_step_percent: float = InputField(default=0.0, description="fraction of steps at which to start easing")
+    end_step_percent: float = InputField(default=1.0, description="fraction of steps after which to end easing")
     # if None, then start_value is used prior to easing start
-    pre_start_value: Optional[float] = Field(default=None, description="value before easing start")
+    pre_start_value: Optional[float] = InputField(default=None, description="value before easing start")
     # if None, then end value is used prior to easing end
-    post_end_value: Optional[float] = Field(default=None, description="value after easing end")
-    mirror: bool = Field(default=False, description="include mirror of easing function")
+    post_end_value: Optional[float] = InputField(default=None, description="value after easing end")
+    mirror: bool = InputField(default=False, description="include mirror of easing function")
     # FIXME: add alt_mirror option (alternative to default or mirror), or remove entirely
-    # alt_mirror: bool = Field(default=False, description="alternative mirroring by dual easing")
-    show_easing_plot: bool = Field(default=False, description="show easing plot")
-    # fmt: on
-
-    class Config(InvocationConfig):
-        schema_extra = {
-            "ui": {"title": "Param Easing By Step", "tags": ["param", "step", "easing"]},
-        }
+    # alt_mirror: bool = InputField(default=False, description="alternative mirroring by dual easing")
+    show_easing_plot: bool = InputField(default=False, description="show easing plot")
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         log_diagnostics = False

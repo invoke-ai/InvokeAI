@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import {
   useGetBoardAssetsTotalQuery,
   useGetBoardImagesTotalQuery,
-} from '../endpoints/images';
+} from '../endpoints/boards';
 
 export const useBoardTotal = (board_id: BoardId) => {
   const galleryView = useAppSelector((state) => state.gallery.galleryView);

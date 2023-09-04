@@ -18,6 +18,7 @@ import { FaWrench } from 'react-icons/fa';
 import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
 import { isEqual } from 'lodash-es';
 import { useTranslation } from 'react-i18next';
+import { memo } from 'react';
 
 export const canvasControlsSelector = createSelector(
   [canvasSelector],
@@ -109,4 +110,4 @@ const UnifiedCanvasSettings = () => {
   );
 };
 
-export default UnifiedCanvasSettings;
+export default memo(UnifiedCanvasSettings);

@@ -1,61 +1,64 @@
-import { Box, Flex, Spinner, SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, Spinner } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
+import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'features/dnd/types';
+import { setHeight, setWidth } from 'features/parameters/store/generationSlice';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { FaRulerVertical, FaSave, FaUndo } from 'react-icons/fa';
+import {
+  useAddImageToBoardMutation,
+  useChangeImageIsIntermediateMutation,
+  useGetImageDTOQuery,
+  useRemoveImageFromBoardMutation,
+} from 'services/api/endpoints/images';
 import { PostUploadAction } from 'services/api/types';
-import { controlNetImageChanged } from '../store/controlNetSlice';
+import IAIDndImageIcon from '../../../common/components/IAIDndImageIcon';
+import {
+  ControlNetConfig,
+  controlNetImageChanged,
+} from '../store/controlNetSlice';
 
 type Props = {
-  controlNetId: string;
-  height: SystemStyleObject['h'];
+  controlNet: ControlNetConfig;
+  isSmall?: boolean;
 };
 
-const ControlNetImagePreview = (props: Props) => {
-  const { height, controlNetId } = props;
+const selector = createSelector(
+  stateSelector,
+  ({ controlNet, gallery }) => {
+    const { pendingControlImages } = controlNet;
+    const { autoAddBoardId } = gallery;
+
+    return {
+      pendingControlImages,
+      autoAddBoardId,
+    };
+  },
+  defaultSelectorOptions
+);
+
+const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
+  const {
+    controlImage: controlImageName,
+    processedControlImage: processedControlImageName,
+    processorType,
+    isEnabled,
+    controlNetId,
+  } = controlNet;
+
   const dispatch = useAppDispatch();
 
-  const selector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ controlNet }) => {
-          const { pendingControlImages } = controlNet;
-          const {
-            controlImage,
-            processedControlImage,
-            processorType,
-            isEnabled,
-          } = controlNet.controlNets[controlNetId];
-
-          return {
-            controlImageName: controlImage,
-            processedControlImageName: processedControlImage,
-            processorType,
-            isEnabled,
-            pendingControlImages,
-          };
-        },
-        defaultSelectorOptions
-      ),
-    [controlNetId]
-  );
-
-  const {
-    controlImageName,
-    processedControlImageName,
-    processorType,
-    pendingControlImages,
-    isEnabled,
-  } = useAppSelector(selector);
+  const { pendingControlImages, autoAddBoardId } = useAppSelector(selector);
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
@@ -67,9 +70,57 @@ const ControlNetImagePreview = (props: Props) => {
     processedControlImageName ?? skipToken
   );
 
+  const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();
+  const [addToBoard] = useAddImageToBoardMutation();
+  const [removeFromBoard] = useRemoveImageFromBoardMutation();
   const handleResetControlImage = useCallback(() => {
     dispatch(controlNetImageChanged({ controlNetId, controlImage: null }));
   }, [controlNetId, dispatch]);
+
+  const handleSaveControlImage = useCallback(async () => {
+    if (!processedControlImage) {
+      return;
+    }
+
+    await changeIsIntermediate({
+      imageDTO: processedControlImage,
+      is_intermediate: false,
+    }).unwrap();
+
+    if (autoAddBoardId !== 'none') {
+      addToBoard({
+        imageDTO: processedControlImage,
+        board_id: autoAddBoardId,
+      });
+    } else {
+      removeFromBoard({ imageDTO: processedControlImage });
+    }
+  }, [
+    processedControlImage,
+    changeIsIntermediate,
+    autoAddBoardId,
+    addToBoard,
+    removeFromBoard,
+  ]);
+
+  const handleSetControlImageToDimensions = useCallback(() => {
+    if (!controlImage) {
+      return;
+    }
+
+    if (activeTabName === 'unifiedCanvas') {
+      dispatch(
+        setBoundingBoxDimensions({
+          width: controlImage.width,
+          height: controlImage.height,
+        })
+      );
+    } else {
+      dispatch(setWidth(controlImage.width));
+      dispatch(setHeight(controlImage.height));
+    }
+  }, [controlImage, activeTabName, dispatch]);
+
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
   }, []);
@@ -116,7 +167,7 @@ const ControlNetImagePreview = (props: Props) => {
       sx={{
         position: 'relative',
         w: 'full',
-        h: height,
+        h: isSmall ? 28 : 366, // magic no touch
         alignItems: 'center',
         justifyContent: 'center',
         pointerEvents: isEnabled ? 'auto' : 'none',
@@ -128,11 +179,9 @@ const ControlNetImagePreview = (props: Props) => {
         droppableData={droppableData}
         imageDTO={controlImage}
         isDropDisabled={shouldShowProcessedImage || !isEnabled}
-        onClickReset={handleResetControlImage}
         postUploadAction={postUploadAction}
-        resetTooltip="Reset Control Image"
-        withResetIcon={Boolean(controlImage)}
       />
+
       <Box
         sx={{
           position: 'absolute',
@@ -152,11 +201,29 @@ const ControlNetImagePreview = (props: Props) => {
           imageDTO={processedControlImage}
           isUploadDisabled={true}
           isDropDisabled={!isEnabled}
-          onClickReset={handleResetControlImage}
-          resetTooltip="Reset Control Image"
-          withResetIcon={Boolean(controlImage)}
         />
       </Box>
+
+      <>
+        <IAIDndImageIcon
+          onClick={handleResetControlImage}
+          icon={controlImage ? <FaUndo /> : undefined}
+          tooltip="Reset Control Image"
+        />
+        <IAIDndImageIcon
+          onClick={handleSaveControlImage}
+          icon={controlImage ? <FaSave size={16} /> : undefined}
+          tooltip="Save Control Image"
+          styleOverrides={{ marginTop: 6 }}
+        />
+        <IAIDndImageIcon
+          onClick={handleSetControlImageToDimensions}
+          icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
+          tooltip="Set Control Image Dimensions To W/H"
+          styleOverrides={{ marginTop: 12 }}
+        />
+      </>
+
       {pendingControlImages.includes(controlNetId) && (
         <Flex
           sx={{

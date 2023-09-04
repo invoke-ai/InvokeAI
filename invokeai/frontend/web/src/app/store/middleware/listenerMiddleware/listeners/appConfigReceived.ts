@@ -18,7 +18,9 @@ export const addAppConfigReceivedListener = () => {
       const infillMethod = getState().generation.infillMethod;
 
       if (!infill_methods.includes(infillMethod)) {
-        dispatch(setInfillMethod(infill_methods[0]));
+        // if there is no infill method, set it to the first one
+        // if there is no first one... god help us
+        dispatch(setInfillMethod(infill_methods[0] as string));
       }
 
       if (!nsfw_methods.includes('nsfw_checker')) {

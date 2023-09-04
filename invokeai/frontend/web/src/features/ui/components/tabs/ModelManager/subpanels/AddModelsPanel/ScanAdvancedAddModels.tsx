@@ -74,7 +74,9 @@ export default function ScanAdvancedAddModels() {
         value={advancedAddMode}
         data={advancedAddModeData}
         onChange={(v) => {
-          if (!v) return;
+          if (!v) {
+            return;
+          }
           setAdvancedAddMode(v as ManualAddMode);
           if (v === 'checkpoint') {
             setIsCheckpoint(true);

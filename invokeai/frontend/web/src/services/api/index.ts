@@ -6,7 +6,7 @@ import {
   createApi,
   fetchBaseQuery,
 } from '@reduxjs/toolkit/query/react';
-import { $authToken, $baseUrl } from 'services/api/client';
+import { $authToken, $baseUrl, $projectId } from 'services/api/client';
 
 export const tagTypes = [
   'Board',
@@ -16,6 +16,7 @@ export const tagTypes = [
   'ImageNameList',
   'ImageList',
   'ImageMetadata',
+  'ImageMetadataFromFile',
   'Model',
 ];
 export type ApiFullTagDescription = FullTagDescription<
@@ -30,12 +31,16 @@ const dynamicBaseQuery: BaseQueryFn<
 > = async (args, api, extraOptions) => {
   const baseUrl = $baseUrl.get();
   const authToken = $authToken.get();
+  const projectId = $projectId.get();
 
   const rawBaseQuery = fetchBaseQuery({
     baseUrl: `${baseUrl ?? ''}/api/v1`,
     prepareHeaders: (headers) => {
       if (authToken) {
         headers.set('Authorization', `Bearer ${authToken}`);
+      }
+      if (projectId) {
+        headers.set('project-id', projectId);
       }
 
       return headers;

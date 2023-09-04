@@ -7,11 +7,12 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import List, Dict, Callable, Union, Set, Optional
+from typing import Optional, List, Dict, Callable, Union, Set
 
 import requests
 from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
+import torch
 from huggingface_hub import hf_hub_url, HfFolder, HfApi
 from omegaconf import OmegaConf
 from tqdm import tqdm
@@ -22,6 +23,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_management import ModelManager, ModelType, BaseModelType, ModelVariantType, AddModelResult
 from invokeai.backend.model_management.model_probe import ModelProbe, SchedulerPredictionType, ModelProbeInfo
 from invokeai.backend.util import download_with_resume
+from invokeai.backend.util.devices import torch_dtype, choose_torch_device
 from ..util.logging import InvokeAILogger
 
 warnings.filterwarnings("ignore")
@@ -86,8 +88,8 @@ class ModelLoadInfo:
     name: str
     model_type: ModelType
     base_type: BaseModelType
-    path: Path = None
-    repo_id: str = None
+    path: Optional[Path] = None
+    repo_id: Optional[str] = None
     description: str = ""
     installed: bool = False
     recommended: bool = False
@@ -98,9 +100,9 @@ class ModelInstall(object):
     def __init__(
         self,
         config: InvokeAIAppConfig,
-        prediction_type_helper: Callable[[Path], SchedulerPredictionType] = None,
-        model_manager: ModelManager = None,
-        access_token: str = None,
+        prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
+        model_manager: Optional[ModelManager] = None,
+        access_token: Optional[str] = None,
     ):
         self.config = config
         self.mgr = model_manager or ModelManager(config.model_conf_path)
@@ -304,6 +306,8 @@ class ModelInstall(object):
             staging = Path(staging)
             if "model_index.json" in files:
                 location = self._download_hf_pipeline(repo_id, staging)  # pipeline
+            elif "unet/model.onnx" in files:
+                location = self._download_hf_model(repo_id, files, staging)
             else:
                 for suffix in ["safetensors", "bin"]:
                     if f"pytorch_lora_weights.{suffix}" in files:
@@ -368,7 +372,7 @@ class ModelInstall(object):
             model_format=info.format,
         )
         legacy_conf = None
-        if info.model_type == ModelType.Main:
+        if info.model_type == ModelType.Main or info.model_type == ModelType.ONNX:
             attributes.update(
                 dict(
                     variant=info.variant_type,
@@ -413,15 +417,25 @@ class ModelInstall(object):
         does a save_pretrained() to the indicated staging area.
         """
         _, name = repo_id.split("/")
-        revisions = ["fp16", "main"] if self.config.precision == "float16" else ["main"]
+        precision = torch_dtype(choose_torch_device())
+        variants = ["fp16", None] if precision == torch.float16 else [None, "fp16"]
+
         model = None
-        for revision in revisions:
+        for variant in variants:
             try:
-                model = DiffusionPipeline.from_pretrained(repo_id, revision=revision, safety_checker=None)
-            except:  # most errors are due to fp16 not being present. Fix this to catch other errors
-                pass
+                model = DiffusionPipeline.from_pretrained(
+                    repo_id,
+                    variant=variant,
+                    torch_dtype=precision,
+                    safety_checker=None,
+                )
+            except Exception as e:  # most errors are due to fp16 not being present. Fix this to catch other errors
+                if "fp16" not in str(e):
+                    print(e)
+
             if model:
                 break
+
         if not model:
             logger.error(f"Diffusers model {repo_id} could not be downloaded. Skipping.")
             return None
@@ -433,8 +447,13 @@ class ModelInstall(object):
         location = staging / name
         paths = list()
         for filename in files:
+            filePath = Path(filename)
             p = hf_download_with_resume(
-                repo_id, model_dir=location, model_name=filename, access_token=self.access_token
+                repo_id,
+                model_dir=location / filePath.parent,
+                model_name=filePath.name,
+                access_token=self.access_token,
+                subfolder=filePath.parent,
             )
             if p:
                 paths.append(p)
@@ -482,11 +501,12 @@ def hf_download_with_resume(
     model_name: str,
     model_dest: Path = None,
     access_token: str = None,
+    subfolder: str = None,
 ) -> Path:
     model_dest = model_dest or Path(os.path.join(model_dir, model_name))
     os.makedirs(model_dir, exist_ok=True)
 
-    url = hf_hub_url(repo_id, model_name)
+    url = hf_hub_url(repo_id, model_name, subfolder=subfolder)
 
     header = {"Authorization": f"Bearer {access_token}"} if access_token else {}
     open_mode = "wb"

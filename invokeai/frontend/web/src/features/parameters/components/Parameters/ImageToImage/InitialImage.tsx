@@ -1,15 +1,15 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
-import {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'app/components/ImageDnd/typesafeDnd';
 import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { useMemo } from 'react';
+import {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'features/dnd/types';
+import { memo, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const selector = createSelector(
@@ -64,4 +64,4 @@ const InitialImage = () => {
   );
 };
 
-export default InitialImage;
+export default memo(InitialImage);

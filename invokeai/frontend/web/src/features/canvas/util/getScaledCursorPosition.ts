@@ -5,7 +5,9 @@ const getScaledCursorPosition = (stage: Stage) => {
 
   const stageTransform = stage.getAbsoluteTransform().copy();
 
-  if (!pointerPosition || !stageTransform) return;
+  if (!pointerPosition || !stageTransform) {
+    return;
+  }
 
   const scaledCursorPosition = stageTransform.invert().point(pointerPosition);
 

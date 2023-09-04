@@ -1,10 +1,11 @@
 from typing import Optional, Union
 from datetime import datetime
-from pydantic import BaseModel, Extra, Field, StrictBool, StrictStr
+from pydantic import Field
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 
-class BoardRecord(BaseModel):
+class BoardRecord(BaseModelExcludeNull):
     """Deserialized board record."""
 
     board_id: str = Field(description="The unique ID of the board.")

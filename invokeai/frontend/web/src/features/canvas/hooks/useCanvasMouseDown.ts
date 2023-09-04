@@ -38,7 +38,9 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
   return useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-      if (!stageRef.current) return;
+      if (!stageRef.current) {
+        return;
+      }
 
       stageRef.current.container().focus();
 
@@ -54,7 +56,9 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-      if (!scaledCursorPosition) return;
+      if (!scaledCursorPosition) {
+        return;
+      }
 
       e.evt.preventDefault();
 

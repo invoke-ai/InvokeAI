@@ -9,13 +9,12 @@ import {
   Tabs,
   Text,
 } from '@chakra-ui/react';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
-import { memo, useMemo } from 'react';
-import { useGetImageMetadataQuery } from 'services/api/endpoints/images';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { memo } from 'react';
+import { useGetImageMetadataFromFileQuery } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
-import { useDebounce } from 'use-debounce';
+import DataViewer from './DataViewer';
 import ImageMetadataActions from './ImageMetadataActions';
-import ImageMetadataJSON from './ImageMetadataJSON';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -28,61 +27,22 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   //   dispatch(setShouldShowImageDetails(false));
   // });
 
-  const [debouncedMetadataQueryArg, debounceState] = useDebounce(
-    image.image_name,
-    500
-  );
-
-  const { currentData } = useGetImageMetadataQuery(
-    debounceState.isPending()
-      ? skipToken
-      : debouncedMetadataQueryArg ?? skipToken
-  );
-  const metadata = currentData?.metadata;
-  const graph = currentData?.graph;
-
-  const tabData = useMemo(() => {
-    const _tabData: { label: string; data: object; copyTooltip: string }[] = [];
-
-    if (metadata) {
-      _tabData.push({
-        label: 'Core Metadata',
-        data: metadata,
-        copyTooltip: 'Copy Core Metadata JSON',
-      });
-    }
-
-    if (image) {
-      _tabData.push({
-        label: 'Image Details',
-        data: image,
-        copyTooltip: 'Copy Image Details JSON',
-      });
-    }
-
-    if (graph) {
-      _tabData.push({
-        label: 'Graph',
-        data: graph,
-        copyTooltip: 'Copy Graph JSON',
-      });
-    }
-    return _tabData;
-  }, [metadata, graph, image]);
+  const { metadata, workflow } = useGetImageMetadataFromFileQuery(image, {
+    selectFromResult: (res) => ({
+      metadata: res?.currentData?.metadata,
+      workflow: res?.currentData?.workflow,
+    }),
+  });
 
   return (
     <Flex
+      layerStyle="first"
       sx={{
         padding: 4,
         gap: 1,
         flexDirection: 'column',
         width: 'full',
         height: 'full',
-        backdropFilter: 'blur(20px)',
-        bg: 'baseAlpha.200',
-        _dark: {
-          bg: 'blackAlpha.600',
-        },
         borderRadius: 'base',
         position: 'absolute',
         overflow: 'hidden',
@@ -103,32 +63,33 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
       >
         <TabList>
-          {tabData.map((tab) => (
-            <Tab
-              key={tab.label}
-              sx={{
-                borderTopRadius: 'base',
-              }}
-            >
-              <Text sx={{ color: 'base.700', _dark: { color: 'base.300' } }}>
-                {tab.label}
-              </Text>
-            </Tab>
-          ))}
+          <Tab>Metadata</Tab>
+          <Tab>Image Details</Tab>
+          <Tab>Workflow</Tab>
         </TabList>
 
-        <TabPanels sx={{ w: 'full', h: 'full' }}>
-          {tabData.map((tab) => (
-            <TabPanel
-              key={tab.label}
-              sx={{ w: 'full', h: 'full', p: 0, pt: 4 }}
-            >
-              <ImageMetadataJSON
-                jsonObject={tab.data}
-                copyTooltip={tab.copyTooltip}
-              />
-            </TabPanel>
-          ))}
+        <TabPanels>
+          <TabPanel>
+            {metadata ? (
+              <DataViewer data={metadata} label="Metadata" />
+            ) : (
+              <IAINoContentFallback label="No metadata found" />
+            )}
+          </TabPanel>
+          <TabPanel>
+            {image ? (
+              <DataViewer data={image} label="Image Details" />
+            ) : (
+              <IAINoContentFallback label="No image details found" />
+            )}
+          </TabPanel>
+          <TabPanel>
+            {workflow ? (
+              <DataViewer data={workflow} label="Workflow" />
+            ) : (
+              <IAINoContentFallback label="No workflow found" />
+            )}
+          </TabPanel>
         </TabPanels>
       </Tabs>
     </Flex>

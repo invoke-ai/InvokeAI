@@ -2,7 +2,7 @@
 /.github/workflows/  @lstein @blessedcoolant
 
 # documentation
-/docs/ @lstein @blessedcoolant @hipsterusername
+/docs/ @lstein @blessedcoolant @hipsterusername @Millu
 /mkdocs.yml @lstein  @blessedcoolant
 
 # nodes
@@ -22,7 +22,7 @@
 /invokeai/backend @blessedcoolant @psychedelicious @lstein @maryhipp
 
 # generation, model management, postprocessing
-/invokeai/backend  @damian0815 @lstein @blessedcoolant @gregghelt2 @StAlKeR7779 @brandonrising
+/invokeai/backend  @damian0815 @lstein @blessedcoolant @gregghelt2 @StAlKeR7779 @brandonrising @ryanjdick
 
 # front ends
 /invokeai/frontend/CLI @lstein

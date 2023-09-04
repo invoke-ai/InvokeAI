@@ -63,7 +63,7 @@ export const addDynamicPromptsToGraph = (
       {
         source: {
           node_id: DYNAMIC_PROMPT,
-          field: 'prompt_collection',
+          field: 'collection',
         },
         destination: {
           node_id: ITERATE,
@@ -108,13 +108,13 @@ export const addDynamicPromptsToGraph = (
 
       // Connect random int to the start of the range of size so the range starts on the random first seed
       graph.edges.push({
-        source: { node_id: RANDOM_INT, field: 'a' },
+        source: { node_id: RANDOM_INT, field: 'value' },
         destination: { node_id: NOISE, field: 'seed' },
       });
 
       if (metadataAccumulator) {
         graph.edges.push({
-          source: { node_id: RANDOM_INT, field: 'a' },
+          source: { node_id: RANDOM_INT, field: 'value' },
           destination: { node_id: METADATA_ACCUMULATOR, field: 'seed' },
         });
       }
@@ -198,7 +198,7 @@ export const addDynamicPromptsToGraph = (
 
       // Connect random int to the start of the range of size so the range starts on the random first seed
       graph.edges.push({
-        source: { node_id: RANDOM_INT, field: 'a' },
+        source: { node_id: RANDOM_INT, field: 'value' },
         destination: { node_id: RANGE_OF_SIZE, field: 'start' },
       });
     } else {

@@ -17,35 +17,44 @@ from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED, BUTTON3_CLICKED
 
 # minimum size for UIs
-MIN_COLS = 130
-MIN_LINES = 38
+MIN_COLS = 150
+MIN_LINES = 40
+
+
+class WindowTooSmallException(Exception):
+    pass
 
 
 # -------------------------------------
-def set_terminal_size(columns: int, lines: int):
-    ts = get_terminal_size()
-    width = max(columns, ts.columns)
-    height = max(lines, ts.lines)
-
+def set_terminal_size(columns: int, lines: int) -> bool:
     OS = platform.uname().system
-    if OS == "Windows":
-        pass
-        # not working reliably - ask user to adjust the window
-        # _set_terminal_size_powershell(width,height)
-    elif OS in ["Darwin", "Linux"]:
-        _set_terminal_size_unix(width, height)
+    screen_ok = False
+    while not screen_ok:
+        ts = get_terminal_size()
+        width = max(columns, ts.columns)
+        height = max(lines, ts.lines)
 
-    # check whether it worked....
-    ts = get_terminal_size()
-    pause = False
-    if ts.columns < columns:
-        print("\033[1mThis window is too narrow for the user interface.\033[0m")
-        pause = True
-    if ts.lines < lines:
-        print("\033[1mThis window is too short for the user interface.\033[0m")
-        pause = True
-    if pause:
-        input("Maximize the window then press any key to continue..")
+        if OS == "Windows":
+            pass
+            # not working reliably - ask user to adjust the window
+            # _set_terminal_size_powershell(width,height)
+        elif OS in ["Darwin", "Linux"]:
+            _set_terminal_size_unix(width, height)
+
+        # check whether it worked....
+        ts = get_terminal_size()
+        if ts.columns < columns or ts.lines < lines:
+            print(
+                f"\033[1mThis window is too small for the interface. InvokeAI requires {columns}x{lines} (w x h) characters, but window is {ts.columns}x{ts.lines}\033[0m"
+            )
+            resp = input(
+                "Maximize the window and/or decrease the font size then press any key to continue. Type [Q] to give up.."
+            )
+            if resp.upper().startswith("Q"):
+                break
+        else:
+            screen_ok = True
+    return screen_ok
 
 
 def _set_terminal_size_powershell(width: int, height: int):
@@ -80,21 +89,21 @@ def _set_terminal_size_unix(width: int, height: int):
     sys.stdout.flush()
 
 
-def set_min_terminal_size(min_cols: int, min_lines: int):
+def set_min_terminal_size(min_cols: int, min_lines: int) -> bool:
     # make sure there's enough room for the ui
     term_cols, term_lines = get_terminal_size()
     if term_cols >= min_cols and term_lines >= min_lines:
-        return
+        return True
     cols = max(term_cols, min_cols)
     lines = max(term_lines, min_lines)
-    set_terminal_size(cols, lines)
+    return set_terminal_size(cols, lines)
 
 
 class IntSlider(npyscreen.Slider):
     def translate_value(self):
         stri = "%2d / %2d" % (self.value, self.out_of)
-        l = (len(str(self.out_of))) * 2 + 4
-        stri = stri.rjust(l)
+        length = (len(str(self.out_of))) * 2 + 4
+        stri = stri.rjust(length)
         return stri
 
 
@@ -158,16 +167,18 @@ class FloatSlider(npyscreen.Slider):
     # this is supposed to adjust display precision, but doesn't
     def translate_value(self):
         stri = "%3.2f / %3.2f" % (self.value, self.out_of)
-        l = (len(str(self.out_of))) * 2 + 4
-        stri = stri.rjust(l)
+        length = (len(str(self.out_of))) * 2 + 4
+        stri = stri.rjust(length)
         return stri
 
 
 class FloatTitleSlider(npyscreen.TitleText):
-    _entry_type = FloatSlider
+    _entry_type = npyscreen.Slider
 
 
 class SelectColumnBase:
+    """Base class for selection widget arranged in columns."""
+
     def make_contained_widgets(self):
         self._my_widgets = []
         column_width = self.width // self.columns
@@ -244,6 +255,7 @@ class MultiSelectColumns(SelectColumnBase, npyscreen.MultiSelect):
 class SingleSelectWithChanged(npyscreen.SelectOne):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.on_changed = None
 
     def h_select(self, ch):
         super().h_select(ch)
@@ -251,7 +263,9 @@ class SingleSelectWithChanged(npyscreen.SelectOne):
             self.on_changed(self.value)
 
 
-class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
+class SingleSelectColumnsSimple(SelectColumnBase, SingleSelectWithChanged):
+    """Row of radio buttons. Spacebar to select."""
+
     def __init__(self, screen, columns: int = 1, values: list = [], **keywords):
         self.columns = columns
         self.value_cnt = len(values)
@@ -259,14 +273,18 @@ class SingleSelectColumns(SelectColumnBase, SingleSelectWithChanged):
         self.on_changed = None
         super().__init__(screen, values=values, **keywords)
 
-    def when_value_edited(self):
-        self.h_select(self.cursor_line)
+    def h_cursor_line_right(self, ch):
+        self.h_exit_down("bye bye")
+
+    def h_cursor_line_left(self, ch):
+        self.h_exit_up("bye bye")
+
+
+class SingleSelectColumns(SingleSelectColumnsSimple):
+    """Row of radio buttons. When tabbing over a selection, it is auto selected."""
 
     def when_cursor_moved(self):
         self.h_select(self.cursor_line)
-
-    def h_cursor_line_right(self, ch):
-        self.h_exit_down("bye bye")
 
 
 class TextBoxInner(npyscreen.MultiLineEdit):
@@ -314,55 +332,6 @@ class TextBoxInner(npyscreen.MultiLineEdit):
         mouse_id, rel_x, rel_y, z, bstate = self.interpret_mouse_event(mouse_event)
         if bstate & (BUTTON2_CLICKED | BUTTON3_CLICKED):
             self.h_paste()
-
-    # def update(self, clear=True):
-    #     if clear:
-    #         self.clear()
-
-    #     HEIGHT = self.height
-    #     WIDTH = self.width
-    #     # draw box.
-    #     self.parent.curses_pad.hline(self.rely, self.relx, curses.ACS_HLINE, WIDTH)
-    #     self.parent.curses_pad.hline(
-    #         self.rely + HEIGHT, self.relx, curses.ACS_HLINE, WIDTH
-    #     )
-    #     self.parent.curses_pad.vline(
-    #         self.rely, self.relx, curses.ACS_VLINE, self.height
-    #     )
-    #     self.parent.curses_pad.vline(
-    #         self.rely, self.relx + WIDTH, curses.ACS_VLINE, HEIGHT
-    #     )
-
-    # # draw corners
-    # self.parent.curses_pad.addch(
-    #     self.rely,
-    #     self.relx,
-    #     curses.ACS_ULCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely,
-    #     self.relx + WIDTH,
-    #     curses.ACS_URCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely + HEIGHT,
-    #     self.relx,
-    #     curses.ACS_LLCORNER,
-    # )
-    # self.parent.curses_pad.addch(
-    #     self.rely + HEIGHT,
-    #     self.relx + WIDTH,
-    #     curses.ACS_LRCORNER,
-    # )
-
-    # # fool our superclass into thinking drawing area is smaller - this is really hacky but it seems to work
-    # (relx, rely, height, width) = (self.relx, self.rely, self.height, self.width)
-    # self.relx += 1
-    # self.rely += 1
-    # self.height -= 1
-    # self.width -= 1
-    # super().update(clear=False)
-    # (self.relx, self.rely, self.height, self.width) = (relx, rely, height, width)
 
 
 class TextBox(npyscreen.BoxTitle):

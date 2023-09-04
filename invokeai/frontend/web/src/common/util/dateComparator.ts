@@ -6,7 +6,11 @@ export const dateComparator = (a: string, b: string) => {
   const dateB = new Date(b);
 
   // sort in ascending order
-  if (dateA > dateB) return 1;
-  if (dateA < dateB) return -1;
+  if (dateA > dateB) {
+    return 1;
+  }
+  if (dateA < dateB) {
+    return -1;
+  }
   return 0;
 };

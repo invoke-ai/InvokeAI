@@ -6,16 +6,19 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
-import { useCallback, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 const selector = createSelector(
   [stateSelector],
-  ({ gallery }) => {
-    const { autoAddBoardId } = gallery;
+  ({ gallery, system }) => {
+    const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
+    const { isProcessing } = system;
 
     return {
       autoAddBoardId,
+      autoAssignBoardOnClick,
+      isProcessing,
     };
   },
   defaultSelectorOptions
@@ -23,7 +26,8 @@ const selector = createSelector(
 
 const BoardAutoAddSelect = () => {
   const dispatch = useAppDispatch();
-  const { autoAddBoardId } = useAppSelector(selector);
+  const { autoAddBoardId, autoAssignBoardOnClick, isProcessing } =
+    useAppSelector(selector);
   const inputRef = useRef<HTMLInputElement>(null);
   const { boards, hasBoards } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
@@ -52,7 +56,7 @@ const BoardAutoAddSelect = () => {
         return;
       }
 
-      dispatch(autoAddBoardIdChanged(v === 'none' ? undefined : v));
+      dispatch(autoAddBoardIdChanged(v));
     },
     [dispatch]
   );
@@ -62,12 +66,12 @@ const BoardAutoAddSelect = () => {
       label="Auto-Add Board"
       inputRef={inputRef}
       autoFocus
-      placeholder={'Select a Board'}
+      placeholder="Select a Board"
       value={autoAddBoardId}
       data={boards}
       nothingFound="No matching Boards"
       itemComponent={IAIMantineSelectItemWithTooltip}
-      disabled={!hasBoards}
+      disabled={!hasBoards || autoAssignBoardOnClick || isProcessing}
       filter={(value, item: SelectItem) =>
         item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
         item.value.toLowerCase().includes(value.toLowerCase().trim())
@@ -77,4 +81,4 @@ const BoardAutoAddSelect = () => {
   );
 };
 
-export default BoardAutoAddSelect;
+export default memo(BoardAutoAddSelect);

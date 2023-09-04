@@ -16,7 +16,10 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { map } from 'lodash-es';
 import { Fragment, memo, useCallback } from 'react';
 import { FaPlus } from 'react-icons/fa';
-import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
+import {
+  controlNetModelsAdapter,
+  useGetControlNetModelsQuery,
+} from 'services/api/endpoints/models';
 import { v4 as uuidv4 } from 'uuid';
 
 const selector = createSelector(
@@ -42,7 +45,9 @@ const ParamControlNetCollapse = () => {
   const dispatch = useAppDispatch();
   const { firstModel } = useGetControlNetModelsQuery(undefined, {
     selectFromResult: (result) => {
-      const firstModel = result.data?.entities[result.data?.ids[0]];
+      const firstModel = result.data
+        ? controlNetModelsAdapter.getSelectors().selectAll(result.data)[0]
+        : undefined;
       return {
         firstModel,
       };
@@ -63,39 +68,37 @@ const ParamControlNetCollapse = () => {
   }
 
   return (
-    <IAICollapse label="ControlNet" activeLabel={activeLabel}>
-      <Flex sx={{ flexDir: 'column', gap: 3 }}>
-        <Flex gap={2} alignItems="center">
-          <Flex
-            sx={{
-              flexDirection: 'column',
-              w: '100%',
-              gap: 2,
-              px: 4,
-              py: 2,
-              borderRadius: 4,
-              bg: 'base.200',
-              _dark: {
-                bg: 'base.850',
-              },
-            }}
-          >
-            <ParamControlNetFeatureToggle />
-          </Flex>
+    <IAICollapse label="Control Adapters" activeLabel={activeLabel}>
+      <Flex sx={{ flexDir: 'column', gap: 2 }}>
+        <Flex
+          sx={{
+            w: '100%',
+            gap: 2,
+            p: 2,
+            ps: 3,
+            borderRadius: 'base',
+            alignItems: 'center',
+            bg: 'base.250',
+            _dark: {
+              bg: 'base.750',
+            },
+          }}
+        >
+          <ParamControlNetFeatureToggle />
           <IAIIconButton
             tooltip="Add ControlNet"
             aria-label="Add ControlNet"
             icon={<FaPlus />}
             isDisabled={!firstModel}
             flexGrow={1}
-            size="md"
+            size="sm"
             onClick={handleClickedAddControlNet}
           />
         </Flex>
         {controlNetsArray.map((c, i) => (
           <Fragment key={c.controlNetId}>
             {i > 0 && <Divider />}
-            <ControlNet controlNetId={c.controlNetId} />
+            <ControlNet controlNet={c} />
           </Fragment>
         ))}
       </Flex>

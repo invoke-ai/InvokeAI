@@ -6,11 +6,11 @@ import {
   configureStore,
 } from '@reduxjs/toolkit';
 import canvasReducer from 'features/canvas/store/canvasSlice';
+import changeBoardModalReducer from 'features/changeBoardModal/store/slice';
 import controlNetReducer from 'features/controlNet/store/controlNetSlice';
+import deleteImageModalReducer from 'features/deleteImageModal/store/slice';
 import dynamicPromptsReducer from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import boardsReducer from 'features/gallery/store/boardSlice';
 import galleryReducer from 'features/gallery/store/gallerySlice';
-import imageDeletionReducer from 'features/imageDeletion/store/imageDeletionSlice';
 import loraReducer from 'features/lora/store/loraSlice';
 import nodesReducer from 'features/nodes/store/nodesSlice';
 import generationReducer from 'features/parameters/store/generationSlice';
@@ -43,9 +43,9 @@ const allReducers = {
   ui: uiReducer,
   hotkeys: hotkeysReducer,
   controlNet: controlNetReducer,
-  boards: boardsReducer,
   dynamicPrompts: dynamicPromptsReducer,
-  imageDeletion: imageDeletionReducer,
+  deleteImageModal: deleteImageModalReducer,
+  changeBoardModal: changeBoardModalReducer,
   lora: loraReducer,
   modelmanager: modelmanagerReducer,
   sdxl: sdxlReducer,

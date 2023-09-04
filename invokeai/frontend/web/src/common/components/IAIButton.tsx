@@ -8,8 +8,8 @@ import {
 import { memo, ReactNode } from 'react';
 
 export interface IAIButtonProps extends ButtonProps {
-  tooltip?: string;
-  tooltipProps?: Omit<TooltipProps, 'children'>;
+  tooltip?: TooltipProps['label'];
+  tooltipProps?: Omit<TooltipProps, 'children' | 'label'>;
   isChecked?: boolean;
   children: ReactNode;
 }

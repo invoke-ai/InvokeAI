@@ -4,10 +4,11 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
+import { memo } from 'react';
+import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 import ParamDynamicPromptsCombinatorial from './ParamDynamicPromptsCombinatorial';
 import ParamDynamicPromptsToggle from './ParamDynamicPromptsEnabled';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
 const selector = createSelector(
   stateSelector,
@@ -40,4 +41,4 @@ const ParamDynamicPromptsCollapse = () => {
   );
 };
 
-export default ParamDynamicPromptsCollapse;
+export default memo(ParamDynamicPromptsCollapse);

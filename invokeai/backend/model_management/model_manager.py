@@ -228,19 +228,19 @@ the root is the InvokeAI ROOTDIR.
 """
 from __future__ import annotations
 
-import os
 import hashlib
+import os
 import textwrap
-import yaml
+import types
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, List, Tuple, Union, Dict, Set, Callable, types
 from shutil import rmtree, move
+from typing import Optional, List, Literal, Tuple, Union, Dict, Set, Callable
 
 import torch
+import yaml
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
-
 from pydantic import BaseModel, Field
 
 import invokeai.backend.util.logging as logger
@@ -259,6 +259,7 @@ from .models import (
     ModelNotFoundException,
     InvalidModelException,
     DuplicateModelException,
+    ModelBase,
 )
 
 # We are only starting to number the config file with release 3.
@@ -276,7 +277,7 @@ class ModelInfo:
     hash: str
     location: Union[Path, str]
     precision: torch.dtype
-    _cache: ModelCache = None
+    _cache: Optional[ModelCache] = None
 
     def __enter__(self):
         return self.context.__enter__()
@@ -340,7 +341,8 @@ class ModelManager(object):
         self.logger = logger
         self.cache = ModelCache(
             max_cache_size=max_cache_size,
-            max_vram_cache_size=self.app_config.max_vram_cache_size,
+            max_vram_cache_size=self.app_config.vram_cache_size,
+            lazy_offloading=self.app_config.lazy_offload,
             execution_device=device_type,
             precision=precision,
             sequential_offload=sequential_offload,
@@ -361,7 +363,7 @@ class ModelManager(object):
             if model_key.startswith("_"):
                 continue
             model_name, base_model, model_type = self.parse_key(model_key)
-            model_class = MODEL_CLASSES[base_model][model_type]
+            model_class = self._get_implementation(base_model, model_type)
             # alias for config file
             model_config["model_format"] = model_config.pop("format")
             self.models[model_key] = model_class.create_config(**model_config)
@@ -381,18 +383,24 @@ class ModelManager(object):
         # causing otherwise unreferenced models to be removed from memory
         self._read_models()
 
-    def model_exists(
-        self,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
-    ) -> bool:
+    def model_exists(self, model_name: str, base_model: BaseModelType, model_type: ModelType, *, rescan=False) -> bool:
         """
-        Given a model name, returns True if it is a valid
-        identifier.
+        Given a model name, returns True if it is a valid identifier.
+
+        :param model_name: symbolic name of the model in models.yaml
+        :param model_type: ModelType enum indicating the type of model to return
+        :param base_model: BaseModelType enum indicating the base model used by this model
+        :param rescan: if True, scan_models_directory
         """
         model_key = self.create_key(model_name, base_model, model_type)
-        return model_key in self.models
+        exists = model_key in self.models
+
+        # if model not found try to find it (maybe file just pasted)
+        if rescan and not exists:
+            self.scan_models_directory(base_model=base_model, model_type=model_type)
+            exists = self.model_exists(model_name, base_model, model_type, rescan=False)
+
+        return exists
 
     @classmethod
     def create_key(
@@ -412,12 +420,12 @@ class ModelManager(object):
         base_model_str, model_type_str, model_name = model_key.split("/", 2)
         try:
             model_type = ModelType(model_type_str)
-        except:
+        except Exception:
             raise Exception(f"Unknown model type: {model_type_str}")
 
         try:
             base_model = BaseModelType(base_model_str)
-        except:
+        except Exception:
             raise Exception(f"Unknown base model: {base_model_str}")
 
         return (model_name, base_model, model_type)
@@ -443,39 +451,32 @@ class ModelManager(object):
         :param model_name: symbolic name of the model in models.yaml
         :param model_type: ModelType enum indicating the type of model to return
         :param base_model: BaseModelType enum indicating the base model used by this model
-        :param submode_typel: an ModelType enum indicating the portion of
+        :param submodel_type: an ModelType enum indicating the portion of
                the model to retrieve (e.g. ModelType.Vae)
         """
-        model_class = MODEL_CLASSES[base_model][model_type]
         model_key = self.create_key(model_name, base_model, model_type)
 
-        # if model not found try to find it (maybe file just pasted)
-        if model_key not in self.models:
-            self.scan_models_directory(base_model=base_model, model_type=model_type)
-            if model_key not in self.models:
-                raise ModelNotFoundException(f"Model not found - {model_key}")
+        if not self.model_exists(model_name, base_model, model_type, rescan=True):
+            raise ModelNotFoundException(f"Model not found - {model_key}")
 
-        model_config = self.models[model_key]
-        model_path = self.resolve_model_path(model_config.path)
+        model_config = self._get_model_config(base_model, model_name, model_type)
+
+        model_path, is_submodel_override = self._get_model_path(model_config, submodel_type)
+
+        if is_submodel_override:
+            model_type = submodel_type
+            submodel_type = None
+
+        model_class = self._get_implementation(base_model, model_type)
 
         if not model_path.exists():
             if model_class.save_to_config:
                 self.models[model_key].error = ModelError.NotFound
-                raise Exception(f'Files for model "{model_key}" not found')
+                raise Exception(f'Files for model "{model_key}" not found at {model_path}')
 
             else:
                 self.models.pop(model_key, None)
-                raise ModelNotFoundException(f"Model not found - {model_key}")
-
-        # vae/movq override
-        # TODO:
-        if submodel_type is not None and hasattr(model_config, submodel_type):
-            override_path = getattr(model_config, submodel_type)
-            if override_path:
-                model_path = self.app_config.root_path / override_path
-                model_type = submodel_type
-                submodel_type = None
-                model_class = MODEL_CLASSES[base_model][model_type]
+                raise ModelNotFoundException(f'Files for model "{model_key}" not found at {model_path}')
 
         # TODO: path
         # TODO: is it accurate to use path as id
@@ -513,12 +514,61 @@ class ModelManager(object):
             _cache=self.cache,
         )
 
+    def _get_model_path(
+        self, model_config: ModelConfigBase, submodel_type: Optional[SubModelType] = None
+    ) -> (Path, bool):
+        """Extract a model's filesystem path from its config.
+
+        :return: The fully qualified Path of the module (or submodule).
+        """
+        model_path = model_config.path
+        is_submodel_override = False
+
+        # Does the config explicitly override the submodel?
+        if submodel_type is not None and hasattr(model_config, submodel_type):
+            submodel_path = getattr(model_config, submodel_type)
+            if submodel_path is not None and len(submodel_path) > 0:
+                model_path = getattr(model_config, submodel_type)
+                is_submodel_override = True
+
+        model_path = self.resolve_model_path(model_path)
+        return model_path, is_submodel_override
+
+    def _get_model_config(self, base_model: BaseModelType, model_name: str, model_type: ModelType) -> ModelConfigBase:
+        """Get a model's config object."""
+        model_key = self.create_key(model_name, base_model, model_type)
+        try:
+            model_config = self.models[model_key]
+        except KeyError:
+            raise ModelNotFoundException(f"Model not found - {model_key}")
+        return model_config
+
+    def _get_implementation(self, base_model: BaseModelType, model_type: ModelType) -> type[ModelBase]:
+        """Get the concrete implementation class for a specific model type."""
+        model_class = MODEL_CLASSES[base_model][model_type]
+        return model_class
+
+    def _instantiate(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> ModelBase:
+        """Make a new instance of this model, without loading it."""
+        model_config = self._get_model_config(base_model, model_name, model_type)
+        model_path, is_submodel_override = self._get_model_path(model_config, submodel_type)
+        # FIXME: do non-overriden submodels get the right class?
+        constructor = self._get_implementation(base_model, model_type)
+        instance = constructor(model_path, base_model, model_type)
+        return instance
+
     def model_info(
         self,
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-    ) -> dict:
+    ) -> Union[dict, None]:
         """
         Given a model name returns the OmegaConf (dict-like) object describing it.
         """
@@ -540,13 +590,16 @@ class ModelManager(object):
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-    ) -> dict:
+    ) -> Union[dict, None]:
         """
         Returns a dict describing one installed model, using
         the combined format of the list_models() method.
         """
         models = self.list_models(base_model, model_type, model_name)
-        return models[0] if models else None
+        if len(models) >= 1:
+            return models[0]
+        else:
+            return None
 
     def list_models(
         self,
@@ -560,7 +613,7 @@ class ModelManager(object):
 
         model_keys = (
             [self.create_key(model_name, base_model, model_type)]
-            if model_name
+            if model_name and base_model and model_type
             else sorted(self.models, key=str.casefold)
         )
         models = []
@@ -596,7 +649,7 @@ class ModelManager(object):
         Print a table of models and their descriptions. This needs to be redone
         """
         # TODO: redo
-        for model_type, model_dict in self.list_models().items():
+        for model_dict in self.list_models():
             for model_name, model_info in model_dict.items():
                 line = f'{model_info["name"]:25s} {model_info["type"]:10s} {model_info["description"]}'
                 print(line)
@@ -658,7 +711,7 @@ class ModelManager(object):
         if path := model_attributes.get("path"):
             model_attributes["path"] = str(self.relative_model_path(Path(path)))
 
-        model_class = MODEL_CLASSES[base_model][model_type]
+        model_class = self._get_implementation(base_model, model_type)
         model_config = model_class.create_config(**model_attributes)
         model_key = self.create_key(model_name, base_model, model_type)
 
@@ -670,7 +723,7 @@ class ModelManager(object):
             # TODO: if path changed and old_model.path inside models folder should we delete this too?
 
             # remove conversion cache as config changed
-            old_model_path = self.app_config.root_path / old_model.path
+            old_model_path = self.resolve_model_path(old_model.path)
             old_model_cache = self._get_model_cache_path(old_model_path)
             if old_model_cache.exists():
                 if old_model_cache.is_dir():
@@ -699,8 +752,8 @@ class ModelManager(object):
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-        new_name: str = None,
-        new_base: BaseModelType = None,
+        new_name: Optional[str] = None,
+        new_base: Optional[BaseModelType] = None,
     ):
         """
         Rename or rebase a model.
@@ -753,7 +806,7 @@ class ModelManager(object):
         self,
         model_name: str,
         base_model: BaseModelType,
-        model_type: Union[ModelType.Main, ModelType.Vae],
+        model_type: Literal[ModelType.Main, ModelType.Vae],
         dest_directory: Optional[Path] = None,
     ) -> AddModelResult:
         """
@@ -767,6 +820,10 @@ class ModelManager(object):
         This will raise a ValueError unless the model is a checkpoint.
         """
         info = self.model_info(model_name, base_model, model_type)
+
+        if info is None:
+            raise FileNotFoundError(f"model not found: {model_name}")
+
         if info["model_format"] != "checkpoint":
             raise ValueError(f"not a checkpoint format model: {model_name}")
 
@@ -780,7 +837,7 @@ class ModelManager(object):
             model_type,
             **submodel,
         )
-        checkpoint_path = self.app_config.root_path / info["path"]
+        checkpoint_path = self.resolve_model_path(info["path"])
         old_diffusers_path = self.resolve_model_path(model.location)
         new_diffusers_path = (
             dest_directory or self.app_config.models_path / base_model.value / model_type.value
@@ -799,7 +856,7 @@ class ModelManager(object):
             info.pop("config")
 
             result = self.add_model(model_name, base_model, model_type, model_attributes=info, clobber=True)
-        except:
+        except Exception:
             # something went wrong, so don't leave dangling diffusers model in directory or it will cause a duplicate model error!
             rmtree(new_diffusers_path)
             raise
@@ -836,7 +893,7 @@ class ModelManager(object):
 
         return search_folder, found_models
 
-    def commit(self, conf_file: Path = None) -> None:
+    def commit(self, conf_file: Optional[Path] = None) -> None:
         """
         Write current configuration out to the indicated file.
         """
@@ -845,7 +902,7 @@ class ModelManager(object):
 
         for model_key, model_config in self.models.items():
             model_name, base_model, model_type = self.parse_key(model_key)
-            model_class = MODEL_CLASSES[base_model][model_type]
+            model_class = self._get_implementation(base_model, model_type)
             if model_class.save_to_config:
                 # TODO: or exclude_unset better fits here?
                 data_to_save[model_key] = model_config.dict(exclude_defaults=True, exclude={"error"})
@@ -903,7 +960,7 @@ class ModelManager(object):
 
                 model_path = self.resolve_model_path(model_config.path).absolute()
                 if not model_path.exists():
-                    model_class = MODEL_CLASSES[cur_base_model][cur_model_type]
+                    model_class = self._get_implementation(cur_base_model, cur_model_type)
                     if model_class.save_to_config:
                         model_config.error = ModelError.NotFound
                         self.models.pop(model_key, None)
@@ -919,7 +976,7 @@ class ModelManager(object):
                 for cur_model_type in ModelType:
                     if model_type is not None and cur_model_type != model_type:
                         continue
-                    model_class = MODEL_CLASSES[cur_base_model][cur_model_type]
+                    model_class = self._get_implementation(cur_base_model, cur_model_type)
                     models_dir = self.resolve_model_path(Path(cur_base_model.value, cur_model_type.value))
 
                     if not models_dir.exists():
@@ -935,7 +992,9 @@ class ModelManager(object):
                                     raise DuplicateModelException(f"Model with key {model_key} added twice")
 
                                 model_path = self.relative_model_path(model_path)
-                                model_config: ModelConfigBase = model_class.probe_config(str(model_path))
+                                model_config: ModelConfigBase = model_class.probe_config(
+                                    str(model_path), model_base=cur_base_model
+                                )
                                 self.models[model_key] = model_config
                                 new_models_found = True
                             except DuplicateModelException as e:
@@ -983,8 +1042,8 @@ class ModelManager(object):
         # LS: hacky
         # Patch in the SD VAE from core so that it is available for use by the UI
         try:
-            self.heuristic_import({self.resolve_model_path("core/convert/sd-vae-ft-mse")})
-        except:
+            self.heuristic_import({str(self.resolve_model_path("core/convert/sd-vae-ft-mse"))})
+        except Exception:
             pass
 
         installer = ModelInstall(
@@ -992,7 +1051,7 @@ class ModelManager(object):
             model_manager=self,
             prediction_type_helper=ask_user_for_prediction_type,
         )
-        known_paths = {config.root_path / x["path"] for x in self.list_models()}
+        known_paths = {self.resolve_model_path(x["path"]) for x in self.list_models()}
         directories = {
             config.root_path / x
             for x in [
@@ -1011,7 +1070,7 @@ class ModelManager(object):
     def heuristic_import(
         self,
         items_to_import: Set[str],
-        prediction_type_helper: Callable[[Path], SchedulerPredictionType] = None,
+        prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
     ) -> Dict[str, AddModelResult]:
         """Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.

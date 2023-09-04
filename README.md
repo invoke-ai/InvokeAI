@@ -43,7 +43,7 @@ Web Interface, interactive Command Line Interface, and also serves as
 the foundation for multiple commercial products.
 
 **Quick links**: [[How to
-  Install](https://invoke-ai.github.io/InvokeAI/#installation)] [<a
+  Install](https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/)] [<a
   href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a
   href="https://invoke-ai.github.io/InvokeAI/">Documentation and
   Tutorials</a>] [<a
@@ -81,7 +81,7 @@ Table of Contents 📝
 ## Quick Start
 
 For full installation and upgrade instructions, please see:
-[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/)
+[InvokeAI Installation Overview](https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/)
 
 If upgrading from version 2.3, please read [Migrating a 2.3 root
 directory to 3.0](#migrating-to-3) first.
@@ -161,7 +161,7 @@ the command `npm install -g yarn` if needed)
     _For Windows/Linux with an NVIDIA GPU:_
 
     ```terminal
-    pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu117
+    pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
     ```
 
     _For Linux with an AMD GPU:_
@@ -184,8 +184,9 @@ the command `npm install -g yarn` if needed)
 6. Configure InvokeAI and install a starting set of image generation models (you only need to do this once):
 
     ```terminal
-    invokeai-configure
+    invokeai-configure --root .
     ```
+	Don't miss the dot at the end!
 
 7. Launch the web server (do it every time you run InvokeAI):
 
@@ -193,15 +194,9 @@ the command `npm install -g yarn` if needed)
     invokeai-web
     ```
 
-8. Build Node.js assets
+8. Point your browser to http://localhost:9090 to bring up the web interface.
 
-  ```terminal
-  cd invokeai/frontend/web/
-  yarn vite build
-  ```
-
-9. Point your browser to http://localhost:9090 to bring up the web interface.
-10. Type `banana sushi` in the box on the top left and click `Invoke`.
+9. Type `banana sushi` in the box on the top left and click `Invoke`.
 
 Be sure to activate the virtual environment each time before re-launching InvokeAI,
 using `source .venv/bin/activate` or `.venv\Scripts\activate`.
@@ -311,13 +306,30 @@ InvokeAI. The second will prepare the 2.3 directory for use with 3.0.
 You may now launch the WebUI in the usual way, by selecting option [1]
 from the launcher script
 
-#### Migration Caveats
+#### Migrating Images
 
 The migration script will migrate your invokeai settings and models,
 including textual inversion models, LoRAs and merges that you may have
 installed previously. However it does **not** migrate the generated
-images stored in your 2.3-format outputs directory. You will need to
-manually import selected images into the 3.0 gallery via drag-and-drop.
+images stored in your 2.3-format outputs directory. To do this, you 
+need to run an additional step:
+
+1. From a working InvokeAI 3.0 root directory, start the launcher and
+enter menu option [8] to open the "developer's console".
+
+2. At the developer's console command line, type the command:
+
+```bash
+invokeai-import-images
+```
+
+3. This will lead you through the process of confirming the desired
+   source and destination for the imported images. The images will
+   appear in the gallery board of your choice, and contain the
+   original prompt, model name, and other parameters used to generate
+   the image.
+   
+(Many kudos to **techjedi** for contributing this script.)
 
 ## Hardware Requirements
 

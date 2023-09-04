@@ -1,4 +1,5 @@
 import { Badge, Flex } from '@chakra-ui/react';
+import { memo } from 'react';
 
 const AutoAddIcon = () => {
   return (
@@ -20,4 +21,4 @@ const AutoAddIcon = () => {
   );
 };
 
-export default AutoAddIcon;
+export default memo(AutoAddIcon);

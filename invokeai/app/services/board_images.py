@@ -1,18 +1,14 @@
 from abc import ABC, abstractmethod
 from logging import Logger
-from typing import List, Union, Optional
+from typing import Optional
 from invokeai.app.services.board_image_record_storage import BoardImageRecordStorageBase
 from invokeai.app.services.board_record_storage import (
     BoardRecord,
     BoardRecordStorageBase,
 )
 
-from invokeai.app.services.image_record_storage import (
-    ImageRecordStorageBase,
-    OffsetPaginatedResults,
-)
+from invokeai.app.services.image_record_storage import ImageRecordStorageBase
 from invokeai.app.services.models.board_record import BoardDTO
-from invokeai.app.services.models.image_record import ImageDTO, image_record_to_dto
 from invokeai.app.services.urls import UrlServiceBase
 
 
@@ -31,7 +27,6 @@ class BoardImagesServiceABC(ABC):
     @abstractmethod
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
         """Removes an image from a board."""
@@ -93,10 +88,9 @@ class BoardImagesService(BoardImagesServiceABC):
 
     def remove_image_from_board(
         self,
-        board_id: str,
         image_name: str,
     ) -> None:
-        self._services.board_image_records.remove_image_from_board(board_id, image_name)
+        self._services.board_image_records.remove_image_from_board(image_name)
 
     def get_all_board_image_names_for_board(
         self,

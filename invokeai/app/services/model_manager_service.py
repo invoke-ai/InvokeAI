@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from logging import Logger
 from pathlib import Path
 from pydantic import Field
-from typing import Optional, Union, Callable, List, Tuple, TYPE_CHECKING
+from typing import Literal, Optional, Union, Callable, List, Tuple, TYPE_CHECKING
 from types import ModuleType
 
 from invokeai.backend.model_management import (
@@ -21,6 +22,7 @@ from invokeai.backend.model_management import (
     ModelNotFoundException,
 )
 from invokeai.backend.model_management.model_search import FindModels
+from invokeai.backend.model_management.model_cache import CacheStats
 
 import torch
 from invokeai.app.models.exceptions import CanceledException
@@ -193,7 +195,7 @@ class ModelManagerServiceBase(ABC):
         self,
         model_name: str,
         base_model: BaseModelType,
-        model_type: Union[ModelType.Main, ModelType.Vae],
+        model_type: Literal[ModelType.Main, ModelType.Vae],
     ) -> AddModelResult:
         """
         Convert a checkpoint file into a diffusers folder, deleting the cached
@@ -276,6 +278,13 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
+    def collect_cache_stats(self, cache_stats: CacheStats):
+        """
+        Reset model cache statistics for graph with graph_id.
+        """
+        pass
+
+    @abstractmethod
     def commit(self, conf_file: Optional[Path] = None) -> None:
         """
         Write current configuration out to the indicated file.
@@ -292,7 +301,7 @@ class ModelManagerService(ModelManagerServiceBase):
     def __init__(
         self,
         config: InvokeAIAppConfig,
-        logger: ModuleType,
+        logger: Logger,
     ):
         """
         Initialize with the path to the models.yaml config file.
@@ -321,8 +330,8 @@ class ModelManagerService(ModelManagerServiceBase):
         # configuration value. If present, then the
         # cache size is set to 2.5 GB times
         # the number of max_loaded_models. Otherwise
-        # use new `max_cache_size` config setting
-        max_cache_size = config.max_cache_size if hasattr(config, "max_cache_size") else config.max_loaded_models * 2.5
+        # use new `ram_cache_size` config setting
+        max_cache_size = config.ram_cache_size
 
         logger.debug(f"Maximum RAM cache size: {max_cache_size} GiB")
 
@@ -396,7 +405,7 @@ class ModelManagerService(ModelManagerServiceBase):
             model_type,
         )
 
-    def model_info(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
+    def model_info(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> Union[dict, None]:
         """
         Given a model name returns a dict-like (OmegaConf) object describing it.
         """
@@ -416,7 +425,7 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         return self.mgr.list_models(base_model, model_type)
 
-    def list_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> dict:
+    def list_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> Union[dict, None]:
         """
         Return information about the model using the same format as list_models()
         """
@@ -429,7 +438,7 @@ class ModelManagerService(ModelManagerServiceBase):
         model_type: ModelType,
         model_attributes: dict,
         clobber: bool = False,
-    ) -> None:
+    ) -> AddModelResult:
         """
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
@@ -478,7 +487,7 @@ class ModelManagerService(ModelManagerServiceBase):
         self,
         model_name: str,
         base_model: BaseModelType,
-        model_type: Union[ModelType.Main, ModelType.Vae],
+        model_type: Literal[ModelType.Main, ModelType.Vae],
         convert_dest_directory: Optional[Path] = Field(
             default=None, description="Optional directory location for merged model"
         ),
@@ -498,6 +507,12 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         self.logger.debug(f"convert model {model_name}")
         return self.mgr.convert_model(model_name, base_model, model_type, convert_dest_directory)
+
+    def collect_cache_stats(self, cache_stats: CacheStats):
+        """
+        Reset model cache statistics for graph with graph_id.
+        """
+        self.mgr.cache.stats = cache_stats
 
     def commit(self, conf_file: Optional[Path] = None):
         """
@@ -573,9 +588,9 @@ class ModelManagerService(ModelManagerServiceBase):
             default=None, description="Base model shared by all models to be merged"
         ),
         merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
-        alpha: Optional[float] = 0.5,
+        alpha: float = 0.5,
         interp: Optional[MergeInterpolationMethod] = None,
-        force: Optional[bool] = False,
+        force: bool = False,
         merge_dest_directory: Optional[Path] = Field(
             default=None, description="Optional directory location for merged model"
         ),
@@ -633,8 +648,8 @@ class ModelManagerService(ModelManagerServiceBase):
         model_name: str,
         base_model: BaseModelType,
         model_type: ModelType,
-        new_name: str = None,
-        new_base: BaseModelType = None,
+        new_name: Optional[str] = None,
+        new_base: Optional[BaseModelType] = None,
     ):
         """
         Rename the indicated model. Can provide a new name and/or a new base.

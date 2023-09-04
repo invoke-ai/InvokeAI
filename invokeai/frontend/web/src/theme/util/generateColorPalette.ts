@@ -22,7 +22,7 @@ export function generateColorPalette(
   ];
 
   const p = colorSteps.reduce((palette, step, index) => {
-    const A = alpha ? lightnessSteps[index] / 100 : 1;
+    const A = alpha ? (lightnessSteps[index] as number) / 100 : 1;
 
     // Lightness should be 50% for alpha colors
     const L = alpha ? 50 : lightnessSteps[colorSteps.length - 1 - index];

@@ -138,7 +138,7 @@ export type RequiredZoeDepthImageProcessorInvocation = O.Required<
 /**
  * Any ControlNet Processor node, with its parameters flagged as required
  */
-export type RequiredControlNetProcessorNode =
+export type RequiredControlNetProcessorNode = O.Required<
   | RequiredCannyImageProcessorInvocation
   | RequiredContentShuffleImageProcessorInvocation
   | RequiredHedImageProcessorInvocation
@@ -150,7 +150,9 @@ export type RequiredControlNetProcessorNode =
   | RequiredNormalbaeImageProcessorInvocation
   | RequiredOpenposeImageProcessorInvocation
   | RequiredPidiImageProcessorInvocation
-  | RequiredZoeDepthImageProcessorInvocation;
+  | RequiredZoeDepthImageProcessorInvocation,
+  'id'
+>;
 
 /**
  * Type guard for CannyImageProcessorInvocation

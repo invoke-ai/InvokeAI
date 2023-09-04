@@ -40,6 +40,7 @@ const invokeAI = defineStyle((props) => ({
       },
     },
   },
+  p: 2,
 }));
 
 export const textareaTheme = defineStyleConfig({

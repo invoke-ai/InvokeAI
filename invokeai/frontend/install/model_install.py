@@ -28,7 +28,6 @@ from npyscreen import widget
 from invokeai.backend.util.logging import InvokeAILogger
 
 from invokeai.backend.install.model_install_backend import (
-    ModelInstallList,
     InstallSelections,
     ModelInstall,
     SchedulerPredictionType,
@@ -41,12 +40,12 @@ from invokeai.frontend.install.widgets import (
     SingleSelectColumns,
     TextBox,
     BufferBox,
-    FileBox,
     set_min_terminal_size,
     select_stable_diffusion_config_file,
     CyclingForm,
     MIN_COLS,
     MIN_LINES,
+    WindowTooSmallException,
 )
 from invokeai.app.services.config import InvokeAIAppConfig
 
@@ -156,7 +155,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             BufferBox,
             name="Log Messages",
             editable=False,
-            max_height=15,
+            max_height=6,
         )
 
         self.nextrely += 1
@@ -252,7 +251,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
     ) -> dict[str, npyscreen.widget]:
         """Generic code to create model selection widgets"""
         widgets = dict()
-        model_list = [x for x in self.all_models if self.all_models[x].model_type == model_type and not x in exclude]
+        model_list = [x for x in self.all_models if self.all_models[x].model_type == model_type and x not in exclude]
         model_labels = [self.model_labels[x] for x in model_list]
 
         show_recommended = len(self.installed_models) == 0
@@ -358,14 +357,14 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
                 try:
                     v.hidden = True
                     v.editable = False
-                except:
+                except Exception:
                     pass
         for k, v in widgets[selected_tab].items():
             try:
                 v.hidden = False
                 if not isinstance(v, (npyscreen.FixedText, npyscreen.TitleFixedText, CenteredTitleText)):
                     v.editable = True
-            except:
+            except Exception:
                 pass
         self.__class__.current_tab = selected_tab  # for persistence
         self.display()
@@ -542,7 +541,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             self.ti_models,
         ]
         for section in ui_sections:
-            if not "models_selected" in section:
+            if "models_selected" not in section:
                 continue
             selected = set([section["models"][x] for x in section["models_selected"].value])
             models_to_install = [x for x in selected if not self.all_models[x].installed]
@@ -638,7 +637,7 @@ def _ask_user_for_pt_tui(model_path: Path, tui_conn: Connection) -> SchedulerPre
             return None
         else:
             return response
-    except:
+    except Exception:
         return None
 
 
@@ -674,8 +673,7 @@ def process_and_execute(
 def select_and_download_models(opt: Namespace):
     precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
     config.precision = precision
-    helper = lambda x: ask_user_for_prediction_type(x)
-    installer = ModelInstall(config, prediction_type_helper=helper)
+    installer = ModelInstall(config, prediction_type_helper=ask_user_for_prediction_type)
     if opt.list_models:
         installer.list_models(opt.list_models)
     elif opt.add or opt.delete:
@@ -693,7 +691,11 @@ def select_and_download_models(opt: Namespace):
         # needed to support the probe() method running under a subprocess
         torch.multiprocessing.set_start_method("spawn")
 
-        set_min_terminal_size(MIN_COLS, MIN_LINES)
+        if not set_min_terminal_size(MIN_COLS, MIN_LINES):
+            raise WindowTooSmallException(
+                "Could not increase terminal size. Try running again with a larger window or smaller font size."
+            )
+
         installApp = AddModelApplication(opt)
         try:
             installApp.run()
@@ -772,7 +774,7 @@ def main():
 
     if not config.model_conf_path.exists():
         logger.info("Your InvokeAI root directory is not set up. Calling invokeai-configure.")
-        from invokeai.frontend.install import invokeai_configure
+        from invokeai.frontend.install.invokeai_configure import invokeai_configure
 
         invokeai_configure()
         sys.exit(0)
@@ -787,6 +789,8 @@ def main():
         curses.echo()
         curses.endwin()
         logger.info("Goodbye! Come back soon.")
+    except WindowTooSmallException as e:
+        logger.error(str(e))
     except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
             logger.error("Insufficient vertical space for the interface. Please make your window taller and try again")

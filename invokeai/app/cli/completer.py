@@ -145,10 +145,10 @@ def set_autocompleter(services: InvocationServices) -> Completer:
     completer = Completer(services.model_manager)
 
     readline.set_completer(completer.complete)
-    # pyreadline3 does not have a set_auto_history() method
     try:
         readline.set_auto_history(True)
-    except:
+    except AttributeError:
+        # pyreadline3 does not have a set_auto_history() method
         pass
     readline.set_pre_input_hook(completer._pre_input_hook)
     readline.set_completer_delims(" ")

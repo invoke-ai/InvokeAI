@@ -1,4 +1,4 @@
-import { Flex, Text, useColorMode } from '@chakra-ui/react';
+import { Box, Flex, useColorMode } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
 import { ReactNode, memo, useRef } from 'react';
 import { mode } from 'theme/util/mode';
@@ -74,7 +74,7 @@ export const IAIDropOverlay = (props: Props) => {
             justifyContent: 'center',
           }}
         >
-          <Text
+          <Box
             sx={{
               fontSize: '2xl',
               fontWeight: 600,
@@ -87,7 +87,7 @@ export const IAIDropOverlay = (props: Props) => {
             }}
           >
             {label}
-          </Text>
+          </Box>
         </Flex>
       </Flex>
     </motion.div>

@@ -4,6 +4,9 @@ title: Overview
 
 Here you can find the documentation for InvokeAI's various features.
 
+## The [Getting Started Guide](../help/gettingStartedWithAI) 
+A getting started guide for those new to AI image generation. 
+
 ## The Basics
 ### * The [Web User Interface](WEB.md)
 Guide to the Web interface. Also see the [WebUI Hotkeys Reference Guide](WEBUIHOTKEYS.md)
@@ -27,10 +30,6 @@ image output.
 ### * [Image-to-Image Guide](IMG2IMG.md)
 Use a seed image to build new creations in the CLI.
 
-### * [Generating Variations](VARIATIONS.md)
-Have an image you like and want to generate many more like it? Variations
-are the ticket.
-
 ## Model Management
 
 ### * [Model Installation](../installation/050_INSTALLING_MODELS.md)
@@ -46,7 +45,7 @@ Personalize models by adding your own style or subjects.
 
 ## Other Features
 
-### * [The NSFW Checker](NSFW.md)
+### * [The NSFW Checker](WATERMARK+NSFW.md)
 Prevent InvokeAI from displaying unwanted racy images.
 
 ### * [Controlling Logging](LOGGING.md)

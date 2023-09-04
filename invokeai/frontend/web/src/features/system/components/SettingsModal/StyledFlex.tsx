@@ -1,5 +1,5 @@
 import { Flex } from '@chakra-ui/react';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, memo } from 'react';
 
 const StyledFlex = (props: PropsWithChildren) => {
   return (
@@ -20,4 +20,4 @@ const StyledFlex = (props: PropsWithChildren) => {
   );
 };
 
-export default StyledFlex;
+export default memo(StyledFlex);

@@ -19,7 +19,7 @@
         "toggleAutoscroll": "Toggle autoscroll",
         "toggleLogViewer": "Toggle Log Viewer",
         "showGallery": "Show Gallery",
-        "showOptionsPanel": "Show Options Panel",
+        "showOptionsPanel": "Show Side Panel",
         "menu": "Menu"
     },
     "common": {
@@ -52,7 +52,7 @@
         "img2img": "Image To Image",
         "unifiedCanvas": "Unified Canvas",
         "linear": "Linear",
-        "nodes": "Node Editor",
+        "nodes": "Workflow Editor",
         "batch": "Batch Manager",
         "modelManager": "Model Manager",
         "postprocessing": "Post Processing",
@@ -95,7 +95,6 @@
         "statusModelConverted": "Model Converted",
         "statusMergingModels": "Merging Models",
         "statusMergedModels": "Models Merged",
-        "pinOptionsPanel": "Pin Options Panel",
         "loading": "Loading",
         "loadingInvokeAI": "Loading Invoke AI",
         "random": "Random",
@@ -116,7 +115,6 @@
         "maintainAspectRatio": "Maintain Aspect Ratio",
         "autoSwitchNewImages": "Auto-Switch to New Images",
         "singleColumnLayout": "Single Column Layout",
-        "pinGallery": "Pin Gallery",
         "allImagesLoaded": "All Images Loaded",
         "loadMore": "Load More",
         "noImagesInGallery": "No Images to Display",
@@ -124,7 +122,8 @@
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
         "images": "Images",
-        "assets": "Assets"
+        "assets": "Assets",
+        "autoAssignBoardOnClick": "Auto-Assign Board on Click"
     },
     "hotkeys": {
         "keyboardShortcuts": "Keyboard Shortcuts",
@@ -132,6 +131,7 @@
         "generalHotkeys": "General Hotkeys",
         "galleryHotkeys": "Gallery Hotkeys",
         "unifiedCanvasHotkeys": "Unified Canvas Hotkeys",
+        "nodesHotkeys": "Nodes Hotkeys",
         "invoke": {
             "title": "Invoke",
             "desc": "Generate an image"
@@ -331,6 +331,10 @@
         "acceptStagingImage": {
             "title": "Accept Staging Image",
             "desc": "Accept Current Staging Area Image"
+        },
+        "addNodes": {
+            "title": "Add Nodes",
+            "desc": "Opens the add node menu"
         }
     },
     "modelManager": {
@@ -342,6 +346,8 @@
         "diffusersModels": "Diffusers",
         "loraModels": "LoRAs",
         "safetensorModels": "SafeTensors",
+        "onnxModels": "Onnx",
+        "oliveModels": "Olives",
         "modelAdded": "Model Added",
         "modelUpdated": "Model Updated",
         "modelUpdateFailed": "Model Update Failed",
@@ -500,15 +506,22 @@
         "hiresStrength": "High Res Strength",
         "imageFit": "Fit Initial Image To Output Size",
         "codeformerFidelity": "Fidelity",
-        "seamSize": "Seam Size",
-        "seamBlur": "Seam Blur",
-        "seamStrength": "Seam Strength",
-        "seamSteps": "Seam Steps",
+        "compositingSettingsHeader": "Compositing Settings",
+        "maskAdjustmentsHeader": "Mask Adjustments",
+        "maskBlur": "Blur",
+        "maskBlurMethod": "Blur Method",
+        "coherencePassHeader": "Coherence Pass",
+        "coherenceMode": "Mode",
+        "coherenceSteps": "Steps",
+        "coherenceStrength": "Strength",
+        "seamLowThreshold": "Low",
+        "seamHighThreshold": "High",
         "scaleBeforeProcessing": "Scale Before Processing",
         "scaledWidth": "Scaled W",
         "scaledHeight": "Scaled H",
         "infillMethod": "Infill Method",
         "tileSize": "Tile Size",
+        "patchmatchDownScaleSize": "Downscale",
         "boundingBoxHeader": "Bounding Box",
         "seamCorrectionHeader": "Seam Correction",
         "infillScalingHeader": "Infill and Scaling",
@@ -559,10 +572,11 @@
         "useSlidersForAll": "Use Sliders For All Options",
         "showProgressInViewer": "Show Progress Images in Viewer",
         "antialiasProgressImages": "Antialias Progress Images",
+        "autoChangeDimensions": "Update W/H To Model Defaults On Change",
         "resetWebUI": "Reset Web UI",
         "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
         "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
-        "resetComplete": "Web UI has been reset. Refresh the page to reload.",
+        "resetComplete": "Web UI has been reset.",
         "consoleLogLevel": "Log Level",
         "shouldLogToConsole": "Console Logging",
         "developer": "Developer",
@@ -702,14 +716,16 @@
     "ui": {
         "showProgressImages": "Show Progress Images",
         "hideProgressImages": "Hide Progress Images",
-        "swapSizes": "Swap Sizes"
+        "swapSizes": "Swap Sizes",
+        "lockRatio": "Lock Ratio"
     },
     "nodes": {
-        "reloadSchema": "Reload Schema",
-        "saveGraph": "Save Graph",
-        "loadGraph": "Load Graph (saved from Node Editor) (Do not copy-paste metadata)",
-        "clearGraph": "Clear Graph",
-        "clearGraphDesc": "Are you sure you want to clear all nodes?",
+        "reloadNodeTemplates": "Reload Node Templates",
+        "downloadWorkflow": "Download Workflow JSON",
+        "loadWorkflow": "Load Workflow",
+        "resetWorkflow": "Reset Workflow",
+        "resetWorkflowDesc": "Are you sure you want to reset this workflow?",
+        "resetWorkflowDesc2": "Resetting the workflow will clear all nodes, edges and workflow details.",
         "zoomInNodes": "Zoom In",
         "zoomOutNodes": "Zoom Out",
         "fitViewportNodes": "Fit View",

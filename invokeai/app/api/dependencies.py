@@ -1,7 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from logging import Logger
-import os
 from invokeai.app.services.board_image_record_storage import (
     SqliteBoardImageRecordStorage,
 )
@@ -29,6 +28,7 @@ from ..services.invoker import Invoker
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
 from ..services.model_manager_service import ModelManagerService
+from ..services.invocation_stats import InvocationStatsService
 from .events import FastAPIEventService
 
 
@@ -44,7 +44,7 @@ def check_internet() -> bool:
     try:
         urllib.request.urlopen(host, timeout=1)
         return True
-    except:
+    except Exception:
         return False
 
 
@@ -54,7 +54,7 @@ logger = InvokeAILogger.getLogger()
 class ApiDependencies:
     """Contains and initializes all dependencies for the API"""
 
-    invoker: Invoker = None
+    invoker: Invoker
 
     @staticmethod
     def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger):
@@ -67,8 +67,9 @@ class ApiDependencies:
         output_folder = config.output_path
 
         # TODO: build a file/path manager?
-        db_location = config.db_path
-        db_location.parent.mkdir(parents=True, exist_ok=True)
+        db_path = config.db_path
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        db_location = str(db_path)
 
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](
             filename=db_location, table_name="graph_executions"
@@ -127,6 +128,7 @@ class ApiDependencies:
             graph_execution_manager=graph_execution_manager,
             processor=DefaultInvocationProcessor(),
             configuration=config,
+            performance_statistics=InvocationStatsService(graph_execution_manager),
             logger=logger,
         )
 

@@ -3,7 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISlider from 'common/components/IAISlider';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import {
   maxPromptsChanged,
   maxPromptsReset,
@@ -60,4 +60,4 @@ const ParamDynamicPromptsMaxPrompts = () => {
   );
 };
 
-export default ParamDynamicPromptsMaxPrompts;
+export default memo(ParamDynamicPromptsMaxPrompts);

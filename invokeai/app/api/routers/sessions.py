@@ -1,12 +1,13 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Annotated, List, Optional, Union
+from typing import Annotated, Optional, Union
 
 from fastapi import Body, HTTPException, Path, Query, Response
 from fastapi.routing import APIRouter
 from pydantic.fields import Field
 
-from ...invocations import *
+# Importing * is bad karma but needed here for node detection
+from ...invocations import *  # noqa: F401 F403
 from ...invocations.baseinvocation import BaseInvocation
 from ...services.graph import (
     Edge,

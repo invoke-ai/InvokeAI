@@ -31,15 +31,20 @@ const predicate: AnyListenerPredicate<RootState> = (
     // do not process if the user just disabled auto-config
     if (
       prevState.controlNet.controlNets[action.payload.controlNetId]
-        .shouldAutoConfig === true
+        ?.shouldAutoConfig === true
     ) {
       return false;
     }
   }
 
-  const { controlImage, processorType, shouldAutoConfig } =
-    state.controlNet.controlNets[action.payload.controlNetId];
+  const cn = state.controlNet.controlNets[action.payload.controlNetId];
 
+  if (!cn) {
+    // something is wrong, the controlNet should exist
+    return false;
+  }
+
+  const { controlImage, processorType, shouldAutoConfig } = cn;
   if (controlNetModelChanged.match(action) && !shouldAutoConfig) {
     // do not process if the action is a model change but the processor settings are dirty
     return false;

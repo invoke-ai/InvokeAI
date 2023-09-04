@@ -10,20 +10,22 @@ import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
+  DENOISE_LATENTS,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   LATENTS_TO_IMAGE,
-  LATENTS_TO_LATENTS,
   MAIN_MODEL_LOADER,
   METADATA_ACCUMULATOR,
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
   RESIZE,
+  SEAMLESS,
 } from './constants';
 
 /**
@@ -49,6 +51,8 @@ export const buildLinearImageToImageGraph = (
     shouldUseCpuNoise,
     shouldUseNoiseSettings,
     vaePrecision,
+    seamlessXAxis,
+    seamlessYAxis,
   } = state.generation;
 
   // TODO: add batch functionality
@@ -80,6 +84,8 @@ export const buildLinearImageToImageGraph = (
     throw new Error('No model found in state');
   }
 
+  let modelLoaderNodeId = MAIN_MODEL_LOADER;
+
   const use_cpu = shouldUseNoiseSettings
     ? shouldUseCpuNoise
     : initialGenerationState.shouldUseCpuNoise;
@@ -88,9 +94,9 @@ export const buildLinearImageToImageGraph = (
   const graph: NonNullableGraph = {
     id: IMAGE_TO_IMAGE_GRAPH,
     nodes: {
-      [MAIN_MODEL_LOADER]: {
+      [modelLoaderNodeId]: {
         type: 'main_model_loader',
-        id: MAIN_MODEL_LOADER,
+        id: modelLoaderNodeId,
         model,
       },
       [CLIP_SKIP]: {
@@ -118,13 +124,14 @@ export const buildLinearImageToImageGraph = (
         id: LATENTS_TO_IMAGE,
         fp32: vaePrecision === 'fp32' ? true : false,
       },
-      [LATENTS_TO_LATENTS]: {
-        type: 'l2l',
-        id: LATENTS_TO_LATENTS,
+      [DENOISE_LATENTS]: {
+        type: 'denoise_latents',
+        id: DENOISE_LATENTS,
         cfg_scale,
         scheduler,
         steps,
-        strength,
+        denoising_start: 1 - strength,
+        denoising_end: 1,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -137,19 +144,20 @@ export const buildLinearImageToImageGraph = (
       },
     },
     edges: [
+      // Connect Model Loader to UNet and CLIP Skip
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'unet',
         },
       },
       {
         source: {
-          node_id: MAIN_MODEL_LOADER,
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -157,6 +165,7 @@ export const buildLinearImageToImageGraph = (
           field: 'clip',
         },
       },
+      // Connect CLIP Skip to Conditioning
       {
         source: {
           node_id: CLIP_SKIP,
@@ -177,24 +186,25 @@ export const buildLinearImageToImageGraph = (
           field: 'clip',
         },
       },
+      // Connect everything to Denoise Latents
       {
         source: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'latents',
+          node_id: POSITIVE_CONDITIONING,
+          field: 'conditioning',
         },
         destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
+          node_id: DENOISE_LATENTS,
+          field: 'positive_conditioning',
         },
       },
       {
         source: {
-          node_id: IMAGE_TO_LATENTS,
-          field: 'latents',
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'conditioning',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'latents',
+          node_id: DENOISE_LATENTS,
+          field: 'negative_conditioning',
         },
       },
       {
@@ -203,28 +213,29 @@ export const buildLinearImageToImageGraph = (
           field: 'noise',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'noise',
         },
       },
       {
         source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
+          node_id: IMAGE_TO_LATENTS,
+          field: 'latents',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'negative_conditioning',
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
         },
       },
+      // Decode denoised latents to image
       {
         source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
+          node_id: DENOISE_LATENTS,
+          field: 'latents',
         },
         destination: {
-          node_id: LATENTS_TO_LATENTS,
-          field: 'positive_conditioning',
+          node_id: LATENTS_TO_IMAGE,
+          field: 'latents',
         },
       },
     ],
@@ -333,17 +344,23 @@ export const buildLinearImageToImageGraph = (
     },
   });
 
-  // add LoRA support
-  addLoRAsToGraph(state, graph, LATENTS_TO_LATENTS);
+  // Add Seamless To Graph
+  if (seamlessXAxis || seamlessYAxis) {
+    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
+    modelLoaderNodeId = SEAMLESS;
+  }
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph);
+  addVAEToGraph(state, graph, modelLoaderNodeId);
+
+  // add LoRA support
+  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add dynamic prompts - also sets up core iteration and seed
   addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, LATENTS_TO_LATENTS);
+  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

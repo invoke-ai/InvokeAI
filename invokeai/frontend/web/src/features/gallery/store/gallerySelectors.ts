@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { RootState } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { ListImagesArgs } from 'services/api/endpoints/images';
+import { ListImagesArgs } from 'services/api/types';
 import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
@@ -24,7 +24,7 @@ export const selectListImagesBaseQueryArgs = createSelector(
       galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES;
 
     const listImagesBaseQueryArgs: ListImagesArgs = {
-      board_id: selectedBoardId ?? 'none',
+      board_id: selectedBoardId,
       categories,
       offset: 0,
       limit: INITIAL_IMAGE_LIMIT,

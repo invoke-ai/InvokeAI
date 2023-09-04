@@ -1,5 +1,6 @@
 import { Box } from '@chakra-ui/react';
 import { useCanvasGenerationMode } from 'features/canvas/hooks/useCanvasGenerationMode';
+import { memo } from 'react';
 
 const GENERATION_MODE_NAME_MAP = {
   txt2img: 'Text to Image',
@@ -18,4 +19,4 @@ const GenerationModeStatusText = () => {
   );
 };
 
-export default GenerationModeStatusText;
+export default memo(GenerationModeStatusText);

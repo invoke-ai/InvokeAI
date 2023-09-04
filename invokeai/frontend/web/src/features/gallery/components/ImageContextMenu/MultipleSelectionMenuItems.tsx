@@ -1,30 +1,67 @@
 import { MenuItem } from '@chakra-ui/react';
-import { useCallback } from 'react';
-import { FaFolder, FaFolderPlus, FaTrash } from 'react-icons/fa';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import {
+  imagesToChangeSelected,
+  isModalOpenChanged,
+} from 'features/changeBoardModal/store/slice';
+import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { memo, useCallback, useMemo } from 'react';
+import { FaFolder, FaTrash } from 'react-icons/fa';
+import { MdStar, MdStarBorder } from 'react-icons/md';
+import {
+  useStarImagesMutation,
+  useUnstarImagesMutation,
+} from '../../../../services/api/endpoints/images';
 
 const MultipleSelectionMenuItems = () => {
-  const handleAddSelectionToBoard = useCallback(() => {
-    // TODO: add selection to board
-  }, []);
+  const dispatch = useAppDispatch();
+  const selection = useAppSelector((state) => state.gallery.selection);
+
+  const [starImages] = useStarImagesMutation();
+  const [unstarImages] = useUnstarImagesMutation();
+
+  const handleChangeBoard = useCallback(() => {
+    dispatch(imagesToChangeSelected(selection));
+    dispatch(isModalOpenChanged(true));
+  }, [dispatch, selection]);
 
   const handleDeleteSelection = useCallback(() => {
-    // TODO: delete all selected images
-  }, []);
+    dispatch(imagesToDeleteSelected(selection));
+  }, [dispatch, selection]);
 
-  const handleAddSelectionToBatch = useCallback(() => {
-    // TODO: add selection to batch
-  }, []);
+  const handleStarSelection = useCallback(() => {
+    starImages({ imageDTOs: selection });
+  }, [starImages, selection]);
+
+  const handleUnstarSelection = useCallback(() => {
+    unstarImages({ imageDTOs: selection });
+  }, [unstarImages, selection]);
+
+  const areAllStarred = useMemo(() => {
+    return selection.every((img) => img.starred);
+  }, [selection]);
+
+  const areAllUnstarred = useMemo(() => {
+    return selection.every((img) => !img.starred);
+  }, [selection]);
 
   return (
     <>
-      <MenuItem icon={<FaFolder />} onClickCapture={handleAddSelectionToBoard}>
-        Move Selection to Board
-      </MenuItem>
-      <MenuItem
-        icon={<FaFolderPlus />}
-        onClickCapture={handleAddSelectionToBatch}
-      >
-        Add Selection to Batch
+      {areAllStarred && (
+        <MenuItem
+          icon={<MdStarBorder />}
+          onClickCapture={handleUnstarSelection}
+        >
+          Unstar All
+        </MenuItem>
+      )}
+      {(areAllUnstarred || (!areAllStarred && !areAllUnstarred)) && (
+        <MenuItem icon={<MdStar />} onClickCapture={handleStarSelection}>
+          Star All
+        </MenuItem>
+      )}
+      <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
+        Change Board
       </MenuItem>
       <MenuItem
         sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
@@ -37,4 +74,4 @@ const MultipleSelectionMenuItems = () => {
   );
 };
 
-export default MultipleSelectionMenuItems;
+export default memo(MultipleSelectionMenuItems);

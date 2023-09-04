@@ -43,7 +43,7 @@ class ControlNetModel(ModelBase):
         try:
             config = EmptyConfigLoader.load_config(self.model_path, config_name="config.json")
             # config = json.loads(os.path.join(self.model_path, "config.json"))
-        except:
+        except Exception:
             raise Exception("Invalid controlnet model! (config.json not found or invalid)")
 
         model_class_name = config.get("_class_name", None)
@@ -53,7 +53,7 @@ class ControlNetModel(ModelBase):
         try:
             self.model_class = self._hf_definition_to_type(["diffusers", model_class_name])
             self.model_size = calc_model_size_by_fs(self.model_path)
-        except:
+        except Exception:
             raise Exception("Invalid ControlNet model!")
 
     def get_size(self, child_type: Optional[SubModelType] = None):
@@ -78,7 +78,7 @@ class ControlNetModel(ModelBase):
                     variant=variant,
                 )
                 break
-            except:
+            except Exception:
                 pass
         if not model:
             raise ModelNotFoundException()

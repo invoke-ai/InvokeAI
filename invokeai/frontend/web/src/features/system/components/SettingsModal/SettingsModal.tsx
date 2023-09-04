@@ -9,8 +9,8 @@ import {
   ModalHeader,
   ModalOverlay,
   Text,
-  useDisclosure,
   useColorMode,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { VALID_LOG_LEVELS } from 'app/logging/logger';
@@ -23,7 +23,6 @@ import { setShouldShowAdvancedOptions } from 'features/parameters/store/generati
 import {
   consoleLogLevelChanged,
   setEnableImageDebugging,
-  setIsNodesEnabled,
   setShouldConfirmOnDelete,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
@@ -31,8 +30,8 @@ import {
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
 import {
+  setShouldAutoChangeDimensions,
   setShouldShowProgressInViewer,
-  setShouldUseCanvasBetaLayout,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
 import { isEqual } from 'lodash-es';
@@ -40,20 +39,22 @@ import {
   ChangeEvent,
   ReactElement,
   cloneElement,
+  memo,
   useCallback,
   useEffect,
+  useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LogLevelName } from 'roarr';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
+import { useFeatureStatus } from '../../hooks/useFeatureStatus';
+import { LANGUAGES } from '../../store/constants';
+import { languageSelector } from '../../store/systemSelectors';
+import { languageChanged } from '../../store/systemSlice';
 import SettingSwitch from './SettingSwitch';
 import SettingsClearIntermediates from './SettingsClearIntermediates';
 import SettingsSchedulers from './SettingsSchedulers';
 import StyledFlex from './StyledFlex';
-import { useFeatureStatus } from '../../hooks/useFeatureStatus';
-import { LANGUAGES } from '../../store/constants';
-import { languageChanged } from '../../store/systemSlice';
-import { languageSelector } from '../../store/systemSelectors';
 
 const selector = createSelector(
   [stateSelector],
@@ -64,15 +65,14 @@ const selector = createSelector(
       consoleLogLevel,
       shouldLogToConsole,
       shouldAntialiasProgressImage,
-      isNodesEnabled,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
     } = system;
 
     const {
-      shouldUseCanvasBetaLayout,
       shouldUseSliders,
       shouldShowProgressInViewer,
+      shouldAutoChangeDimensions,
     } = ui;
 
     const { shouldShowAdvancedOptions } = generation;
@@ -80,16 +80,15 @@ const selector = createSelector(
     return {
       shouldConfirmOnDelete,
       enableImageDebugging,
-      shouldUseCanvasBetaLayout,
       shouldUseSliders,
       shouldShowProgressInViewer,
       consoleLogLevel,
       shouldLogToConsole,
       shouldAntialiasProgressImage,
       shouldShowAdvancedOptions,
-      isNodesEnabled,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
+      shouldAutoChangeDimensions,
     };
   },
   {
@@ -100,10 +99,8 @@ const selector = createSelector(
 type ConfigOptions = {
   shouldShowDeveloperSettings: boolean;
   shouldShowResetWebUiText: boolean;
-  shouldShowBetaLayout: boolean;
   shouldShowAdvancedOptionsSettings: boolean;
   shouldShowClearIntermediates: boolean;
-  shouldShowNodesToggle: boolean;
   shouldShowLocalizationToggle: boolean;
 };
 
@@ -116,8 +113,8 @@ type SettingsModalProps = {
 const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const [countdown, setCountdown] = useState(3);
 
-  const shouldShowBetaLayout = config?.shouldShowBetaLayout ?? true;
   const shouldShowDeveloperSettings =
     config?.shouldShowDeveloperSettings ?? true;
   const shouldShowResetWebUiText = config?.shouldShowResetWebUiText ?? true;
@@ -125,7 +122,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     config?.shouldShowAdvancedOptionsSettings ?? true;
   const shouldShowClearIntermediates =
     config?.shouldShowClearIntermediates ?? true;
-  const shouldShowNodesToggle = config?.shouldShowNodesToggle ?? true;
   const shouldShowLocalizationToggle =
     config?.shouldShowLocalizationToggle ?? true;
 
@@ -160,16 +156,15 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const {
     shouldConfirmOnDelete,
     enableImageDebugging,
-    shouldUseCanvasBetaLayout,
     shouldUseSliders,
     shouldShowProgressInViewer,
     consoleLogLevel,
     shouldLogToConsole,
     shouldAntialiasProgressImage,
     shouldShowAdvancedOptions,
-    isNodesEnabled,
     shouldUseNSFWChecker,
     shouldUseWatermarker,
+    shouldAutoChangeDimensions,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -184,7 +179,14 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     });
     onSettingsModalClose();
     onRefreshModalOpen();
+    setInterval(() => setCountdown((prev) => prev - 1), 1000);
   }, [onSettingsModalClose, onRefreshModalOpen]);
+
+  useEffect(() => {
+    if (countdown <= 0) {
+      window.location.reload();
+    }
+  }, [countdown]);
 
   const handleLogLevelChanged = useCallback(
     (v: string) => {
@@ -203,13 +205,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const handleLogToConsoleChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldLogToConsoleChanged(e.target.checked));
-    },
-    [dispatch]
-  );
-
-  const handleToggleNodes = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(setIsNodesEnabled(e.target.checked));
     },
     [dispatch]
   );
@@ -309,25 +304,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     )
                   }
                 />
-                {shouldShowBetaLayout && (
-                  <SettingSwitch
-                    label={t('settings.alternateCanvasLayout')}
-                    useBadge
-                    badgeLabel={t('settings.beta')}
-                    isChecked={shouldUseCanvasBetaLayout}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      dispatch(setShouldUseCanvasBetaLayout(e.target.checked))
-                    }
-                  />
-                )}
-                {shouldShowNodesToggle && (
-                  <SettingSwitch
-                    label={t('settings.enableNodesEditor')}
-                    useBadge
-                    isChecked={isNodesEnabled}
-                    onChange={handleToggleNodes}
-                  />
-                )}
+                <SettingSwitch
+                  label={t('settings.autoChangeDimensions')}
+                  isChecked={shouldAutoChangeDimensions}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setShouldAutoChangeDimensions(e.target.checked))
+                  }
+                />
                 {shouldShowLocalizationToggle && (
                   <IAIMantineSelect
                     disabled={!isLocalizationEnabled}
@@ -401,6 +384,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
         isOpen={isRefreshModalOpen}
         onClose={onRefreshModalClose}
         isCentered
+        closeOnEsc={false}
       >
         <ModalOverlay backdropFilter="blur(40px)" />
         <ModalContent>
@@ -408,7 +392,9 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
           <ModalBody>
             <Flex justifyContent="center">
               <Text fontSize="lg">
-                <Text>{t('settings.resetComplete')}</Text>
+                <Text>
+                  {t('settings.resetComplete')} Reloading in {countdown}...
+                </Text>
               </Text>
             </Flex>
           </ModalBody>
@@ -419,4 +405,4 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   );
 };
 
-export default SettingsModal;
+export default memo(SettingsModal);

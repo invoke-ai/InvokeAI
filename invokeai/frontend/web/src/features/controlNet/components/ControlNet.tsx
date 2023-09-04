@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { FaCopy, FaTrash } from 'react-icons/fa';
 import {
+  ControlNetConfig,
   controlNetDuplicated,
   controlNetRemoved,
   controlNetToggled,
@@ -16,29 +17,42 @@ import { stateSelector } from 'app/store/store';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useToggle } from 'react-use';
 import { v4 as uuidv4 } from 'uuid';
 import ControlNetImagePreview from './ControlNetImagePreview';
 import ControlNetProcessorComponent from './ControlNetProcessorComponent';
 import ParamControlNetShouldAutoConfig from './ParamControlNetShouldAutoConfig';
+import ControlNetCanvasImageImports from './imports/ControlNetCanvasImageImports';
 import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ParamControlNetControlMode from './parameters/ParamControlNetControlMode';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
 import ParamControlNetResizeMode from './parameters/ParamControlNetResizeMode';
 
 type ControlNetProps = {
-  controlNetId: string;
+  controlNet: ControlNetConfig;
 };
 
 const ControlNet = (props: ControlNetProps) => {
-  const { controlNetId } = props;
+  const { controlNet } = props;
+  const { controlNetId } = controlNet;
   const dispatch = useAppDispatch();
+
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
   const selector = createSelector(
     stateSelector,
     ({ controlNet }) => {
-      const { isEnabled, shouldAutoConfig } =
-        controlNet.controlNets[controlNetId];
+      const cn = controlNet.controlNets[controlNetId];
+
+      if (!cn) {
+        return {
+          isEnabled: false,
+          shouldAutoConfig: false,
+        };
+      }
+
+      const { isEnabled, shouldAutoConfig } = cn;
 
       return { isEnabled, shouldAutoConfig };
     },
@@ -70,19 +84,19 @@ const ControlNet = (props: ControlNetProps) => {
       sx={{
         flexDir: 'column',
         gap: 3,
-        p: 3,
+        p: 2,
         borderRadius: 'base',
         position: 'relative',
-        bg: 'base.200',
+        bg: 'base.250',
         _dark: {
-          bg: 'base.850',
+          bg: 'base.750',
         },
       }}
     >
       <Flex sx={{ gap: 2, alignItems: 'center' }}>
         <IAISwitch
-          tooltip={'Toggle this ControlNet'}
-          aria-label={'Toggle this ControlNet'}
+          tooltip="Toggle this ControlNet"
+          aria-label="Toggle this ControlNet"
           isChecked={isEnabled}
           onChange={handleToggleIsEnabled}
         />
@@ -96,8 +110,11 @@ const ControlNet = (props: ControlNetProps) => {
             transitionDuration: '0.1s',
           }}
         >
-          <ParamControlNetModel controlNetId={controlNetId} />
+          <ParamControlNetModel controlNet={controlNet} />
         </Box>
+        {activeTabName === 'unifiedCanvas' && (
+          <ControlNetCanvasImageImports controlNet={controlNet} />
+        )}
         <IAIIconButton
           size="sm"
           tooltip="Duplicate"
@@ -157,6 +174,7 @@ const ControlNet = (props: ControlNetProps) => {
           />
         )}
       </Flex>
+
       <Flex sx={{ w: 'full', flexDirection: 'column', gap: 3 }}>
         <Flex sx={{ gap: 4, w: 'full', alignItems: 'center' }}>
           <Flex
@@ -171,8 +189,8 @@ const ControlNet = (props: ControlNetProps) => {
               justifyContent: 'space-between',
             }}
           >
-            <ParamControlNetWeight controlNetId={controlNetId} />
-            <ParamControlNetBeginEnd controlNetId={controlNetId} />
+            <ParamControlNetWeight controlNet={controlNet} />
+            <ParamControlNetBeginEnd controlNet={controlNet} />
           </Flex>
           {!isExpanded && (
             <Flex
@@ -184,22 +202,22 @@ const ControlNet = (props: ControlNetProps) => {
                 aspectRatio: '1/1',
               }}
             >
-              <ControlNetImagePreview controlNetId={controlNetId} height={28} />
+              <ControlNetImagePreview controlNet={controlNet} isSmall />
             </Flex>
           )}
         </Flex>
         <Flex sx={{ gap: 2 }}>
-          <ParamControlNetControlMode controlNetId={controlNetId} />
-          <ParamControlNetResizeMode controlNetId={controlNetId} />
+          <ParamControlNetControlMode controlNet={controlNet} />
+          <ParamControlNetResizeMode controlNet={controlNet} />
         </Flex>
-        <ParamControlNetProcessorSelect controlNetId={controlNetId} />
+        <ParamControlNetProcessorSelect controlNet={controlNet} />
       </Flex>
 
       {isExpanded && (
         <>
-          <ControlNetImagePreview controlNetId={controlNetId} height="392px" />
-          <ParamControlNetShouldAutoConfig controlNetId={controlNetId} />
-          <ControlNetProcessorComponent controlNetId={controlNetId} />
+          <ControlNetImagePreview controlNet={controlNet} />
+          <ParamControlNetShouldAutoConfig controlNet={controlNet} />
+          <ControlNetProcessorComponent controlNet={controlNet} />
         </>
       )}
     </Flex>

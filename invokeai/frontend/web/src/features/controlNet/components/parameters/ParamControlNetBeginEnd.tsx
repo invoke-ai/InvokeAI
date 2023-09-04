@@ -9,48 +9,39 @@ import {
   RangeSliderTrack,
   Tooltip,
 } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useAppDispatch } from 'app/store/storeHooks';
 import {
+  ControlNetConfig,
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
 } from 'features/controlNet/store/controlNetSlice';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 
 type Props = {
-  controlNetId: string;
+  controlNet: ControlNetConfig;
 };
 
 const formatPct = (v: number) => `${Math.round(v * 100)}%`;
 
 const ParamControlNetBeginEnd = (props: Props) => {
-  const { controlNetId } = props;
+  const { beginStepPct, endStepPct, isEnabled, controlNetId } =
+    props.controlNet;
   const dispatch = useAppDispatch();
-
-  const selector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ controlNet }) => {
-          const { beginStepPct, endStepPct, isEnabled } =
-            controlNet.controlNets[controlNetId];
-          return { beginStepPct, endStepPct, isEnabled };
-        },
-        defaultSelectorOptions
-      ),
-    [controlNetId]
-  );
-
-  const { beginStepPct, endStepPct, isEnabled } = useAppSelector(selector);
 
   const handleStepPctChanged = useCallback(
     (v: number[]) => {
       dispatch(
-        controlNetBeginStepPctChanged({ controlNetId, beginStepPct: v[0] })
+        controlNetBeginStepPctChanged({
+          controlNetId,
+          beginStepPct: v[0] as number,
+        })
       );
-      dispatch(controlNetEndStepPctChanged({ controlNetId, endStepPct: v[1] }));
+      dispatch(
+        controlNetEndStepPctChanged({
+          controlNetId,
+          endStepPct: v[1] as number,
+        })
+      );
     },
     [controlNetId, dispatch]
   );

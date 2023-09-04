@@ -11,6 +11,33 @@ title: Home
   ```
 -->
 
+<!-- CSS styling -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.1/css/fontawesome.min.css">
+<style>
+    .button {
+      width: 300px;
+      height: 50px;
+      background-color: #448AFF;
+      color: #fff;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      border-radius: 0.2rem;
+    }
+
+    .button-container {
+      display: grid;
+      grid-template-columns: repeat(3, 300px);
+      gap: 20px;
+    }
+
+    .button:hover {
+      background-color: #526CFE;
+    }
+</style>
+
+
+
 <div align="center" markdown>
 
 
@@ -22,9 +49,9 @@ title: Home
 [![github stars badge]][github stars link]
 [![github forks badge]][github forks link]
 
-[![CI checks on main badge]][ci checks on main link]
+<!-- [![CI checks on main badge]][ci checks on main link]
 [![CI checks on dev badge]][ci checks on dev link]
-<!-- [![latest commit to dev badge]][latest commit to dev link] -->
+[![latest commit to dev badge]][latest commit to dev link] -->
 
 [![github open issues badge]][github open issues link]
 [![github open prs badge]][github open prs link]
@@ -70,63 +97,23 @@ image-to-image generator. It provides a streamlined process with various new
 features and options to aid the image generation process. It runs on Windows,
 Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 
-**Quick links**: [<a href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>]
-[<a href="https://github.com/invoke-ai/InvokeAI/">Code and Downloads</a>] [<a
-href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>] [<a
-href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion, Ideas &
-Q&A</a>]
-
 <div align="center"><img src="assets/invoke-web-server-1.png" width=640></div>
 
-!!! note
+!!! Note
 
-    This software is rapidly evolving. Please use the [Issues tab](https://github.com/invoke-ai/InvokeAI/issues) to report bugs and make feature requests. Be sure to use the provided templates. They will help aid diagnose issues faster.
+    This project is rapidly evolving. Please use the [Issues tab](https://github.com/invoke-ai/InvokeAI/issues) to report bugs and make feature requests. Be sure to use the provided templates as it will help aid response time.
 
-## :octicons-package-dependencies-24: Installation
+## :octicons-link-24: Quick Links
 
-This software is supported across Linux, Windows and Macintosh. Linux users can use
-either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
-driver).
-
-### [Installation Getting Started Guide](installation)
-#### **[Automated Installer](installation/010_INSTALL_AUTOMATED.md)**
-✅ This is the recommended installation method for first-time users. 
-#### [Manual Installation](installation/020_INSTALL_MANUAL.md)
-This method is recommended for experienced users and developers
-#### [Docker Installation](installation/040_INSTALL_DOCKER.md)
-This method is recommended for those familiar with running Docker containers
-#### [Installation Troubleshooting](installation/010_INSTALL_AUTOMATED.md#troubleshooting)
-Installation troubleshooting guide.
-### Other Installation Guides
-  - [PyPatchMatch](installation/060_INSTALL_PATCHMATCH.md)
-  - [XFormers](installation/070_INSTALL_XFORMERS.md)
-  - [CUDA and ROCm Drivers](installation/030_INSTALL_CUDA_AND_ROCM.md)
-  - [Installing New Models](installation/050_INSTALLING_MODELS.md)
-
-## :fontawesome-solid-computer: Hardware Requirements
-
-### :octicons-cpu-24: System
-
-You wil need one of the following:
-
-- :simple-nvidia: An NVIDIA-based graphics card with 4 GB or more VRAM memory.
-- :simple-amd: An AMD-based graphics card with 4 GB or more VRAM memory (Linux
-  only)
-- :fontawesome-brands-apple: An Apple computer with an M1 chip.
-
-We do **not recommend** the following video cards due to issues with their
-running in half-precision mode and having insufficient VRAM to render 512x512
-images in full-precision mode:
-
-- NVIDIA 10xx series cards such as the 1080ti
-- GTX 1650 series cards
-- GTX 1660 series cards
-
-### :fontawesome-solid-memory: Memory and Disk
-
-- At least 12 GB Main Memory RAM.
-- At least 18 GB of free disk space for the machine learning model, Python, and
-  all its dependencies.
+<div class="button-container">
+    <a href="installation/INSTALLATION"> <button class="button">Installation</button> </a>
+    <a href="features/"> <button class="button">Features</button> </a>
+    <a href="help/gettingStartedWithAI/"> <button class="button">Getting Started</button> </a>
+    <a href="contributing/CONTRIBUTING/"> <button class="button">Contributing</button> </a>
+    <a href="https://github.com/invoke-ai/InvokeAI/"> <button class="button">Code and Downloads</button> </a>
+    <a href="https://github.com/invoke-ai/InvokeAI/issues"> <button class="button">Bug Reports </button> </a>
+    <a href="https://discord.gg/ZmtBAhwWhy"> <button class="button"> Join the Discord Server!</button> </a>
+</div>
 
 
 ## :octicons-gift-24: InvokeAI Features

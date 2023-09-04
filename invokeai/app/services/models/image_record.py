@@ -1,13 +1,14 @@
 import datetime
 from typing import Optional, Union
 
-from pydantic import BaseModel, Extra, Field, StrictBool, StrictStr
+from pydantic import Extra, Field, StrictBool, StrictStr
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 
-class ImageRecord(BaseModel):
+class ImageRecord(BaseModelExcludeNull):
     """Deserialized image record without metadata."""
 
     image_name: str = Field(description="The unique name of the image.")
@@ -38,18 +39,21 @@ class ImageRecord(BaseModel):
         description="The node ID that generated this image, if it is a generated image.",
     )
     """The node ID that generated this image, if it is a generated image."""
+    starred: bool = Field(description="Whether this image is starred.")
+    """Whether this image is starred."""
 
 
-class ImageRecordChanges(BaseModel, extra=Extra.forbid):
+class ImageRecordChanges(BaseModelExcludeNull, extra=Extra.forbid):
     """A set of changes to apply to an image record.
 
     Only limited changes are valid:
       - `image_category`: change the category of an image
       - `session_id`: change the session associated with an image
       - `is_intermediate`: change the image's `is_intermediate` flag
+      - `starred`: change whether the image is starred
     """
 
-    image_category: Optional[ImageCategory] = Field(description="The image's new category.")
+    image_category: Optional[ImageCategory] = Field(default=None, description="The image's new category.")
     """The image's new category."""
     session_id: Optional[StrictStr] = Field(
         default=None,
@@ -58,9 +62,11 @@ class ImageRecordChanges(BaseModel, extra=Extra.forbid):
     """The image's new session ID."""
     is_intermediate: Optional[StrictBool] = Field(default=None, description="The image's new `is_intermediate` flag.")
     """The image's new `is_intermediate` flag."""
+    starred: Optional[StrictBool] = Field(default=None, description="The image's new `starred` state")
+    """The image's new `starred` state."""
 
 
-class ImageUrlsDTO(BaseModel):
+class ImageUrlsDTO(BaseModelExcludeNull):
     """The URLs for an image and its thumbnail."""
 
     image_name: str = Field(description="The unique name of the image.")
@@ -76,11 +82,15 @@ class ImageDTO(ImageRecord, ImageUrlsDTO):
 
     board_id: Optional[str] = Field(description="The id of the board the image belongs to, if one exists.")
     """The id of the board the image belongs to, if one exists."""
+
     pass
 
 
 def image_record_to_dto(
-    image_record: ImageRecord, image_url: str, thumbnail_url: str, board_id: Optional[str]
+    image_record: ImageRecord,
+    image_url: str,
+    thumbnail_url: str,
+    board_id: Optional[str],
 ) -> ImageDTO:
     """Converts an image record to an image DTO."""
     return ImageDTO(
@@ -108,6 +118,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     updated_at = image_dict.get("updated_at", get_iso_timestamp())
     deleted_at = image_dict.get("deleted_at", get_iso_timestamp())
     is_intermediate = image_dict.get("is_intermediate", False)
+    starred = image_dict.get("starred", False)
 
     return ImageRecord(
         image_name=image_name,
@@ -121,4 +132,5 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         updated_at=updated_at,
         deleted_at=deleted_at,
         is_intermediate=is_intermediate,
+        starred=starred,
     )

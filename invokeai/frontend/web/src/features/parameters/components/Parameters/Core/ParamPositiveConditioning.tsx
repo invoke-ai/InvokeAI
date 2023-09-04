@@ -1,7 +1,7 @@
 import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ChangeEvent, KeyboardEvent, useCallback, useRef } from 'react';
+import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
 
 import { createSelector } from '@reduxjs/toolkit';
 import {
@@ -23,9 +23,8 @@ import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 const promptInputSelector = createSelector(
   [stateSelector, activeTabNameSelector],
-  ({ generation, ui }, activeTabName) => {
+  ({ generation }, activeTabName) => {
     return {
-      shouldPinParametersPanel: ui.shouldPinParametersPanel,
       prompt: generation.positivePrompt,
       activeTabName,
     };
@@ -42,8 +41,7 @@ const promptInputSelector = createSelector(
  */
 const ParamPositiveConditioning = () => {
   const dispatch = useAppDispatch();
-  const { prompt, shouldPinParametersPanel, activeTabName } =
-    useAppSelector(promptInputSelector);
+  const { prompt, activeTabName } = useAppSelector(promptInputSelector);
   const isReady = useIsReadyToInvoke();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
@@ -148,7 +146,7 @@ const ParamPositiveConditioning = () => {
         <Box
           sx={{
             position: 'absolute',
-            top: shouldPinParametersPanel ? 5 : 0,
+            top: 0,
             insetInlineEnd: 0,
           }}
         >
@@ -159,4 +157,4 @@ const ParamPositiveConditioning = () => {
   );
 };
 
-export default ParamPositiveConditioning;
+export default memo(ParamPositiveConditioning);

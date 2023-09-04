@@ -348,7 +348,7 @@ class InvokeAiInstance:
 
         introduction()
 
-        from invokeai.frontend.install import invokeai_configure
+        from invokeai.frontend.install.invokeai_configure import invokeai_configure
 
         # NOTE: currently the config script does its own arg parsing! this means the command-line switches
         # from the installer will also automatically propagate down to the config script.
@@ -407,7 +407,7 @@ def get_pip_from_venv(venv_path: Path) -> str:
     :rtype: str
     """
 
-    pip = "Scripts\pip.exe" if OS == "Windows" else "bin/pip"
+    pip = "Scripts\\pip.exe" if OS == "Windows" else "bin/pip"
     return str(venv_path.expanduser().resolve() / pip)
 
 
@@ -455,7 +455,7 @@ def get_torch_source() -> (Union[str, None], str):
     device = graphical_accelerator()
 
     url = None
-    optional_modules = None
+    optional_modules = "[onnx]"
     if OS == "Linux":
         if device == "rocm":
             url = "https://download.pytorch.org/whl/rocm5.4.2"
@@ -463,8 +463,11 @@ def get_torch_source() -> (Union[str, None], str):
             url = "https://download.pytorch.org/whl/cpu"
 
     if device == "cuda":
-        url = "https://download.pytorch.org/whl/cu117"
-        optional_modules = "[xformers]"
+        url = "https://download.pytorch.org/whl/cu118"
+        optional_modules = "[xformers,onnx-cuda]"
+    if device == "cuda_and_dml":
+        url = "https://download.pytorch.org/whl/cu118"
+        optional_modules = "[xformers,onnx-directml]"
 
     # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13
 

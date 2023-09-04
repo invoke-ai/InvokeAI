@@ -60,7 +60,7 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
         return None if name not in self.__cache else self.__cache[name]
 
     def __set_cache(self, name: str, data: torch.Tensor):
-        if not name in self.__cache:
+        if name not in self.__cache:
             self.__cache[name] = data
             self.__cache_ids.put(name)
             if self.__cache_ids.qsize() > self.__max_cache_size:

@@ -49,7 +49,7 @@ export const IAILoadingImageFallback = (props: Props) => {
 
 type IAINoImageFallbackProps = {
   label?: string;
-  icon?: As;
+  icon?: As | null;
   boxSize?: StyleProps['boxSize'];
   sx?: ChakraProps['sx'];
 };
@@ -76,7 +76,7 @@ export const IAINoContentFallback = (props: IAINoImageFallbackProps) => {
         ...props.sx,
       }}
     >
-      <Icon as={icon} boxSize={boxSize} opacity={0.7} />
+      {icon && <Icon as={icon} boxSize={boxSize} opacity={0.7} />}
       {props.label && <Text textAlign="center">{props.label}</Text>}
     </Flex>
   );

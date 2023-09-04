@@ -116,7 +116,7 @@ class MigrateTo3(object):
         appropriate location within the destination models directory.
         """
         directories_scanned = set()
-        for root, dirs, files in os.walk(src_dir):
+        for root, dirs, files in os.walk(src_dir, followlinks=True):
             for d in dirs:
                 try:
                     model = Path(root, d)
@@ -492,10 +492,10 @@ def _parse_legacy_yamlfile(root: Path, initfile: Path) -> ModelPaths:
     loras = paths.get("lora_dir", "loras")
     controlnets = paths.get("controlnet_dir", "controlnets")
     return ModelPaths(
-        models=root / models,
-        embeddings=root / embeddings,
-        loras=root / loras,
-        controlnets=root / controlnets,
+        models=root / models if models else None,
+        embeddings=root / embeddings if embeddings else None,
+        loras=root / loras if loras else None,
+        controlnets=root / controlnets if controlnets else None,
     )
 
 
@@ -525,7 +525,7 @@ def do_migrate(src_directory: Path, dest_directory: Path):
     if version_3:  # write into the dest directory
         try:
             shutil.copy(dest_directory / "configs" / "models.yaml", config_file)
-        except:
+        except Exception:
             MigrateTo3.initialize_yaml(config_file)
         mgr = ModelManager(config_file)  # important to initialize BEFORE moving the models directory
         (dest_directory / "models").replace(dest_models)
@@ -553,7 +553,7 @@ def main():
     parser = argparse.ArgumentParser(
         prog="invokeai-migrate3",
         description="""
-This will copy and convert the models directory and the configs/models.yaml from the InvokeAI 2.3 format 
+This will copy and convert the models directory and the configs/models.yaml from the InvokeAI 2.3 format
 '--from-directory' root to the InvokeAI 3.0 '--to-directory' root. These may be abbreviated '--from' and '--to'.a
 
 The old models directory and config file will be renamed 'models.orig' and 'models.yaml.orig' respectively.
@@ -591,7 +591,6 @@ script, which will perform a full upgrade in place.""",
     # TODO: revisit - don't rely on invokeai.yaml to exist yet!
     dest_is_setup = (dest_root / "models/core").exists() and (dest_root / "databases").exists()
     if not dest_is_setup:
-        import invokeai.frontend.install.invokeai_configure
         from invokeai.backend.install.invokeai_configure import initialize_rootdir
 
         initialize_rootdir(dest_root, True)

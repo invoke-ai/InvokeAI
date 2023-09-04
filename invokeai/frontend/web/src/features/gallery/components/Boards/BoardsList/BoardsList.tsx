@@ -15,10 +15,9 @@ import NoBoardBoard from './NoBoardBoard';
 
 const selector = createSelector(
   [stateSelector],
-  ({ boards, gallery }) => {
-    const { searchText } = boards;
-    const { selectedBoardId } = gallery;
-    return { selectedBoardId, searchText };
+  ({ gallery }) => {
+    const { selectedBoardId, boardSearchText } = gallery;
+    return { selectedBoardId, boardSearchText };
   },
   defaultSelectorOptions
 );
@@ -29,11 +28,11 @@ type Props = {
 
 const BoardsList = (props: Props) => {
   const { isOpen } = props;
-  const { selectedBoardId, searchText } = useAppSelector(selector);
+  const { selectedBoardId, boardSearchText } = useAppSelector(selector);
   const { data: boards } = useListAllBoardsQuery();
-  const filteredBoards = searchText
+  const filteredBoards = boardSearchText
     ? boards?.filter((board) =>
-        board.board_name.toLowerCase().includes(searchText.toLowerCase())
+        board.board_name.toLowerCase().includes(boardSearchText.toLowerCase())
       )
     : boards;
   const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
@@ -42,7 +41,7 @@ const BoardsList = (props: Props) => {
     <>
       <Collapse in={isOpen} animateOpacity>
         <Flex
-          layerStyle={'first'}
+          layerStyle="first"
           sx={{
             flexDir: 'column',
             gap: 2,
@@ -75,7 +74,7 @@ const BoardsList = (props: Props) => {
               }}
             >
               <GridItem sx={{ p: 1.5 }}>
-                <NoBoardBoard isSelected={selectedBoardId === undefined} />
+                <NoBoardBoard isSelected={selectedBoardId === 'none'} />
               </GridItem>
               {filteredBoards &&
                 filteredBoards.map((board) => (

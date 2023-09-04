@@ -3,6 +3,11 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { ImageDTO } from 'services/api/types';
 import { buildCanvasImageToImageGraph } from './buildCanvasImageToImageGraph';
 import { buildCanvasInpaintGraph } from './buildCanvasInpaintGraph';
+import { buildCanvasOutpaintGraph } from './buildCanvasOutpaintGraph';
+import { buildCanvasSDXLImageToImageGraph } from './buildCanvasSDXLImageToImageGraph';
+import { buildCanvasSDXLInpaintGraph } from './buildCanvasSDXLInpaintGraph';
+import { buildCanvasSDXLOutpaintGraph } from './buildCanvasSDXLOutpaintGraph';
+import { buildCanvasSDXLTextToImageGraph } from './buildCanvasSDXLTextToImageGraph';
 import { buildCanvasTextToImageGraph } from './buildCanvasTextToImageGraph';
 
 export const buildCanvasGraph = (
@@ -14,17 +19,58 @@ export const buildCanvasGraph = (
   let graph: NonNullableGraph;
 
   if (generationMode === 'txt2img') {
-    graph = buildCanvasTextToImageGraph(state);
+    if (
+      state.generation.model &&
+      state.generation.model.base_model === 'sdxl'
+    ) {
+      graph = buildCanvasSDXLTextToImageGraph(state);
+    } else {
+      graph = buildCanvasTextToImageGraph(state);
+    }
   } else if (generationMode === 'img2img') {
     if (!canvasInitImage) {
       throw new Error('Missing canvas init image');
     }
-    graph = buildCanvasImageToImageGraph(state, canvasInitImage);
-  } else {
+    if (
+      state.generation.model &&
+      state.generation.model.base_model === 'sdxl'
+    ) {
+      graph = buildCanvasSDXLImageToImageGraph(state, canvasInitImage);
+    } else {
+      graph = buildCanvasImageToImageGraph(state, canvasInitImage);
+    }
+  } else if (generationMode === 'inpaint') {
     if (!canvasInitImage || !canvasMaskImage) {
       throw new Error('Missing canvas init and mask images');
     }
-    graph = buildCanvasInpaintGraph(state, canvasInitImage, canvasMaskImage);
+    if (
+      state.generation.model &&
+      state.generation.model.base_model === 'sdxl'
+    ) {
+      graph = buildCanvasSDXLInpaintGraph(
+        state,
+        canvasInitImage,
+        canvasMaskImage
+      );
+    } else {
+      graph = buildCanvasInpaintGraph(state, canvasInitImage, canvasMaskImage);
+    }
+  } else {
+    if (!canvasInitImage) {
+      throw new Error('Missing canvas init image');
+    }
+    if (
+      state.generation.model &&
+      state.generation.model.base_model === 'sdxl'
+    ) {
+      graph = buildCanvasSDXLOutpaintGraph(
+        state,
+        canvasInitImage,
+        canvasMaskImage
+      );
+    } else {
+      graph = buildCanvasOutpaintGraph(state, canvasInitImage, canvasMaskImage);
+    }
   }
 
   return graph;

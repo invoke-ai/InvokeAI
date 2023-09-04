@@ -18,7 +18,6 @@ import {
 import {
   resetCanvas,
   resetCanvasView,
-  resizeAndScaleCanvas,
   setIsMaskEnabled,
   setLayer,
   setTool,
@@ -48,6 +47,7 @@ import IAICanvasRedoButton from './IAICanvasRedoButton';
 import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
+import { memo } from 'react';
 
 export const selector = createSelector(
   [systemSelector, canvasSelector, isStagingSelector],
@@ -166,7 +166,9 @@ const IAICanvasToolbar = () => {
 
   const handleResetCanvasView = (shouldScaleTo1 = false) => {
     const canvasBaseLayer = getCanvasBaseLayer();
-    if (!canvasBaseLayer) return;
+    if (!canvasBaseLayer) {
+      return;
+    }
     const clientRect = canvasBaseLayer.getClientRect({
       skipTransform: true,
     });
@@ -180,7 +182,6 @@ const IAICanvasToolbar = () => {
 
   const handleResetCanvas = () => {
     dispatch(resetCanvas());
-    dispatch(resizeAndScaleCanvas());
   };
 
   const handleMergeVisible = () => {
@@ -309,4 +310,4 @@ const IAICanvasToolbar = () => {
   );
 };
 
-export default IAICanvasToolbar;
+export default memo(IAICanvasToolbar);

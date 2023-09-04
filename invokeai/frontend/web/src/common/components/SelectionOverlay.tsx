@@ -1,4 +1,5 @@
 import { Box } from '@chakra-ui/react';
+import { memo } from 'react';
 
 type Props = {
   isSelected: boolean;
@@ -18,6 +19,7 @@ const SelectionOverlay = ({ isSelected, isHovered }: Props) => {
         opacity: isSelected ? 1 : 0.7,
         transitionProperty: 'common',
         transitionDuration: '0.1s',
+        pointerEvents: 'none',
         shadow: isSelected
           ? isHovered
             ? 'hoverSelected.light'
@@ -39,4 +41,4 @@ const SelectionOverlay = ({ isSelected, isHovered }: Props) => {
   );
 };
 
-export default SelectionOverlay;
+export default memo(SelectionOverlay);

@@ -264,7 +264,7 @@ experimental versions later.
 	  you can create several levels of subfolders and drop your models into
       whichever ones you want.
 	
-    - ***Autoimport FolderLICENSE***     
+    - ***LICENSE***     
 
     At the bottom of the screen you will see a checkbox for accepting
     the CreativeML Responsible AI Licenses. You need to accept the license
@@ -471,7 +471,7 @@ Then type the following commands:
 
 === "NVIDIA System"
     ```bash
-    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu117
+    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu118
     pip install xformers
     ```
 

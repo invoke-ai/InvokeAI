@@ -1,8 +1,5 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
+import { ControlNetConfig } from '../store/controlNetSlice';
 import CannyProcessor from './processors/CannyProcessor';
 import ContentShuffleProcessor from './processors/ContentShuffleProcessor';
 import HedProcessor from './processors/HedProcessor';
@@ -17,28 +14,11 @@ import PidiProcessor from './processors/PidiProcessor';
 import ZoeDepthProcessor from './processors/ZoeDepthProcessor';
 
 export type ControlNetProcessorProps = {
-  controlNetId: string;
+  controlNet: ControlNetConfig;
 };
 
 const ControlNetProcessorComponent = (props: ControlNetProcessorProps) => {
-  const { controlNetId } = props;
-
-  const selector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ controlNet }) => {
-          const { isEnabled, processorNode } =
-            controlNet.controlNets[controlNetId];
-
-          return { isEnabled, processorNode };
-        },
-        defaultSelectorOptions
-      ),
-    [controlNetId]
-  );
-
-  const { isEnabled, processorNode } = useAppSelector(selector);
+  const { controlNetId, isEnabled, processorNode } = props.controlNet;
 
   if (processorNode.type === 'canny_image_processor') {
     return (

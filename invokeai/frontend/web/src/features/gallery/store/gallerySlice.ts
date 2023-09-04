@@ -1,64 +1,30 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import { uniq } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
+import { imagesApi } from 'services/api/endpoints/images';
+import { ImageDTO } from 'services/api/types';
 import { BoardId, GalleryState, GalleryView } from './types';
 
 export const initialGalleryState: GalleryState = {
   selection: [],
   shouldAutoSwitch: true,
-  autoAddBoardId: undefined,
+  autoAssignBoardOnClick: true,
+  autoAddBoardId: 'none',
   galleryImageMinimumWidth: 96,
-  selectedBoardId: undefined,
+  selectedBoardId: 'none',
   galleryView: 'images',
-  batchImageNames: [],
-  isBatchEnabled: false,
+  boardSearchText: '',
 };
 
 export const gallerySlice = createSlice({
   name: 'gallery',
   initialState: initialGalleryState,
   reducers: {
-    imageRangeEndSelected: () => {
-      // TODO
-    },
-    // imageRangeEndSelected: (state, action: PayloadAction<string>) => {
-    // const rangeEndImageName = action.payload;
-    // const lastSelectedImage = state.selection[state.selection.length - 1];
-    // const filteredImages = selectFilteredImagesLocal(state);
-    // const lastClickedIndex = filteredImages.findIndex(
-    //   (n) => n.image_name === lastSelectedImage
-    // );
-    // const currentClickedIndex = filteredImages.findIndex(
-    //   (n) => n.image_name === rangeEndImageName
-    // );
-    // if (lastClickedIndex > -1 && currentClickedIndex > -1) {
-    //   // We have a valid range!
-    //   const start = Math.min(lastClickedIndex, currentClickedIndex);
-    //   const end = Math.max(lastClickedIndex, currentClickedIndex);
-    //   const imagesToSelect = filteredImages
-    //     .slice(start, end + 1)
-    //     .map((i) => i.image_name);
-    //   state.selection = uniq(state.selection.concat(imagesToSelect));
-    // }
-    // },
-    imageSelectionToggled: () => {
-      // TODO
-    },
-    // imageSelectionToggled: (state, action: PayloadAction<string>) => {
-    // TODO: multiselect
-    // if (
-    //   state.selection.includes(action.payload) &&
-    //   state.selection.length > 1
-    // ) {
-    //   state.selection = state.selection.filter(
-    //     (imageName) => imageName !== action.payload
-    //   );
-    // } else {
-    //   state.selection = uniq(state.selection.concat(action.payload));
-    // }
-    imageSelected: (state, action: PayloadAction<string | null>) => {
+    imageSelected: (state, action: PayloadAction<ImageDTO | null>) => {
       state.selection = action.payload ? [action.payload] : [];
+    },
+    selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
+      state.selection = action.payload;
     },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
@@ -66,57 +32,36 @@ export const gallerySlice = createSlice({
     setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
       state.galleryImageMinimumWidth = action.payload;
     },
+    autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
+      state.autoAssignBoardOnClick = action.payload;
+    },
     boardIdSelected: (state, action: PayloadAction<BoardId>) => {
       state.selectedBoardId = action.payload;
       state.galleryView = 'images';
     },
-    isBatchEnabledChanged: (state, action: PayloadAction<boolean>) => {
-      state.isBatchEnabled = action.payload;
-    },
-    imagesAddedToBatch: (state, action: PayloadAction<string[]>) => {
-      state.batchImageNames = uniq(
-        state.batchImageNames.concat(action.payload)
-      );
-    },
-    imagesRemovedFromBatch: (state, action: PayloadAction<string[]>) => {
-      state.batchImageNames = state.batchImageNames.filter(
-        (imageName) => !action.payload.includes(imageName)
-      );
-
-      const newSelection = state.selection.filter(
-        (imageName) => !action.payload.includes(imageName)
-      );
-
-      if (newSelection.length) {
-        state.selection = newSelection;
+    autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
+      if (!action.payload) {
+        state.autoAddBoardId = 'none';
         return;
       }
-
-      state.selection = [state.batchImageNames[0]] ?? [];
-    },
-    batchReset: (state) => {
-      state.batchImageNames = [];
-      state.selection = [];
-    },
-    autoAddBoardIdChanged: (
-      state,
-      action: PayloadAction<string | undefined>
-    ) => {
       state.autoAddBoardId = action.payload;
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
       state.galleryView = action.payload;
+    },
+    boardSearchTextChanged: (state, action: PayloadAction<string>) => {
+      state.boardSearchText = action.payload;
     },
   },
   extraReducers: (builder) => {
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
       const deletedBoardId = action.meta.arg.originalArgs;
       if (deletedBoardId === state.selectedBoardId) {
-        state.selectedBoardId = undefined;
+        state.selectedBoardId = 'none';
         state.galleryView = 'images';
       }
       if (deletedBoardId === state.autoAddBoardId) {
-        state.autoAddBoardId = undefined;
+        state.autoAddBoardId = 'none';
       }
     });
     builder.addMatcher(
@@ -128,7 +73,7 @@ export const gallerySlice = createSlice({
         }
 
         if (!boards.map((b) => b.board_id).includes(state.autoAddBoardId)) {
-          state.autoAddBoardId = undefined;
+          state.autoAddBoardId = 'none';
         }
       }
     );
@@ -136,22 +81,20 @@ export const gallerySlice = createSlice({
 });
 
 export const {
-  imageRangeEndSelected,
-  imageSelectionToggled,
   imageSelected,
   shouldAutoSwitchChanged,
+  autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
   boardIdSelected,
-  isBatchEnabledChanged,
-  imagesAddedToBatch,
-  imagesRemovedFromBatch,
   autoAddBoardIdChanged,
   galleryViewChanged,
+  selectionChanged,
+  boardSearchTextChanged,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
 
 const isAnyBoardDeleted = isAnyOf(
-  boardsApi.endpoints.deleteBoard.matchFulfilled,
-  boardsApi.endpoints.deleteBoardAndImages.matchFulfilled
+  imagesApi.endpoints.deleteBoard.matchFulfilled,
+  imagesApi.endpoints.deleteBoardAndImages.matchFulfilled
 );

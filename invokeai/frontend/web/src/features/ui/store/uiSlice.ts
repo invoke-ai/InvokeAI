@@ -8,18 +8,17 @@ import { UIState } from './uiTypes';
 
 export const initialUIState: UIState = {
   activeTab: 0,
-  shouldPinParametersPanel: true,
-  shouldShowParametersPanel: true,
   shouldShowImageDetails: false,
   shouldUseCanvasBetaLayout: false,
   shouldShowExistingModelsInSearch: false,
   shouldUseSliders: false,
-  shouldPinGallery: true,
-  shouldShowGallery: true,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
   shouldShowEmbeddingPicker: false,
+  shouldAutoChangeDimensions: false,
   favoriteSchedulers: [],
+  globalContextMenuCloseTrigger: 0,
+  panels: {},
 };
 
 export const uiSlice = createSlice({
@@ -28,13 +27,6 @@ export const uiSlice = createSlice({
   reducers: {
     setActiveTab: (state, action: PayloadAction<InvokeTabName>) => {
       setActiveTabReducer(state, action.payload);
-    },
-    setShouldPinParametersPanel: (state, action: PayloadAction<boolean>) => {
-      state.shouldPinParametersPanel = action.payload;
-      state.shouldShowParametersPanel = true;
-    },
-    setShouldShowParametersPanel: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowParametersPanel = action.payload;
     },
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
@@ -54,36 +46,6 @@ export const uiSlice = createSlice({
     setShouldUseSliders: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSliders = action.payload;
     },
-    setShouldShowGallery: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowGallery = action.payload;
-    },
-    togglePinGalleryPanel: (state) => {
-      state.shouldPinGallery = !state.shouldPinGallery;
-      if (!state.shouldPinGallery) {
-        state.shouldShowGallery = true;
-      }
-    },
-    togglePinParametersPanel: (state) => {
-      state.shouldPinParametersPanel = !state.shouldPinParametersPanel;
-      if (!state.shouldPinParametersPanel) {
-        state.shouldShowParametersPanel = true;
-      }
-    },
-    toggleParametersPanel: (state) => {
-      state.shouldShowParametersPanel = !state.shouldShowParametersPanel;
-    },
-    toggleGalleryPanel: (state) => {
-      state.shouldShowGallery = !state.shouldShowGallery;
-    },
-    togglePanels: (state) => {
-      if (state.shouldShowGallery || state.shouldShowParametersPanel) {
-        state.shouldShowGallery = false;
-        state.shouldShowParametersPanel = false;
-      } else {
-        state.shouldShowGallery = true;
-        state.shouldShowParametersPanel = true;
-      }
-    },
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
     },
@@ -96,6 +58,18 @@ export const uiSlice = createSlice({
     toggleEmbeddingPicker: (state) => {
       state.shouldShowEmbeddingPicker = !state.shouldShowEmbeddingPicker;
     },
+    setShouldAutoChangeDimensions: (state, action: PayloadAction<boolean>) => {
+      state.shouldAutoChangeDimensions = action.payload;
+    },
+    contextMenusClosed: (state) => {
+      state.globalContextMenuCloseTrigger += 1;
+    },
+    panelsChanged: (
+      state,
+      action: PayloadAction<{ name: string; value: string }>
+    ) => {
+      state.panels[action.payload.name] = action.payload.value;
+    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
@@ -106,22 +80,17 @@ export const uiSlice = createSlice({
 
 export const {
   setActiveTab,
-  setShouldPinParametersPanel,
-  setShouldShowParametersPanel,
   setShouldShowImageDetails,
   setShouldUseCanvasBetaLayout,
   setShouldShowExistingModelsInSearch,
   setShouldUseSliders,
   setShouldHidePreview,
-  setShouldShowGallery,
-  togglePanels,
-  togglePinGalleryPanel,
-  togglePinParametersPanel,
-  toggleParametersPanel,
-  toggleGalleryPanel,
   setShouldShowProgressInViewer,
   favoriteSchedulersChanged,
   toggleEmbeddingPicker,
+  setShouldAutoChangeDimensions,
+  contextMenusClosed,
+  panelsChanged,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;
