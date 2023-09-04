@@ -9,11 +9,11 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { numberStringRegex } from 'common/components/IAINumberInput';
 import { fieldNumberValueChanged } from 'features/nodes/store/nodesSlice';
 import {
+  FieldComponentProps,
   FloatInputFieldTemplate,
   FloatInputFieldValue,
   IntegerInputFieldTemplate,
   IntegerInputFieldValue,
-  FieldComponentProps,
 } from 'features/nodes/types/types';
 import { memo, useEffect, useMemo, useState } from 'react';
 
