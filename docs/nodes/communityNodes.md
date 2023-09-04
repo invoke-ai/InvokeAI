@@ -120,74 +120,67 @@ There are simple parameters to change the FOV, camera position, and model orient
 
 Additional parameters like different image sizes will probably be added, and things like more sophisticated rotations are planned but this node is experimental and may or may not change much.
 
-**Node Link:** https://github.com/dwringer/invoke-nodes/blob/main/depth_from_obj.py
+**Node Link:** https://github.com/dwringer/depth-from-obj-node
+
+**Example Usage:**
+![depth from obj usage graph](https://raw.githubusercontent.com/dwringer/depth-from-obj-node/main/depth_from_obj_usage.jpg)
 
 --------------------------------
-### Enhance Image
+### Enhance Image (simple adjustments)
 
 **Description:** Boost or reduce color saturation, contrast, brightness, sharpness, or invert colors of any image at any stage with this simple wrapper for pillow [PIL]'s ImageEnhance module.
 
 Color inversion is toggled with a simple switch, while each of the four enhancer modes are activated by entering a value other than 1 in each corresponding input field. Values less than 1 will reduce the corresponding property, while values greater than 1 will enhance it.
 
-**Node Link:** https://github.com/dwringer/invoke-nodes/blob/main/image_enhance.py
+**Node Link:** https://github.com/dwringer/image-enhance-node
+
+**Example Usage:**
+![enhance image usage graph](https://raw.githubusercontent.com/dwringer/image-enhance-node/main/image_enhance_usage.jpg)
 
 --------------------------------
 ### Generative Grammar-Based Prompt Nodes
 
-**Description:** This generates prompts from simple user-defined grammar rules (loaded from custom files - examples provided below). The prompts are made by recursively expanding a special template string, replacing nonterminal "parts-of-speech" until no more nonterminal terms remain in the string.
+**Description:** This set of 3 nodes generates prompts from simple user-defined grammar rules (loaded from custom files - examples provided below). The prompts are made by recursively expanding a special template string, replacing nonterminal "parts-of-speech" until no more nonterminal terms remain in the string.
 
-**Three nodes are included:**
+This includes 3 Nodes:
 - *Lookup Table from File* - loads a YAML file "prompt" section (or of a whole folder of YAML's) into a JSON-ified dictionary (Lookups output)
 - *Lookups Entry from Prompt* - places a single entry in a new Lookups output under the specified heading
-- *Prompt from LookupTable* - uses a Collection of Lookups as grammar rules from which to randomly generate prompts.
+- *Prompt from Lookup Table* - uses a Collection of Lookups as grammar rules from which to randomly generate prompts.
 
-**Node Link:** https://github.com/dwringer/invoke-nodes/blob/main/lookuptables.py
-
-**Example Templates:** 
-- https://github.com/dwringer/invoke-nodes/blob/main/example_template.yaml
-- https://github.com/dwringer/invoke-nodes/blob/main/movies.yaml
-- https://github.com/dwringer/invoke-nodes/blob/main/photograph.yaml
+**Node Link:** https://github.com/dwringer/generative-grammar-prompt-nodes
 
 **Example Usage:**
-![lookups usage example graph](https://raw.githubusercontent.com/dwringer/invoke-nodes/main/lookuptables_usage.jpg)
+![lookups usage example graph](https://raw.githubusercontent.com/dwringer/generative-grammar-prompt-nodes/main/lookuptables_usage.jpg)
 
 --------------------------------
-### Ideal Size Stepper
+### Image and Mask Composition Pack
 
-**Description:** Plug in your full size dimensions as well as JPPhoto's Ideal Size node's output dimensions, and get 1, 2, or 3 intermediate pairs of dimensions for upscaling based on the natural log of the image area. Thus, each successive generation (from ideal size to full size) adds approximately the same percentage of new pixels to the image. Note this does not output the ideal size or full size dimensions. The 1, 2, or 3 outputs of this node are only the intermediate step sizes.
+**Description:** This is a pack of nodes for composing masks and images, including a simple text mask creator and both image and latent offset nodes. The offsets wrap around, so these can be used in conjunction with the Seamless node to progressively generate centered on different parts of the seamless tiling.
 
-There are up to three stages which determine how many intermediate sizes to compute and output. With Tapers B and C disabled, outputs A, B, and C will be the same (inactive outputs yield copies of the previous pair). With a taper assigned to B, Width/Height A and B will both be active with progressively larger intermediate resolutions, and if Taper C is activated, active outputs will be calculated with even finer gradations.
+This includes 4 Nodes:
+- Text Mask (simple 2D) - create and position a white on black (or black on white) line of text using any font locally available to Invoke.
+- Image Compositor - Take a subject from an image with a flat backdrop and layer it on another image using a chroma key or flood select background removal.
+- Offset Latents - Offset a latents tensor in the vertical and/or horizontal dimensions, wrapping it around.
+- Offset Image - Offset an image in the vertical and/or horizontal dimensions, wrapping it around.
 
-**Node Link:** https://github.com/dwringer/invoke-nodes/blob/main/ideal_size_stepper.py
+**Node Link:** https://github.com/dwringer/composition-nodes
 
---------------------------------
-### Image Compositor
-
-**Description:** Take a subject from an image with a flat backdrop and layer it on another image using a chroma key to specify a color value/threshold to remove backdrop pixels, or leave the color blank and a "flood select" will be used from the image corners.
-
-The subject image may be scaled using the fill X and fill Y options (enable both to stretch-fit).  Final subject position may also be adjusted with X offset and Y offset. If used, chroma key may be specified either as an (R, G, B) tuple, or a CSS-3 color string.
-
-**Node Link:** https://github.com/dwringer/invoke-nodes/blob/main/image_composite.py
+**Example Usage:**
+![composition nodes usage graph](https://raw.githubusercontent.com/dwringer/composition-nodes/main/composition_nodes_usage.jpg)
 
 --------------------------------
-### Final Size & Orientation / Random Switch (Integers)
+### Size Stepper Nodes
 
-**Description:** Input two integers, get two out in random, landscape, or portrait orientations.
+**Description:** This is a set of nodes for calculating the necessary size increments for doing upscaling workflows. Use the Final Size & Orientation node to enter your full size dimensions and orientation (portrait/landscape/random), then plug that and your initial generation dimensions into the Ideal Size Stepper and get 1, 2, or 3 intermediate pairs of dimensions for upscaling. Note this does not output the initial size or full size dimensions. The 1, 2, or 3 outputs of this node are only the intermediate sizes.
 
-Pretty self explanatory. You can just enter your height/width in the two inputs and then get the requested configurations of WxH or HxW from the two outputs. 
+For the Ideal Size Stepper, there are up to three stages which determine how many intermediate sizes to compute and output. With Tapers B and C disabled, outputs A, B, and C will be the same (inactive outputs yield copies of the previous pair). With a taper assigned to B, Width/Height A and B will both be active with progressively larger intermediate resolutions, and if Taper C is activated, active outputs will be calculated with even finer gradations.
 
-Contains two nodes: Final Size & Orientation, and Random Switch (Integer) which was the original, slightly more generalized version.
+A third node is included, Random Switch (Integers), which is just a generic version of Final Size with no orientation selection.
 
-**Node Link:** https://github.com/dwringer/invoke-nodes/blob/main/random_switch.py
+**Node Link:** https://github.com/dwringer/size-stepper-nodes
 
---------------------------------
-### Text Mask (simple 2D)
-
-**Description:** Create a white on black (or black on white) text image for use with controlnets or further processing in other nodes. Specify any TTF/OTF font file available to Invoke and control parameters to resize, rotate, and reposition the text.
-
-Currently this only generates one line of text, but it can be layered with other images using the Image Compositor node or any other such tool.
-
-**Node Link:** https://github.com/dwringer/invoke-nodes/blob/main/text_mask.py
+**Example Usage:**
+![size stepper usage graph](https://raw.githubusercontent.com/dwringer/size-stepper-nodes/main/size_nodes_usage.jpg)
 
 --------------------------------
 
