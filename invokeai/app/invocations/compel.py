@@ -44,7 +44,7 @@ class ConditioningFieldData:
 #    PerpNeg = "perp_neg"
 
 
-@invocation("compel", title="Prompt", tags=["prompt", "compel"], category="conditioning")
+@invocation("compel", title="Prompt", tags=["prompt", "compel"], category="conditioning", version="1.0.0")
 class CompelInvocation(BaseInvocation):
     """Parse prompt using compel package to conditioning."""
 
@@ -267,6 +267,7 @@ class SDXLPromptInvocationBase:
     title="SDXL Prompt",
     tags=["sdxl", "compel", "prompt"],
     category="conditioning",
+    version="1.0.0",
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -279,8 +280,8 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     crop_left: int = InputField(default=0, description="")
     target_width: int = InputField(default=1024, description="")
     target_height: int = InputField(default=1024, description="")
-    clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
-    clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
+    clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 1")
+    clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 2")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
@@ -351,6 +352,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     title="SDXL Refiner Prompt",
     tags=["sdxl", "compel", "prompt"],
     category="conditioning",
+    version="1.0.0",
 )
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -403,7 +405,7 @@ class ClipSkipInvocationOutput(BaseInvocationOutput):
     clip: ClipField = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
-@invocation("clip_skip", title="CLIP Skip", tags=["clipskip", "clip", "skip"], category="conditioning")
+@invocation("clip_skip", title="CLIP Skip", tags=["clipskip", "clip", "skip"], category="conditioning", version="1.0.0")
 class ClipSkipInvocation(BaseInvocation):
     """Skip layers in clip text_encoder model."""
 

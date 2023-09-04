@@ -73,7 +73,7 @@ class LoRAModelField(BaseModel):
     base_model: BaseModelType = Field(description="Base model")
 
 
-@invocation("main_model_loader", title="Main Model", tags=["model"], category="model")
+@invocation("main_model_loader", title="Main Model", tags=["model"], category="model", version="1.0.0")
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
@@ -173,7 +173,7 @@ class LoraLoaderOutput(BaseInvocationOutput):
     clip: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
-@invocation("lora_loader", title="LoRA", tags=["model"], category="model")
+@invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.0")
 class LoraLoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
@@ -244,19 +244,19 @@ class SDXLLoraLoaderOutput(BaseInvocationOutput):
     clip2: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP 2")
 
 
-@invocation("sdxl_lora_loader", title="SDXL LoRA", tags=["lora", "model"], category="model")
+@invocation("sdxl_lora_loader", title="SDXL LoRA", tags=["lora", "model"], category="model", version="1.0.0")
 class SDXLLoraLoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: LoRAModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA")
-    weight: float = Field(default=0.75, description=FieldDescriptions.lora_weight)
-    unet: Optional[UNetField] = Field(
-        default=None, description=FieldDescriptions.unet, input=Input.Connection, title="UNET"
+    weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
+    unet: Optional[UNetField] = InputField(
+        default=None, description=FieldDescriptions.unet, input=Input.Connection, title="UNet"
     )
-    clip: Optional[ClipField] = Field(
+    clip: Optional[ClipField] = InputField(
         default=None, description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 1"
     )
-    clip2: Optional[ClipField] = Field(
+    clip2: Optional[ClipField] = InputField(
         default=None, description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 2"
     )
 
@@ -338,7 +338,7 @@ class VaeLoaderOutput(BaseInvocationOutput):
     vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
-@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model")
+@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.0")
 class VaeLoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
 
@@ -376,7 +376,7 @@ class SeamlessModeOutput(BaseInvocationOutput):
     vae: Optional[VaeField] = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
-@invocation("seamless", title="Seamless", tags=["seamless", "model"], category="model")
+@invocation("seamless", title="Seamless", tags=["seamless", "model"], category="model", version="1.0.0")
 class SeamlessModeInvocation(BaseInvocation):
     """Applies the seamless transformation to the Model UNet and VAE."""
 

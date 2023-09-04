@@ -1,4 +1,6 @@
 import * as png from '@stevebel/png';
+import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import {
   ImageMetadataAndWorkflow,
   zCoreMetadata,
@@ -18,6 +20,11 @@ export const getMetadataAndWorkflowFromImageBlob = async (
     const metadataResult = zCoreMetadata.safeParse(JSON.parse(rawMetadata));
     if (metadataResult.success) {
       data.metadata = metadataResult.data;
+    } else {
+      logger('system').error(
+        { error: parseify(metadataResult.error) },
+        'Problem reading metadata from image'
+      );
     }
   }
 
@@ -26,6 +33,11 @@ export const getMetadataAndWorkflowFromImageBlob = async (
     const workflowResult = zWorkflow.safeParse(JSON.parse(rawWorkflow));
     if (workflowResult.success) {
       data.workflow = workflowResult.data;
+    } else {
+      logger('system').error(
+        { error: parseify(workflowResult.error) },
+        'Problem reading workflow from image'
+      );
     }
   }
 
