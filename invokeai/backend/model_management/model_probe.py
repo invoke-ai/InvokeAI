@@ -50,6 +50,7 @@ class ModelProbe(object):
         "StableDiffusionInpaintPipeline": ModelType.Main,
         "StableDiffusionXLPipeline": ModelType.Main,
         "StableDiffusionXLImg2ImgPipeline": ModelType.Main,
+        "StableDiffusionXLInpaintPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
     }

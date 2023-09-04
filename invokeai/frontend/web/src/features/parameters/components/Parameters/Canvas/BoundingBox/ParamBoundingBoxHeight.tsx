@@ -14,8 +14,9 @@ const selector = createSelector(
   [stateSelector, isStagingSelector],
   ({ canvas, generation }, isStaging) => {
     const { boundingBoxDimensions } = canvas;
-    const { aspectRatio } = generation;
+    const { model, aspectRatio } = generation;
     return {
+      model,
       boundingBoxDimensions,
       isStaging,
       aspectRatio,
@@ -26,10 +27,14 @@ const selector = createSelector(
 
 const ParamBoundingBoxWidth = () => {
   const dispatch = useAppDispatch();
-  const { boundingBoxDimensions, isStaging, aspectRatio } =
+  const { model, boundingBoxDimensions, isStaging, aspectRatio } =
     useAppSelector(selector);
 
   const { t } = useTranslation();
+
+  const initial = ['sdxl', 'sdxl-refiner'].includes(model?.base_model as string)
+    ? 1024
+    : 512;
 
   const handleChangeHeight = (v: number) => {
     dispatch(
@@ -53,15 +58,15 @@ const ParamBoundingBoxWidth = () => {
     dispatch(
       setBoundingBoxDimensions({
         ...boundingBoxDimensions,
-        height: Math.floor(512),
+        height: Math.floor(initial),
       })
     );
     if (aspectRatio) {
-      const newWidth = roundToMultiple(512 * aspectRatio, 64);
+      const newWidth = roundToMultiple(initial * aspectRatio, 64);
       dispatch(
         setBoundingBoxDimensions({
           width: newWidth,
-          height: Math.floor(512),
+          height: Math.floor(initial),
         })
       );
     }
@@ -71,7 +76,7 @@ const ParamBoundingBoxWidth = () => {
     <IAISlider
       label={t('parameters.boundingBoxHeight')}
       min={64}
-      max={1024}
+      max={1536}
       step={64}
       value={boundingBoxDimensions.height}
       onChange={handleChangeHeight}

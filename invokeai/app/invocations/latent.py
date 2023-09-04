@@ -47,7 +47,18 @@ from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import Post
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
 from ..models.image import ImageCategory, ResourceOrigin
-from .baseinvocation import BaseInvocation, FieldDescriptions, Input, InputField, InvocationContext, UIType, tags, title
+from .baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    FieldDescriptions,
+    Input,
+    InputField,
+    InvocationContext,
+    OutputField,
+    UIType,
+    invocation,
+    invocation_output,
+)
 from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
 from .model import ModelInfo, UNetField, VaeField
@@ -58,15 +69,27 @@ DEFAULT_PRECISION = choose_precision(choose_torch_device())
 SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
 
 
-@title("Create Denoise Mask")
-@tags("mask", "denoise")
+@invocation_output("scheduler_output")
+class SchedulerOutput(BaseInvocationOutput):
+    scheduler: SAMPLER_NAME_VALUES = OutputField(description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler)
+
+
+@invocation("scheduler", title="Scheduler", tags=["scheduler"], category="latents")
+class SchedulerInvocation(BaseInvocation):
+    """Selects a scheduler."""
+
+    scheduler: SAMPLER_NAME_VALUES = InputField(
+        default="euler", description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler
+    )
+
+    def invoke(self, context: InvocationContext) -> SchedulerOutput:
+        return SchedulerOutput(scheduler=self.scheduler)
+
+
+@invocation("create_denoise_mask", title="Create Denoise Mask", tags=["mask", "denoise"], category="latents")
 class CreateDenoiseMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
 
-    # Metadata
-    type: Literal["create_denoise_mask"] = "create_denoise_mask"
-
-    # Inputs
     vae: VaeField = InputField(description=FieldDescriptions.vae, input=Input.Connection, ui_order=0)
     image: Optional[ImageField] = InputField(default=None, description="Image which will be masked", ui_order=1)
     mask: ImageField = InputField(description="The mask to use when pasting", ui_order=2)
@@ -158,14 +181,15 @@ def get_scheduler(
     return scheduler
 
 
-@title("Denoise Latents")
-@tags("latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l")
+@invocation(
+    "denoise_latents",
+    title="Denoise Latents",
+    tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
+    category="latents",
+)
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
 
-    type: Literal["denoise_latents"] = "denoise_latents"
-
-    # Inputs
     positive_conditioning: ConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection, ui_order=0
     )
@@ -421,8 +445,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 latents = context.services.latents.get(self.latents.latents_name)
                 if seed is None:
                     seed = self.latents.seed
-            else:
+
+                if noise is not None and noise.shape[1:] != latents.shape[1:]:
+                    raise Exception(f"Incompatable 'noise' and 'latents' shapes: {latents.shape=} {noise.shape=}")
+
+            elif noise is not None:
                 latents = torch.zeros_like(noise)
+            else:
+                raise Exception("'latents' or 'noise' must be provided!")
 
             if seed is None:
                 seed = 0
@@ -512,14 +542,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=result_latents, seed=seed)
 
 
-@title("Latents to Image")
-@tags("latents", "image", "vae", "l2i")
+@invocation("l2i", title="Latents to Image", tags=["latents", "image", "vae", "l2i"], category="latents")
 class LatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
 
-    type: Literal["l2i"] = "l2i"
-
-    # Inputs
     latents: LatentsField = InputField(
         description=FieldDescriptions.latents,
         input=Input.Connection,
@@ -600,6 +626,7 @@ class LatentsToImageInvocation(BaseInvocation):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata.dict() if self.metadata else None,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -612,14 +639,10 @@ class LatentsToImageInvocation(BaseInvocation):
 LATENTS_INTERPOLATION_MODE = Literal["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"]
 
 
-@title("Resize Latents")
-@tags("latents", "resize")
+@invocation("lresize", title="Resize Latents", tags=["latents", "resize"], category="latents")
 class ResizeLatentsInvocation(BaseInvocation):
     """Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8."""
 
-    type: Literal["lresize"] = "lresize"
-
-    # Inputs
     latents: LatentsField = InputField(
         description=FieldDescriptions.latents,
         input=Input.Connection,
@@ -660,14 +683,10 @@ class ResizeLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=resized_latents, seed=self.latents.seed)
 
 
-@title("Scale Latents")
-@tags("latents", "resize")
+@invocation("lscale", title="Scale Latents", tags=["latents", "resize"], category="latents")
 class ScaleLatentsInvocation(BaseInvocation):
     """Scales latents by a given factor."""
 
-    type: Literal["lscale"] = "lscale"
-
-    # Inputs
     latents: LatentsField = InputField(
         description=FieldDescriptions.latents,
         input=Input.Connection,
@@ -700,14 +719,10 @@ class ScaleLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=resized_latents, seed=self.latents.seed)
 
 
-@title("Image to Latents")
-@tags("latents", "image", "vae", "i2l")
+@invocation("i2l", title="Image to Latents", tags=["latents", "image", "vae", "i2l"], category="latents")
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""
 
-    type: Literal["i2l"] = "i2l"
-
-    # Inputs
     image: ImageField = InputField(
         description="The image to encode",
     )
@@ -784,14 +799,10 @@ class ImageToLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=latents, seed=None)
 
 
-@title("Blend Latents")
-@tags("latents", "blend")
+@invocation("lblend", title="Blend Latents", tags=["latents", "blend"], category="latents")
 class BlendLatentsInvocation(BaseInvocation):
     """Blend two latents using a given alpha. Latents must have same size."""
 
-    type: Literal["lblend"] = "lblend"
-
-    # Inputs
     latents_a: LatentsField = InputField(
         description=FieldDescriptions.latents,
         input=Input.Connection,

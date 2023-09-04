@@ -22,6 +22,7 @@ export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
           }
           return map(nodeTemplate.inputs)
             .filter((field) => ['any', 'direct'].includes(field.input))
+            .filter((field) => !field.ui_hidden)
             .sort((a, b) => (a.ui_order ?? 0) - (b.ui_order ?? 0))
             .map((field) => field.name)
             .filter((fieldName) => fieldName !== 'is_intermediate');

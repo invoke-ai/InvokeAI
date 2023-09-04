@@ -298,4 +298,18 @@ class DownloadQueue(DownloadQueueBase):
         """Download a job that holds a huggingface repoid."""
         repo_id = job.source
         variant = job.variant
+        urls_to_download = self._get_repo_urls(repo_id, variant)
+        job.total_bytes = sum([self._get_download_size(url) for url in urls_to_download])
+        bytes_downloaded = dict()
+
+        def report_sub_downloads(subjob: DownloadJobBase):
+            if subjob.status == DownloadJobStatus.RUNNING:
+                bytes_downloaded[subjob.id] = subjob.bytes
+                total_downloaded = sum(bytes_downloaded.values())
+                if job.event_handler:
+                    job.bytes = total_downloaded
+                    job.event_handler(job)
+                
+            
+        subqueue = self.__class__(event_handler=report_sub_downloads)
         

@@ -21,6 +21,7 @@ export const useOutputFieldNames = (nodeId: string) => {
             return [];
           }
           return map(nodeTemplate.outputs)
+            .filter((field) => !field.ui_hidden)
             .sort((a, b) => (a.ui_order ?? 0) - (b.ui_order ?? 0))
             .map((field) => field.name)
             .filter((fieldName) => fieldName !== 'is_intermediate');

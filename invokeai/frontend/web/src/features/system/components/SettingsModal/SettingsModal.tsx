@@ -30,6 +30,7 @@ import {
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
 import {
+  setShouldAutoChangeDimensions,
   setShouldShowProgressInViewer,
   setShouldUseSliders,
 } from 'features/ui/store/uiSlice';
@@ -68,7 +69,11 @@ const selector = createSelector(
       shouldUseWatermarker,
     } = system;
 
-    const { shouldUseSliders, shouldShowProgressInViewer } = ui;
+    const {
+      shouldUseSliders,
+      shouldShowProgressInViewer,
+      shouldAutoChangeDimensions,
+    } = ui;
 
     const { shouldShowAdvancedOptions } = generation;
 
@@ -83,6 +88,7 @@ const selector = createSelector(
       shouldShowAdvancedOptions,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
+      shouldAutoChangeDimensions,
     };
   },
   {
@@ -158,6 +164,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     shouldShowAdvancedOptions,
     shouldUseNSFWChecker,
     shouldUseWatermarker,
+    shouldAutoChangeDimensions,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -295,6 +302,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     dispatch(
                       shouldAntialiasProgressImageChanged(e.target.checked)
                     )
+                  }
+                />
+                <SettingSwitch
+                  label={t('settings.autoChangeDimensions')}
+                  isChecked={shouldAutoChangeDimensions}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(setShouldAutoChangeDimensions(e.target.checked))
                   }
                 />
                 {shouldShowLocalizationToggle && (
