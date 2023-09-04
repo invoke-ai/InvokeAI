@@ -113,13 +113,16 @@ export const makeConnectionErrorSelector = (
       const isCollectionToGenericCollection =
         targetType === 'Collection' && COLLECTION_TYPES.includes(sourceType);
 
+      const isIntToFloat = sourceType === 'integer' && targetType === 'float';
+
       if (
         !(
           isCollectionItemToNonCollection ||
           isNonCollectionToCollectionItem ||
           isAnythingToPolymorphicOfSameBaseType ||
           isGenericCollectionToAnyCollectionOrPolymorphic ||
-          isCollectionToGenericCollection
+          isCollectionToGenericCollection ||
+          isIntToFloat
         )
       ) {
         return 'Field types must match';

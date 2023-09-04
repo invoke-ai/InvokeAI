@@ -120,12 +120,15 @@ export const useIsValidConnection = () => {
         const isCollectionToGenericCollection =
           targetType === 'Collection' && COLLECTION_TYPES.includes(sourceType);
 
+        const isIntToFloat = sourceType === 'integer' && targetType === 'float';
+
         return (
           isCollectionItemToNonCollection ||
           isNonCollectionToCollectionItem ||
           isAnythingToPolymorphicOfSameBaseType ||
           isGenericCollectionToAnyCollectionOrPolymorphic ||
-          isCollectionToGenericCollection
+          isCollectionToGenericCollection ||
+          isIntToFloat
         );
       }
 
