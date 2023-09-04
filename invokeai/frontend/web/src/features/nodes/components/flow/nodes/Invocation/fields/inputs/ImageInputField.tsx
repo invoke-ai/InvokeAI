@@ -9,9 +9,9 @@ import {
 } from 'features/dnd/types';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import {
+  FieldComponentProps,
   ImageInputFieldTemplate,
   ImageInputFieldValue,
-  FieldComponentProps,
 } from 'features/nodes/types/types';
 import { memo, useCallback, useMemo } from 'react';
 import { FaUndo } from 'react-icons/fa';

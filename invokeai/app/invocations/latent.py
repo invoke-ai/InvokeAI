@@ -208,12 +208,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
     )
     unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet", ui_order=2)
     control: Union[ControlField, list[ControlField]] = InputField(
-        default=None, description=FieldDescriptions.control, input=Input.Connection, ui_order=5
+        default=None,
+        description=FieldDescriptions.control,
+        input=Input.Connection,
+        ui_order=5,
     )
     latents: Optional[LatentsField] = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     denoise_mask: Optional[DenoiseMaskField] = InputField(
-        default=None,
-        description=FieldDescriptions.mask,
+        default=None, description=FieldDescriptions.mask, input=Input.Connection, ui_order=6
     )
 
     @validator("cfg_scale")
@@ -317,7 +319,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         # really only need model for dtype and device
         model: StableDiffusionGeneratorPipeline,
-        control_input: List[ControlField],
+        control_input: Union[ControlField, List[ControlField]],
         latents_shape: List[int],
         exit_stack: ExitStack,
         do_classifier_free_guidance: bool = True,
