@@ -31,7 +31,7 @@ class PromptsToFileInvocation(BaseInvocation):
     file_path: str = InputField(description="Path to prompt text file")
     prompts: Union[str, list[str], None] = InputField(default=None, description="Prompt or collection of prompts to write", ui_type=UIType.Collection)
     append: bool = InputField(default=True, description="Append or overwrite file")
-        
+
     def invoke(self, context: InvocationContext) -> PromptsToFileInvocationOutput:
         with open(self.file_path, 'a' if self.append else 'w') as f:
             if isinstance(self.prompts, list):
@@ -39,7 +39,7 @@ class PromptsToFileInvocation(BaseInvocation):
                     f.write ( line + '\n' )
             else:
                 f.write((self.prompts or '') + '\n')
- 
+
         return PromptsToFileInvocationOutput()
 
 @invocation_output("prompt_pos_neg_output")
@@ -71,7 +71,7 @@ class PromptSplitNegInvocation(BaseInvocation):
             elif brackets_depth > 0:
                 n_prompt += char
             else:
-                p_prompt += char            
+                p_prompt += char
 
             #keep track of the escape char but only if it isn't escaped already
             if char == "\\" and not escaped:
@@ -80,7 +80,7 @@ class PromptSplitNegInvocation(BaseInvocation):
                 escaped = False
 
         return PromptPosNegOutput(positive_prompt=p_prompt, negative_prompt=n_prompt)
-    
+
 
 @invocation("prompt_join", title="Prompt Join", tags=["prompt", "join"], category="prompt")
 class PromptJoinInvocation(BaseInvocation):
@@ -119,7 +119,7 @@ class PromptReplaceInvocation(BaseInvocation):
         new_prompt = (self.prompt or '')
         if len(pattern) > 0: 
             if not self.use_regex:
-                #None regex so make case insensitve 
+                #None regex so make case insensitve
                 pattern = "(?i)" + re.escape(pattern)
             new_prompt = re.sub(pattern, (self.replace_string or ''), new_prompt)
         return StringOutput(value=new_prompt)  
@@ -156,7 +156,7 @@ class PTFieldsCollectInvocation(BaseInvocation):
     height: Optional[int] = InputField(description="The height parameter", input=Input.Connection)
     steps: Optional[int] = InputField(description="The number of steps used for inference", input=Input.Connection)
     cfg_scale: Optional[float] = InputField(description="The classifier-free guidance scale parameter", input=Input.Connection)
-       
+
     def invoke(self, context: InvocationContext) -> PTFieldsCollectOutput:
         x:str = str(json.dumps(
                     PTFields(
@@ -188,7 +188,7 @@ class PTFieldsExpandOutput(BaseInvocationOutput):
     height: int = OutputField(description="The height parameter")
     steps: int = OutputField(description="The number of steps used for inference")
     cfg_scale: float = OutputField(description="The classifier-free guidance scale parameter")
-        
+
 @invocation("pt_fields_expand", title="PTFields Expand", tags=["prompt", "fields"], category="prompt")
 class PTFieldsExpandInvocation(BaseInvocation):
     '''Save Expand PTFields into individual items'''
@@ -209,3 +209,36 @@ class PTFieldsExpandInvocation(BaseInvocation):
             cfg_scale = fields.get('cfg_scale'),
             steps = fields.get('steps'),
         )
+
+
+@invocation("prompt_strength", title="Prompt Strength", tags=["prompt"], category="prompt")
+class PromptStrengthInvocation(BaseInvocation):
+    """Takes a prompt string and float strength and outputs a new string in the format of (prompt)strength"""
+
+    prompt: str = InputField(default='', description="Prompt to work on", ui_component=UIComponent.Textarea)
+    strength : float = InputField(default=1, gt=0, description="strength of the prompt")
+
+    def invoke(self, context: InvocationContext) -> StringOutput:
+        return StringOutput(value=f"({self.prompt}){self.strength}")
+
+
+COMBINE_TYPE = Literal[".and", ".blend"]
+
+@invocation("prompt_strengths_combine", title="Prompt Strengths Combine", tags=["prompt", "combine"], category="prompt")
+class PromptStrengthsCombineInvocation(BaseInvocation):
+    """Takes a collection of prompt strength strings and converts it into a combined .and() or .blend() structure. Blank prompts are ignored"""
+
+    prompt_strengths: list[str] = InputField(default=[''], description="Prompt strengths to combine", ui_type=UIType.Collection)
+    combine_type: COMBINE_TYPE = InputField(default=".and", description="Combine type .and() or .blend()", input=Input.Direct)
+
+    def invoke(self, context: InvocationContext) -> StringOutput:
+        strings = []
+        numbers = []
+        for item in self.prompt_strengths:
+            string, number = item.rsplit(')', 1)
+            string = string[1:].strip()
+            number = float(number)
+            if len(string)>0:
+                strings.append(f'"{string}"')
+                numbers.append(number)
+        return StringOutput(value=f'({",".join(strings)}){self.combine_type}({",".join(map(str, numbers))})')
