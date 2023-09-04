@@ -225,6 +225,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     models_dir          : Path = Field(default='models', description='Path to the models directory', category='Paths')
     legacy_conf_dir     : Path = Field(default='configs/stable-diffusion', description='Path to directory of legacy checkpoint config files', category='Paths')
     db_dir              : Path = Field(default='databases', description='Path to InvokeAI databases directory', category='Paths')
+    nodes_dir           : Path = Field(default='nodes', description='Path to InvokeAI nodes extension directory', category='Paths')
     outdir              : Path = Field(default='outputs', description='Default folder for output images', category='Paths')
     use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', category='Paths')
     from_file           : Path = Field(default=None, description='Take command input from the indicated file (command-line client only)', category='Paths')
@@ -350,6 +351,13 @@ class InvokeAIAppConfig(InvokeAISettings):
         Path to the invokeai.db file.
         """
         return self._resolve(self.db_dir) / DB_FILE
+
+    @property
+    def nodes_path(self) -> Path:
+        """
+        Path to the custom nodes directory.
+        """
+        return self._resolve(self.nodes_path)
 
     @property
     def model_conf_path(self) -> Path:

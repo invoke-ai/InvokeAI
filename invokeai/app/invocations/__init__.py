@@ -1,6 +1,6 @@
 import pathlib
 
-from ..extensions import InvokeAIExtensionManager
+from ..extensions.extension_manager import InvokeAIExtensionManager
 
 __all__ = []
 extension_manager = InvokeAIExtensionManager()

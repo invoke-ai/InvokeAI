@@ -1,6 +1,5 @@
 import ast
 import pathlib
-from collections import OrderedDict
 from typing import Dict, List
 
 from pydantic import BaseModel, ValidationError
@@ -29,7 +28,7 @@ class InvokeAIExtensionManager:
         try:
             assert self.community_nodes_dir.is_dir()
         except AssertionError:
-            self.logger("Nodes directory is missing. Please make sure it exists.")
+            self.logger.error("Nodes directory is missing. Please make sure it exists.")
 
     def get_extensions(self) -> Dict[str, Extension]:
         """Returns an object with paths to all folders in the extension directory"""
