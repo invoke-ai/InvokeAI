@@ -39,6 +39,19 @@ export const POLYMORPHIC_TYPES = [
   'ColorPolymorphic',
 ];
 
+export const MODEL_TYPES = [
+  'ControlNetModelField',
+  'LoRAModelField',
+  'MainModelField',
+  'ONNXModelField',
+  'SDXLMainModelField',
+  'SDXLRefinerModelField',
+  'VaeModelField',
+  'UNetField',
+  'VaeField',
+  'ClipField',
+];
+
 export const COLLECTION_MAP = {
   integer: 'IntegerCollection',
   boolean: 'BooleanCollection',
@@ -103,7 +116,7 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     title: 'Boolean Polymorphic',
   },
   ClipField: {
-    color: 'green.300',
+    color: 'green.500',
     description: 'Tokenizer and text_encoder submodels.',
     title: 'Clip',
   },
@@ -238,17 +251,17 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     title: 'Latents Polymorphic',
   },
   LoRAModelField: {
-    color: 'teal.300',
+    color: 'teal.500',
     description: 'TODO',
     title: 'LoRA',
   },
   MainModelField: {
-    color: 'teal.300',
+    color: 'teal.500',
     description: 'TODO',
     title: 'Model',
   },
   ONNXModelField: {
-    color: 'teal.300',
+    color: 'teal.500',
     description: 'ONNX model field.',
     title: 'ONNX Model',
   },
@@ -258,12 +271,12 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     title: 'Scheduler',
   },
   SDXLMainModelField: {
-    color: 'teal.300',
+    color: 'teal.500',
     description: 'SDXL model field.',
     title: 'SDXL Model',
   },
   SDXLRefinerModelField: {
-    color: 'teal.300',
+    color: 'teal.500',
     description: 'TODO',
     title: 'Refiner Model',
   },
@@ -283,17 +296,17 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     title: 'String Polymorphic',
   },
   UNetField: {
-    color: 'red.300',
+    color: 'red.500',
     description: 'UNet submodel.',
     title: 'UNet',
   },
   VaeField: {
-    color: 'blue.300',
+    color: 'blue.500',
     description: 'Vae submodel.',
     title: 'Vae',
   },
   VaeModelField: {
-    color: 'teal.300',
+    color: 'teal.500',
     description: 'TODO',
     title: 'VAE',
   },

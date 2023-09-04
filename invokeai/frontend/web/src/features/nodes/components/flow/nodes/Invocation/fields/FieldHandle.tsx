@@ -4,6 +4,7 @@ import {
   COLLECTION_TYPES,
   FIELDS,
   HANDLE_TOOLTIP_OPEN_DELAY,
+  MODEL_TYPES,
   POLYMORPHIC_TYPES,
 } from 'features/nodes/types/constants';
 import {
@@ -52,6 +53,7 @@ const FieldHandle = (props: FieldHandleProps) => {
   const styles: CSSProperties = useMemo(() => {
     const isCollectionType = COLLECTION_TYPES.includes(type);
     const isPolymorphicType = POLYMORPHIC_TYPES.includes(type);
+    const isModelType = MODEL_TYPES.includes(type);
     const color = colorTokenToCssVar(typeColor);
     const s: CSSProperties = {
       backgroundColor:
@@ -64,7 +66,7 @@ const FieldHandle = (props: FieldHandleProps) => {
       borderWidth: isCollectionType || isPolymorphicType ? 4 : 0,
       borderStyle: 'solid',
       borderColor: color,
-      borderRadius: isPolymorphicType ? 4 : '100%',
+      borderRadius: isModelType ? 4 : '100%',
       zIndex: 1,
     };
 
