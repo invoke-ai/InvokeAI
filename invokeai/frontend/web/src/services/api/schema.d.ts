@@ -6804,7 +6804,7 @@ export type components = {
        * Seamless Axes
        * @description Axes("x" and "y") to which apply seamless
        */
-      seamless_axes: string[];
+      seamless_axes?: string[];
     };
     /** Upscaler */
     Upscaler: {
@@ -6843,7 +6843,7 @@ export type components = {
        * Seamless Axes
        * @description Axes("x" and "y") to which apply seamless
        */
-      seamless_axes: string[];
+      seamless_axes?: string[];
     };
     /**
      * VAE
@@ -7037,6 +7037,12 @@ export type components = {
       ui_order?: number;
     };
     /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -7060,12 +7066,6 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
   };
   responses: never;
   parameters: never;
