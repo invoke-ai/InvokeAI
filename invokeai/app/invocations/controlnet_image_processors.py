@@ -1,7 +1,7 @@
 # Invocations for ControlNet image preprocessors
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
 from builtins import bool, float
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, List, Optional
 
 import cv2
 import numpy as np
@@ -27,17 +27,7 @@ from PIL import Image
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
 from ..models.image import ImageCategory, ResourceOrigin
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    FieldDescriptions,
-    Input,
-    InputField,
-    InvocationContext,
-    OutputField,
-    UIType,
-    invocation,
-)
+from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, invocation
 
 
 @invocation(

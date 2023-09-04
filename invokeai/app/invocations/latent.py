@@ -65,7 +65,6 @@ from .control_adapter import ControlField
 from .model import ModelInfo, UNetField, VaeField
 
 
-
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
 SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
@@ -387,7 +386,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                         resize_mode=control_info.resize_mode,
                     )
                     control_item = ControlNetData(
-                        model=control_model, # model object
+                        model=control_model,  # model object
                         image_tensor=control_image,
                         weight=control_info.control_weight,
                         begin_step_percent=control_info.begin_step_percent,
@@ -404,7 +403,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     input_image = context.services.images.get_pil_image(control_image_field.image_name)
                     control_item = IPAdapterData(
                         ip_adapter_model=control_info.ip_adapter_model,  # name of model (NOT model object)
-                        image_encoder_model=control_info.image_encoder_model, # name of model (NOT model obj)
+                        image_encoder_model=control_info.image_encoder_model,  # name of model (NOT model obj)
                         image=input_image,
                         weight=control_info.control_weight,
                     )
@@ -564,8 +563,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     conditioning_data=conditioning_data,
                     control_data=controlnet_data,  # list[ControlNetData],
                     ip_adapter_data=ip_adapter_data,  # list[IPAdapterData],
-#                    ip_adapter_image=unwrapped_ip_adapter_image,
-#                    ip_adapter_strength=self.ip_adapter_strength,
+                    #                    ip_adapter_image=unwrapped_ip_adapter_image,
+                    #                    ip_adapter_strength=self.ip_adapter_strength,
                     callback=step_callback,
                 )
 

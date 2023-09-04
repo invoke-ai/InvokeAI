@@ -15,7 +15,6 @@ from diffusers.models import ControlNetModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 
 
-
 def is_torch2_available():
     return hasattr(F, "scaled_dot_product_attention")
 
@@ -150,9 +149,7 @@ def generate(
         control_guidance_end = len(control_guidance_start) * [control_guidance_end]
     elif not isinstance(control_guidance_start, list) and not isinstance(control_guidance_end, list):
         mult = len(controlnet.nets) if isinstance(controlnet, MultiControlNetModel) else 1
-        control_guidance_start, control_guidance_end = mult * [control_guidance_start], mult * [
-            control_guidance_end
-        ]
+        control_guidance_start, control_guidance_end = mult * [control_guidance_start], mult * [control_guidance_end]
 
     # 1. Check inputs. Raise error if not correct
     self.check_inputs(
@@ -192,9 +189,7 @@ def generate(
     guess_mode = guess_mode or global_pool_conditions
 
     # 3. Encode input prompt
-    text_encoder_lora_scale = (
-        cross_attention_kwargs.get("scale", None) if cross_attention_kwargs is not None else None
-    )
+    text_encoder_lora_scale = cross_attention_kwargs.get("scale", None) if cross_attention_kwargs is not None else None
     prompt_embeds = self._encode_prompt(
         prompt,
         device,

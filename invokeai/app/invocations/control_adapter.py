@@ -29,6 +29,7 @@ CONTROLNET_RESIZE_VALUES = Literal[
     "just_resize_simple",
 ]
 
+
 class ControlNetModelField(BaseModel):
     """ControlNet model field"""
 
@@ -68,6 +69,7 @@ class ControlField(BaseModel):
                 raise ValueError("Control weights must be within -1 to 2 range")
         return v
 
+
 @invocation_output("control_output")
 class ControlOutput(BaseInvocationOutput):
     """node output for ControlNet info"""
@@ -76,7 +78,6 @@ class ControlOutput(BaseInvocationOutput):
 
     # Outputs
     control: ControlField = OutputField(description=FieldDescriptions.control)
-
 
 
 @invocation("controlnet", title="ControlNet", tags=["controlnet"], category="controlnet")
@@ -119,18 +120,20 @@ class ControlNetInvocation(BaseInvocation):
             ),
         )
 
+
 IP_ADAPTER_MODELS = Literal[
     "models_ip_adapter/models/ip-adapter_sd15.bin",
     "models_ip_adapter/models/ip-adapter-plus_sd15.bin",
     "models_ip_adapter/models/ip-adapter-plus-face_sd15.bin",
-    "models_ip_adapter/sdxl_models/ip-adapter_sdxl.bin"
+    "models_ip_adapter/sdxl_models/ip-adapter_sdxl.bin",
 ]
 
 IP_ADAPTER_IMAGE_ENCODER_MODELS = Literal[
     "models_ip_adapter/models/image_encoder/",
     "./models_ip_adapter/models/image_encoder/",
-    "models_ip_adapter/sdxl_models/image_encoder/"
+    "models_ip_adapter/sdxl_models/image_encoder/",
 ]
+
 
 @invocation("ipadapter", title="IP-Adapter", tags=["ipadapter"], category="ipadapter")
 class IPAdapterInvocation(BaseInvocation):
@@ -140,14 +143,15 @@ class IPAdapterInvocation(BaseInvocation):
 
     # Inputs
     image: ImageField = InputField(description="The control image")
-    #control_model: ControlNetModelField = InputField(
+    # control_model: ControlNetModelField = InputField(
     #    default="lllyasviel/sd-controlnet-canny", description=FieldDescriptions.controlnet_model, input=Input.Direct
-    #)
-    ip_adapter_model: IP_ADAPTER_MODELS = InputField(default="./models_ip_adapter/models/ip-adapter_sd15.bin",
-                                                    description="The IP-Adapter model")
+    # )
+    ip_adapter_model: IP_ADAPTER_MODELS = InputField(
+        default="./models_ip_adapter/models/ip-adapter_sd15.bin", description="The IP-Adapter model"
+    )
     image_encoder_model: IP_ADAPTER_IMAGE_ENCODER_MODELS = InputField(
-        default="./models_ip_adapter/models/image_encoder/",
-        description="The image encoder model")
+        default="./models_ip_adapter/models/image_encoder/", description="The image encoder model"
+    )
     control_weight: Union[float, List[float]] = InputField(
         default=1.0, description="The weight given to the ControlNet", ui_type=UIType.Float
     )
@@ -172,9 +176,9 @@ class IPAdapterInvocation(BaseInvocation):
                 image_encoder_model=self.image_encoder_model,
                 control_weight=self.control_weight,
                 # rest are currently ignored
-                #begin_step_percent=self.begin_step_percent,
-                #end_step_percent=self.end_step_percent,
-                #control_mode=self.control_mode,
-                #resize_mode=self.resize_mode,
+                # begin_step_percent=self.begin_step_percent,
+                # end_step_percent=self.end_step_percent,
+                # control_mode=self.control_mode,
+                # resize_mode=self.resize_mode,
             ),
         )

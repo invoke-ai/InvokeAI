@@ -12,6 +12,7 @@ class AttnProcessor(nn.Module):
     r"""
     Default processor for performing attention-related computations.
     """
+
     def __init__(
         self,
         hidden_size=None,
@@ -140,7 +141,10 @@ class IPAttnProcessor(nn.Module):
             encoder_hidden_states = attn.norm_encoder_hidden_states(encoder_hidden_states)
 
         # split hidden states
-        encoder_hidden_states, ip_hidden_states = encoder_hidden_states[:, :self.text_context_len, :], encoder_hidden_states[:, self.text_context_len:, :]
+        encoder_hidden_states, ip_hidden_states = (
+            encoder_hidden_states[:, : self.text_context_len, :],
+            encoder_hidden_states[:, self.text_context_len :, :],
+        )
 
         key = attn.to_k(encoder_hidden_states)
         value = attn.to_v(encoder_hidden_states)
@@ -186,6 +190,7 @@ class AttnProcessor2_0(torch.nn.Module):
     r"""
     Processor for implementing scaled dot-product attention (enabled by default if you're using PyTorch 2.0).
     """
+
     def __init__(
         self,
         hidden_size=None,
@@ -338,7 +343,10 @@ class IPAttnProcessor2_0(torch.nn.Module):
             encoder_hidden_states = attn.norm_encoder_hidden_states(encoder_hidden_states)
 
         # split hidden states
-        encoder_hidden_states, ip_hidden_states = encoder_hidden_states[:, :self.text_context_len, :], encoder_hidden_states[:, self.text_context_len:, :]
+        encoder_hidden_states, ip_hidden_states = (
+            encoder_hidden_states[:, : self.text_context_len, :],
+            encoder_hidden_states[:, self.text_context_len :, :],
+        )
 
         key = attn.to_k(encoder_hidden_states)
         value = attn.to_v(encoder_hidden_states)
