@@ -74,7 +74,7 @@ class SchedulerOutput(BaseInvocationOutput):
     scheduler: SAMPLER_NAME_VALUES = OutputField(description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler)
 
 
-@invocation("scheduler", title="Scheduler", tags=["scheduler"], category="latents")
+@invocation("scheduler", title="Scheduler", tags=["scheduler"], category="latents", version="1.0.0")
 class SchedulerInvocation(BaseInvocation):
     """Selects a scheduler."""
 
@@ -86,7 +86,9 @@ class SchedulerInvocation(BaseInvocation):
         return SchedulerOutput(scheduler=self.scheduler)
 
 
-@invocation("create_denoise_mask", title="Create Denoise Mask", tags=["mask", "denoise"], category="latents")
+@invocation(
+    "create_denoise_mask", title="Create Denoise Mask", tags=["mask", "denoise"], category="latents", version="1.0.0"
+)
 class CreateDenoiseMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
 
@@ -186,6 +188,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
+    version="1.0.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -544,7 +547,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=result_latents, seed=seed)
 
 
-@invocation("l2i", title="Latents to Image", tags=["latents", "image", "vae", "l2i"], category="latents")
+@invocation(
+    "l2i", title="Latents to Image", tags=["latents", "image", "vae", "l2i"], category="latents", version="1.0.0"
+)
 class LatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
 
@@ -641,7 +646,7 @@ class LatentsToImageInvocation(BaseInvocation):
 LATENTS_INTERPOLATION_MODE = Literal["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"]
 
 
-@invocation("lresize", title="Resize Latents", tags=["latents", "resize"], category="latents")
+@invocation("lresize", title="Resize Latents", tags=["latents", "resize"], category="latents", version="1.0.0")
 class ResizeLatentsInvocation(BaseInvocation):
     """Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8."""
 
@@ -685,7 +690,7 @@ class ResizeLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=resized_latents, seed=self.latents.seed)
 
 
-@invocation("lscale", title="Scale Latents", tags=["latents", "resize"], category="latents")
+@invocation("lscale", title="Scale Latents", tags=["latents", "resize"], category="latents", version="1.0.0")
 class ScaleLatentsInvocation(BaseInvocation):
     """Scales latents by a given factor."""
 
@@ -721,7 +726,9 @@ class ScaleLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=resized_latents, seed=self.latents.seed)
 
 
-@invocation("i2l", title="Image to Latents", tags=["latents", "image", "vae", "i2l"], category="latents")
+@invocation(
+    "i2l", title="Image to Latents", tags=["latents", "image", "vae", "i2l"], category="latents", version="1.0.0"
+)
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""
 
@@ -801,7 +808,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=latents, seed=None)
 
 
-@invocation("lblend", title="Blend Latents", tags=["latents", "blend"], category="latents")
+@invocation("lblend", title="Blend Latents", tags=["latents", "blend"], category="latents", version="1.0.0")
 class BlendLatentsInvocation(BaseInvocation):
     """Blend two latents using a given alpha. Latents must have same size."""
 

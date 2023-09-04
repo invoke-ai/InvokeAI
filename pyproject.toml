@@ -74,6 +74,7 @@ dependencies = [
   "rich~=13.3",
   "safetensors==0.3.1",
   "scikit-image~=0.21.0",
+  "semver~=3.0.1",
   "send2trash",
   "test-tube~=0.7.5",
   "torch~=2.0.1",
