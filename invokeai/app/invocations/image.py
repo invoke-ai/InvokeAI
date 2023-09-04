@@ -16,7 +16,7 @@ from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, invocation
 
 
-@invocation("show_image", title="Show Image", tags=["image"], category="image")
+@invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.0")
 class ShowImageInvocation(BaseInvocation):
     """Displays a provided image using the OS image viewer, and passes it forward in the pipeline."""
 
@@ -36,7 +36,7 @@ class ShowImageInvocation(BaseInvocation):
         )
 
 
-@invocation("blank_image", title="Blank Image", tags=["image"], category="image")
+@invocation("blank_image", title="Blank Image", tags=["image"], category="image", version="1.0.0")
 class BlankImageInvocation(BaseInvocation):
     """Creates a blank image and forwards it to the pipeline"""
 
@@ -65,7 +65,7 @@ class BlankImageInvocation(BaseInvocation):
         )
 
 
-@invocation("img_crop", title="Crop Image", tags=["image", "crop"], category="image")
+@invocation("img_crop", title="Crop Image", tags=["image", "crop"], category="image", version="1.0.0")
 class ImageCropInvocation(BaseInvocation):
     """Crops an image to a specified box. The box can be outside of the image."""
 
@@ -98,7 +98,7 @@ class ImageCropInvocation(BaseInvocation):
         )
 
 
-@invocation("img_paste", title="Paste Image", tags=["image", "paste"], category="image")
+@invocation("img_paste", title="Paste Image", tags=["image", "paste"], category="image", version="1.0.0")
 class ImagePasteInvocation(BaseInvocation):
     """Pastes an image into another image."""
 
@@ -146,7 +146,7 @@ class ImagePasteInvocation(BaseInvocation):
         )
 
 
-@invocation("tomask", title="Mask from Alpha", tags=["image", "mask"], category="image")
+@invocation("tomask", title="Mask from Alpha", tags=["image", "mask"], category="image", version="1.0.0")
 class MaskFromAlphaInvocation(BaseInvocation):
     """Extracts the alpha channel of an image as a mask."""
 
@@ -177,7 +177,7 @@ class MaskFromAlphaInvocation(BaseInvocation):
         )
 
 
-@invocation("img_mul", title="Multiply Images", tags=["image", "multiply"], category="image")
+@invocation("img_mul", title="Multiply Images", tags=["image", "multiply"], category="image", version="1.0.0")
 class ImageMultiplyInvocation(BaseInvocation):
     """Multiplies two images together using `PIL.ImageChops.multiply()`."""
 
@@ -210,7 +210,7 @@ class ImageMultiplyInvocation(BaseInvocation):
 IMAGE_CHANNELS = Literal["A", "R", "G", "B"]
 
 
-@invocation("img_chan", title="Extract Image Channel", tags=["image", "channel"], category="image")
+@invocation("img_chan", title="Extract Image Channel", tags=["image", "channel"], category="image", version="1.0.0")
 class ImageChannelInvocation(BaseInvocation):
     """Gets a channel from an image."""
 
@@ -242,7 +242,7 @@ class ImageChannelInvocation(BaseInvocation):
 IMAGE_MODES = Literal["L", "RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV", "I", "F"]
 
 
-@invocation("img_conv", title="Convert Image Mode", tags=["image", "convert"], category="image")
+@invocation("img_conv", title="Convert Image Mode", tags=["image", "convert"], category="image", version="1.0.0")
 class ImageConvertInvocation(BaseInvocation):
     """Converts an image to a different mode."""
 
@@ -271,7 +271,7 @@ class ImageConvertInvocation(BaseInvocation):
         )
 
 
-@invocation("img_blur", title="Blur Image", tags=["image", "blur"], category="image")
+@invocation("img_blur", title="Blur Image", tags=["image", "blur"], category="image", version="1.0.0")
 class ImageBlurInvocation(BaseInvocation):
     """Blurs an image"""
 
@@ -325,7 +325,7 @@ PIL_RESAMPLING_MAP = {
 }
 
 
-@invocation("img_resize", title="Resize Image", tags=["image", "resize"], category="image")
+@invocation("img_resize", title="Resize Image", tags=["image", "resize"], category="image", version="1.0.0")
 class ImageResizeInvocation(BaseInvocation):
     """Resizes an image to specific dimensions"""
 
@@ -365,7 +365,7 @@ class ImageResizeInvocation(BaseInvocation):
         )
 
 
-@invocation("img_scale", title="Scale Image", tags=["image", "scale"], category="image")
+@invocation("img_scale", title="Scale Image", tags=["image", "scale"], category="image", version="1.0.0")
 class ImageScaleInvocation(BaseInvocation):
     """Scales an image by a factor"""
 
@@ -406,7 +406,7 @@ class ImageScaleInvocation(BaseInvocation):
         )
 
 
-@invocation("img_lerp", title="Lerp Image", tags=["image", "lerp"], category="image")
+@invocation("img_lerp", title="Lerp Image", tags=["image", "lerp"], category="image", version="1.0.0")
 class ImageLerpInvocation(BaseInvocation):
     """Linear interpolation of all pixels of an image"""
 
@@ -439,7 +439,7 @@ class ImageLerpInvocation(BaseInvocation):
         )
 
 
-@invocation("img_ilerp", title="Inverse Lerp Image", tags=["image", "ilerp"], category="image")
+@invocation("img_ilerp", title="Inverse Lerp Image", tags=["image", "ilerp"], category="image", version="1.0.0")
 class ImageInverseLerpInvocation(BaseInvocation):
     """Inverse linear interpolation of all pixels of an image"""
 
@@ -472,7 +472,7 @@ class ImageInverseLerpInvocation(BaseInvocation):
         )
 
 
-@invocation("img_nsfw", title="Blur NSFW Image", tags=["image", "nsfw"], category="image")
+@invocation("img_nsfw", title="Blur NSFW Image", tags=["image", "nsfw"], category="image", version="1.0.0")
 class ImageNSFWBlurInvocation(BaseInvocation):
     """Add blur to NSFW-flagged images"""
 
@@ -517,7 +517,9 @@ class ImageNSFWBlurInvocation(BaseInvocation):
         return caution.resize((caution.width // 2, caution.height // 2))
 
 
-@invocation("img_watermark", title="Add Invisible Watermark", tags=["image", "watermark"], category="image")
+@invocation(
+    "img_watermark", title="Add Invisible Watermark", tags=["image", "watermark"], category="image", version="1.0.0"
+)
 class ImageWatermarkInvocation(BaseInvocation):
     """Add an invisible watermark to an image"""
 
@@ -548,7 +550,7 @@ class ImageWatermarkInvocation(BaseInvocation):
         )
 
 
-@invocation("mask_edge", title="Mask Edge", tags=["image", "mask", "inpaint"], category="image")
+@invocation("mask_edge", title="Mask Edge", tags=["image", "mask", "inpaint"], category="image", version="1.0.0")
 class MaskEdgeInvocation(BaseInvocation):
     """Applies an edge mask to an image"""
 
@@ -593,7 +595,9 @@ class MaskEdgeInvocation(BaseInvocation):
         )
 
 
-@invocation("mask_combine", title="Combine Masks", tags=["image", "mask", "multiply"], category="image")
+@invocation(
+    "mask_combine", title="Combine Masks", tags=["image", "mask", "multiply"], category="image", version="1.0.0"
+)
 class MaskCombineInvocation(BaseInvocation):
     """Combine two masks together by multiplying them using `PIL.ImageChops.multiply()`."""
 
@@ -623,7 +627,7 @@ class MaskCombineInvocation(BaseInvocation):
         )
 
 
-@invocation("color_correct", title="Color Correct", tags=["image", "color"], category="image")
+@invocation("color_correct", title="Color Correct", tags=["image", "color"], category="image", version="1.0.0")
 class ColorCorrectInvocation(BaseInvocation):
     """
     Shifts the colors of a target image to match the reference image, optionally
@@ -728,7 +732,7 @@ class ColorCorrectInvocation(BaseInvocation):
         )
 
 
-@invocation("img_hue_adjust", title="Adjust Image Hue", tags=["image", "hue"], category="image")
+@invocation("img_hue_adjust", title="Adjust Image Hue", tags=["image", "hue"], category="image", version="1.0.0")
 class ImageHueAdjustmentInvocation(BaseInvocation):
     """Adjusts the Hue of an image."""
 
@@ -774,6 +778,7 @@ class ImageHueAdjustmentInvocation(BaseInvocation):
     title="Adjust Image Luminosity",
     tags=["image", "luminosity", "hsl"],
     category="image",
+    version="1.0.0",
 )
 class ImageLuminosityAdjustmentInvocation(BaseInvocation):
     """Adjusts the Luminosity (Value) of an image."""
@@ -826,6 +831,7 @@ class ImageLuminosityAdjustmentInvocation(BaseInvocation):
     title="Adjust Image Saturation",
     tags=["image", "saturation", "hsl"],
     category="image",
+    version="1.0.0",
 )
 class ImageSaturationAdjustmentInvocation(BaseInvocation):
     """Adjusts the Saturation of an image."""

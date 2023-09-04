@@ -6981,6 +6981,11 @@ export type components = {
        * @description The node's category
        */
       category?: string;
+      /**
+       * Version
+       * @description The node's version. Should be a valid semver string e.g. "1.0.0" or "3.8.13".
+       */
+      version?: string;
     };
     /**
      * Input
@@ -7037,23 +7042,11 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
-    /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
@@ -7066,6 +7059,18 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
   };
   responses: never;
   parameters: never;

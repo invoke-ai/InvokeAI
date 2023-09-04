@@ -26,9 +26,14 @@ from typing import (
 from pydantic import BaseModel, Field, validator
 from pydantic.fields import Undefined, ModelField
 from pydantic.typing import NoArgAnyCallable
+import semver
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
+
+
+class InvalidVersionError(ValueError):
+    pass
 
 
 class FieldDescriptions:
@@ -401,6 +406,9 @@ class UIConfigBase(BaseModel):
     tags: Optional[list[str]] = Field(default_factory=None, description="The node's tags")
     title: Optional[str] = Field(default=None, description="The node's display name")
     category: Optional[str] = Field(default=None, description="The node's category")
+    version: Optional[str] = Field(
+        default=None, description='The node\'s version. Should be a valid semver string e.g. "1.0.0" or "3.8.13".'
+    )
 
 
 class InvocationContext:
@@ -499,6 +507,8 @@ class BaseInvocation(ABC, BaseModel):
                 schema["tags"] = uiconfig.tags
             if uiconfig and hasattr(uiconfig, "category"):
                 schema["category"] = uiconfig.category
+            if uiconfig and hasattr(uiconfig, "version"):
+                schema["version"] = uiconfig.version
             if "required" not in schema or not isinstance(schema["required"], list):
                 schema["required"] = list()
             schema["required"].extend(["type", "id"])
@@ -567,7 +577,11 @@ GenericBaseInvocation = TypeVar("GenericBaseInvocation", bound=BaseInvocation)
 
 
 def invocation(
-    invocation_type: str, title: Optional[str] = None, tags: Optional[list[str]] = None, category: Optional[str] = None
+    invocation_type: str,
+    title: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+    category: Optional[str] = None,
+    version: Optional[str] = None,
 ) -> Callable[[Type[GenericBaseInvocation]], Type[GenericBaseInvocation]]:
     """
     Adds metadata to an invocation.
@@ -594,6 +608,12 @@ def invocation(
             cls.UIConfig.tags = tags
         if category is not None:
             cls.UIConfig.category = category
+        if version is not None:
+            try:
+                semver.Version.parse(version)
+            except ValueError as e:
+                raise InvalidVersionError(f'Invalid version string for node "{invocation_type}": "{version}"') from e
+            cls.UIConfig.version = version
 
         # Add the invocation type to the pydantic model of the invocation
         invocation_type_annotation = Literal[invocation_type]  # type: ignore

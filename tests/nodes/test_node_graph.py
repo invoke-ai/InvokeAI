@@ -1,4 +1,10 @@
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    InvalidVersionError,
+    invocation,
+    invocation_output,
+)
 from .test_nodes import (
     ImageToImageTestInvocation,
     TextToImageTestInvocation,
@@ -616,18 +622,38 @@ def test_invocation_decorator():
     title = "Test Invocation"
     tags = ["first", "second", "third"]
     category = "category"
+    version = "1.2.3"
 
-    @invocation(invocation_type, title=title, tags=tags, category=category)
-    class Test(BaseInvocation):
+    @invocation(invocation_type, title=title, tags=tags, category=category, version=version)
+    class TestInvocation(BaseInvocation):
         def invoke(self):
             pass
 
-    schema = Test.schema()
+    schema = TestInvocation.schema()
 
     assert schema.get("title") == title
     assert schema.get("tags") == tags
     assert schema.get("category") == category
-    assert Test(id="1").type == invocation_type  # type: ignore (type is dynamically added)
+    assert schema.get("version") == version
+    assert TestInvocation(id="1").type == invocation_type  # type: ignore (type is dynamically added)
+
+
+def test_invocation_version_must_be_semver():
+    invocation_type = "test_invocation"
+    valid_version = "1.0.0"
+    invalid_version = "not_semver"
+
+    @invocation(invocation_type, version=valid_version)
+    class ValidVersionInvocation(BaseInvocation):
+        def invoke(self):
+            pass
+
+    with pytest.raises(InvalidVersionError):
+
+        @invocation(invocation_type, version=invalid_version)
+        class InvalidVersionInvocation(BaseInvocation):
+            def invoke(self):
+                pass
 
 
 def test_invocation_output_decorator():

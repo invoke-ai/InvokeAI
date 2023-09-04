@@ -52,6 +52,10 @@ export type InvocationTemplate = {
    * The type of this node's output
    */
   outputType: string; // TODO: generate a union of output types
+  /**
+   * The invocation's version.
+   */
+  version?: string;
 };
 
 export type FieldUIConfig = {
@@ -962,6 +966,7 @@ export type InvocationSchemaExtra = {
   title: string;
   category?: string;
   tags?: string[];
+  version?: string;
   properties: Omit<
     NonNullable<OpenAPIV3.SchemaObject['properties']> &
       (_InputField | _OutputField),
@@ -1095,6 +1100,29 @@ export const zCoreMetadata = z
 
 export type CoreMetadata = z.infer<typeof zCoreMetadata>;
 
+export const zSemVer = z.string().refine((val) => {
+  const [major, minor, patch] = val.split('.');
+  return (
+    major !== undefined &&
+    Number.isInteger(Number(major)) &&
+    minor !== undefined &&
+    Number.isInteger(Number(minor)) &&
+    patch !== undefined &&
+    Number.isInteger(Number(patch))
+  );
+});
+
+export const zParsedSemver = zSemVer.transform((val) => {
+  const [major, minor, patch] = val.split('.');
+  return {
+    major: Number(major),
+    minor: Number(minor),
+    patch: Number(patch),
+  };
+});
+
+export type SemVer = z.infer<typeof zSemVer>;
+
 export const zInvocationNodeData = z.object({
   id: z.string().trim().min(1),
   // no easy way to build this dynamically, and we don't want to anyways, because this will be used
@@ -1107,6 +1135,7 @@ export const zInvocationNodeData = z.object({
   notes: z.string(),
   embedWorkflow: z.boolean(),
   isIntermediate: z.boolean(),
+  version: zSemVer.optional(),
 });
 
 // Massage this to get better type safety while developing
@@ -1194,20 +1223,6 @@ export const zFieldIdentifier = z.object({
 });
 
 export type FieldIdentifier = z.infer<typeof zFieldIdentifier>;
-
-export const zSemVer = z.string().refine((val) => {
-  const [major, minor, patch] = val.split('.');
-  return (
-    major !== undefined &&
-    minor !== undefined &&
-    patch !== undefined &&
-    Number.isInteger(Number(major)) &&
-    Number.isInteger(Number(minor)) &&
-    Number.isInteger(Number(patch))
-  );
-});
-
-export type SemVer = z.infer<typeof zSemVer>;
 
 export type WorkflowWarning = {
   message: string;
