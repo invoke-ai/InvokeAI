@@ -98,7 +98,9 @@ class MetadataAccumulatorOutput(BaseInvocationOutput):
     metadata: CoreMetadata = OutputField(description="The core metadata for the image")
 
 
-@invocation("metadata_accumulator", title="Metadata Accumulator", tags=["metadata"], category="metadata")
+@invocation(
+    "metadata_accumulator", title="Metadata Accumulator", tags=["metadata"], category="metadata", version="1.0.0"
+)
 class MetadataAccumulatorInvocation(BaseInvocation):
     """Outputs a Core Metadata Object"""
 

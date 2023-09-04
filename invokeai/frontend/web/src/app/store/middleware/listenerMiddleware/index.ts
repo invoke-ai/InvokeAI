@@ -84,6 +84,7 @@ import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
 import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
+import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -201,6 +202,9 @@ addBoardIdSelectedListener();
 
 // Node schemas
 addReceivedOpenAPISchemaListener();
+
+// Workflows
+addWorkflowLoadedListener();
 
 // DND
 addImageDroppedListener();
