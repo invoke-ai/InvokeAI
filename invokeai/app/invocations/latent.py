@@ -215,8 +215,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     )
     latents: Optional[LatentsField] = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     denoise_mask: Optional[DenoiseMaskField] = InputField(
-        default=None,
-        description=FieldDescriptions.mask,
+        default=None, description=FieldDescriptions.mask, input=Input.Connection, ui_order=6
     )
 
     @validator("cfg_scale")
