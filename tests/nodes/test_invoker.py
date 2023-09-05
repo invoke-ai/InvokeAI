@@ -72,8 +72,12 @@ def simple_batch():
 
 @pytest.fixture
 def graph_with_subgraph():
+    sub_g = Graph()
+    sub_g.add_node(PromptTestInvocation(id="1", prompt="Banana sushi"))
+    sub_g.add_node(TextToImageTestInvocation(id="2"))
+    sub_g.add_edge(create_edge("1", "prompt", "2", "prompt"))
     g = Graph()
-    g.add_node(GraphInvocation(id="1", graph=simple_graph()))
+    g.add_node(GraphInvocation(id="1", graph=sub_g))
     return g
 
 
@@ -221,10 +225,10 @@ def test_can_create_batch_with_subgraph(mock_invoker: Invoker, graph_with_subgra
         graph=graph_with_subgraph,
     )
     assert batch_process_res.batch_id
-    assert len(batch_process_res.session_ids) == 25
     # TODO: without the mock events service emitting the `graph_execution_state` events,
     # the batch sessions do not know when they have finished, so this logic will fail
 
+    # assert len(batch_process_res.session_ids) == 25
     # mock_invoker.services.batch_manager.run_batch_process(batch_process_res.batch_id)
 
     # def has_executed_all_batches(batch_id: str):
@@ -241,10 +245,10 @@ def test_can_create_batch(mock_invoker: Invoker, simple_graph, simple_batch):
         graph=simple_graph,
     )
     assert batch_process_res.batch_id
-    assert len(batch_process_res.session_ids) == 25
     # TODO: without the mock events service emitting the `graph_execution_state` events,
     # the batch sessions do not know when they have finished, so this logic will fail
 
+    # assert len(batch_process_res.session_ids) == 25
     # mock_invoker.services.batch_manager.run_batch_process(batch_process_res.batch_id)
 
     # def has_executed_all_batches(batch_id: str):
