@@ -62,6 +62,8 @@ class ControlField(BaseModel):
         elif values["control_type"] == "IP-Adapter":
             if values.get("ip_adapter_model") is None:
                 raise ValueError('IP-Adapter control_type requires "ip_adapter_model" be provided')
+            if values.get("image_encoder_model") is None:
+                raise ValueError('IP-Adapter control_type requires "image_encoder_model" be provided')
         return values
 
     @validator("control_weight")
