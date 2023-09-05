@@ -41,7 +41,7 @@ To use a community workflow, download the the `.json` node graph file and load i
 
 **Description:** This InvokeAI node takes in a collection of images and randomly chooses one. This can be useful when you have a number of poses to choose from for a ControlNet node, or a number of input images for another purpose.
 
-**Node Link:** https://github.com/JPPhoto/film-grain-node
+**Node Link:** https://github.com/JPPhoto/image-picker-node
 
 --------------------------------
 ### Retroize
