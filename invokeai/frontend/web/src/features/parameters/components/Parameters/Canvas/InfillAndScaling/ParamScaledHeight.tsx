@@ -41,7 +41,7 @@ const ParamScaledHeight = () => {
     const newHeight = Math.floor(v);
 
     if (aspectRatio) {
-      newWidth = roundToMultiple(newHeight * aspectRatio, 8);
+      newWidth = roundToMultiple(newHeight * aspectRatio, 64);
     }
 
     dispatch(
@@ -57,7 +57,7 @@ const ParamScaledHeight = () => {
     const resetHeight = Math.floor(initial);
 
     if (aspectRatio) {
-      resetWidth = roundToMultiple(resetHeight * aspectRatio, 8);
+      resetWidth = roundToMultiple(resetHeight * aspectRatio, 64);
     }
 
     dispatch(

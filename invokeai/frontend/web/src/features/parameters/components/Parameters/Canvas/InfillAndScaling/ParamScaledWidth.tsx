@@ -41,7 +41,7 @@ const ParamScaledWidth = () => {
     let newHeight = scaledBoundingBoxDimensions.height;
 
     if (aspectRatio) {
-      newHeight = roundToMultiple(newWidth / aspectRatio, 8);
+      newHeight = roundToMultiple(newWidth / aspectRatio, 64);
     }
 
     dispatch(
@@ -57,7 +57,7 @@ const ParamScaledWidth = () => {
     let resetHeight = scaledBoundingBoxDimensions.height;
 
     if (aspectRatio) {
-      resetHeight = roundToMultiple(resetWidth / aspectRatio, 8);
+      resetHeight = roundToMultiple(resetWidth / aspectRatio, 64);
     }
 
     dispatch(
