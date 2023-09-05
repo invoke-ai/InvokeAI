@@ -51,7 +51,6 @@ class DownloadJobRepoID(DownloadJobBase):
             raise ValidationError(f'{v} invalid repo_id')
         return v
 
-
 class DownloadQueue(DownloadQueueBase):
     """Class for queued download of models."""
 
@@ -209,6 +208,7 @@ class DownloadQueue(DownloadQueueBase):
         """Worker thread gets next job on priority queue."""
         while True:
             job = self._queue.get()
+
             if job == STOP_JOB:  # marker that queue is done
                 print(f'DEBUG: thread {threading.current_thread().native_id} exiting')
                 break
@@ -271,7 +271,7 @@ class DownloadQueue(DownloadQueueBase):
         try:
             with open(dest, open_mode) as file:
                 for data in resp.iter_content(chunk_size=1024):
-                    if job.status != DownloadJobStatus.RUNNING:   # cancelled, paused or errored
+                    if job.status != DownloadJobStatus.RUNNING:  # cancelled, paused or errored
                         return
                     job.bytes += file.write(data)
                     if job.bytes - last_report_bytes >= report_delta:

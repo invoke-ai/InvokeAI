@@ -190,14 +190,8 @@ class EventServiceBase:
             ),
         )
 
-    def emit_model_download_event (
-            self,
-            job: DownloadJobBase
-    ):
+    def emit_model_download_event(self, job: DownloadJobBase):
         """Emit event when the status of a download job changes."""
         self.dispatch(  # use dispatch() directly here because we are not a session event.
-            event_name="download_job_event",
-            payload=dict(
-                job=job
-            )
+            event_name="download_job_event", payload=dict(job=job)
         )
