@@ -25,7 +25,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 
-@invocation("strings_from_file", title="Strings from File", tags=["string", "file"], category="string")
+@invocation("strings_from_file", title="Strings from File", tags=["string", "file"], category="string", version="1.0.0")
 class StringsFromFileInvocation(BaseInvocation):
     """Loads strings from a text file"""
 
@@ -77,7 +77,7 @@ class StringsFromFileInvocation(BaseInvocation):
 class StringsToFileInvocationOutput(BaseInvocationOutput):
     """Base class for invocation that writes to a file and returns nothing of use"""
 
-@invocation("string_to_file", title="Strings to File", tags=["string", "file"], category="string")
+@invocation("string_to_file", title="Strings to File", tags=["string", "file"], category="string", version="1.0.0")
 class StringsToFileInvocation(BaseInvocation):
     '''Save strings to a text file'''
 
@@ -102,7 +102,7 @@ class StringPosNegOutput(BaseInvocationOutput):
     positive_string: str = OutputField(description="Positive string")
     negative_string: str = OutputField(description="Negative string")
 
-@invocation("string_split_neg", title="String Spilt Negative", tags=["string", "split", "negative"], category="string")
+@invocation("string_split_neg", title="String Spilt Negative", tags=["string", "split", "negative"], category="string", version="1.0.0")
 class StringSplitNegInvocation(BaseInvocation):
     """Splits string into two strings, inside [] goes into negative string everthing else goes into positive string. Each [ and ] character is replaced with a space"""
 
@@ -142,7 +142,7 @@ class String2Output(BaseInvocationOutput):
     string_1: str = OutputField(description="string 1")
     string_2: str = OutputField(description="string 2")
 
-@invocation("string_split", title="String Spilt", tags=["string", "split"], category="string")
+@invocation("string_split", title="String Spilt", tags=["string", "split"], category="string", version="1.0.0")
 class StringSplitInvocation(BaseInvocation):
     """Splits string into two strings, based on the first occurance of the delimiter. The delimiter will be removed from the string"""
 
@@ -160,7 +160,7 @@ class StringSplitInvocation(BaseInvocation):
         return String2Output(string_1=part1, string_2=part2)
 
 
-@invocation("string_join", title="String Join", tags=["string", "join"], category="string")
+@invocation("string_join", title="String Join", tags=["string", "join"], category="string", version="1.0.0")
 class StringJoinInvocation(BaseInvocation):
     """Joins string left to string right"""
 
@@ -171,7 +171,7 @@ class StringJoinInvocation(BaseInvocation):
         return StringOutput(value=((self.string_left or '') + (self.string_right or '')))  
 
 
-@invocation("string_join_three", title="String Join Three", tags=["string", "join"], category="string")
+@invocation("string_join_three", title="String Join Three", tags=["string", "join"], category="string", version="1.0.0")
 class StringJoinThreeInvocation(BaseInvocation):
     """Joins string left to string middle to string right"""
 
@@ -183,7 +183,7 @@ class StringJoinThreeInvocation(BaseInvocation):
         return StringOutput(value=((self.string_left or '') + (self.string_middle or '') + (self.string_right or '')))  
 
 
-@invocation("string_replace", title="String Replace", tags=["string", "replace", "regex"], category="string")
+@invocation("string_replace", title="String Replace", tags=["string", "replace", "regex"], category="string", version="1.0.0")
 class StringReplaceInvocation(BaseInvocation):
     """Replaces the search string with the replace string"""
 
@@ -203,7 +203,7 @@ class StringReplaceInvocation(BaseInvocation):
         return StringOutput(value=new_string)  
 
 
-@invocation("string_weight", title="String Weight", tags=["string", "weight"], category="string")
+@invocation("string_weight", title="String Weight", tags=["string", "weight"], category="string", version="1.0.0")
 class StringWeightInvocation(BaseInvocation):
     """Takes a string and weight and outputs a new string in the format of a compel style (string)weight"""
 
@@ -216,7 +216,7 @@ class StringWeightInvocation(BaseInvocation):
 
 COMBINE_TYPE = Literal[".and", ".blend"]
 
-@invocation("string_weights_to_combine", title="String Weights to Combine", tags=["string", "combine", "and", "blend"], category="string")
+@invocation("string_weights_to_combine", title="String Weights to Combine", tags=["string", "combine", "and", "blend"], category="string", version="1.0.0")
 class StringWeightsToCombineInvocation(BaseInvocation):
     """Takes a collection of (string)weight strings and converts it into a combined .and() or .blend() structure. Blank strings are ignored"""
 
