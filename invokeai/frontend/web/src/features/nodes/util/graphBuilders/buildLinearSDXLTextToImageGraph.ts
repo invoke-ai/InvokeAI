@@ -62,6 +62,8 @@ export const buildLinearSDXLTextToImageGraph = (
     throw new Error('No model found in state');
   }
 
+  const fp32 = vaePrecision === 'fp32';
+
   // Construct Style Prompt
   const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
     craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
@@ -118,7 +120,7 @@ export const buildLinearSDXLTextToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
     },
     edges: [

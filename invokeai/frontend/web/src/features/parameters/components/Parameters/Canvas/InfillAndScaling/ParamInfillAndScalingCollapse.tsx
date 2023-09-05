@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import IAICollapse from 'common/components/IAICollapse';
 import SubParametersWrapper from '../../SubParametersWrapper';
 import ParamInfillMethod from './ParamInfillMethod';
-import ParamInfillTilesize from './ParamInfillTilesize';
+import ParamInfillOptions from './ParamInfillOptions';
 import ParamScaleBeforeProcessing from './ParamScaleBeforeProcessing';
 import ParamScaledHeight from './ParamScaledHeight';
 import ParamScaledWidth from './ParamScaledWidth';
@@ -18,7 +18,7 @@ const ParamInfillCollapse = () => {
       <Flex sx={{ gap: 2, flexDirection: 'column' }}>
         <SubParametersWrapper>
           <ParamInfillMethod />
-          <ParamInfillTilesize />
+          <ParamInfillOptions />
         </SubParametersWrapper>
         <Divider />
         <SubParametersWrapper>
