@@ -193,7 +193,7 @@ def test_can_create_batch(mock_invoker: Invoker, simple_graph, simple_batch):
     # wait_until(lambda: has_executed_all_batches(batch_process_res.batch_id), timeout=10, interval=1)
 
 
-def test_can_create_bad_batches():
+def test_cannot_create_bad_batches():
     batch = None
     try:
         batch = Batch(  # This batch has a duplicate node_id|fieldname combo
