@@ -112,13 +112,9 @@ This node works best with SDXL models, especially as the style can be described 
 --------------------------------
 ### Depth Map from Wavefront OBJ
 
-**Description:** Render depth maps from Wavefront .obj files (triangulated) using this simple 3D renderer utilizing numpy and matplotlib to compute and color the scene. 
+**Description:** Render depth maps from Wavefront .obj files (triangulated) using this simple 3D renderer utilizing numpy and matplotlib to compute and color the scene. There are simple parameters to change the FOV, camera position, and model orientation.
 
 To be imported, an .obj must use triangulated meshes, so make sure to enable that option if exporting from a 3D modeling program. This renderer makes each triangle a solid color based on its average depth, so it will cause anomalies if your .obj has large triangles. In Blender, the Remesh modifier can be helpful to subdivide a mesh into small pieces that work well given these limitations.
-
-There are simple parameters to change the FOV, camera position, and model orientation.
-
-Additional parameters like different image sizes will probably be added, and things like more sophisticated rotations are planned but this node is experimental and may or may not change much.
 
 **Node Link:** https://github.com/dwringer/depth-from-obj-node
 
@@ -158,10 +154,10 @@ This includes 3 Nodes:
 **Description:** This is a pack of nodes for composing masks and images, including a simple text mask creator and both image and latent offset nodes. The offsets wrap around, so these can be used in conjunction with the Seamless node to progressively generate centered on different parts of the seamless tiling.
 
 This includes 4 Nodes:
-- Text Mask (simple 2D) - create and position a white on black (or black on white) line of text using any font locally available to Invoke.
-- Image Compositor - Take a subject from an image with a flat backdrop and layer it on another image using a chroma key or flood select background removal.
-- Offset Latents - Offset a latents tensor in the vertical and/or horizontal dimensions, wrapping it around.
-- Offset Image - Offset an image in the vertical and/or horizontal dimensions, wrapping it around.
+- *Text Mask (simple 2D)* - create and position a white on black (or black on white) line of text using any font locally available to Invoke.
+- *Image Compositor* - Take a subject from an image with a flat backdrop and layer it on another image using a chroma key or flood select background removal.
+- *Offset Latents* - Offset a latents tensor in the vertical and/or horizontal dimensions, wrapping it around.
+- *Offset Image* - Offset an image in the vertical and/or horizontal dimensions, wrapping it around.
 
 **Node Link:** https://github.com/dwringer/composition-nodes
 
@@ -171,11 +167,9 @@ This includes 4 Nodes:
 --------------------------------
 ### Size Stepper Nodes
 
-**Description:** This is a set of nodes for calculating the necessary size increments for doing upscaling workflows. Use the Final Size & Orientation node to enter your full size dimensions and orientation (portrait/landscape/random), then plug that and your initial generation dimensions into the Ideal Size Stepper and get 1, 2, or 3 intermediate pairs of dimensions for upscaling. Note this does not output the initial size or full size dimensions. The 1, 2, or 3 outputs of this node are only the intermediate sizes.
+**Description:** This is a set of nodes for calculating the necessary size increments for doing upscaling workflows. Use the *Final Size & Orientation* node to enter your full size dimensions and orientation (portrait/landscape/random), then plug that and your initial generation dimensions into the *Ideal Size Stepper* and get 1, 2, or 3 intermediate pairs of dimensions for upscaling. Note this does not output the initial size or full size dimensions: the 1, 2, or 3 outputs of this node are only the intermediate sizes.
 
-For the Ideal Size Stepper, there are up to three stages which determine how many intermediate sizes to compute and output. With Tapers B and C disabled, outputs A, B, and C will be the same (inactive outputs yield copies of the previous pair). With a taper assigned to B, Width/Height A and B will both be active with progressively larger intermediate resolutions, and if Taper C is activated, active outputs will be calculated with even finer gradations.
-
-A third node is included, Random Switch (Integers), which is just a generic version of Final Size with no orientation selection.
+A third node is included, *Random Switch (Integers)*, which is just a generic version of Final Size with no orientation selection.
 
 **Node Link:** https://github.com/dwringer/size-stepper-nodes
 
