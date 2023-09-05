@@ -42,7 +42,7 @@ class ControlField(BaseModel):
     image: ImageField = Field(description="The control image")
     # control_model and ip_adapter_models are both optional
     #    but must be on the two present
-    # if control_type == "ControlNet", then mus be control_model
+    # if control_type == "ControlNet", then must be control_model
     # if control_type == "IP-Adapter", then must be ip_adapter_model
     control_model: Optional[ControlNetModelField] = Field(description="The ControlNet model to use")
     ip_adapter_model: Optional[str] = Field(description="The IP-Adapter model to use")
@@ -74,8 +74,6 @@ class ControlField(BaseModel):
 class ControlOutput(BaseInvocationOutput):
     """node output for ControlNet info"""
 
-    type: Literal["control_output"] = "control_output"
-
     # Outputs
     control: ControlField = OutputField(description=FieldDescriptions.control)
 
@@ -83,8 +81,6 @@ class ControlOutput(BaseInvocationOutput):
 @invocation("controlnet", title="ControlNet", tags=["controlnet"], category="controlnet", version="1.0.0")
 class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
-
-    type: Literal["controlnet"] = "controlnet"
 
     # Inputs
     image: ImageField = InputField(description="The control image")
@@ -136,8 +132,6 @@ IP_ADAPTER_IMAGE_ENCODER_MODELS = Literal[
 @invocation("ipadapter", title="IP-Adapter", tags=["ipadapter"], category="ipadapter", version="1.0.0")
 class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes"""
-
-    type: Literal["ipadapter"] = "ipadapter"
 
     # Inputs
     image: ImageField = InputField(description="The control image")
