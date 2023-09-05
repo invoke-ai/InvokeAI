@@ -1,4 +1,3 @@
-import json
 import sqlite3
 import threading
 import uuid
@@ -85,19 +84,15 @@ class BatchSession(BaseModel):
     session_id: str = Field(
         default_factory=uuid_string, description="The Session to which this BatchSession is attached."
     )
-    batch_index: list[int] = Field(description="The index of the batch to be run in this BatchSession.")
+    batch_index: int = Field(description="The index of this batch session in its parent batch process")
     state: BATCH_SESSION_STATE = Field(default="uninitialized", description="The state of this BatchSession")
-
-    @validator("batch_index", pre=True)
-    def parse_str_to_list(cls, v: Union[str, list[int]]):
-        if isinstance(v, str):
-            return json.loads(v)
-        return v
 
 
 class BatchProcess(BaseModel):
     batch_id: str = Field(default_factory=uuid_string, description="Identifier for this batch.")
     batch: Batch = Field(description="The Batch to apply to this session.")
+    current_batch_index: int = Field(default=0, description="The last executed batch index")
+    current_run: int = Field(default=0, description="The current run of the batch")
     canceled: bool = Field(description="Whether or not to run sessions from this batch.", default=False)
     graph: Graph = Field(description="The graph into which batch data will be inserted before being executed.")
 
@@ -279,8 +274,10 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
             """--sql
             CREATE TABLE IF NOT EXISTS batch_process (
                 batch_id TEXT NOT NULL PRIMARY KEY,
-                batches TEXT NOT NULL,
+                batch TEXT NOT NULL,
                 graph TEXT NOT NULL,
+                current_batch_index NUMBER NOT NULL,
+                current_run NUMBER NOT NULL,
                 canceled BOOLEAN NOT NULL DEFAULT(0),
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
@@ -316,8 +313,8 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
             CREATE TABLE IF NOT EXISTS batch_session (
                 batch_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
-                batch_index TEXT NOT NULL,
                 state TEXT NOT NULL,
+                batch_index NUMBER NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
@@ -386,10 +383,16 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                INSERT OR IGNORE INTO batch_process (batch_id, batches, graph)
-                VALUES (?, ?, ?);
+                INSERT OR REPLACE INTO batch_process (batch_id, batch, graph, current_batch_index, current_run)
+                VALUES (?, ?, ?, ?, ?);
                 """,
-                (batch_process.batch_id, batch_process.batch.json(), batch_process.graph.json()),
+                (
+                    batch_process.batch_id,
+                    batch_process.batch.json(),
+                    batch_process.graph.json(),
+                    batch_process.current_batch_index,
+                    batch_process.current_run,
+                ),
             )
             self._conn.commit()
         except sqlite3.Error as e:
@@ -405,13 +408,17 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
         # Retrieve all the values, setting "reasonable" defaults if they are not present.
 
         batch_id = session_dict.get("batch_id", "unknown")
-        batch_raw = session_dict.get("batches", "unknown")
+        batch_raw = session_dict.get("batch", "unknown")
         graph_raw = session_dict.get("graph", "unknown")
+        current_batch_index = session_dict.get("current_batch_index", 0)
+        current_run = session_dict.get("current_run", 0)
         canceled = session_dict.get("canceled", 0)
         return BatchProcess(
             batch_id=batch_id,
             batch=parse_raw_as(Batch, batch_raw),
             graph=parse_raw_as(Graph, graph_raw),
+            current_batch_index=current_batch_index,
+            current_run=current_run,
             canceled=canceled == 1,
         )
 
@@ -543,7 +550,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
                 INSERT OR IGNORE INTO batch_session (batch_id, session_id, state, batch_index)
                 VALUES (?, ?, ?, ?);
                 """,
-                (session.batch_id, session.session_id, session.state, json.dumps(session.batch_index)),
+                (session.batch_id, session.session_id, session.state, session.batch_index),
             )
             self._conn.commit()
         except sqlite3.Error as e:
@@ -559,10 +566,7 @@ class SqliteBatchProcessStorage(BatchProcessStorageBase):
     ) -> list[BatchSession]:
         try:
             self._lock.acquire()
-            session_data = [
-                (session.batch_id, session.session_id, session.state, json.dumps(session.batch_index))
-                for session in sessions
-            ]
+            session_data = [(session.batch_id, session.session_id, session.state) for session in sessions]
             self._cursor.executemany(
                 """--sql
                 INSERT OR IGNORE INTO batch_session (batch_id, session_id, state, batch_index)

@@ -1,22 +1,24 @@
-import networkx as nx
-
 from abc import ABC, abstractmethod
 from itertools import product
-from pydantic import BaseModel, Field
+from typing import Optional
+from uuid import uuid4
+
+import networkx as nx
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event
+from pydantic import BaseModel, Field
 
+from invokeai.app.services.batch_manager_storage import (
+    Batch,
+    BatchProcess,
+    BatchProcessStorageBase,
+    BatchSession,
+    BatchSessionChanges,
+    BatchSessionNotFoundException,
+)
 from invokeai.app.services.events import EventServiceBase
 from invokeai.app.services.graph import Graph, GraphExecutionState
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.batch_manager_storage import (
-    BatchProcessStorageBase,
-    BatchSessionNotFoundException,
-    Batch,
-    BatchProcess,
-    BatchSession,
-    BatchSessionChanges,
-)
 
 
 class BatchProcessResponse(BaseModel):
@@ -107,7 +109,9 @@ class BatchManager(BatchManagerBase):
         if not batch_process.canceled:
             self.run_batch_process(batch_process.batch_id)
 
-    def _create_batch_session(self, batch_process: BatchProcess, batch_indices: tuple[int]) -> GraphExecutionState:
+    def _create_graph_execution_state(
+        self, batch_process: BatchProcess, batch_indices: tuple[int, ...]
+    ) -> GraphExecutionState:
         graph = batch_process.graph.copy(deep=True)
         batch = batch_process.batch
         g = graph.nx_graph_flat()
@@ -129,12 +133,31 @@ class BatchManager(BatchManagerBase):
 
     def run_batch_process(self, batch_id: str) -> None:
         self.__batch_process_storage.start(batch_id)
-        try:
-            next_session = self.__batch_process_storage.get_next_session(batch_id)
-        except BatchSessionNotFoundException:
-            return
         batch_process = self.__batch_process_storage.get(batch_id)
-        ges = self._create_batch_session(batch_process=batch_process, batch_indices=tuple(next_session.batch_index))
+        next_batch_index = self._get_batch_index_tuple(batch_process)
+        if next_batch_index is None:
+            # finished with current run
+            if batch_process.current_run >= (batch_process.batch.runs - 1):
+                # finished with all runs
+                return
+            batch_process.current_batch_index = 0
+            batch_process.current_run += 1
+            next_batch_index = self._get_batch_index_tuple(batch_process)
+            if next_batch_index is None:
+                # shouldn't happen; satisfy types
+                return
+        # remember to increment the batch index
+        batch_process.current_batch_index += 1
+        self.__batch_process_storage.save(batch_process)
+        ges = self._create_graph_execution_state(batch_process=batch_process, batch_indices=next_batch_index)
+        next_session = self.__batch_process_storage.create_session(
+            BatchSession(
+                batch_id=batch_id,
+                session_id=str(uuid4()),
+                state="uninitialized",
+                batch_index=batch_process.current_batch_index,
+            )
+        )
         ges.id = next_session.session_id
         self.__invoker.services.graph_execution_manager.set(ges)
         self.__batch_process_storage.update_session_state(
@@ -150,25 +173,10 @@ class BatchManager(BatchManagerBase):
             graph=graph,
         )
         batch_process = self.__batch_process_storage.save(batch_process)
-        sessions = self._create_sessions(batch_process)
         return BatchProcessResponse(
             batch_id=batch_process.batch_id,
-            session_ids=[session.session_id for session in sessions],
+            session_ids=[],
         )
-
-    def _create_sessions(self, batch_process: BatchProcess) -> list[BatchSession]:
-        batch_indices = list()
-        sessions_to_create: list[BatchSession] = list()
-        for batchdata in batch_process.batch.data:
-            batch_indices.append(list(range(len(batchdata[0].items))))
-        all_batch_indices = product(*batch_indices)
-        for bi in all_batch_indices:
-            for _ in range(batch_process.batch.runs):
-                sessions_to_create.append(BatchSession(batch_id=batch_process.batch_id, batch_index=list(bi)))
-            if not sessions_to_create:
-                sessions_to_create.append(BatchSession(batch_id=batch_process.batch_id, batch_index=list(bi)))
-        created_sessions = self.__batch_process_storage.create_sessions(sessions_to_create)
-        return created_sessions
 
     def get_sessions(self, batch_id: str) -> list[BatchSession]:
         return self.__batch_process_storage.get_sessions_by_batch_id(batch_id)
@@ -199,3 +207,12 @@ class BatchManager(BatchManagerBase):
                 )
             )
         return res
+
+    def _get_batch_index_tuple(self, batch_process: BatchProcess) -> Optional[tuple[int, ...]]:
+        batch_indices = list()
+        for batchdata in batch_process.batch.data:
+            batch_indices.append(list(range(len(batchdata[0].items))))
+        try:
+            return list(product(*batch_indices))[batch_process.current_batch_index]
+        except IndexError:
+            return None
