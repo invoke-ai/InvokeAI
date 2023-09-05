@@ -3,7 +3,6 @@ from itertools import product
 from typing import Optional
 from uuid import uuid4
 
-import networkx as nx
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event
 from pydantic import BaseModel, Field
@@ -114,20 +113,16 @@ class BatchManager(BatchManagerBase):
     ) -> GraphExecutionState:
         graph = batch_process.graph.copy(deep=True)
         batch = batch_process.batch
-        g = graph.nx_graph_flat()
-        sorted_nodes = nx.topological_sort(g)
-        for npath in sorted_nodes:
-            node = graph.get_node(npath)
-            for index, bdl in enumerate(batch.data):
-                relevant_bd = [bd for bd in bdl if bd.node_id in node.id]
-                if not relevant_bd:
+        for index, bdl in enumerate(batch.data):
+            for bd in bdl:
+                node = graph.get_node(bd.node_path)
+                if node is None:
                     continue
-                for bd in relevant_bd:
-                    batch_index = batch_indices[index]
-                    datum = bd.items[batch_index]
-                    key = bd.field_name
-                    node.__dict__[key] = datum
-                graph.update_node(npath, node)
+                batch_index = batch_indices[index]
+                datum = bd.items[batch_index]
+                key = bd.field_name
+                node.__dict__[key] = datum
+                graph.update_node(bd.node_path, node)
 
         return GraphExecutionState(graph=graph)
 

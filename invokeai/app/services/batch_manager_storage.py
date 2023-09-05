@@ -17,7 +17,7 @@ class BatchData(BaseModel):
     A batch data collection.
     """
 
-    node_id: str = Field(description="The node into which this batch data collection will be substituted.")
+    node_path: str = Field(description="The node into which this batch data collection will be substituted.")
     field_name: str = Field(description="The field into which this batch data collection will be substituted.")
     items: list[BatchDataType] = Field(
         default_factory=list, description="The list of items to substitute into the node/field."
@@ -64,7 +64,7 @@ class Batch(BaseModel):
         count: int = 0
         for batch_data in v:
             for datum in batch_data:
-                paths.add((datum.node_id, datum.field_name))
+                paths.add((datum.node_path, datum.field_name))
                 count += 1
         if len(paths) != count:
             raise ValueError("Each batch data must have unique node_id and field_name")

@@ -41,7 +41,7 @@ def simple_batch():
         data=[
             [
                 BatchData(
-                    node_id="1",
+                    node_path="1",
                     field_name="prompt",
                     items=[
                         "Tomato sushi",
@@ -54,7 +54,7 @@ def simple_batch():
             ],
             [
                 BatchData(
-                    node_id="2",
+                    node_path="2",
                     field_name="prompt",
                     items=[
                         "Ume sushi",
@@ -196,11 +196,11 @@ def test_can_create_batch(mock_invoker: Invoker, simple_graph, simple_batch):
 def test_cannot_create_bad_batches():
     batch = None
     try:
-        batch = Batch(  # This batch has a duplicate node_id|fieldname combo
+        batch = Batch(  # This batch has a duplicate node_path|fieldname combo
             data=[
                 [
                     BatchData(
-                        node_id="1",
+                        node_path="1",
                         field_name="prompt",
                         items=[
                             "Tomato sushi",
@@ -209,7 +209,7 @@ def test_cannot_create_bad_batches():
                 ],
                 [
                     BatchData(
-                        node_id="1",
+                        node_path="1",
                         field_name="prompt",
                         items=[
                             "Ume sushi",
@@ -225,14 +225,14 @@ def test_cannot_create_bad_batches():
             data=[
                 [
                     BatchData(
-                        node_id="1",
+                        node_path="1",
                         field_name="prompt",
                         items=[
                             "Tomato sushi",
                         ],
                     ),
                     BatchData(
-                        node_id="1",
+                        node_path="1",
                         field_name="prompt",
                         items=[
                             "Tomato sushi",
@@ -242,7 +242,7 @@ def test_cannot_create_bad_batches():
                 ],
                 [
                     BatchData(
-                        node_id="1",
+                        node_path="1",
                         field_name="prompt",
                         items=[
                             "Ume sushi",
@@ -258,7 +258,7 @@ def test_cannot_create_bad_batches():
             data=[
                 [
                     BatchData(
-                        node_id="1",
+                        node_path="1",
                         field_name="prompt",
                         items=["Tomato sushi", 5],
                     ),
