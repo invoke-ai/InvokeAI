@@ -117,11 +117,22 @@ class StableDiffusionXLModel(DiffusersModel):
         if isinstance(config, cls.CheckpointConfig):
             from invokeai.backend.model_management.models.stable_diffusion import _convert_ckpt_and_cache
 
+            # Hack in VAE-fp16 fix - If model sdxl-vae-fp16-fix is installed,
+            # then we bake it into the converted model.
+            from invokeai.app.services.config import InvokeAIAppConfig
+
+            kwargs = dict()
+            app_config = InvokeAIAppConfig.get_config()
+            vae_path = app_config.models_path / 'sdxl/vae/sdxl-vae-fp16-fix'
+            if vae_path.exists():
+                kwargs['vae_path'] = vae_path
+
             return _convert_ckpt_and_cache(
                 version=base_model,
                 model_config=config,
                 output_path=output_path,
                 use_safetensors=False,  # corrupts sdxl models for some reason
+                **kwargs,
             )
         else:
             return model_path
