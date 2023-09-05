@@ -1,7 +1,6 @@
 # 2023 skunkworxdark (https://github.com/skunkworxdark)
 
-from typing import Literal, Union, Optional
-import re
+from typing import Optional
 import json
 
 from pydantic import BaseModel
@@ -14,115 +13,9 @@ from invokeai.app.invocations.baseinvocation import (
     Input,
     OutputField,
     InvocationContext,
-    UIComponent,
-    UIType,
     invocation,
     invocation_output,
 )
-
-@invocation_output("prompt_to_file_output")
-class PromptsToFileInvocationOutput(BaseInvocationOutput):
-    """Base class for invocation that writes to a file and returns nothing of use"""
-
-@invocation("prompt_to_file", title="Prompts To File", tags=["prompt", "file"], category="prompt")
-class PromptsToFileInvocation(BaseInvocation):
-    '''Save prompts to a text file'''
-
-    file_path: str = InputField(description="Path to prompt text file")
-    prompts: Union[str, list[str], None] = InputField(default=None, description="Prompt or collection of prompts to write", ui_type=UIType.Collection)
-    append: bool = InputField(default=True, description="Append or overwrite file")
-
-    def invoke(self, context: InvocationContext) -> PromptsToFileInvocationOutput:
-        with open(self.file_path, 'a' if self.append else 'w') as f:
-            if isinstance(self.prompts, list):
-                for line in (self.prompts):
-                    f.write ( line + '\n' )
-            else:
-                f.write((self.prompts or '') + '\n')
-
-        return PromptsToFileInvocationOutput()
-
-@invocation_output("prompt_pos_neg_output")
-class PromptPosNegOutput(BaseInvocationOutput):
-    """Base class for invocations that output a posirtive and negative prompt"""
-
-    positive_prompt: str = OutputField(description="Positive prompt")
-    negative_prompt: str = OutputField(description="Negative prompt")
-
-@invocation("prompt_split_neg", title="Prompt Spilt Negative", tags=["prompt", "split", "negative"], category="prompt")
-class PromptSplitNegInvocation(BaseInvocation):
-    """Splits prompt into two prompts, inside [] goes into negative prompt everthing else goes into positive prompt. Each [ and ] character is replaced with a space"""
-
-    prompt: str = InputField(default='', description="Prompt to split")
-
-    def invoke(self, context: InvocationContext) -> PromptPosNegOutput:
-        p_prompt = ""
-        n_prompt = ""
-        brackets_depth = 0
-        escaped = False
-
-        for char in (self.prompt or ''):
-            if char == "[" and not escaped:
-                n_prompt += ' '
-                brackets_depth += 1 
-            elif char == "]" and not escaped:
-                brackets_depth -= 1 
-                char = ' ' 
-            elif brackets_depth > 0:
-                n_prompt += char
-            else:
-                p_prompt += char
-
-            #keep track of the escape char but only if it isn't escaped already
-            if char == "\\" and not escaped:
-                escaped = True
-            else:
-                escaped = False
-
-        return PromptPosNegOutput(positive_prompt=p_prompt, negative_prompt=n_prompt)
-
-
-@invocation("prompt_join", title="Prompt Join", tags=["prompt", "join"], category="prompt")
-class PromptJoinInvocation(BaseInvocation):
-    """Joins prompt left to prompt right"""
-
-    prompt_left: str = InputField(default='', description="Prompt Left", ui_component=UIComponent.Textarea)
-    prompt_right: str = InputField(default='', description="Prompt Right", ui_component=UIComponent.Textarea)
-
-    def invoke(self, context: InvocationContext) -> StringOutput:
-        return StringOutput(value=((self.prompt_left or '') + (self.prompt_right or '')))  
-
-
-@invocation("prompt_join_three", title="Prompt Join Three", tags=["prompt", "join"], category="prompt")
-class PromptJoinThreeInvocation(BaseInvocation):
-    """Joins prompt left to prompt middle to prompt right"""
-
-    prompt_left: str = InputField(default='', description="Prompt Left", ui_component=UIComponent.Textarea)
-    prompt_middle: str = InputField(default='', description="Prompt Middle", ui_component=UIComponent.Textarea)
-    prompt_right: str = InputField(default='', description="Prompt Right", ui_component=UIComponent.Textarea)
-
-    def invoke(self, context: InvocationContext) -> StringOutput:
-        return StringOutput(value=((self.prompt_left or '') + (self.prompt_middle or '') + (self.prompt_right or '')))  
-
-
-@invocation("prompt_replace", title="Prompt Replace", tags=["prompt", "replace", "regex"], category="prompt")
-class PromptReplaceInvocation(BaseInvocation):
-    """Replaces the search string with the replace string in the prompt"""
-
-    prompt: str = InputField(default='', description="Prompt to work on", ui_component=UIComponent.Textarea)
-    search_string : str = InputField(default='', description="String to search for", ui_component=UIComponent.Textarea)
-    replace_string : str = InputField(default='', description="String to replace the search", ui_component=UIComponent.Textarea)
-    use_regex: bool = InputField(default=False, description="Use search string as a regex expression (non regex is case insensitive)")
-
-    def invoke(self, context: InvocationContext) -> StringOutput:
-        pattern = (self.search_string or '')
-        new_prompt = (self.prompt or '')
-        if len(pattern) > 0: 
-            if not self.use_regex:
-                #None regex so make case insensitve
-                pattern = "(?i)" + re.escape(pattern)
-            new_prompt = re.sub(pattern, (self.replace_string or ''), new_prompt)
-        return StringOutput(value=new_prompt)  
 
 
 class PTFields(BaseModel):
@@ -209,36 +102,3 @@ class PTFieldsExpandInvocation(BaseInvocation):
             cfg_scale = fields.get('cfg_scale'),
             steps = fields.get('steps'),
         )
-
-
-@invocation("prompt_strength", title="Prompt Strength", tags=["prompt"], category="prompt")
-class PromptStrengthInvocation(BaseInvocation):
-    """Takes a prompt string and float strength and outputs a new string in the format of (prompt)strength"""
-
-    prompt: str = InputField(default='', description="Prompt to work on", ui_component=UIComponent.Textarea)
-    strength : float = InputField(default=1, gt=0, description="strength of the prompt")
-
-    def invoke(self, context: InvocationContext) -> StringOutput:
-        return StringOutput(value=f"({self.prompt}){self.strength}")
-
-
-COMBINE_TYPE = Literal[".and", ".blend"]
-
-@invocation("prompt_strengths_combine", title="Prompt Strengths Combine", tags=["prompt", "combine"], category="prompt")
-class PromptStrengthsCombineInvocation(BaseInvocation):
-    """Takes a collection of prompt strength strings and converts it into a combined .and() or .blend() structure. Blank prompts are ignored"""
-
-    prompt_strengths: list[str] = InputField(default=[''], description="Prompt strengths to combine", ui_type=UIType.Collection)
-    combine_type: COMBINE_TYPE = InputField(default=".and", description="Combine type .and() or .blend()", input=Input.Direct)
-
-    def invoke(self, context: InvocationContext) -> StringOutput:
-        strings = []
-        numbers = []
-        for item in self.prompt_strengths:
-            string, number = item.rsplit(')', 1)
-            string = string[1:].strip()
-            number = float(number)
-            if len(string)>0:
-                strings.append(f'"{string}"')
-                numbers.append(number)
-        return StringOutput(value=f'({",".join(strings)}){self.combine_type}({",".join(map(str, numbers))})')
