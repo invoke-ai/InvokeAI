@@ -283,7 +283,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             eta=0.0,  # ddim_eta
             # for ancestral and sde schedulers
             # flip all bits to have noise different from initial
-            generator=torch.Generator(device=unet.device).manual_seed(seed ^ SEED_MAX),
+            generator=torch.Generator(device=unet.device).manual_seed(seed ^ 0xFFFFFFFF),
         )
         return conditioning_data
 
