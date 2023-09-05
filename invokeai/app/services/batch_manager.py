@@ -178,21 +178,19 @@ class BatchManager(BatchManagerBase):
 
     def get_batch_processes(self) -> list[BatchProcessResponse]:
         bps = self.__batch_process_storage.get_all()
-        res = list()
-        for bp in bps:
-            sessions = self.__batch_process_storage.get_sessions_by_batch_id(bp.batch_id)
-            res.append(
-                BatchProcessResponse(
-                    batch_id=bp.batch_id,
-                    session_ids=[session.session_id for session in sessions],
-                )
-            )
-        return res
+        return self._get_batch_process_responses(bps)
 
     def get_incomplete_batch_processes(self) -> list[BatchProcessResponse]:
         bps = self.__batch_process_storage.get_incomplete()
-        res = list()
-        for bp in bps:
+        return self._get_batch_process_responses(bps)
+
+    def cancel_batch_process(self, batch_process_id: str) -> None:
+        self.__batch_process_storage.cancel(batch_process_id)
+
+    def _get_batch_process_responses(self, batch_processes: list[BatchProcess]) -> list[BatchProcessResponse]:
+        sessions = list()
+        res: list[BatchProcessResponse] = list()
+        for bp in batch_processes:
             sessions = self.__batch_process_storage.get_sessions_by_batch_id(bp.batch_id)
             res.append(
                 BatchProcessResponse(
@@ -201,6 +199,3 @@ class BatchManager(BatchManagerBase):
                 )
             )
         return res
-
-    def cancel_batch_process(self, batch_process_id: str) -> None:
-        self.__batch_process_storage.cancel(batch_process_id)
