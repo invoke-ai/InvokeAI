@@ -1,4 +1,4 @@
-import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
+import { RAND_SEED_MAX, RAND_SEED_MIN } from 'app/constants';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
@@ -15,7 +15,7 @@ export default function ParamSeedShuffle() {
   const { t } = useTranslation();
 
   const handleClickRandomizeSeed = () =>
-    dispatch(setSeed(randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)));
+    dispatch(setSeed(randomInt(RAND_SEED_MIN, RAND_SEED_MAX)));
 
   return (
     <IAIIconButton

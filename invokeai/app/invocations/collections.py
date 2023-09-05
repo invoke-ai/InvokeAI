@@ -59,7 +59,7 @@ class RandomRangeInvocation(BaseInvocation):
     """Creates a collection of random numbers"""
 
     low: int = InputField(default=0, description="The inclusive low value")
-    high: int = InputField(default=np.iinfo(np.int32).max, description="The exclusive high value")
+    high: int = InputField(default=SEED_MAX, description="The exclusive high value") # should this be SEED_MAX+1?
     size: int = InputField(default=1, description="The number of values to generate")
     seed: int = InputField(
         ge=0,

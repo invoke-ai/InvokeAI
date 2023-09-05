@@ -1,4 +1,4 @@
-import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
+import { RAND_SEED_MAX, RAND_SEED_MIN } from 'app/constants';
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAINumberInput from 'common/components/IAINumberInput';
@@ -26,8 +26,8 @@ export default function ParamSeed() {
       step={1}
       precision={0}
       flexGrow={1}
-      min={NUMPY_RAND_MIN}
-      max={NUMPY_RAND_MAX}
+      min={RAND_SEED_MIN}
+      max={RAND_SEED_MAX}
       isDisabled={shouldRandomizeSeed}
       isInvalid={seed < 0 && shouldGenerateVariations}
       onChange={handleChangeSeed}

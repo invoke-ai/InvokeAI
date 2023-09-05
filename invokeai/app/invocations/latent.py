@@ -31,6 +31,7 @@ from invokeai.app.invocations.primitives import (
 )
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
+from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 
 from ...backend.model_management.lora import ModelPatcher
@@ -282,7 +283,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             eta=0.0,  # ddim_eta
             # for ancestral and sde schedulers
             # flip all bits to have noise different from initial
-            generator=torch.Generator(device=unet.device).manual_seed(seed ^ 0xFFFFFFFF),
+            generator=torch.Generator(device=unet.device).manual_seed(seed ^ SEED_MAX),
         )
         return conditioning_data
 

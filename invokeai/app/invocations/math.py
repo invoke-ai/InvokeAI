@@ -3,6 +3,7 @@
 import numpy as np
 
 from invokeai.app.invocations.primitives import IntegerOutput
+from invokeai.app.util.misc import SEED_MAX
 
 from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, invocation
 
@@ -56,7 +57,7 @@ class RandomIntInvocation(BaseInvocation):
     """Outputs a single random integer."""
 
     low: int = InputField(default=0, description="The inclusive low value")
-    high: int = InputField(default=np.iinfo(np.int32).max, description="The exclusive high value")
+    high: int = InputField(default=SEED_MAX, description="The exclusive high value")
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         return IntegerOutput(value=np.random.randint(self.low, self.high))

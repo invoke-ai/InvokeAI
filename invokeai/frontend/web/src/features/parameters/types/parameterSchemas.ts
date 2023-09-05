@@ -1,4 +1,4 @@
-import { NUMPY_RAND_MAX } from 'app/constants';
+import { RAND_SEED_MAX } from 'app/constants';
 import { z } from 'zod';
 
 /**
@@ -171,7 +171,7 @@ export const SCHEDULER_LABEL_MAP: Record<SchedulerParam, string> = {
 /**
  * Zod schema for seed parameter
  */
-export const zSeed = z.number().int().min(0).max(NUMPY_RAND_MAX);
+export const zSeed = z.number().int().min(0).max(RAND_SEED_MAX);
 /**
  * Type alias for seed parameter, inferred from its zod schema
  */
