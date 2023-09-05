@@ -20,7 +20,7 @@ def is_torch2_available():
 @torch.no_grad()
 def generate(
     self,
-    prompt: Union[str, List[str]] = None,
+    prompt: Union[str, List[str], None] = None,
     image: Union[
         torch.FloatTensor,
         PIL.Image.Image,
@@ -28,6 +28,7 @@ def generate(
         List[torch.FloatTensor],
         List[PIL.Image.Image],
         List[np.ndarray],
+        None,
     ] = None,
     height: Optional[int] = None,
     width: Optional[int] = None,
