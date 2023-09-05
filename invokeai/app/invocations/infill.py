@@ -196,10 +196,8 @@ class InfillPatchMatchInvocation(BaseInvocation):
     """Infills transparent areas of an image using the PatchMatch algorithm"""
 
     image: ImageField = InputField(description="The image to infill")
-    downscale: Optional[float] = InputField(
-        default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill"
-    )
-    resample_mode: Optional[PIL_RESAMPLING_MODES] = InputField(default="bicubic", description="The resampling mode")
+    downscale: float = InputField(default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill")
+    resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name).convert("RGBA")
