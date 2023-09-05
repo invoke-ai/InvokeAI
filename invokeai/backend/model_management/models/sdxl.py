@@ -125,9 +125,9 @@ class StableDiffusionXLModel(DiffusersModel):
 
             kwargs = dict()
             app_config = InvokeAIAppConfig.get_config()
-            vae_path = app_config.models_path / 'sdxl/vae/sdxl-vae-fp16-fix'
+            vae_path = app_config.models_path / "sdxl/vae/sdxl-vae-fp16-fix"
             if vae_path.exists():
-                kwargs['vae_path'] = vae_path
+                kwargs["vae_path"] = vae_path
 
             return _convert_ckpt_and_cache(
                 version=base_model,
