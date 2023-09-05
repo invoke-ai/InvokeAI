@@ -164,8 +164,8 @@ class IPAdapterInvocation(BaseInvocation):
                 # control_model is currently optional
                 #    must be either a control_model or ip_adapter_model
                 # control_model=None,
-                ip_adapter_model=self.ip_adapter_model,
-                image_encoder_model=self.image_encoder_model,
+                ip_adapter_model=context.services.configuration.get_config().root_dir / self.ip_adapter_model,
+                image_encoder_model=context.services.configuration.get_config().root_dir / self.image_encoder_model,
                 control_weight=self.control_weight,
                 # rest are currently ignored
                 # begin_step_percent=self.begin_step_percent,
