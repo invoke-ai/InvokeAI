@@ -7,11 +7,13 @@ import requests
 import threading
 
 from pathlib import Path
-from typing import Dict, Optional, Set, List
+from typing import Dict, Optional, Set, List, Tuple
 
 from pydantic import Field, validator, ValidationError
 from pydantic.networks import AnyHttpUrl
 from queue import PriorityQueue
+
+from huggingface_hub import HfApi, hf_hub_url
 
 from invokeai.backend.util.logging import InvokeAILogger
 from .base import (
@@ -45,7 +47,7 @@ class DownloadJobRepoID(DownloadJobBase):
     @validator('source')
     @classmethod
     def _validate_source(cls, v: str) -> str:
-        if not re.match(r'^\w+/\w+$', v):
+        if not re.match(r'^[\w-]+/[\w-]+$', v):
             raise ValidationError(f'{v} invalid repo_id')
         return v
 
@@ -71,7 +73,6 @@ class DownloadQueue(DownloadQueueBase):
         :param max_parallel_dl: Number of simultaneous downloads allowed [5].
         :param event_handler: Optional callable that will be called each time a job status changes.
         """
-        print('IN __INIT__')
         self._jobs = dict()
         self._next_job_id = 0
         self._queue = PriorityQueue()
@@ -92,7 +93,7 @@ class DownloadQueue(DownloadQueueBase):
             access_token: Optional[str] = None,
             event_handler: Optional[DownloadEventHandler] = None,
     ) -> int:
-        if re.match(r'^\w+/\w+$', source):
+        if re.match(r'^[\w-]+/[\w-]+$', source):
             cls = DownloadJobRepoID
             kwargs = dict(variant=variant)
         else:
@@ -139,9 +140,10 @@ class DownloadQueue(DownloadQueueBase):
         finally:
             self._lock.release()
 
-    def cancel_job(self, job: DownloadJobBase):
+    def cancel_job(self, id: str):
         try:
             self._lock.acquire()
+            job = self._jobs[id]
             job.status = DownloadJobStatus.ERROR
             job.error = CancelledJobException(f"Job {job.id} cancelled at caller's request")
             self._update_job_status
@@ -189,7 +191,7 @@ class DownloadQueue(DownloadQueueBase):
         finally:
             self._lock.release()
 
-    def cancel_all_jobs(self, id: int):
+    def cancel_all_jobs(self):
         try:
             self._lock.acquire()
             for id in self._jobs:
@@ -214,7 +216,7 @@ class DownloadQueue(DownloadQueueBase):
                 if isinstance(job, DownloadJobURL):
                     self._download_with_resume(job)
                 elif isinstance(job, DownloadJobRepoID):
-                    raise self._download_repoid(job)
+                    self._download_repoid(job)
                 else:
                     raise NotImplementedError(f"Don't know what to do with this job: {job}")
             self._queue.task_done()
@@ -231,7 +233,7 @@ class DownloadQueue(DownloadQueueBase):
 
         if job.destination.is_dir():
             try:
-                file_name = re.search('filename="(.+)"', resp.headers.get("Content-Disposition")).group(1)
+                file_name = re.search('filename="(.+)"', resp.headers.get("Content-Disposition", "bug-noname")).group(1)
             except AttributeError:
                 file_name = os.path.basename(job.source)
             job.destination = job.destination / file_name
@@ -296,20 +298,92 @@ class DownloadQueue(DownloadQueueBase):
 
     def _download_repoid(self, job: DownloadJobBase):
         """Download a job that holds a huggingface repoid."""
-        repo_id = job.source
-        variant = job.variant
-        urls_to_download = self._get_repo_urls(repo_id, variant)
-        job.total_bytes = sum([self._get_download_size(url) for url in urls_to_download])
-        bytes_downloaded = dict()
 
-        def report_sub_downloads(subjob: DownloadJobBase):
+        def subdownload_event(subjob: DownloadJobBase):
             if subjob.status == DownloadJobStatus.RUNNING:
                 bytes_downloaded[subjob.id] = subjob.bytes
-                total_downloaded = sum(bytes_downloaded.values())
-                if job.event_handler:
-                    job.bytes = total_downloaded
-                    job.event_handler(job)
-                
-            
-        subqueue = self.__class__(event_handler=report_sub_downloads)
-        
+                job.bytes = sum(bytes_downloaded.values())
+                self._update_job_status(job, DownloadJobStatus.RUNNING)
+
+            elif subjob.status == DownloadJobStatus.ERROR:
+                job.error = subjob.error
+                subqueue.cancel_all_jobs()
+                self._update_job_status(job, DownloadJobStatus.ERROR)
+
+        subqueue = self.__class__(event_handler=subdownload_event)
+        try:
+            repo_id = job.source
+            variant = job.variant
+            urls_to_download = self._get_repo_urls(repo_id, variant)
+            job.destination = job.destination / Path(repo_id).name
+            job.total_bytes = sum([self._get_download_size(url) for (url, _, _) in urls_to_download])
+            bytes_downloaded = dict()
+
+            for url, subdir, file in urls_to_download:
+                subqueue.create_download_job(
+                    source=url,
+                    destdir=job.destination / subdir,
+                    filename=file,
+                    variant=variant,
+                    access_token=job.access_token
+                )
+        except Exception as excp:
+            job.status = DownloadJobStatus.ERROR
+            job.error = excp
+            self._logger.error(job.error)
+        finally:
+            subqueue.join()
+            if not job.status == DownloadJobStatus.ERROR:
+                self._update_job_status(job, DownloadJobStatus.COMPLETED)
+            subqueue.release()  # get rid of the subqueue
+
+    def _get_download_size(self, url: AnyHttpUrl) -> int:
+        resp = requests.get(url, stream=True)
+        resp.raise_for_status()
+        return int(resp.headers.get('content-length',0))
+
+    def _get_repo_urls(self, repo_id: str, variant: Optional[str] = None) -> List[Tuple[AnyHttpUrl, Path, Path]]:
+        """Given a repo_id and an optional variant, return list of URLs to download to get the model."""
+        model_info = HfApi().model_info(repo_id=repo_id)
+        sibs = model_info.siblings
+        paths = [x.rfilename for x in sibs]
+        if "model_index.json" in paths:
+            url = hf_hub_url(repo_id, filename="model_index.json")
+            resp = requests.get(url)
+            resp.raise_for_status()   # will raise an HTTPError on non-200 status
+            submodels = resp.json()
+            paths = [x for x in paths if Path(x).parent.as_posix() in submodels]
+            paths.insert(0, "model_index.json")
+        return [(hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path('.'), x.name) for x in self._select_variants(paths, variant)]
+
+    def _select_variants(self, paths: List[str], variant: Optional[str] = None) -> Set[Path]:
+        """Select the proper variant files from a list of HuggingFace repo_id paths."""
+        result = set()
+        basenames = dict()
+        for p in paths:
+            path = Path(p)
+            if path.suffix in ['.bin', '.safetensors', '.pt']:
+                parent = path.parent
+                suffixes = path.suffixes
+                if len(suffixes) == 2:
+                    file_variant, suffix = suffixes
+                    basename = parent / Path(path.stem).stem
+                else:
+                    file_variant = None
+                    suffix = suffixes[0]
+                    basename = parent / path.stem
+
+                if previous := basenames.get(basename):
+                    if previous.suffix != '.safetensors' and suffix == '.safetensors':
+                        basenames[basename] = path
+                    if file_variant == f'.{variant}':
+                        basenames[basename] = path
+                    elif not variant and not file_variant:
+                        basenames[basename] = path
+                else:
+                    basenames[basename] = path
+            else:
+                result.add(path)
+        for v in basenames.values():
+            result.add(v)
+        return result
