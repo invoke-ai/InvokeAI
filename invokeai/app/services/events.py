@@ -13,6 +13,7 @@ from invokeai.app.services.model_manager_service import (
 
 class EventServiceBase:
     session_event: str = "session_event"
+    batch_event: str = "batch_event"
 
     """Basic event bus, to have an empty stand-in when not needed"""
 
@@ -20,9 +21,18 @@ class EventServiceBase:
         pass
 
     def __emit_session_event(self, event_name: str, payload: dict) -> None:
+        """Session events are emitted to a room with the session_id as the room name"""
         payload["timestamp"] = get_timestamp()
         self.dispatch(
             event_name=EventServiceBase.session_event,
+            payload=dict(event=event_name, data=payload),
+        )
+
+    def __emit_batch_event(self, event_name: str, payload: dict) -> None:
+        """Batch events are emitted to a room with the batch_id as the room name"""
+        payload["timestamp"] = get_timestamp()
+        self.dispatch(
+            event_name=EventServiceBase.batch_event,
             payload=dict(event=event_name, data=payload),
         )
 
@@ -186,4 +196,15 @@ class EventServiceBase:
                 error_type=error_type,
                 error=error,
             ),
+        )
+
+    def emit_batch_session_created(
+        self,
+        batch_id: str,
+        graph_execution_state_id: str,
+    ) -> None:
+        """Emitted when a batch session is created"""
+        self.__emit_batch_event(
+            event_name="batch_session_created",
+            payload=dict(batch_id=batch_id, graph_execution_state_id=graph_execution_state_id),
         )

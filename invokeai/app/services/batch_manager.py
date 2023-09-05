@@ -160,6 +160,7 @@ class BatchManager(BatchManagerBase):
             session_id=next_session.session_id,
             changes=BatchSessionChanges(state="in_progress"),
         )
+        self.__invoker.services.events.emit_batch_session_created(next_session.batch_id, next_session.session_id)
         self.__invoker.invoke(ges, invoke_all=True)
 
     def create_batch_process(self, batch: Batch, graph: Graph) -> BatchProcessResponse:
