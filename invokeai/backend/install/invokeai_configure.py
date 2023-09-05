@@ -291,8 +291,18 @@ def download_realesrgan():
 
 
 # ---------------------------------------------
+def download_lama():
+    logger.info("Installing lama infill model")
+    download_with_progress_bar(
+        'https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt',
+        config.models_path / 'core/misc/lama/lama.pt',
+        'lama infill model'
+    )
+        
+# ---------------------------------------------
 def download_support_models():
     download_realesrgan()
+    download_lama()
     download_conversion_models()
 
 
