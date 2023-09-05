@@ -13,6 +13,7 @@ import Konva from 'konva';
 import { Vector2d } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 
+import { KonvaEventObject } from 'konva/lib/Node';
 import { MutableRefObject, useCallback } from 'react';
 import getScaledCursorPosition from '../util/getScaledCursorPosition';
 import useColorPicker from './useColorUnderCursor';
@@ -31,7 +32,7 @@ const selector = createSelector(
   { memoizeOptions: { resultEqualityCheck: isEqual } }
 );
 
-const useCanvasMouseMove = (
+const useCanvasTouchMove = (
   stageRef: MutableRefObject<Konva.Stage | null>,
   didMouseMoveRef: MutableRefObject<boolean>,
   lastCursorPositionRef: MutableRefObject<Vector2d>
@@ -40,47 +41,53 @@ const useCanvasMouseMove = (
   const { isDrawing, tool, isStaging } = useAppSelector(selector);
   const { updateColorUnderCursor } = useColorPicker();
 
-  return useCallback(() => {
-    if (!stageRef.current) {
-      return;
-    }
+  return useCallback(
+    (e: KonvaEventObject<TouchEvent>) => {
+      if (!stageRef.current) {
+        return;
+      }
 
-    const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
+      const scaledCursorPosition = getScaledCursorPosition(stageRef.current);
 
-    if (!scaledCursorPosition) {
-      return;
-    }
+      if (!scaledCursorPosition) {
+        return;
+      }
 
-    dispatch(setCursorPosition(scaledCursorPosition));
+      dispatch(setCursorPosition(scaledCursorPosition));
 
-    lastCursorPositionRef.current = scaledCursorPosition;
+      lastCursorPositionRef.current = scaledCursorPosition;
 
-    if (tool === 'colorPicker') {
-      updateColorUnderCursor();
-      return;
-    }
+      if (tool === 'colorPicker') {
+        updateColorUnderCursor();
+        return;
+      }
 
-    if (!isDrawing || tool === 'move' || isStaging) {
-      return;
-    }
+      if (!isDrawing || tool === 'move' || isStaging) {
+        return;
+      }
 
-    didMouseMoveRef.current = true;
-    dispatch(
-      addPointToCurrentLine({
-        points: [scaledCursorPosition.x, scaledCursorPosition.y],
-        strokeWidth: 1,
-      })
-    );
-  }, [
-    didMouseMoveRef,
-    dispatch,
-    isDrawing,
-    isStaging,
-    lastCursorPositionRef,
-    stageRef,
-    tool,
-    updateColorUnderCursor,
-  ]);
+      didMouseMoveRef.current = true;
+
+      dispatch(
+        addPointToCurrentLine({
+          points: [scaledCursorPosition.x, scaledCursorPosition.y],
+          strokeWidth: e.evt.targetTouches[0]?.force
+            ? e.evt.targetTouches[0]?.force
+            : 1,
+        })
+      );
+    },
+    [
+      didMouseMoveRef,
+      dispatch,
+      isDrawing,
+      isStaging,
+      lastCursorPositionRef,
+      stageRef,
+      tool,
+      updateColorUnderCursor,
+    ]
+  );
 };
 
-export default useCanvasMouseMove;
+export default useCanvasTouchMove;

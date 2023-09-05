@@ -17,6 +17,8 @@ import useCanvasMouseDown from '../hooks/useCanvasMouseDown';
 import useCanvasMouseMove from '../hooks/useCanvasMouseMove';
 import useCanvasMouseOut from '../hooks/useCanvasMouseOut';
 import useCanvasMouseUp from '../hooks/useCanvasMouseUp';
+import useCanvasTouchMove from '../hooks/useCanvasTouchMove';
+import useCanvasTouchStart from '../hooks/useCanvasTouchStart';
 import useCanvasWheel from '../hooks/useCanvasZoom';
 import { canvasResized } from '../store/canvasSlice';
 import {
@@ -129,8 +131,14 @@ const IAICanvas = () => {
 
   const handleWheel = useCanvasWheel(stageRef);
   const handleMouseDown = useCanvasMouseDown(stageRef);
+  const handleTouchStart = useCanvasTouchStart(stageRef);
   const handleMouseUp = useCanvasMouseUp(stageRef, didMouseMoveRef);
   const handleMouseMove = useCanvasMouseMove(
+    stageRef,
+    didMouseMoveRef,
+    lastCursorPositionRef
+  );
+  const handleTouchMove = useCanvasTouchMove(
     stageRef,
     didMouseMoveRef,
     lastCursorPositionRef
@@ -193,8 +201,8 @@ const IAICanvas = () => {
           width={stageDimensions.width}
           height={stageDimensions.height}
           scale={{ x: stageScale, y: stageScale }}
-          onTouchStart={handleMouseDown}
-          onTouchMove={handleMouseMove}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
           onTouchEnd={handleMouseUp}
           onMouseDown={handleMouseDown}
           onMouseLeave={handleMouseOut}

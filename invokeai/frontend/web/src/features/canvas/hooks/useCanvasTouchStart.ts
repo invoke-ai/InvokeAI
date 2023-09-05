@@ -32,13 +32,15 @@ const selector = createSelector(
   { memoizeOptions: { resultEqualityCheck: isEqual } }
 );
 
-const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
+const useCanvasTouchStart = (
+  stageRef: MutableRefObject<Konva.Stage | null>
+) => {
   const dispatch = useAppDispatch();
   const { tool, isStaging } = useAppSelector(selector);
   const { commitColorUnderCursor } = useColorPicker();
 
   return useCallback(
-    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    (e: KonvaEventObject<TouchEvent>) => {
       if (!stageRef.current) {
         return;
       }
@@ -64,13 +66,14 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       e.evt.preventDefault();
 
       dispatch(setIsDrawing(true));
-
+      if (e.evt.targetTouches[0]) {
+        dispatch(setPenPressure(e.evt.targetTouches[0].force));
+      }
       // Add a new line starting from the current cursor position.
-      dispatch(setPenPressure(1));
       dispatch(addLine([scaledCursorPosition.x, scaledCursorPosition.y]));
     },
     [stageRef, tool, isStaging, dispatch, commitColorUnderCursor]
   );
 };
 
-export default useCanvasMouseDown;
+export default useCanvasTouchStart;

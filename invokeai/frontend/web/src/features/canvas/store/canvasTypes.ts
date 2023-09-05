@@ -124,6 +124,7 @@ export interface CanvasState {
   boundingBoxDimensions: Dimensions;
   boundingBoxPreviewFill: RgbaColor;
   boundingBoxScaleMethod: BoundingBoxScale;
+  penPressure: number;
   brushColor: RgbaColor;
   brushSize: number;
   colorPickerColor: RgbaColor;

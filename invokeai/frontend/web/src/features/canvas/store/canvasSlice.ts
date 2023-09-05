@@ -44,6 +44,7 @@ export const initialCanvasState: CanvasState = {
   boundingBoxDimensions: { width: 512, height: 512 },
   boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
   boundingBoxScaleMethod: 'none',
+  penPressure: 1,
   brushColor: { r: 90, g: 90, b: 255, a: 1 },
   brushSize: 50,
   colorPickerColor: { r: 90, g: 90, b: 255, a: 1 },
@@ -109,6 +110,9 @@ export const canvasSlice = createSlice({
       if (currentTool !== 'move') {
         state.tool = currentTool === 'brush' ? 'eraser' : 'brush';
       }
+    },
+    setPenPressure: (state, action: PayloadAction<number>) => {
+      state.penPressure = action.payload;
     },
     setMaskColor: (state, action: PayloadAction<RgbaColor>) => {
       state.maskColor = action.payload;
@@ -390,18 +394,28 @@ export const canvasSlice = createSlice({
       state.futureLayerStates = [];
     },
     addLine: (state, action: PayloadAction<number[]>) => {
-      const { tool, layer, brushColor, brushSize, shouldRestrictStrokesToBox } =
-        state;
+      const {
+        tool,
+        layer,
+        brushColor,
+        brushSize,
+        penPressure,
+        shouldRestrictStrokesToBox,
+      } = state;
 
       if (tool === 'move' || tool === 'colorPicker') {
         return;
       }
 
-      const newStrokeWidth = brushSize / 2;
+      const newStrokeWidth = (brushSize * penPressure) / 2;
 
       // set & then spread this to only conditionally add the "color" key
       const newColor =
-        layer === 'base' && tool === 'brush' ? { color: brushColor } : {};
+        layer === 'base' && tool === 'brush'
+          ? {
+              color: { ...brushColor, a: brushColor.a * penPressure },
+            }
+          : {};
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
@@ -429,14 +443,18 @@ export const canvasSlice = createSlice({
 
       state.futureLayerStates = [];
     },
-    addPointToCurrentLine: (state, action: PayloadAction<number[]>) => {
+    addPointToCurrentLine: (
+      state,
+      action: PayloadAction<{ points: number[]; strokeWidth: number }>
+    ) => {
       const lastLine = state.layerState.objects.findLast(isCanvasAnyLine);
 
       if (!lastLine) {
         return;
       }
 
-      lastLine.points.push(...action.payload);
+      // lastLine.strokeWidth = action.payload.strokeWidth;
+      lastLine.points.push(...action.payload.points);
     },
     undo: (state) => {
       const targetState = state.pastLayerStates.pop();
@@ -829,6 +847,7 @@ export const {
   setBoundingBoxPreviewFill,
   setBoundingBoxScaleMethod,
   flipBoundingBoxAxes,
+  setPenPressure,
   setBrushColor,
   setBrushSize,
   setColorPickerColor,
