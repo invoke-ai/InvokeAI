@@ -22,18 +22,19 @@ from pydantic.networks import AnyHttpUrl
 from invokeai.backend.util.logging import InvokeAILogger
 
 
-class EventServicesBase:   # forward declaration
+class EventServicesBase:  # forward declaration
     pass
+
 
 class DownloadJobStatus(str, Enum):
     """State of a download job."""
 
-    IDLE = "idle"            # not enqueued, will not run
-    ENQUEUED = "enqueued"    # enqueued but not yet active
-    RUNNING = "running"      # actively downloading
-    PAUSED = "paused"        # previously started, now paused
+    IDLE = "idle"  # not enqueued, will not run
+    ENQUEUED = "enqueued"  # enqueued but not yet active
+    RUNNING = "running"  # actively downloading
+    PAUSED = "paused"  # previously started, now paused
     COMPLETED = "completed"  # finished running
-    ERROR = "error"          # terminated with an error message
+    ERROR = "error"  # terminated with an error message
 
 
 class UnknownJobIDException(Exception):
@@ -59,10 +60,12 @@ class DownloadJob(BaseModel):
     status: DownloadJobStatus = Field(default=DownloadJobStatus.IDLE, description="Status of the download")
     bytes: int = Field(default=0, description="Bytes downloaded so far")
     total_bytes: int = Field(default=0, description="Total bytes to download")
-    event_handler: Optional[DownloadEventHandler] = Field(description="Callable will be called whenever job status changes")
+    event_handler: Optional[DownloadEventHandler] = Field(
+        description="Callable will be called whenever job status changes"
+    )
     error: Exception = Field(default=None, description="Exception that caused an error")
 
-    class Config():
+    class Config:
         """Config object for this pydantic class."""
 
         arbitrary_types_allowed = True
@@ -91,13 +94,13 @@ class DownloadQueueBase(ABC):
 
     @abstractmethod
     def create_download_job(
-            self,
-            url: str,
-            destdir: Path,
-            filename: Optional[Path] = None,
-            start: bool = True,
-            access_token: Optional[str] = None,
-            event_handler: Optional[DownloadEventHandler] = None,
+        self,
+        url: str,
+        destdir: Path,
+        filename: Optional[Path] = None,
+        start: bool = True,
+        access_token: Optional[str] = None,
+        event_handler: Optional[DownloadEventHandler] = None,
     ) -> int:
         """
         Create a download job.
@@ -195,11 +198,12 @@ class DownloadQueue(DownloadQueueBase):
     _event_handler: Optional[DownloadEventHandler]
     _next_job_id: int = 0
 
-    def __init__(self,
-                 max_parallel_dl: int = 5,
-                 events: Optional["EventServicesBase"] = None,
-                 event_handler: Optional[DownloadEventHandler] = None,
-                 ):
+    def __init__(
+        self,
+        max_parallel_dl: int = 5,
+        events: Optional["EventServicesBase"] = None,
+        event_handler: Optional[DownloadEventHandler] = None,
+    ):
         """
         Initialize DownloadQueue.
 
@@ -219,13 +223,13 @@ class DownloadQueue(DownloadQueueBase):
         self._start_workers(max_parallel_dl)
 
     def create_download_job(
-            self,
-            url: str,
-            destdir: Path,
-            filename: Optional[Path] = None,
-            start: bool = True,
-            access_token: Optional[str] = None,
-            event_handler: Optional[DownloadEventHandler] = None,
+        self,
+        url: str,
+        destdir: Path,
+        filename: Optional[Path] = None,
+        start: bool = True,
+        access_token: Optional[str] = None,
+        event_handler: Optional[DownloadEventHandler] = None,
     ) -> int:
         try:
             self._lock.acquire()
@@ -250,7 +254,6 @@ class DownloadQueue(DownloadQueueBase):
 
     def list_jobs(self) -> List[DownloadJob]:
         return self._jobs.values()
-
 
     def change_priority(self, id: int, delta: int):
         try:
@@ -330,7 +333,7 @@ class DownloadQueue(DownloadQueueBase):
         """Worker thread gets next job on priority queue."""
         while True:
             job = self._queue.get()
-            if job.status == DownloadJobStatus.ENQUEUED:    # Don't do anything for cancelled or errored jobs
+            if job.status == DownloadJobStatus.ENQUEUED:  # Don't do anything for cancelled or errored jobs
                 self._download_with_resume(job)
             self._queue.task_done()
 
@@ -383,7 +386,7 @@ class DownloadQueue(DownloadQueueBase):
         try:
             with open(dest, open_mode) as file:
                 for data in resp.iter_content(chunk_size=1024):
-                    if job.status != DownloadJobStatus.RUNNING:   # cancelled, paused or errored
+                    if job.status != DownloadJobStatus.RUNNING:  # cancelled, paused or errored
                         return
                     job.bytes += file.write(data)
                     if job.bytes - last_report_bytes >= report_delta:
@@ -397,10 +400,7 @@ class DownloadQueue(DownloadQueueBase):
             job.error = excp
             self._update_job_status(job, DownloadJobStatus.ERROR)
 
-    def _update_job_status(self,
-                           job: DownloadJob,
-                           new_status: Optional[DownloadJobStatus] = None
-                           ):
+    def _update_job_status(self, job: DownloadJob, new_status: Optional[DownloadJobStatus] = None):
         """Optionally change the job status and send an event indicating a change of state."""
         if new_status:
             job.status = new_status
