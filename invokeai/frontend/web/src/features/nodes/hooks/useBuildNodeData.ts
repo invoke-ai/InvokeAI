@@ -138,11 +138,14 @@ export const useBuildNodeData = () => {
         data: {
           id: nodeId,
           type,
-          inputs,
-          outputs,
-          isOpen: true,
+          version: template.version,
           label: '',
           notes: '',
+          isOpen: true,
+          embedWorkflow: false,
+          isIntermediate: true,
+          inputs,
+          outputs,
         },
       };
 

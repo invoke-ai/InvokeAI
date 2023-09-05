@@ -326,21 +326,20 @@ export type components = {
     AddInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default add
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "add";
+      workflow?: string;
       /**
        * A
        * @description The first number
@@ -353,6 +352,12 @@ export type components = {
        * @default 0
        */
       b?: number;
+      /**
+       * Type
+       * @default add
+       * @enum {string}
+       */
+      type: "add";
     };
     /**
      * AppConfig
@@ -404,21 +409,20 @@ export type components = {
     BlankImageInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default blank_image
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "blank_image";
+      workflow?: string;
       /**
        * Width
        * @description The width of the image
@@ -449,6 +453,12 @@ export type components = {
        * }
        */
       color?: components["schemas"]["ColorField"];
+      /**
+       * Type
+       * @default blank_image
+       * @enum {string}
+       */
+      type: "blank_image";
     };
     /**
      * Blend Latents
@@ -457,21 +467,20 @@ export type components = {
     BlendLatentsInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default lblend
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "lblend";
+      workflow?: string;
       /**
        * Latents A
        * @description Latents tensor
@@ -488,6 +497,12 @@ export type components = {
        * @default 0.5
        */
       alpha?: number;
+      /**
+       * Type
+       * @default lblend
+       * @enum {string}
+       */
+      type: "lblend";
     };
     /** BoardChanges */
     BoardChanges: {
@@ -665,32 +680,37 @@ export type components = {
       file: Blob;
     };
     /**
-     * Boolean Primitive Collection
+     * Boolean Collection Primitive
      * @description A collection of boolean primitive values
      */
     BooleanCollectionInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Collection
+       * @description The collection of boolean values
+       */
+      collection?: boolean[];
       /**
        * Type
        * @default boolean_collection
        * @enum {string}
        */
       type: "boolean_collection";
-      /**
-       * Collection
-       * @description The collection of boolean values
-       */
-      collection?: boolean[];
     };
     /**
      * BooleanCollectionOutput
@@ -698,16 +718,16 @@ export type components = {
      */
     BooleanCollectionOutput: {
       /**
+       * Collection
+       * @description The output boolean collection
+       */
+      collection: boolean[];
+      /**
        * Type
        * @default boolean_collection_output
        * @enum {string}
        */
       type: "boolean_collection_output";
-      /**
-       * Collection
-       * @description The output boolean collection
-       */
-      collection: boolean[];
     };
     /**
      * Boolean Primitive
@@ -716,27 +736,32 @@ export type components = {
     BooleanInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default boolean
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "boolean";
+      workflow?: string;
       /**
        * Value
        * @description The boolean value
        * @default false
        */
       value?: boolean;
+      /**
+       * Type
+       * @default boolean
+       * @enum {string}
+       */
+      type: "boolean";
     };
     /**
      * BooleanOutput
@@ -744,16 +769,16 @@ export type components = {
      */
     BooleanOutput: {
       /**
+       * Value
+       * @description The output boolean
+       */
+      value: boolean;
+      /**
        * Type
        * @default boolean_output
        * @enum {string}
        */
       type: "boolean_output";
-      /**
-       * Value
-       * @description The output boolean
-       */
-      value: boolean;
     };
     /**
      * Canny Processor
@@ -762,26 +787,31 @@ export type components = {
     CannyImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default canny_image_processor
        * @enum {string}
        */
       type: "canny_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Low Threshold
        * @description The low threshold of the Canny pixel gradient (0-255)
@@ -825,21 +855,20 @@ export type components = {
     ClipSkipInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default clip_skip
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "clip_skip";
+      workflow?: string;
       /**
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
@@ -851,6 +880,12 @@ export type components = {
        * @default 0
        */
       skipped_layers?: number;
+      /**
+       * Type
+       * @default clip_skip
+       * @enum {string}
+       */
+      type: "clip_skip";
     };
     /**
      * ClipSkipInvocationOutput
@@ -858,16 +893,16 @@ export type components = {
      */
     ClipSkipInvocationOutput: {
       /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["ClipField"];
+      /**
        * Type
        * @default clip_skip_output
        * @enum {string}
        */
       type: "clip_skip_output";
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip?: components["schemas"]["ClipField"];
     };
     /**
      * CollectInvocation
@@ -876,21 +911,20 @@ export type components = {
     CollectInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default collect
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "collect";
+      workflow?: string;
       /**
        * Collection Item
        * @description The item to collect (all inputs must be of the same type)
@@ -901,23 +935,31 @@ export type components = {
        * @description The collection, will be provided on execution
        */
       collection?: unknown[];
+      /**
+       * Type
+       * @default collect
+       * @enum {string}
+       */
+      type: "collect";
     };
     /**
      * CollectInvocationOutput
-     * @description Base class for all invocation outputs
+     * @description Base class for all invocation outputs.
+     *
+     * All invocation outputs must use the `@invocation_output` decorator to provide their unique type.
      */
     CollectInvocationOutput: {
+      /**
+       * Collection
+       * @description The collection of input items
+       */
+      collection: unknown[];
       /**
        * Type
        * @default collect_output
        * @enum {string}
        */
       type: "collect_output";
-      /**
-       * Collection
-       * @description The collection of input items
-       */
-      collection: unknown[];
     };
     /**
      * ColorCollectionOutput
@@ -925,16 +967,16 @@ export type components = {
      */
     ColorCollectionOutput: {
       /**
+       * Collection
+       * @description The output colors
+       */
+      collection: components["schemas"]["ColorField"][];
+      /**
        * Type
        * @default color_collection_output
        * @enum {string}
        */
       type: "color_collection_output";
-      /**
-       * Collection
-       * @description The output colors
-       */
-      collection: components["schemas"]["ColorField"][];
     };
     /**
      * Color Correct
@@ -944,21 +986,20 @@ export type components = {
     ColorCorrectInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default color_correct
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "color_correct";
+      workflow?: string;
       /**
        * Image
        * @description The image to color-correct
@@ -980,6 +1021,12 @@ export type components = {
        * @default 8
        */
       mask_blur_radius?: number;
+      /**
+       * Type
+       * @default color_correct
+       * @enum {string}
+       */
+      type: "color_correct";
     };
     /**
      * ColorField
@@ -1014,21 +1061,20 @@ export type components = {
     ColorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default color
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "color";
+      workflow?: string;
       /**
        * Color
        * @description The color value
@@ -1040,6 +1086,12 @@ export type components = {
        * }
        */
       color?: components["schemas"]["ColorField"];
+      /**
+       * Type
+       * @default color
+       * @enum {string}
+       */
+      type: "color";
     };
     /**
      * ColorOutput
@@ -1047,39 +1099,38 @@ export type components = {
      */
     ColorOutput: {
       /**
+       * Color
+       * @description The output color
+       */
+      color: components["schemas"]["ColorField"];
+      /**
        * Type
        * @default color_output
        * @enum {string}
        */
       type: "color_output";
-      /**
-       * Color
-       * @description The output color
-       */
-      color: components["schemas"]["ColorField"];
     };
     /**
-     * Compel Prompt
+     * Prompt
      * @description Parse prompt using compel package to conditioning.
      */
     CompelInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default compel
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "compel";
+      workflow?: string;
       /**
        * Prompt
        * @description Prompt to be parsed by Compel to create a conditioning tensor
@@ -1087,39 +1138,49 @@ export type components = {
        */
       prompt?: string;
       /**
+       * Type
+       * @default compel
+       * @enum {string}
+       */
+      type: "compel";
+      /**
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip?: components["schemas"]["ClipField"];
     };
     /**
-     * Conditioning Primitive Collection
+     * Conditioning Collection Primitive
      * @description A collection of conditioning tensor primitive values
      */
     ConditioningCollectionInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Collection
+       * @description The collection of conditioning tensors
+       */
+      collection?: components["schemas"]["ConditioningField"][];
       /**
        * Type
        * @default conditioning_collection
        * @enum {string}
        */
       type: "conditioning_collection";
-      /**
-       * Collection
-       * @description The collection of conditioning tensors
-       * @default 0
-       */
-      collection?: components["schemas"]["ConditioningField"][];
     };
     /**
      * ConditioningCollectionOutput
@@ -1127,16 +1188,16 @@ export type components = {
      */
     ConditioningCollectionOutput: {
       /**
+       * Collection
+       * @description The output conditioning tensors
+       */
+      collection: components["schemas"]["ConditioningField"][];
+      /**
        * Type
        * @default conditioning_collection_output
        * @enum {string}
        */
       type: "conditioning_collection_output";
-      /**
-       * Collection
-       * @description The output conditioning tensors
-       */
-      collection: components["schemas"]["ConditioningField"][];
     };
     /**
      * ConditioningField
@@ -1156,26 +1217,31 @@ export type components = {
     ConditioningInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Conditioning
+       * @description Conditioning tensor
+       */
+      conditioning?: components["schemas"]["ConditioningField"];
       /**
        * Type
        * @default conditioning
        * @enum {string}
        */
       type: "conditioning";
-      /**
-       * Conditioning
-       * @description Conditioning tensor
-       */
-      conditioning?: components["schemas"]["ConditioningField"];
     };
     /**
      * ConditioningOutput
@@ -1183,16 +1249,16 @@ export type components = {
      */
     ConditioningOutput: {
       /**
+       * Conditioning
+       * @description Conditioning tensor
+       */
+      conditioning: components["schemas"]["ConditioningField"];
+      /**
        * Type
        * @default conditioning_output
        * @enum {string}
        */
       type: "conditioning_output";
-      /**
-       * Conditioning
-       * @description Conditioning tensor
-       */
-      conditioning: components["schemas"]["ConditioningField"];
     };
     /**
      * Content Shuffle Processor
@@ -1201,26 +1267,31 @@ export type components = {
     ContentShuffleImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default content_shuffle_image_processor
        * @enum {string}
        */
       type: "content_shuffle_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -1304,21 +1375,20 @@ export type components = {
     ControlNetInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default controlnet
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "controlnet";
+      workflow?: string;
       /**
        * Image
        * @description The control image
@@ -1327,9 +1397,8 @@ export type components = {
       /**
        * Control Model
        * @description ControlNet model to load
-       * @default lllyasviel/sd-controlnet-canny
        */
-      control_model?: components["schemas"]["ControlNetModelField"];
+      control_model: components["schemas"]["ControlNetModelField"];
       /**
        * Control Weight
        * @description The weight given to the ControlNet
@@ -1362,6 +1431,12 @@ export type components = {
        * @enum {string}
        */
       resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+      /**
+       * Type
+       * @default controlnet
+       * @enum {string}
+       */
+      type: "controlnet";
     };
     /** ControlNetModelCheckpointConfig */
     ControlNetModelCheckpointConfig: {
@@ -1426,16 +1501,16 @@ export type components = {
      */
     ControlOutput: {
       /**
+       * Control
+       * @description ControlNet(s) to apply
+       */
+      control: components["schemas"]["ControlField"];
+      /**
        * Type
        * @default control_output
        * @enum {string}
        */
       type: "control_output";
-      /**
-       * Control
-       * @description ControlNet(s) to apply
-       */
-      control: components["schemas"]["ControlField"];
     };
     /**
      * CoreMetadata
@@ -1445,7 +1520,7 @@ export type components = {
       /**
        * App Version
        * @description The version of InvokeAI used to generate this image
-       * @default 3.0.2post1
+       * @default 3.1.0
        */
       app_version?: string;
       /**
@@ -1569,20 +1644,75 @@ export type components = {
        */
       refiner_scheduler?: string;
       /**
-       * Refiner Positive Aesthetic Store
+       * Refiner Positive Aesthetic Score
        * @description The aesthetic score used for the refiner
        */
-      refiner_positive_aesthetic_store?: number;
+      refiner_positive_aesthetic_score?: number;
       /**
-       * Refiner Negative Aesthetic Store
+       * Refiner Negative Aesthetic Score
        * @description The aesthetic score used for the refiner
        */
-      refiner_negative_aesthetic_store?: number;
+      refiner_negative_aesthetic_score?: number;
       /**
        * Refiner Start
        * @description The start value used for refiner denoising
        */
       refiner_start?: number;
+    };
+    /**
+     * Create Denoise Mask
+     * @description Creates mask for denoising model run.
+     */
+    CreateDenoiseMaskInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Vae
+       * @description VAE
+       */
+      vae?: components["schemas"]["VaeField"];
+      /**
+       * Image
+       * @description Image which will be masked
+       */
+      image?: components["schemas"]["ImageField"];
+      /**
+       * Mask
+       * @description The mask to use when pasting
+       */
+      mask?: components["schemas"]["ImageField"];
+      /**
+       * Tiled
+       * @description Processing using overlapping tiles (reduce memory consumption)
+       * @default false
+       */
+      tiled?: boolean;
+      /**
+       * Fp32
+       * @description Whether or not to use full float32 precision
+       * @default false
+       */
+      fp32?: boolean;
+      /**
+       * Type
+       * @default create_denoise_mask
+       * @enum {string}
+       */
+      type: "create_denoise_mask";
     };
     /**
      * OpenCV Inpaint
@@ -1591,21 +1721,20 @@ export type components = {
     CvInpaintInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default cv_inpaint
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "cv_inpaint";
+      workflow?: string;
       /**
        * Image
        * @description The image to inpaint
@@ -1616,6 +1745,12 @@ export type components = {
        * @description The mask to use when inpainting
        */
       mask?: components["schemas"]["ImageField"];
+      /**
+       * Type
+       * @default cv_inpaint
+       * @enum {string}
+       */
+      type: "cv_inpaint";
     };
     /** DeleteBoardResult */
     DeleteBoardResult: {
@@ -1647,21 +1782,20 @@ export type components = {
     DenoiseLatentsInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default denoise_latents
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "denoise_latents";
+      workflow?: string;
       /**
        * Noise
        * @description Noise tensor
@@ -1709,10 +1843,16 @@ export type components = {
        */
       latents?: components["schemas"]["LatentsField"];
       /**
-       * Mask
+       * Denoise Mask
        * @description The mask to use for the operation
        */
-      mask?: components["schemas"]["ImageField"];
+      denoise_mask?: components["schemas"]["DenoiseMaskField"];
+      /**
+       * Type
+       * @default denoise_latents
+       * @enum {string}
+       */
+      type: "denoise_latents";
       /**
        * Positive Conditioning
        * @description Positive conditioning tensor
@@ -1730,27 +1870,59 @@ export type components = {
       unet?: components["schemas"]["UNetField"];
     };
     /**
+     * DenoiseMaskField
+     * @description An inpaint mask field
+     */
+    DenoiseMaskField: {
+      /**
+       * Mask Name
+       * @description The name of the mask image
+       */
+      mask_name: string;
+      /**
+       * Masked Latents Name
+       * @description The name of the masked image latents
+       */
+      masked_latents_name?: string;
+    };
+    /**
+     * DenoiseMaskOutput
+     * @description Base class for nodes that output a single image
+     */
+    DenoiseMaskOutput: {
+      /**
+       * Denoise Mask
+       * @description Mask for denoise model run
+       */
+      denoise_mask: components["schemas"]["DenoiseMaskField"];
+      /**
+       * Type
+       * @default denoise_mask_output
+       * @enum {string}
+       */
+      type: "denoise_mask_output";
+    };
+    /**
      * Divide Integers
      * @description Divides two numbers
      */
     DivideInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default div
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "div";
+      workflow?: string;
       /**
        * A
        * @description The first number
@@ -1763,6 +1935,12 @@ export type components = {
        * @default 0
        */
       b?: number;
+      /**
+       * Type
+       * @default div
+       * @enum {string}
+       */
+      type: "div";
     };
     /**
      * Dynamic Prompt
@@ -1771,21 +1949,20 @@ export type components = {
     DynamicPromptInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default dynamic_prompt
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "dynamic_prompt";
+      workflow?: string;
       /**
        * Prompt
        * @description The prompt to parse with dynamicprompts
@@ -1803,6 +1980,12 @@ export type components = {
        * @default false
        */
       combinatorial?: boolean;
+      /**
+       * Type
+       * @default dynamic_prompt
+       * @enum {string}
+       */
+      type: "dynamic_prompt";
     };
     /**
      * Upscale (RealESRGAN)
@@ -1811,21 +1994,20 @@ export type components = {
     ESRGANInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default esrgan
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "esrgan";
+      workflow?: string;
       /**
        * Image
        * @description The input image
@@ -1838,6 +2020,12 @@ export type components = {
        * @enum {string}
        */
       model_name?: "RealESRGAN_x4plus.pth" | "RealESRGAN_x4plus_anime_6B.pth" | "ESRGAN_SRx4_DF2KOST_official-ff704c30.pth" | "RealESRGAN_x2plus.pth";
+      /**
+       * Type
+       * @default esrgan
+       * @enum {string}
+       */
+      type: "esrgan";
     };
     /** Edge */
     Edge: {
@@ -1866,32 +2054,37 @@ export type components = {
       field: string;
     };
     /**
-     * Float Primitive Collection
+     * Float Collection Primitive
      * @description A collection of float primitive values
      */
     FloatCollectionInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Collection
+       * @description The collection of float values
+       */
+      collection?: number[];
       /**
        * Type
        * @default float_collection
        * @enum {string}
        */
       type: "float_collection";
-      /**
-       * Collection
-       * @description The collection of float values
-       */
-      collection?: number[];
     };
     /**
      * FloatCollectionOutput
@@ -1899,16 +2092,16 @@ export type components = {
      */
     FloatCollectionOutput: {
       /**
+       * Collection
+       * @description The float collection
+       */
+      collection: number[];
+      /**
        * Type
        * @default float_collection_output
        * @enum {string}
        */
       type: "float_collection_output";
-      /**
-       * Collection
-       * @description The float collection
-       */
-      collection: number[];
     };
     /**
      * Float Primitive
@@ -1917,27 +2110,32 @@ export type components = {
     FloatInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default float
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "float";
+      workflow?: string;
       /**
        * Value
        * @description The float value
        * @default 0
        */
       value?: number;
+      /**
+       * Type
+       * @default float
+       * @enum {string}
+       */
+      type: "float";
     };
     /**
      * Float Range
@@ -1946,21 +2144,20 @@ export type components = {
     FloatLinearRangeInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default float_range
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "float_range";
+      workflow?: string;
       /**
        * Start
        * @description The first value of the range
@@ -1979,6 +2176,12 @@ export type components = {
        * @default 30
        */
       steps?: number;
+      /**
+       * Type
+       * @default float_range
+       * @enum {string}
+       */
+      type: "float_range";
     };
     /**
      * FloatOutput
@@ -1986,16 +2189,16 @@ export type components = {
      */
     FloatOutput: {
       /**
+       * Value
+       * @description The output float
+       */
+      value: number;
+      /**
        * Type
        * @default float_output
        * @enum {string}
        */
       type: "float_output";
-      /**
-       * Value
-       * @description The output float
-       */
-      value: number;
     };
     /** Graph */
     Graph: {
@@ -2009,7 +2212,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes?: {
-        [key: string]: components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageLuminosityAdjustmentInvocation"] | components["schemas"]["ImageSaturationAdjustmentInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
+        [key: string]: components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageLuminosityAdjustmentInvocation"] | components["schemas"]["ImageSaturationAdjustmentInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
       };
       /**
        * Edges
@@ -2052,7 +2255,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["BooleanOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["VaeLoaderOutput"] | components["schemas"]["MetadataAccumulatorOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["CollectInvocationOutput"];
+        [key: string]: components["schemas"]["BooleanOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["VaeLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["MetadataAccumulatorOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["CollectInvocationOutput"];
       };
       /**
        * Errors
@@ -2083,30 +2286,37 @@ export type components = {
     GraphInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Graph
+       * @description The graph to run
+       */
+      graph?: components["schemas"]["Graph"];
       /**
        * Type
        * @default graph
        * @enum {string}
        */
       type: "graph";
-      /**
-       * Graph
-       * @description The graph to run
-       */
-      graph?: components["schemas"]["Graph"];
     };
     /**
      * GraphInvocationOutput
-     * @description Base class for all invocation outputs
+     * @description Base class for all invocation outputs.
+     *
+     * All invocation outputs must use the `@invocation_output` decorator to provide their unique type.
      */
     GraphInvocationOutput: {
       /**
@@ -2128,26 +2338,31 @@ export type components = {
     HedImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default hed_image_processor
        * @enum {string}
        */
       type: "hed_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -2174,21 +2389,20 @@ export type components = {
     ImageBlurInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_blur
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_blur";
+      workflow?: string;
       /**
        * Image
        * @description The image to blur
@@ -2207,6 +2421,12 @@ export type components = {
        * @enum {string}
        */
       blur_type?: "gaussian" | "box";
+      /**
+       * Type
+       * @default img_blur
+       * @enum {string}
+       */
+      type: "img_blur";
     };
     /**
      * ImageCategory
@@ -2227,21 +2447,20 @@ export type components = {
     ImageChannelInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_chan
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_chan";
+      workflow?: string;
       /**
        * Image
        * @description The image to get the channel from
@@ -2254,35 +2473,45 @@ export type components = {
        * @enum {string}
        */
       channel?: "A" | "R" | "G" | "B";
+      /**
+       * Type
+       * @default img_chan
+       * @enum {string}
+       */
+      type: "img_chan";
     };
     /**
-     * Image Primitive Collection
+     * Image Collection Primitive
      * @description A collection of image primitive values
      */
     ImageCollectionInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Collection
+       * @description The collection of image values
+       */
+      collection?: components["schemas"]["ImageField"][];
       /**
        * Type
        * @default image_collection
        * @enum {string}
        */
       type: "image_collection";
-      /**
-       * Collection
-       * @description The collection of image values
-       * @default 0
-       */
-      collection?: components["schemas"]["ImageField"][];
     };
     /**
      * ImageCollectionOutput
@@ -2290,16 +2519,16 @@ export type components = {
      */
     ImageCollectionOutput: {
       /**
+       * Collection
+       * @description The output images
+       */
+      collection: components["schemas"]["ImageField"][];
+      /**
        * Type
        * @default image_collection_output
        * @enum {string}
        */
       type: "image_collection_output";
-      /**
-       * Collection
-       * @description The output images
-       */
-      collection: components["schemas"]["ImageField"][];
     };
     /**
      * Convert Image Mode
@@ -2308,21 +2537,20 @@ export type components = {
     ImageConvertInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_conv
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_conv";
+      workflow?: string;
       /**
        * Image
        * @description The image to convert
@@ -2335,6 +2563,12 @@ export type components = {
        * @enum {string}
        */
       mode?: "L" | "RGB" | "RGBA" | "CMYK" | "YCbCr" | "LAB" | "HSV" | "I" | "F";
+      /**
+       * Type
+       * @default img_conv
+       * @enum {string}
+       */
+      type: "img_conv";
     };
     /**
      * Crop Image
@@ -2343,21 +2577,20 @@ export type components = {
     ImageCropInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_crop
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_crop";
+      workflow?: string;
       /**
        * Image
        * @description The image to crop
@@ -2387,6 +2620,12 @@ export type components = {
        * @default 512
        */
       height?: number;
+      /**
+       * Type
+       * @default img_crop
+       * @enum {string}
+       */
+      type: "img_crop";
     };
     /**
      * ImageDTO
@@ -2475,27 +2714,26 @@ export type components = {
       image_name: string;
     };
     /**
-     * Image Hue Adjustment
+     * Adjust Image Hue
      * @description Adjusts the Hue of an image.
      */
     ImageHueAdjustmentInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_hue_adjust
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_hue_adjust";
+      workflow?: string;
       /**
        * Image
        * @description The image to adjust
@@ -2507,6 +2745,12 @@ export type components = {
        * @default 0
        */
       hue?: number;
+      /**
+       * Type
+       * @default img_hue_adjust
+       * @enum {string}
+       */
+      type: "img_hue_adjust";
     };
     /**
      * Inverse Lerp Image
@@ -2515,21 +2759,20 @@ export type components = {
     ImageInverseLerpInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_ilerp
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_ilerp";
+      workflow?: string;
       /**
        * Image
        * @description The image to lerp
@@ -2547,6 +2790,12 @@ export type components = {
        * @default 255
        */
       max?: number;
+      /**
+       * Type
+       * @default img_ilerp
+       * @enum {string}
+       */
+      type: "img_ilerp";
     };
     /**
      * Image Primitive
@@ -2555,26 +2804,31 @@ export type components = {
     ImageInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to load
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default image
        * @enum {string}
        */
       type: "image";
-      /**
-       * Image
-       * @description The image to load
-       */
-      image?: components["schemas"]["ImageField"];
     };
     /**
      * Lerp Image
@@ -2583,21 +2837,20 @@ export type components = {
     ImageLerpInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_lerp
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_lerp";
+      workflow?: string;
       /**
        * Image
        * @description The image to lerp
@@ -2615,29 +2868,34 @@ export type components = {
        * @default 255
        */
       max?: number;
+      /**
+       * Type
+       * @default img_lerp
+       * @enum {string}
+       */
+      type: "img_lerp";
     };
     /**
-     * Image Luminosity Adjustment
+     * Adjust Image Luminosity
      * @description Adjusts the Luminosity (Value) of an image.
      */
     ImageLuminosityAdjustmentInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_luminosity_adjust
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_luminosity_adjust";
+      workflow?: string;
       /**
        * Image
        * @description The image to adjust
@@ -2649,6 +2907,12 @@ export type components = {
        * @default 1
        */
       luminosity?: number;
+      /**
+       * Type
+       * @default img_luminosity_adjust
+       * @enum {string}
+       */
+      type: "img_luminosity_adjust";
     };
     /**
      * ImageMetadata
@@ -2673,21 +2937,20 @@ export type components = {
     ImageMultiplyInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_mul
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_mul";
+      workflow?: string;
       /**
        * Image1
        * @description The first image to multiply
@@ -2698,6 +2961,12 @@ export type components = {
        * @description The second image to multiply
        */
       image2?: components["schemas"]["ImageField"];
+      /**
+       * Type
+       * @default img_mul
+       * @enum {string}
+       */
+      type: "img_mul";
     };
     /**
      * Blur NSFW Image
@@ -2706,26 +2975,31 @@ export type components = {
     ImageNSFWBlurInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Metadata
+       * @description Optional core metadata to be written to image
+       */
+      metadata?: components["schemas"]["CoreMetadata"];
       /**
        * Type
        * @default img_nsfw
        * @enum {string}
        */
       type: "img_nsfw";
-      /**
-       * Metadata
-       * @description Optional core metadata to be written to image
-       */
-      metadata?: components["schemas"]["CoreMetadata"];
       /**
        * Image
        * @description The image to check
@@ -2737,12 +3011,6 @@ export type components = {
      * @description Base class for nodes that output a single image
      */
     ImageOutput: {
-      /**
-       * Type
-       * @default image_output
-       * @enum {string}
-       */
-      type: "image_output";
       /**
        * Image
        * @description The output image
@@ -2758,6 +3026,12 @@ export type components = {
        * @description The height of the image in pixels
        */
       height: number;
+      /**
+       * Type
+       * @default image_output
+       * @enum {string}
+       */
+      type: "image_output";
     };
     /**
      * Paste Image
@@ -2766,21 +3040,20 @@ export type components = {
     ImagePasteInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_paste
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_paste";
+      workflow?: string;
       /**
        * Base Image
        * @description The base image
@@ -2808,34 +3081,45 @@ export type components = {
        * @default 0
        */
       y?: number;
+      /**
+       * Type
+       * @default img_paste
+       * @enum {string}
+       */
+      type: "img_paste";
     };
     /**
-     * ImageProcessorInvocation
+     * Base Image Processor
      * @description Base class for invocations that preprocess images for ControlNet
      */
     ImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default image_processor
        * @enum {string}
        */
       type: "image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
     };
     /**
      * ImageRecordChanges
@@ -2873,21 +3157,20 @@ export type components = {
     ImageResizeInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_resize
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_resize";
+      workflow?: string;
       /**
        * Image
        * @description The image to resize
@@ -2912,29 +3195,39 @@ export type components = {
        * @enum {string}
        */
       resample_mode?: "nearest" | "box" | "bilinear" | "hamming" | "bicubic" | "lanczos";
+      /**
+       * Metadata
+       * @description Optional core metadata to be written to image
+       */
+      metadata?: components["schemas"]["CoreMetadata"];
+      /**
+       * Type
+       * @default img_resize
+       * @enum {string}
+       */
+      type: "img_resize";
     };
     /**
-     * Image Saturation Adjustment
+     * Adjust Image Saturation
      * @description Adjusts the Saturation of an image.
      */
     ImageSaturationAdjustmentInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_saturation_adjust
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_saturation_adjust";
+      workflow?: string;
       /**
        * Image
        * @description The image to adjust
@@ -2946,6 +3239,12 @@ export type components = {
        * @default 1
        */
       saturation?: number;
+      /**
+       * Type
+       * @default img_saturation_adjust
+       * @enum {string}
+       */
+      type: "img_saturation_adjust";
     };
     /**
      * Scale Image
@@ -2954,21 +3253,20 @@ export type components = {
     ImageScaleInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_scale
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_scale";
+      workflow?: string;
       /**
        * Image
        * @description The image to scale
@@ -2987,6 +3285,12 @@ export type components = {
        * @enum {string}
        */
       resample_mode?: "nearest" | "box" | "bilinear" | "hamming" | "bicubic" | "lanczos";
+      /**
+       * Type
+       * @default img_scale
+       * @enum {string}
+       */
+      type: "img_scale";
     };
     /**
      * Image to Latents
@@ -2995,21 +3299,20 @@ export type components = {
     ImageToLatentsInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default i2l
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "i2l";
+      workflow?: string;
       /**
        * Image
        * @description The image to encode
@@ -3032,6 +3335,12 @@ export type components = {
        * @default false
        */
       fp32?: boolean;
+      /**
+       * Type
+       * @default i2l
+       * @enum {string}
+       */
+      type: "i2l";
     };
     /**
      * ImageUrlsDTO
@@ -3061,21 +3370,20 @@ export type components = {
     ImageWatermarkInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default img_watermark
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "img_watermark";
+      workflow?: string;
       /**
        * Image
        * @description The image to check
@@ -3092,6 +3400,12 @@ export type components = {
        * @description Optional core metadata to be written to image
        */
       metadata?: components["schemas"]["CoreMetadata"];
+      /**
+       * Type
+       * @default img_watermark
+       * @enum {string}
+       */
+      type: "img_watermark";
     };
     /** ImagesUpdatedFromListResult */
     ImagesUpdatedFromListResult: {
@@ -3108,21 +3422,20 @@ export type components = {
     InfillColorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default infill_rgba
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "infill_rgba";
+      workflow?: string;
       /**
        * Image
        * @description The image to infill
@@ -3139,6 +3452,12 @@ export type components = {
        * }
        */
       color?: components["schemas"]["ColorField"];
+      /**
+       * Type
+       * @default infill_rgba
+       * @enum {string}
+       */
+      type: "infill_rgba";
     };
     /**
      * PatchMatch Infill
@@ -3147,26 +3466,31 @@ export type components = {
     InfillPatchMatchInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to infill
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default infill_patchmatch
        * @enum {string}
        */
       type: "infill_patchmatch";
-      /**
-       * Image
-       * @description The image to infill
-       */
-      image?: components["schemas"]["ImageField"];
     };
     /**
      * Tile Infill
@@ -3175,21 +3499,20 @@ export type components = {
     InfillTileInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default infill_tile
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "infill_tile";
+      workflow?: string;
       /**
        * Image
        * @description The image to infill
@@ -3206,35 +3529,45 @@ export type components = {
        * @description The seed to use for tile generation (omit for random)
        */
       seed?: number;
+      /**
+       * Type
+       * @default infill_tile
+       * @enum {string}
+       */
+      type: "infill_tile";
     };
     /**
-     * Integer Primitive Collection
+     * Integer Collection Primitive
      * @description A collection of integer primitive values
      */
     IntegerCollectionInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Collection
+       * @description The collection of integer values
+       */
+      collection?: number[];
       /**
        * Type
        * @default integer_collection
        * @enum {string}
        */
       type: "integer_collection";
-      /**
-       * Collection
-       * @description The collection of integer values
-       * @default 0
-       */
-      collection?: number[];
     };
     /**
      * IntegerCollectionOutput
@@ -3242,16 +3575,16 @@ export type components = {
      */
     IntegerCollectionOutput: {
       /**
+       * Collection
+       * @description The int collection
+       */
+      collection: number[];
+      /**
        * Type
        * @default integer_collection_output
        * @enum {string}
        */
       type: "integer_collection_output";
-      /**
-       * Collection
-       * @description The int collection
-       */
-      collection: number[];
     };
     /**
      * Integer Primitive
@@ -3260,27 +3593,32 @@ export type components = {
     IntegerInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default integer
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "integer";
+      workflow?: string;
       /**
        * Value
        * @description The integer value
        * @default 0
        */
       value?: number;
+      /**
+       * Type
+       * @default integer
+       * @enum {string}
+       */
+      type: "integer";
     };
     /**
      * IntegerOutput
@@ -3288,16 +3626,16 @@ export type components = {
      */
     IntegerOutput: {
       /**
+       * Value
+       * @description The output integer
+       */
+      value: number;
+      /**
        * Type
        * @default integer_output
        * @enum {string}
        */
       type: "integer_output";
-      /**
-       * Value
-       * @description The output integer
-       */
-      value: number;
     };
     /**
      * IterateInvocation
@@ -3306,21 +3644,20 @@ export type components = {
     IterateInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default iterate
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "iterate";
+      workflow?: string;
       /**
        * Collection
        * @description The list of items to iterate over
@@ -3332,6 +3669,12 @@ export type components = {
        * @default 0
        */
       index?: number;
+      /**
+       * Type
+       * @default iterate
+       * @enum {string}
+       */
+      type: "iterate";
     };
     /**
      * IterateInvocationOutput
@@ -3339,16 +3682,16 @@ export type components = {
      */
     IterateInvocationOutput: {
       /**
+       * Collection Item
+       * @description The item being iterated over
+       */
+      item?: unknown;
+      /**
        * Type
        * @default iterate_output
        * @enum {string}
        */
       type: "iterate_output";
-      /**
-       * Collection Item
-       * @description The item being iterated over
-       */
-      item?: unknown;
     };
     /**
      * LaMa Infill
@@ -3357,54 +3700,64 @@ export type components = {
     LaMaInfillInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to infill
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default infill_lama
        * @enum {string}
        */
       type: "infill_lama";
-      /**
-       * Image
-       * @description The image to infill
-       */
-      image?: components["schemas"]["ImageField"];
     };
     /**
-     * Latents Primitive Collection
+     * Latents Collection Primitive
      * @description A collection of latents tensor primitive values
      */
     LatentsCollectionInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Collection
+       * @description The collection of latents tensors
+       */
+      collection?: components["schemas"]["LatentsField"][];
       /**
        * Type
        * @default latents_collection
        * @enum {string}
        */
       type: "latents_collection";
-      /**
-       * Collection
-       * @description The collection of latents tensors
-       */
-      collection?: components["schemas"]["LatentsField"][];
     };
     /**
      * LatentsCollectionOutput
@@ -3412,16 +3765,16 @@ export type components = {
      */
     LatentsCollectionOutput: {
       /**
+       * Collection
+       * @description Latents tensor
+       */
+      collection: components["schemas"]["LatentsField"][];
+      /**
        * Type
        * @default latents_collection_output
        * @enum {string}
        */
       type: "latents_collection_output";
-      /**
-       * Collection
-       * @description Latents tensor
-       */
-      collection: components["schemas"]["LatentsField"][];
     };
     /**
      * LatentsField
@@ -3446,38 +3799,37 @@ export type components = {
     LatentsInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Latents
+       * @description The latents tensor
+       */
+      latents?: components["schemas"]["LatentsField"];
       /**
        * Type
        * @default latents
        * @enum {string}
        */
       type: "latents";
-      /**
-       * Latents
-       * @description The latents tensor
-       */
-      latents?: components["schemas"]["LatentsField"];
     };
     /**
      * LatentsOutput
      * @description Base class for nodes that output a single latents tensor
      */
     LatentsOutput: {
-      /**
-       * Type
-       * @default latents_output
-       * @enum {string}
-       */
-      type: "latents_output";
       /**
        * Latents
        * @description Latents tensor
@@ -3493,6 +3845,12 @@ export type components = {
        * @description Height of output (px)
        */
       height: number;
+      /**
+       * Type
+       * @default latents_output
+       * @enum {string}
+       */
+      type: "latents_output";
     };
     /**
      * Latents to Image
@@ -3501,21 +3859,20 @@ export type components = {
     LatentsToImageInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default l2i
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "l2i";
+      workflow?: string;
       /**
        * Tiled
        * @description Processing using overlapping tiles (reduce memory consumption)
@@ -3534,6 +3891,12 @@ export type components = {
        */
       metadata?: components["schemas"]["CoreMetadata"];
       /**
+       * Type
+       * @default l2i
+       * @enum {string}
+       */
+      type: "l2i";
+      /**
        * Latents
        * @description Latents tensor
        */
@@ -3551,26 +3914,31 @@ export type components = {
     LeresImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default leres_image_processor
        * @enum {string}
        */
       type: "leres_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Thr A
        * @description Leres parameter `thr_a`
@@ -3609,26 +3977,31 @@ export type components = {
     LineartAnimeImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default lineart_anime_image_processor
        * @enum {string}
        */
       type: "lineart_anime_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -3649,26 +4022,31 @@ export type components = {
     LineartImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default lineart_image_processor
        * @enum {string}
        */
       type: "lineart_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -3772,21 +4150,20 @@ export type components = {
     LoraLoaderInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default lora_loader
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "lora_loader";
+      workflow?: string;
       /**
        * LoRA
        * @description LoRA model to load
@@ -3808,18 +4185,18 @@ export type components = {
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip?: components["schemas"]["ClipField"];
+      /**
+       * Type
+       * @default lora_loader
+       * @enum {string}
+       */
+      type: "lora_loader";
     };
     /**
      * LoraLoaderOutput
      * @description Model loader output
      */
     LoraLoaderOutput: {
-      /**
-       * Type
-       * @default lora_loader_output
-       * @enum {string}
-       */
-      type: "lora_loader_output";
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
@@ -3830,6 +4207,12 @@ export type components = {
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip?: components["schemas"]["ClipField"];
+      /**
+       * Type
+       * @default lora_loader_output
+       * @enum {string}
+       */
+      type: "lora_loader_output";
     };
     /**
      * MainModelField
@@ -3853,49 +4236,53 @@ export type components = {
     MainModelLoaderInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Model
+       * @description Main model (UNet, VAE, CLIP) to load
+       */
+      model: components["schemas"]["MainModelField"];
       /**
        * Type
        * @default main_model_loader
        * @enum {string}
        */
       type: "main_model_loader";
-      /**
-       * Model
-       * @description Main model (UNet, VAE, CLIP) to load
-       */
-      model: components["schemas"]["MainModelField"];
     };
     /**
-     * Combine Mask
+     * Combine Masks
      * @description Combine two masks together by multiplying them using `PIL.ImageChops.multiply()`.
      */
     MaskCombineInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default mask_combine
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "mask_combine";
+      workflow?: string;
       /**
        * Mask1
        * @description The first mask to combine
@@ -3906,6 +4293,12 @@ export type components = {
        * @description The second image to combine
        */
       mask2?: components["schemas"]["ImageField"];
+      /**
+       * Type
+       * @default mask_combine
+       * @enum {string}
+       */
+      type: "mask_combine";
     };
     /**
      * Mask Edge
@@ -3914,21 +4307,20 @@ export type components = {
     MaskEdgeInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default mask_edge
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "mask_edge";
+      workflow?: string;
       /**
        * Image
        * @description The image to apply the mask to
@@ -3954,6 +4346,12 @@ export type components = {
        * @description Second threshold for the hysteresis procedure in Canny edge detection
        */
       high_threshold?: number;
+      /**
+       * Type
+       * @default mask_edge
+       * @enum {string}
+       */
+      type: "mask_edge";
     };
     /**
      * Mask from Alpha
@@ -3962,21 +4360,20 @@ export type components = {
     MaskFromAlphaInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default tomask
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "tomask";
+      workflow?: string;
       /**
        * Image
        * @description The image to create the mask from
@@ -3988,6 +4385,12 @@ export type components = {
        * @default false
        */
       invert?: boolean;
+      /**
+       * Type
+       * @default tomask
+       * @enum {string}
+       */
+      type: "tomask";
     };
     /**
      * Mediapipe Face Processor
@@ -3996,26 +4399,31 @@ export type components = {
     MediapipeFaceProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default mediapipe_face_processor
        * @enum {string}
        */
       type: "mediapipe_face_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Max Faces
        * @description Maximum number of faces to detect
@@ -4042,21 +4450,20 @@ export type components = {
     MetadataAccumulatorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default metadata_accumulator
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "metadata_accumulator";
+      workflow?: string;
       /**
        * Generation Mode
        * @description The generation mode that output this image
@@ -4173,20 +4580,26 @@ export type components = {
        */
       refiner_scheduler?: string;
       /**
-       * Refiner Positive Aesthetic Store
+       * Refiner Positive Aesthetic Score
        * @description The aesthetic score used for the refiner
        */
-      refiner_positive_aesthetic_store?: number;
+      refiner_positive_aesthetic_score?: number;
       /**
-       * Refiner Negative Aesthetic Store
+       * Refiner Negative Aesthetic Score
        * @description The aesthetic score used for the refiner
        */
-      refiner_negative_aesthetic_store?: number;
+      refiner_negative_aesthetic_score?: number;
       /**
        * Refiner Start
        * @description The start value used for refiner denoising
        */
       refiner_start?: number;
+      /**
+       * Type
+       * @default metadata_accumulator
+       * @enum {string}
+       */
+      type: "metadata_accumulator";
     };
     /**
      * MetadataAccumulatorOutput
@@ -4194,44 +4607,49 @@ export type components = {
      */
     MetadataAccumulatorOutput: {
       /**
+       * Metadata
+       * @description The core metadata for the image
+       */
+      metadata: components["schemas"]["CoreMetadata"];
+      /**
        * Type
        * @default metadata_accumulator_output
        * @enum {string}
        */
       type: "metadata_accumulator_output";
-      /**
-       * Metadata
-       * @description The core metadata for the image
-       */
-      metadata: components["schemas"]["CoreMetadata"];
     };
     /**
-     * Midas (Depth) Processor
+     * Midas Depth Processor
      * @description Applies Midas depth processing to image
      */
     MidasDepthImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default midas_depth_image_processor
        * @enum {string}
        */
       type: "midas_depth_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * A Mult
        * @description Midas parameter `a_mult` (a = a_mult * PI)
@@ -4252,26 +4670,31 @@ export type components = {
     MlsdImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default mlsd_image_processor
        * @enum {string}
        */
       type: "mlsd_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -4323,12 +4746,6 @@ export type components = {
      */
     ModelLoaderOutput: {
       /**
-       * Type
-       * @default model_loader_output
-       * @enum {string}
-       */
-      type: "model_loader_output";
-      /**
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
@@ -4343,6 +4760,12 @@ export type components = {
        * @description VAE
        */
       vae: components["schemas"]["VaeField"];
+      /**
+       * Type
+       * @default model_loader_output
+       * @enum {string}
+       */
+      type: "model_loader_output";
     };
     /**
      * ModelType
@@ -4368,21 +4791,20 @@ export type components = {
     MultiplyInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default mul
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "mul";
+      workflow?: string;
       /**
        * A
        * @description The first number
@@ -4395,6 +4817,12 @@ export type components = {
        * @default 0
        */
       b?: number;
+      /**
+       * Type
+       * @default mul
+       * @enum {string}
+       */
+      type: "mul";
     };
     /**
      * Noise
@@ -4403,21 +4831,20 @@ export type components = {
     NoiseInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default noise
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "noise";
+      workflow?: string;
       /**
        * Seed
        * @description Seed for random number generation
@@ -4441,18 +4868,18 @@ export type components = {
        * @default true
        */
       use_cpu?: boolean;
+      /**
+       * Type
+       * @default noise
+       * @enum {string}
+       */
+      type: "noise";
     };
     /**
      * NoiseOutput
      * @description Invocation noise output
      */
     NoiseOutput: {
-      /**
-       * Type
-       * @default noise_output
-       * @enum {string}
-       */
-      type: "noise_output";
       /**
        * Noise
        * @description Noise tensor
@@ -4468,6 +4895,12 @@ export type components = {
        * @description Height of output (px)
        */
       height: number;
+      /**
+       * Type
+       * @default noise_output
+       * @enum {string}
+       */
+      type: "noise_output";
     };
     /**
      * Normal BAE Processor
@@ -4476,26 +4909,31 @@ export type components = {
     NormalbaeImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default normalbae_image_processor
        * @enum {string}
        */
       type: "normalbae_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -4516,21 +4954,20 @@ export type components = {
     ONNXLatentsToImageInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default l2i_onnx
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "l2i_onnx";
+      workflow?: string;
       /**
        * Latents
        * @description Denoised latents tensor
@@ -4546,18 +4983,18 @@ export type components = {
        * @description Optional core metadata to be written to image
        */
       metadata?: components["schemas"]["CoreMetadata"];
+      /**
+       * Type
+       * @default l2i_onnx
+       * @enum {string}
+       */
+      type: "l2i_onnx";
     };
     /**
      * ONNXModelLoaderOutput
      * @description Model loader output
      */
     ONNXModelLoaderOutput: {
-      /**
-       * Type
-       * @default model_loader_output_onnx
-       * @enum {string}
-       */
-      type: "model_loader_output_onnx";
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
@@ -4578,30 +5015,37 @@ export type components = {
        * @description VAE
        */
       vae_encoder?: components["schemas"]["VaeField"];
+      /**
+       * Type
+       * @default model_loader_output_onnx
+       * @enum {string}
+       */
+      type: "model_loader_output_onnx";
     };
     /**
      * ONNX Prompt (Raw)
      * @description A node to process inputs and produce outputs.
      * May use dependency injection in __init__ to receive providers.
+     *
+     * All invocations must use the `@invocation` decorator to provide their unique type.
      */
     ONNXPromptInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default prompt_onnx
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "prompt_onnx";
+      workflow?: string;
       /**
        * Prompt
        * @description Raw prompt text (no parsing)
@@ -4613,6 +5057,12 @@ export type components = {
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip?: components["schemas"]["ClipField"];
+      /**
+       * Type
+       * @default prompt_onnx
+       * @enum {string}
+       */
+      type: "prompt_onnx";
     };
     /** ONNXStableDiffusion1ModelConfig */
     ONNXStableDiffusion1ModelConfig: {
@@ -4668,21 +5118,20 @@ export type components = {
     ONNXTextToLatentsInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default t2l_onnx
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "t2l_onnx";
+      workflow?: string;
       /**
        * Positive Conditioning
        * @description Positive conditioning tensor
@@ -4734,6 +5183,12 @@ export type components = {
        * @description ControlNet(s) to apply
        */
       control?: components["schemas"]["ControlField"] | components["schemas"]["ControlField"][];
+      /**
+       * Type
+       * @default t2l_onnx
+       * @enum {string}
+       */
+      type: "t2l_onnx";
     };
     /**
      * OffsetPaginatedResults[BoardDTO]
@@ -4809,26 +5264,31 @@ export type components = {
     OnnxModelLoaderInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Model
+       * @description ONNX Main model (UNet, VAE, CLIP) to load
+       */
+      model: components["schemas"]["OnnxModelField"];
       /**
        * Type
        * @default onnx_model_loader
        * @enum {string}
        */
       type: "onnx_model_loader";
-      /**
-       * Model
-       * @description ONNX Main model (UNet, VAE, CLIP) to load
-       */
-      model: components["schemas"]["OnnxModelField"];
     };
     /**
      * Openpose Processor
@@ -4837,26 +5297,31 @@ export type components = {
     OpenposeImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default openpose_image_processor
        * @enum {string}
        */
       type: "openpose_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Hand And Face
        * @description Whether to use hands and face mode
@@ -4914,26 +5379,31 @@ export type components = {
     PidiImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default pidi_image_processor
        * @enum {string}
        */
       type: "pidi_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -4966,21 +5436,20 @@ export type components = {
     PromptsFromFileInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default prompt_from_file
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "prompt_from_file";
+      workflow?: string;
       /**
        * File Path
        * @description Path to prompt text file
@@ -5008,6 +5477,12 @@ export type components = {
        * @default 1
        */
       max_prompts?: number;
+      /**
+       * Type
+       * @default prompt_from_file
+       * @enum {string}
+       */
+      type: "prompt_from_file";
     };
     /**
      * Random Integer
@@ -5016,21 +5491,20 @@ export type components = {
     RandomIntInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default rand_int
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "rand_int";
+      workflow?: string;
       /**
        * Low
        * @description The inclusive low value
@@ -5043,6 +5517,12 @@ export type components = {
        * @default 2147483647
        */
       high?: number;
+      /**
+       * Type
+       * @default rand_int
+       * @enum {string}
+       */
+      type: "rand_int";
     };
     /**
      * Random Range
@@ -5051,21 +5531,20 @@ export type components = {
     RandomRangeInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default random_range
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "random_range";
+      workflow?: string;
       /**
        * Low
        * @description The inclusive low value
@@ -5089,6 +5568,12 @@ export type components = {
        * @description The seed for the RNG (omit for random)
        */
       seed?: number;
+      /**
+       * Type
+       * @default random_range
+       * @enum {string}
+       */
+      type: "random_range";
     };
     /**
      * Integer Range
@@ -5097,21 +5582,20 @@ export type components = {
     RangeInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default range
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "range";
+      workflow?: string;
       /**
        * Start
        * @description The start of the range
@@ -5130,6 +5614,12 @@ export type components = {
        * @default 1
        */
       step?: number;
+      /**
+       * Type
+       * @default range
+       * @enum {string}
+       */
+      type: "range";
     };
     /**
      * Integer Range of Size
@@ -5138,21 +5628,20 @@ export type components = {
     RangeOfSizeInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default range_of_size
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "range_of_size";
+      workflow?: string;
       /**
        * Start
        * @description The start of the range
@@ -5171,6 +5660,12 @@ export type components = {
        * @default 1
        */
       step?: number;
+      /**
+       * Type
+       * @default range_of_size
+       * @enum {string}
+       */
+      type: "range_of_size";
     };
     /** RemoveImagesFromBoardResult */
     RemoveImagesFromBoardResult: {
@@ -5187,21 +5682,20 @@ export type components = {
     ResizeLatentsInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default lresize
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "lresize";
+      workflow?: string;
       /**
        * Latents
        * @description Latents tensor
@@ -5230,6 +5724,12 @@ export type components = {
        * @default false
        */
       antialias?: boolean;
+      /**
+       * Type
+       * @default lresize
+       * @enum {string}
+       */
+      type: "lresize";
     };
     /**
      * ResourceOrigin
@@ -5242,27 +5742,26 @@ export type components = {
      */
     ResourceOrigin: "internal" | "external";
     /**
-     * SDXL Compel Prompt
+     * SDXL Prompt
      * @description Parse prompt using compel package to conditioning.
      */
     SDXLCompelPromptInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default sdxl_compel_prompt
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "sdxl_compel_prompt";
+      workflow?: string;
       /**
        * Prompt
        * @description Prompt to be parsed by Compel to create a conditioning tensor
@@ -5306,15 +5805,21 @@ export type components = {
        */
       target_height?: number;
       /**
-       * Clip
+       * CLIP 1
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip?: components["schemas"]["ClipField"];
       /**
-       * Clip2
+       * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip2?: components["schemas"]["ClipField"];
+      /**
+       * Type
+       * @default sdxl_compel_prompt
+       * @enum {string}
+       */
+      type: "sdxl_compel_prompt";
     };
     /**
      * SDXL LoRA
@@ -5323,21 +5828,20 @@ export type components = {
     SDXLLoraLoaderInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default sdxl_lora_loader
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "sdxl_lora_loader";
+      workflow?: string;
       /**
        * LoRA
        * @description LoRA model to load
@@ -5349,33 +5853,6 @@ export type components = {
        * @default 0.75
        */
       weight?: number;
-      /**
-       * UNET
-       * @description UNet (scheduler, LoRAs)
-       */
-      unet?: components["schemas"]["UNetField"];
-      /**
-       * CLIP 1
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip?: components["schemas"]["ClipField"];
-      /**
-       * CLIP 2
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip2?: components["schemas"]["ClipField"];
-    };
-    /**
-     * SDXLLoraLoaderOutput
-     * @description SDXL LoRA Loader Output
-     */
-    SDXLLoraLoaderOutput: {
-      /**
-       * Type
-       * @default sdxl_lora_loader_output
-       * @enum {string}
-       */
-      type: "sdxl_lora_loader_output";
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
@@ -5391,6 +5868,39 @@ export type components = {
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip2?: components["schemas"]["ClipField"];
+      /**
+       * Type
+       * @default sdxl_lora_loader
+       * @enum {string}
+       */
+      type: "sdxl_lora_loader";
+    };
+    /**
+     * SDXLLoraLoaderOutput
+     * @description SDXL LoRA Loader Output
+     */
+    SDXLLoraLoaderOutput: {
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       */
+      unet?: components["schemas"]["UNetField"];
+      /**
+       * CLIP 1
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["ClipField"];
+      /**
+       * CLIP 2
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip2?: components["schemas"]["ClipField"];
+      /**
+       * Type
+       * @default sdxl_lora_loader_output
+       * @enum {string}
+       */
+      type: "sdxl_lora_loader_output";
     };
     /**
      * SDXL Main Model
@@ -5399,38 +5909,37 @@ export type components = {
     SDXLModelLoaderInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Model
+       * @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load
+       */
+      model: components["schemas"]["MainModelField"];
       /**
        * Type
        * @default sdxl_model_loader
        * @enum {string}
        */
       type: "sdxl_model_loader";
-      /**
-       * Model
-       * @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load
-       */
-      model: components["schemas"]["MainModelField"];
     };
     /**
      * SDXLModelLoaderOutput
      * @description SDXL base model loader output
      */
     SDXLModelLoaderOutput: {
-      /**
-       * Type
-       * @default sdxl_model_loader_output
-       * @enum {string}
-       */
-      type: "sdxl_model_loader_output";
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
@@ -5451,29 +5960,34 @@ export type components = {
        * @description VAE
        */
       vae: components["schemas"]["VaeField"];
+      /**
+       * Type
+       * @default sdxl_model_loader_output
+       * @enum {string}
+       */
+      type: "sdxl_model_loader_output";
     };
     /**
-     * SDXL Refiner Compel Prompt
+     * SDXL Refiner Prompt
      * @description Parse prompt using compel package to conditioning.
      */
     SDXLRefinerCompelPromptInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default sdxl_refiner_compel_prompt
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "sdxl_refiner_compel_prompt";
+      workflow?: string;
       /**
        * Style
        * @description Prompt to be parsed by Compel to create a conditioning tensor
@@ -5511,6 +6025,12 @@ export type components = {
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip2?: components["schemas"]["ClipField"];
+      /**
+       * Type
+       * @default sdxl_refiner_compel_prompt
+       * @enum {string}
+       */
+      type: "sdxl_refiner_compel_prompt";
     };
     /**
      * SDXL Refiner Model
@@ -5519,38 +6039,37 @@ export type components = {
     SDXLRefinerModelLoaderInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Model
+       * @description SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load
+       */
+      model: components["schemas"]["MainModelField"];
       /**
        * Type
        * @default sdxl_refiner_model_loader
        * @enum {string}
        */
       type: "sdxl_refiner_model_loader";
-      /**
-       * Model
-       * @description SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load
-       */
-      model: components["schemas"]["MainModelField"];
     };
     /**
      * SDXLRefinerModelLoaderOutput
      * @description SDXL refiner model loader output
      */
     SDXLRefinerModelLoaderOutput: {
-      /**
-       * Type
-       * @default sdxl_refiner_model_loader_output
-       * @enum {string}
-       */
-      type: "sdxl_refiner_model_loader_output";
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
@@ -5566,6 +6085,12 @@ export type components = {
        * @description VAE
        */
       vae: components["schemas"]["VaeField"];
+      /**
+       * Type
+       * @default sdxl_refiner_model_loader_output
+       * @enum {string}
+       */
+      type: "sdxl_refiner_model_loader_output";
     };
     /**
      * Scale Latents
@@ -5574,21 +6099,20 @@ export type components = {
     ScaleLatentsInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default lscale
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "lscale";
+      workflow?: string;
       /**
        * Latents
        * @description Latents tensor
@@ -5612,6 +6136,67 @@ export type components = {
        * @default false
        */
       antialias?: boolean;
+      /**
+       * Type
+       * @default lscale
+       * @enum {string}
+       */
+      type: "lscale";
+    };
+    /**
+     * Scheduler
+     * @description Selects a scheduler.
+     */
+    SchedulerInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Scheduler
+       * @description Scheduler to use during inference
+       * @default euler
+       * @enum {string}
+       */
+      scheduler?: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc";
+      /**
+       * Type
+       * @default scheduler
+       * @enum {string}
+       */
+      type: "scheduler";
+    };
+    /**
+     * SchedulerOutput
+     * @description Base class for all invocation outputs.
+     *
+     * All invocation outputs must use the `@invocation_output` decorator to provide their unique type.
+     */
+    SchedulerOutput: {
+      /**
+       * Scheduler
+       * @description Scheduler to use during inference
+       * @enum {string}
+       */
+      scheduler: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc";
+      /**
+       * Type
+       * @default scheduler_output
+       * @enum {string}
+       */
+      type: "scheduler_output";
     };
     /**
      * SchedulerPredictionType
@@ -5620,60 +6205,142 @@ export type components = {
      */
     SchedulerPredictionType: "epsilon" | "v_prediction" | "sample";
     /**
+     * Seamless
+     * @description Applies the seamless transformation to the Model UNet and VAE.
+     */
+    SeamlessModeInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       */
+      unet?: components["schemas"]["UNetField"];
+      /**
+       * VAE
+       * @description VAE model to load
+       */
+      vae?: components["schemas"]["VaeField"];
+      /**
+       * Seamless Y
+       * @description Specify whether Y axis is seamless
+       * @default true
+       */
+      seamless_y?: boolean;
+      /**
+       * Seamless X
+       * @description Specify whether X axis is seamless
+       * @default true
+       */
+      seamless_x?: boolean;
+      /**
+       * Type
+       * @default seamless
+       * @enum {string}
+       */
+      type: "seamless";
+    };
+    /**
+     * SeamlessModeOutput
+     * @description Modified Seamless Model output
+     */
+    SeamlessModeOutput: {
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       */
+      unet?: components["schemas"]["UNetField"];
+      /**
+       * VAE
+       * @description VAE
+       */
+      vae?: components["schemas"]["VaeField"];
+      /**
+       * Type
+       * @default seamless_output
+       * @enum {string}
+       */
+      type: "seamless_output";
+    };
+    /**
      * Segment Anything Processor
      * @description Applies segment anything processing to image
      */
     SegmentAnythingProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default segment_anything_processor
        * @enum {string}
        */
       type: "segment_anything_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
     };
     /**
      * Show Image
-     * @description Displays a provided image, and passes it forward in the pipeline.
+     * @description Displays a provided image using the OS image viewer, and passes it forward in the pipeline.
      */
     ShowImageInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to show
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default show_image
        * @enum {string}
        */
       type: "show_image";
-      /**
-       * Image
-       * @description The image to show
-       */
-      image?: components["schemas"]["ImageField"];
     };
     /** StableDiffusion1ModelCheckpointConfig */
     StableDiffusion1ModelCheckpointConfig: {
@@ -5832,21 +6499,20 @@ export type components = {
     StepParamEasingInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default step_param_easing
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "step_param_easing";
+      workflow?: string;
       /**
        * Easing
        * @description The easing function to use
@@ -5906,34 +6572,45 @@ export type components = {
        * @default false
        */
       show_easing_plot?: boolean;
+      /**
+       * Type
+       * @default step_param_easing
+       * @enum {string}
+       */
+      type: "step_param_easing";
     };
     /**
-     * String Primitive Collection
+     * String Collection Primitive
      * @description A collection of string primitive values
      */
     StringCollectionInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Collection
+       * @description The collection of string values
+       */
+      collection?: string[];
       /**
        * Type
        * @default string_collection
        * @enum {string}
        */
       type: "string_collection";
-      /**
-       * Collection
-       * @description The collection of string values
-       */
-      collection?: string[];
     };
     /**
      * StringCollectionOutput
@@ -5941,16 +6618,16 @@ export type components = {
      */
     StringCollectionOutput: {
       /**
+       * Collection
+       * @description The output strings
+       */
+      collection: string[];
+      /**
        * Type
        * @default string_collection_output
        * @enum {string}
        */
       type: "string_collection_output";
-      /**
-       * Collection
-       * @description The output strings
-       */
-      collection: string[];
     };
     /**
      * String Primitive
@@ -5959,27 +6636,32 @@ export type components = {
     StringInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default string
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "string";
+      workflow?: string;
       /**
        * Value
        * @description The string value
        * @default
        */
       value?: string;
+      /**
+       * Type
+       * @default string
+       * @enum {string}
+       */
+      type: "string";
     };
     /**
      * StringOutput
@@ -5987,16 +6669,16 @@ export type components = {
      */
     StringOutput: {
       /**
+       * Value
+       * @description The output string
+       */
+      value: string;
+      /**
        * Type
        * @default string_output
        * @enum {string}
        */
       type: "string_output";
-      /**
-       * Value
-       * @description The output string
-       */
-      value: string;
     };
     /**
      * SubModelType
@@ -6011,21 +6693,20 @@ export type components = {
     SubtractInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
       /**
-       * Type
-       * @default sub
-       * @enum {string}
+       * Workflow
+       * @description The workflow to save with the image
        */
-      type: "sub";
+      workflow?: string;
       /**
        * A
        * @description The first number
@@ -6038,6 +6719,12 @@ export type components = {
        * @default 0
        */
       b?: number;
+      /**
+       * Type
+       * @default sub
+       * @enum {string}
+       */
+      type: "sub";
     };
     /** TextualInversionModelConfig */
     TextualInversionModelConfig: {
@@ -6064,26 +6751,31 @@ export type components = {
     TileResamplerProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default tile_image_processor
        * @enum {string}
        */
       type: "tile_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
       /**
        * Down Sampling Rate
        * @description Down sampling rate
@@ -6108,6 +6800,11 @@ export type components = {
        * @description Loras to apply on model loading
        */
       loras: components["schemas"]["LoraInfo"][];
+      /**
+       * Seamless Axes
+       * @description Axes("x" and "y") to which apply seamless
+       */
+      seamless_axes?: string[];
     };
     /** Upscaler */
     Upscaler: {
@@ -6142,6 +6839,11 @@ export type components = {
        * @description Info to load vae submodel
        */
       vae: components["schemas"]["ModelInfo"];
+      /**
+       * Seamless Axes
+       * @description Axes("x" and "y") to which apply seamless
+       */
+      seamless_axes?: string[];
     };
     /**
      * VAE
@@ -6150,43 +6852,48 @@ export type components = {
     VaeLoaderInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * VAE
+       * @description VAE model to load
+       */
+      vae_model: components["schemas"]["VAEModelField"];
       /**
        * Type
        * @default vae_loader
        * @enum {string}
        */
       type: "vae_loader";
-      /**
-       * VAE
-       * @description VAE model to load
-       */
-      vae_model: components["schemas"]["VAEModelField"];
     };
     /**
      * VaeLoaderOutput
-     * @description Model loader output
+     * @description VAE output
      */
     VaeLoaderOutput: {
+      /**
+       * VAE
+       * @description VAE
+       */
+      vae: components["schemas"]["VaeField"];
       /**
        * Type
        * @default vae_loader_output
        * @enum {string}
        */
       type: "vae_loader_output";
-      /**
-       * VAE
-       * @description VAE
-       */
-      vae: components["schemas"]["VaeField"];
     };
     /** VaeModelConfig */
     VaeModelConfig: {
@@ -6227,44 +6934,58 @@ export type components = {
     ZoeDepthImageProcessorInvocation: {
       /**
        * Id
-       * @description The id of this node. Must be unique among all nodes.
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
       id: string;
       /**
        * Is Intermediate
-       * @description Whether or not this node is an intermediate node.
+       * @description Whether or not this is an intermediate invocation.
        * @default false
        */
       is_intermediate?: boolean;
+      /**
+       * Workflow
+       * @description The workflow to save with the image
+       */
+      workflow?: string;
+      /**
+       * Image
+       * @description The image to process
+       */
+      image?: components["schemas"]["ImageField"];
       /**
        * Type
        * @default zoe_depth_image_processor
        * @enum {string}
        */
       type: "zoe_depth_image_processor";
-      /**
-       * Image
-       * @description The image to process
-       */
-      image?: components["schemas"]["ImageField"];
     };
     /**
      * UIConfigBase
      * @description Provides additional node configuration to the UI.
-     * This is used internally by the @tags and @title decorator logic. You probably want to use those
-     * decorators, though you may add this class to a node definition to specify the title and tags.
+     * This is used internally by the @invocation decorator logic. Do not use this directly.
      */
     UIConfigBase: {
       /**
        * Tags
-       * @description The tags to display in the UI
+       * @description The node's tags
        */
       tags?: string[];
       /**
        * Title
-       * @description The display name of the node
+       * @description The node's display name
        */
       title?: string;
+      /**
+       * Category
+       * @description The node's category
+       */
+      category?: string;
+      /**
+       * Version
+       * @description The node's version. Should be a valid semver string e.g. "1.0.0" or "3.8.13".
+       */
+      version?: string;
     };
     /**
      * Input
@@ -6281,7 +7002,7 @@ export type components = {
      * If a field should be provided a data type that does not exactly match the python type of the field,     use this to provide the type that should be used instead. See the node development docs for detail     on adding a new field type, which involves client-side changes.
      * @enum {string}
      */
-    UIType: "integer" | "float" | "boolean" | "string" | "array" | "ImageField" | "LatentsField" | "ConditioningField" | "ControlField" | "ColorField" | "ImageCollection" | "ConditioningCollection" | "ColorCollection" | "LatentsCollection" | "IntegerCollection" | "FloatCollection" | "StringCollection" | "BooleanCollection" | "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VaeModelField" | "LoRAModelField" | "ControlNetModelField" | "UNetField" | "VaeField" | "ClipField" | "Collection" | "CollectionItem" | "FilePath" | "enum" | "Scheduler";
+    UIType: "boolean" | "ColorField" | "ConditioningField" | "ControlField" | "float" | "ImageField" | "integer" | "LatentsField" | "string" | "BooleanCollection" | "ColorCollection" | "ConditioningCollection" | "ControlCollection" | "FloatCollection" | "ImageCollection" | "IntegerCollection" | "LatentsCollection" | "StringCollection" | "BooleanPolymorphic" | "ColorPolymorphic" | "ConditioningPolymorphic" | "ControlPolymorphic" | "FloatPolymorphic" | "ImagePolymorphic" | "IntegerPolymorphic" | "LatentsPolymorphic" | "StringPolymorphic" | "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VaeModelField" | "LoRAModelField" | "ControlNetModelField" | "UNetField" | "VaeField" | "ClipField" | "Collection" | "CollectionItem" | "enum" | "Scheduler" | "WorkflowField" | "IsIntermediate" | "MetadataField";
     /**
      * UIComponent
      * @description The type of UI component to use for a field, used to override the default components, which are     inferred from the field type.
@@ -6303,6 +7024,8 @@ export type components = {
       ui_component?: components["schemas"]["UIComponent"];
       /** Ui Order */
       ui_order?: number;
+      /** Item Default */
+      item_default?: unknown;
     };
     /**
      * _OutputField
@@ -6319,23 +7042,11 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
@@ -6348,6 +7059,18 @@ export type components = {
      * @enum {string}
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
   };
   responses: never;
   parameters: never;
@@ -6464,7 +7187,7 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageLuminosityAdjustmentInvocation"] | components["schemas"]["ImageSaturationAdjustmentInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
+        "application/json": components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageLuminosityAdjustmentInvocation"] | components["schemas"]["ImageSaturationAdjustmentInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
       };
     };
     responses: {
@@ -6505,7 +7228,7 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageLuminosityAdjustmentInvocation"] | components["schemas"]["ImageSaturationAdjustmentInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
+        "application/json": components["schemas"]["BooleanInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["MetadataAccumulatorInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageLuminosityAdjustmentInvocation"] | components["schemas"]["ImageSaturationAdjustmentInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"];
       };
     };
     responses: {

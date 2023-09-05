@@ -21,6 +21,8 @@ from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.metadata import CoreMetadata
 from invokeai.app.invocations.primitives import (
+    DenoiseMaskField,
+    DenoiseMaskOutput,
     ImageField,
     ImageOutput,
     LatentsField,
@@ -31,8 +33,9 @@ from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 
-from ...backend.model_management.models import BaseModelType
 from ...backend.model_management.lora import ModelPatcher
+from ...backend.model_management.seamless import set_seamless
+from ...backend.model_management.models import BaseModelType
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ConditioningData,
@@ -46,13 +49,15 @@ from ...backend.util.devices import choose_precision, choose_torch_device
 from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
+    BaseInvocationOutput,
     FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
+    OutputField,
     UIType,
-    tags,
-    title,
+    invocation,
+    invocation_output,
 )
 from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
@@ -62,6 +67,86 @@ DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
 
 SAMPLER_NAME_VALUES = Literal[tuple(list(SCHEDULER_MAP.keys()))]
+
+
+@invocation_output("scheduler_output")
+class SchedulerOutput(BaseInvocationOutput):
+    scheduler: SAMPLER_NAME_VALUES = OutputField(description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler)
+
+
+@invocation("scheduler", title="Scheduler", tags=["scheduler"], category="latents", version="1.0.0")
+class SchedulerInvocation(BaseInvocation):
+    """Selects a scheduler."""
+
+    scheduler: SAMPLER_NAME_VALUES = InputField(
+        default="euler", description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler
+    )
+
+    def invoke(self, context: InvocationContext) -> SchedulerOutput:
+        return SchedulerOutput(scheduler=self.scheduler)
+
+
+@invocation(
+    "create_denoise_mask", title="Create Denoise Mask", tags=["mask", "denoise"], category="latents", version="1.0.0"
+)
+class CreateDenoiseMaskInvocation(BaseInvocation):
+    """Creates mask for denoising model run."""
+
+    vae: VaeField = InputField(description=FieldDescriptions.vae, input=Input.Connection, ui_order=0)
+    image: Optional[ImageField] = InputField(default=None, description="Image which will be masked", ui_order=1)
+    mask: ImageField = InputField(description="The mask to use when pasting", ui_order=2)
+    tiled: bool = InputField(default=False, description=FieldDescriptions.tiled, ui_order=3)
+    fp32: bool = InputField(default=DEFAULT_PRECISION == "float32", description=FieldDescriptions.fp32, ui_order=4)
+
+    def prep_mask_tensor(self, mask_image):
+        if mask_image.mode != "L":
+            mask_image = mask_image.convert("L")
+        mask_tensor = image_resized_to_grid_as_tensor(mask_image, normalize=False)
+        if mask_tensor.dim() == 3:
+            mask_tensor = mask_tensor.unsqueeze(0)
+        # if shape is not None:
+        #    mask_tensor = tv_resize(mask_tensor, shape, T.InterpolationMode.BILINEAR)
+        return mask_tensor
+
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> DenoiseMaskOutput:
+        if self.image is not None:
+            image = context.services.images.get_pil_image(self.image.image_name)
+            image = image_resized_to_grid_as_tensor(image.convert("RGB"))
+            if image.dim() == 3:
+                image = image.unsqueeze(0)
+        else:
+            image = None
+
+        mask = self.prep_mask_tensor(
+            context.services.images.get_pil_image(self.mask.image_name),
+        )
+
+        if image is not None:
+            vae_info = context.services.model_manager.get_model(
+                **self.vae.vae.dict(),
+                context=context,
+            )
+
+            img_mask = tv_resize(mask, image.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
+            masked_image = image * torch.where(img_mask < 0.5, 0.0, 1.0)
+            # TODO:
+            masked_latents = ImageToLatentsInvocation.vae_encode(vae_info, self.fp32, self.tiled, masked_image.clone())
+
+            masked_latents_name = f"{context.graph_execution_state_id}__{self.id}_masked_latents"
+            context.services.latents.save(masked_latents_name, masked_latents)
+        else:
+            masked_latents_name = None
+
+        mask_name = f"{context.graph_execution_state_id}__{self.id}_mask"
+        context.services.latents.save(mask_name, mask)
+
+        return DenoiseMaskOutput(
+            denoise_mask=DenoiseMaskField(
+                mask_name=mask_name,
+                masked_latents_name=masked_latents_name,
+            ),
+        )
 
 
 def get_scheduler(
@@ -98,14 +183,16 @@ def get_scheduler(
     return scheduler
 
 
-@title("Denoise Latents")
-@tags("latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l")
+@invocation(
+    "denoise_latents",
+    title="Denoise Latents",
+    tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
+    category="latents",
+    version="1.0.0",
+)
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
 
-    type: Literal["denoise_latents"] = "denoise_latents"
-
-    # Inputs
     positive_conditioning: ConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection, ui_order=0
     )
@@ -124,14 +211,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
     )
     unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet", ui_order=2)
     control: Union[ControlField, list[ControlField]] = InputField(
-        default=None, description=FieldDescriptions.control, input=Input.Connection, ui_order=5
-    )
-    latents: Optional[LatentsField] = InputField(
-        description=FieldDescriptions.latents, input=Input.Connection, ui_order=4
-    )
-    mask: Optional[ImageField] = InputField(
         default=None,
-        description=FieldDescriptions.mask,
+        description=FieldDescriptions.control,
+        input=Input.Connection,
+        ui_order=5,
+    )
+    latents: Optional[LatentsField] = InputField(description=FieldDescriptions.latents, input=Input.Connection)
+    denoise_mask: Optional[DenoiseMaskField] = InputField(
+        default=None, description=FieldDescriptions.mask, input=Input.Connection, ui_order=6
     )
 
     @validator("cfg_scale")
@@ -235,7 +322,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         # really only need model for dtype and device
         model: StableDiffusionGeneratorPipeline,
-        control_input: List[ControlField],
+        control_input: Union[ControlField, List[ControlField]],
         latents_shape: List[int],
         exit_stack: ExitStack,
         do_classifier_free_guidance: bool = True,
@@ -309,52 +396,46 @@ class DenoiseLatentsInvocation(BaseInvocation):
     # original idea by https://github.com/AmericanPresidentJimmyCarter
     # TODO: research more for second order schedulers timesteps
     def init_scheduler(self, scheduler, device, steps, denoising_start, denoising_end):
-        num_inference_steps = steps
         if scheduler.config.get("cpu_only", False):
-            scheduler.set_timesteps(num_inference_steps, device="cpu")
+            scheduler.set_timesteps(steps, device="cpu")
             timesteps = scheduler.timesteps.to(device=device)
         else:
-            scheduler.set_timesteps(num_inference_steps, device=device)
+            scheduler.set_timesteps(steps, device=device)
             timesteps = scheduler.timesteps
 
-        # apply denoising_start
+        # skip greater order timesteps
+        _timesteps = timesteps[:: scheduler.order]
+
+        # get start timestep index
         t_start_val = int(round(scheduler.config.num_train_timesteps * (1 - denoising_start)))
-        t_start_idx = len(list(filter(lambda ts: ts >= t_start_val, timesteps)))
-        timesteps = timesteps[t_start_idx:]
-        if scheduler.order == 2 and t_start_idx > 0:
-            timesteps = timesteps[1:]
+        t_start_idx = len(list(filter(lambda ts: ts >= t_start_val, _timesteps)))
 
-        # save start timestep to apply noise
-        init_timestep = timesteps[:1]
-
-        # apply denoising_end
+        # get end timestep index
         t_end_val = int(round(scheduler.config.num_train_timesteps * (1 - denoising_end)))
-        t_end_idx = len(list(filter(lambda ts: ts >= t_end_val, timesteps)))
-        if scheduler.order == 2 and t_end_idx > 0:
-            t_end_idx += 1
-        timesteps = timesteps[:t_end_idx]
+        t_end_idx = len(list(filter(lambda ts: ts >= t_end_val, _timesteps[t_start_idx:])))
 
-        # calculate step count based on scheduler order
-        num_inference_steps = len(timesteps)
-        if scheduler.order == 2:
-            num_inference_steps += num_inference_steps % 2
-            num_inference_steps = num_inference_steps // 2
+        # apply order to indexes
+        t_start_idx *= scheduler.order
+        t_end_idx *= scheduler.order
+
+        init_timestep = timesteps[t_start_idx : t_start_idx + 1]
+        timesteps = timesteps[t_start_idx : t_start_idx + t_end_idx]
+        num_inference_steps = len(timesteps) // scheduler.order
 
         return num_inference_steps, timesteps, init_timestep
 
-    def prep_mask_tensor(self, mask, context, lantents):
-        if mask is None:
-            return None
+    def prep_inpaint_mask(self, context, latents):
+        if self.denoise_mask is None:
+            return None, None
 
-        mask_image = context.services.images.get_pil_image(mask.image_name)
-        if mask_image.mode != "L":
-            # FIXME: why do we get passed an RGB image here? We can only use single-channel.
-            mask_image = mask_image.convert("L")
-        mask_tensor = image_resized_to_grid_as_tensor(mask_image, normalize=False)
-        if mask_tensor.dim() == 3:
-            mask_tensor = mask_tensor.unsqueeze(0)
-        mask_tensor = tv_resize(mask_tensor, lantents.shape[-2:], T.InterpolationMode.BILINEAR)
-        return 1 - mask_tensor
+        mask = context.services.latents.get(self.denoise_mask.mask_name)
+        mask = tv_resize(mask, latents.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
+        if self.denoise_mask.masked_latents_name is not None:
+            masked_latents = context.services.latents.get(self.denoise_mask.masked_latents_name)
+        else:
+            masked_latents = None
+
+        return 1 - mask, masked_latents
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
@@ -369,13 +450,19 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 latents = context.services.latents.get(self.latents.latents_name)
                 if seed is None:
                     seed = self.latents.seed
-            else:
+
+                if noise is not None and noise.shape[1:] != latents.shape[1:]:
+                    raise Exception(f"Incompatable 'noise' and 'latents' shapes: {latents.shape=} {noise.shape=}")
+
+            elif noise is not None:
                 latents = torch.zeros_like(noise)
+            else:
+                raise Exception("'latents' or 'noise' must be provided!")
 
             if seed is None:
                 seed = 0
 
-            mask = self.prep_mask_tensor(self.mask, context, latents)
+            mask, masked_latents = self.prep_inpaint_mask(context, latents)
 
             # Get the source node id (we are invoking the prepared node)
             graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
@@ -400,12 +487,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             )
             with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
                 unet_info.context.model, _lora_loader()
-            ), unet_info as unet:
+            ), set_seamless(unet_info.context.model, self.unet.seamless_axes), unet_info as unet:
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
                     noise = noise.to(device=unet.device, dtype=unet.dtype)
                 if mask is not None:
                     mask = mask.to(device=unet.device, dtype=unet.dtype)
+                if masked_latents is not None:
+                    masked_latents = masked_latents.to(device=unet.device, dtype=unet.dtype)
 
                 scheduler = get_scheduler(
                     context=context,
@@ -442,6 +531,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     noise=noise,
                     seed=seed,
                     mask=mask,
+                    masked_latents=masked_latents,
                     num_inference_steps=num_inference_steps,
                     conditioning_data=conditioning_data,
                     control_data=control_data,  # list[ControlNetData]
@@ -457,14 +547,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=result_latents, seed=seed)
 
 
-@title("Latents to Image")
-@tags("latents", "image", "vae", "l2i")
+@invocation(
+    "l2i", title="Latents to Image", tags=["latents", "image", "vae", "l2i"], category="latents", version="1.0.0"
+)
 class LatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
 
-    type: Literal["l2i"] = "l2i"
-
-    # Inputs
     latents: LatentsField = InputField(
         description=FieldDescriptions.latents,
         input=Input.Connection,
@@ -490,7 +578,7 @@ class LatentsToImageInvocation(BaseInvocation):
             context=context,
         )
 
-        with vae_info as vae:
+        with set_seamless(vae_info.context.model, self.vae.seamless_axes), vae_info as vae:
             latents = latents.to(vae.device)
             if self.fp32:
                 vae.to(dtype=torch.float32)
@@ -545,6 +633,7 @@ class LatentsToImageInvocation(BaseInvocation):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata.dict() if self.metadata else None,
+            workflow=self.workflow,
         )
 
         return ImageOutput(
@@ -557,14 +646,10 @@ class LatentsToImageInvocation(BaseInvocation):
 LATENTS_INTERPOLATION_MODE = Literal["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"]
 
 
-@title("Resize Latents")
-@tags("latents", "resize")
+@invocation("lresize", title="Resize Latents", tags=["latents", "resize"], category="latents", version="1.0.0")
 class ResizeLatentsInvocation(BaseInvocation):
     """Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8."""
 
-    type: Literal["lresize"] = "lresize"
-
-    # Inputs
     latents: LatentsField = InputField(
         description=FieldDescriptions.latents,
         input=Input.Connection,
@@ -605,14 +690,10 @@ class ResizeLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=resized_latents, seed=self.latents.seed)
 
 
-@title("Scale Latents")
-@tags("latents", "resize")
+@invocation("lscale", title="Scale Latents", tags=["latents", "resize"], category="latents", version="1.0.0")
 class ScaleLatentsInvocation(BaseInvocation):
     """Scales latents by a given factor."""
 
-    type: Literal["lscale"] = "lscale"
-
-    # Inputs
     latents: LatentsField = InputField(
         description=FieldDescriptions.latents,
         input=Input.Connection,
@@ -645,14 +726,12 @@ class ScaleLatentsInvocation(BaseInvocation):
         return build_latents_output(latents_name=name, latents=resized_latents, seed=self.latents.seed)
 
 
-@title("Image to Latents")
-@tags("latents", "image", "vae", "i2l")
+@invocation(
+    "i2l", title="Image to Latents", tags=["latents", "image", "vae", "i2l"], category="latents", version="1.0.0"
+)
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""
 
-    type: Literal["i2l"] = "i2l"
-
-    # Inputs
     image: ImageField = InputField(
         description="The image to encode",
     )
@@ -663,26 +742,11 @@ class ImageToLatentsInvocation(BaseInvocation):
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
     fp32: bool = InputField(default=DEFAULT_PRECISION == "float32", description=FieldDescriptions.fp32)
 
-    @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
-        # image = context.services.images.get(
-        #     self.image.image_type, self.image.image_name
-        # )
-        image = context.services.images.get_pil_image(self.image.image_name)
-
-        # vae_info = context.services.model_manager.get_model(**self.vae.vae.dict())
-        vae_info = context.services.model_manager.get_model(
-            **self.vae.vae.dict(),
-            context=context,
-        )
-
-        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
-        if image_tensor.dim() == 3:
-            image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
-
+    @staticmethod
+    def vae_encode(vae_info, upcast, tiled, image_tensor):
         with vae_info as vae:
             orig_dtype = vae.dtype
-            if self.fp32:
+            if upcast:
                 vae.to(dtype=torch.float32)
 
                 use_torch_2_0_or_xformers = isinstance(
@@ -707,7 +771,7 @@ class ImageToLatentsInvocation(BaseInvocation):
                 vae.to(dtype=torch.float16)
                 # latents = latents.half()
 
-            if self.tiled:
+            if tiled:
                 vae.enable_tiling()
             else:
                 vae.disable_tiling()
@@ -721,20 +785,33 @@ class ImageToLatentsInvocation(BaseInvocation):
             latents = vae.config.scaling_factor * latents
             latents = latents.to(dtype=orig_dtype)
 
+        return latents
+
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        image = context.services.images.get_pil_image(self.image.image_name)
+
+        vae_info = context.services.model_manager.get_model(
+            **self.vae.vae.dict(),
+            context=context,
+        )
+
+        image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
+        if image_tensor.dim() == 3:
+            image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
+
+        latents = self.vae_encode(vae_info, self.fp32, self.tiled, image_tensor)
+
         name = f"{context.graph_execution_state_id}__{self.id}"
         latents = latents.to("cpu")
         context.services.latents.save(name, latents)
         return build_latents_output(latents_name=name, latents=latents, seed=None)
 
 
-@title("Blend Latents")
-@tags("latents", "blend")
+@invocation("lblend", title="Blend Latents", tags=["latents", "blend"], category="latents", version="1.0.0")
 class BlendLatentsInvocation(BaseInvocation):
     """Blend two latents using a given alpha. Latents must have same size."""
 
-    type: Literal["lblend"] = "lblend"
-
-    # Inputs
     latents_a: LatentsField = InputField(
         description=FieldDescriptions.latents,
         input=Input.Connection,

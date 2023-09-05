@@ -9,6 +9,7 @@ import {
   CANVAS_TEXT_TO_IMAGE_GRAPH,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
+  INPAINT_CREATE_MASK,
   INPAINT_IMAGE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
@@ -19,6 +20,7 @@ import {
   SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
+  SDXL_REFINER_INPAINT_CREATE_MASK,
   SDXL_TEXT_TO_IMAGE_GRAPH,
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
@@ -30,6 +32,12 @@ export const addVAEToGraph = (
   modelLoaderNodeId: string = MAIN_MODEL_LOADER
 ): void => {
   const { vae } = state.generation;
+  const { boundingBoxScaleMethod } = state.canvas;
+  const { shouldUseSDXLRefiner } = state.sdxl;
+
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(
+    boundingBoxScaleMethod
+  );
 
   const isAutoVae = !vae;
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
@@ -76,7 +84,7 @@ export const addVAEToGraph = (
         field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
       },
       destination: {
-        node_id: CANVAS_OUTPUT,
+        node_id: isUsingScaledDimensions ? LATENTS_TO_IMAGE : CANVAS_OUTPUT,
         field: 'vae',
       },
     });
@@ -123,11 +131,39 @@ export const addVAEToGraph = (
           field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
         },
         destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'vae',
+        },
+      },
+      {
+        source: {
+          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        },
+        destination: {
           node_id: LATENTS_TO_IMAGE,
           field: 'vae',
         },
       }
     );
+  }
+
+  if (shouldUseSDXLRefiner) {
+    if (
+      graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
+      graph.id === SDXL_CANVAS_OUTPAINT_GRAPH
+    ) {
+      graph.edges.push({
+        source: {
+          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        },
+        destination: {
+          node_id: SDXL_REFINER_INPAINT_CREATE_MASK,
+          field: 'vae',
+        },
+      });
+    }
   }
 
   if (vae && metadataAccumulator) {

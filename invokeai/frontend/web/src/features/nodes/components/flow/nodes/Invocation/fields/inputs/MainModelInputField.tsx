@@ -134,6 +134,7 @@ const MainModelInputFieldComponent = (
           disabled={data.length === 0}
           onChange={handleChangeModel}
           sx={{
+            width: '100%',
             '.mantine-Select-dropdown': {
               width: '16rem !important',
             },

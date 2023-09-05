@@ -2,13 +2,13 @@ import { ListItem, Text, UnorderedList } from '@chakra-ui/react';
 import { useLogger } from 'app/logging/useLogger';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { parseify } from 'common/util/serialize';
-import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { zWorkflow } from 'features/nodes/types/types';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { ZodError } from 'zod';
 import { fromZodError, fromZodIssue } from 'zod-validation-error';
+import { workflowLoadRequested } from '../store/actions';
 
 export const useLoadWorkflowFromFile = () => {
   const dispatch = useAppDispatch();
@@ -27,49 +27,38 @@ export const useLoadWorkflowFromFile = () => {
           const result = zWorkflow.safeParse(parsedJSON);
 
           if (!result.success) {
-            const message = fromZodError(result.error, {
+            const { message } = fromZodError(result.error, {
               prefix: 'Workflow Validation Error',
-            }).toString();
+            });
+
             logger.error({ error: parseify(result.error) }, message);
 
             dispatch(
               addToast(
                 makeToast({
                   title: 'Unable to Validate Workflow',
-                  description: (
-                    <WorkflowValidationErrorContent error={result.error} />
-                  ),
                   status: 'error',
                   duration: 5000,
                 })
               )
             );
+            reader.abort();
             return;
           }
 
-          dispatch(workflowLoaded(result.data));
+          dispatch(workflowLoadRequested(result.data));
 
+          reader.abort();
+        } catch {
+          // file reader error
           dispatch(
             addToast(
               makeToast({
-                title: 'Workflow Loaded',
-                status: 'success',
+                title: 'Unable to Load Workflow',
+                status: 'error',
               })
             )
           );
-          reader.abort();
-        } catch (error) {
-          // file reader error
-          if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: 'Unable to Load Workflow',
-                  status: 'error',
-                })
-              )
-            );
-          }
         }
       };
 

@@ -63,7 +63,11 @@ const selector = createSelector(
             return;
           }
 
-          if (fieldTemplate.required && !field.value && !hasConnection) {
+          if (
+            fieldTemplate.required &&
+            field.value === undefined &&
+            !hasConnection
+          ) {
             reasons.push(
               `${node.data.label || nodeTemplate.title} -> ${
                 field.label || fieldTemplate.title
