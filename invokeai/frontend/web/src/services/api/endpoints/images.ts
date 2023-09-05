@@ -6,7 +6,8 @@ import {
   IMAGE_CATEGORIES,
   IMAGE_LIMIT,
 } from 'features/gallery/store/types';
-import { keyBy } from 'lodash';
+import { getMetadataAndWorkflowFromImageBlob } from 'features/nodes/util/getMetadataAndWorkflowFromImageBlob';
+import { keyBy } from 'lodash-es';
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
 import { components, paths } from '../schema';
 import {
@@ -26,6 +27,9 @@ import {
   imagesSelectors,
 } from '../util';
 import { boardsApi } from './boards';
+import { ImageMetadataAndWorkflow } from 'features/nodes/types/types';
+import { fetchBaseQuery } from '@reduxjs/toolkit/dist/query';
+import { $authToken, $projectId } from '../client';
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -110,6 +114,42 @@ export const imagesApi = api.injectEndpoints({
       query: (image_name) => ({ url: `images/i/${image_name}/metadata` }),
       providesTags: (result, error, image_name) => [
         { type: 'ImageMetadata', id: image_name },
+      ],
+      keepUnusedDataFor: 86400, // 24 hours
+    }),
+    getImageMetadataFromFile: build.query<ImageMetadataAndWorkflow, ImageDTO>({
+      queryFn: async (args: ImageDTO, api, extraOptions) => {
+        const authToken = $authToken.get();
+        const projectId = $projectId.get();
+        const customBaseQuery = fetchBaseQuery({
+          baseUrl: '',
+          prepareHeaders: (headers) => {
+            if (authToken) {
+              headers.set('Authorization', `Bearer ${authToken}`);
+            }
+            if (projectId) {
+              headers.set('project-id', projectId);
+            }
+
+            return headers;
+          },
+          responseHandler: async (res) => {
+            return await res.blob();
+          },
+        });
+
+        const response = await customBaseQuery(
+          args.image_url,
+          api,
+          extraOptions
+        );
+        const data = await getMetadataAndWorkflowFromImageBlob(
+          response.data as Blob
+        );
+        return { data };
+      },
+      providesTags: (result, error, image_dto) => [
+        { type: 'ImageMetadataFromFile', id: image_dto.image_name },
       ],
       keepUnusedDataFor: 86400, // 24 hours
     }),
@@ -357,7 +397,7 @@ export const imagesApi = api.injectEndpoints({
       ],
       async onQueryStarted(
         { imageDTO, session_id },
-        { dispatch, queryFulfilled, getState }
+        { dispatch, queryFulfilled }
       ) {
         /**
          * Cache changes for `changeImageSessionId`:
@@ -432,7 +472,9 @@ export const imagesApi = api.injectEndpoints({
             data.updated_image_names.includes(i.image_name)
           );
 
-          if (!updatedImages[0]) return;
+          if (!updatedImages[0]) {
+            return;
+          }
 
           // assume all images are on the same board/category
           const categories = getCategories(updatedImages[0]);
@@ -544,7 +586,9 @@ export const imagesApi = api.injectEndpoints({
             data.updated_image_names.includes(i.image_name)
           );
 
-          if (!updatedImages[0]) return;
+          if (!updatedImages[0]) {
+            return;
+          }
           // assume all images are on the same board/category
           const categories = getCategories(updatedImages[0]);
           const boardId = updatedImages[0].board_id;
@@ -645,17 +689,7 @@ export const imagesApi = api.injectEndpoints({
           },
         };
       },
-      async onQueryStarted(
-        {
-          file,
-          image_category,
-          is_intermediate,
-          postUploadAction,
-          session_id,
-          board_id,
-        },
-        { dispatch, queryFulfilled }
-      ) {
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           /**
            * NOTE: PESSIMISTIC UPDATE
@@ -712,7 +746,7 @@ export const imagesApi = api.injectEndpoints({
 
     deleteBoard: build.mutation<DeleteBoardResult, string>({
       query: (board_id) => ({ url: `boards/${board_id}`, method: 'DELETE' }),
-      invalidatesTags: (result, error, board_id) => [
+      invalidatesTags: () => [
         { type: 'Board', id: LIST_TAG },
         // invalidate the 'No Board' cache
         {
@@ -732,7 +766,7 @@ export const imagesApi = api.injectEndpoints({
         { type: 'BoardImagesTotal', id: 'none' },
         { type: 'BoardAssetsTotal', id: 'none' },
       ],
-      async onQueryStarted(board_id, { dispatch, queryFulfilled, getState }) {
+      async onQueryStarted(board_id, { dispatch, queryFulfilled }) {
         /**
          * Cache changes for deleteBoard:
          * - Update every image in the 'getImageDTO' cache that has the board_id
@@ -802,7 +836,7 @@ export const imagesApi = api.injectEndpoints({
         method: 'DELETE',
         params: { include_images: true },
       }),
-      invalidatesTags: (result, error, board_id) => [
+      invalidatesTags: () => [
         { type: 'Board', id: LIST_TAG },
         {
           type: 'ImageList',
@@ -821,7 +855,7 @@ export const imagesApi = api.injectEndpoints({
         { type: 'BoardImagesTotal', id: 'none' },
         { type: 'BoardAssetsTotal', id: 'none' },
       ],
-      async onQueryStarted(board_id, { dispatch, queryFulfilled, getState }) {
+      async onQueryStarted(board_id, { dispatch, queryFulfilled }) {
         /**
          * Cache changes for deleteBoardAndImages:
          * - ~~Remove every image in the 'getImageDTO' cache that has the board_id~~
@@ -1253,9 +1287,8 @@ export const imagesApi = api.injectEndpoints({
         ];
 
         result?.removed_image_names.forEach((image_name) => {
-          const board_id = imageDTOs.find(
-            (i) => i.image_name === image_name
-          )?.board_id;
+          const board_id = imageDTOs.find((i) => i.image_name === image_name)
+            ?.board_id;
 
           if (!board_id || touchedBoardIds.includes(board_id)) {
             return;
@@ -1385,4 +1418,5 @@ export const {
   useDeleteBoardMutation,
   useStarImagesMutation,
   useUnstarImagesMutation,
+  useGetImageMetadataFromFileQuery,
 } = imagesApi;

@@ -22,10 +22,10 @@ import {
   NOISE,
   ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
-  REFINER_SEAMLESS,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
@@ -60,6 +60,8 @@ export const buildCanvasSDXLTextToImageGraph = (
     boundingBoxScaleMethod,
     shouldAutoSave,
   } = state.canvas;
+
+  const fp32 = vaePrecision === 'fp32';
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
@@ -252,7 +254,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       id: LATENTS_TO_IMAGE,
       type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
       is_intermediate: true,
-      fp32: vaePrecision === 'fp32' ? true : false,
+      fp32,
     };
 
     graph.nodes[CANVAS_OUTPUT] = {
@@ -290,7 +292,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
       id: CANVAS_OUTPUT,
       is_intermediate: !shouldAutoSave,
-      fp32: vaePrecision === 'fp32' ? true : false,
+      fp32,
     };
 
     graph.edges.push({
@@ -347,8 +349,15 @@ export const buildCanvasSDXLTextToImageGraph = (
 
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
-    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
-    modelLoaderNodeId = REFINER_SEAMLESS;
+    addSDXLRefinerToGraph(
+      state,
+      graph,
+      SDXL_DENOISE_LATENTS,
+      modelLoaderNodeId
+    );
+    if (seamlessXAxis || seamlessYAxis) {
+      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
+    }
   }
 
   // add LoRA support

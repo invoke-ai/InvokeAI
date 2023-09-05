@@ -118,7 +118,11 @@ const IAICanvasToolChooserOptions = () => {
   useHotkeys(
     ['BracketLeft'],
     () => {
-      dispatch(setBrushSize(Math.max(brushSize - 5, 5)));
+      if (brushSize - 5 <= 5) {
+        dispatch(setBrushSize(Math.max(brushSize - 1, 1)));
+      } else {
+        dispatch(setBrushSize(Math.max(brushSize - 5, 1)));
+      }
     },
     {
       enabled: () => !isStaging,

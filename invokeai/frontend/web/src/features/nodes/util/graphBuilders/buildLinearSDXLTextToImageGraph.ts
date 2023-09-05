@@ -16,9 +16,9 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  REFINER_SEAMLESS,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_SEAMLESS,
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
 } from './constants';
@@ -61,6 +61,8 @@ export const buildLinearSDXLTextToImageGraph = (
     log.error('No model found in state');
     throw new Error('No model found in state');
   }
+
+  const fp32 = vaePrecision === 'fp32';
 
   // Construct Style Prompt
   const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
@@ -118,7 +120,7 @@ export const buildLinearSDXLTextToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
     },
     edges: [
@@ -261,7 +263,9 @@ export const buildLinearSDXLTextToImageGraph = (
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
-    modelLoaderNodeId = REFINER_SEAMLESS;
+    if (seamlessXAxis || seamlessYAxis) {
+      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
+    }
   }
 
   // optionally add custom VAE

@@ -31,48 +31,54 @@ const selector = createSelector(
       reasons.push('No initial image selected');
     }
 
-    if (activeTabName === 'nodes' && nodes.shouldValidateGraph) {
-      if (!nodes.nodes.length) {
-        reasons.push('No nodes in graph');
-      }
-
-      nodes.nodes.forEach((node) => {
-        if (!isInvocationNode(node)) {
-          return;
+    if (activeTabName === 'nodes') {
+      if (nodes.shouldValidateGraph) {
+        if (!nodes.nodes.length) {
+          reasons.push('No nodes in graph');
         }
 
-        const nodeTemplate = nodes.nodeTemplates[node.data.type];
-
-        if (!nodeTemplate) {
-          // Node type not found
-          reasons.push('Missing node template');
-          return;
-        }
-
-        const connectedEdges = getConnectedEdges([node], nodes.edges);
-
-        forEach(node.data.inputs, (field) => {
-          const fieldTemplate = nodeTemplate.inputs[field.name];
-          const hasConnection = connectedEdges.some(
-            (edge) =>
-              edge.target === node.id && edge.targetHandle === field.name
-          );
-
-          if (!fieldTemplate) {
-            reasons.push('Missing field template');
+        nodes.nodes.forEach((node) => {
+          if (!isInvocationNode(node)) {
             return;
           }
 
-          if (fieldTemplate.required && !field.value && !hasConnection) {
-            reasons.push(
-              `${node.data.label || nodeTemplate.title} -> ${
-                field.label || fieldTemplate.title
-              } missing input`
+          const nodeTemplate = nodes.nodeTemplates[node.data.type];
+
+          if (!nodeTemplate) {
+            // Node type not found
+            reasons.push('Missing node template');
+            return;
+          }
+
+          const connectedEdges = getConnectedEdges([node], nodes.edges);
+
+          forEach(node.data.inputs, (field) => {
+            const fieldTemplate = nodeTemplate.inputs[field.name];
+            const hasConnection = connectedEdges.some(
+              (edge) =>
+                edge.target === node.id && edge.targetHandle === field.name
             );
-            return;
-          }
+
+            if (!fieldTemplate) {
+              reasons.push('Missing field template');
+              return;
+            }
+
+            if (
+              fieldTemplate.required &&
+              field.value === undefined &&
+              !hasConnection
+            ) {
+              reasons.push(
+                `${node.data.label || nodeTemplate.title} -> ${
+                  field.label || fieldTemplate.title
+                } missing input`
+              );
+              return;
+            }
+          });
         });
-      });
+      }
     } else {
       if (!model) {
         reasons.push('No model selected');

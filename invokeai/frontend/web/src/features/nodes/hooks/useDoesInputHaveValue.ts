@@ -15,7 +15,7 @@ export const useDoesInputHaveValue = (nodeId: string, fieldName: string) => {
           if (!isInvocationNode(node)) {
             return;
           }
-          return Boolean(node?.data.inputs[fieldName]?.value);
+          return node?.data.inputs[fieldName]?.value !== undefined;
         },
         defaultSelectorOptions
       ),

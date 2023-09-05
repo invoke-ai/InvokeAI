@@ -7,6 +7,7 @@ import { ImageDTO } from 'services/api/types';
 
 import { clipSkipMap } from '../types/constants';
 import {
+  CanvasCoherenceModeParam,
   CfgScaleParam,
   HeightParam,
   MainModelParam,
@@ -37,6 +38,7 @@ export interface GenerationState {
   scheduler: SchedulerParam;
   maskBlur: number;
   maskBlurMethod: MaskBlurMethodParam;
+  canvasCoherenceMode: CanvasCoherenceModeParam;
   canvasCoherenceSteps: number;
   canvasCoherenceStrength: StrengthParam;
   seed: SeedParam;
@@ -47,7 +49,8 @@ export interface GenerationState {
   shouldUseNoiseSettings: boolean;
   steps: StepsParam;
   threshold: number;
-  tileSize: number;
+  infillTileSize: number;
+  infillPatchmatchDownscaleSize: number;
   variationAmount: number;
   width: WidthParam;
   shouldUseSymmetry: boolean;
@@ -62,6 +65,7 @@ export interface GenerationState {
   shouldUseCpuNoise: boolean;
   shouldShowAdvancedOptions: boolean;
   aspectRatio: number | null;
+  shouldLockAspectRatio: boolean;
 }
 
 export const initialGenerationState: GenerationState = {
@@ -76,6 +80,7 @@ export const initialGenerationState: GenerationState = {
   scheduler: 'euler',
   maskBlur: 16,
   maskBlurMethod: 'box',
+  canvasCoherenceMode: 'edge',
   canvasCoherenceSteps: 20,
   canvasCoherenceStrength: 0.3,
   seed: 0,
@@ -86,7 +91,8 @@ export const initialGenerationState: GenerationState = {
   shouldUseNoiseSettings: false,
   steps: 50,
   threshold: 0,
-  tileSize: 32,
+  infillTileSize: 32,
+  infillPatchmatchDownscaleSize: 1,
   variationAmount: 0.1,
   width: 512,
   shouldUseSymmetry: false,
@@ -101,6 +107,7 @@ export const initialGenerationState: GenerationState = {
   shouldUseCpuNoise: true,
   shouldShowAdvancedOptions: false,
   aspectRatio: null,
+  shouldLockAspectRatio: false,
 };
 
 const initialState: GenerationState = initialGenerationState;
@@ -204,17 +211,29 @@ export const generationSlice = createSlice({
     setMaskBlurMethod: (state, action: PayloadAction<MaskBlurMethodParam>) => {
       state.maskBlurMethod = action.payload;
     },
+    setCanvasCoherenceMode: (
+      state,
+      action: PayloadAction<CanvasCoherenceModeParam>
+    ) => {
+      state.canvasCoherenceMode = action.payload;
+    },
     setCanvasCoherenceSteps: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceSteps = action.payload;
     },
     setCanvasCoherenceStrength: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceStrength = action.payload;
     },
-    setTileSize: (state, action: PayloadAction<number>) => {
-      state.tileSize = action.payload;
-    },
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
+    },
+    setInfillTileSize: (state, action: PayloadAction<number>) => {
+      state.infillTileSize = action.payload;
+    },
+    setInfillPatchmatchDownscaleSize: (
+      state,
+      action: PayloadAction<number>
+    ) => {
+      state.infillPatchmatchDownscaleSize = action.payload;
     },
     setShouldUseSymmetry: (state, action: PayloadAction<boolean>) => {
       state.shouldUseSymmetry = action.payload;
@@ -272,6 +291,9 @@ export const generationSlice = createSlice({
         state.height = roundToMultiple(state.width / newAspectRatio, 8);
       }
     },
+    setShouldLockAspectRatio: (state, action: PayloadAction<boolean>) => {
+      state.shouldLockAspectRatio = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -318,6 +340,7 @@ export const {
   setScheduler,
   setMaskBlur,
   setMaskBlurMethod,
+  setCanvasCoherenceMode,
   setCanvasCoherenceSteps,
   setCanvasCoherenceStrength,
   setSeed,
@@ -327,7 +350,8 @@ export const {
   setShouldRandomizeSeed,
   setSteps,
   setThreshold,
-  setTileSize,
+  setInfillTileSize,
+  setInfillPatchmatchDownscaleSize,
   setVariationAmount,
   setShouldUseSymmetry,
   setHorizontalSymmetrySteps,
@@ -342,6 +366,7 @@ export const {
   shouldUseCpuNoiseChanged,
   setShouldShowAdvancedOptions,
   setAspectRatio,
+  setShouldLockAspectRatio,
   vaePrecisionChanged,
 } = generationSlice.actions;
 

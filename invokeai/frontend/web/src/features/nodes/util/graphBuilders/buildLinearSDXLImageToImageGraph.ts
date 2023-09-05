@@ -21,11 +21,11 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  REFINER_SEAMLESS,
   RESIZE,
   SDXL_DENOISE_LATENTS,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
@@ -84,6 +84,8 @@ export const buildLinearSDXLImageToImageGraph = (
     throw new Error('No model found in state');
   }
 
+  const fp32 = vaePrecision === 'fp32';
+
   // Model Loader ID
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
@@ -124,7 +126,7 @@ export const buildLinearSDXLImageToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -144,7 +146,7 @@ export const buildLinearSDXLImageToImageGraph = (
         // image: {
         //   image_name: initialImage.image_name,
         // },
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
     },
     edges: [
@@ -368,7 +370,9 @@ export const buildLinearSDXLImageToImageGraph = (
   // Add Refiner if enabled
   if (shouldUseSDXLRefiner) {
     addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
-    modelLoaderNodeId = REFINER_SEAMLESS;
+    if (seamlessXAxis || seamlessYAxis) {
+      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
+    }
   }
 
   // optionally add custom VAE

@@ -6,6 +6,7 @@ import {
   ImageBlurInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
+  MaskEdgeInvocation,
   NoiseInvocation,
   RandomIntInvocation,
   RangeOfSizeInvocation,
@@ -19,6 +20,8 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
+  CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+  CANVAS_COHERENCE_MASK_EDGE,
   CANVAS_COHERENCE_NOISE,
   CANVAS_COHERENCE_NOISE_INCREMENT,
   CANVAS_OUTPUT,
@@ -36,10 +39,10 @@ import {
   POSITIVE_CONDITIONING,
   RANDOM_INT,
   RANGE_OF_SIZE,
-  REFINER_SEAMLESS,
   SDXL_CANVAS_INPAINT_GRAPH,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
+  SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
@@ -68,6 +71,7 @@ export const buildCanvasSDXLInpaintGraph = (
     shouldUseCpuNoise,
     maskBlur,
     maskBlurMethod,
+    canvasCoherenceMode,
     canvasCoherenceSteps,
     canvasCoherenceStrength,
     seamlessXAxis,
@@ -95,6 +99,12 @@ export const buildCanvasSDXLInpaintGraph = (
     boundingBoxScaleMethod,
     shouldAutoSave,
   } = state.canvas;
+
+  const fp32 = vaePrecision === 'fp32';
+
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(
+    boundingBoxScaleMethod
+  );
 
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
@@ -137,7 +147,7 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'i2l',
         id: INPAINT_IMAGE,
         is_intermediate: true,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
       [NOISE]: {
         type: 'noise',
@@ -149,7 +159,7 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'create_denoise_mask',
         id: INPAINT_CREATE_MASK,
         is_intermediate: true,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -177,7 +187,7 @@ export const buildCanvasSDXLInpaintGraph = (
       },
       [CANVAS_COHERENCE_DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: SDXL_DENOISE_LATENTS,
+        id: CANVAS_COHERENCE_DENOISE_LATENTS,
         is_intermediate: true,
         steps: canvasCoherenceSteps,
         cfg_scale: cfg_scale,
@@ -189,7 +199,7 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         is_intermediate: true,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
       [CANVAS_OUTPUT]: {
         type: 'color_correct',
@@ -433,7 +443,7 @@ export const buildCanvasSDXLInpaintGraph = (
   };
 
   // Handle Scale Before Processing
-  if (['auto', 'manual'].includes(boundingBoxScaleMethod)) {
+  if (isUsingScaledDimensions) {
     const scaledWidth: number = scaledBoundingBoxDimensions.width;
     const scaledHeight: number = scaledBoundingBoxDimensions.height;
 
@@ -596,6 +606,116 @@ export const buildCanvasSDXLInpaintGraph = (
     );
   }
 
+  // Handle Coherence Mode
+  if (canvasCoherenceMode !== 'unmasked') {
+    // Create Mask If Coherence Mode Is Not Full
+    graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
+      type: 'create_denoise_mask',
+      id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+      is_intermediate: true,
+      fp32,
+    };
+
+    // Handle Image Input For Mask Creation
+    if (isUsingScaledDimensions) {
+      graph.edges.push({
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      });
+    } else {
+      graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
+        ...(graph.nodes[
+          CANVAS_COHERENCE_INPAINT_CREATE_MASK
+        ] as CreateDenoiseMaskInvocation),
+        image: canvasInitImage,
+      };
+    }
+
+    // Create Mask If Coherence Mode Is Mask
+    if (canvasCoherenceMode === 'mask') {
+      if (isUsingScaledDimensions) {
+        graph.edges.push({
+          source: {
+            node_id: MASK_RESIZE_UP,
+            field: 'image',
+          },
+          destination: {
+            node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+            field: 'mask',
+          },
+        });
+      } else {
+        graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
+          ...(graph.nodes[
+            CANVAS_COHERENCE_INPAINT_CREATE_MASK
+          ] as CreateDenoiseMaskInvocation),
+          mask: canvasMaskImage,
+        };
+      }
+    }
+
+    // Create Mask Edge If Coherence Mode Is Edge
+    if (canvasCoherenceMode === 'edge') {
+      graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
+        type: 'mask_edge',
+        id: CANVAS_COHERENCE_MASK_EDGE,
+        is_intermediate: true,
+        edge_blur: maskBlur,
+        edge_size: maskBlur * 2,
+        low_threshold: 100,
+        high_threshold: 200,
+      };
+
+      // Handle Scaled Dimensions For Mask Edge
+      if (isUsingScaledDimensions) {
+        graph.edges.push({
+          source: {
+            node_id: MASK_RESIZE_UP,
+            field: 'image',
+          },
+          destination: {
+            node_id: CANVAS_COHERENCE_MASK_EDGE,
+            field: 'image',
+          },
+        });
+      } else {
+        graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
+          ...(graph.nodes[CANVAS_COHERENCE_MASK_EDGE] as MaskEdgeInvocation),
+          image: canvasMaskImage,
+        };
+      }
+
+      graph.edges.push({
+        source: {
+          node_id: CANVAS_COHERENCE_MASK_EDGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'mask',
+        },
+      });
+    }
+
+    // Plug Denoise Mask To Coherence Denoise Latents
+    graph.edges.push({
+      source: {
+        node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+        field: 'denoise_mask',
+      },
+      destination: {
+        node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+        field: 'denoise_mask',
+      },
+    });
+  }
+
   // Handle Seed
   if (shouldRandomizeSeed) {
     // Random int node to generate the starting seed
@@ -628,9 +748,12 @@ export const buildCanvasSDXLInpaintGraph = (
       state,
       graph,
       CANVAS_COHERENCE_DENOISE_LATENTS,
-      modelLoaderNodeId
+      modelLoaderNodeId,
+      canvasInitImage
     );
-    modelLoaderNodeId = REFINER_SEAMLESS;
+    if (seamlessXAxis || seamlessYAxis) {
+      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
+    }
   }
 
   // optionally add custom VAE

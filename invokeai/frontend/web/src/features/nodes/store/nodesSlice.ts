@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { cloneDeep, forEach, isEqual, uniqBy } from 'lodash-es';
+import { cloneDeep, forEach, isEqual, map, uniqBy } from 'lodash-es';
 import {
   addEdge,
   applyEdgeChanges,
@@ -18,7 +18,7 @@ import {
   Viewport,
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
-import { sessionInvoked } from 'services/api/thunks/session';
+import { sessionCanceled, sessionInvoked } from 'services/api/thunks/session';
 import { ImageField } from 'services/api/types';
 import {
   appSocketGeneratorProgress,
@@ -102,6 +102,7 @@ export const initialNodesState: NodesState = {
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
   mouseOverField: null,
+  mouseOverNode: null,
   nodesToCopy: [],
   edgesToCopy: [],
   selectionMode: SelectionMode.Partial,
@@ -244,6 +245,34 @@ const nodesSlice = createSlice({
         return;
       }
       field.label = label;
+    },
+    nodeEmbedWorkflowChanged: (
+      state,
+      action: PayloadAction<{ nodeId: string; embedWorkflow: boolean }>
+    ) => {
+      const { nodeId, embedWorkflow } = action.payload;
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+
+      const node = state.nodes?.[nodeIndex];
+
+      if (!isInvocationNode(node)) {
+        return;
+      }
+      node.data.embedWorkflow = embedWorkflow;
+    },
+    nodeIsIntermediateChanged: (
+      state,
+      action: PayloadAction<{ nodeId: string; isIntermediate: boolean }>
+    ) => {
+      const { nodeId, isIntermediate } = action.payload;
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+
+      const node = state.nodes?.[nodeIndex];
+
+      if (!isInvocationNode(node)) {
+        return;
+      }
+      node.data.isIntermediate = isIntermediate;
     },
     nodeIsOpenChanged: (
       state,
@@ -414,6 +443,17 @@ const nodesSlice = createSlice({
       }
       node.data.notes = notes;
     },
+    nodeExclusivelySelected: (state, action: PayloadAction<string>) => {
+      const nodeId = action.payload;
+      state.nodes = applyNodeChanges(
+        state.nodes.map((n) => ({
+          id: n.id,
+          type: 'select',
+          selected: n.id === nodeId ? true : false,
+        })),
+        state.nodes
+      );
+    },
     selectedNodesChanged: (state, action: PayloadAction<string[]>) => {
       state.selectedNodes = action.payload;
     },
@@ -561,7 +601,7 @@ const nodesSlice = createSlice({
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
-      state.workflow.exposedFields = [];
+      state.workflow = cloneDeep(initialWorkflow);
     },
     shouldValidateGraphChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldValidateGraph = action.payload;
@@ -636,6 +676,9 @@ const nodesSlice = createSlice({
       action: PayloadAction<FieldIdentifier | null>
     ) => {
       state.mouseOverField = action.payload;
+    },
+    mouseOverNodeChanged: (state, action: PayloadAction<string | null>) => {
+      state.mouseOverNode = action.payload;
     },
     selectedAll: (state) => {
       state.nodes = applyNodeChanges(
@@ -790,6 +833,13 @@ const nodesSlice = createSlice({
         nes.outputs = [];
       });
     });
+    builder.addCase(sessionCanceled.fulfilled, (state) => {
+      map(state.nodeExecutionStates, (nes) => {
+        if (nes.status === NodeStatus.IN_PROGRESS) {
+          nes.status = NodeStatus.PENDING;
+        }
+      });
+    });
   },
 });
 
@@ -850,6 +900,10 @@ export const {
   addNodePopoverClosed,
   addNodePopoverToggled,
   selectionModeChanged,
+  nodeEmbedWorkflowChanged,
+  nodeIsIntermediateChanged,
+  mouseOverNodeChanged,
+  nodeExclusivelySelected,
 } = nodesSlice.actions;
 
 export default nodesSlice.reducer;

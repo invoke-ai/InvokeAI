@@ -2,6 +2,7 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { MetadataAccumulatorInvocation } from 'services/api/types';
 import {
+  CANVAS_COHERENCE_INPAINT_CREATE_MASK,
   CANVAS_IMAGE_TO_IMAGE_GRAPH,
   CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPAINT_GRAPH,
@@ -20,6 +21,7 @@ import {
   SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
+  SDXL_REFINER_INPAINT_CREATE_MASK,
   SDXL_TEXT_TO_IMAGE_GRAPH,
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
@@ -30,8 +32,9 @@ export const addVAEToGraph = (
   graph: NonNullableGraph,
   modelLoaderNodeId: string = MAIN_MODEL_LOADER
 ): void => {
-  const { vae } = state.generation;
+  const { vae, canvasCoherenceMode } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
+  const { shouldUseSDXLRefiner } = state.sdxl;
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
@@ -144,6 +147,38 @@ export const addVAEToGraph = (
         },
       }
     );
+
+    // Handle Coherence Mode
+    if (canvasCoherenceMode !== 'unmasked') {
+      graph.edges.push({
+        source: {
+          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        },
+        destination: {
+          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
+          field: 'vae',
+        },
+      });
+    }
+  }
+
+  if (shouldUseSDXLRefiner) {
+    if (
+      graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
+      graph.id === SDXL_CANVAS_OUTPAINT_GRAPH
+    ) {
+      graph.edges.push({
+        source: {
+          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          field: isAutoVae && isOnnxModel ? 'vae_decoder' : 'vae',
+        },
+        destination: {
+          node_id: SDXL_REFINER_INPAINT_CREATE_MASK,
+          field: 'vae',
+        },
+      });
+    }
   }
 
   if (vae && metadataAccumulator) {

@@ -35,6 +35,7 @@ export type NodesState = {
   viewport: Viewport;
   isReady: boolean;
   mouseOverField: FieldIdentifier | null;
+  mouseOverNode: string | null;
   nodesToCopy: Node<NodeData>[];
   edgesToCopy: Edge<InvocationEdgeExtra>[];
   isAddNodePopoverOpen: boolean;

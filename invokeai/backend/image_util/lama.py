@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from PIL import Image
 
+import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import get_invokeai_config
 from invokeai.backend.util.devices import choose_torch_device
 
@@ -19,7 +20,7 @@ def norm_img(np_img):
 
 def load_jit_model(url_or_path, device):
     model_path = url_or_path
-    print(f"Loading model from: {model_path}")
+    logger.info(f"Loading model from: {model_path}")
     model = torch.jit.load(model_path, map_location="cpu").to(device)
     model.eval()
     return model
@@ -52,5 +53,6 @@ class LaMA:
 
         del model
         gc.collect()
+        torch.cuda.empty_cache()
 
         return infilled_image

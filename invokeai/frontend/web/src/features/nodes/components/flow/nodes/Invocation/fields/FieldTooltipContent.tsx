@@ -34,6 +34,8 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
       }
 
       return 'Unknown Field';
+    } else {
+      return fieldTemplate?.title || 'Unknown Field';
     }
   }, [field, fieldTemplate]);
 
