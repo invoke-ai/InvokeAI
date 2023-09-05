@@ -61,6 +61,8 @@ export const buildCanvasSDXLTextToImageGraph = (
     shouldAutoSave,
   } = state.canvas;
 
+  const fp32 = vaePrecision === 'fp32';
+
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
@@ -252,7 +254,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       id: LATENTS_TO_IMAGE,
       type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
       is_intermediate: true,
-      fp32: vaePrecision === 'fp32' ? true : false,
+      fp32,
     };
 
     graph.nodes[CANVAS_OUTPUT] = {
@@ -290,7 +292,7 @@ export const buildCanvasSDXLTextToImageGraph = (
       type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
       id: CANVAS_OUTPUT,
       is_intermediate: !shouldAutoSave,
-      fp32: vaePrecision === 'fp32' ? true : false,
+      fp32,
     };
 
     graph.edges.push({

@@ -45,7 +45,7 @@ from invokeai.app.invocations.primitives import FloatCollectionOutput
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 
-@invocation("float_range", title="Float Range", tags=["math", "range"], category="math")
+@invocation("float_range", title="Float Range", tags=["math", "range"], category="math", version="1.0.0")
 class FloatLinearRangeInvocation(BaseInvocation):
     """Creates a range"""
 
@@ -96,7 +96,7 @@ EASING_FUNCTION_KEYS = Literal[tuple(list(EASING_FUNCTIONS_MAP.keys()))]
 
 
 # actually I think for now could just use CollectionOutput (which is list[Any]
-@invocation("step_param_easing", title="Step Param Easing", tags=["step", "easing"], category="step")
+@invocation("step_param_easing", title="Step Param Easing", tags=["step", "easing"], category="step", version="1.0.0")
 class StepParamEasingInvocation(BaseInvocation):
     """Experimental per-step parameter easing for denoising steps"""
 

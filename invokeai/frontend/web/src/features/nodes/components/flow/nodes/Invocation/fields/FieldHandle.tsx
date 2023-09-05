@@ -1,8 +1,11 @@
 import { Tooltip } from '@chakra-ui/react';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import {
+  COLLECTION_TYPES,
   FIELDS,
   HANDLE_TOOLTIP_OPEN_DELAY,
+  MODEL_TYPES,
+  POLYMORPHIC_TYPES,
 } from 'features/nodes/types/constants';
 import {
   InputFieldTemplate,
@@ -18,6 +21,7 @@ export const handleBaseStyles: CSSProperties = {
   borderWidth: 0,
   zIndex: 1,
 };
+``;
 
 export const inputHandleStyles: CSSProperties = {
   left: '-1rem',
@@ -44,15 +48,25 @@ const FieldHandle = (props: FieldHandleProps) => {
     connectionError,
   } = props;
   const { name, type } = fieldTemplate;
-  const { color, title } = FIELDS[type];
+  const { color: typeColor, title } = FIELDS[type];
 
   const styles: CSSProperties = useMemo(() => {
+    const isCollectionType = COLLECTION_TYPES.includes(type);
+    const isPolymorphicType = POLYMORPHIC_TYPES.includes(type);
+    const isModelType = MODEL_TYPES.includes(type);
+    const color = colorTokenToCssVar(typeColor);
     const s: CSSProperties = {
-      backgroundColor: colorTokenToCssVar(color),
+      backgroundColor:
+        isCollectionType || isPolymorphicType
+          ? 'var(--invokeai-colors-base-900)'
+          : color,
       position: 'absolute',
       width: '1rem',
       height: '1rem',
-      borderWidth: 0,
+      borderWidth: isCollectionType || isPolymorphicType ? 4 : 0,
+      borderStyle: 'solid',
+      borderColor: color,
+      borderRadius: isModelType ? 4 : '100%',
       zIndex: 1,
     };
 
@@ -78,11 +92,12 @@ const FieldHandle = (props: FieldHandleProps) => {
 
     return s;
   }, [
-    color,
     connectionError,
     handleType,
     isConnectionInProgress,
     isConnectionStartField,
+    type,
+    typeColor,
   ]);
 
   const tooltip = useMemo(() => {

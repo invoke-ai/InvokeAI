@@ -112,6 +112,10 @@ def are_connection_types_compatible(from_type: Any, to_type: Any) -> bool:
         if to_type in get_args(from_type):
             return True
 
+        # allow int -> float, pydantic will cast for us
+        if from_type is int and to_type is float:
+            return True
+
         # if not issubclass(from_type, to_type):
         if not is_union_subtype(from_type, to_type):
             return False
