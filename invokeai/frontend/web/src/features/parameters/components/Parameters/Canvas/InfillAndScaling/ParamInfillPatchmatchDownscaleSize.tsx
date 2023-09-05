@@ -45,7 +45,6 @@ const ParamInfillPatchmatchDownscaleSize = () => {
       label={t('parameters.patchmatchDownScaleSize')}
       min={1}
       max={10}
-      sliderNumberInputProps={{ max: 10 }}
       value={infillPatchmatchDownscaleSize}
       onChange={handleChange}
       withInput

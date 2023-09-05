@@ -92,7 +92,7 @@ export const initialGenerationState: GenerationState = {
   steps: 50,
   threshold: 0,
   infillTileSize: 32,
-  infillPatchmatchDownscaleSize: 2,
+  infillPatchmatchDownscaleSize: 1,
   variationAmount: 0.1,
   width: 512,
   shouldUseSymmetry: false,
