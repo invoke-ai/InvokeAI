@@ -57,28 +57,29 @@ familiar with containerization technologies such as Docker.
 For downloads and instructions, visit the [NVIDIA CUDA Container
 Runtime Site](https://developer.nvidia.com/nvidia-container-runtime)
 
-### Cudnnn Installation*
+### (Optional) Cudnnn Installation for 40 series Optimization*
 
 1) Find the InvokeAI folder
-2) click on .venv folder should look like that YourInvokeFolderHere\.venv
-3) Click on Lib folder should look like that YourInvokeFolderHere\.venv\Lib
-4) Click on site-packages folder should look like YourInvokeFolderHere\.venv\Lib\site-packages
-5) Find Torch directory when finded click on it should look like that YourInvokeFolderHere\InvokeAI\.venv\Lib\site-packages\torch
-6) Find the lib folder should look like that YourInvokeFolderHere\.venv\Lib\site-packages\torch\lib
+2) Click on .venv folder - e.g., YourInvokeFolderHere\.venv
+3) Click on Lib folder - e.g., YourInvokeFolderHere\.venv\Lib
+4) Click on site-packages folder - e.g., YourInvokeFolderHere\.venv\Lib\site-packages
+5) Click on Torch directory - e.g., YourInvokeFolderHere\InvokeAI\.venv\Lib\site-packages\torch
+6) Click on the lib folder - e.g., YourInvokeFolderHere\.venv\Lib\site-packages\torch\lib
 7) __Copy everything inside the folder as a Backup in whatever folder you want, it's just in case.__
 8) Go to https://developer.nvidia.com/cudnn
 9) Log-in Or Create an account if you're not already connected
 10) Download the latest version
 11) Go to the folder and extract it.
 12) Find the bin folder E\cudnn-windows-x86_64-__Whatever Version__\bin
-13) Copy the 7 dll
+13) Copy the 7 dll files
 14) Go Back to YourInvokeFolderHere\.venv\Lib\site-packages\torch\lib
 15) Paste the 7 dll took earlier. It should ask for replacement, accept it.
 16) Enjoy !
 
 __Very Important: You should Copy everything inside the folder of the torch lib. You do not moove It.__
 *Note: 
-If _no change is seen or bug appear__ follow the same step instead just copy the Torch/lib back up folder you made earlier and replace it ! 
+If _no change is seen or a bug appears__ follow the same step instead just copy the Torch/lib back up folder you made earlier and replace it! If you 
+didn't make a backup, you can also uninstall and reinstall torch through the command line to repair this folder.
 This optimization is normally intented for the newer version of graphics card (4th series 3th series) but results have been seen with older graphics card.
 So giving a try could be good.
 
