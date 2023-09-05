@@ -9,13 +9,20 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
+import { nodeExclusivelySelected } from 'features/nodes/store/nodesSlice';
 import {
   DRAG_HANDLE_CLASSNAME,
   NODE_WIDTH,
 } from 'features/nodes/types/constants';
 import { NodeStatus } from 'features/nodes/types/types';
 import { contextMenusClosed } from 'features/ui/store/uiSlice';
-import { PropsWithChildren, memo, useCallback, useMemo } from 'react';
+import {
+  MouseEvent,
+  PropsWithChildren,
+  memo,
+  useCallback,
+  useMemo,
+} from 'react';
 
 type NodeWrapperProps = PropsWithChildren & {
   nodeId: string;
@@ -57,9 +64,15 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const opacity = useAppSelector((state) => state.nodes.nodeOpacity);
 
-  const handleClick = useCallback(() => {
-    dispatch(contextMenusClosed());
-  }, [dispatch]);
+  const handleClick = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+        dispatch(nodeExclusivelySelected(nodeId));
+      }
+      dispatch(contextMenusClosed());
+    },
+    [dispatch, nodeId]
+  );
 
   return (
     <Box
