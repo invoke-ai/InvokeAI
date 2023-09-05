@@ -24,7 +24,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 # Modified ControlNetModel with encoder_attention_mask argument added
 
 
-logger = InvokeAILogger.getLogger(__name__)
+logger = InvokeAILogger.get_logger(__name__)
 
 
 class ControlNetModel(ModelMixin, ConfigMixin, FromOriginalControlnetMixin):

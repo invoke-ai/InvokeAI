@@ -1,6 +1,5 @@
 # Copyright (c) 2022-2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 import asyncio
-import logging
 import socket
 from inspect import signature
 from pathlib import Path
@@ -218,7 +217,7 @@ def invoke_api():
                 exc_info=e,
             )
         else:
-            jurigged.watch(logger=InvokeAILogger.getLogger(name="jurigged").info)
+            jurigged.watch(logger=InvokeAILogger.get_logger(name="jurigged").info)
 
     port = find_port(app_config.port)
     if port != app_config.port:
@@ -237,7 +236,7 @@ def invoke_api():
 
     # replace uvicorn's loggers with InvokeAI's for consistent appearance
     for logname in ["uvicorn.access", "uvicorn"]:
-        log = logging.getLogger(logname)
+        log = InvokeAILogger.get_logger(logname)
         log.handlers.clear()
         for ch in logger.handlers:
             log.addHandler(ch)
