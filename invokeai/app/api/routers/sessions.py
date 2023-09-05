@@ -118,7 +118,7 @@ async def get_batch(
 
 @session_router.get(
     "/batch/{batch_process_id}/sessions",
-    operation_id="get_batch",
+    operation_id="get_batch_sessions",
     responses={200: {"model": list[BatchSession]}},
 )
 async def get_batch_sessions(
