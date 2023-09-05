@@ -110,6 +110,73 @@ a Text-Generation-Webui instance (might work remotely too, but I never tried it)
 This node works best with SDXL models, especially as the style can be described independantly of the LLM's output.
 
 --------------------------------
+### Depth Map from Wavefront OBJ
+
+**Description:** Render depth maps from Wavefront .obj files (triangulated) using this simple 3D renderer utilizing numpy and matplotlib to compute and color the scene. There are simple parameters to change the FOV, camera position, and model orientation.
+
+To be imported, an .obj must use triangulated meshes, so make sure to enable that option if exporting from a 3D modeling program. This renderer makes each triangle a solid color based on its average depth, so it will cause anomalies if your .obj has large triangles. In Blender, the Remesh modifier can be helpful to subdivide a mesh into small pieces that work well given these limitations.
+
+**Node Link:** https://github.com/dwringer/depth-from-obj-node
+
+**Example Usage:**
+![depth from obj usage graph](https://raw.githubusercontent.com/dwringer/depth-from-obj-node/main/depth_from_obj_usage.jpg)
+
+--------------------------------
+### Enhance Image (simple adjustments)
+
+**Description:** Boost or reduce color saturation, contrast, brightness, sharpness, or invert colors of any image at any stage with this simple wrapper for pillow [PIL]'s ImageEnhance module.
+
+Color inversion is toggled with a simple switch, while each of the four enhancer modes are activated by entering a value other than 1 in each corresponding input field. Values less than 1 will reduce the corresponding property, while values greater than 1 will enhance it.
+
+**Node Link:** https://github.com/dwringer/image-enhance-node
+
+**Example Usage:**
+![enhance image usage graph](https://raw.githubusercontent.com/dwringer/image-enhance-node/main/image_enhance_usage.jpg)
+
+--------------------------------
+### Generative Grammar-Based Prompt Nodes
+
+**Description:** This set of 3 nodes generates prompts from simple user-defined grammar rules (loaded from custom files - examples provided below). The prompts are made by recursively expanding a special template string, replacing nonterminal "parts-of-speech" until no more nonterminal terms remain in the string.
+
+This includes 3 Nodes:
+- *Lookup Table from File* - loads a YAML file "prompt" section (or of a whole folder of YAML's) into a JSON-ified dictionary (Lookups output)
+- *Lookups Entry from Prompt* - places a single entry in a new Lookups output under the specified heading
+- *Prompt from Lookup Table* - uses a Collection of Lookups as grammar rules from which to randomly generate prompts.
+
+**Node Link:** https://github.com/dwringer/generative-grammar-prompt-nodes
+
+**Example Usage:**
+![lookups usage example graph](https://raw.githubusercontent.com/dwringer/generative-grammar-prompt-nodes/main/lookuptables_usage.jpg)
+
+--------------------------------
+### Image and Mask Composition Pack
+
+**Description:** This is a pack of nodes for composing masks and images, including a simple text mask creator and both image and latent offset nodes. The offsets wrap around, so these can be used in conjunction with the Seamless node to progressively generate centered on different parts of the seamless tiling.
+
+This includes 4 Nodes:
+- *Text Mask (simple 2D)* - create and position a white on black (or black on white) line of text using any font locally available to Invoke.
+- *Image Compositor* - Take a subject from an image with a flat backdrop and layer it on another image using a chroma key or flood select background removal.
+- *Offset Latents* - Offset a latents tensor in the vertical and/or horizontal dimensions, wrapping it around.
+- *Offset Image* - Offset an image in the vertical and/or horizontal dimensions, wrapping it around.
+
+**Node Link:** https://github.com/dwringer/composition-nodes
+
+**Example Usage:**
+![composition nodes usage graph](https://raw.githubusercontent.com/dwringer/composition-nodes/main/composition_nodes_usage.jpg)
+
+--------------------------------
+### Size Stepper Nodes
+
+**Description:** This is a set of nodes for calculating the necessary size increments for doing upscaling workflows. Use the *Final Size & Orientation* node to enter your full size dimensions and orientation (portrait/landscape/random), then plug that and your initial generation dimensions into the *Ideal Size Stepper* and get 1, 2, or 3 intermediate pairs of dimensions for upscaling. Note this does not output the initial size or full size dimensions: the 1, 2, or 3 outputs of this node are only the intermediate sizes.
+
+A third node is included, *Random Switch (Integers)*, which is just a generic version of Final Size with no orientation selection.
+
+**Node Link:** https://github.com/dwringer/size-stepper-nodes
+
+**Example Usage:**
+![size stepper usage graph](https://raw.githubusercontent.com/dwringer/size-stepper-nodes/main/size_nodes_usage.jpg)
+
+--------------------------------
 
 ### Example Node Template
 
