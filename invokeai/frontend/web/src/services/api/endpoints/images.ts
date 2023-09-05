@@ -28,6 +28,8 @@ import {
 } from '../util';
 import { boardsApi } from './boards';
 import { ImageMetadataAndWorkflow } from 'features/nodes/types/types';
+import { fetchBaseQuery } from '@reduxjs/toolkit/dist/query';
+import { $authToken, $projectId } from '../client';
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -115,18 +117,40 @@ export const imagesApi = api.injectEndpoints({
       ],
       keepUnusedDataFor: 86400, // 24 hours
     }),
-    getImageMetadataFromFile: build.query<ImageMetadataAndWorkflow, string>({
-      query: (image_name) => ({
-        url: `images/i/${image_name}/full`,
-        responseHandler: async (res) => {
-          return await res.blob();
-        },
-      }),
-      providesTags: (result, error, image_name) => [
-        { type: 'ImageMetadataFromFile', id: image_name },
+    getImageMetadataFromFile: build.query<ImageMetadataAndWorkflow, ImageDTO>({
+      queryFn: async (args: ImageDTO, api, extraOptions) => {
+        const authToken = $authToken.get();
+        const projectId = $projectId.get();
+        const customBaseQuery = fetchBaseQuery({
+          baseUrl: '',
+          prepareHeaders: (headers) => {
+            if (authToken) {
+              headers.set('Authorization', `Bearer ${authToken}`);
+            }
+            if (projectId) {
+              headers.set('project-id', projectId);
+            }
+
+            return headers;
+          },
+          responseHandler: async (res) => {
+            return await res.blob();
+          },
+        });
+
+        const response = await customBaseQuery(
+          args.image_url,
+          api,
+          extraOptions
+        );
+        const data = await getMetadataAndWorkflowFromImageBlob(
+          response.data as Blob
+        );
+        return { data };
+      },
+      providesTags: (result, error, image_dto) => [
+        { type: 'ImageMetadataFromFile', id: image_dto.image_name },
       ],
-      transformResponse: (response: Blob) =>
-        getMetadataAndWorkflowFromImageBlob(response),
       keepUnusedDataFor: 86400, // 24 hours
     }),
     clearIntermediates: build.mutation<number, void>({

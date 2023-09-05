@@ -20,6 +20,7 @@ from invokeai.app.invocations.baseinvocation import (
 
 class PTFields(BaseModel):
     """Prompt Tools Fields for an image generated in InvokeAI."""
+
     positive_prompt: str
     positive_style_prompt: str
     negative_prompt: str
@@ -30,38 +31,49 @@ class PTFields(BaseModel):
     steps: int
     cfg_scale: float
 
+
 @invocation_output("pt_fields_collect_output")
 class PTFieldsCollectOutput(BaseInvocationOutput):
     """PTFieldsCollect Output"""
 
     pt_fields: str = OutputField(description="PTFields in Json Format")
 
-@invocation("pt_fields_collect", title="PTFields Collect", tags=["prompt", "fields"], category="prompt")
+
+@invocation(
+    "pt_fields_collect", title="PTFields Collect", tags=["prompt", "fields"], category="prompt", version="1.0.0"
+)
 class PTFieldsCollectInvocation(BaseInvocation):
     """Collect Prompt Tools Fields for an image generated in InvokeAI."""
 
     positive_prompt: Optional[str] = InputField(description="The positive prompt parameter", input=Input.Connection)
-    positive_style_prompt: Optional[str] = InputField(description="The positive style prompt parameter", input=Input.Connection)
+    positive_style_prompt: Optional[str] = InputField(
+        description="The positive style prompt parameter", input=Input.Connection
+    )
     negative_prompt: Optional[str] = InputField(description="The negative prompt parameter", input=Input.Connection)
-    negative_style_prompt: Optional[str] = InputField(description="The negative prompt parameter", input=Input.Connection)
+    negative_style_prompt: Optional[str] = InputField(
+        description="The negative prompt parameter", input=Input.Connection
+    )
     seed: Optional[int] = InputField(description="The seed used for noise generation", input=Input.Connection)
     width: Optional[int] = InputField(description="The width parameter", input=Input.Connection)
     height: Optional[int] = InputField(description="The height parameter", input=Input.Connection)
     steps: Optional[int] = InputField(description="The number of steps used for inference", input=Input.Connection)
-    cfg_scale: Optional[float] = InputField(description="The classifier-free guidance scale parameter", input=Input.Connection)
+    cfg_scale: Optional[float] = InputField(
+        description="The classifier-free guidance scale parameter", input=Input.Connection
+    )
 
     def invoke(self, context: InvocationContext) -> PTFieldsCollectOutput:
-        x:str = str(json.dumps(
-                    PTFields(
-                        positive_prompt = self.positive_prompt, 
-                        positive_style_prompt = self.positive_style_prompt,
-                        negative_prompt = self.negative_prompt,
-                        negative_style_prompt = self.negative_style_prompt,
-                        seed = self.seed,
-                        width = self.width,
-                        height = self.height,
-                        steps = self.steps,
-                        cfg_scale = self.cfg_scale,
+        x: str = str(
+            json.dumps(
+                PTFields(
+                    positive_prompt=self.positive_prompt,
+                    positive_style_prompt=self.positive_style_prompt,
+                    negative_prompt=self.negative_prompt,
+                    negative_style_prompt=self.negative_style_prompt,
+                    seed=self.seed,
+                    width=self.width,
+                    height=self.height,
+                    steps=self.steps,
+                    cfg_scale=self.cfg_scale,
                 ).dict()
             )
         )
@@ -82,12 +94,13 @@ class PTFieldsExpandOutput(BaseInvocationOutput):
     steps: int = OutputField(description="The number of steps used for inference")
     cfg_scale: float = OutputField(description="The classifier-free guidance scale parameter")
 
-@invocation("pt_fields_expand", title="PTFields Expand", tags=["prompt", "fields"], category="prompt")
+
+@invocation("pt_fields_expand", title="PTFields Expand", tags=["prompt", "fields"], category="prompt", version="1.0.0")
 class PTFieldsExpandInvocation(BaseInvocation):
-    '''Save Expand PTFields into individual items'''
+    """Save Expand PTFields into individual items"""
 
     pt_fields: str = InputField(default=None, description="PTFields in json Format", input=Input.Connection)
-       
+
     def invoke(self, context: InvocationContext) -> PTFieldsExpandOutput:
         fields = json.loads(self.pt_fields)
 

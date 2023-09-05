@@ -244,8 +244,12 @@ copy-paste the template above.
 We can use the `@invocation` decorator to provide some additional info to the
 UI, like a custom title, tags and category.
 
+We also encourage providing a version. This must be a
+[semver](https://semver.org/) version string ("$MAJOR.$MINOR.$PATCH"). The UI
+will let users know if their workflow is using a mismatched version of the node.
+
 ```python
-@invocation("resize", title="My Resizer", tags=["resize", "image"], category="My Invocations")
+@invocation("resize", title="My Resizer", tags=["resize", "image"], category="My Invocations", version="1.0.0")
 class ResizeInvocation(BaseInvocation):
     """Resizes an image"""
 
@@ -278,8 +282,6 @@ best way to do this is to submit a Pull Request to add the Node to the
 take a look a at our [contributing nodes overview](contributingNodes).
 
 ## Advanced
-
--->
 
 ### Custom Output Types
 

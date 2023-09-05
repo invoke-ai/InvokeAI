@@ -3,6 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { $flow } from 'features/nodes/store/reactFlowInstance';
 import { contextMenusClosed } from 'features/ui/store/uiSlice';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -13,6 +14,7 @@ import {
   OnConnectStart,
   OnEdgesChange,
   OnEdgesDelete,
+  OnInit,
   OnMoveEnd,
   OnNodesChange,
   OnNodesDelete,
@@ -147,6 +149,11 @@ export const Flow = () => {
     dispatch(contextMenusClosed());
   }, [dispatch]);
 
+  const onInit: OnInit = useCallback((flow) => {
+    $flow.set(flow);
+    flow.fitView();
+  }, []);
+
   useHotkeys(['Ctrl+c', 'Meta+c'], (e) => {
     e.preventDefault();
     dispatch(selectionCopied());
@@ -170,6 +177,7 @@ export const Flow = () => {
       edgeTypes={edgeTypes}
       nodes={nodes}
       edges={edges}
+      onInit={onInit}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onEdgesDelete={onEdgesDelete}

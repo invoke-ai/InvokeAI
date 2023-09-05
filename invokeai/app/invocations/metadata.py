@@ -72,10 +72,10 @@ class CoreMetadata(BaseModelExcludeNull):
     )
     refiner_steps: Optional[int] = Field(default=None, description="The number of steps used for the refiner")
     refiner_scheduler: Optional[str] = Field(default=None, description="The scheduler used for the refiner")
-    refiner_positive_aesthetic_store: Optional[float] = Field(
+    refiner_positive_aesthetic_score: Optional[float] = Field(
         default=None, description="The aesthetic score used for the refiner"
     )
-    refiner_negative_aesthetic_store: Optional[float] = Field(
+    refiner_negative_aesthetic_score: Optional[float] = Field(
         default=None, description="The aesthetic score used for the refiner"
     )
     refiner_start: Optional[float] = Field(default=None, description="The start value used for refiner denoising")
@@ -98,7 +98,9 @@ class MetadataAccumulatorOutput(BaseInvocationOutput):
     metadata: CoreMetadata = OutputField(description="The core metadata for the image")
 
 
-@invocation("metadata_accumulator", title="Metadata Accumulator", tags=["metadata"], category="metadata")
+@invocation(
+    "metadata_accumulator", title="Metadata Accumulator", tags=["metadata"], category="metadata", version="1.0.0"
+)
 class MetadataAccumulatorInvocation(BaseInvocation):
     """Outputs a Core Metadata Object"""
 
@@ -160,11 +162,11 @@ class MetadataAccumulatorInvocation(BaseInvocation):
         default=None,
         description="The scheduler used for the refiner",
     )
-    refiner_positive_aesthetic_store: Optional[float] = InputField(
+    refiner_positive_aesthetic_score: Optional[float] = InputField(
         default=None,
         description="The aesthetic score used for the refiner",
     )
-    refiner_negative_aesthetic_store: Optional[float] = InputField(
+    refiner_negative_aesthetic_score: Optional[float] = InputField(
         default=None,
         description="The aesthetic score used for the refiner",
     )

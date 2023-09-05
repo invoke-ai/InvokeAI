@@ -6,7 +6,7 @@ from invokeai.app.invocations.primitives import StringCollectionOutput
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, UIComponent, invocation
 
 
-@invocation("dynamic_prompt", title="Dynamic Prompt", tags=["prompt", "collection"], category="prompt")
+@invocation("dynamic_prompt", title="Dynamic Prompt", tags=["prompt", "collection"], category="prompt", version="1.0.0")
 class DynamicPromptInvocation(BaseInvocation):
     """Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator"""
 

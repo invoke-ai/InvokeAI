@@ -1,7 +1,7 @@
 import math
-import torch
-import diffusers
 
+import diffusers
+import torch
 
 if torch.backends.mps.is_available():
     torch.empty = torch.zeros
@@ -203,7 +203,7 @@ class ChunkedSlicedAttnProcessor:
         if attn.upcast_attention:
             out_item_size = 4
 
-        chunk_size = 2 ** 29
+        chunk_size = 2**29
 
         out_size = query.shape[1] * key.shape[1] * out_item_size
         chunks_count = min(query.shape[1], math.ceil((out_size - 1) / chunk_size))
