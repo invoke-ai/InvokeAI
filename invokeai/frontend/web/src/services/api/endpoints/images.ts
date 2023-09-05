@@ -7,7 +7,7 @@ import {
   IMAGE_LIMIT,
 } from 'features/gallery/store/types';
 import { getMetadataAndWorkflowFromImageBlob } from 'features/nodes/util/getMetadataAndWorkflowFromImageBlob';
-import { isUndefined, keyBy } from 'lodash-es';
+import { keyBy } from 'lodash-es';
 import { ApiFullTagDescription, LIST_TAG, api } from '..';
 import { components, paths } from '../schema';
 import {
@@ -28,12 +28,8 @@ import {
 } from '../util';
 import { boardsApi } from './boards';
 import { ImageMetadataAndWorkflow } from 'features/nodes/types/types';
-import {
-  FetchBaseQueryError,
-  fetchBaseQuery,
-} from '@reduxjs/toolkit/dist/query';
+import { fetchBaseQuery } from '@reduxjs/toolkit/dist/query';
 import { $authToken, $projectId } from '../client';
-import { QueryReturnValue } from '@reduxjs/toolkit/dist/query/baseQueryTypes';
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
