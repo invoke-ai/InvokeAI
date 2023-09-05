@@ -352,8 +352,11 @@ export const zControlNetModel = zModelIdentifier;
 export type ControlNetModel = z.infer<typeof zControlNetModel>;
 
 export const zControlField = z.object({
+  control_type: z.enum(['ControlNet', 'IP-Adapter', 'T2I-Adapter']).optional(),
   image: zImageField,
-  control_model: zControlNetModel,
+  control_model: zControlNetModel.optional(),
+  ip_adapter_model: z.string().optional(),
+  image_encoder_model: z.string().optional(),
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
