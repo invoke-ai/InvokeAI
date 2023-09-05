@@ -100,6 +100,8 @@ export const buildCanvasSDXLInpaintGraph = (
     shouldAutoSave,
   } = state.canvas;
 
+  const fp32 = vaePrecision === 'fp32';
+
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
@@ -145,7 +147,7 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'i2l',
         id: INPAINT_IMAGE,
         is_intermediate: true,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
       [NOISE]: {
         type: 'noise',
@@ -157,7 +159,7 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'create_denoise_mask',
         id: INPAINT_CREATE_MASK,
         is_intermediate: true,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -197,7 +199,7 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         is_intermediate: true,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
       [CANVAS_OUTPUT]: {
         type: 'color_correct',
@@ -611,7 +613,7 @@ export const buildCanvasSDXLInpaintGraph = (
       type: 'create_denoise_mask',
       id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
       is_intermediate: true,
-      fp32: vaePrecision === 'fp32' ? true : false,
+      fp32,
     };
 
     // Handle Image Input For Mask Creation

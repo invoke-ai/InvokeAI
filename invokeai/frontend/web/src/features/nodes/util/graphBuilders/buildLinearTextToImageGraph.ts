@@ -57,6 +57,8 @@ export const buildLinearTextToImageGraph = (
     throw new Error('No model found in state');
   }
 
+  const fp32 = vaePrecision === 'fp32';
+
   const isUsingOnnxModel = model.model_type === 'onnx';
 
   let modelLoaderNodeId = isUsingOnnxModel
@@ -139,7 +141,7 @@ export const buildLinearTextToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
         id: LATENTS_TO_IMAGE,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
     },
     edges: [

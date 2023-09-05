@@ -47,6 +47,8 @@ export const addSDXLRefinerToGraph = (
   const { seamlessXAxis, seamlessYAxis, vaePrecision } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
 
+  const fp32 = vaePrecision === 'fp32';
+
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
@@ -232,7 +234,7 @@ export const addSDXLRefinerToGraph = (
       type: 'create_denoise_mask',
       id: SDXL_REFINER_INPAINT_CREATE_MASK,
       is_intermediate: true,
-      fp32: vaePrecision === 'fp32' ? true : false,
+      fp32,
     };
 
     if (isUsingScaledDimensions) {
