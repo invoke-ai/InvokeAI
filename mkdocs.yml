@@ -158,7 +158,7 @@ nav:
       - Development:
         - Overview: 'contributing/contribution_guides/development.md'
         - InvokeAI Architecture: 'contributing/ARCHITECTURE.md'
-        - Frontend Documentation: 'contributing/contribution_guides/development_guides/contributingToFrontend.md'
+        - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
         - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Nodes: 'contributing/INVOCATIONS.md'
