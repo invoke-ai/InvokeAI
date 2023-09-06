@@ -235,9 +235,17 @@ export const canvasSlice = createSlice({
         state.boundingBoxDimensions.width,
         state.boundingBoxDimensions.height,
       ];
+      const [currScaledWidth, currScaledHeight] = [
+        state.scaledBoundingBoxDimensions.width,
+        state.scaledBoundingBoxDimensions.height,
+      ];
       state.boundingBoxDimensions = {
         width: currHeight,
         height: currWidth,
+      };
+      state.scaledBoundingBoxDimensions = {
+        width: currScaledHeight,
+        height: currScaledWidth,
       };
     },
     setBoundingBoxCoordinates: (state, action: PayloadAction<Vector2d>) => {
@@ -786,6 +794,10 @@ export const canvasSlice = createSlice({
       if (ratio) {
         state.boundingBoxDimensions.height = roundToMultiple(
           state.boundingBoxDimensions.width / ratio,
+          64
+        );
+        state.scaledBoundingBoxDimensions.height = roundToMultiple(
+          state.scaledBoundingBoxDimensions.width / ratio,
           64
         );
       }
