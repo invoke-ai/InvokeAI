@@ -12,10 +12,10 @@ To join, just raise your hand on the InvokeAI Discord server (#dev-chat) or the 
 ### Areas of contribution: 
 
 #### Development
-If you’d like to help with development, please see our [development guide](contribution_guides/development.md). If you’re unfamiliar with contributing to open source projects, there is a tutorial contained within the development guide.
+If you’d like to help with development, please see our [development guide](contribution_guides/development.md). If you’re unfamiliar with contributing to open source projects, take a look at our [new contributor guide](contribution_guides/newContributorChecklist.md).
 
 #### Nodes
-If you’d like to help with development, please see our [nodes contribution guide](/nodes/contributingNodes). If you’re unfamiliar with contributing to open source projects, there is a tutorial contained within the development guide.
+If you’d like to add a Node, please see our [nodes contribution guide](../nodes/contributingNodes.md).
 
 #### Documentation
 If you’d like to help with documentation, please see our [documentation guide](contribution_guides/documentation.md).
