@@ -24,7 +24,7 @@ import invokeai.frontend.web as web_dir
 import mimetypes
 
 from .api.dependencies import ApiDependencies
-from .api.routers import sessions, models, images, boards, board_images, app_info
+from .api.routers import sessions, batches, models, images, boards, board_images, app_info
 from .api.sockets import SocketIO
 from .invocations.baseinvocation import BaseInvocation, _InputField, _OutputField, UIConfigBase
 
@@ -89,6 +89,8 @@ async def shutdown_event():
 #     prefix = '/api')
 
 app.include_router(sessions.session_router, prefix="/api")
+
+app.include_router(batches.batches_router, prefix="/api")
 
 app.include_router(models.models_router, prefix="/api")
 
