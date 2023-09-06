@@ -60,11 +60,15 @@ const isNotInDenylist = (schema: InvocationSchemaObject) =>
   !invocationDenylist.includes(schema.properties.type.default);
 
 export const parseSchema = (
-  openAPI: OpenAPIV3.Document
+  openAPI: OpenAPIV3.Document,
+  nodesDenylistExtra: string[] = []
 ): Record<string, InvocationTemplate> => {
   const filteredSchemas = Object.values(openAPI.components?.schemas ?? {})
     .filter(isInvocationSchemaObject)
-    .filter(isNotInDenylist);
+    .filter(isNotInDenylist)
+    .filter(
+      (schema) => !nodesDenylistExtra.includes(schema.properties.type.default)
+    );
 
   const invocations = filteredSchemas.reduce<
     Record<string, InvocationTemplate>

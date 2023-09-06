@@ -9,13 +9,16 @@ import { startAppListening } from '..';
 export const addReceivedOpenAPISchemaListener = () => {
   startAppListening({
     actionCreator: receivedOpenAPISchema.fulfilled,
-    effect: (action, { dispatch }) => {
+    effect: (action, { dispatch, getState }) => {
       const log = logger('system');
       const schemaJSON = action.payload;
 
       log.debug({ schemaJSON }, 'Received OpenAPI schema');
 
-      const nodeTemplates = parseSchema(schemaJSON);
+      const nodeTemplates = parseSchema(
+        schemaJSON,
+        getState().config.nodesDenylist
+      );
 
       log.debug(
         { nodeTemplates: parseify(nodeTemplates) },
