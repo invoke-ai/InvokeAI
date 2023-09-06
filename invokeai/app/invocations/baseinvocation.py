@@ -473,7 +473,6 @@ class BaseInvocation(ABC, BaseModel):
     @classmethod
     def get_all_subclasses(cls):
         app_config = InvokeAIAppConfig.get_config()
-        app_config.parse_args()
         subclasses = []
         toprocess = [cls]
         while len(toprocess) > 0:
