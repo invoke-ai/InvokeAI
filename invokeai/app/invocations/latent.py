@@ -64,7 +64,7 @@ from .baseinvocation import (
     invocation_output,
 )
 from .compel import ConditioningField
-from .control_adapter import ControlField
+from .controlnet_image_processors import ControlField
 from .model import ModelInfo, UNetField, VaeField
 
 DEFAULT_PRECISION = choose_precision(choose_torch_device())

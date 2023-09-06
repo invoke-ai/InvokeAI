@@ -13,7 +13,12 @@ from pydantic import BaseModel, Field, validator
 from tqdm import tqdm
 
 from invokeai.app.invocations.metadata import CoreMetadata
-from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
+from invokeai.app.invocations.primitives import (
+    ConditioningField,
+    ConditioningOutput,
+    ImageField,
+    ImageOutput,
+)
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend import BaseModelType, ModelType, SubModelType
 
@@ -25,8 +30,8 @@ from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     FieldDescriptions,
-    InputField,
     Input,
+    InputField,
     InvocationContext,
     OutputField,
     UIComponent,
@@ -34,8 +39,14 @@ from .baseinvocation import (
     invocation,
     invocation_output,
 )
-from .control_adapter import ControlField
-from .latent import SAMPLER_NAME_VALUES, LatentsField, LatentsOutput, build_latents_output, get_scheduler
+from .controlnet_image_processors import ControlField
+from .latent import (
+    SAMPLER_NAME_VALUES,
+    LatentsField,
+    LatentsOutput,
+    build_latents_output,
+    get_scheduler,
+)
 from .model import ClipField, ModelInfo, UNetField, VaeField
 
 ORT_TO_NP_TYPE = {
@@ -95,9 +106,10 @@ class ONNXPromptInvocation(BaseInvocation):
                     print(f'Warn: trigger: "{trigger}" not found')
             if loras or ti_list:
                 text_encoder.release_session()
-            with ONNXModelPatcher.apply_lora_text_encoder(text_encoder, loras), ONNXModelPatcher.apply_ti(
-                orig_tokenizer, text_encoder, ti_list
-            ) as (tokenizer, ti_manager):
+            with (
+                ONNXModelPatcher.apply_lora_text_encoder(text_encoder, loras),
+                ONNXModelPatcher.apply_ti(orig_tokenizer, text_encoder, ti_list) as (tokenizer, ti_manager),
+            ):
                 text_encoder.create_session()
 
                 # copy from
