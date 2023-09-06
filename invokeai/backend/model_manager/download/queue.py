@@ -5,6 +5,7 @@ import re
 import os
 import requests
 import threading
+import time
 
 from pathlib import Path
 from typing import Dict, Optional, Set, List, Tuple
@@ -59,18 +60,22 @@ class DownloadQueue(DownloadQueueBase):
     _queue: PriorityQueue
     _lock: threading.Lock
     _logger: InvokeAILogger
-    _event_handler: Optional[DownloadEventHandler]
+    _event_handlers: Optional[List[DownloadEventHandler]]
     _next_job_id: int = 0
+    _sequence: int = 0  # This is for debugging and used to tag jobs in dequeueing order
+    _requests: requests.sessions.Session
 
     def __init__(self,
                  max_parallel_dl: int = 5,
-                 event_handler: Optional[DownloadEventHandler] = None,
+                 event_handlers: Optional[List[DownloadEventHandler]] = None,
+                 requests_session: Optional[requests.sessions.Session] = None
                  ):
         """
         Initialize DownloadQueue.
 
         :param max_parallel_dl: Number of simultaneous downloads allowed [5].
         :param event_handler: Optional callable that will be called each time a job status changes.
+        :param requests_session: Optional requests.sessions.Session object, for unit tests.
         """
         self._jobs = dict()
         self._next_job_id = 0
@@ -78,7 +83,8 @@ class DownloadQueue(DownloadQueueBase):
         self._worker_pool = set()
         self._lock = threading.RLock()
         self._logger = InvokeAILogger.getLogger()
-        self._event_handler = event_handler
+        self._event_handlers = event_handlers
+        self._requests = requests_session or requests.Session()
 
         self._start_workers(max_parallel_dl)
 
@@ -90,8 +96,9 @@ class DownloadQueue(DownloadQueueBase):
             start: bool = True,
             variant: Optional[str] = None,
             access_token: Optional[str] = None,
-            event_handler: Optional[DownloadEventHandler] = None,
+            event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> int:
+        """Create a download job and return its ID."""
         if re.match(r'^[\w-]+/[\w-]+$', source):
             cls = DownloadJobRepoID
             kwargs = dict(variant=variant)
@@ -106,7 +113,7 @@ class DownloadQueue(DownloadQueueBase):
                 source=source,
                 destination=Path(destdir) / (filename or "."),
                 access_token=access_token,
-                event_handler=(event_handler or self._event_handler),
+                event_handlers=(event_handlers or self._event_handlers),
                 **kwargs,
             )
             self._next_job_id += 1
@@ -124,12 +131,15 @@ class DownloadQueue(DownloadQueueBase):
                 self._queue.put(STOP_JOB)
 
     def join(self):
+        """Wait for all jobs to complete."""
         self._queue.join()
 
     def list_jobs(self) -> List[DownloadJobBase]:
+        """List all the jobs."""
         return self._jobs.values()
 
     def change_priority(self, id: int, delta: int):
+        """Change the priority of a job. Smaller priorities run first."""
         try:
             self._lock.acquire()
             job = self._jobs[id]
@@ -140,6 +150,12 @@ class DownloadQueue(DownloadQueueBase):
             self._lock.release()
 
     def cancel_job(self, id: str):
+        """
+        Cancel the indicated job.
+
+        If it is running it will be stopped.
+        job.error will be set to CancelledJobException.
+        """
         try:
             self._lock.acquire()
             job = self._jobs[id]
@@ -151,12 +167,14 @@ class DownloadQueue(DownloadQueueBase):
             self._lock.release()
 
     def id_to_job(self, id: int) -> DownloadJobBase:
+        """Translate a job ID into a DownloadJobBase object."""
         try:
             return self._jobs[id]
         except KeyError as excp:
             raise UnknownJobIDException("Unrecognized job") from excp
 
     def start_job(self, id: int):
+        """Enqueue (start) the indicated job."""
         try:
             job = self._jobs[id]
             self._update_job_status(job, DownloadJobStatus.ENQUEUED)
@@ -165,6 +183,12 @@ class DownloadQueue(DownloadQueueBase):
             raise UnknownJobIDException("Unrecognized job") from excp
 
     def pause_job(self, id: int):
+        """
+        Pause (dequeue) the indicated job.
+
+        In theory the job can be restarted and the download will pick up
+        from where it left off.
+        """
         try:
             self._lock.acquire()
             job = self._jobs[id]
@@ -175,30 +199,37 @@ class DownloadQueue(DownloadQueueBase):
             self._lock.release()
 
     def start_all_jobs(self):
+        """Start (enqueue) all jobs that are idle or paused."""
         try:
             self._lock.acquire()
-            for id in self._jobs:
-                self.start_job(id)
+            for id, job in self._jobs.items():
+                if job.status in [DownloadJobStatus.IDLE or DownloadJobStatus.PAUSED]:
+                    self.start_job(id)
         finally:
             self._lock.release()
 
     def pause_all_jobs(self, id: int):
+        """Pause all running jobs."""
         try:
             self._lock.acquire()
-            for id in self._jobs:
-                self.pause_job(id)
+            for id, job in self._jobs.items():
+                if job.stats == DownloadJobStatus.RUNNING:
+                    self.pause_job(id)
         finally:
             self._lock.release()
 
     def cancel_all_jobs(self):
+        """Cancel all running jobs."""
         try:
             self._lock.acquire()
-            for id in self._jobs:
-                self.cancel_job(id)
+            for id, job in self._jobs.items():
+                if job.status in [DownloadJobStatus.RUNNING, DownloadJobStatus.PAUSED, DownloadJobStatus.ENQUEUED]:
+                    self.cancel_job(id)
         finally:
             self._lock.release()
 
     def _start_workers(self, max_workers: int):
+        """Start the requested number of worker threads."""
         for i in range(0, max_workers):
             worker = threading.Thread(target=self._download_next_item, daemon=True)
             worker.start()
@@ -209,8 +240,14 @@ class DownloadQueue(DownloadQueueBase):
         while True:
             job = self._queue.get()
 
+            try:
+                self._lock.acquire()
+                job.job_sequence = self._sequence
+                self._sequence += 1
+            finally:
+                self._lock.release()
+
             if job == STOP_JOB:  # marker that queue is done
-                print(f'DEBUG: thread {threading.current_thread().native_id} exiting')
                 break
             if job.status == DownloadJobStatus.ENQUEUED:    # Don't do anything for cancelled or errored jobs
                 if isinstance(job, DownloadJobURL):
@@ -227,7 +264,7 @@ class DownloadQueue(DownloadQueueBase):
         open_mode = "wb"
         exist_size = 0
 
-        resp = requests.get(job.source, header, stream=True)
+        resp = self._requests.get(job.source, headers=header, stream=True)
         content_length = int(resp.headers.get("content-length", 0))
         job.total_bytes = content_length
 
@@ -246,7 +283,7 @@ class DownloadQueue(DownloadQueueBase):
             job.bytes = dest.stat().st_size
             header["Range"] = f"bytes={job.bytes}-"
             open_mode = "ab"
-            resp = requests.get(job.source, headers=header, stream=True)  # new request with range
+            resp = self._requests.get(job.source, headers=header, stream=True)  # new request with range
 
         if exist_size > content_length:
             self._logger.warning("corrupt existing file found. re-downloading")
@@ -293,8 +330,13 @@ class DownloadQueue(DownloadQueueBase):
         if new_status:
             job.status = new_status
         self._logger.debug(f"Status update for download job {job.id}: {job}")
-        if job.event_handler:
-            job.event_handler(job)
+        if new_status == DownloadJobStatus.RUNNING and not job.job_started:
+            job.job_started = time.time()
+        elif new_status in [DownloadJobStatus.COMPLETED, DownloadJobStatus.ERROR]:
+            job.job_ended = time.time()
+        if job.event_handlers:
+            for handler in job.event_handlers:
+                handler(job)
 
     def _download_repoid(self, job: DownloadJobBase):
         """Download a job that holds a huggingface repoid."""
@@ -310,7 +352,7 @@ class DownloadQueue(DownloadQueueBase):
                 subqueue.cancel_all_jobs()
                 self._update_job_status(job, DownloadJobStatus.ERROR)
 
-        subqueue = self.__class__(event_handler=subdownload_event)
+        subqueue = self.__class__(event_handlers=[subdownload_event])
         try:
             repo_id = job.source
             variant = job.variant
@@ -338,7 +380,7 @@ class DownloadQueue(DownloadQueueBase):
             subqueue.release()  # get rid of the subqueue
 
     def _get_download_size(self, url: AnyHttpUrl) -> int:
-        resp = requests.get(url, stream=True)
+        resp = self._requests.get(url, stream=True)
         resp.raise_for_status()
         return int(resp.headers.get('content-length',0))
 
@@ -349,7 +391,7 @@ class DownloadQueue(DownloadQueueBase):
         paths = [x.rfilename for x in sibs]
         if "model_index.json" in paths:
             url = hf_hub_url(repo_id, filename="model_index.json")
-            resp = requests.get(url)
+            resp = self._requests.get(url)
             resp.raise_for_status()   # will raise an HTTPError on non-200 status
             submodels = resp.json()
             paths = [x for x in paths if Path(x).parent.as_posix() in submodels]

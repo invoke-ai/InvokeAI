@@ -46,7 +46,10 @@ class DownloadJobBase(BaseModel):
     status: DownloadJobStatus = Field(default=DownloadJobStatus.IDLE, description="Status of the download")
     bytes: int = Field(default=0, description="Bytes downloaded so far")
     total_bytes: int = Field(default=0, description="Total bytes to download")
-    event_handler: Optional[DownloadEventHandler] = Field(description="Callable will be called whenever job status changes")
+    event_handlers: Optional[List[DownloadEventHandler]] = Field(description="Callables that will be called whenever job status changes")
+    job_started: Optional[float] = Field(description="Timestamp for when the download job started")
+    job_ended: Optional[float] = Field(description="Timestamp for when the download job ended (completed or errored)")
+    job_sequence: Optional[int] = Field(description="Counter that records order in which this job was dequeued (for debugging)")
     error: Optional[Exception] = Field(default=None, description="Exception that caused an error")
 
     class Config():
@@ -61,9 +64,9 @@ class DownloadJobBase(BaseModel):
 
         :param other: The DownloadJobBase that this will be compared against.
         """
-        if not hasattr(other, "id"):
+        if not hasattr(other, "priority"):
             return NotImplemented
-        return self.id < other.id
+        return self.priority < other.priority
 
 
 class DownloadQueueBase(ABC):
@@ -78,7 +81,7 @@ class DownloadQueueBase(ABC):
             start: bool = True,
             variant: Optional[str] = None,
             access_token: Optional[str] = None,
-            event_handler: Optional[DownloadEventHandler] = None,
+            event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> int:
         """
         Create a download job.
@@ -89,7 +92,7 @@ class DownloadQueueBase(ABC):
         will use the content-disposition field to assign the name.
         :param start: Immediately start job [True]
         :param variant: Variant to download, such as "fp16" (repo_ids only).
-        :param event_handler: Optional callable that will be called whenever job status changes.
+        :param event_handlers: Optional callables that will be called whenever job status changes.
         :returns job id: The numeric ID of the DownloadJobBase object for this task.
         """
         pass
@@ -122,6 +125,11 @@ class DownloadQueueBase(ABC):
 
         Exceptions:
         * UnknownJobIDException
+
+        Note that once a job is completed, id_to_job() may no longer
+        recognize the job. Call id_to_job() before the job completes
+        if you wish to keep the job object around after it has 
+        completed work.
         """
         pass
 
@@ -171,7 +179,12 @@ class DownloadQueueBase(ABC):
 
     @abstractmethod
     def join(self):
-        """Wait until all jobs are off the queue."""
+        """
+        Wait until all jobs are off the queue.
+
+        Note that once a job is completed, id_to_job() will
+        no longer recognize the job.
+        """
         pass
 
 

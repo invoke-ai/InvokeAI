@@ -20,6 +20,7 @@ class DownloadQueueServiceBase(ABC):
             filename: Optional[Path] = None,
             start: bool = True,
             access_token: Optional[str] = None,
+            event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> int:
         """
         Create a download job.
@@ -29,6 +30,7 @@ class DownloadQueueServiceBase(ABC):
         :param filename: Optional name of file, if not provided
         will use the content-disposition field to assign the name.
         :param start: Immediately start job [True]
+        :param event_handler: Callable that receives a DownloadJobBase and acts on it.
         :returns job id: The numeric ID of the DownloadJobBase object for this task.
         """
         pass
@@ -119,17 +121,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         e.g. `max_parallel_dl`.
         """
         self._event_bus = event_bus
-        self._queue = DownloadQueue(event_handler=self._forward_event)
-
-    def _forward_event(self, job: DownloadJobBase):
-        if self._event_bus:
-            self._event_bus.emit_model_download_event(job)
-
-    def _wrap_handler(self, event_handler: DownloadEventHandler) -> DownloadEventHandler:
-        def __wrapper(job: DownloadJobBase):
-            self._forward_events(job)
-            event_handler(job)
-        return __wrapper
+        self._queue = DownloadQueue(event_handlers=[self._forward_event])
 
     def create_download_job(
         self,
@@ -138,13 +130,14 @@ class DownloadQueueService(DownloadQueueServiceBase):
         filename: Optional[Path] = None,
         start: bool = True,
         access_token: Optional[str] = None,
-        event_handler: Optional[DownloadEventHandler] = None,
+        event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> int:
-        if event_handler:
-            event_handler = self._wrap_handler(event_handler)
+        event_handlers = event_handlers or []
+        if self._event_bus:
+            event_handlers.append([self._event_bus.emit_model_download_event])
         return self._queue.create_download_job(
             source, destdir, filename, start, access_token,
-            event_handler=event_handler
+            event_handlers=event_handlers,
         )
 
     def list_jobs(self) -> List[DownloadJobBase]:
