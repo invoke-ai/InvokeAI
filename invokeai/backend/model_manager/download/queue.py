@@ -305,7 +305,7 @@ class DownloadQueue(DownloadQueueBase):
         last_report_bytes = 0
         try:
             with open(dest, open_mode) as file:
-                for data in resp.iter_content(chunk_size=1024):
+                for data in resp.iter_content(chunk_size=16384):
                     if job.status != DownloadJobStatus.RUNNING:  # cancelled, paused or errored
                         return
                     job.bytes += file.write(data)
@@ -341,11 +341,19 @@ class DownloadQueue(DownloadQueueBase):
                 bytes_downloaded[subjob.id] = subjob.bytes
                 job.bytes = sum(bytes_downloaded.values())
                 self._update_job_status(job, DownloadJobStatus.RUNNING)
+                return
 
-            elif subjob.status == DownloadJobStatus.ERROR:
+            if subjob.status == DownloadJobStatus.ERROR:
                 job.error = subjob.error
                 subqueue.cancel_all_jobs()
                 self._update_job_status(job, DownloadJobStatus.ERROR)
+                return
+
+            if subjob.status == DownloadJobStatus.COMPLETED:
+                bytes_downloaded[subjob.id] = subjob.bytes
+                job.bytes = sum(bytes_downloaded.values())
+                self._update_job_status(job, DownloadJobStatus.RUNNING)
+                return
 
         subqueue = self.__class__(event_handlers=[subdownload_event])
         try:
@@ -373,11 +381,6 @@ class DownloadQueue(DownloadQueueBase):
             if not job.status == DownloadJobStatus.ERROR:
                 self._update_job_status(job, DownloadJobStatus.COMPLETED)
             subqueue.release()  # get rid of the subqueue
-
-    # def _get_download_size(self, url: AnyHttpUrl) -> int:
-    #     resp = self._requests.get(url, stream=True)
-    #     resp.raise_for_status()
-    #     return int(resp.headers.get("content-length", 0))
 
     def _get_repo_urls(self, repo_id: str, variant: Optional[str] = None) -> List[Tuple[AnyHttpUrl, Path, Path]]:
         """Given a repo_id and an optional variant, return list of URLs to download to get the model."""
