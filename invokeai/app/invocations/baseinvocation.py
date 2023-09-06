@@ -28,6 +28,8 @@ from pydantic.fields import Undefined, ModelField
 from pydantic.typing import NoArgAnyCallable
 import semver
 
+from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
+
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
 
@@ -470,6 +472,8 @@ class BaseInvocation(ABC, BaseModel):
 
     @classmethod
     def get_all_subclasses(cls):
+        app_config = InvokeAIAppConfig.get_config()
+        app_config.parse_args()
         subclasses = []
         toprocess = [cls]
         while len(toprocess) > 0:
@@ -477,7 +481,23 @@ class BaseInvocation(ABC, BaseModel):
             next_subclasses = next.__subclasses__()
             subclasses.extend(next_subclasses)
             toprocess.extend(next_subclasses)
-        return subclasses
+        allowed_invocations = []
+        for sc in subclasses:
+            is_in_allowlist = (
+                sc.__fields__.get("type").default in app_config.allow_nodes
+                if isinstance(app_config.allow_nodes, list)
+                else True
+            )
+
+            is_in_denylist = (
+                sc.__fields__.get("type").default in app_config.deny_nodes
+                if isinstance(app_config.deny_nodes, list)
+                else False
+            )
+
+            if is_in_allowlist and not is_in_denylist:
+                allowed_invocations.append(sc)
+        return allowed_invocations
 
     @classmethod
     def get_invocations(cls):
