@@ -17,7 +17,7 @@ This fork is supported across Linux, Windows and Macintosh. Linux users can use
 either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
 driver).
 
-### [Installation Getting Started Guide](installation)
+### Installation Getting Started Guide
 #### **[Automated Installer](010_INSTALL_AUTOMATED.md)**
 ✅ This is the recommended installation method for first-time users. 
 #### [Manual Installation](020_INSTALL_MANUAL.md)
