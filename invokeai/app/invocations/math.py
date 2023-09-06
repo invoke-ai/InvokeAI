@@ -147,3 +147,13 @@ class ModulusInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         return IntegerOutput(value=self.a % self.b)
+
+
+@invocation("sqrt", title="Square Root", tags=["math", "sqrt"], category="math", version="1.0.0")
+class SquareRootInvocation(BaseInvocation):
+    """Returns the square root of a number."""
+
+    value: float = InputField(default=0, ge=0, description="The float value")
+
+    def invoke(self, context: InvocationContext) -> FloatOutput:
+        return FloatOutput(value=np.sqrt(self.value))
