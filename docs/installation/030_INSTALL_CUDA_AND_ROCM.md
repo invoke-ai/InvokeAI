@@ -60,17 +60,17 @@ Runtime Site](https://developer.nvidia.com/nvidia-container-runtime)
 ### cuDNN Installation for 40/30 Series Optimization* (Optional)
 
 1. Find the InvokeAI folder
-2. Click on .venv folder - e.g., YourInvokeFolderHere\.venv
-3. Click on Lib folder - e.g., YourInvokeFolderHere\.venv\Lib
-4. Click on site-packages folder - e.g., YourInvokeFolderHere\.venv\Lib\site-packages
-5. Click on Torch directory - e.g., YourInvokeFolderHere\InvokeAI\.venv\Lib\site-packages\torch
-6. Click on the lib folder - e.g., YourInvokeFolderHere\.venv\Lib\site-packages\torch\lib
+2. Click on .venv folder - e.g., YourInvokeFolderHere\\.venv
+3. Click on Lib folder - e.g., YourInvokeFolderHere\\.venv\Lib
+4. Click on site-packages folder - e.g., YourInvokeFolderHere\\.venv\Lib\site-packages
+5. Click on Torch directory - e.g., YourInvokeFolderHere\InvokeAI\\.venv\Lib\site-packages\torch
+6. Click on the lib folder - e.g., YourInvokeFolderHere\\.venv\Lib\site-packages\torch\lib
 7. Copy everything inside the folder and save it elsewhere as a backup.
 8. Go to https://developer.nvidia.com/cudnn
 9. Log-in Or Create An account
 10. Download the latest version and extract it from the download location
 12. Find the bin folder E\cudnn-windows-x86_64-__Whatever Version__\bin
-13. Copy and paste the 7 .dll files into YourInvokeFolderHere\.venv\Lib\site-packages\torch\lib **Make sure to copy, and not move the files**
+13. Copy and paste the 7 .dll files into YourInvokeFolderHere\\.venv\Lib\site-packages\torch\lib **Make sure to copy, and not move the files**
 14. If prompted, replace any existing files 
 
 **Notes:** 
