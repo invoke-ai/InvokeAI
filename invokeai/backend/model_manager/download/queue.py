@@ -23,15 +23,11 @@ from .base import (
     DownloadEventHandler,
     UnknownJobIDException,
     CancelledJobException,
-    DownloadJobBase
+    DownloadJobBase,
 )
 
 # marker that the queue is done and that thread should exit
-STOP_JOB = DownloadJobBase(
-    id=-99,
-    priority=-99,
-    source='dummy',
-    destination='/')
+STOP_JOB = DownloadJobBase(id=-99, priority=-99, source="dummy", destination="/")
 
 
 class DownloadJobURL(DownloadJobBase):
@@ -45,12 +41,13 @@ class DownloadJobRepoID(DownloadJobBase):
 
     variant: Optional[str] = Field(description="Variant, such as 'fp16', to download")
 
-    @validator('source')
+    @validator("source")
     @classmethod
     def _validate_source(cls, v: str) -> str:
-        if not re.match(r'^[\w-]+/[\w-]+$', v):
-            raise ValidationError(f'{v} invalid repo_id')
+        if not re.match(r"^[\w-]+/[\w-]+$", v):
+            raise ValidationError(f"{v} invalid repo_id")
         return v
+
 
 class DownloadQueue(DownloadQueueBase):
     """Class for queued download of models."""
@@ -65,11 +62,12 @@ class DownloadQueue(DownloadQueueBase):
     _sequence: int = 0  # This is for debugging and used to tag jobs in dequeueing order
     _requests: requests.sessions.Session
 
-    def __init__(self,
-                 max_parallel_dl: int = 5,
-                 event_handlers: Optional[List[DownloadEventHandler]] = None,
-                 requests_session: Optional[requests.sessions.Session] = None
-                 ):
+    def __init__(
+        self,
+        max_parallel_dl: int = 5,
+        event_handlers: Optional[List[DownloadEventHandler]] = None,
+        requests_session: Optional[requests.sessions.Session] = None,
+    ):
         """
         Initialize DownloadQueue.
 
@@ -89,17 +87,17 @@ class DownloadQueue(DownloadQueueBase):
         self._start_workers(max_parallel_dl)
 
     def create_download_job(
-            self,
-            source: str,
-            destdir: Path,
-            filename: Optional[Path] = None,
-            start: bool = True,
-            variant: Optional[str] = None,
-            access_token: Optional[str] = None,
-            event_handlers: Optional[List[DownloadEventHandler]] = None,
+        self,
+        source: str,
+        destdir: Path,
+        filename: Optional[Path] = None,
+        start: bool = True,
+        variant: Optional[str] = None,
+        access_token: Optional[str] = None,
+        event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> int:
         """Create a download job and return its ID."""
-        if re.match(r'^[\w-]+/[\w-]+$', source):
+        if re.match(r"^[\w-]+/[\w-]+$", source):
             cls = DownloadJobRepoID
             kwargs = dict(variant=variant)
         else:
@@ -249,7 +247,7 @@ class DownloadQueue(DownloadQueueBase):
 
             if job == STOP_JOB:  # marker that queue is done
                 break
-            if job.status == DownloadJobStatus.ENQUEUED:    # Don't do anything for cancelled or errored jobs
+            if job.status == DownloadJobStatus.ENQUEUED:  # Don't do anything for cancelled or errored jobs
                 if isinstance(job, DownloadJobURL):
                     self._download_with_resume(job)
                 elif isinstance(job, DownloadJobRepoID):
@@ -322,10 +320,7 @@ class DownloadQueue(DownloadQueueBase):
             job.error = excp
             self._update_job_status(job, DownloadJobStatus.ERROR)
 
-    def _update_job_status(self,
-                           job: DownloadJobBase,
-                           new_status: Optional[DownloadJobStatus] = None
-                           ):
+    def _update_job_status(self, job: DownloadJobBase, new_status: Optional[DownloadJobStatus] = None):
         """Optionally change the job status and send an event indicating a change of state."""
         if new_status:
             job.status = new_status
@@ -367,7 +362,7 @@ class DownloadQueue(DownloadQueueBase):
                     destdir=job.destination / subdir,
                     filename=file,
                     variant=variant,
-                    access_token=job.access_token
+                    access_token=job.access_token,
                 )
         except Exception as excp:
             job.status = DownloadJobStatus.ERROR
@@ -382,7 +377,7 @@ class DownloadQueue(DownloadQueueBase):
     def _get_download_size(self, url: AnyHttpUrl) -> int:
         resp = self._requests.get(url, stream=True)
         resp.raise_for_status()
-        return int(resp.headers.get('content-length',0))
+        return int(resp.headers.get("content-length", 0))
 
     def _get_repo_urls(self, repo_id: str, variant: Optional[str] = None) -> List[Tuple[AnyHttpUrl, Path, Path]]:
         """Given a repo_id and an optional variant, return list of URLs to download to get the model."""
@@ -392,11 +387,14 @@ class DownloadQueue(DownloadQueueBase):
         if "model_index.json" in paths:
             url = hf_hub_url(repo_id, filename="model_index.json")
             resp = self._requests.get(url)
-            resp.raise_for_status()   # will raise an HTTPError on non-200 status
+            resp.raise_for_status()  # will raise an HTTPError on non-200 status
             submodels = resp.json()
             paths = [x for x in paths if Path(x).parent.as_posix() in submodels]
             paths.insert(0, "model_index.json")
-        return [(hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path('.'), x.name) for x in self._select_variants(paths, variant)]
+        return [
+            (hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path("."), x.name)
+            for x in self._select_variants(paths, variant)
+        ]
 
     def _select_variants(self, paths: List[str], variant: Optional[str] = None) -> Set[Path]:
         """Select the proper variant files from a list of HuggingFace repo_id paths."""
@@ -404,7 +402,7 @@ class DownloadQueue(DownloadQueueBase):
         basenames = dict()
         for p in paths:
             path = Path(p)
-            if path.suffix in ['.bin', '.safetensors', '.pt']:
+            if path.suffix in [".bin", ".safetensors", ".pt"]:
                 parent = path.parent
                 suffixes = path.suffixes
                 if len(suffixes) == 2:
@@ -416,9 +414,9 @@ class DownloadQueue(DownloadQueueBase):
                     basename = parent / path.stem
 
                 if previous := basenames.get(basename):
-                    if previous.suffix != '.safetensors' and suffix == '.safetensors':
+                    if previous.suffix != ".safetensors" and suffix == ".safetensors":
                         basenames[basename] = path
-                    if file_variant == f'.{variant}':
+                    if file_variant == f".{variant}":
                         basenames[basename] = path
                     elif not variant and not file_variant:
                         basenames[basename] = path

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.config import InvokeAIAppConfig
     from invokeai.app.services.graph import GraphExecutionState, LibraryGraph
     from invokeai.app.services.invoker import InvocationProcessorABC
+    from invokeai.app.services.download_manager import DownloadQueueServiceBase
 
 
 class InvocationServices:
@@ -34,6 +35,7 @@ class InvocationServices:
     model_manager: "ModelManagerServiceBase"
     processor: "InvocationProcessorABC"
     performance_statistics: "InvocationStatsServiceBase"
+    download_manager: "DownloadQueueServiceBase"
     queue: "InvocationQueueABC"
 
     def __init__(

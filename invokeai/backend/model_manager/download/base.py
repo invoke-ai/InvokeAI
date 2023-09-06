@@ -15,12 +15,12 @@ from pydantic.networks import AnyHttpUrl
 class DownloadJobStatus(str, Enum):
     """State of a download job."""
 
-    IDLE = "idle"            # not enqueued, will not run
-    ENQUEUED = "enqueued"    # enqueued but not yet active
-    RUNNING = "running"      # actively downloading
-    PAUSED = "paused"        # previously started, now paused
+    IDLE = "idle"  # not enqueued, will not run
+    ENQUEUED = "enqueued"  # enqueued but not yet active
+    RUNNING = "running"  # actively downloading
+    PAUSED = "paused"  # previously started, now paused
     COMPLETED = "completed"  # finished running
-    ERROR = "error"          # terminated with an error message
+    ERROR = "error"  # terminated with an error message
 
 
 class UnknownJobIDException(Exception):
@@ -46,13 +46,17 @@ class DownloadJobBase(BaseModel):
     status: DownloadJobStatus = Field(default=DownloadJobStatus.IDLE, description="Status of the download")
     bytes: int = Field(default=0, description="Bytes downloaded so far")
     total_bytes: int = Field(default=0, description="Total bytes to download")
-    event_handlers: Optional[List[DownloadEventHandler]] = Field(description="Callables that will be called whenever job status changes")
+    event_handlers: Optional[List[DownloadEventHandler]] = Field(
+        description="Callables that will be called whenever job status changes"
+    )
     job_started: Optional[float] = Field(description="Timestamp for when the download job started")
     job_ended: Optional[float] = Field(description="Timestamp for when the download job ended (completed or errored)")
-    job_sequence: Optional[int] = Field(description="Counter that records order in which this job was dequeued (for debugging)")
+    job_sequence: Optional[int] = Field(
+        description="Counter that records order in which this job was dequeued (for debugging)"
+    )
     error: Optional[Exception] = Field(default=None, description="Exception that caused an error")
 
-    class Config():
+    class Config:
         """Config object for this pydantic class."""
 
         arbitrary_types_allowed = True
@@ -74,14 +78,14 @@ class DownloadQueueBase(ABC):
 
     @abstractmethod
     def create_download_job(
-            self,
-            source: str,
-            destdir: Path,
-            filename: Optional[Path] = None,
-            start: bool = True,
-            variant: Optional[str] = None,
-            access_token: Optional[str] = None,
-            event_handlers: Optional[List[DownloadEventHandler]] = None,
+        self,
+        source: str,
+        destdir: Path,
+        filename: Optional[Path] = None,
+        start: bool = True,
+        variant: Optional[str] = None,
+        access_token: Optional[str] = None,
+        event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> int:
         """
         Create a download job.
@@ -128,7 +132,7 @@ class DownloadQueueBase(ABC):
 
         Note that once a job is completed, id_to_job() may no longer
         recognize the job. Call id_to_job() before the job completes
-        if you wish to keep the job object around after it has 
+        if you wish to keep the job object around after it has
         completed work.
         """
         pass
@@ -186,5 +190,3 @@ class DownloadQueueBase(ABC):
         no longer recognize the job.
         """
         pass
-
-

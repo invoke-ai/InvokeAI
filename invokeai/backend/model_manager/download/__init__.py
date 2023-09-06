@@ -6,7 +6,7 @@ from .base import (  # noqa F401
     DownloadEventHandler,
     UnknownJobIDException,
     CancelledJobException,
-    DownloadJobBase
+    DownloadJobBase,
 )
 
-from .queue import DownloadQueue   # noqa F401
+from .queue import DownloadQueue  # noqa F401

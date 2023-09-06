@@ -9,18 +9,19 @@ from typing import Optional, List
 from .events import EventServicesBase
 from invokeai.backend.model_manager.download import DownloadQueue, DownloadJobBase, DownloadEventHandler
 
+
 class DownloadQueueServiceBase(ABC):
     """Multithreaded queue for downloading models via URL or repo_id."""
 
     @abstractmethod
     def create_download_job(
-            self,
-            source: str,
-            destdir: Path,
-            filename: Optional[Path] = None,
-            start: bool = True,
-            access_token: Optional[str] = None,
-            event_handlers: Optional[List[DownloadEventHandler]] = None,
+        self,
+        source: str,
+        destdir: Path,
+        filename: Optional[Path] = None,
+        start: bool = True,
+        access_token: Optional[str] = None,
+        event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> int:
         """
         Create a download job.
@@ -136,7 +137,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if self._event_bus:
             event_handlers.append([self._event_bus.emit_model_download_event])
         return self._queue.create_download_job(
-            source, destdir, filename, start, access_token,
+            source,
+            destdir,
+            filename,
+            start,
+            access_token,
             event_handlers=event_handlers,
         )
 
