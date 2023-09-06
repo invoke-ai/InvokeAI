@@ -73,7 +73,7 @@ export const parseSchema = (
     const title = schema.title.replace('Invocation', '');
     const tags = schema.tags ?? [];
     const description = schema.description ?? '';
-    const version = schema.version ?? '';
+    const version = schema.version;
 
     const inputs = reduce(
       schema.properties,
