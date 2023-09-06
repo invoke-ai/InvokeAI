@@ -49,6 +49,7 @@ export type AppConfig = {
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];
   canRestoreDeletedImagesFromBin: boolean;
+  nodesDenylist: string[];
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];
