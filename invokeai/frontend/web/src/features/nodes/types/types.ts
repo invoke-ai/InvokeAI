@@ -93,6 +93,7 @@ export const zFieldType = z.enum([
   'integer',
   'IntegerCollection',
   'IntegerPolymorphic',
+  'IPAdapterField',
   'LatentsCollection',
   'LatentsField',
   'LatentsPolymorphic',
@@ -352,11 +353,8 @@ export const zControlNetModel = zModelIdentifier;
 export type ControlNetModel = z.infer<typeof zControlNetModel>;
 
 export const zControlField = z.object({
-  control_type: z.enum(['ControlNet', 'IP-Adapter', 'T2I-Adapter']).optional(),
   image: zImageField,
-  control_model: zControlNetModel.optional(),
-  ip_adapter_model: z.string().optional(),
-  image_encoder_model: z.string().optional(),
+  control_model: zControlNetModel,
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
@@ -389,6 +387,22 @@ export const zControlCollectionInputFieldValue = zInputFieldValueBase.extend({
 });
 export type ControlCollectionInputFieldValue = z.infer<
   typeof zControlCollectionInputFieldValue
+>;
+
+export const zIPAdapterField = z.object({
+  image: zImageField,
+  ip_adapter_model: z.string().trim().min(1),
+  image_encoder_model: z.string().trim().min(1),
+  weight: z.number(),
+});
+export type IPAdapterField = z.infer<typeof zIPAdapterField>;
+
+export const zIPAdapterInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('IPAdapterField'),
+  value: zIPAdapterField.optional(),
+});
+export type IPAdapterInputFieldValue = z.infer<
+  typeof zIPAdapterInputFieldValue
 >;
 
 export const zModelType = z.enum([
@@ -622,6 +636,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zIntegerCollectionInputFieldValue,
   zIntegerPolymorphicInputFieldValue,
   zIntegerInputFieldValue,
+  zIPAdapterInputFieldValue,
   zLatentsInputFieldValue,
   zLatentsCollectionInputFieldValue,
   zLatentsPolymorphicInputFieldValue,
@@ -824,6 +839,11 @@ export type ControlPolymorphicInputFieldTemplate = Omit<
   type: 'ControlPolymorphic';
 };
 
+export type IPAdapterInputFieldTemplate = InputFieldTemplateBase & {
+  default: undefined;
+  type: 'IPAdapterField';
+};
+
 export type EnumInputFieldTemplate = InputFieldTemplateBase & {
   default: string | number;
   type: 'enum';
@@ -932,6 +952,7 @@ export type InputFieldTemplate =
   | IntegerCollectionInputFieldTemplate
   | IntegerPolymorphicInputFieldTemplate
   | IntegerInputFieldTemplate
+  | IPAdapterInputFieldTemplate
   | LatentsInputFieldTemplate
   | LatentsCollectionInputFieldTemplate
   | LatentsPolymorphicInputFieldTemplate

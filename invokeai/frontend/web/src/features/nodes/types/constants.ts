@@ -235,6 +235,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     description: 'A collection of integers.',
     title: 'Integer Polymorphic',
   },
+  IPAdapterField: {
+    color: 'green.300',
+    description: 'IP-Adapter info passed between nodes.',
+    title: 'IP-Adapter',
+  },
   LatentsCollection: {
     color: 'pink.500',
     description: 'Latents may be passed between nodes.',
