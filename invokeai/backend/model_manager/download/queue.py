@@ -353,10 +353,10 @@ class DownloadQueue(DownloadQueueBase):
             variant = job.variant
             urls_to_download = self._get_repo_urls(repo_id, variant)
             job.destination = job.destination / Path(repo_id).name
-            job.total_bytes = sum([self._get_download_size(url) for (url, _, _) in urls_to_download])
             bytes_downloaded = dict()
 
-            for url, subdir, file in urls_to_download:
+            for url, subdir, file, size in urls_to_download:
+                job.total_bytes += size
                 subqueue.create_download_job(
                     source=url,
                     destdir=job.destination / subdir,
@@ -374,16 +374,17 @@ class DownloadQueue(DownloadQueueBase):
                 self._update_job_status(job, DownloadJobStatus.COMPLETED)
             subqueue.release()  # get rid of the subqueue
 
-    def _get_download_size(self, url: AnyHttpUrl) -> int:
-        resp = self._requests.get(url, stream=True)
-        resp.raise_for_status()
-        return int(resp.headers.get("content-length", 0))
+    # def _get_download_size(self, url: AnyHttpUrl) -> int:
+    #     resp = self._requests.get(url, stream=True)
+    #     resp.raise_for_status()
+    #     return int(resp.headers.get("content-length", 0))
 
     def _get_repo_urls(self, repo_id: str, variant: Optional[str] = None) -> List[Tuple[AnyHttpUrl, Path, Path]]:
         """Given a repo_id and an optional variant, return list of URLs to download to get the model."""
-        model_info = HfApi().model_info(repo_id=repo_id)
+        model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True)
         sibs = model_info.siblings
         paths = [x.rfilename for x in sibs]
+        sizes = {x.rfilename: x.size for x in sibs}
         if "model_index.json" in paths:
             url = hf_hub_url(repo_id, filename="model_index.json")
             resp = self._requests.get(url)
@@ -392,7 +393,7 @@ class DownloadQueue(DownloadQueueBase):
             paths = [x for x in paths if Path(x).parent.as_posix() in submodels]
             paths.insert(0, "model_index.json")
         return [
-            (hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path("."), x.name)
+            (hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path("."), x.name, sizes[x.as_posix()])
             for x in self._select_variants(paths, variant)
         ]
 
