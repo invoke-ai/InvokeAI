@@ -46,7 +46,7 @@ def test_basic_queue():
     )
     with tempfile.TemporaryDirectory() as tmpdir:
         id1 = queue.create_download_job(source="http://www.civitai.com/models/12345", destdir=tmpdir, start=False)
-        assert type(id1) == int, "expected first job id to be numeric"
+        assert isinstance(id1, int), "expected first job id to be numeric"
 
         job = queue.id_to_job(id1)
         assert isinstance(job, DownloadJobBase), "expected job to be a DownloadJobBase"
