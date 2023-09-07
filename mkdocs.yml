@@ -157,9 +157,9 @@ nav:
       - How to Contribute: 'contributing/CONTRIBUTING.md'
       - Development:
         - Overview: 'contributing/contribution_guides/development.md'
+        - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
         - InvokeAI Architecture: 'contributing/ARCHITECTURE.md'
         - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
-        - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
         - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Nodes: 'contributing/INVOCATIONS.md'
