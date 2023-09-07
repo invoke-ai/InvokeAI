@@ -1,19 +1,19 @@
 import typing
 from enum import Enum
+from pathlib import Path
+
 from fastapi import Body
 from fastapi.routing import APIRouter
-from pathlib import Path
 from pydantic import BaseModel, Field
 
+from invokeai.app.invocations.upscale import ESRGAN_MODELS
+from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.patchmatch import PatchMatch
 from invokeai.backend.image_util.safety_checker import SafetyChecker
-from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
-from invokeai.app.invocations.upscale import ESRGAN_MODELS
-
+from invokeai.backend.util.logging import logging
 from invokeai.version import __version__
 
 from ..dependencies import ApiDependencies
-from invokeai.backend.util.logging import logging
 
 
 class LogLevel(int, Enum):
@@ -55,7 +55,7 @@ async def get_version() -> AppVersion:
 
 @app_router.get("/config", operation_id="get_config", status_code=200, response_model=AppConfig)
 async def get_config() -> AppConfig:
-    infill_methods = ["tile", "lama"]
+    infill_methods = ["tile", "lama", "cv2"]
     if PatchMatch.patchmatch_available():
         infill_methods.append("patchmatch")
 

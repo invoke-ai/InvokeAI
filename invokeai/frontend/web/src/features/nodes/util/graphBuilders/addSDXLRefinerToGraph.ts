@@ -10,7 +10,8 @@ import {
   CANVAS_OUTPUT,
   INPAINT_IMAGE_RESIZE_UP,
   LATENTS_TO_IMAGE,
-  MASK_BLUR,
+  MASK_COMBINE,
+  MASK_RESIZE_UP,
   METADATA_ACCUMULATOR,
   SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
   SDXL_CANVAS_INPAINT_GRAPH,
@@ -45,6 +46,8 @@ export const addSDXLRefinerToGraph = (
 
   const { seamlessXAxis, seamlessYAxis, vaePrecision } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
+
+  const fp32 = vaePrecision === 'fp32';
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
@@ -231,7 +234,7 @@ export const addSDXLRefinerToGraph = (
       type: 'create_denoise_mask',
       id: SDXL_REFINER_INPAINT_CREATE_MASK,
       is_intermediate: true,
-      fp32: vaePrecision === 'fp32' ? true : false,
+      fp32,
     };
 
     if (isUsingScaledDimensions) {
@@ -257,7 +260,7 @@ export const addSDXLRefinerToGraph = (
     graph.edges.push(
       {
         source: {
-          node_id: MASK_BLUR,
+          node_id: isUsingScaledDimensions ? MASK_RESIZE_UP : MASK_COMBINE,
           field: 'image',
         },
         destination: {

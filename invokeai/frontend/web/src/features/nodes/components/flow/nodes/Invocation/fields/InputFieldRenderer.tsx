@@ -3,18 +3,10 @@ import { useFieldData } from 'features/nodes/hooks/useFieldData';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import { memo } from 'react';
 import BooleanInputField from './inputs/BooleanInputField';
-import ClipInputField from './inputs/ClipInputField';
-import CollectionInputField from './inputs/CollectionInputField';
-import CollectionItemInputField from './inputs/CollectionItemInputField';
 import ColorInputField from './inputs/ColorInputField';
-import ConditioningInputField from './inputs/ConditioningInputField';
-import ControlInputField from './inputs/ControlInputField';
 import ControlNetModelInputField from './inputs/ControlNetModelInputField';
-import DenoiseMaskInputField from './inputs/DenoiseMaskInputField';
 import EnumInputField from './inputs/EnumInputField';
-import ImageCollectionInputField from './inputs/ImageCollectionInputField';
 import ImageInputField from './inputs/ImageInputField';
-import LatentsInputField from './inputs/LatentsInputField';
 import LoRAModelInputField from './inputs/LoRAModelInputField';
 import MainModelInputField from './inputs/MainModelInputField';
 import NumberInputField from './inputs/NumberInputField';
@@ -22,8 +14,6 @@ import RefinerModelInputField from './inputs/RefinerModelInputField';
 import SDXLMainModelInputField from './inputs/SDXLMainModelInputField';
 import SchedulerInputField from './inputs/SchedulerInputField';
 import StringInputField from './inputs/StringInputField';
-import UnetInputField from './inputs/UnetInputField';
-import VaeInputField from './inputs/VaeInputField';
 import VaeModelInputField from './inputs/VaeModelInputField';
 
 type InputFieldProps = {
@@ -31,7 +21,6 @@ type InputFieldProps = {
   fieldName: string;
 };
 
-// build an individual input element based on the schema
 const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   const field = useFieldData(nodeId, fieldName);
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'input');
@@ -86,88 +75,6 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   if (field?.type === 'ImageField' && fieldTemplate?.type === 'ImageField') {
     return (
       <ImageInputField
-        nodeId={nodeId}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (
-    field?.type === 'LatentsField' &&
-    fieldTemplate?.type === 'LatentsField'
-  ) {
-    return (
-      <LatentsInputField
-        nodeId={nodeId}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (
-    field?.type === 'DenoiseMaskField' &&
-    fieldTemplate?.type === 'DenoiseMaskField'
-  ) {
-    return (
-      <DenoiseMaskInputField
-        nodeId={nodeId}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (
-    field?.type === 'ConditioningField' &&
-    fieldTemplate?.type === 'ConditioningField'
-  ) {
-    return (
-      <ConditioningInputField
-        nodeId={nodeId}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (field?.type === 'UNetField' && fieldTemplate?.type === 'UNetField') {
-    return (
-      <UnetInputField
-        nodeId={nodeId}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (field?.type === 'ClipField' && fieldTemplate?.type === 'ClipField') {
-    return (
-      <ClipInputField
-        nodeId={nodeId}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (field?.type === 'VaeField' && fieldTemplate?.type === 'VaeField') {
-    return (
-      <VaeInputField
-        nodeId={nodeId}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (
-    field?.type === 'ControlField' &&
-    fieldTemplate?.type === 'ControlField'
-  ) {
-    return (
-      <ControlInputField
         nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
@@ -240,45 +147,9 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
     );
   }
 
-  if (field?.type === 'Collection' && fieldTemplate?.type === 'Collection') {
-    return (
-      <CollectionInputField
-        nodeId={nodeId}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (
-    field?.type === 'CollectionItem' &&
-    fieldTemplate?.type === 'CollectionItem'
-  ) {
-    return (
-      <CollectionItemInputField
-        nodeId={nodeId}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
   if (field?.type === 'ColorField' && fieldTemplate?.type === 'ColorField') {
     return (
       <ColorInputField
-        nodeId={nodeId}
-        field={field}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (
-    field?.type === 'ImageCollection' &&
-    fieldTemplate?.type === 'ImageCollection'
-  ) {
-    return (
-      <ImageCollectionInputField
         nodeId={nodeId}
         field={field}
         fieldTemplate={fieldTemplate}
@@ -307,6 +178,11 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
         fieldTemplate={fieldTemplate}
       />
     );
+  }
+
+  if (field && fieldTemplate) {
+    // Fallback for when there is no component for the type
+    return null;
   }
 
   return (
