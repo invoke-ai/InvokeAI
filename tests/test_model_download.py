@@ -1,14 +1,9 @@
-"""
-Test the queued download facility
-"""
+"""Test the queued download facility"""
 
-import pytest
 import tempfile
 import requests
 from requests_testadapter import TestAdapter
 from pathlib import Path
-
-TestAdapter.__test__ = False
 
 from invokeai.backend.model_manager.download import (
     DownloadJobStatus,
@@ -16,6 +11,7 @@ from invokeai.backend.model_manager.download import (
     DownloadJobBase,
 )
 
+TestAdapter.__test__ = False
 
 SAFETENSORS1_CONTENT = b"I am a safetensors file (1)"
 SAFETENSORS1_HEADER = {
@@ -75,12 +71,11 @@ def test_queue_priority():
 
         id2 = queue.create_download_job(source="http://www.civitai.com/models/9999", destdir=tmpdir, start=False)
 
-        queue.change_priority(id1, -10)  #  make id1 run first
+        queue.change_priority(id1, -10)  # make id1 run first
         job1 = queue.id_to_job(id1)
         job2 = queue.id_to_job(id2)
         assert job1 < job2
 
-        id_list = list()
         queue.start_all_jobs()
         queue.join()
         assert job1.job_sequence < job2.job_sequence
@@ -89,7 +84,7 @@ def test_queue_priority():
 
         id2 = queue.create_download_job(source="http://www.civitai.com/models/9999", destdir=tmpdir, start=False)
 
-        queue.change_priority(id2, -10)  #  make id2 run first
+        queue.change_priority(id2, -10)  # make id2 run first
         job1 = queue.id_to_job(id1)
         job2 = queue.id_to_job(id2)
         assert job2 < job1
