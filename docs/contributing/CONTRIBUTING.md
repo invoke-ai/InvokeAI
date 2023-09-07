@@ -3,7 +3,7 @@
 Invoke AI originated as a project built by the community, and that vision carries forward today as we aim to build the best pro-grade tools available. We work together to incorporate the latest in AI/ML research, making these tools available in over 20 languages to artists and creatives around the world as part of our fully permissive OSS project designed for individual users to self-host and use.
 
 
-# Contributing to Invoke AI
+# Methods of Contributing to Invoke AI
 Anyone who wishes to contribute to InvokeAI, whether features, bug fixes, code cleanup, testing, code reviews, documentation or translation is very much encouraged to do so.
 
 ## Development
@@ -13,6 +13,11 @@ If you’d like to help with development, please see our [development guide](con
 
 ## Nodes
 If you’d like to add a Node, please see our [nodes contribution guide](../nodes/contributingNodes.md).
+
+## Support and Triaging
+Helping support other users in [Discord](https://discord.gg/ZmtBAhwWhy) and on Github are valuable forms of contribution that we greatly appreciate. 
+
+We receive many issues and requests for help from users. We're limited in bandwidth relative to our the user base, so providing answers to questions or helping identify causes of issues is very helpful. By doing this, you enable us to spend time on the highest priority work. 
 
 ## Documentation
 If you’d like to help with documentation, please see our [documentation guide](contribution_guides/documentation.md).
