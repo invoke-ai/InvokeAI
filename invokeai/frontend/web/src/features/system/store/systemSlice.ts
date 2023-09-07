@@ -3,7 +3,7 @@ import { PayloadAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { InvokeLogLevel } from 'app/logging/logger';
 import { userInvoked } from 'app/store/actions';
 import { t } from 'i18next';
-import { get, startCase, upperFirst } from 'lodash-es';
+import { get, startCase, truncate, upperFirst } from 'lodash-es';
 import { LogLevelName } from 'roarr';
 import {
   isAnySessionRejected,
@@ -357,10 +357,13 @@ export const systemSlice = createSlice({
           result.data.error.detail.map((e) => {
             state.toastQueue.push(
               makeToast({
-                title: upperFirst(e.msg),
+                title: truncate(upperFirst(e.msg), { length: 128 }),
                 status: 'error',
-                description: `Path:
-                ${e.loc.slice(3).join('.')}`,
+                description: truncate(
+                  `Path:
+                ${e.loc.join('.')}`,
+                  { length: 128 }
+                ),
                 duration,
               })
             );
@@ -375,7 +378,10 @@ export const systemSlice = createSlice({
         makeToast({
           title: t('toast.serverError'),
           status: 'error',
-          description: get(errorDescription, 'detail', 'Unknown Error'),
+          description: truncate(
+            get(errorDescription, 'detail', 'Unknown Error'),
+            { length: 128 }
+          ),
           duration,
         })
       );
