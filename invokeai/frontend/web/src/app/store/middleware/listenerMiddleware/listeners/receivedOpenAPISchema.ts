@@ -14,10 +14,11 @@ export const addReceivedOpenAPISchemaListener = () => {
       const schemaJSON = action.payload;
 
       log.debug({ schemaJSON }, 'Received OpenAPI schema');
-
+      const { nodesAllowlist, nodesDenylist } = getState().config;
       const nodeTemplates = parseSchema(
         schemaJSON,
-        getState().config.nodesDenylist
+        nodesAllowlist,
+        nodesDenylist
       );
 
       log.debug(
