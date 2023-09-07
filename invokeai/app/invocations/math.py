@@ -86,7 +86,7 @@ class DivideFloatInvocation(BaseInvocation):
     """Divides two float numbers"""
 
     a: float = InputField(default=0, description=FieldDescriptions.num_1)
-    b: float = InputField(default=0, description=FieldDescriptions.num_2)
+    b: float = InputField(default=1, description=FieldDescriptions.num_2)
 
     def invoke(self, context: InvocationContext) -> FloatOutput:
         return FloatOutput(value=self.a / self.b)
@@ -109,7 +109,7 @@ class RoundToMultipleInvocation(BaseInvocation):
 
     value: float = InputField(default=0, description="The value to round")
     multiple: int = InputField(default=1, ge=1, description="The multiple to round to")
-    method: Literal["Nearest", "Floor", "Ceiling"] = InputField(default="round", description="The method to use for rounding")
+    method: Literal["Nearest", "Floor", "Ceiling"] = InputField(default="Nearest", description="The method to use for rounding")
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         if self.method == "Nearest":
