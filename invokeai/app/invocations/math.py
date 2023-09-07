@@ -103,21 +103,24 @@ class RandomIntInvocation(BaseInvocation):
         return IntegerOutput(value=np.random.randint(self.low, self.high))
 
 
-@invocation("float_to_int", title="Float to Integer", tags=["math", "convert"], category="math", version="1.0.0")
-class FloatToIntInvocation(BaseInvocation):
-    """Converts a float to an integer."""
+@invocation("round_to_multiple", title="Round to Multiple", tags=["math", "round", "integer", "convert"], category="math", version="1.0.0")
+class RoundToMultipleInvocation(BaseInvocation):
+    """Rounds a number to the nearest integer multiple."""
 
-    value: float = InputField(default=0, description="The float value")
-    method: Literal["Floor", "Ceiling"] = InputField(default="round", description="The method to use for conversion")
+    value: float = InputField(default=0, description="The value to round")
+    multiple: int = InputField(default=1, ge=1, description="The multiple to round to")
+    method: Literal["Nearest", "Floor", "Ceiling"] = InputField(default="round", description="The method to use for rounding")
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        if self.method == "Floor":
-            return IntegerOutput(value=np.floor(self.value))
-        else:
-            return IntegerOutput(value=np.ceil(self.value))
+        if self.method == "Nearest":
+            return IntegerOutput(value=round(self.value / self.multiple) * self.multiple)
+        elif self.method == "Floor":
+            return IntegerOutput(value=np.floor(self.value / self.multiple) * self.multiple)
+        else: #self.method == "Ceiling"
+            return IntegerOutput(value=np.ceil(self.value / self.multiple) * self.multiple)
 
 
-@invocation("round", title="Round Float", tags=["math", "round"], category="math", version="1.0.0")
+@invocation("round_float", title="Round Float", tags=["math", "round"], category="math", version="1.0.0")
 class RoundInvocation(BaseInvocation):
     """Rounds a float to a specified number of decimal places."""
 
