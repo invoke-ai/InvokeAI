@@ -70,12 +70,13 @@ Runtime Site](https://developer.nvidia.com/nvidia-container-runtime)
 9. Login or create an Account. 
 10. Choose the newer version of Cudnnn but __read__ the Important Note  __Important Note:__
 There is two version 11x or 12x for the differents architectures(Turing,Maxwell Etc...) of GPUs.
-You can find which version you should download here note that it's based on your graphics card architecture so for exemple a 4090 use the Ada Lovelace Architecture etc.: __https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html__
-11. Log-in Or Create An account
-12. Download the latest version and extract it from the download location
-13. Find the bin folder E\cudnn-windows-x86_64-__Whatever Version__\bin
-14. Copy and paste the 7 .dll files into YourInvokeFolderHere\\.venv\Lib\site-packages\torch\lib **Make sure to copy, and not move the files**
-15. If prompted, replace any existing files 
+You can find which version you should download on the link below. note that it's based on your graphics card architecture so for exemple a 4090 use the Ada Lovelace Architecture etc.
+__https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html__
+12. Log-in Or Create An account
+13. Download the latest version and extract it from the download location
+14. Find the bin folder E\cudnn-windows-x86_64-__Whatever Version__\bin
+15. Copy and paste the 7 .dll files into YourInvokeFolderHere\\.venv\Lib\site-packages\torch\lib **Make sure to copy, and not move the files**
+16. If prompted, replace any existing files 
 
 **Notes:** 
 * If no change is seen or any issues are encountered, follow the same steps as above and paste the torch/lib backup folder you made earlier and replace it. If you didn't make a backup, you can also uninstall and reinstall torch through the command line to repair this folder. 
