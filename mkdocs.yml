@@ -148,7 +148,7 @@ nav:
       - NSFW Checker: 'features/WATERMARK+NSFW.md'
       - Postprocessing: 'features/POSTPROCESS.md'
       - Prompting Features: 'features/PROMPTS.md'
-      - Training: 'features/TRAINING.md'
+      - Textual Inversion Training: 'features/TRAINING.md'
       - Unified Canvas: 'features/UNIFIED_CANVAS.md'
       - InvokeAI Web Server: 'features/WEB.md'
       - WebUI Hotkeys: "features/WEBUIHOTKEYS.md"
