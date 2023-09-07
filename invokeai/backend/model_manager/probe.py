@@ -516,7 +516,7 @@ class TextualInversionFolderProbe(FolderProbeBase):
         """Return the ModelBaseType of the HuggingFace-style Textual Inversion Folder."""
         path = self.model / "learned_embeds.bin"
         if not path.exists():
-            raise InvalidModelException(f"This textual inversion folder does not contain a learned_embeds.bin file.")
+            raise InvalidModelException("This textual inversion folder does not contain a learned_embeds.bin file.")
         return TextualInversionCheckpointProbe(path).get_base_type()
 
 

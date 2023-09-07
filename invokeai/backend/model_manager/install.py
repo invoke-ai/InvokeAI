@@ -278,7 +278,7 @@ class ModelInstall(ModelInstallBase):
             id = self.register(model)
             self._logger.info(f"Registered {model} with id {id}")
             self._installed.add(id)
-        except DuplicateModelException as exc:
+        except DuplicateModelException:
             pass
         return True
 
@@ -287,6 +287,6 @@ class ModelInstall(ModelInstallBase):
             id = self.install(model)
             self._logger.info(f"Installed {model} with id {id}")
             self._installed.add(id)
-        except DuplicateModelException as exc:
+        except DuplicateModelException:
             pass
         return True

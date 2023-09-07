@@ -7,9 +7,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import Set, List, Optional, Dict, Callable
-from pydantic import BaseModel, Field, validator, ValidationError
-from pydantic.networks import AnyHttpUrl
+from typing import List, Optional, Callable
+from pydantic import BaseModel, Field
 
 
 class DownloadJobStatus(str, Enum):

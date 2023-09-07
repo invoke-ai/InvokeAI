@@ -16,4 +16,4 @@ from .config import (  # noqa F401
 from .install import ModelInstall  # noqa F401
 from .probe import ModelProbe, InvalidModelException  # noqa F401
 from .storage import DuplicateModelException  # noqa F401
-from .search import ModelSearch
+from .search import ModelSearch  # noqa F401

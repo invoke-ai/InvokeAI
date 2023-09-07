@@ -15,14 +15,14 @@ Example usage:
 
   search = ModelSearch(on_model_found=report_it)
   found = search.search('/tmp/models')
-  print(found)   #  list of matching model paths 
+  print(found)   #  list of matching model paths
   print(search.stats)  #  search stats
 ```
 """
 
 import os
 from abc import ABC, abstractmethod
-from typing import Set, Optional, Callable, Union, types
+from typing import Set, Optional, Callable, Union
 from pathlib import Path
 
 from invokeai.backend.util.logging import InvokeAILogger
