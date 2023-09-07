@@ -1,4 +1,4 @@
-# How to Contribute
+# Contributing
 
 Invoke AI originated as a project built by the community, and that vision carries forward today as we aim to build the best pro-grade tools available. We work together to incorporate the latest in AI/ML research, making these tools available in over 20 languages to artists and creatives around the world as part of our fully permissive OSS project designed for individual users to self-host and use.
 
