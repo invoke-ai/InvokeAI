@@ -22,7 +22,7 @@ class DownloadQueueServiceBase(ABC):
         start: bool = True,
         access_token: Optional[str] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
-    ) -> int:
+    ) -> DownloadJobBase:
         """
         Create a download job.
 
@@ -73,26 +73,26 @@ class DownloadQueueServiceBase(ABC):
         pass
 
     @abstractmethod
-    def start_job(self, id: int):
+    def start_job(self, job: DownloadJobBase):
         """Start the job putting it into ENQUEUED state."""
         pass
 
     @abstractmethod
-    def pause_job(self, id: int):
+    def pause_job(self, job: DownloadJobBase):
         """Pause the job, putting it into PAUSED state."""
         pass
 
     @abstractmethod
-    def cancel_job(self, id: int):
+    def cancel_job(self, job: DownloadJobBase):
         """Cancel the job, clearing partial downloads and putting it into ERROR state."""
         pass
 
     @abstractmethod
-    def change_priority(self, id: int, delta: int):
+    def change_priority(self, job: DownloadJobBase, delta: int):
         """
         Change the job's priority.
 
-        :param id: ID of the job
+        :param job: Job to  apply change to
         :param delta: Value to increment or decrement priority.
 
         Lower values are higher priority.  The default starting value is 10.
@@ -132,7 +132,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         start: bool = True,
         access_token: Optional[str] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
-    ) -> int:
+    ) -> DownloadJobBase:
         event_handlers = event_handlers or []
         if self._event_bus:
             event_handlers.append([self._event_bus.emit_model_download_event])
@@ -160,16 +160,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def cancel_all_jobs(self):
         return self._queue.cancel_all_jobs()
 
-    def start_job(self, id: int):
+    def start_job(self, job: DownloadJobBase):
         return self._queue.start_job(id)
 
-    def pause_job(self, id: int):
+    def pause_job(self, job: DownloadJobBase):
         return self._queue.pause_job(id)
 
-    def cancel_job(self, id: int):
+    def cancel_job(self, job: DownloadJobBase):
         return self._queue.cancel_job(id)
 
-    def change_priority(self, id: int, delta: int):
+    def change_priority(self, job: DownloadJobBase, delta: int):
         return self._queue.change_priority(id, delta)
 
     def join(self):

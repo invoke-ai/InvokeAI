@@ -20,14 +20,11 @@ class DownloadJobStatus(str, Enum):
     PAUSED = "paused"  # previously started, now paused
     COMPLETED = "completed"  # finished running
     ERROR = "error"  # terminated with an error message
+    CANCELLED = "cancelled"  # terminated by caller
 
 
 class UnknownJobIDException(Exception):
-    """Raised when an invalid Job ID is requested."""
-
-
-class CancelledJobException(Exception):
-    """Raised when a job is cancelled."""
+    """Raised when an invalid Job is referenced."""
 
 
 DownloadEventHandler = Callable[["DownloadJobBase"], None]
@@ -85,7 +82,7 @@ class DownloadQueueBase(ABC):
         variant: Optional[str] = None,
         access_token: Optional[str] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
-    ) -> int:
+    ) -> DownloadJobBase:
         """
         Create a download job.
 
@@ -101,7 +98,7 @@ class DownloadQueueBase(ABC):
         pass
 
     @abstractmethod
-    def release(self) -> int:
+    def release(self):
         """
         Release resources used by queue.
 
@@ -127,7 +124,7 @@ class DownloadQueueBase(ABC):
         :param id: ID of the DownloadJobBase.
 
         Exceptions:
-        * UnknownJobIDException
+        * UnknownJobException
 
         Note that once a job is completed, id_to_job() may no longer
         recognize the job. Call id_to_job() before the job completes
@@ -152,26 +149,26 @@ class DownloadQueueBase(ABC):
         pass
 
     @abstractmethod
-    def start_job(self, id: int):
+    def start_job(self, job: DownloadJobBase):
         """Start the job putting it into ENQUEUED state."""
         pass
 
     @abstractmethod
-    def pause_job(self, id: int):
+    def pause_job(self, job: DownloadJobBase):
         """Pause the job, putting it into PAUSED state."""
         pass
 
     @abstractmethod
-    def cancel_job(self, id: int):
+    def cancel_job(self, job: DownloadJobBase):
         """Cancel the job, clearing partial downloads and putting it into ERROR state."""
         pass
 
     @abstractmethod
-    def change_priority(self, id: int, delta: int):
+    def change_priority(self, job: DownloadJobBase, delta: int):
         """
         Change the job's priority.
 
-        :param id: ID of the job
+        :param job: Job to change
         :param delta: Value to increment or decrement priority.
 
         Lower values are higher priority.  The default starting value is 10.

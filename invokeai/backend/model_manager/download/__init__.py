@@ -5,7 +5,6 @@ from .base import (  # noqa F401
     DownloadJobStatus,
     DownloadEventHandler,
     UnknownJobIDException,
-    CancelledJobException,
     DownloadJobBase,
 )
 
