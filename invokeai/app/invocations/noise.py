@@ -78,7 +78,7 @@ def build_noise_output(latents_name: str, latents: torch.Tensor, seed: int):
     )
 
 
-@invocation("noise", title="Noise", tags=["latents", "noise"], category="latents")
+@invocation("noise", title="Noise", tags=["latents", "noise"], category="latents", version="1.0.0")
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""
 

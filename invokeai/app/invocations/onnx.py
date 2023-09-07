@@ -56,7 +56,7 @@ ORT_TO_NP_TYPE = {
 PRECISION_VALUES = Literal[tuple(list(ORT_TO_NP_TYPE.keys()))]
 
 
-@invocation("prompt_onnx", title="ONNX Prompt (Raw)", tags=["prompt", "onnx"], category="conditioning")
+@invocation("prompt_onnx", title="ONNX Prompt (Raw)", tags=["prompt", "onnx"], category="conditioning", version="1.0.0")
 class ONNXPromptInvocation(BaseInvocation):
     prompt: str = InputField(default="", description=FieldDescriptions.raw_prompt, ui_component=UIComponent.Textarea)
     clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
@@ -143,6 +143,7 @@ class ONNXPromptInvocation(BaseInvocation):
     title="ONNX Text to Latents",
     tags=["latents", "inference", "txt2img", "onnx"],
     category="latents",
+    version="1.0.0",
 )
 class ONNXTextToLatentsInvocation(BaseInvocation):
     """Generates latents from conditionings."""
@@ -319,6 +320,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     title="ONNX Latents to Image",
     tags=["latents", "image", "vae", "onnx"],
     category="image",
+    version="1.0.0",
 )
 class ONNXLatentsToImageInvocation(BaseInvocation):
     """Generates an image from latents."""
@@ -403,7 +405,7 @@ class OnnxModelField(BaseModel):
     model_type: ModelType = Field(description="Model Type")
 
 
-@invocation("onnx_model_loader", title="ONNX Main Model", tags=["onnx", "model"], category="model")
+@invocation("onnx_model_loader", title="ONNX Main Model", tags=["onnx", "model"], category="model", version="1.0.0")
 class OnnxModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 

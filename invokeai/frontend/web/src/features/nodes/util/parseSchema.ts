@@ -73,6 +73,7 @@ export const parseSchema = (
     const title = schema.title.replace('Invocation', '');
     const tags = schema.tags ?? [];
     const description = schema.description ?? '';
+    const version = schema.version;
 
     const inputs = reduce(
       schema.properties,
@@ -225,11 +226,12 @@ export const parseSchema = (
     const invocation: InvocationTemplate = {
       title,
       type,
+      version,
       tags,
       description,
+      outputType,
       inputs,
       outputs,
-      outputType,
     };
 
     Object.assign(invocationsAccumulator, { [type]: invocation });
