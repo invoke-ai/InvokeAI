@@ -14,7 +14,8 @@ export const initialConfigState: AppConfig = {
     'perlinNoise',
     'noiseThreshold',
   ],
-  nodesDenylist: [],
+  nodesAllowlist: undefined,
+  nodesDenylist: undefined,
   canRestoreDeletedImagesFromBin: true,
   sd: {
     disabledControlNetModels: [],
