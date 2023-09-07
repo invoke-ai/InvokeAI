@@ -68,14 +68,12 @@ Runtime Site](https://developer.nvidia.com/nvidia-container-runtime)
 7. Copy everything inside the folder and save it elsewhere as a backup.
 8. Go to __https://developer.nvidia.com/cudnn__
 9. Login or create an Account. 
-10. Choose the newer version of Cudnnn but __read__ the Important Note  __Important Note:__
-There is two version 11x or 12x for the differents architectures(Turing,Maxwell Etc...) of GPUs.
-You can find which version you should download on the link below. note that it's based on your graphics card architecture so for exemple a 4090 use the Ada Lovelace Architecture etc.
-__https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html__
-12. Log-in Or Create An account
+10. Choose the newer version of cuDNN. **Note:** 
+There are two versions, 11.x or 12.x for the differents architectures(Turing,Maxwell Etc...) of GPUs.
+You can find which version you should download from [this link](https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html).
 13. Download the latest version and extract it from the download location
 14. Find the bin folder E\cudnn-windows-x86_64-__Whatever Version__\bin
-15. Copy and paste the 7 .dll files into YourInvokeFolderHere\\.venv\Lib\site-packages\torch\lib **Make sure to copy, and not move the files**
+15. Copy and paste the .dll files into YourInvokeFolderHere\\.venv\Lib\site-packages\torch\lib **Make sure to copy, and not move the files**
 16. If prompted, replace any existing files 
 
 **Notes:** 
