@@ -6,7 +6,7 @@ Model download service.
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, List
-from .events import EventServicesBase
+from .events import EventServiceBase
 from invokeai.backend.model_manager.download import DownloadQueue, DownloadJobBase, DownloadEventHandler
 
 
@@ -110,19 +110,19 @@ class DownloadQueueServiceBase(ABC):
 class DownloadQueueService(DownloadQueueServiceBase):
     """Multithreaded queue for downloading models via URL or repo_id."""
 
-    _event_bus: EventServicesBase
+    _event_bus: EventServiceBase
     _queue: DownloadQueue
 
-    def __init__(self, event_bus: EventServicesBase, **kwargs):
+    def __init__(self, event_bus: EventServiceBase, **kwargs):
         """
         Initialize new DownloadQueueService object.
 
-        :param event_bus: EventServicesBase object for reporting progress.
+        :param event_bus: EventServiceBase object for reporting progress.
         :param **kwargs: Any of the arguments taken by invokeai.backend.model_manager.download.DownloadQueue.
         e.g. `max_parallel_dl`.
         """
         self._event_bus = event_bus
-        self._queue = DownloadQueue(event_handlers=[self._forward_event])
+        self._queue = DownloadQueue()
 
     def create_download_job(
         self,

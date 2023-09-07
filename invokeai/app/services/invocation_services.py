@@ -52,6 +52,7 @@ class InvocationServices:
         model_manager: "ModelManagerServiceBase",
         processor: "InvocationProcessorABC",
         performance_statistics: "InvocationStatsServiceBase",
+        download_manager: "DownloadQueueServiceBase",
         queue: "InvocationQueueABC",
     ):
         self.board_images = board_images
