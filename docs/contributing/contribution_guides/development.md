@@ -4,14 +4,19 @@
 
 If you are looking to help to with a code contribution, InvokeAI uses several different technologies under the hood: Python (Pydantic, FastAPI, diffusers) and Typescript (React, Redux Toolkit, ChakraUI, Mantine, Konva). Familiarity with StableDiffusion and image generation concepts is helpful, but not essential. 
 
-For more information, please review our area specific documentation:
+
+## **Get Started**
+
+To get started, take a look at our [new contributors checklist](newContributorChecklist.md)
+
+Once you're setup, for more information, you can review the documentation specific to your area of interest:
 
 * #### [InvokeAI Architecure](../ARCHITECTURE.md)
 * #### [Frontend Documentation](development_guides/contributingToFrontend.md)
 * #### [Node Documentation](../INVOCATIONS.md)
 * #### [Local Development](../LOCAL_DEVELOPMENT.md)
 
-**New Contributers:** Take a look at our [new contributors checklist](newContributorChecklist.md)
+
 
 If you don't feel ready to make a code contribution yet, no problem! You can also help out in other ways, such as [documentation](documentation.md), [translation](translation.md) or helping support other users and triage issues as they're reported in GitHub.
 
