@@ -17,14 +17,32 @@ This fork is supported across Linux, Windows and Macintosh. Linux users can use
 either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
 driver).
 
-### Installation Getting Started Guide
-#### **[Automated Installer](010_INSTALL_AUTOMATED.md)**
+
+## **[Automated Installer](010_INSTALL_AUTOMATED.md)**
 ✅ This is the recommended installation method for first-time users. 
-#### [Manual Installation](020_INSTALL_MANUAL.md)
-This method is recommended for experienced users and developers
-#### [Docker Installation](040_INSTALL_DOCKER.md)
-This method is recommended for those familiar with running Docker containers
-### Other Installation Guides
+
+  This is a script that will install all of InvokeAI's essential
+  third party libraries and InvokeAI itself. It includes access to a
+  "developer console" which will help us debug problems with you and
+  give you to access experimental features.
+
+## **[Manual Installation](020_INSTALL_MANUAL.md)**
+This method is recommended for experienced users and developers.
+
+  In this method you will manually run the commands needed to install
+  InvokeAI and its dependencies. We offer two recipes: one suited to
+  those who prefer the `conda` tool, and one suited to those who prefer
+  `pip` and Python virtual environments. In our hands the pip install
+  is faster and more reliable, but your mileage may vary.
+  Note that the conda installation method is currently deprecated and
+  will not be supported at some point in the future.
+
+## **[Docker Installation](040_INSTALL_DOCKER.md)**
+This method is recommended for those familiar with running Docker containers.
+
+We offer a method for creating Docker containers containing InvokeAI and its dependencies. This method is recommended for individuals with experience with Docker containers and understand the pluses and minuses of a container-based install.
+
+## Other Installation Guides
   - [PyPatchMatch](060_INSTALL_PATCHMATCH.md)
   - [XFormers](070_INSTALL_XFORMERS.md)
   - [CUDA and ROCm Drivers](030_INSTALL_CUDA_AND_ROCM.md)
@@ -63,43 +81,3 @@ images in full-precision mode:
 - GTX 1650 series cards
 - GTX 1660 series cards
 
-## Installation options
-
-1. [Automated Installer](010_INSTALL_AUTOMATED.md)
-
-    This is a script that will install all of InvokeAI's essential
-    third party libraries and InvokeAI itself. It includes access to a
-    "developer console" which will help us debug problems with you and
-    give you to access experimental features.
-
-
-    ✅ This is the recommended option for first time users. 
-
-2. [Manual Installation](020_INSTALL_MANUAL.md)
-
-    In this method you will manually run the commands needed to install
-    InvokeAI and its dependencies. We offer two recipes: one suited to
-    those who prefer the `conda` tool, and one suited to those who prefer
-    `pip` and Python virtual environments. In our hands the pip install
-    is faster and more reliable, but your mileage may vary.
-    Note that the conda installation method is currently deprecated and
-    will not be supported at some point in the future.
-
-    This method is recommended for users who have previously used `conda`
-    or `pip` in the past, developers, and anyone who wishes to remain on
-    the cutting edge of future InvokeAI development and is willing to put
-    up with occasional glitches and breakage.
-
-3. [Docker Installation](040_INSTALL_DOCKER.md)
-
-    We also offer a method for creating Docker containers containing
-    InvokeAI and its dependencies. This method is recommended for
-    individuals with experience with Docker containers and understand
-    the pluses and minuses of a container-based install.
-
-## Quick Guides
-
-* [Installing CUDA and ROCm Drivers](./030_INSTALL_CUDA_AND_ROCM.md)
-* [Installing XFormers](./070_INSTALL_XFORMERS.md)
-* [Installing PyPatchMatch](./060_INSTALL_PATCHMATCH.md)
-* [Installing New Models](./050_INSTALLING_MODELS.md)
