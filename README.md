@@ -46,13 +46,13 @@ the foundation for multiple commercial products.
   Install](https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/)] [<a
   href="https://discord.gg/ZmtBAhwWhy">Discord Server</a>] [<a
   href="https://invoke-ai.github.io/InvokeAI/">Documentation and
-  Tutorials</a>] [<a
-  href="https://github.com/invoke-ai/InvokeAI/">Code and
-  Downloads</a>] [<a
-  href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>]
+  Tutorials</a>]
+  [<a href="https://github.com/invoke-ai/InvokeAI/issues">Bug Reports</a>]
   [<a
   href="https://github.com/invoke-ai/InvokeAI/discussions">Discussion,
-  Ideas & Q&A</a>]
+  Ideas & Q&A</a>] 
+   [<a
+  href="https://invoke-ai.github.io/InvokeAI/contributing/CONTRIBUTING/">Contributing</a>] 
 
 <div align="center">
 
