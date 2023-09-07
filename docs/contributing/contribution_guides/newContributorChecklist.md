@@ -51,6 +51,14 @@ git push origin branch-name-here
 
 If you’d like to learn more about contributing to Open Source projects, here is a [Getting Started Guide](https://opensource.com/article/19/7/create-pull-request-github). 
 
+
+## Best Practices: 
+* Keep your pull requests small. Smaller pull requests are more likely to be accepted and merged
+* Comments! Commenting your code helps reviewers easily understand your contribution
+* Use Python and Typescript’s typing systems, and consider using an editor with [LSP](https://microsoft.github.io/language-server-protocol/) support to streamline development
+* Make all communications public. This ensure knowledge is shared with the whole community
+
+
 ## **Where can I go for help?**
 
 If you need help, you can ask questions in the [#dev-chat](https://discord.com/channels/1020123559063990373/1049495067846524939) channel of the Discord.

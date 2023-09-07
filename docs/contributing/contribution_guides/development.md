@@ -11,7 +11,9 @@ For more information, please review our area specific documentation:
 * #### [Node Documentation](../INVOCATIONS.md)
 * #### [Local Development](../LOCAL_DEVELOPMENT.md)
 
-If you don't feel ready to make a code contribution yet, no problem! You can also help out in other ways, such as [documentation](documentation.md) or [translation](translation.md).
+**New Contributers:** Take a look at our [new contributors checklist](newContributorChecklist.md)
+
+If you don't feel ready to make a code contribution yet, no problem! You can also help out in other ways, such as [documentation](documentation.md), [translation](translation.md) or helping support other users and triage issues as they're reported in GitHub.
 
 There are two paths to making a development contribution: 
 
@@ -23,7 +25,7 @@ There are two paths to making a development contribution:
 
 ## Best Practices: 
 * Keep your pull requests small. Smaller pull requests are more likely to be accepted and merged
-* Comments! Commenting your code helps reviwers easily understand your contribution
+* Comments! Commenting your code helps reviewers easily understand your contribution
 * Use Python and Typescript’s typing systems, and consider using an editor with [LSP](https://microsoft.github.io/language-server-protocol/) support to streamline development
 * Make all communications public. This ensure knowledge is shared with the whole community
 
