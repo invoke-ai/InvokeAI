@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 
 # General
-site_name: InvokeAI Stable Diffusion Toolkit Docs
+site_name: InvokeAI Documentation
 site_url: https://invoke-ai.github.io/InvokeAI
 site_author: mauwii
 dev_addr: '127.0.0.1:8080'
