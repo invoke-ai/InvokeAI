@@ -1,15 +1,11 @@
 # Example Workflows
 
-TODO: Will update once uploading workflows is available.
+We've curated some example workflows for you to get started with Workflows in InvokeAI
 
-## Text2Image
+To use them, download your desired workflow, and use the "Load Workflow" functionality in InvokeAI to load the workflow and start generating images!
 
-## Image2Image
+* SD1.5 / SD2 Text to Image  
+* SDXL Text to Image 
+* SDXL (with Refiner) Text to Image 
+* Tiled Upscaling with ControlNet
 
-## ControlNet
-
-## Upscaling
-
-## Inpainting / Outpainting
-
-## LoRAs
