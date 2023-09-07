@@ -34,8 +34,8 @@ from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 
 from ...backend.model_management.lora import ModelPatcher
-from ...backend.model_management.seamless import set_seamless
 from ...backend.model_management.models import BaseModelType
+from ...backend.model_management.seamless import set_seamless
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ConditioningData,
@@ -43,7 +43,9 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
     StableDiffusionGeneratorPipeline,
     image_resized_to_grid_as_tensor,
 )
-from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
+from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import (
+    PostprocessingSettings,
+)
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
 from ..models.image import ImageCategory, ResourceOrigin
@@ -485,9 +487,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 **self.unet.unet.dict(),
                 context=context,
             )
-            with ExitStack() as exit_stack, ModelPatcher.apply_lora_unet(
-                unet_info.context.model, _lora_loader()
-            ), set_seamless(unet_info.context.model, self.unet.seamless_axes), unet_info as unet:
+            with (
+                ExitStack() as exit_stack,
+                ModelPatcher.apply_lora_unet(unet_info.context.model, _lora_loader()),
+                set_seamless(unet_info.context.model, self.unet.seamless_axes),
+                unet_info as unet,
+            ):
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
                     noise = noise.to(device=unet.device, dtype=unet.dtype)
@@ -524,7 +529,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     denoising_end=self.denoising_end,
                 )
 
-                result_latents, result_attention_map_saver = pipeline.latents_from_embeddings(
+                result_latents = pipeline.latents_from_embeddings(
                     latents=latents,
                     timesteps=timesteps,
                     init_timestep=init_timestep,

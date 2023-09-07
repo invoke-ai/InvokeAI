@@ -5,14 +5,13 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any, Callable, List, Optional, Union
 
-import PIL.Image
 import einops
+import PIL.Image
 import psutil
 import torch
 import torchvision.transforms as T
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.controlnet import ControlNetModel
-from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
     StableDiffusionPipeline,
 )
@@ -27,13 +26,13 @@ from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config import InvokeAIAppConfig
+
+from ..util import auto_detect_slice_size, normalize_device
 from .diffusion import (
-    AttentionMapSaver,
+    BasicConditioningInfo,
     InvokeAIDiffuserComponent,
     PostprocessingSettings,
-    BasicConditioningInfo,
 )
-from ..util import normalize_device, auto_detect_slice_size
 
 
 @dataclass
@@ -44,7 +43,6 @@ class PipelineIntermediateState:
     timestep: int
     latents: torch.Tensor
     predicted_original: Optional[torch.Tensor] = None
-    attention_map_saver: Optional[AttentionMapSaver] = None
 
 
 @dataclass
@@ -103,7 +101,7 @@ class AddsMaskGuidance:
         # Mask anything that has the same shape as prev_sample, return others as-is.
         return output_class(
             {
-                k: (self.apply_mask(v, self._t_for_field(k, t)) if are_like_tensors(prev_sample, v) else v)
+                k: self.apply_mask(v, self._t_for_field(k, t)) if are_like_tensors(prev_sample, v) else v
                 for k, v in step_output.items()
             }
         )
@@ -203,18 +201,6 @@ class ConditioningData:
             else:
                 scheduler_args[name] = value
         return dataclasses.replace(self, scheduler_args=scheduler_args)
-
-
-@dataclass
-class InvokeAIStableDiffusionPipelineOutput(StableDiffusionPipelineOutput):
-    r"""
-    Output class for InvokeAI's Stable Diffusion pipeline.
-
-    Args:
-        attention_map_saver (`AttentionMapSaver`): Object containing attention maps that can be displayed to the user
-         after generation completes. Optional.
-    """
-    attention_map_saver: Optional[AttentionMapSaver]
 
 
 class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
@@ -360,7 +346,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
         seed: Optional[int] = None,
-    ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
+    ) -> torch.Tensor:
         if init_timestep.shape[0] == 0:
             return latents, None
 
@@ -402,7 +388,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise))
 
         try:
-            latents, attention_map_saver = self.generate_latents_from_embeddings(
+            latents = self.generate_latents_from_embeddings(
                 latents,
                 timesteps,
                 conditioning_data,
@@ -417,7 +403,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if mask is not None:
             latents = torch.lerp(orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype))
 
-        return latents, attention_map_saver
+        return latents
 
     def generate_latents_from_embeddings(
         self,
@@ -434,16 +420,14 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             additional_guidance = []
 
         batch_size = latents.shape[0]
-        attention_map_saver: Optional[AttentionMapSaver] = None
 
         if timesteps.shape[0] == 0:
-            return latents, attention_map_saver
+            return latents
 
         extra_conditioning_info = conditioning_data.extra
         with self.invokeai_diffuser.custom_attention_context(
             self.invokeai_diffuser.model,
             extra_conditioning_info=extra_conditioning_info,
-            step_count=len(self.scheduler.timesteps),
         ):
             if callback is not None:
                 callback(
@@ -480,13 +464,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
                 predicted_original = getattr(step_output, "pred_original_sample", None)
 
-                # TODO resuscitate attention map saving
-                # if i == len(timesteps)-1 and extra_conditioning_info is not None:
-                #    eos_token_index = extra_conditioning_info.tokens_count_including_eos_bos - 1
-                #    attention_map_token_ids = range(1, eos_token_index)
-                #    attention_map_saver = AttentionMapSaver(token_ids=attention_map_token_ids, latents_shape=latents.shape[-2:])
-                #    self.invokeai_diffuser.setup_attention_map_saving(attention_map_saver)
-
                 if callback is not None:
                     callback(
                         PipelineIntermediateState(
@@ -496,11 +473,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                             timestep=int(t),
                             latents=latents,
                             predicted_original=predicted_original,
-                            attention_map_saver=attention_map_saver,
                         )
                     )
 
-            return latents, attention_map_saver
+            return latents
 
     @torch.inference_mode()
     def step(

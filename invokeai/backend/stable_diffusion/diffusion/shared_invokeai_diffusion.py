@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import math
 from contextlib import contextmanager
 from dataclasses import dataclass
-import math
 from typing import Any, Callable, Optional, Union
 
 import torch
@@ -14,12 +14,9 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from .cross_attention_control import (
     Arguments,
     Context,
-    CrossAttentionType,
     SwapCrossAttnContext,
-    get_cross_attention_modules,
     setup_cross_attention_control_attention_processors,
 )
-from .cross_attention_map_saving import AttentionMapSaver
 
 ModelForwardCallback: TypeAlias = Union[
     # x, t, conditioning, Optional[cross-attention kwargs]
@@ -105,7 +102,6 @@ class InvokeAIDiffuserComponent:
         self,
         unet: UNet2DConditionModel,  # note: also may futz with the text encoder depending on requested LoRAs
         extra_conditioning_info: Optional[ExtraConditioningInfo],
-        step_count: int,
     ):
         old_attn_processors = None
         if extra_conditioning_info and (extra_conditioning_info.wants_cross_attention_control):
@@ -114,7 +110,6 @@ class InvokeAIDiffuserComponent:
             if extra_conditioning_info.wants_cross_attention_control:
                 self.cross_attention_control_context = Context(
                     arguments=extra_conditioning_info.cross_attention_control_args,
-                    step_count=step_count,
                 )
                 setup_cross_attention_control_attention_processors(
                     unet,
@@ -127,27 +122,6 @@ class InvokeAIDiffuserComponent:
             self.cross_attention_control_context = None
             if old_attn_processors is not None:
                 unet.set_attn_processor(old_attn_processors)
-            # TODO resuscitate attention map saving
-            # self.remove_attention_map_saving()
-
-    def setup_attention_map_saving(self, saver: AttentionMapSaver):
-        def callback(slice, dim, offset, slice_size, key):
-            if dim is not None:
-                # sliced tokens attention map saving is not implemented
-                return
-            saver.add_attention_maps(slice, key)
-
-        tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
-        for identifier, module in tokens_cross_attention_modules:
-            key = "down" if identifier.startswith("down") else "up" if identifier.startswith("up") else "mid"
-            module.set_attention_slice_calculated_callback(
-                lambda slice, dim, offset, slice_size, key=key: callback(slice, dim, offset, slice_size, key)
-            )
-
-    def remove_attention_map_saving(self):
-        tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
-        for _, module in tokens_cross_attention_modules:
-            module.set_attention_slice_calculated_callback(None)
 
     def do_controlnet_step(
         self,
