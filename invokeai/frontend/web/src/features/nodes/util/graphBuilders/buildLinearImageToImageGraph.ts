@@ -84,6 +84,8 @@ export const buildLinearImageToImageGraph = (
     throw new Error('No model found in state');
   }
 
+  const fp32 = vaePrecision === 'fp32';
+
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
   const use_cpu = shouldUseNoiseSettings
@@ -122,7 +124,7 @@ export const buildLinearImageToImageGraph = (
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -140,7 +142,7 @@ export const buildLinearImageToImageGraph = (
         // image: {
         //   image_name: initialImage.image_name,
         // },
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
     },
     edges: [

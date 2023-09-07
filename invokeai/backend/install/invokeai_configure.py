@@ -291,8 +291,19 @@ def download_realesrgan():
 
 
 # ---------------------------------------------
+def download_lama():
+    logger.info("Installing lama infill model")
+    download_with_progress_bar(
+        "https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt",
+        config.models_path / "core/misc/lama/lama.pt",
+        "lama infill model",
+    )
+
+
+# ---------------------------------------------
 def download_support_models():
     download_realesrgan()
+    download_lama()
     download_conversion_models()
 
 
@@ -496,7 +507,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
                 scroll_exit=True,
             )
         else:
-            self.vram_cache_size = DummyWidgetValue.zero
+            self.vram = DummyWidgetValue.zero
         self.nextrely += 1
         self.outdir = self.add_widget_intelligent(
             FileBox,
@@ -594,7 +605,8 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
             "vram",
             "outdir",
         ]:
-            setattr(new_opts, attr, getattr(self, attr).value)
+            if hasattr(self, attr):
+                setattr(new_opts, attr, getattr(self, attr).value)
 
         for attr in self.autoimport_dirs:
             directory = Path(self.autoimport_dirs[attr].value)

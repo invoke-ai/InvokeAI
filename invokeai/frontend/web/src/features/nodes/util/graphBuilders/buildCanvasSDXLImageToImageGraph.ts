@@ -67,6 +67,8 @@ export const buildCanvasSDXLImageToImageGraph = (
     shouldAutoSave,
   } = state.canvas;
 
+  const fp32 = vaePrecision === 'fp32';
+
   const isUsingScaledDimensions = ['auto', 'manual'].includes(
     boundingBoxScaleMethod
   );
@@ -133,7 +135,7 @@ export const buildCanvasSDXLImageToImageGraph = (
         type: 'i2l',
         id: IMAGE_TO_LATENTS,
         is_intermediate: true,
-        fp32: vaePrecision === 'fp32' ? true : false,
+        fp32,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -258,7 +260,7 @@ export const buildCanvasSDXLImageToImageGraph = (
       id: LATENTS_TO_IMAGE,
       type: 'l2i',
       is_intermediate: true,
-      fp32: vaePrecision === 'fp32' ? true : false,
+      fp32,
     };
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
@@ -305,7 +307,7 @@ export const buildCanvasSDXLImageToImageGraph = (
       type: 'l2i',
       id: CANVAS_OUTPUT,
       is_intermediate: !shouldAutoSave,
-      fp32: vaePrecision === 'fp32' ? true : false,
+      fp32,
     };
 
     (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image =

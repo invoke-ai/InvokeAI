@@ -112,6 +112,7 @@ export type ImageScaleInvocation = s['ImageScaleInvocation'];
 export type InfillPatchMatchInvocation = s['InfillPatchMatchInvocation'];
 export type InfillTileInvocation = s['InfillTileInvocation'];
 export type CreateDenoiseMaskInvocation = s['CreateDenoiseMaskInvocation'];
+export type MaskEdgeInvocation = s['MaskEdgeInvocation'];
 export type RandomIntInvocation = s['RandomIntInvocation'];
 export type CompelInvocation = s['CompelInvocation'];
 export type DynamicPromptInvocation = s['DynamicPromptInvocation'];
