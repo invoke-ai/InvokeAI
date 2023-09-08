@@ -1,6 +1,6 @@
 import { Flex, MenuItem, Spinner } from '@chakra-ui/react';
 import { useAppToaster } from 'app/components/Toaster';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   imagesToChangeSelected,
@@ -34,6 +34,7 @@ import {
 import { ImageDTO } from 'services/api/types';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
+import { configSelector } from '../../../system/store/configSelectors';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -48,9 +49,10 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const toaster = useAppToaster();
 
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
+  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
 
   const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    imageDTO,
+    { image: imageDTO, shouldFetchMetadataFromApi },
     {
       selectFromResult: (res) => ({
         isLoading: res.isFetching,
