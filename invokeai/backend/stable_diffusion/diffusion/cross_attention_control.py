@@ -11,16 +11,17 @@ import diffusers
 import psutil
 import torch
 from compel.cross_attention_control import Arguments
-from diffusers.models.unet_2d_condition import UNet2DConditionModel
-from diffusers.models.attention_processor import AttentionProcessor
 from diffusers.models.attention_processor import (
     Attention,
+    AttentionProcessor,
     AttnProcessor,
     SlicedAttnProcessor,
 )
+from diffusers.models.unet_2d_condition import UNet2DConditionModel
 from torch import nn
 
 import invokeai.backend.util.logging as logger
+
 from ...util import torch_dtype
 
 
@@ -380,10 +381,13 @@ def get_cross_attention_modules(model, which: CrossAttentionType) -> list[tuple[
         # non-fatal error but .swap() won't work.
         logger.error(
             f"Error! CrossAttentionControl found an unexpected number of {cross_attention_class} modules in the model "
-            + f"(expected {expected_count}, found {cross_attention_modules_in_model_count}). Either monkey-patching failed "
+            + f"(expected {expected_count}, found {cross_attention_modules_in_model_count}). Either monkey-patching"
+            " failed "
             + "or some assumption has changed about the structure of the model itself. Please fix the monkey-patching, "
-            + f"and/or update the {expected_count} above to an appropriate number, and/or find and inform someone who knows "
-            + "what it means. This error is non-fatal, but it is likely that .swap() and attention map display will not "
+            + f"and/or update the {expected_count} above to an appropriate number, and/or find and inform someone who"
+            " knows "
+            + "what it means. This error is non-fatal, but it is likely that .swap() and attention map display will"
+            " not "
             + "work properly until it is fixed."
         )
     return attention_module_tuples
@@ -581,6 +585,7 @@ class SlicedSwapCrossAttnProcesser(SlicedAttnProcessor):
         attention_mask=None,
         # kwargs
         swap_cross_attn_context: SwapCrossAttnContext = None,
+        **kwargs,
     ):
         attention_type = CrossAttentionType.SELF if encoder_hidden_states is None else CrossAttentionType.TOKENS
 
