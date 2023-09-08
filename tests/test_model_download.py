@@ -43,7 +43,36 @@ for i in ["12345", "9999", "54321"]:
         ),
     )
 
+# here are some malformed URLs to test
+# missing the content length
+session.mount("http://www.civitai.com/models/missing",
+              TestAdapter(
+                  b"Missing content length",
+                  headers={
+                      "Content-Disposition" : 'filename="missing.txt"',
+                  }
+              ),
+              )
+# not found
 session.mount("http://www.civitai.com/models/broken", TestAdapter(b"Not found", status=404))
+# specifies a content disposition that may overwrite files in the parent directory
+session.mount("http://www.civitai.com/models/malicious",
+              TestAdapter(
+                  b"Malicious URL",
+                  headers={
+                      "Content-Disposition" : 'filename="../badness.txt"',
+                  }
+              ),
+              )
+# Would create a path that is too long
+session.mount("http://www.civitai.com/models/long",
+              TestAdapter(
+                  b"Malicious URL",
+                  headers={
+                      "Content-Disposition" : f'filename="{"i"*1000}"',
+                  }
+              ),
+              )
 
 # mock HuggingFace URLs
 hf_sd2_paths = [
@@ -176,17 +205,41 @@ def test_repo_id_download():
         assert not Path(repo_root, "text_encoder", "model.fp16.safetensors").exists()
 
 
-def test_failure_modes():
+def test_bad_urls():
     queue = DownloadQueue(
         requests_session=session,
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
+        # do we handle 404 and other HTTP errors?
         job = queue.create_download_job(source="http://www.civitai.com/models/broken", destdir=tmpdir)
         queue.join()
         assert job.status == "error"
         assert isinstance(job.error, HTTPError)
         assert str(job.error) == "NOT FOUND"
+
+        # Do we handle missing content length field?
+        job = queue.create_download_job(source="http://www.civitai.com/models/missing", destdir=tmpdir)
+        queue.join()
+        assert job.status == "completed"
+        assert job.total_bytes == 0
+        assert job.bytes > 0
+        assert job.bytes == Path(tmpdir, "missing.txt").stat().st_size
+
+        # Don't let the URL specify a filename with slashes or double dots... (e.g. '../../etc/passwd')
+        job = queue.create_download_job(source="http://www.civitai.com/models/malicious", destdir=tmpdir)
+        queue.join()
+        assert job.status == "completed"
+        assert job.destination == Path(tmpdir, 'malicious')
+        assert Path(tmpdir, 'malicious').exists()
+
+        # Nor a destination that would exceed the maximum filename or path length
+        job = queue.create_download_job(source="http://www.civitai.com/models/long", destdir=tmpdir)
+        queue.join()
+        assert job.status == "completed"
+        assert job.destination == Path(tmpdir, 'long')
+        assert Path(tmpdir, 'long').exists()
+        
 
     # create a foreign job which will be invalid for the queue
     bad_job = DownloadJobBase(id=999, source="mock", destination="mock")
@@ -288,3 +341,4 @@ def test_pause_cancel_url():  # this one is tricky because of potential race con
             ).exists(), "cancelled file should be deleted"
 
             assert len(queue.list_jobs()) == 0
+

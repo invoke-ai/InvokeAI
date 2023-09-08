@@ -284,8 +284,12 @@ class DownloadQueue(DownloadQueueBase):
 
         if job.destination.is_dir():
             try:
-                file_name = re.search('filename="(.+)"', resp.headers.get("Content-Disposition", "bug-noname")).group(1)
-            except AttributeError:
+                file_name = re.search('filename="(.+)"', resp.headers["Content-Disposition"]).group(1)
+                self._validate_filename(job.destination, file_name)  # will raise a ValueError exception if file_name is suspicious
+            except ValueError:
+                self._logger.warning(f"Invalid filename '{file_name}' returned by source {job.source}, using last component of URL instead")
+                file_name = os.path.basename(job.source)
+            except KeyError:
                 file_name = os.path.basename(job.source)
             job.destination = job.destination / file_name
             dest = job.destination
@@ -335,6 +339,16 @@ class DownloadQueue(DownloadQueueBase):
             self._logger.error(f"An error occurred while downloading {dest}: {str(excp)}")
             job.error = excp
             self._update_job_status(job, DownloadJobStatus.ERROR)
+
+    def _validate_filename(self, directory: str, filename: str):
+        if '/' in filename:
+            raise ValueError
+        if filename.startswith('..'):
+            raise ValueError
+        if len(filename) > os.pathconf(directory, "PC_NAME_MAX"):
+            raise ValueError
+        if len(os.path.join(directory, filename)) > os.pathconf(directory, "PC_PATH_MAX"):
+            raise ValueError
 
     def _update_job_status(self, job: DownloadJobBase, new_status: Optional[DownloadJobStatus] = None):
         """Optionally change the job status and send an event indicating a change of state."""
