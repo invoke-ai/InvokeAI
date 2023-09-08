@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import dataclass
 import math
+from contextlib import contextmanager
 from typing import Any, Callable, Optional, Union
 
 import torch
@@ -10,9 +9,13 @@ from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    ExtraConditioningInfo,
+    PostprocessingSettings,
+    SDXLConditioningInfo,
+)
 
 from .cross_attention_control import (
-    Arguments,
     Context,
     CrossAttentionType,
     SwapCrossAttnContext,
@@ -31,37 +34,6 @@ ModelForwardCallback: TypeAlias = Union[
 ]
 
 
-@dataclass
-class BasicConditioningInfo:
-    embeds: torch.Tensor
-    extra_conditioning: Optional[InvokeAIDiffuserComponent.ExtraConditioningInfo]
-    # weight: float
-    # mode: ConditioningAlgo
-
-    def to(self, device, dtype=None):
-        self.embeds = self.embeds.to(device=device, dtype=dtype)
-        return self
-
-
-@dataclass
-class SDXLConditioningInfo(BasicConditioningInfo):
-    pooled_embeds: torch.Tensor
-    add_time_ids: torch.Tensor
-
-    def to(self, device, dtype=None):
-        self.pooled_embeds = self.pooled_embeds.to(device=device, dtype=dtype)
-        self.add_time_ids = self.add_time_ids.to(device=device, dtype=dtype)
-        return super().to(device=device, dtype=dtype)
-
-
-@dataclass(frozen=True)
-class PostprocessingSettings:
-    threshold: float
-    warmup: float
-    h_symmetry_time_pct: Optional[float]
-    v_symmetry_time_pct: Optional[float]
-
-
 class InvokeAIDiffuserComponent:
     """
     The aim of this component is to provide a single place for code that can be applied identically to
@@ -74,15 +46,6 @@ class InvokeAIDiffuserComponent:
 
     debug_thresholding = False
     sequential_guidance = False
-
-    @dataclass
-    class ExtraConditioningInfo:
-        tokens_count_including_eos_bos: int
-        cross_attention_control_args: Optional[Arguments] = None
-
-        @property
-        def wants_cross_attention_control(self):
-            return self.cross_attention_control_args is not None
 
     def __init__(
         self,

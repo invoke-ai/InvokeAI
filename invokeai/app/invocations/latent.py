@@ -33,13 +33,15 @@ from invokeai.app.invocations.primitives import (
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    ConditioningData,
+)
 
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.model_management.models import BaseModelType
 from ...backend.model_management.seamless import set_seamless
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
-    ConditioningData,
     ControlNetData,
     IPAdapterData,
     StableDiffusionGeneratorPipeline,

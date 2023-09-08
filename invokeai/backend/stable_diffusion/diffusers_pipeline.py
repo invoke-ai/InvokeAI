@@ -28,14 +28,12 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus, IPAdapterXL
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    ConditioningData,
+)
 
 from ..util import auto_detect_slice_size, normalize_device
-from .diffusion import (
-    AttentionMapSaver,
-    BasicConditioningInfo,
-    InvokeAIDiffuserComponent,
-    PostprocessingSettings,
-)
+from .diffusion import AttentionMapSaver, InvokeAIDiffuserComponent
 
 
 @dataclass
@@ -179,42 +177,6 @@ class IPAdapterData:
     # TODO: change to polymorphic so can do different weights per step (once implemented...)
     # weight: Union[float, List[float]] = Field(default=1.0)
     weight: float = Field(default=1.0)
-
-
-@dataclass
-class ConditioningData:
-    unconditioned_embeddings: BasicConditioningInfo
-    text_embeddings: BasicConditioningInfo
-    guidance_scale: Union[float, List[float]]
-    """
-    Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
-    `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
-    Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
-    images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
-    """
-    extra: Optional[InvokeAIDiffuserComponent.ExtraConditioningInfo] = None
-    scheduler_args: dict[str, Any] = field(default_factory=dict)
-    """
-    Additional arguments to pass to invokeai_diffuser.do_latent_postprocessing().
-    """
-    postprocessing_settings: Optional[PostprocessingSettings] = None
-
-    @property
-    def dtype(self):
-        return self.text_embeddings.dtype
-
-    def add_scheduler_args_if_applicable(self, scheduler, **kwargs):
-        scheduler_args = dict(self.scheduler_args)
-        step_method = inspect.signature(scheduler.step)
-        for name, value in kwargs.items():
-            try:
-                step_method.bind_partial(**{name: value})
-            except TypeError:
-                # FIXME: don't silently discard arguments
-                pass  # debug("%s does not accept argument named %r", scheduler, name)
-            else:
-                scheduler_args[name] = value
-        return dataclasses.replace(self, scheduler_args=scheduler_args)
 
 
 @dataclass
