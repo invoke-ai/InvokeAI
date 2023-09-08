@@ -28,7 +28,7 @@ from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus, IPAdapterXL
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningData,
     IPAdapterConditioningInfo,
@@ -421,11 +421,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if ip_adapter_data is not None:
             # Initialize IPAdapter
             # TODO(ryand): Refactor to use model management for the IP-Adapter.
-            if "sdxl" in ip_adapter_data.ip_adapter_model:
-                ip_adapter = IPAdapterXL(
-                    self.unet, ip_adapter_data.image_encoder_model, ip_adapter_data.ip_adapter_model, self.unet.device
-                )
-            elif "plus" in ip_adapter_data.ip_adapter_model:
+            if "plus" in ip_adapter_data.ip_adapter_model:
                 ip_adapter = IPAdapterPlus(
                     self.unet,
                     ip_adapter_data.image_encoder_model,

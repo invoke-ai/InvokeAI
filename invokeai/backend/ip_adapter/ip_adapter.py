@@ -41,6 +41,8 @@ class ImageProjModel(torch.nn.Module):
 
 
 class IPAdapter:
+    """IP-Adapter: https://arxiv.org/pdf/2308.06721.pdf"""
+
     def __init__(self, unet: UNet2DConditionModel, image_encoder_path, ip_ckpt, device, num_tokens=4):
         self._unet = unet
         self.device = device
@@ -127,12 +129,6 @@ class IPAdapter:
         for attn_processor in self._attn_processors.values():
             if isinstance(attn_processor, IPAttnProcessor):
                 attn_processor.scale = scale
-
-
-class IPAdapterXL(IPAdapter):
-    """SDXL"""
-
-    pass
 
 
 class IPAdapterPlus(IPAdapter):
