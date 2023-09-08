@@ -5,6 +5,7 @@ import { merge } from 'lodash-es';
 
 export const initialConfigState: AppConfig = {
   shouldUpdateImagesOnConnect: false,
+  shouldFetchMetadataFromApi: false,
   disabledTabs: [],
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
   disabledSDFeatures: [
