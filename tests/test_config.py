@@ -156,7 +156,8 @@ def test_type_coercion(patch_rootdir):
 
     This test needs to deny nodes from being included in the InvocationsUnion by providing
     an app configuration as a test fixture. Pytest executes all test files before running
-    tests, so the app configuration is already initialized by the time this test runs.
+    tests, so the app configuration is already initialized by the time this test runs, and
+    the InvocationUnion is already created and the denied nodes are not omitted from it.
 
     This test passes when `test_config.py` is tested in isolation.
 
