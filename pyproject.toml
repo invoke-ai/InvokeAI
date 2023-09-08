@@ -102,6 +102,7 @@ dependencies = [
   "flake8",
   "Flake8-pyproject",
   "pytest>6.0.0",
+  "pytest-asyncio",
   "pytest-cov",
   "pytest-datadir",
 ]
@@ -176,6 +177,7 @@ version = { attr = "invokeai.version.__version__" }
 #=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]
 addopts = "--cov-report term --cov-report html --cov-report xml"
+asyncio_mode = "auto"
 [tool.coverage.run]
 branch = true
 source = ["invokeai"]

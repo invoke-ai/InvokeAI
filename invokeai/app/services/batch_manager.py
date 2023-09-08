@@ -104,6 +104,7 @@ class BatchManager(BatchManagerBase):
             batch_session.session_id,
             changes,
         )
+        sessions = self.get_sessions(batch_session.batch_id)
         batch_process = self.__batch_process_storage.get(batch_session.batch_id)
         if not batch_process.canceled:
             self.run_batch_process(batch_process.batch_id)
