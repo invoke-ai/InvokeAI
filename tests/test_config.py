@@ -1,5 +1,6 @@
 import os
 from typing import Any
+from pydantic import ValidationError
 
 import pytest
 from omegaconf import OmegaConf
@@ -147,3 +148,43 @@ def test_type_coercion(patch_rootdir):
     conf.parse_args(argv=["--root=/tmp/foobar"])
     assert conf.root == Path("/tmp/different")
     assert isinstance(conf.root, Path)
+
+
+def test_deny_nodes(patch_rootdir):
+    # Allow integer, string and float, but explicitly deny float
+    allow_deny_nodes_conf = OmegaConf.create(
+        """
+        InvokeAI:
+          Nodes:
+            allow_nodes:
+              - integer
+              - string
+              - float
+            deny_nodes:
+              - float
+        """
+    )
+    # must parse config before importing Graph, so its nodes union uses the config
+    conf = InvokeAIAppConfig().get_config()
+    conf.parse_args(conf=allow_deny_nodes_conf, argv=[])
+    from invokeai.app.services.graph import Graph
+
+    # confirm graph validation fails when using denied node
+    Graph(nodes={"1": {"id": "1", "type": "integer"}})
+    Graph(nodes={"1": {"id": "1", "type": "string"}})
+
+    with pytest.raises(ValidationError):
+        Graph(nodes={"1": {"id": "1", "type": "float"}})
+
+    from invokeai.app.invocations.baseinvocation import BaseInvocation
+
+    # confirm invocations union will not have denied nodes
+    all_invocations = BaseInvocation.get_invocations()
+
+    has_integer = len([i for i in all_invocations if i.__fields__.get("type").default == "integer"]) == 1
+    has_string = len([i for i in all_invocations if i.__fields__.get("type").default == "string"]) == 1
+    has_float = len([i for i in all_invocations if i.__fields__.get("type").default == "float"]) == 1
+
+    assert has_integer
+    assert has_string
+    assert not has_float
