@@ -55,11 +55,11 @@ class PostprocessingSettings:
 class IPAdapterConditioningInfo:
     cond_image_prompt_embeds: torch.Tensor
     """IP-Adapter image encoder conditioning embeddings.
-    Shape: (batch_size, num_tokens, encoding_dim). Typically: (1, 4, 1024) TODO(ryand): confirm 
+    Shape: (batch_size, num_tokens, encoding_dim).
     """
     uncond_image_prompt_embeds: torch.Tensor
     """IP-Adapter image encoding embeddings to use for unconditional generation.
-     Shape: (batch_size, num_tokens, encoding_dim). Typically: (1, 4, 1024) TODO(ryand): confirm 
+    Shape: (batch_size, num_tokens, encoding_dim).
     """
 
 
