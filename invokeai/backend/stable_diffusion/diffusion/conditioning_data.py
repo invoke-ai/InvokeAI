@@ -52,6 +52,18 @@ class PostprocessingSettings:
 
 
 @dataclass
+class IPAdapterConditioningInfo:
+    cond_image_prompt_embeds: torch.Tensor
+    """IP-Adapter image encoder conditioning embeddings.
+    Shape: (batch_size, num_tokens, encoding_dim). Typically: (1, 4, 1024) TODO(ryand): confirm 
+    """
+    uncond_image_prompt_embeds: torch.Tensor
+    """IP-Adapter image encoding embeddings to use for unconditional generation.
+     Shape: (batch_size, num_tokens, encoding_dim). Typically: (1, 4, 1024) TODO(ryand): confirm 
+    """
+
+
+@dataclass
 class ConditioningData:
     unconditioned_embeddings: BasicConditioningInfo
     text_embeddings: BasicConditioningInfo
@@ -68,6 +80,8 @@ class ConditioningData:
     Additional arguments to pass to invokeai_diffuser.do_latent_postprocessing().
     """
     postprocessing_settings: Optional[PostprocessingSettings] = None
+
+    ip_adapter_conditioning: Optional[IPAdapterConditioningInfo] = None
 
     @property
     def dtype(self):

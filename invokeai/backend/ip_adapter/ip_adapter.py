@@ -92,7 +92,6 @@ class IPAdapter:
                 print("swapping in IPAttnProcessor for", name)
                 attn_procs[name] = IPAttnProcessor(
                     hidden_size=hidden_size,
-                    image_embedding_len=self.num_tokens,
                     cross_attention_dim=cross_attention_dim,
                     scale=1.0,
                 ).to(self.device, dtype=torch.float16)

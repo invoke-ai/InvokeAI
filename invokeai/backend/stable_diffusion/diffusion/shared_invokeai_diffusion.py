@@ -10,6 +10,7 @@ from typing_extensions import TypeAlias
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    ConditioningData,
     ExtraConditioningInfo,
     PostprocessingSettings,
     SDXLConditioningInfo,
@@ -232,6 +233,8 @@ class InvokeAIDiffuserComponent:
         total_step_count: int,
         **kwargs,
     ):
+        # TODO(ryand): Raise here if both cross attention control and ip-adapter are enabled?
+
         cross_attention_control_types_to_do = []
         context: Context = self.cross_attention_control_context
         if self.cross_attention_control_context is not None:
@@ -339,10 +342,23 @@ class InvokeAIDiffuserComponent:
 
     # methods below are called from do_diffusion_step and should be considered private to this class.
 
-    def _apply_standard_conditioning(self, x, sigma, conditioning_data, **kwargs):
-        # fast batched path
+    def _apply_standard_conditioning(self, x, sigma, conditioning_data: ConditioningData, **kwargs):
+        """Runs the conditioned and unconditioned UNet forward passes in a single batch for faster inference speed at
+        the cost of higher memory usage.
+        """
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
+
+        cross_attention_kwargs = None
+        if conditioning_data.ip_adapter_conditioning is not None:
+            cross_attention_kwargs = {
+                "ip_adapter_image_prompt_embeds": torch.cat(
+                    [
+                        conditioning_data.ip_adapter_conditioning.uncond_image_prompt_embeds,
+                        conditioning_data.ip_adapter_conditioning.cond_image_prompt_embeds,
+                    ]
+                )
+            }
 
         added_cond_kwargs = None
         if type(conditioning_data.text_embeddings) is SDXLConditioningInfo:
@@ -371,6 +387,7 @@ class InvokeAIDiffuserComponent:
             x_twice,
             sigma_twice,
             both_conditionings,
+            cross_attention_kwargs=cross_attention_kwargs,
             encoder_attention_mask=encoder_attention_mask,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
@@ -382,9 +399,12 @@ class InvokeAIDiffuserComponent:
         self,
         x: torch.Tensor,
         sigma,
-        conditioning_data,
+        conditioning_data: ConditioningData,
         **kwargs,
     ):
+        """Runs the conditioned and unconditioned UNet forward passes sequentially for lower memory usage at the cost of
+        slower execution speed.
+        """
         # low-memory sequential path
         uncond_down_block, cond_down_block = None, None
         down_block_additional_residuals = kwargs.pop("down_block_additional_residuals", None)
@@ -400,6 +420,13 @@ class InvokeAIDiffuserComponent:
         if mid_block_additional_residual is not None:
             uncond_mid_block, cond_mid_block = mid_block_additional_residual.chunk(2)
 
+        # Run unconditional UNet denoising.
+        cross_attention_kwargs = None
+        if conditioning_data.ip_adapter_conditioning is not None:
+            cross_attention_kwargs = {
+                "ip_adapter_image_prompt_embeds": conditioning_data.ip_adapter_conditioning.uncond_image_prompt_embeds
+            }
+
         added_cond_kwargs = None
         is_sdxl = type(conditioning_data.text_embeddings) is SDXLConditioningInfo
         if is_sdxl:
@@ -412,12 +439,21 @@ class InvokeAIDiffuserComponent:
             x,
             sigma,
             conditioning_data.unconditioned_embeddings.embeds,
+            cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=uncond_down_block,
             mid_block_additional_residual=uncond_mid_block,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
         )
 
+        # Run conditional UNet denoising.
+        cross_attention_kwargs = None
+        if conditioning_data.ip_adapter_conditioning is not None:
+            cross_attention_kwargs = {
+                "ip_adapter_image_prompt_embeds": conditioning_data.ip_adapter_conditioning.cond_image_prompt_embeds
+            }
+
+        added_cond_kwargs = None
         if is_sdxl:
             added_cond_kwargs = {
                 "text_embeds": conditioning_data.text_embeddings.pooled_embeds,
@@ -428,6 +464,7 @@ class InvokeAIDiffuserComponent:
             x,
             sigma,
             conditioning_data.text_embeddings.embeds,
+            cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=cond_down_block,
             mid_block_additional_residual=cond_mid_block,
             added_cond_kwargs=added_cond_kwargs,
