@@ -42,7 +42,7 @@ class IPAdapterField(BaseModel):
 @invocation_output("ip_adapter_output")
 class IPAdapterOutput(BaseInvocationOutput):
     # Outputs
-    ip_adapter: IPAdapterField = OutputField(description=FieldDescriptions.ip_adapter)
+    ip_adapter: IPAdapterField = OutputField(description=FieldDescriptions.ip_adapter, title="IP-Adapter")
 
 
 @invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.0.0")
@@ -52,7 +52,9 @@ class IPAdapterInvocation(BaseInvocation):
     # Inputs
     image: ImageField = InputField(description="The IP-Adapter image prompt.")
     ip_adapter_model: IP_ADAPTER_MODELS = InputField(
-        default="models/core/ip_adapters/sd-1/ip-adapter_sd15.bin", description="The name of the IP-Adapter model."
+        default="models/core/ip_adapters/sd-1/ip-adapter_sd15.bin",
+        description="The name of the IP-Adapter model.",
+        title="IP-Adapter Model",
     )
     image_encoder_model: IP_ADAPTER_IMAGE_ENCODER_MODELS = InputField(
         default="models/core/ip_adapters/sd-1/image_encoder/", description="The name of the CLIP image encoder model."

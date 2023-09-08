@@ -222,7 +222,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         ui_order=5,
     )
     ip_adapter: Optional[IPAdapterField] = InputField(
-        description=FieldDescriptions.ip_adapter, default=None, input=Input.Connection, ui_order=6
+        description=FieldDescriptions.ip_adapter, title="IP-Adapter", default=None, input=Input.Connection, ui_order=6
     )
     latents: Optional[LatentsField] = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     denoise_mask: Optional[DenoiseMaskField] = InputField(
