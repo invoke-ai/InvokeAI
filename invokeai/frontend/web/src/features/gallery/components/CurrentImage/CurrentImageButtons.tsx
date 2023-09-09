@@ -27,7 +27,7 @@ import {
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -49,7 +49,7 @@ import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuIte
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
-  ({ gallery, system, ui }, activeTabName) => {
+  ({ gallery, system, ui, config }, activeTabName) => {
     const { isProcessing, isConnected, shouldConfirmOnDelete, progressImage } =
       system;
 
@@ -58,6 +58,8 @@ const currentImageButtonsSelector = createSelector(
       shouldHidePreview,
       shouldShowProgressInViewer,
     } = ui;
+
+    const { shouldFetchMetadataFromApi } = config;
 
     const lastSelectedImage = gallery.selection[gallery.selection.length - 1];
 
@@ -72,6 +74,7 @@ const currentImageButtonsSelector = createSelector(
       shouldHidePreview,
       shouldShowProgressInViewer,
       lastSelectedImage,
+      shouldFetchMetadataFromApi,
     };
   },
   {
@@ -92,6 +95,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     shouldShowImageDetails,
     lastSelectedImage,
     shouldShowProgressInViewer,
+    shouldFetchMetadataFromApi,
   } = useAppSelector(currentImageButtonsSelector);
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
@@ -106,8 +110,16 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     lastSelectedImage?.image_name ?? skipToken
   );
 
+  const getMetadataArg = useMemo(() => {
+    if (lastSelectedImage) {
+      return { image: lastSelectedImage, shouldFetchMetadataFromApi };
+    } else {
+      return skipToken;
+    }
+  }, [lastSelectedImage, shouldFetchMetadataFromApi]);
+
   const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    lastSelectedImage ?? skipToken,
+    getMetadataArg,
     {
       selectFromResult: (res) => ({
         isLoading: res.isFetching,
