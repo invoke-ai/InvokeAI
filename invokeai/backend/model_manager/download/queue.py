@@ -159,7 +159,6 @@ class DownloadQueue(DownloadQueueBase):
             self._lock.acquire()
             assert isinstance(self._jobs[job.id], DownloadJobBase)
             self._update_job_status(job, DownloadJobStatus.CANCELLED)
-        #            del self._jobs[job.id]
         except (AssertionError, KeyError) as excp:
             raise UnknownJobIDException("Unrecognized job") from excp
         finally:
