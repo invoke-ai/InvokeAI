@@ -35,7 +35,7 @@ class InvocationServices:
     model_manager: "ModelManagerServiceBase"
     processor: "InvocationProcessorABC"
     performance_statistics: "InvocationStatsServiceBase"
-    download_manager: "DownloadQueueServiceBase"
+    download_manager: Optional["DownloadQueueServiceBase"]
     queue: "InvocationQueueABC"
 
     def __init__(
@@ -52,8 +52,8 @@ class InvocationServices:
         model_manager: "ModelManagerServiceBase",
         processor: "InvocationProcessorABC",
         performance_statistics: "InvocationStatsServiceBase",
-        download_manager: "DownloadQueueServiceBase",
         queue: "InvocationQueueABC",
+        download_manager: Optional["DownloadQueueServiceBase"] = None,  # optional for now pending design decisions
     ):
         self.board_images = board_images
         self.boards = boards
@@ -66,6 +66,7 @@ class InvocationServices:
         self.latents = latents
         self.logger = logger
         self.model_manager = model_manager
+        self.download_manager = download_manager
         self.processor = processor
         self.performance_statistics = performance_statistics
         self.queue = queue

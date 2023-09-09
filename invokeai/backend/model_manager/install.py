@@ -320,11 +320,11 @@ class ModelInstall(ModelInstallBase):
                 info = self._store.get_model(id)
                 info.description = f"Downloaded model {info.name}"
                 info.source_url = str(job.source)
-                if card_data := job.metadata.get('cardData'):
-                    info.license = card_data.get('license')
-                if author := job.metadata.get('author'):
+                if card_data := job.metadata.get("cardData"):
+                    info.license = card_data.get("license")
+                if author := job.metadata.get("author"):
                     info.author = author
-                if tags := job.metadata.get('tags'):
+                if tags := job.metadata.get("tags"):
                     info.tags = tags
                 self._store.update_model(id, info)
                 self._async_installs[job.source] = id
@@ -337,9 +337,7 @@ class ModelInstall(ModelInstallBase):
         # Better to do the cleanup in the callback
         self._tmpdir = self._tmpdir or tempfile.TemporaryDirectory(dir=models_dir)
         return queue.create_download_job(
-            source=source,
-            destdir=self._tmpdir.name,
-            event_handlers=[complete_installation]
+            source=source, destdir=self._tmpdir.name, event_handlers=[complete_installation]
         )
 
     def wait_for_downloads(self) -> Dict[str, str]:  # noqa D102

@@ -419,10 +419,11 @@ class DownloadQueue(DownloadQueueBase):
                 self._update_job_status(job, DownloadJobStatus.COMPLETED)
             subqueue.release()  # get rid of the subqueue
 
-    def _get_repo_info(self,
-                       repo_id: str,
-                       variant: Optional[str] = None,
-                       ) -> Tuple[List[Tuple[AnyHttpUrl, Path, Path]], Dict[str, str]]:
+    def _get_repo_info(
+        self,
+        repo_id: str,
+        variant: Optional[str] = None,
+    ) -> Tuple[List[Tuple[AnyHttpUrl, Path, Path]], Dict[str, str]]:
         """Given a repo_id and an optional variant, return list of URLs to download to get the model."""
         model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True)
         sibs = model_info.siblings
@@ -439,7 +440,7 @@ class DownloadQueue(DownloadQueueBase):
             (hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path("."), x.name, sizes[x.as_posix()])
             for x in self._select_variants(paths, variant)
         ]
-        return (urls, {'cardData': model_info.cardData, 'tags': model_info.tags, 'author': model_info.author})
+        return (urls, {"cardData": model_info.cardData, "tags": model_info.tags, "author": model_info.author})
 
     def _select_variants(self, paths: List[str], variant: Optional[str] = None) -> Set[Path]:
         """Select the proper variant files from a list of HuggingFace repo_id paths."""
