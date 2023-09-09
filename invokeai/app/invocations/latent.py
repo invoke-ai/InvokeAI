@@ -277,13 +277,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ),
         )
 
+        bitmask = 0xFFFFFFFF if seed <= 0xFFFFFFFF else 0xFFFFFFFF_FFFFFFFF
         conditioning_data = conditioning_data.add_scheduler_args_if_applicable(
             scheduler,
             # for ddim scheduler
             eta=0.0,  # ddim_eta
             # for ancestral and sde schedulers
             # flip all bits to have noise different from initial
-            generator=torch.Generator(device=unet.device).manual_seed(seed ^ 0xFFFFFFFF),
+            generator=torch.Generator(device=unet.device).manual_seed(seed ^ bitmask),
         )
         return conditioning_data
 
