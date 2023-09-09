@@ -106,8 +106,8 @@ class ModelConfigBase(BaseModel):
     id: Optional[str] = Field(None)  # this may get added by the store
     description: Optional[str] = Field(None)
     author: Optional[str] = Field(description="Model author")
+    license: Optional[str] = Field(description="License string")
     thumbnail_url: Optional[str] = Field(description="URL of thumbnail image")
-    license_url: Optional[str] = Field(description="URL of license")
     source_url: Optional[str] = Field(description="Model download source")
     tags: Optional[List[str]] = Field(description="Descriptive tags")  # Set would be better, but not JSON serializable
 

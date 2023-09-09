@@ -395,8 +395,9 @@ class DownloadQueue(DownloadQueueBase):
         try:
             repo_id = job.source
             variant = job.variant
-            urls_to_download = self._get_repo_urls(repo_id, variant)
+            urls_to_download, metadata = self._get_repo_info(repo_id, variant)
             job.destination = job.destination / Path(repo_id).name
+            job.metadata = metadata
             bytes_downloaded = dict()
 
             for url, subdir, file, size in urls_to_download:
@@ -418,7 +419,10 @@ class DownloadQueue(DownloadQueueBase):
                 self._update_job_status(job, DownloadJobStatus.COMPLETED)
             subqueue.release()  # get rid of the subqueue
 
-    def _get_repo_urls(self, repo_id: str, variant: Optional[str] = None) -> List[Tuple[AnyHttpUrl, Path, Path]]:
+    def _get_repo_info(self,
+                       repo_id: str,
+                       variant: Optional[str] = None,
+                       ) -> Tuple[List[Tuple[AnyHttpUrl, Path, Path]], Dict[str, str]]:
         """Given a repo_id and an optional variant, return list of URLs to download to get the model."""
         model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True)
         sibs = model_info.siblings
@@ -431,10 +435,11 @@ class DownloadQueue(DownloadQueueBase):
             submodels = resp.json()
             paths = [x for x in paths if Path(x).parent.as_posix() in submodels]
             paths.insert(0, "model_index.json")
-        return [
+        urls = [
             (hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path("."), x.name, sizes[x.as_posix()])
             for x in self._select_variants(paths, variant)
         ]
+        return (urls, {'cardData': model_info.cardData, 'tags': model_info.tags, 'author': model_info.author})
 
     def _select_variants(self, paths: List[str], variant: Optional[str] = None) -> Set[Path]:
         """Select the proper variant files from a list of HuggingFace repo_id paths."""

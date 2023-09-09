@@ -320,6 +320,12 @@ class ModelInstall(ModelInstallBase):
                 info = self._store.get_model(id)
                 info.description = f"Downloaded model {info.name}"
                 info.source_url = str(job.source)
+                if card_data := job.metadata.get('cardData'):
+                    info.license = card_data.get('license')
+                if author := job.metadata.get('author'):
+                    info.author = author
+                if tags := job.metadata.get('tags'):
+                    info.tags = tags
                 self._store.update_model(id, info)
                 self._async_installs[job.source] = id
             jobs = queue.list_jobs()

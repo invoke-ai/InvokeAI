@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -50,6 +50,7 @@ class DownloadJobBase(BaseModel):
     job_sequence: Optional[int] = Field(
         description="Counter that records order in which this job was dequeued (for debugging)"
     )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Model metadata (source-specific)")
     error: Optional[Exception] = Field(default=None, description="Exception that caused an error")
 
     class Config:
