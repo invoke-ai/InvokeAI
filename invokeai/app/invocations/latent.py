@@ -277,13 +277,22 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ),
         )
 
+        # dynamic bitmask to match seed size
+        tmpnum = seed
+        numbits = 0
+        bitmask = 1
+        while tmpnum > 0:
+            tmpnum >>= 1
+            bitmask <<= 1
+        bitmask -= 1
+
         conditioning_data = conditioning_data.add_scheduler_args_if_applicable(
             scheduler,
             # for ddim scheduler
             eta=0.0,  # ddim_eta
             # for ancestral and sde schedulers
             # flip all bits to have noise different from initial
-            generator=torch.Generator(device=unet.device).manual_seed(seed ^ 0xFFFFFFFF),
+            generator=torch.Generator(device=unet.device).manual_seed(seed ^ bitmask),
         )
         return conditioning_data
 
