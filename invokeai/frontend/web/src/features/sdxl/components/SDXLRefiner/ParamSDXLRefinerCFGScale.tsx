@@ -43,7 +43,7 @@ const ParamSDXLRefinerCFGScale = () => {
 
   return shouldUseSliders ? (
     <IAISlider
-      label={t('parameters.cfgScale')}
+      label={t('sdxl.cfgScale')}
       step={shift ? 0.1 : 0.5}
       min={1}
       max={20}
@@ -59,7 +59,7 @@ const ParamSDXLRefinerCFGScale = () => {
     />
   ) : (
     <IAINumberInput
-      label={t('parameters.cfgScale')}
+      label={t('sdxl.cfgScale')}
       step={0.5}
       min={1}
       max={200}

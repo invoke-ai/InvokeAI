@@ -17,6 +17,7 @@ import DataViewer from './DataViewer';
 import ImageMetadataActions from './ImageMetadataActions';
 import { useAppSelector } from '../../../../app/store/storeHooks';
 import { configSelector } from '../../../system/store/configSelectors';
+import { useTranslation } from 'react-i18next';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -28,6 +29,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // useHotkeys('esc', () => {
   //   dispatch(setShouldShowImageDetails(false));
   // });
+  const { t } = useTranslation();
 
   const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
 
@@ -78,23 +80,23 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         <TabPanels>
           <TabPanel>
             {metadata ? (
-              <DataViewer data={metadata} label="Metadata" />
+              <DataViewer data={metadata} label={t('metadata.metadata')} />
             ) : (
-              <IAINoContentFallback label="No metadata found" />
+              <IAINoContentFallback label={t('metadata.noMetaData')} />
             )}
           </TabPanel>
           <TabPanel>
             {image ? (
-              <DataViewer data={image} label="Image Details" />
+              <DataViewer data={image} label={t('metadata.imageDetails')} />
             ) : (
-              <IAINoContentFallback label="No image details found" />
+              <IAINoContentFallback label={t('metadata.noImageDetails')} />
             )}
           </TabPanel>
           <TabPanel>
             {workflow ? (
-              <DataViewer data={workflow} label="Workflow" />
+              <DataViewer data={workflow} label={t('metadata.workflow')} />
             ) : (
-              <IAINoContentFallback label="No workflow found" />
+              <IAINoContentFallback label={t('metadata.noWorkFlow')} />
             )}
           </TabPanel>
         </TabPanels>

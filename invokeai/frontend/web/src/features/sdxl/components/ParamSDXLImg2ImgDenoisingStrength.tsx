@@ -37,7 +37,7 @@ const ParamSDXLImg2ImgDenoisingStrength = () => {
   return (
     <SubParametersWrapper>
       <IAISlider
-        label={`${t('parameters.denoisingStrength')}`}
+        label={t('sdxl.denoisingStrength')}
         step={0.01}
         min={0}
         max={1}

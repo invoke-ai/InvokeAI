@@ -138,11 +138,14 @@ export const InvokeButtonTooltipContent = memo(() => {
   const { isReady, reasons } = useIsReadyToInvoke();
   const { autoAddBoardId } = useAppSelector(tooltipSelector);
   const autoAddBoardName = useBoardName(autoAddBoardId);
+  const { t } = useTranslation();
 
   return (
     <Flex flexDir="column" gap={1}>
       <Text fontWeight={600}>
-        {isReady ? 'Ready to Invoke' : 'Unable to Invoke'}
+        {isReady
+          ? t('parameters.invoke.readyToInvoke')
+          : t('parameters.invoke.unableToInvoke')}
       </Text>
       {reasons.length > 0 && (
         <UnorderedList>
@@ -159,7 +162,7 @@ export const InvokeButtonTooltipContent = memo(() => {
         _dark={{ borderColor: 'base.900' }}
       />
       <Text fontWeight={400} fontStyle="oblique 10deg">
-        Adding images to{' '}
+        {t('parameters.invoke.addingImagesTo')}{' '}
         <Text as="span" fontWeight={600}>
           {autoAddBoardName || 'Uncategorized'}
         </Text>

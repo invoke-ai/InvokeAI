@@ -21,6 +21,7 @@ import {
   useRemoveImagesFromBoardMutation,
 } from 'services/api/endpoints/images';
 import { changeBoardReset, isModalOpenChanged } from '../store/slice';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
@@ -42,10 +43,11 @@ const ChangeBoardModal = () => {
   const { imagesToChange, isModalOpen } = useAppSelector(selector);
   const [addImagesToBoard] = useAddImagesToBoardMutation();
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
+  const { t } = useTranslation();
 
   const data = useMemo(() => {
     const data: { label: string; value: string }[] = [
-      { label: 'Uncategorized', value: 'none' },
+      { label: t('boards.uncategorized'), value: 'none' },
     ];
     (boards ?? []).forEach((board) =>
       data.push({
@@ -55,7 +57,7 @@ const ChangeBoardModal = () => {
     );
 
     return data;
-  }, [boards]);
+  }, [boards, t]);
 
   const handleClose = useCallback(() => {
     dispatch(changeBoardReset());
