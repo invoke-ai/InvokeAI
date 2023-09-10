@@ -6,6 +6,7 @@ from typing import List, Literal, Optional, Union
 import einops
 import numpy as np
 import torch
+from torch import mps
 import torchvision.transforms as T
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.models.attention_processor import (
@@ -541,6 +542,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
             result_latents = result_latents.to("cpu")
             torch.cuda.empty_cache()
+            mps.empty_cache()
 
             name = f"{context.graph_execution_state_id}__{self.id}"
             context.services.latents.save(name, result_latents)
@@ -612,6 +614,7 @@ class LatentsToImageInvocation(BaseInvocation):
 
             # clear memory as vae decode can request a lot
             torch.cuda.empty_cache()
+            mps.empty_cache()
 
             with torch.inference_mode():
                 # copied from diffusers pipeline
@@ -624,6 +627,7 @@ class LatentsToImageInvocation(BaseInvocation):
                 image = VaeImageProcessor.numpy_to_pil(np_image)[0]
 
         torch.cuda.empty_cache()
+        mps.empty_cache()
 
         image_dto = context.services.images.create(
             image=image,
@@ -683,6 +687,7 @@ class ResizeLatentsInvocation(BaseInvocation):
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         resized_latents = resized_latents.to("cpu")
         torch.cuda.empty_cache()
+        mps.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
         # context.services.latents.set(name, resized_latents)
@@ -719,6 +724,7 @@ class ScaleLatentsInvocation(BaseInvocation):
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         resized_latents = resized_latents.to("cpu")
         torch.cuda.empty_cache()
+        mps.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
         # context.services.latents.set(name, resized_latents)
@@ -875,6 +881,7 @@ class BlendLatentsInvocation(BaseInvocation):
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         blended_latents = blended_latents.to("cpu")
         torch.cuda.empty_cache()
+        mps.empty_cache()
 
         name = f"{context.graph_execution_state_id}__{self.id}"
         # context.services.latents.set(name, resized_latents)
