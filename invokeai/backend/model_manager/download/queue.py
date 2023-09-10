@@ -280,11 +280,6 @@ class DownloadQueue(DownloadQueueBase):
 
             if self._in_terminal_state(job):
                 del self._jobs[job.id]
-
-            if job.status == "error":
-                self._logger.warning(f"{job.source}: Download finished with error: {job.error}")
-            else:
-                self._logger.info(f"{job.source}: Download finished with status {job.status}")
             self._queue.task_done()
 
     def _fetch_metadata(self, job: DownloadJobBase) -> Tuple[AnyHttpUrl, ModelSourceMetadata]:
@@ -380,7 +375,7 @@ class DownloadQueue(DownloadQueueBase):
             if resp.status_code == 206 or exist_size > 0:
                 self._logger.warning(f"{dest}: partial file found. Resuming")
             elif resp.status_code != 200:
-                raise HTTPError(resp.reason)
+                raise HTTPError(f"status code {resp.status_code}: {resp.reason}")
             else:
                 self._logger.info(f"{job.source}: Downloading {job.destination}")
 
@@ -389,7 +384,7 @@ class DownloadQueue(DownloadQueueBase):
 
             self._update_job_status(job, DownloadJobStatus.RUNNING)
             with open(dest, open_mode) as file:
-                for data in resp.iter_content(chunk_size=16384):
+                for data in resp.iter_content(chunk_size=100000):
                     if job.status != DownloadJobStatus.RUNNING:  # cancelled, paused or errored
                         return
                     job.bytes += file.write(data)
@@ -428,12 +423,12 @@ class DownloadQueue(DownloadQueueBase):
         elif new_status in [DownloadJobStatus.COMPLETED, DownloadJobStatus.ERROR]:
             job.job_ended = time.time()
         if job.event_handlers:
-            try:
-                for handler in job.event_handlers:
+            for handler in job.event_handlers:
+                try:
                     handler(job)
-            except Exception as excp:
-                job.status = DownloadJobStatus.ERROR
-                job.error = excp
+                except Exception as excp:
+                    job.error = excp
+                    self._update_job_status(job, DownloadJobStatus.ERROR)
 
     def _download_repoid(self, job: DownloadJobBase):
         """Download a job that holds a huggingface repoid."""

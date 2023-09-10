@@ -78,6 +78,7 @@ class ModelInstallBase(ABC):
         store: Optional[ModelConfigStore] = None,
         config: Optional[InvokeAIAppConfig] = None,
         logger: Optional[InvokeAILogger] = None,
+        download: Optional[DownloadQueueBase] = None,
     ):
         """
         Create ModelInstall object.
@@ -88,6 +89,8 @@ class ModelInstallBase(ABC):
         uses the system-wide default app config.
         :param logger: Optional InvokeAILogger. If None passed,
         uses the system-wide default logger.
+        :param download: Optional DownloadQueueBase object. If None passed,
+        a default queue object will be created.
         """
         pass
 
@@ -323,6 +326,7 @@ class ModelInstall(ModelInstallBase):
 
         def complete_installation(job: DownloadJobBase):
             if job.status == "completed":
+                self._logger.info(f"{job.source}: Download finished with status {job.status}. Installing.")
                 model_id = self.install(job.destination)
                 info = self._store.get_model(model_id)
                 info.source = str(job.source)
@@ -334,8 +338,13 @@ class ModelInstall(ModelInstallBase):
                 info.thumbnail_url = metadata.thumbnail_url
                 self._store.update_model(model_id, info)
                 self._async_installs[job.source] = model_id
+            elif job.status == "error":
+                self._logger.warning(f"{job.source}: Download finished with error: {job.error}")
+            elif job.status == "cancelled":
+                self._logger.warning(f"{job.source}: Download cancelled at caller's request.")
             jobs = queue.list_jobs()
             if len(jobs) <= 1 and job.status in ["completed", "error", "cancelled"]:
+                self._tmpdir.cleanup()
                 self._tmpdir = None
 
         # note - this is probably not going to work. The tmpdir
