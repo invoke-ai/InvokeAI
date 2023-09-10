@@ -4,6 +4,7 @@ import numpy as np
 from typing import Literal
 
 from invokeai.app.invocations.primitives import IntegerOutput, FloatOutput
+from pydantic import validator
 
 from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, invocation
 
@@ -17,16 +18,6 @@ class AddInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         return IntegerOutput(value=self.a + self.b)
-    
-@invocation("add_float", title="Add Floats", tags=["math", "add", "float"], category="math", version="1.0.0")
-class AddFloatInvocation(BaseInvocation):
-    """Adds two float numbers"""
-
-    a: float = InputField(default=0, description=FieldDescriptions.num_1)
-    b: float = InputField(default=0, description=FieldDescriptions.num_2)
-
-    def invoke(self, context: InvocationContext) -> FloatOutput:
-        return FloatOutput(value=self.a + self.b)
 
 
 @invocation("sub", title="Subtract Integers", tags=["math", "subtract"], category="math", version="1.0.0")
@@ -38,16 +29,6 @@ class SubtractInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         return IntegerOutput(value=self.a - self.b)
-    
-@invocation("sub_float", title="Subtract Floats", tags=["math", "subtract", "float"], category="math", version="1.0.0")
-class SubtractFloatInvocation(BaseInvocation):
-    """Subtracts two float numbers"""
-
-    a: float = InputField(default=0, description=FieldDescriptions.num_1)
-    b: float = InputField(default=0, description=FieldDescriptions.num_2)
-
-    def invoke(self, context: InvocationContext) -> FloatOutput:
-        return FloatOutput(value=self.a - self.b)
 
 
 @invocation("mul", title="Multiply Integers", tags=["math", "multiply"], category="math", version="1.0.0")
@@ -60,16 +41,6 @@ class MultiplyInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         return IntegerOutput(value=self.a * self.b)
 
-@invocation("mul_float", title="Multiply Floats", tags=["math", "multiply", "float"], category="math", version="1.0.0")
-class MultiplyFloatInvocation(BaseInvocation):
-    """Multiplies two float numbers"""
-
-    a: float = InputField(default=0, description=FieldDescriptions.num_1)
-    b: float = InputField(default=0, description=FieldDescriptions.num_2)
-
-    def invoke(self, context: InvocationContext) -> FloatOutput:
-        return FloatOutput(value=self.a * self.b)
-
 
 @invocation("div", title="Divide Integers", tags=["math", "divide"], category="math", version="1.0.0")
 class DivideInvocation(BaseInvocation):
@@ -80,16 +51,6 @@ class DivideInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         return IntegerOutput(value=int(self.a / self.b))
-
-@invocation("div_float", title="Divide Floats", tags=["math", "divide", "float"], category="math", version="1.0.0")
-class DivideFloatInvocation(BaseInvocation):
-    """Divides two float numbers"""
-
-    a: float = InputField(default=0, description=FieldDescriptions.num_1)
-    b: float = InputField(default=1, description=FieldDescriptions.num_2)
-
-    def invoke(self, context: InvocationContext) -> FloatOutput:
-        return FloatOutput(value=self.a / self.b)
 
 
 @invocation("rand_int", title="Random Integer", tags=["math", "random"], category="math", version="1.0.0")
@@ -103,21 +64,23 @@ class RandomIntInvocation(BaseInvocation):
         return IntegerOutput(value=np.random.randint(self.low, self.high))
 
 
-@invocation("round_to_multiple", title="Round to Multiple", tags=["math", "round", "integer", "convert"], category="math", version="1.0.0")
+@invocation("float_to_int", title="Float To Integer", tags=["math", "round", "integer", "float", "convert"], category="math", version="1.0.0")
 class RoundToMultipleInvocation(BaseInvocation):
-    """Rounds a number to the nearest integer multiple."""
+    """Rounds a float number to (a multiple of) an integer."""
 
     value: float = InputField(default=0, description="The value to round")
-    multiple: int = InputField(default=1, ge=1, description="The multiple to round to")
-    method: Literal["Nearest", "Floor", "Ceiling"] = InputField(default="Nearest", description="The method to use for rounding")
+    multiple: int = InputField(default=1, ge=1,title="Multiple of", description="The multiple to round to")
+    method: Literal["Nearest", "Floor", "Ceiling", "Truncate"] = InputField(default="Nearest", description="The method to use for rounding")
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         if self.method == "Nearest":
             return IntegerOutput(value=round(self.value / self.multiple) * self.multiple)
         elif self.method == "Floor":
             return IntegerOutput(value=np.floor(self.value / self.multiple) * self.multiple)
-        else: #self.method == "Ceiling"
+        elif self.method == "Ceiling":
             return IntegerOutput(value=np.ceil(self.value / self.multiple) * self.multiple)
+        else: #self.method == "Truncate"
+            return IntegerOutput(value=int(self.value / self.multiple) * self.multiple)
 
 
 @invocation("round_float", title="Round Float", tags=["math", "round"], category="math", version="1.0.0")
@@ -131,32 +94,142 @@ class RoundInvocation(BaseInvocation):
         return FloatOutput(value=round(self.value, self.decimals))
 
 
-@invocation("abs", title="Absolute Value", tags=["math", "abs"], category="math", version="1.0.0")
-class AbsoluteValueInvocation(BaseInvocation):
-    """Returns the absolute value of a number."""
+INTEGER_OPERATIONS = Literal[
+    "Add A+B",
+    "Subtract A-B",
+    "Multiply A*B",
+    "Divide A/B",
+    "Exponentiate A^B",
+    "Modulus A%B",
+    "Absolute Value of A",
+    "Minimum(A,B)",
+    "Maximum(A,B)"
+]
 
-    value: float = InputField(default=0, description="The float value")
 
-    def invoke(self, context: InvocationContext) -> FloatOutput:
-        return FloatOutput(value=abs(self.value))
+@invocation(
+    "integer_math",
+    title="Integer Math",
+    tags=[
+        "math",
+        "integer",
+        "add",
+        "subtract",
+        "multiply",
+        "divide",
+        "modulus",
+        "power",
+        "absolute value",
+        "min",
+        "max"
+        ],
+        category="math",
+        version="1.0.0"
+)
+class IntegerMathInvocation(BaseInvocation):
+    """Performs integer math."""
 
-
-@invocation("mod", title="Modulus", tags=["math", "modulus"], category="math", version="1.0.0")
-class ModulusInvocation(BaseInvocation):
-    """Returns the modulus of two numbers."""
-
+    operation: INTEGER_OPERATIONS = InputField(default="Add A+B", description="The operation to perform")
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
+    @validator("operation")
+    def no_divide_by_zero(cls, v, values):
+        if v == "Divide A/B" and values["b"] == 0:
+            raise ValueError("Cannot divide by zero")
+        elif v == "Modulus A%B" and values["b"] == 0:
+            raise ValueError("Cannot divide by zero")
+        elif v == "Exponentiate A^B" and values["b"] < 0:
+            raise ValueError("Result of exponentiation is not an integer")
+        return v
+
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        return IntegerOutput(value=self.a % self.b)
+        #Python doesn't support switch statements until 3.10, but InvokeAI supports back to 3.9
+        if self.operation == "Add A+B":
+            return IntegerOutput(value=self.a + self.b)
+        elif self.operation == "Subtract A-B":
+            return IntegerOutput(value=self.a - self.b)
+        elif self.operation == "Multiply A*B":
+            return IntegerOutput(value=self.a * self.b)
+        elif self.operation == "Divide A/B":
+            return IntegerOutput(value=int(self.a / self.b))
+        elif self.operation == "Exponentiate A^B":
+            return IntegerOutput(value=self.a ** self.b)
+        elif self.operation == "Modulus A%B":
+            return IntegerOutput(value=self.a % self.b)
+        elif self.operation == "Absolute Value of A":
+            return IntegerOutput(value=abs(self.a))
+        elif self.operation == "Minimum(A,B)":
+            return IntegerOutput(value=min(self.a, self.b))
+        else: #self.operation == "Maximum(A,B)":
+            return IntegerOutput(value=max(self.a, self.b))
 
 
-@invocation("sqrt", title="Square Root", tags=["math", "sqrt"], category="math", version="1.0.0")
-class SquareRootInvocation(BaseInvocation):
-    """Returns the square root of a number."""
+FLOAT_OPERATIONS = Literal[
+    "Add A+B",
+    "Subtract A-B",
+    "Multiply A*B",
+    "Divide A/B",
+    "Exponentiate A^B",
+    "Absolute Value of A",
+    "Minimum(A,B)",
+    "Maximum(A,B)"
+]
 
-    value: float = InputField(default=0, ge=0, description="The float value")
+
+@invocation(
+    "float_math",
+    title="Float Math",
+    tags=[
+        "math",
+        "float",
+        "add",
+        "subtract",
+        "multiply",
+        "divide",
+        "power",
+        "root",
+        "absolute value",
+        "min",
+        "max"
+    ],
+    category="math",
+    version="1.0.0"
+)
+class FloatMathInvocation(BaseInvocation):
+    """Performs floating point math."""
+
+    operation: FLOAT_OPERATIONS = InputField(default="Add A+B", description="The operation to perform")
+    a: float = InputField(default=0, description=FieldDescriptions.num_1)
+    b: float = InputField(default=0, description=FieldDescriptions.num_2)
+
+    @validator("operation")
+    def no_divide_by_zero(cls, v, values):
+        if v == "Divide A/B" and values["b"] == 0:
+            raise ValueError("Cannot divide by zero")
+        elif v == "Exponentiate A^B" and values["a"] == 0 and values["b"] < 0:
+            raise ValueError("Cannot raise zero to a negative power")
+        elif v == "Exponentiate A^B" and type(values["a"]**values["b"]) == complex:
+            raise ValueError("Root operation resulted in a complex number")
+        return v
 
     def invoke(self, context: InvocationContext) -> FloatOutput:
-        return FloatOutput(value=np.sqrt(self.value))
+        #Python doesn't support switch statements until 3.10, but InvokeAI supports back to 3.9
+        if self.operation == "Add A+B":
+            return FloatOutput(value=self.a + self.b)
+        elif self.operation == "Subtract A-B":
+            return FloatOutput(value=self.a - self.b)
+        elif self.operation == "Multiply A*B":
+            return FloatOutput(value=self.a * self.b)
+        elif self.operation == "Divide A/B":
+            return FloatOutput(value=self.a / self.b)
+        elif self.operation == "Exponentiate A^B":
+            return FloatOutput(value=self.a ** self.b)
+        elif self.operation == "Square Root of A":
+            return FloatOutput(value=np.sqrt(self.a))
+        elif self.operation == "Absolute Value of A":
+            return FloatOutput(value=abs(self.a))
+        elif self.operation == "Minimum(A,B)":
+            return FloatOutput(value=min(self.a, self.b))
+        else: #self.operation == "Maximum(A,B)":
+            return FloatOutput(value=max(self.a, self.b))
