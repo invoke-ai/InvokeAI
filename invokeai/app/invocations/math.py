@@ -65,7 +65,7 @@ class RandomIntInvocation(BaseInvocation):
 
 
 @invocation("float_to_int", title="Float To Integer", tags=["math", "round", "integer", "float", "convert"], category="math", version="1.0.0")
-class RoundToMultipleInvocation(BaseInvocation):
+class FloatToIntegerInvocation(BaseInvocation):
     """Rounds a float number to (a multiple of) an integer."""
 
     value: float = InputField(default=0, description="The value to round")
