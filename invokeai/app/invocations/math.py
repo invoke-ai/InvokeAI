@@ -133,13 +133,13 @@ class IntegerMathInvocation(BaseInvocation):
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
-    @validator("operation")
-    def no_divide_by_zero(cls, v, values):
-        if v == "Divide A/B" and values["b"] == 0:
+    @validator("b")
+    def no_unrepresentable_results(cls, v, values):
+        if values["operation"] == "Divide A/B" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif v == "Modulus A%B" and values["b"] == 0:
+        elif values["operation"] == "Modulus A%B" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif v == "Exponentiate A^B" and values["b"] < 0:
+        elif values["operation"] == "Exponentiate A^B" and v < 0:
             raise ValueError("Result of exponentiation is not an integer")
         return v
 
@@ -203,13 +203,13 @@ class FloatMathInvocation(BaseInvocation):
     a: float = InputField(default=0, description=FieldDescriptions.num_1)
     b: float = InputField(default=0, description=FieldDescriptions.num_2)
 
-    @validator("operation")
-    def no_divide_by_zero(cls, v, values):
-        if v == "Divide A/B" and values["b"] == 0:
+    @validator("b")
+    def no_unrepresentable_results(cls, v, values):
+        if values["operation"] == "Divide A/B" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif v == "Exponentiate A^B" and values["a"] == 0 and values["b"] < 0:
+        elif values["operation"] == "Exponentiate A^B" and values["a"] == 0 and v < 0:
             raise ValueError("Cannot raise zero to a negative power")
-        elif v == "Exponentiate A^B" and type(values["a"]**values["b"]) == complex:
+        elif values["operation"] == "Exponentiate A^B" and type(values["a"]**v) == complex:
             raise ValueError("Root operation resulted in a complex number")
         return v
 
