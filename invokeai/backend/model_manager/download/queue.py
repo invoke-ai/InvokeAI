@@ -12,7 +12,7 @@ import traceback
 from json import JSONDecodeError
 from pathlib import Path
 from requests import HTTPError
-from typing import Dict, Optional, Set, List, Tuple
+from typing import Dict, Optional, Set, List, Tuple, Union
 
 from pydantic import Field, validator, ValidationError
 from pydantic.networks import AnyHttpUrl
@@ -31,6 +31,9 @@ from .base import (
     ModelSourceMetadata,
 )
 from ..storage import DuplicateModelException
+
+# Maximum number of bytes to download during each call to requests.iter_content()
+DOWNLOAD_CHUNK_SIZE = 100000
 
 # marker that the queue is done and that thread should exit
 STOP_JOB = DownloadJobBase(id=-99, priority=-99, source="dummy", destination="/")
@@ -61,6 +64,12 @@ class DownloadJobRepoID(DownloadJobBase):
         return v
 
 
+class DownloadJobPath(DownloadJobBase):
+    """Handle file paths."""
+
+    source: Path = Field(description="Path to a file or directory to install")
+
+
 class DownloadQueue(DownloadQueueBase):
     """Class for queued download of models."""
 
@@ -73,6 +82,10 @@ class DownloadQueue(DownloadQueueBase):
     _next_job_id: int = 0
     _sequence: int = 0  # This is for debugging and used to tag jobs in dequeueing order
     _requests: requests.sessions.Session
+
+    # for debugging
+    _gets: int = 0
+    _dones: int = 0
 
     def __init__(
         self,
@@ -99,9 +112,13 @@ class DownloadQueue(DownloadQueueBase):
 
         self._start_workers(max_parallel_dl)
 
+        # debugging - get rid of this
+        self._gets = 0
+        self._dones = 0
+
     def create_download_job(
         self,
-        source: str,
+        source: Union[str, Path, AnyHttpUrl],
         destdir: Path,
         filename: Optional[Path] = None,
         start: bool = True,
@@ -110,12 +127,18 @@ class DownloadQueue(DownloadQueueBase):
         event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> DownloadJobBase:
         """Create a download job and return its ID."""
-        if re.match(r"^[\w-]+/[\w-]+$", source):
+        kwargs = dict()
+
+        if Path(source).exists():
+            cls = DownloadJobPath
+        elif re.match(r"^[\w-]+/[\w-]+$", str(source)):
             cls = DownloadJobRepoID
             kwargs = dict(variant=variant)
-        else:
+        elif re.match(r"^https?://", str(source)):
             cls = DownloadJobURL
-            kwargs = dict()
+        else:
+            raise NotImplementedError(f"Don't know what to do with this type of source: {source}")
+
         try:
             self._lock.acquire()
             id = self._next_job_id
@@ -160,7 +183,7 @@ class DownloadQueue(DownloadQueueBase):
         finally:
             self._lock.release()
 
-    def cancel_job(self, job: DownloadJobBase):
+    def cancel_job(self, job: DownloadJobBase, preserve_partial: bool = False):
         """
         Cancel the indicated job.
 
@@ -170,7 +193,10 @@ class DownloadQueue(DownloadQueueBase):
         try:
             self._lock.acquire()
             assert isinstance(self._jobs[job.id], DownloadJobBase)
+            job.preserve_partial_downloads = preserve_partial
             self._update_job_status(job, DownloadJobStatus.CANCELLED)
+            if job.subqueue:
+                job.subqueue.cancel_all_jobs(preserve_partial=preserve_partial)
         except (AssertionError, KeyError) as excp:
             raise UnknownJobIDException("Unrecognized job") from excp
         finally:
@@ -196,13 +222,16 @@ class DownloadQueue(DownloadQueueBase):
         """
         Pause (dequeue) the indicated job.
 
-        In theory the job can be restarted and the download will pick up
+        The job can be restarted with start_job() and the download will pick up
         from where it left off.
         """
         try:
             self._lock.acquire()
             assert isinstance(self._jobs[job.id], DownloadJobBase)
             self._update_job_status(job, DownloadJobStatus.PAUSED)
+            if job.subqueue:
+                job.subqueue.cancel_all_jobs(preserve_partial=True)
+                job.subqueue.release()
         except (AssertionError, KeyError) as excp:
             raise UnknownJobIDException("Unrecognized job") from excp
         finally:
@@ -213,7 +242,7 @@ class DownloadQueue(DownloadQueueBase):
         try:
             self._lock.acquire()
             for job in self._jobs.values():
-                if job.status in [DownloadJobStatus.IDLE or DownloadJobStatus.PAUSED]:
+                if job.status in [DownloadJobStatus.IDLE, DownloadJobStatus.PAUSED]:
                     self.start_job(job)
         finally:
             self._lock.release()
@@ -222,19 +251,19 @@ class DownloadQueue(DownloadQueueBase):
         """Pause all running jobs."""
         try:
             self._lock.acquire()
-            for id, job in self._jobs.items():
-                if job.stats == DownloadJobStatus.RUNNING:
-                    self.pause_job(id)
+            for job in self._jobs.values():
+                if job.status == DownloadJobStatus.RUNNING:
+                    self.pause_job(job)
         finally:
             self._lock.release()
 
-    def cancel_all_jobs(self):
+    def cancel_all_jobs(self, preserve_partial: bool = False):
         """Cancel all running jobs."""
         try:
             self._lock.acquire()
-            for id, job in self._jobs.items():
+            for job in self._jobs.values():
                 if not self._in_terminal_state(job):
-                    self.cancel_job(id)
+                    self.cancel_job(job, preserve_partial)
         finally:
             self._lock.release()
 
@@ -254,10 +283,12 @@ class DownloadQueue(DownloadQueueBase):
 
     def _download_next_item(self):
         """Worker thread gets next job on priority queue."""
-        while True:
+        done = False
+        while not done:
             job = self._queue.get()
+            self._gets += 1
 
-            try:
+            try:  # this is for debugging priority
                 self._lock.acquire()
                 job.job_sequence = self._sequence
                 self._sequence += 1
@@ -265,13 +296,16 @@ class DownloadQueue(DownloadQueueBase):
                 self._lock.release()
 
             if job == STOP_JOB:  # marker that queue is done
-                break
+                done = True
 
             if job.status == DownloadJobStatus.ENQUEUED:  # Don't do anything for non-enqueued jobs (shouldn't happen)
+                # There should be a better way to dispatch on the job type
                 if isinstance(job, DownloadJobURL):
                     self._download_with_resume(job)
                 elif isinstance(job, DownloadJobRepoID):
                     self._download_repoid(job)
+                elif isinstance(job, DownloadJobPath):
+                    self._download_path(job)
                 else:
                     raise NotImplementedError(f"Don't know what to do with this job: {job}")
 
@@ -280,6 +314,8 @@ class DownloadQueue(DownloadQueueBase):
 
             if self._in_terminal_state(job):
                 del self._jobs[job.id]
+
+            self._dones += 1
             self._queue.task_done()
 
     def _fetch_metadata(self, job: DownloadJobBase) -> Tuple[AnyHttpUrl, ModelSourceMetadata]:
@@ -375,7 +411,7 @@ class DownloadQueue(DownloadQueueBase):
             if resp.status_code == 206 or exist_size > 0:
                 self._logger.warning(f"{dest}: partial file found. Resuming")
             elif resp.status_code != 200:
-                raise HTTPError(f"status code {resp.status_code}: {resp.reason}")
+                raise HTTPError(resp.reason)
             else:
                 self._logger.info(f"{job.source}: Downloading {job.destination}")
 
@@ -384,7 +420,7 @@ class DownloadQueue(DownloadQueueBase):
 
             self._update_job_status(job, DownloadJobStatus.RUNNING)
             with open(dest, open_mode) as file:
-                for data in resp.iter_content(chunk_size=100000):
+                for data in resp.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
                     if job.status != DownloadJobStatus.RUNNING:  # cancelled, paused or errored
                         return
                     job.bytes += file.write(data)
@@ -393,6 +429,8 @@ class DownloadQueue(DownloadQueueBase):
                         self._update_job_status(job)
 
             self._update_job_status(job, DownloadJobStatus.COMPLETED)
+        except KeyboardInterrupt as excp:
+            raise excp
         except DuplicateModelException as excp:
             self._logger.error(f"A model with the same hash as {dest} is already installed.")
             job.error = excp
@@ -426,6 +464,8 @@ class DownloadQueue(DownloadQueueBase):
             for handler in job.event_handlers:
                 try:
                     handler(job)
+                except KeyboardInterrupt as excp:
+                    raise excp
                 except Exception as excp:
                     job.error = excp
                     self._update_job_status(job, DownloadJobStatus.ERROR)
@@ -442,7 +482,7 @@ class DownloadQueue(DownloadQueueBase):
 
             if subjob.status == DownloadJobStatus.ERROR:
                 job.error = subjob.error
-                subqueue.cancel_all_jobs()
+                subjob.subqueue.cancel_all_jobs()
                 self._update_job_status(job, DownloadJobStatus.ERROR)
                 return
 
@@ -452,7 +492,7 @@ class DownloadQueue(DownloadQueueBase):
                 self._update_job_status(job, DownloadJobStatus.RUNNING)
                 return
 
-        subqueue = self.__class__(
+        job.subqueue = self.__class__(
             event_handlers=[subdownload_event],
             requests_session=self._requests,
         )
@@ -460,28 +500,32 @@ class DownloadQueue(DownloadQueueBase):
             repo_id = job.source
             variant = job.variant
             urls_to_download, metadata = self._get_repo_info(repo_id, variant)
-            job.destination = job.destination / Path(repo_id).name
+            if job.destination.stem != Path(repo_id).stem:
+                job.destination = job.destination / Path(repo_id).stem
             job.metadata = metadata
             bytes_downloaded = dict()
+            job.total_bytes = 0
 
             for url, subdir, file, size in urls_to_download:
                 job.total_bytes += size
-                subqueue.create_download_job(
+                job.subqueue.create_download_job(
                     source=url,
                     destdir=job.destination / subdir,
                     filename=file,
                     variant=variant,
                     access_token=job.access_token,
                 )
+        except KeyboardInterrupt as excp:
+            raise excp
         except Exception as excp:
             job.error = excp
             self._update_job_status(job, DownloadJobStatus.ERROR)
             self._logger.error(job.error)
         finally:
-            subqueue.join()
-            if not job.status == DownloadJobStatus.ERROR:
+            job.subqueue.join()
+            if job.status == DownloadJobStatus.RUNNING:
                 self._update_job_status(job, DownloadJobStatus.COMPLETED)
-            subqueue.release()  # get rid of the subqueue
+            job.subqueue.release()  # get rid of the subqueue
 
     def _get_repo_info(
         self,
@@ -543,7 +587,22 @@ class DownloadQueue(DownloadQueueBase):
             result.add(v)
         return result
 
+    def _download_path(self, job: DownloadJobBase):
+        """Call when the source is a Path or pathlike object."""
+        source = Path(job.source).resolve()
+        destination = Path(job.destination).resolve()
+        job.metadata = ModelSourceMetadata()
+        try:
+            if source != destination:
+                shutil.move(source, destination)
+            self._update_job_status(job, DownloadJobStatus.COMPLETED)
+        except OSError as excp:
+            job.error = excp
+            self._update_job_status(job, DownloadJobStatus.ERROR)
+
     def _cleanup_cancelled_job(self, job: DownloadJobBase):
+        if job.preserve_partial_downloads:
+            return
         self._logger.warning("Cleaning up leftover files from cancelled download job {job.destination}")
         dest = Path(job.destination)
         if dest.is_file():

@@ -5,7 +5,8 @@ Model download service.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Union
+from pydantic.networks import AnyHttpUrl
 from .events import EventServiceBase
 from invokeai.backend.model_manager.download import DownloadQueue, DownloadJobBase, DownloadEventHandler
 
@@ -16,7 +17,7 @@ class DownloadQueueServiceBase(ABC):
     @abstractmethod
     def create_download_job(
         self,
-        source: str,
+        source: Union[str, Path, AnyHttpUrl],
         destdir: Path,
         filename: Optional[Path] = None,
         start: bool = True,
@@ -26,7 +27,7 @@ class DownloadQueueServiceBase(ABC):
         """
         Create a download job.
 
-        :param source: Source of the download - URL or repo_id
+        :param source: Source of the download - URL, repo_id or local Path
         :param destdir: Directory to download into.
         :param filename: Optional name of file, if not provided
         will use the content-disposition field to assign the name.
@@ -126,13 +127,13 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def create_download_job(
         self,
-        source: str,
+        source: Union[str, Path, AnyHttpUrl],
         destdir: Path,
         filename: Optional[Path] = None,
         start: bool = True,
         access_token: Optional[str] = None,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
-    ) -> DownloadJobBase:
+    ) -> DownloadJobBase:  # noqa D102
         event_handlers = event_handlers or []
         if self._event_bus:
             event_handlers.append([self._event_bus.emit_model_download_event])
@@ -145,32 +146,32 @@ class DownloadQueueService(DownloadQueueServiceBase):
             event_handlers=event_handlers,
         )
 
-    def list_jobs(self) -> List[DownloadJobBase]:
+    def list_jobs(self) -> List[DownloadJobBase]:  # noqa D102
         return self._queue.list_jobs()
 
-    def id_to_job(self, id: int) -> DownloadJobBase:
+    def id_to_job(self, id: int) -> DownloadJobBase:  # noqa D102
         return self._queue.id_to_job(id)
 
-    def start_all_jobs(self):
+    def start_all_jobs(self):  # noqa D102
         return self._queue.start_all_jobs()
 
-    def pause_all_jobs(self):
+    def pause_all_jobs(self):  # noqa D102
         return self._queue.pause_all_jobs()
 
-    def cancel_all_jobs(self):
+    def cancel_all_jobs(self):  # noqa D102
         return self._queue.cancel_all_jobs()
 
-    def start_job(self, job: DownloadJobBase):
+    def start_job(self, job: DownloadJobBase):  # noqa D102
         return self._queue.start_job(id)
 
-    def pause_job(self, job: DownloadJobBase):
+    def pause_job(self, job: DownloadJobBase):  # noqa D102
         return self._queue.pause_job(id)
 
-    def cancel_job(self, job: DownloadJobBase):
+    def cancel_job(self, job: DownloadJobBase):  # noqa D102
         return self._queue.cancel_job(id)
 
-    def change_priority(self, job: DownloadJobBase, delta: int):
+    def change_priority(self, job: DownloadJobBase, delta: int):  # noqa D102
         return self._queue.change_priority(id, delta)
 
-    def join(self):
+    def join(self):  # noqa D102
         return self._queue.join()

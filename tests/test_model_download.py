@@ -13,9 +13,17 @@ from invokeai.backend.model_manager.download import (
     DownloadJobBase,
     UnknownJobIDException,
 )
+import invokeai.backend.model_manager.download.queue as download_queue
 
+# Allow for at least one chunk to be fetched during the pause/unpause test.
+# Otherwise pause test doesn't work because whole file contents are read
+# before pause is received.
+download_queue.DOWNLOAD_CHUNK_SIZE = 16500
+
+# Prevent pytest deprecation warnings
 TestAdapter.__test__ = False
 
+# Disable some tests that require the internet.
 INTERNET_AVAILABLE = requests.get("http://www.google.com/").status_code == 200
 
 ########################################################################################
@@ -264,7 +272,6 @@ def test_pause_cancel_url():  # this one is tricky because of potential race con
         time.sleep(0.5)  # slow down the thread by blocking it just a bit at every step
 
     queue = DownloadQueue(requests_session=session, event_handlers=[event_handler])
-
     with tempfile.TemporaryDirectory() as tmpdir:
         job1 = queue.create_download_job(source="http://www.civitai.com/models/12345", destdir=tmpdir, start=False)
         job2 = queue.create_download_job(source="http://www.civitai.com/models/9999", destdir=tmpdir, start=False)

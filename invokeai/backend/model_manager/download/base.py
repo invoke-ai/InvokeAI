@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Union
 from pydantic import BaseModel, Field
 from pydantic.networks import AnyHttpUrl
 
@@ -63,6 +63,12 @@ class DownloadJobBase(BaseModel):
     job_sequence: Optional[int] = Field(
         description="Counter that records order in which this job was dequeued (for debugging)"
     )
+    subqueue: Optional["DownloadQueueBase"] = Field(
+        description="a subqueue used for downloading repo_ids", default=None
+    )
+    preserve_partial_downloads: bool = Field(
+        description="if true, then preserve partial downloads when cancelled or errored", default=False
+    )
     error: Optional[Exception] = Field(default=None, description="Exception that caused an error")
 
     def add_event_handler(self, handler: DownloadEventHandler):
@@ -96,7 +102,7 @@ class DownloadQueueBase(ABC):
     @abstractmethod
     def create_download_job(
         self,
-        source: str,
+        source: Union[str, Path, AnyHttpUrl],
         destdir: Path,
         filename: Optional[Path] = None,
         start: bool = True,
@@ -107,7 +113,7 @@ class DownloadQueueBase(ABC):
         """
         Create a download job.
 
-        :param source: Source of the download - URL or repo_id
+        :param source: Source of the download - URL, repo_id or Path
         :param destdir: Directory to download into.
         :param filename: Optional name of file, if not provided
         will use the content-disposition field to assign the name.
@@ -165,8 +171,12 @@ class DownloadQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_all_jobs(self):
-        """Cancel all active and enquedjobs."""
+    def cancel_all_jobs(self, preserve_partial: bool = False):
+        """
+        Cancel all active and enquedjobs.
+
+        :param preserve_partial: Keep partially downloaded files [False].
+        """
         pass
 
     @abstractmethod
@@ -180,8 +190,12 @@ class DownloadQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_job(self, job: DownloadJobBase):
-        """Cancel the job, clearing partial downloads and putting it into ERROR state."""
+    def cancel_job(self, job: DownloadJobBase, preserve_partial: bool = False):
+        """
+        Cancel the job, clearing partial downloads and putting it into CANCELLED state.
+
+        :param preserve_partial: Keep partial downloads [False]
+        """
         pass
 
     @abstractmethod
