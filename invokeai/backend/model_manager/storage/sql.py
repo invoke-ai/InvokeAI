@@ -206,7 +206,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
         except sqlite3.IntegrityError as e:
             self._conn.rollback()
             if "UNIQUE constraint failed" in str(e):
-                raise DuplicateModelException from e
+                raise DuplicateModelException(f"A model with key '{key}' is already installed") from e
             else:
                 raise e
         except sqlite3.Error as e:

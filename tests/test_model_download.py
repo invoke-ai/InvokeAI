@@ -54,8 +54,14 @@ session.mount(
         },
     ),
 )
-# not found
+# not found test
 session.mount("http://www.civitai.com/models/broken", TestAdapter(b"Not found", status=404))
+
+# prevent us from going to civitai to get metadata
+session.mount("https://civitai.com/api/download/models/", TestAdapter(b"Not found", status=404))
+session.mount("https://civitai.com/api/v1/models/", TestAdapter(b"Not found", status=404))
+session.mount("https://civitai.com/api/v1/model-versions/", TestAdapter(b"Not found", status=404))
+
 # specifies a content disposition that may overwrite files in the parent directory
 session.mount(
     "http://www.civitai.com/models/malicious",

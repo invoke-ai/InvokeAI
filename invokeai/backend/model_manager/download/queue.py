@@ -7,7 +7,9 @@ import requests
 import shutil
 import threading
 import time
+import traceback
 
+from json import JSONDecodeError
 from pathlib import Path
 from requests import HTTPError
 from typing import Dict, Optional, Set, List, Tuple
@@ -19,16 +21,25 @@ from queue import PriorityQueue
 from huggingface_hub import HfApi, hf_hub_url
 
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.app.services.config import InvokeAIAppConfig
 from .base import (
     DownloadQueueBase,
     DownloadJobStatus,
     DownloadEventHandler,
     UnknownJobIDException,
     DownloadJobBase,
+    ModelSourceMetadata,
 )
+from ..storage import DuplicateModelException
 
 # marker that the queue is done and that thread should exit
 STOP_JOB = DownloadJobBase(id=-99, priority=-99, source="dummy", destination="/")
+
+# endpoint for civitai get-model API
+CIVITAI_MODEL_DOWNLOAD = "https://civitai.com/api/download/models/"
+CIVITAI_MODEL_PAGE = "https://civitai.com/models/"
+CIVITAI_MODELS_ENDPOINT = "https://civitai.com/api/v1/models/"
+CIVITAI_VERSIONS_ENDPOINT = "https://civitai.com/api/v1/model-versions/"
 
 
 class DownloadJobURL(DownloadJobBase):
@@ -68,6 +79,7 @@ class DownloadQueue(DownloadQueueBase):
         max_parallel_dl: int = 5,
         event_handlers: Optional[List[DownloadEventHandler]] = None,
         requests_session: Optional[requests.sessions.Session] = None,
+        config: Optional[InvokeAIAppConfig] = None,
     ):
         """
         Initialize DownloadQueue.
@@ -81,7 +93,7 @@ class DownloadQueue(DownloadQueueBase):
         self._queue = PriorityQueue()
         self._worker_pool = set()
         self._lock = threading.RLock()
-        self._logger = InvokeAILogger.getLogger()
+        self._logger = InvokeAILogger.getLogger(config=config)
         self._event_handlers = event_handlers
         self._requests = requests_session or requests.Session()
 
@@ -269,43 +281,91 @@ class DownloadQueue(DownloadQueueBase):
             if self._in_terminal_state(job):
                 del self._jobs[job.id]
 
+            if job.status == "error":
+                self._logger.warning(f"{job.source}: Download finished with error: {job.error}")
+            else:
+                self._logger.info(f"{job.source}: Download finished with status {job.status}")
             self._queue.task_done()
+
+    def _fetch_metadata(self, job: DownloadJobBase) -> Tuple[AnyHttpUrl, ModelSourceMetadata]:
+        """
+        Fetch metadata from certain well-known URLs.
+
+        The metadata will be stashed in job.metadata, if found
+        Return the download URL.
+        """
+        metadata = ModelSourceMetadata()
+        url = job.source
+        metadata_url = url
+        try:
+            # a Civitai download URL
+            if match := re.match(CIVITAI_MODEL_DOWNLOAD + r"(\d+)", metadata_url):
+                version = match.group(1)
+                resp = self._requests.get(CIVITAI_VERSIONS_ENDPOINT + version).json()
+                metadata.thumbnail_url = resp["images"][0]["url"]
+                metadata.description = (
+                    f"Trigger terms: {(', ').join(resp['trainedWords'])}"
+                    if resp["trainedWords"]
+                    else resp["description"]
+                )
+                metadata_url = CIVITAI_MODEL_PAGE + str(resp["modelId"])
+
+            # a Civitai model page
+            if match := re.match(CIVITAI_MODEL_PAGE + r"(\d+)", metadata_url):
+                model = match.group(1)
+                resp = self._requests.get(CIVITAI_MODELS_ENDPOINT + str(model)).json()
+
+                # note that we munge the URL here to get the download URL of the first model
+                url = resp["modelVersions"][0]["downloadUrl"]
+
+                metadata.author = resp["creator"]["username"]
+                metadata.tags = resp["tags"]
+                metadata.thumbnail_url = resp["modelVersions"][0]["images"][0]["url"]
+                metadata.license = f"allowCommercialUse={resp['allowCommercialUse']}; allowDerivatives={resp['allowDerivatives']}; allowNoCredit={resp['allowNoCredit']}"
+        except (HTTPError, KeyError, TypeError, JSONDecodeError) as excp:
+            self._logger.warn(excp)
+
+        # update metadata and return the download url
+        return url, metadata
 
     def _download_with_resume(self, job: DownloadJobBase):
         """Do the actual download."""
-        header = {"Authorization": f"Bearer {job.access_token}"} if job.access_token else {}
-        open_mode = "wb"
-        exist_size = 0
-
-        resp = self._requests.get(job.source, headers=header, stream=True)
-        content_length = int(resp.headers.get("content-length", 0))
-        job.total_bytes = content_length
-
-        if job.destination.is_dir():
-            try:
-                file_name = re.search('filename="(.+)"', resp.headers["Content-Disposition"]).group(1)
-                self._validate_filename(
-                    job.destination, file_name
-                )  # will raise a ValueError exception if file_name is suspicious
-            except ValueError:
-                self._logger.warning(
-                    f"Invalid filename '{file_name}' returned by source {job.source}, using last component of URL instead"
-                )
-                file_name = os.path.basename(job.source)
-            except KeyError:
-                file_name = os.path.basename(job.source)
-            job.destination = job.destination / file_name
-            dest = job.destination
-        else:
-            dest = job.destination
-            dest.parent.mkdir(parents=True, exist_ok=True)
-
         try:
+            url, metadata = self._fetch_metadata(job)
+            job.metadata = metadata
+
+            header = {"Authorization": f"Bearer {job.access_token}"} if job.access_token else {}
+            open_mode = "wb"
+            exist_size = 0
+
+            resp = self._requests.get(url, headers=header, stream=True)
+            content_length = int(resp.headers.get("content-length", 0))
+            job.total_bytes = content_length
+
+            if job.destination.is_dir():
+                try:
+                    file_name = re.search('filename="(.+)"', resp.headers["Content-Disposition"]).group(1)
+                    self._validate_filename(
+                        job.destination, file_name
+                    )  # will raise a ValueError exception if file_name is suspicious
+                except ValueError:
+                    self._logger.warning(
+                        f"Invalid filename '{file_name}' returned by source {url}, using last component of URL instead"
+                    )
+                    file_name = os.path.basename(url)
+                except KeyError:
+                    file_name = os.path.basename(url)
+                job.destination = job.destination / file_name
+                dest = job.destination
+            else:
+                dest = job.destination
+                dest.parent.mkdir(parents=True, exist_ok=True)
+
             if dest.exists():
                 job.bytes = dest.stat().st_size
                 header["Range"] = f"bytes={job.bytes}-"
                 open_mode = "ab"
-                resp = self._requests.get(job.source, headers=header, stream=True)  # new request with range
+                resp = self._requests.get(url, headers=header, stream=True)  # new request with range
 
             if exist_size > content_length:
                 self._logger.warning("corrupt existing file found. re-downloading")
@@ -318,11 +378,11 @@ class DownloadQueue(DownloadQueueBase):
                 return
 
             if resp.status_code == 206 or exist_size > 0:
-                self._logger.warning(f"{dest}: partial file found. Resuming...")
+                self._logger.warning(f"{dest}: partial file found. Resuming")
             elif resp.status_code != 200:
                 raise HTTPError(resp.reason)
             else:
-                self._logger.info(f"{dest}: Downloading...")
+                self._logger.info(f"{job.source}: Downloading {job.destination}")
 
             report_delta = job.total_bytes / 100  # report every 1% change
             last_report_bytes = 0
@@ -338,8 +398,13 @@ class DownloadQueue(DownloadQueueBase):
                         self._update_job_status(job)
 
             self._update_job_status(job, DownloadJobStatus.COMPLETED)
+        except DuplicateModelException as excp:
+            self._logger.error(f"A model with the same hash as {dest} is already installed.")
+            job.error = excp
+            self._update_job_status(job, DownloadJobStatus.ERROR)
         except Exception as excp:
-            self._logger.error(f"An error occurred while downloading {dest}: {str(excp)}")
+            self._logger.error(f"An error occurred while downloading/installing {dest}: {str(excp)}")
+            traceback.print_exception(excp)
             job.error = excp
             self._update_job_status(job, DownloadJobStatus.ERROR)
 
@@ -363,8 +428,12 @@ class DownloadQueue(DownloadQueueBase):
         elif new_status in [DownloadJobStatus.COMPLETED, DownloadJobStatus.ERROR]:
             job.job_ended = time.time()
         if job.event_handlers:
-            for handler in job.event_handlers:
-                handler(job)
+            try:
+                for handler in job.event_handlers:
+                    handler(job)
+            except Exception as excp:
+                job.status = DownloadJobStatus.ERROR
+                job.error = excp
 
     def _download_repoid(self, job: DownloadJobBase):
         """Download a job that holds a huggingface repoid."""
@@ -410,8 +479,8 @@ class DownloadQueue(DownloadQueueBase):
                     access_token=job.access_token,
                 )
         except Exception as excp:
-            job.status = DownloadJobStatus.ERROR
             job.error = excp
+            self._update_job_status(job, DownloadJobStatus.ERROR)
             self._logger.error(job.error)
         finally:
             subqueue.join()
@@ -423,7 +492,7 @@ class DownloadQueue(DownloadQueueBase):
         self,
         repo_id: str,
         variant: Optional[str] = None,
-    ) -> Tuple[List[Tuple[AnyHttpUrl, Path, Path]], Dict[str, str]]:
+    ) -> Tuple[List[Tuple[AnyHttpUrl, Path, Path]], ModelSourceMetadata]:
         """Given a repo_id and an optional variant, return list of URLs to download to get the model."""
         model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True)
         sibs = model_info.siblings
@@ -440,7 +509,12 @@ class DownloadQueue(DownloadQueueBase):
             (hf_hub_url(repo_id, filename=x.as_posix()), x.parent or Path("."), x.name, sizes[x.as_posix()])
             for x in self._select_variants(paths, variant)
         ]
-        return (urls, {"cardData": model_info.cardData, "tags": model_info.tags, "author": model_info.author})
+        return (
+            urls,
+            ModelSourceMetadata(
+                license=model_info.cardData.get("license"), tags=model_info.tags, author=model_info.author
+            ),
+        )
 
     def _select_variants(self, paths: List[str], variant: Optional[str] = None) -> Set[Path]:
         """Select the proper variant files from a list of HuggingFace repo_id paths."""

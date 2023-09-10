@@ -57,7 +57,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
 from .search import ModelSearch
 from .storage import ModelConfigStore, ModelConfigStoreYAML, DuplicateModelException
-from .download import DownloadQueueBase, DownloadQueue, DownloadJobBase
+from .download import DownloadQueueBase, DownloadQueue, DownloadJobBase, ModelSourceMetadata
 from .hash import FastModelHash
 from .probe import ModelProbe, ModelProbeInfo, InvalidModelException
 from .config import (
@@ -250,9 +250,9 @@ class ModelInstall(ModelInstallBase):
         download: Optional[DownloadQueueBase] = None,
     ):  # noqa D107 - use base class docstrings
         self._config = config or InvokeAIAppConfig.get_config()
-        self._logger = logger or InvokeAILogger.getLogger()
+        self._logger = logger or InvokeAILogger.getLogger(config=self._config)
         self._store = store or ModelConfigStoreYAML(self._config.model_conf_path)
-        self._download_queue = download or DownloadQueue()
+        self._download_queue = download or DownloadQueue(config=self._config)
         self._async_installs = dict()
         self._tmpdir = None
 
@@ -274,6 +274,14 @@ class ModelInstall(ModelInstallBase):
         if info.model_type == ModelType.Main and info.format == ModelFormat.Checkpoint:
             try:
                 config_file = self._legacy_configs[info.base_type][info.variant_type]
+                if isinstance(config_file, dict):  # need another tier for sd-2.x models
+                    if prediction_type := info.prediction_type:
+                        config_file = config_file[prediction_type]
+                    else:
+                        self._logger.warning(
+                            f"Could not infer prediction type for {model_path.stem}. Guessing 'v_prediction' for a SD-2 768 pixel model"
+                        )
+                        config_file = config_file[SchedulerPredictionType.VPrediction]
             except KeyError as exc:
                 raise InvalidModelException("Configuration file for this checkpoint could not be determined") from exc
             registration_data.update(
@@ -314,20 +322,18 @@ class ModelInstall(ModelInstallBase):
         self._async_installs[source] = None
 
         def complete_installation(job: DownloadJobBase):
-            self._logger.info(f"{job.source}: {job.status} filename={job.destination}({job.bytes}/{job.total_bytes})")
             if job.status == "completed":
-                id = self.install(job.destination)
-                info = self._store.get_model(id)
-                info.description = f"Downloaded model {info.name}"
-                info.source_url = str(job.source)
-                if card_data := job.metadata.get("cardData"):
-                    info.license = card_data.get("license")
-                if author := job.metadata.get("author"):
-                    info.author = author
-                if tags := job.metadata.get("tags"):
-                    info.tags = tags
-                self._store.update_model(id, info)
-                self._async_installs[job.source] = id
+                model_id = self.install(job.destination)
+                info = self._store.get_model(model_id)
+                info.source = str(job.source)
+                metadata: ModelSourceMetadata = job.metadata
+                info.description = metadata.description or f"Downloaded model {info.name}"
+                info.author = metadata.author
+                info.tags = metadata.tags
+                info.license = metadata.license
+                info.thumbnail_url = metadata.thumbnail_url
+                self._store.update_model(model_id, info)
+                self._async_installs[job.source] = model_id
             jobs = queue.list_jobs()
             if len(jobs) <= 1 and job.status in ["completed", "error", "cancelled"]:
                 self._tmpdir = None
@@ -336,9 +342,8 @@ class ModelInstall(ModelInstallBase):
         # will be deleted before the job actually runs.
         # Better to do the cleanup in the callback
         self._tmpdir = self._tmpdir or tempfile.TemporaryDirectory(dir=models_dir)
-        return queue.create_download_job(
-            source=source, destdir=self._tmpdir.name, event_handlers=[complete_installation]
-        )
+        job = queue.create_download_job(source=source, destdir=self._tmpdir.name)
+        job.add_event_handler(complete_installation)
 
     def wait_for_downloads(self) -> Dict[str, str]:  # noqa D102
         self._download_queue.join()

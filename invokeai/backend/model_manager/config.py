@@ -107,8 +107,8 @@ class ModelConfigBase(BaseModel):
     description: Optional[str] = Field(None)
     author: Optional[str] = Field(description="Model author")
     license: Optional[str] = Field(description="License string")
+    source: Optional[str] = Field(description="Model download source (URL or repo_id)")
     thumbnail_url: Optional[str] = Field(description="URL of thumbnail image")
-    source_url: Optional[str] = Field(description="Model download source")
     tags: Optional[List[str]] = Field(description="Descriptive tags")  # Set would be better, but not JSON serializable
 
     class Config:

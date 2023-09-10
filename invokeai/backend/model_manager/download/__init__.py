@@ -6,6 +6,7 @@ from .base import (  # noqa F401
     DownloadEventHandler,
     UnknownJobIDException,
     DownloadJobBase,
+    ModelSourceMetadata,
 )
 
 from .queue import DownloadQueue  # noqa F401

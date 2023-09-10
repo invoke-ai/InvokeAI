@@ -9,6 +9,7 @@ from functools import total_ordering
 from pathlib import Path
 from typing import List, Optional, Callable, Dict, Any
 from pydantic import BaseModel, Field
+from pydantic.networks import AnyHttpUrl
 
 
 class DownloadJobStatus(str, Enum):
@@ -27,6 +28,16 @@ class UnknownJobIDException(Exception):
     """Raised when an invalid Job is referenced."""
 
 
+class ModelSourceMetadata(BaseModel):
+    """Information collected on a downloadable model from its source site."""
+
+    author: Optional[str] = Field(description="Author/creator of the model")
+    description: Optional[str] = Field(description="Description of the model")
+    license: Optional[str] = Field(description="Model license terms")
+    thumbnail_url: Optional[AnyHttpUrl] = Field(description="URL of a thumbnail image for the model")
+    tags: Optional[List[str]] = Field(description="List of descriptive tags")
+
+
 DownloadEventHandler = Callable[["DownloadJobBase"], None]
 
 
@@ -38,20 +49,29 @@ class DownloadJobBase(BaseModel):
     id: int = Field(description="Numeric ID of this job")
     source: str = Field(description="URL or repo_id to download")
     destination: Path = Field(description="Destination of URL on local disk")
+    metadata: Optional[ModelSourceMetadata] = Field(description="Model metadata (source-specific)", default=None)
     access_token: Optional[str] = Field(description="access token needed to access this resource")
     status: DownloadJobStatus = Field(default=DownloadJobStatus.IDLE, description="Status of the download")
     bytes: int = Field(default=0, description="Bytes downloaded so far")
     total_bytes: int = Field(default=0, description="Total bytes to download")
     event_handlers: Optional[List[DownloadEventHandler]] = Field(
-        description="Callables that will be called whenever job status changes"
+        description="Callables that will be called whenever job status changes",
+        default_factory=list,
     )
     job_started: Optional[float] = Field(description="Timestamp for when the download job started")
     job_ended: Optional[float] = Field(description="Timestamp for when the download job ended (completed or errored)")
     job_sequence: Optional[int] = Field(
         description="Counter that records order in which this job was dequeued (for debugging)"
     )
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Model metadata (source-specific)")
     error: Optional[Exception] = Field(default=None, description="Exception that caused an error")
+
+    def add_event_handler(self, handler: DownloadEventHandler):
+        """Add an event handler to the end of the handlers list."""
+        self.event_handlers.append(handler)
+
+    def clear_event_handlers(self):
+        """Clear all event handlers."""
+        self.event_handlers = list()
 
     class Config:
         """Config object for this pydantic class."""

@@ -116,7 +116,10 @@ class ModelConfigStoreYAML(ModelConfigStore):
         try:
             self._lock.acquire()
             if key in self._config:
-                raise DuplicateModelException(f"Duplicate key {key} for model named '{record.name}'")
+                existing_model = self.get_model(key)
+                raise DuplicateModelException(
+                    f"Can't save {record.name} because a model named '{existing_model.name}' is already stored with the same key '{key}'"
+                )
             self._config[key] = dict_fields
             self._commit()
         finally:

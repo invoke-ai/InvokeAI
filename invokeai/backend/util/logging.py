@@ -181,6 +181,7 @@ import urllib.parse
 
 from abc import abstractmethod
 from pathlib import Path
+from typing import Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
 
@@ -352,9 +353,8 @@ class InvokeAILogger(object):
     loggers = dict()
 
     @classmethod
-    def getLogger(
-        cls, name: str = "InvokeAI", config: InvokeAIAppConfig = InvokeAIAppConfig.get_config()
-    ) -> logging.Logger:
+    def getLogger(cls, name: str = "InvokeAI", config: Optional[InvokeAIAppConfig] = None) -> logging.Logger:
+        config = config or InvokeAIAppConfig.get_config()
         if name in cls.loggers:
             logger = cls.loggers[name]
             logger.handlers.clear()
