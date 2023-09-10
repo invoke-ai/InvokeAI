@@ -125,11 +125,11 @@ session.mount(
     TestAdapter(
         model_index_content,
         status=200,
-        headers={"Content-Length": len(model_index_content), "Content-Disposition": f'filename="model_index.json"'},
+        headers={"Content-Length": len(model_index_content), "Content-Disposition": 'filename="model_index.json"'},
     ),
 )
 
-########################################################################################3
+# ================================================================================================================== #
 
 
 def test_basic_queue_download():
