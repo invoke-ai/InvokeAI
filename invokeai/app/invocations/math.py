@@ -11,7 +11,7 @@ from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, Invoc
 
 @invocation("add", title="Add Integers", tags=["math", "add"], category="math", version="1.0.0")
 class AddInvocation(BaseInvocation):
-    """Adds two integer numbers"""
+    """Adds two numbers"""
 
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)

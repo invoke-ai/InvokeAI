@@ -5,8 +5,6 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 | Node <img width=160 align="right"> | Function                                                                              |
 |: ---------------------------------- | :--------------------------------------------------------------------------------------|
 |Add Integers 			| Adds two numbers|
-|Add Floats             | Adds two floating point numbers|
-|Absolute Value         | Returns the positive form of a float|
 |Boolean Primitive Collection 			| A collection of boolean primitive values|
 |Boolean Primitive 			| A boolean primitive value|
 |Canny Processor 			| Canny edge detection for ControlNet|
@@ -22,9 +20,9 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |OpenCV Inpaint 			| Simple inpaint using opencv.|
 |Denoise Latents 			| Denoises noisy latents to decodable images|
 |Divide Integers 			| Divides two numbers|
-|Divide Floats              | Divides two floating point numbers|
 |Dynamic Prompt 			| Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator|
 |Upscale (RealESRGAN) 			| Upscales an image using RealESRGAN.|
+|Float Math             | Perform basic math operations on two floats|
 |Float Primitive Collection 			| A collection of float primitive values|
 |Float Primitive 			| A float primitive value|
 |Float Range 			| Creates a range|
@@ -32,6 +30,7 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |Blur Image 			| Blurs an image|
 |Extract Image Channel 			| Gets a channel from an image.|
 |Image Primitive Collection 			| A collection of image primitive values|
+|Integer Math           | Perform basic math operations on two integers|
 |Convert Image Mode 			| Converts an image to a different mode.|
 |Crop Image 			| Crops an image to a specified box. The box can be outside of the image.|
 |Image Hue Adjustment 			| Adjusts the Hue of an image.|
@@ -70,9 +69,7 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |Mediapipe Face Processor 			| Applies mediapipe face processing to image|
 |Midas (Depth) Processor 			| Applies Midas depth processing to image|
 |MLSD Processor 			| Applies MLSD processing to image|
-|Modulus                    | Returns the remainder after integer division|
 |Multiply Integers 			| Multiplies two numbers|
-|Multiply Floats            | Multiplies two floating point numbers|
 |Noise 			| Generates latent noise.|
 |Normal BAE Processor 			| Applies NormalBae processing to image|
 |ONNX Latents to Image 			| Generates an image from latents.|
@@ -99,8 +96,6 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |String Primitive Collection 			| A collection of string primitive values|
 |String Primitive 			| A string primitive value|
 |Subtract Integers 			| Subtracts two numbers|
-|Subtract Floats            | Subtracts two floating point numbers|
-|Square Root                | Returns the square root of a float|
 |Tile Resample Processor 			| Tile resampler processor|
 |VAE Loader 			| Loads a VAE model, outputting a VaeLoaderOutput|
 |Zoe (Depth) Processor 			| Applies Zoe depth processing to image|
