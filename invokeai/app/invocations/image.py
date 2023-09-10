@@ -110,6 +110,7 @@ class ImagePasteInvocation(BaseInvocation):
     )
     x: int = InputField(default=0, description="The left x coordinate at which to paste the image")
     y: int = InputField(default=0, description="The top y coordinate at which to paste the image")
+    crop: bool = InputField(default=False, description="Crop to base image dimensions")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         base_image = context.services.images.get_pil_image(self.base_image.image_name)
@@ -128,6 +129,10 @@ class ImagePasteInvocation(BaseInvocation):
         new_image = Image.new(mode="RGBA", size=(max_x - min_x, max_y - min_y), color=(0, 0, 0, 0))
         new_image.paste(base_image, (abs(min_x), abs(min_y)))
         new_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
+
+        if self.crop:
+            base_w, base_h = base_image.size
+            new_image = new_image.crop((abs(min_x), abs(min_y), abs(min_x) + base_w, abs(min_y) + base_h))
 
         image_dto = context.services.images.create(
             image=new_image,
