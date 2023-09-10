@@ -45,7 +45,7 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |ImageProcessor 			| Base class for invocations that preprocess images for ControlNet|
 |Resize Image 			| Resizes an image to specific dimensions|
 |Round Float            | Rounds a float to a specified number of decimal places|
-|Round To Multiple      | Converts a float to an integer|
+|Float to Integer       | Converts a float to an integer. Optionally rounds to an even multiple of a input number.|
 |Scale Image 			| Scales an image by a factor|
 |Image to Latents 			| Encodes an image into latents.|
 |Add Invisible Watermark 			| Add an invisible watermark to an image|
