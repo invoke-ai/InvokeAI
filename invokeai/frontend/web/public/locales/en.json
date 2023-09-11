@@ -771,7 +771,7 @@
     "sdxl": {
         "cfgScale": "CFG Scale",
         "concatPromptStyle": "Concatenate Prompt & Style",
-        "denoisingStrength":"Denoising Strength",
+        "denoisingStrength": "Denoising Strength",
         "loading": "Loading...",
         "negAestheticScore": "Negative Aesthetic Score",
         "negStylePrompt": "Negative Style Prompt",
