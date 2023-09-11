@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
-import re
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
@@ -23,10 +23,10 @@ from typing import (
     get_type_hints,
 )
 
-from pydantic import BaseModel, Field, validator
-from pydantic.fields import Undefined, ModelField
-from pydantic.typing import NoArgAnyCallable
 import semver
+from pydantic import BaseModel, Field, validator
+from pydantic.fields import ModelField, Undefined
+from pydantic.typing import NoArgAnyCallable
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
@@ -65,6 +65,7 @@ class FieldDescriptions:
     width = "Width of output (px)"
     height = "Height of output (px)"
     control = "ControlNet(s) to apply"
+    ip_adapter = "IP-Adapter to apply"
     denoised_latents = "Denoised latents tensor"
     latents = "Latents tensor"
     strength = "Strength of denoising (proportional to steps)"

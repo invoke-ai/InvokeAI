@@ -60,6 +60,7 @@ import {
   ImageField,
   LatentsField,
   ConditioningField,
+  IPAdapterInputFieldTemplate,
 } from '../types/types';
 import { ControlField } from 'services/api/types';
 
@@ -648,6 +649,19 @@ const buildControlCollectionInputFieldTemplate = ({
   return template;
 };
 
+const buildIPAdapterInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): IPAdapterInputFieldTemplate => {
+  const template: IPAdapterInputFieldTemplate = {
+    ...baseField,
+    type: 'IPAdapterField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildEnumInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -851,6 +865,7 @@ const TEMPLATE_BUILDER_MAP = {
   integer: buildIntegerInputFieldTemplate,
   IntegerCollection: buildIntegerCollectionInputFieldTemplate,
   IntegerPolymorphic: buildIntegerPolymorphicInputFieldTemplate,
+  IPAdapterField: buildIPAdapterInputFieldTemplate,
   LatentsCollection: buildLatentsCollectionInputFieldTemplate,
   LatentsField: buildLatentsInputFieldTemplate,
   LatentsPolymorphic: buildLatentsPolymorphicInputFieldTemplate,

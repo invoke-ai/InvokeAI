@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import dataclasses
-import inspect
-from dataclasses import dataclass, field
+from contextlib import nullcontext
+from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Union
 
 import einops
@@ -13,8 +12,12 @@ import torchvision.transforms as T
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.controlnet import ControlNetModel
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
-from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
+    StableDiffusionPipeline,
+)
+from diffusers.pipelines.stable_diffusion.safety_checker import (
+    StableDiffusionSafetyChecker,
+)
 from diffusers.schedulers import KarrasDiffusionSchedulers
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
 from diffusers.utils.import_utils import is_xformers_available
@@ -23,10 +26,14 @@ from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus, IPAdapterXL
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    ConditioningData,
+    IPAdapterConditioningInfo,
+)
 
 from ..util import auto_detect_slice_size, normalize_device
-from .diffusion import AttentionMapSaver, BasicConditioningInfo, InvokeAIDiffuserComponent, PostprocessingSettings
+from .diffusion import AttentionMapSaver, InvokeAIDiffuserComponent
 
 
 @dataclass
@@ -96,7 +103,7 @@ class AddsMaskGuidance:
         # Mask anything that has the same shape as prev_sample, return others as-is.
         return output_class(
             {
-                k: (self.apply_mask(v, self._t_for_field(k, t)) if are_like_tensors(prev_sample, v) else v)
+                k: self.apply_mask(v, self._t_for_field(k, t)) if are_like_tensors(prev_sample, v) else v
                 for k, v in step_output.items()
             }
         )
@@ -170,42 +177,6 @@ class IPAdapterData:
     # TODO: change to polymorphic so can do different weights per step (once implemented...)
     # weight: Union[float, List[float]] = Field(default=1.0)
     weight: float = Field(default=1.0)
-
-
-@dataclass
-class ConditioningData:
-    unconditioned_embeddings: BasicConditioningInfo
-    text_embeddings: BasicConditioningInfo
-    guidance_scale: Union[float, List[float]]
-    """
-    Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
-    `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
-    Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
-    images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
-    """
-    extra: Optional[InvokeAIDiffuserComponent.ExtraConditioningInfo] = None
-    scheduler_args: dict[str, Any] = field(default_factory=dict)
-    """
-    Additional arguments to pass to invokeai_diffuser.do_latent_postprocessing().
-    """
-    postprocessing_settings: Optional[PostprocessingSettings] = None
-
-    @property
-    def dtype(self):
-        return self.text_embeddings.dtype
-
-    def add_scheduler_args_if_applicable(self, scheduler, **kwargs):
-        scheduler_args = dict(self.scheduler_args)
-        step_method = inspect.signature(scheduler.step)
-        for name, value in kwargs.items():
-            try:
-                step_method.bind_partial(**{name: value})
-            except TypeError:
-                # FIXME: don't silently discard arguments
-                pass  # debug("%s does not accept argument named %r", scheduler, name)
-            else:
-                scheduler_args[name] = value
-        return dataclasses.replace(self, scheduler_args=scheduler_args)
 
 
 @dataclass
@@ -360,7 +331,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         additional_guidance: List[Callable] = None,
         callback: Callable[[PipelineIntermediateState], None] = None,
         control_data: List[ControlNetData] = None,
-        ip_adapter_data: IPAdapterData = None,
+        ip_adapter_data: Optional[IPAdapterData] = None,
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
         seed: Optional[int] = None,
@@ -432,7 +403,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         *,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
-        ip_adapter_data: List[IPAdapterData] = None,
+        ip_adapter_data: Optional[IPAdapterData] = None,
         callback: Callable[[PipelineIntermediateState], None] = None,
     ):
         self._adjust_memory_efficient_attention(latents)
@@ -445,80 +416,46 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if timesteps.shape[0] == 0:
             return latents, attention_map_saver
 
-        # print("ip_adapter_image: ", type(ip_adapter_image))
-        if ip_adapter_data is not None and len(ip_adapter_data) > 0:
-            ip_adapter_info = ip_adapter_data[0]
-            ip_adapter_image = ip_adapter_info.image
-            # initialize IPAdapter
-            print("   width:", ip_adapter_image.width, " height:", ip_adapter_image.height)
-            # FIXME:
-            #   WARNING!
-            #   IPAdapter constructor modifies UNet model in-place
-            #   Adds additional cross-attention layers to UNet model for image embedding
-            #       need to figure out how to only do this if UNet hasn't already been modified by prior IPAdapter
-            #       and how to undo if ip_adapter_image is removed
-            #   Should reimplement to use existing model management context etc.
-            #
-            if "sdxl" in ip_adapter_info.ip_adapter_model:
-                print("using IPAdapterXL")
-                ip_adapter = IPAdapterXL(
-                    self, ip_adapter_info.image_encoder_model, ip_adapter_info.ip_adapter_model, self.unet.device
-                )
-            elif "plus" in ip_adapter_info.ip_adapter_model:
-                print("using IPAdapterPlus")
+        if ip_adapter_data is not None:
+            # Initialize IPAdapter
+            # TODO(ryand): Refactor to use model management for the IP-Adapter.
+            if "plus" in ip_adapter_data.ip_adapter_model:
                 ip_adapter = IPAdapterPlus(
-                    self,  # IPAdapterPlus first arg is StableDiffusionPipeline
-                    ip_adapter_info.image_encoder_model,
-                    ip_adapter_info.ip_adapter_model,
+                    self.unet,
+                    ip_adapter_data.image_encoder_model,
+                    ip_adapter_data.ip_adapter_model,
                     self.unet.device,
                     num_tokens=16,
                 )
             else:
-                print("using IPAdapter")
                 ip_adapter = IPAdapter(
-                    self,  # IPAdapter first arg is StableDiffusionPipeline
-                    ip_adapter_info.image_encoder_model,
-                    ip_adapter_info.ip_adapter_model,
+                    self.unet,
+                    ip_adapter_data.image_encoder_model,
+                    ip_adapter_data.ip_adapter_model,
                     self.unet.device,
                 )
-            # IP-Adapter ==> add additional cross-attention layers to UNet model here?
-            ip_adapter.set_scale(ip_adapter_info.weight)
-            print("ip_adapter:", ip_adapter)
+            ip_adapter.set_scale(ip_adapter_data.weight)
 
-            # get image embedding from CLIP and ImageProjModel
-            print("getting image embeddings from IP-Adapter...")
-            num_samples = 1  # hardwiring for first pass
-            image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter.get_image_embeds(ip_adapter_image)
-            print("image cond   embeds shape:", image_prompt_embeds.shape)
-            print("image uncond embeds shape:", uncond_image_prompt_embeds.shape)
-            bs_embed, seq_len, _ = image_prompt_embeds.shape
-            image_prompt_embeds = image_prompt_embeds.repeat(1, num_samples, 1)
-            image_prompt_embeds = image_prompt_embeds.view(bs_embed * num_samples, seq_len, -1)
-            uncond_image_prompt_embeds = uncond_image_prompt_embeds.repeat(1, num_samples, 1)
-            uncond_image_prompt_embeds = uncond_image_prompt_embeds.view(bs_embed * num_samples, seq_len, -1)
-            print("image cond   embeds shape:", image_prompt_embeds.shape)
-            print("image uncond embeds shape:", uncond_image_prompt_embeds.shape)
+            # Get image embeddings from CLIP and ImageProjModel.
+            image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter.get_image_embeds(ip_adapter_data.image)
+            conditioning_data.ip_adapter_conditioning = IPAdapterConditioningInfo(
+                image_prompt_embeds, uncond_image_prompt_embeds
+            )
 
-            # IP-Adapter: run IP-Adapter model here?
-            # and add output as additional cross-attention layers
-            text_prompt_embeds = conditioning_data.text_embeddings.embeds
-            uncond_text_prompt_embeds = conditioning_data.unconditioned_embeddings.embeds
-            print("text embeds shape:", text_prompt_embeds.shape)
-            concat_prompt_embeds = torch.cat([text_prompt_embeds, image_prompt_embeds], dim=1)
-            concat_uncond_prompt_embeds = torch.cat([uncond_text_prompt_embeds, uncond_image_prompt_embeds], dim=1)
-            print("concat embeds shape:", concat_prompt_embeds.shape)
-            conditioning_data.text_embeddings.embeds = concat_prompt_embeds
-            conditioning_data.unconditioned_embeddings.embeds = concat_uncond_prompt_embeds
+        if conditioning_data.extra is not None and conditioning_data.extra.wants_cross_attention_control:
+            attn_ctx = self.invokeai_diffuser.custom_attention_context(
+                self.invokeai_diffuser.model,
+                extra_conditioning_info=conditioning_data.extra,
+                step_count=len(self.scheduler.timesteps),
+            )
+        elif ip_adapter_data is not None:
+            # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
+            # As it is now, the IP-Adapter will silently be skipped.
+            attn_ctx = ip_adapter.apply_ip_adapter_attention()
         else:
-            image_prompt_embeds = None
-            uncond_image_prompt_embeds = None
+            attn_ctx = nullcontext()
 
-        extra_conditioning_info = conditioning_data.extra
-        with self.invokeai_diffuser.custom_attention_context(
-            self.invokeai_diffuser.model,
-            extra_conditioning_info=extra_conditioning_info,
-            step_count=len(self.scheduler.timesteps),
-        ):
+        with attn_ctx:
             if callback is not None:
                 callback(
                     PipelineIntermediateState(

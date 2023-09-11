@@ -11,7 +11,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.control_adapter import ControlField
+from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
