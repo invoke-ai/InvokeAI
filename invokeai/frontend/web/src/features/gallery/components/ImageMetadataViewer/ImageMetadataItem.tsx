@@ -1,108 +1,78 @@
 import { ExternalLinkIcon } from '@chakra-ui/icons';
-import {
-  Flex,
-  Link,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-  Text,
-} from '@chakra-ui/react';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { Flex, IconButton, Link, Text, Tooltip } from '@chakra-ui/react';
 import { memo } from 'react';
-import { useGetImageMetadataFromFileQuery } from 'services/api/endpoints/images';
-import { ImageDTO } from 'services/api/types';
-import DataViewer from './DataViewer';
-import ImageMetadataActions from './ImageMetadataActions';
-import { useAppSelector } from '../../../../app/store/storeHooks';
-import { configSelector } from '../../../system/store/configSelectors';
 import { useTranslation } from 'react-i18next';
+import { FaCopy } from 'react-icons/fa';
+import { IoArrowUndoCircleOutline } from 'react-icons/io5';
 
-type ImageMetadataViewerProps = {
-  image: ImageDTO;
+type MetadataItemProps = {
+  isLink?: boolean;
+  label: string;
+  onClick?: () => void;
+  value: number | string | boolean;
+  labelPosition?: string;
+  withCopy?: boolean;
 };
 
-const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
-  // TODO: fix hotkeys
-  // const dispatch = useAppDispatch();
-  // useHotkeys('esc', () => {
-  //   dispatch(setShouldShowImageDetails(false));
-  // });
+/**
+ * Component to display an individual metadata item or parameter.
+ */
+const ImageMetadataItem = ({
+  label,
+  value,
+  onClick,
+  isLink,
+  labelPosition,
+  withCopy = false,
+}: MetadataItemProps) => {
   const { t } = useTranslation();
 
-  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
-
-  const { metadata, workflow } = useGetImageMetadataFromFileQuery(
-    { image, shouldFetchMetadataFromApi },
-    {
-      selectFromResult: (res) => ({
-        metadata: res?.currentData?.metadata,
-        workflow: res?.currentData?.workflow,
-      }),
-    }
-  );
+  if (!value) {
+    return null;
+  }
 
   return (
-    <Flex
-      layerStyle="first"
-      sx={{
-        padding: 4,
-        gap: 1,
-        flexDirection: 'column',
-        width: 'full',
-        height: 'full',
-        borderRadius: 'base',
-        position: 'absolute',
-        overflow: 'hidden',
-      }}
-    >
-      <Flex gap={2}>
-        <Text fontWeight="semibold">File:</Text>
-        <Link href={image.image_url} isExternal maxW="calc(100% - 3rem)">
-          {image.image_name}
-          <ExternalLinkIcon mx="2px" />
-        </Link>
+    <Flex gap={2}>
+      {onClick && (
+        <Tooltip label={`Recall ${label}`}>
+          <IconButton
+            aria-label={t('accessibility.useThisParameter')}
+            icon={<IoArrowUndoCircleOutline />}
+            size="xs"
+            variant="ghost"
+            fontSize={20}
+            onClick={onClick}
+          />
+        </Tooltip>
+      )}
+      {withCopy && (
+        <Tooltip label={`Copy ${label}`}>
+          <IconButton
+            aria-label={`Copy ${label}`}
+            icon={<FaCopy />}
+            size="xs"
+            variant="ghost"
+            fontSize={14}
+            onClick={() => navigator.clipboard.writeText(value.toString())}
+          />
+        </Tooltip>
+      )}
+      <Flex direction={labelPosition ? 'column' : 'row'}>
+        <Text fontWeight="semibold" whiteSpace="pre-wrap" pr={2}>
+          {label}:
+        </Text>
+        {isLink ? (
+          <Link href={value.toString()} isExternal wordBreak="break-all">
+            {value.toString()} <ExternalLinkIcon mx="2px" />
+          </Link>
+        ) : (
+          <Text overflowY="scroll" wordBreak="break-all">
+            {value.toString()}
+          </Text>
+        )}
       </Flex>
-
-      <ImageMetadataActions metadata={metadata} />
-
-      <Tabs
-        variant="line"
-        sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
-      >
-        <TabList>
-          <Tab>{t('metadata.metadata')}</Tab>
-          <Tab>{t('metadata.imageDetails')}</Tab>
-          <Tab>{t('metadata.workflow')}</Tab>
-        </TabList>
-
-        <TabPanels>
-          <TabPanel>
-            {metadata ? (
-              <DataViewer data={metadata} label={t('metadata.metadata')} />
-            ) : (
-              <IAINoContentFallback label={t('metadata.noMetaData')} />
-            )}
-          </TabPanel>
-          <TabPanel>
-            {image ? (
-              <DataViewer data={image} label={t('metadata.imageDetails')} />
-            ) : (
-              <IAINoContentFallback label={t('metadata.noImageDetails')} />
-            )}
-          </TabPanel>
-          <TabPanel>
-            {workflow ? (
-              <DataViewer data={workflow} label={t('metadata.workflow')} />
-            ) : (
-              <IAINoContentFallback label={t('metadata.noWorkFlow')} />
-            )}
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
     </Flex>
   );
 };
 
-export default memo(ImageMetadataViewer);
+export default memo(ImageMetadataItem);

@@ -72,9 +72,9 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
         sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
       >
         <TabList>
-          <Tab>Metadata</Tab>
-          <Tab>Image Details</Tab>
-          <Tab>Workflow</Tab>
+          <Tab>{t('metadata.metadata')}</Tab>
+          <Tab>{t('metadata.imageDetails')}</Tab>
+          <Tab>{t('metadata.workflow')}</Tab>
         </TabList>
 
         <TabPanels>
