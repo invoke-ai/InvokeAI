@@ -26,7 +26,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Type, Union, types
 
 import torch
-from torch import mps
 
 import invokeai.backend.util.logging as logger
 
