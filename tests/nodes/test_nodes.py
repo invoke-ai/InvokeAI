@@ -1,5 +1,7 @@
 from typing import Any, Callable, Union
+
 from pydantic import Field
+
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,

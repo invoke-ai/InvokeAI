@@ -23,13 +23,9 @@ from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from .diffusion import (
-    AttentionMapSaver,
-    InvokeAIDiffuserComponent,
-    PostprocessingSettings,
-    BasicConditioningInfo,
-)
-from ..util import normalize_device, auto_detect_slice_size
+
+from ..util import auto_detect_slice_size, normalize_device
+from .diffusion import AttentionMapSaver, BasicConditioningInfo, InvokeAIDiffuserComponent, PostprocessingSettings
 
 
 @dataclass

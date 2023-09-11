@@ -18,7 +18,7 @@ from argparse import Namespace
 from enum import Enum
 from pathlib import Path
 from shutil import get_terminal_size
-from typing import get_type_hints, get_args, Any
+from typing import Any, get_args, get_type_hints
 from urllib import request
 
 import npyscreen
@@ -46,17 +46,13 @@ from invokeai.frontend.install.model_install import addModelsForm, process_and_e
 
 # TO DO - Move all the frontend code into invokeai.frontend.install
 from invokeai.frontend.install.widgets import (
-    SingleSelectColumnsSimple,
-    MultiSelectColumns,
-    CenteredButtonPress,
-    FileBox,
-    set_min_terminal_size,
-    CyclingForm,
     MIN_COLS,
     MIN_LINES,
     CenteredButtonPress,
     CyclingForm,
     FileBox,
+    MultiSelectColumns,
+    SingleSelectColumnsSimple,
     WindowTooSmallException,
     set_min_terminal_size,
 )
