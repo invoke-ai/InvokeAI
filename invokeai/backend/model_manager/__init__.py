@@ -1,7 +1,7 @@
 """
 Initialization file for invokeai.backend.model_manager.config
 """
-from ..model_management.models.base import read_checkpoint_meta  # noqa F401
+from .models.base import read_checkpoint_meta  # noqa F401
 from .config import (  # noqa F401
     BaseModelType,
     InvalidModelConfigException,
@@ -12,7 +12,9 @@ from .config import (  # noqa F401
     ModelVariantType,
     SchedulerPredictionType,
     SubModelType,
+    SilenceWarnings,
 )
+from .loader import ModelLoader  # noqa F401
 from .install import ModelInstall  # noqa F401
 from .probe import ModelProbe, InvalidModelException  # noqa F401
 from .storage import DuplicateModelException  # noqa F401

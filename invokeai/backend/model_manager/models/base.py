@@ -3,7 +3,6 @@ import os
 import sys
 import typing
 import inspect
-import warnings
 from abc import ABCMeta, abstractmethod
 from contextlib import suppress
 from enum import Enum
@@ -21,84 +20,29 @@ from onnxruntime import (
     SessionOptions,
     get_available_providers,
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
-from diffusers import logging as diffusers_logging
-from transformers import logging as transformers_logging
-
-
-class DuplicateModelException(Exception):
-    pass
-
-
-class InvalidModelException(Exception):
-    pass
-
+from ..config import (  # noqa F401
+    BaseModelType,
+    ModelType,
+    SubModelType,
+    ModelVariantType,
+    ModelFormat,
+    SchedulerPredictionType,
+    ModelConfigBase,
+)
 
 class ModelNotFoundException(Exception):
-    pass
+    """Exception for when a model is not found on the expected path."""
 
-
-class BaseModelType(str, Enum):
-    StableDiffusion1 = "sd-1"
-    StableDiffusion2 = "sd-2"
-    StableDiffusionXL = "sdxl"
-    StableDiffusionXLRefiner = "sdxl-refiner"
-    # Kandinsky2_1 = "kandinsky-2.1"
-
-
-class ModelType(str, Enum):
-    ONNX = "onnx"
-    Main = "main"
-    Vae = "vae"
-    Lora = "lora"
-    ControlNet = "controlnet"  # used by model_probe
-    TextualInversion = "embedding"
-
-
-class SubModelType(str, Enum):
-    UNet = "unet"
-    TextEncoder = "text_encoder"
-    TextEncoder2 = "text_encoder_2"
-    Tokenizer = "tokenizer"
-    Tokenizer2 = "tokenizer_2"
-    Vae = "vae"
-    VaeDecoder = "vae_decoder"
-    VaeEncoder = "vae_encoder"
-    Scheduler = "scheduler"
-    SafetyChecker = "safety_checker"
-    # MoVQ = "movq"
-
-
-class ModelVariantType(str, Enum):
-    Normal = "normal"
-    Inpaint = "inpaint"
-    Depth = "depth"
-
-
-class SchedulerPredictionType(str, Enum):
-    Epsilon = "epsilon"
-    VPrediction = "v_prediction"
-    Sample = "sample"
-
-
-class ModelError(str, Enum):
-    NotFound = "not_found"
-
-
-class ModelConfigBase(BaseModel):
-    path: str  # or Path
-    description: Optional[str] = Field(None)
-    model_format: Optional[str] = Field(None)
-    error: Optional[ModelError] = Field(None)
-
-    class Config:
-        use_enum_values = True
-
+class InvalidModelException(Exception):
+    """Exception for when a model is corrupted in some way; for example missing files."""
 
 class EmptyConfigLoader(ConfigMixin):
+
     @classmethod
     def load_config(cls, *args, **kwargs):
+        """Load empty configuration."""
         cls.config_name = kwargs.pop("config_name")
         return super().load_config(*args, **kwargs)
 
@@ -453,24 +397,7 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
     return checkpoint
 
 
-class SilenceWarnings(object):
-    def __init__(self):
-        self.transformers_verbosity = transformers_logging.get_verbosity()
-        self.diffusers_verbosity = diffusers_logging.get_verbosity()
-
-    def __enter__(self):
-        transformers_logging.set_verbosity_error()
-        diffusers_logging.set_verbosity_error()
-        warnings.simplefilter("ignore")
-
-    def __exit__(self, type, value, traceback):
-        transformers_logging.set_verbosity(self.transformers_verbosity)
-        diffusers_logging.set_verbosity(self.diffusers_verbosity)
-        warnings.simplefilter("default")
-
-
 ONNX_WEIGHTS_NAME = "model.onnx"
-
 
 class IAIOnnxRuntimeModel:
     class _tensor_access:

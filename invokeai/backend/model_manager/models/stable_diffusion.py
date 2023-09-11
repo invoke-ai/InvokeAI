@@ -11,12 +11,11 @@ from .base import (
     ModelType,
     ModelVariantType,
     DiffusersModel,
-    SilenceWarnings,
     read_checkpoint_meta,
     classproperty,
     InvalidModelException,
-    ModelNotFoundException,
 )
+from ..config import SilenceWarnings
 from .sdxl import StableDiffusionXLModel
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig

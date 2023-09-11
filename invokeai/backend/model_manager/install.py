@@ -52,7 +52,8 @@ import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from shutil import rmtree
-from typing import Optional, List, Union, Dict
+from typing import Optional, List, Union, Dict, Set
+from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
@@ -236,6 +237,7 @@ class ModelInstall(ModelInstallBase):
     _store: ModelConfigStore
     _download_queue: DownloadQueueBase
     _async_installs: Dict[str, str]
+    _installed: Set[Path] = Field(default=set)
     _tmpdir: Optional[tempfile.TemporaryDirectory]  # used for downloads
 
     _legacy_configs = {
@@ -273,6 +275,7 @@ class ModelInstall(ModelInstallBase):
         self._store = store or ModelConfigStoreYAML(self._config.model_conf_path)
         self._download_queue = download or DownloadQueue(config=self._config)
         self._async_installs = dict()
+        self._installed = set()
         self._tmpdir = None
 
     @property
@@ -428,7 +431,7 @@ class ModelInstall(ModelInstallBase):
     # the following two methods are callbacks to the ModelSearch object
     def _scan_register(self, model: Path) -> bool:
         try:
-            id = self.register(model)
+            id = self.register_path(model)
             self._logger.info(f"Registered {model} with id {id}")
             self._installed.add(id)
         except DuplicateModelException:
@@ -437,7 +440,7 @@ class ModelInstall(ModelInstallBase):
 
     def _scan_install(self, model: Path) -> bool:
         try:
-            id = self.install(model)
+            id = self.install_path(model)
             self._logger.info(f"Installed {model} with id {id}")
             self._installed.add(id)
         except DuplicateModelException:

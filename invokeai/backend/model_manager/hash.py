@@ -3,7 +3,7 @@
 Fast hashing of diffusers and checkpoint-style models.
 
 Usage:
-from invokeai.backend.model_management.model_hash import FastModelHash
+from invokeai.backend.model_managre.model_hash import FastModelHash
 >>> FastModelHash.hash('/home/models/stable-diffusion-v1.5')
 'a8e693a126ea5b831c96064dc569956f'
 """

@@ -19,6 +19,8 @@ Typical usage:
 Validation errors will raise an InvalidModelConfigException error.
 
 """
+import warnings
+
 from enum import Enum
 from typing import Optional, Literal, List, Union, Type
 from omegaconf.listconfig import ListConfig  # to support the yaml backend
@@ -26,10 +28,12 @@ import pydantic
 from pydantic import BaseModel, Field, Extra
 from pydantic.error_wrappers import ValidationError
 
+# import these so that we can silence them
+from diffusers import logging as diffusers_logging
+from transformers import logging as transformers_logging
 
 class InvalidModelConfigException(Exception):
     """Exception for when config parser doesn't recognized this combination of model type and format."""
-
 
 class BaseModelType(str, Enum):
     """Base model type."""
@@ -94,6 +98,9 @@ class SchedulerPredictionType(str, Enum):
     VPrediction = "v_prediction"
     Sample = "sample"
 
+# TODO: use this
+class ModelError(str, Enum):
+    NotFound = "not_found"
 
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
@@ -114,7 +121,7 @@ class ModelConfigBase(BaseModel):
     class Config:
         """Pydantic configuration hint."""
 
-        use_enum_values = True
+        use_enum_values = False
         extra = Extra.forbid
         validate_assignment = True
 
@@ -267,3 +274,21 @@ class ModelConfigFactory(object):
             ) from exc
         except ValidationError as exc:
             raise InvalidModelConfigException(f"Invalid model configuration passed: {str(exc)}") from exc
+
+# TO DO: Move this somewhere else
+class SilenceWarnings(object):
+    def __init__(self):
+        self.transformers_verbosity = transformers_logging.get_verbosity()
+        self.diffusers_verbosity = diffusers_logging.get_verbosity()
+
+    def __enter__(self):
+        transformers_logging.set_verbosity_error()
+        diffusers_logging.set_verbosity_error()
+        warnings.simplefilter("ignore")
+
+    def __exit__(self, type, value, traceback):
+        transformers_logging.set_verbosity(self.transformers_verbosity)
+        diffusers_logging.set_verbosity(self.diffusers_verbosity)
+        warnings.simplefilter("default")
+
+

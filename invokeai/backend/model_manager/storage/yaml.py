@@ -4,7 +4,7 @@ Implementation of ModelConfigStore using a YAML file.
 
 Typical usage:
 
-  from invokeai.backend.model_management2.storage.yaml import ModelConfigStoreYAML
+  from invokeai.backend.model_manager.storage.yaml import ModelConfigStoreYAML
   store = ModelConfigStoreYAML("./configs/models.yaml")
   config = dict(
         path='/tmp/pokemon.bin',
