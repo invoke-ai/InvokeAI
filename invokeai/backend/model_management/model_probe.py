@@ -1,24 +1,23 @@
 import json
-import torch
-import safetensors.torch
-
 from dataclasses import dataclass
-
-from diffusers import ModelMixin, ConfigMixin
 from pathlib import Path
-from typing import Callable, Literal, Union, Dict, Optional
+from typing import Callable, Dict, Literal, Optional, Union
+
+import safetensors.torch
+import torch
+from diffusers import ConfigMixin, ModelMixin
 from picklescan.scanner import scan_file_path
 
 from .models import (
     BaseModelType,
+    InvalidModelException,
     ModelType,
     ModelVariantType,
     SchedulerPredictionType,
     SilenceWarnings,
-    InvalidModelException,
 )
-from .util import lora_token_vector_length
 from .models.base import read_checkpoint_meta
+from .util import lora_token_vector_length
 
 
 @dataclass
@@ -53,6 +52,7 @@ class ModelProbe(object):
         "StableDiffusionXLInpaintPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
+        "IPAdapterModel": ModelType.IPAdapter,
     }
 
     @classmethod
@@ -367,6 +367,11 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
         raise InvalidModelException("Unable to determine base type for {self.checkpoint_path}")
 
 
+class IPAdapterCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
 ########################################################
 # classes for probing folders
 #######################################################
@@ -486,11 +491,11 @@ class ControlNetFolderProbe(FolderProbeBase):
         base_model = (
             BaseModelType.StableDiffusion1
             if dimension == 768
-            else BaseModelType.StableDiffusion2
-            if dimension == 1024
-            else BaseModelType.StableDiffusionXL
-            if dimension == 2048
-            else None
+            else (
+                BaseModelType.StableDiffusion2
+                if dimension == 1024
+                else BaseModelType.StableDiffusionXL if dimension == 2048 else None
+            )
         )
         if not base_model:
             raise InvalidModelException(f"Unable to determine model base for {self.folder_path}")
@@ -510,15 +515,24 @@ class LoRAFolderProbe(FolderProbeBase):
         return LoRACheckpointProbe(model_file, None).get_base_type()
 
 
+class IPAdapterFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
 ############## register probe classes ######
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Vae, VaeFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Lora, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
+
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Vae, VaeCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Lora, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
+
 ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)
