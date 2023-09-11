@@ -10,7 +10,7 @@ from .base import (  # noqa: F401
     ModelConfigBase,
     ModelVariantType,
     SchedulerPredictionType,
-    InvalidModelException
+    InvalidModelException,
 )
 from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
 from .sdxl import StableDiffusionXLModel

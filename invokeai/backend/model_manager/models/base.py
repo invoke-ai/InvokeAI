@@ -32,14 +32,16 @@ from ..config import (  # noqa F401
     ModelConfigBase,
 )
 
+
 class ModelNotFoundException(Exception):
     """Exception for when a model is not found on the expected path."""
+
 
 class InvalidModelException(Exception):
     """Exception for when a model is corrupted in some way; for example missing files."""
 
-class EmptyConfigLoader(ConfigMixin):
 
+class EmptyConfigLoader(ConfigMixin):
     @classmethod
     def load_config(cls, *args, **kwargs):
         """Load empty configuration."""
@@ -398,6 +400,7 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
 
 
 ONNX_WEIGHTS_NAME = "model.onnx"
+
 
 class IAIOnnxRuntimeModel:
     class _tensor_access:

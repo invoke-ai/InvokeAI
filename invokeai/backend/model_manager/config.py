@@ -32,8 +32,10 @@ from pydantic.error_wrappers import ValidationError
 from diffusers import logging as diffusers_logging
 from transformers import logging as transformers_logging
 
+
 class InvalidModelConfigException(Exception):
     """Exception for when config parser doesn't recognized this combination of model type and format."""
+
 
 class BaseModelType(str, Enum):
     """Base model type."""
@@ -98,9 +100,11 @@ class SchedulerPredictionType(str, Enum):
     VPrediction = "v_prediction"
     Sample = "sample"
 
+
 # TODO: use this
 class ModelError(str, Enum):
     NotFound = "not_found"
+
 
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
@@ -275,6 +279,7 @@ class ModelConfigFactory(object):
         except ValidationError as exc:
             raise InvalidModelConfigException(f"Invalid model configuration passed: {str(exc)}") from exc
 
+
 # TO DO: Move this somewhere else
 class SilenceWarnings(object):
     def __init__(self):
@@ -290,5 +295,3 @@ class SilenceWarnings(object):
         transformers_logging.set_verbosity(self.transformers_verbosity)
         diffusers_logging.set_verbosity(self.diffusers_verbosity)
         warnings.simplefilter("default")
-
-

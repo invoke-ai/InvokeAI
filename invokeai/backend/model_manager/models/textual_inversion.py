@@ -15,6 +15,7 @@ from .base import (
 # TODO: naming
 from ..lora import TextualInversionModel as TextualInversionModelRaw
 
+
 class TextualInversionModel(ModelBase):
     # model_size: int
 

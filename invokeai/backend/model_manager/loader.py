@@ -19,7 +19,7 @@ from .models import InvalidModelException, ModelBase, MODEL_CLASSES
 
 
 @dataclass
-class ModelInfo():
+class ModelInfo:
     """This is a context manager object that is used to intermediate access to a model."""
 
     context: ModelLocker
@@ -44,10 +44,7 @@ class ModelLoaderBase(ABC):
     """Abstract base class for a model loader which works with the ModelConfigStore backend."""
 
     @abstractmethod
-    def get_model(self,
-                  key: str,
-                  submodel_type: Optional[SubModelType] = None
-                  ) -> ModelInfo:
+    def get_model(self, key: str, submodel_type: Optional[SubModelType] = None) -> ModelInfo:
         """
         Return a model given its key.
 
@@ -83,9 +80,10 @@ class ModelLoader(ModelLoaderBase):
     _logger: InvokeAILogger
     _cache_keys: dict
 
-    def __init__(self,
-                 config: InvokeAIAppConfig,
-                 ):
+    def __init__(
+        self,
+        config: InvokeAIAppConfig,
+    ):
         """
         Initialize ModelLoader object.
 
@@ -95,21 +93,20 @@ class ModelLoader(ModelLoaderBase):
             models_file = config.model_conf_path
         else:
             models_file = config.root_path / "configs/models3.yaml"
-        store = ModelConfigStoreYAML(models_file) \
-            if models_file.suffix == '.yaml' \
-            else ModelConfigStoreSQL(models_file) \
-            if models_file.suffix == '.db' \
+        store = (
+            ModelConfigStoreYAML(models_file)
+            if models_file.suffix == ".yaml"
+            else ModelConfigStoreSQL(models_file)
+            if models_file.suffix == ".db"
             else None
+        )
         if not store:
             raise ValueError(f"Invalid model configuration file: {models_file}")
 
         self._app_config = config
         self._store = store
         self._logger = InvokeAILogger.getLogger()
-        self._installer = ModelInstall(store=self._store,
-                                       logger=self._logger,
-                                       config=self._app_config
-                                       )
+        self._installer = ModelInstall(store=self._store, logger=self._logger, config=self._app_config)
         self._cache_keys = dict()
         device = torch.device(choose_torch_device())
         device_name = torch.cuda.get_device_name() if device == torch.device("cuda") else ""
@@ -142,10 +139,7 @@ class ModelLoader(ModelLoaderBase):
         """Return the ModelInstallBase instance used by this class."""
         return self._installer
 
-    def get_model(self,
-                  key: str,
-                  submodel_type: Optional[SubModelType] = None
-                  ) -> ModelInfo:
+    def get_model(self, key: str, submodel_type: Optional[SubModelType] = None) -> ModelInfo:
         """
         Get the ModelInfo corresponding to the model with key "key".
 
@@ -198,10 +192,7 @@ class ModelLoader(ModelLoaderBase):
             _cache=self._cache,
         )
 
-    def _get_implementation(self,
-                            base_model: BaseModelType,
-                            model_type: ModelType
-                            ) -> type[ModelBase]:
+    def _get_implementation(self, base_model: BaseModelType, model_type: ModelType) -> type[ModelBase]:
         """Get the concrete implementation class for a specific model type."""
         model_class = MODEL_CLASSES[base_model][model_type]
         return model_class
