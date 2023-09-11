@@ -76,7 +76,7 @@ export default function InvokeButton(props: InvokeButton) {
         )}
         {asIconButton ? (
           <IAIIconButton
-            aria-label={t('parameters.invoke')}
+            aria-label={t('parameters.invoke.invoke')}
             type="submit"
             icon={<FaPlay />}
             isDisabled={!isReady}
@@ -96,7 +96,7 @@ export default function InvokeButton(props: InvokeButton) {
         ) : (
           <IAIButton
             tooltip={<InvokeButtonTooltipContent />}
-            aria-label={t('parameters.invoke')}
+            aria-label={t('parameters.invoke.invoke')}
             type="submit"
             data-progress={isProcessing}
             isDisabled={!isReady}
@@ -105,7 +105,7 @@ export default function InvokeButton(props: InvokeButton) {
             id="invoke-button"
             leftIcon={isProcessing ? undefined : <FaPlay />}
             isLoading={isProcessing}
-            loadingText={t('parameters.invoke')}
+            loadingText={t('parameters.invoke.invoke')}
             sx={{
               w: 'full',
               flexGrow: 1,
