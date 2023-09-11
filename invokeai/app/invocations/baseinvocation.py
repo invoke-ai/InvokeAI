@@ -26,9 +26,16 @@ from typing import (
 from pydantic import BaseModel, Field, validator
 from pydantic.fields import Undefined, ModelField
 from pydantic.typing import NoArgAnyCallable
+import semver
+
+from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 
 if TYPE_CHECKING:
     from ..services.invocation_services import InvocationServices
+
+
+class InvalidVersionError(ValueError):
+    pass
 
 
 class FieldDescriptions:
@@ -105,24 +112,39 @@ class UIType(str, Enum):
     """
 
     # region Primitives
-    Integer = "integer"
-    Float = "float"
     Boolean = "boolean"
-    String = "string"
-    Array = "array"
-    Image = "ImageField"
-    Latents = "LatentsField"
+    Color = "ColorField"
     Conditioning = "ConditioningField"
     Control = "ControlField"
-    Color = "ColorField"
-    ImageCollection = "ImageCollection"
-    ConditioningCollection = "ConditioningCollection"
-    ColorCollection = "ColorCollection"
-    LatentsCollection = "LatentsCollection"
-    IntegerCollection = "IntegerCollection"
-    FloatCollection = "FloatCollection"
-    StringCollection = "StringCollection"
+    Float = "float"
+    Image = "ImageField"
+    Integer = "integer"
+    Latents = "LatentsField"
+    String = "string"
+    # endregion
+
+    # region Collection Primitives
     BooleanCollection = "BooleanCollection"
+    ColorCollection = "ColorCollection"
+    ConditioningCollection = "ConditioningCollection"
+    ControlCollection = "ControlCollection"
+    FloatCollection = "FloatCollection"
+    ImageCollection = "ImageCollection"
+    IntegerCollection = "IntegerCollection"
+    LatentsCollection = "LatentsCollection"
+    StringCollection = "StringCollection"
+    # endregion
+
+    # region Polymorphic Primitives
+    BooleanPolymorphic = "BooleanPolymorphic"
+    ColorPolymorphic = "ColorPolymorphic"
+    ConditioningPolymorphic = "ConditioningPolymorphic"
+    ControlPolymorphic = "ControlPolymorphic"
+    FloatPolymorphic = "FloatPolymorphic"
+    ImagePolymorphic = "ImagePolymorphic"
+    IntegerPolymorphic = "IntegerPolymorphic"
+    LatentsPolymorphic = "LatentsPolymorphic"
+    StringPolymorphic = "StringPolymorphic"
     # endregion
 
     # region Models
@@ -176,6 +198,7 @@ class _InputField(BaseModel):
     ui_type: Optional[UIType]
     ui_component: Optional[UIComponent]
     ui_order: Optional[int]
+    item_default: Optional[Any]
 
 
 class _OutputField(BaseModel):
@@ -223,6 +246,7 @@ def InputField(
     ui_component: Optional[UIComponent] = None,
     ui_hidden: bool = False,
     ui_order: Optional[int] = None,
+    item_default: Optional[Any] = None,
     **kwargs: Any,
 ) -> Any:
     """
@@ -249,6 +273,11 @@ def InputField(
       For this case, you could provide `UIComponent.Textarea`.
 
     : param bool ui_hidden: [False] Specifies whether or not this field should be hidden in the UI.
+
+    : param int ui_order: [None] Specifies the order in which this field should be rendered in the UI. \
+
+    : param bool item_default: [None] Specifies the default item value, if this is a collection input. \
+      Ignored for non-collection fields..
     """
     return Field(
         *args,
@@ -282,6 +311,7 @@ def InputField(
         ui_component=ui_component,
         ui_hidden=ui_hidden,
         ui_order=ui_order,
+        item_default=item_default,
         **kwargs,
     )
 
@@ -332,6 +362,8 @@ def OutputField(
       `UIType.SDXLMainModelField` to indicate that the field is an SDXL main model field.
 
     : param bool ui_hidden: [False] Specifies whether or not this field should be hidden in the UI. \
+
+    : param int ui_order: [None] Specifies the order in which this field should be rendered in the UI. \
     """
     return Field(
         *args,
@@ -376,6 +408,9 @@ class UIConfigBase(BaseModel):
     tags: Optional[list[str]] = Field(default_factory=None, description="The node's tags")
     title: Optional[str] = Field(default=None, description="The node's display name")
     category: Optional[str] = Field(default=None, description="The node's category")
+    version: Optional[str] = Field(
+        default=None, description='The node\'s version. Should be a valid semver string e.g. "1.0.0" or "3.8.13".'
+    )
 
 
 class InvocationContext:
@@ -437,6 +472,7 @@ class BaseInvocation(ABC, BaseModel):
 
     @classmethod
     def get_all_subclasses(cls):
+        app_config = InvokeAIAppConfig.get_config()
         subclasses = []
         toprocess = [cls]
         while len(toprocess) > 0:
@@ -444,7 +480,23 @@ class BaseInvocation(ABC, BaseModel):
             next_subclasses = next.__subclasses__()
             subclasses.extend(next_subclasses)
             toprocess.extend(next_subclasses)
-        return subclasses
+        allowed_invocations = []
+        for sc in subclasses:
+            is_in_allowlist = (
+                sc.__fields__.get("type").default in app_config.allow_nodes
+                if isinstance(app_config.allow_nodes, list)
+                else True
+            )
+
+            is_in_denylist = (
+                sc.__fields__.get("type").default in app_config.deny_nodes
+                if isinstance(app_config.deny_nodes, list)
+                else False
+            )
+
+            if is_in_allowlist and not is_in_denylist:
+                allowed_invocations.append(sc)
+        return allowed_invocations
 
     @classmethod
     def get_invocations(cls):
@@ -474,6 +526,8 @@ class BaseInvocation(ABC, BaseModel):
                 schema["tags"] = uiconfig.tags
             if uiconfig and hasattr(uiconfig, "category"):
                 schema["category"] = uiconfig.category
+            if uiconfig and hasattr(uiconfig, "version"):
+                schema["version"] = uiconfig.version
             if "required" not in schema or not isinstance(schema["required"], list):
                 schema["required"] = list()
             schema["required"].extend(["type", "id"])
@@ -542,7 +596,11 @@ GenericBaseInvocation = TypeVar("GenericBaseInvocation", bound=BaseInvocation)
 
 
 def invocation(
-    invocation_type: str, title: Optional[str] = None, tags: Optional[list[str]] = None, category: Optional[str] = None
+    invocation_type: str,
+    title: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+    category: Optional[str] = None,
+    version: Optional[str] = None,
 ) -> Callable[[Type[GenericBaseInvocation]], Type[GenericBaseInvocation]]:
     """
     Adds metadata to an invocation.
@@ -569,6 +627,12 @@ def invocation(
             cls.UIConfig.tags = tags
         if category is not None:
             cls.UIConfig.category = category
+        if version is not None:
+            try:
+                semver.Version.parse(version)
+            except ValueError as e:
+                raise InvalidVersionError(f'Invalid version string for node "{invocation_type}": "{version}"') from e
+            cls.UIConfig.version = version
 
         # Add the invocation type to the pydantic model of the invocation
         invocation_type_annotation = Literal[invocation_type]  # type: ignore
@@ -580,8 +644,9 @@ def invocation(
             config=cls.__config__,
         )
         cls.__fields__.update({"type": invocation_type_field})
-        cls.__annotations__.update({"type": invocation_type_annotation})
-
+        # to support 3.9, 3.10 and 3.11, as described in https://docs.python.org/3/howto/annotations.html
+        if annotations := cls.__dict__.get("__annotations__", None):
+            annotations.update({"type": invocation_type_annotation})
         return cls
 
     return wrapper
@@ -615,7 +680,10 @@ def invocation_output(
             config=cls.__config__,
         )
         cls.__fields__.update({"type": output_type_field})
-        cls.__annotations__.update({"type": output_type_annotation})
+
+        # to support 3.9, 3.10 and 3.11, as described in https://docs.python.org/3/howto/annotations.html
+        if annotations := cls.__dict__.get("__annotations__", None):
+            annotations.update({"type": output_type_annotation})
 
         return cls
 

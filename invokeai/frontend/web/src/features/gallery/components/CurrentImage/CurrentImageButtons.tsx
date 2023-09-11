@@ -17,20 +17,17 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import { workflowLoaded } from 'features/nodes/store/nodesSlice';
+import { workflowLoadRequested } from 'features/nodes/store/actions';
 import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import {
-  setActiveTab,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -52,7 +49,7 @@ import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuIte
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
-  ({ gallery, system, ui }, activeTabName) => {
+  ({ gallery, system, ui, config }, activeTabName) => {
     const { isProcessing, isConnected, shouldConfirmOnDelete, progressImage } =
       system;
 
@@ -61,6 +58,8 @@ const currentImageButtonsSelector = createSelector(
       shouldHidePreview,
       shouldShowProgressInViewer,
     } = ui;
+
+    const { shouldFetchMetadataFromApi } = config;
 
     const lastSelectedImage = gallery.selection[gallery.selection.length - 1];
 
@@ -75,6 +74,7 @@ const currentImageButtonsSelector = createSelector(
       shouldHidePreview,
       shouldShowProgressInViewer,
       lastSelectedImage,
+      shouldFetchMetadataFromApi,
     };
   },
   {
@@ -95,6 +95,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     shouldShowImageDetails,
     lastSelectedImage,
     shouldShowProgressInViewer,
+    shouldFetchMetadataFromApi,
   } = useAppSelector(currentImageButtonsSelector);
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
@@ -109,8 +110,16 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     lastSelectedImage?.image_name ?? skipToken
   );
 
+  const getMetadataArg = useMemo(() => {
+    if (lastSelectedImage) {
+      return { image: lastSelectedImage, shouldFetchMetadataFromApi };
+    } else {
+      return skipToken;
+    }
+  }, [lastSelectedImage, shouldFetchMetadataFromApi]);
+
   const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    lastSelectedImage ?? skipToken,
+    getMetadataArg,
     {
       selectFromResult: (res) => ({
         isLoading: res.isFetching,
@@ -124,16 +133,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
     if (!workflow) {
       return;
     }
-    dispatch(workflowLoaded(workflow));
-    dispatch(setActiveTab('nodes'));
-    dispatch(
-      addToast(
-        makeToast({
-          title: 'Workflow Loaded',
-          status: 'success',
-        })
-      )
-    );
+    dispatch(workflowLoadRequested(workflow));
   }, [dispatch, workflow]);
 
   const handleClickUseAllParameters = useCallback(() => {

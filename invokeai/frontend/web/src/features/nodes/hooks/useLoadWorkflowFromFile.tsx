@@ -2,13 +2,13 @@ import { ListItem, Text, UnorderedList } from '@chakra-ui/react';
 import { useLogger } from 'app/logging/useLogger';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { parseify } from 'common/util/serialize';
-import { workflowLoaded } from 'features/nodes/store/nodesSlice';
-import { zValidatedWorkflow } from 'features/nodes/types/types';
+import { zWorkflow } from 'features/nodes/types/types';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { ZodError } from 'zod';
 import { fromZodError, fromZodIssue } from 'zod-validation-error';
+import { workflowLoadRequested } from '../store/actions';
 
 export const useLoadWorkflowFromFile = () => {
   const dispatch = useAppDispatch();
@@ -24,7 +24,7 @@ export const useLoadWorkflowFromFile = () => {
 
         try {
           const parsedJSON = JSON.parse(String(rawJSON));
-          const result = zValidatedWorkflow.safeParse(parsedJSON);
+          const result = zWorkflow.safeParse(parsedJSON);
 
           if (!result.success) {
             const { message } = fromZodError(result.error, {
@@ -45,32 +45,8 @@ export const useLoadWorkflowFromFile = () => {
             reader.abort();
             return;
           }
-          dispatch(workflowLoaded(result.data.workflow));
 
-          if (!result.data.warnings.length) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: 'Workflow Loaded',
-                  status: 'success',
-                })
-              )
-            );
-            reader.abort();
-            return;
-          }
-
-          dispatch(
-            addToast(
-              makeToast({
-                title: 'Workflow Loaded with Warnings',
-                status: 'warning',
-              })
-            )
-          );
-          result.data.warnings.forEach(({ message, ...rest }) => {
-            logger.warn(rest, message);
-          });
+          dispatch(workflowLoadRequested(result.data));
 
           reader.abort();
         } catch {

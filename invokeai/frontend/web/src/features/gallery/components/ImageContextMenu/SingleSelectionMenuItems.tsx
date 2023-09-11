@@ -1,18 +1,15 @@
 import { Flex, MenuItem, Spinner } from '@chakra-ui/react';
 import { useAppToaster } from 'app/components/Toaster';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   imagesToChangeSelected,
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
 import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
@@ -36,6 +33,8 @@ import {
 } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import { workflowLoadRequested } from 'features/nodes/store/actions';
+import { configSelector } from '../../../system/store/configSelectors';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -50,9 +49,10 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const toaster = useAppToaster();
 
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
+  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
 
   const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    imageDTO,
+    { image: imageDTO, shouldFetchMetadataFromApi },
     {
       selectFromResult: (res) => ({
         isLoading: res.isFetching,
@@ -102,16 +102,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     if (!workflow) {
       return;
     }
-    dispatch(workflowLoaded(workflow));
-    dispatch(setActiveTab('nodes'));
-    dispatch(
-      addToast(
-        makeToast({
-          title: 'Workflow Loaded',
-          status: 'success',
-        })
-      )
-    );
+    dispatch(workflowLoadRequested(workflow));
   }, [dispatch, workflow]);
 
   const handleSendToImageToImage = useCallback(() => {

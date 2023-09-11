@@ -60,11 +60,23 @@ const isNotInDenylist = (schema: InvocationSchemaObject) =>
   !invocationDenylist.includes(schema.properties.type.default);
 
 export const parseSchema = (
-  openAPI: OpenAPIV3.Document
+  openAPI: OpenAPIV3.Document,
+  nodesAllowlistExtra: string[] | undefined = undefined,
+  nodesDenylistExtra: string[] | undefined = undefined
 ): Record<string, InvocationTemplate> => {
   const filteredSchemas = Object.values(openAPI.components?.schemas ?? {})
     .filter(isInvocationSchemaObject)
-    .filter(isNotInDenylist);
+    .filter(isNotInDenylist)
+    .filter((schema) =>
+      nodesAllowlistExtra
+        ? nodesAllowlistExtra.includes(schema.properties.type.default)
+        : true
+    )
+    .filter((schema) =>
+      nodesDenylistExtra
+        ? !nodesDenylistExtra.includes(schema.properties.type.default)
+        : true
+    );
 
   const invocations = filteredSchemas.reduce<
     Record<string, InvocationTemplate>
@@ -73,6 +85,7 @@ export const parseSchema = (
     const title = schema.title.replace('Invocation', '');
     const tags = schema.tags ?? [];
     const description = schema.description ?? '';
+    const version = schema.version;
 
     const inputs = reduce(
       schema.properties,
@@ -225,11 +238,12 @@ export const parseSchema = (
     const invocation: InvocationTemplate = {
       title,
       type,
+      version,
       tags,
       description,
+      outputType,
       inputs,
       outputs,
-      outputType,
     };
 
     Object.assign(invocationsAccumulator, { [type]: invocation });
