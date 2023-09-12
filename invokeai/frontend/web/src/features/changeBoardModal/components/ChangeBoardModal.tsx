@@ -99,7 +99,7 @@ const ChangeBoardModal = () => {
       <AlertDialogOverlay>
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            Change Board
+            {t('boards.changeBoard')}
           </AlertDialogHeader>
 
           <AlertDialogBody>
@@ -109,7 +109,9 @@ const ChangeBoardModal = () => {
                 {`${imagesToChange.length > 1 ? 's' : ''}`} to board:
               </Text>
               <IAIMantineSearchableSelect
-                placeholder={isFetching ? 'Loading...' : 'Select Board'}
+                placeholder={
+                  isFetching ? t('boards.loading') : t('boards.selectBoard')
+                }
                 disabled={isFetching}
                 onChange={(v) => setSelectedBoard(v)}
                 value={selectedBoard}
@@ -119,10 +121,10 @@ const ChangeBoardModal = () => {
           </AlertDialogBody>
           <AlertDialogFooter>
             <IAIButton ref={cancelRef} onClick={handleClose}>
-              Cancel
+              {t('boards.cancel')}
             </IAIButton>
             <IAIButton colorScheme="accent" onClick={handleChangeBoard} ml={3}>
-              Move
+              {t('boards.move')}
             </IAIButton>
           </AlertDialogFooter>
         </AlertDialogContent>
