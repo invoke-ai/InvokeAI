@@ -1,29 +1,31 @@
 import inspect
 from enum import Enum
-from pydantic import BaseModel
 from typing import Literal, get_origin
+
+from pydantic import BaseModel
+
 from .base import (  # noqa: F401
     BaseModelType,
-    ModelType,
-    SubModelType,
+    DuplicateModelException,
+    InvalidModelException,
     ModelBase,
     ModelConfigBase,
+    ModelError,
+    ModelNotFoundException,
+    ModelType,
     ModelVariantType,
     SchedulerPredictionType,
-    ModelError,
     SilenceWarnings,
-    ModelNotFoundException,
-    InvalidModelException,
-    DuplicateModelException,
+    SubModelType,
 )
-from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
-from .sdxl import StableDiffusionXLModel
-from .vae import VaeModel
-from .lora import LoRAModel
 from .controlnet import ControlNetModel  # TODO:
-from .textual_inversion import TextualInversionModel
-
+from .ip_adapter import IPAdapterModel
+from .lora import LoRAModel
+from .sdxl import StableDiffusionXLModel
+from .stable_diffusion import StableDiffusion1Model, StableDiffusion2Model
 from .stable_diffusion_onnx import ONNXStableDiffusion1Model, ONNXStableDiffusion2Model
+from .textual_inversion import TextualInversionModel
+from .vae import VaeModel
 
 MODEL_CLASSES = {
     BaseModelType.StableDiffusion1: {
@@ -33,6 +35,7 @@ MODEL_CLASSES = {
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
+        ModelType.IPAdapter: IPAdapterModel,
     },
     BaseModelType.StableDiffusion2: {
         ModelType.ONNX: ONNXStableDiffusion2Model,
@@ -41,6 +44,7 @@ MODEL_CLASSES = {
         ModelType.Lora: LoRAModel,
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
+        ModelType.IPAdapter: IPAdapterModel,
     },
     BaseModelType.StableDiffusionXL: {
         ModelType.Main: StableDiffusionXLModel,
@@ -50,6 +54,7 @@ MODEL_CLASSES = {
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
         ModelType.ONNX: ONNXStableDiffusion2Model,
+        ModelType.IPAdapter: IPAdapterModel,
     },
     BaseModelType.StableDiffusionXLRefiner: {
         ModelType.Main: StableDiffusionXLModel,
@@ -59,6 +64,7 @@ MODEL_CLASSES = {
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
         ModelType.ONNX: ONNXStableDiffusion2Model,
+        ModelType.IPAdapter: IPAdapterModel,
     },
     # BaseModelType.Kandinsky2_1: {
     #    ModelType.Main: Kandinsky2_1Model,
