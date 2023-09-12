@@ -2,6 +2,7 @@
 # Copyright (c) 2022 Lincoln D. Stein (https://github.com/lstein)
 
 import warnings
+
 from invokeai.frontend.install.invokeai_configure import invokeai_configure as configure
 
 if __name__ == "__main__":

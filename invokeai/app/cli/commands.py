@@ -1,16 +1,18 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from abc import ABC, abstractmethod
 import argparse
+from abc import ABC, abstractmethod
 from typing import Any, Callable, Iterable, Literal, Union, get_args, get_origin, get_type_hints
-from pydantic import BaseModel, Field
-import networkx as nx
+
 import matplotlib.pyplot as plt
+import networkx as nx
+from pydantic import BaseModel, Field
 
 import invokeai.backend.util.logging as logger
+
 from ..invocations.baseinvocation import BaseInvocation
 from ..invocations.image import ImageField
-from ..services.graph import GraphExecutionState, LibraryGraph, Edge
+from ..services.graph import Edge, GraphExecutionState, LibraryGraph
 from ..services.invoker import Invoker
 
 

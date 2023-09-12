@@ -1,24 +1,23 @@
 import json
-import torch
-import safetensors.torch
-
 from dataclasses import dataclass
-
-from diffusers import ModelMixin, ConfigMixin
 from pathlib import Path
-from typing import Callable, Literal, Union, Dict, Optional
+from typing import Callable, Dict, Literal, Optional, Union
+
+import safetensors.torch
+import torch
+from diffusers import ConfigMixin, ModelMixin
 from picklescan.scanner import scan_file_path
 
 from .models import (
     BaseModelType,
+    InvalidModelException,
     ModelType,
     ModelVariantType,
     SchedulerPredictionType,
     SilenceWarnings,
-    InvalidModelException,
 )
-from .util import lora_token_vector_length
 from .models.base import read_checkpoint_meta
+from .util import lora_token_vector_length
 
 
 @dataclass

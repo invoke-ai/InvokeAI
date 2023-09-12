@@ -26,12 +26,7 @@ from invokeai.app.services.image_record_storage import (
     OffsetPaginatedResults,
 )
 from invokeai.app.services.item_storage import ItemStorageABC
-from invokeai.app.services.models.image_record import (
-    ImageDTO,
-    ImageRecord,
-    ImageRecordChanges,
-    image_record_to_dto,
-)
+from invokeai.app.services.models.image_record import ImageDTO, ImageRecord, ImageRecordChanges, image_record_to_dto
 from invokeai.app.services.resource_name import NameServiceBase
 from invokeai.app.services.urls import UrlServiceBase
 from invokeai.app.util.metadata import get_metadata_graph_from_raw_session

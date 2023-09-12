@@ -5,16 +5,17 @@ import curses
 import math
 import os
 import platform
-import pyperclip
 import struct
 import subprocess
 import sys
-import npyscreen
 import textwrap
-import npyscreen.wgmultiline as wgmultiline
-from npyscreen import fmPopup
-from shutil import get_terminal_size
 from curses import BUTTON2_CLICKED, BUTTON3_CLICKED
+from shutil import get_terminal_size
+
+import npyscreen
+import npyscreen.wgmultiline as wgmultiline
+import pyperclip
+from npyscreen import fmPopup
 
 # minimum size for UIs
 MIN_COLS = 150

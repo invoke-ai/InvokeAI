@@ -1,6 +1,6 @@
+import uuid
 from abc import ABC, abstractmethod
 from enum import Enum, EnumMeta
-import uuid
 
 
 class ResourceType(str, Enum, metaclass=EnumMeta):
