@@ -16,10 +16,10 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.primitives import ImageField
 
 IP_ADAPTER_MODELS = Literal[
-    "models/core/ip_adapters/sd-1/ip-adapter_sd15.bin",
-    "models/core/ip_adapters/sd-1/ip-adapter-plus_sd15.bin",
-    "models/core/ip_adapters/sd-1/ip-adapter-plus-face_sd15.bin",
-    "models/core/ip_adapters/sdxl/ip-adapter_sdxl.bin",
+    "ip-adapter_sd15",
+    "ip-adapter-plus_sd15",
+    "ip-adapter-plus-face_sd15",
+    "ip-adapter_sdxl",
 ]
 
 IP_ADAPTER_IMAGE_ENCODER_MODELS = Literal[
@@ -52,7 +52,7 @@ class IPAdapterInvocation(BaseInvocation):
     # Inputs
     image: ImageField = InputField(description="The IP-Adapter image prompt.")
     ip_adapter_model: IP_ADAPTER_MODELS = InputField(
-        default="models/core/ip_adapters/sd-1/ip-adapter_sd15.bin",
+        default="ip-adapter_sd15.bin",
         description="The name of the IP-Adapter model.",
         title="IP-Adapter Model",
     )
@@ -65,12 +65,8 @@ class IPAdapterInvocation(BaseInvocation):
         return IPAdapterOutput(
             ip_adapter=IPAdapterField(
                 image=self.image,
-                ip_adapter_model=(
-                    context.services.configuration.get_config().root_dir / self.ip_adapter_model
-                ).as_posix(),
-                image_encoder_model=(
-                    context.services.configuration.get_config().root_dir / self.image_encoder_model
-                ).as_posix(),
+                ip_adapter_model=self.ip_adapter_model,
+                image_encoder_model=self.image_encoder_model,
                 weight=self.weight,
             ),
         )

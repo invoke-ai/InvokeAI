@@ -7,23 +7,33 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional, List, Dict, Callable, Union, Set
+from typing import Callable, Dict, List, Optional, Set, Union
 
 import requests
+import torch
 from diffusers import DiffusionPipeline
 from diffusers import logging as dlogging
-import torch
-from huggingface_hub import hf_hub_url, HfFolder, HfApi
+from huggingface_hub import HfApi, HfFolder, hf_hub_url
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
 import invokeai.configs as configs
-
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_management import ModelManager, ModelType, BaseModelType, ModelVariantType, AddModelResult
-from invokeai.backend.model_management.model_probe import ModelProbe, SchedulerPredictionType, ModelProbeInfo
+from invokeai.backend.model_management import (
+    AddModelResult,
+    BaseModelType,
+    ModelManager,
+    ModelType,
+    ModelVariantType,
+)
+from invokeai.backend.model_management.model_probe import (
+    ModelProbe,
+    ModelProbeInfo,
+    SchedulerPredictionType,
+)
 from invokeai.backend.util import download_with_resume
-from invokeai.backend.util.devices import torch_dtype, choose_torch_device
+from invokeai.backend.util.devices import choose_torch_device, torch_dtype
+
 from ..util.logging import InvokeAILogger
 
 warnings.filterwarnings("ignore")
@@ -308,6 +318,7 @@ class ModelInstall(object):
                 location = self._download_hf_pipeline(repo_id, staging)  # pipeline
             elif "unet/model.onnx" in files:
                 location = self._download_hf_model(repo_id, files, staging)
+            # TODO(ryand): Add special handling for ip_adapter?
             else:
                 for suffix in ["safetensors", "bin"]:
                     if f"pytorch_lora_weights.{suffix}" in files:
@@ -534,14 +545,17 @@ def hf_download_with_resume(
         logger.info(f"{model_name}: Downloading...")
 
     try:
-        with open(model_dest, open_mode) as file, tqdm(
-            desc=model_name,
-            initial=exist_size,
-            total=total + exist_size,
-            unit="iB",
-            unit_scale=True,
-            unit_divisor=1000,
-        ) as bar:
+        with (
+            open(model_dest, open_mode) as file,
+            tqdm(
+                desc=model_name,
+                initial=exist_size,
+                total=total + exist_size,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1000,
+            ) as bar,
+        ):
             for data in resp.iter_content(chunk_size=1024):
                 size = file.write(data)
                 bar.update(size)

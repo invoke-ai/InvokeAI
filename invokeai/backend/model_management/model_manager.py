@@ -1001,8 +1001,8 @@ class ModelManager(object):
                                 new_models_found = True
                             except DuplicateModelException as e:
                                 self.logger.warning(e)
-                            except InvalidModelException:
-                                self.logger.warning(f"Not a valid model: {model_path}")
+                            except InvalidModelException as e:
+                                self.logger.warning(f"Not a valid model: {model_path}. {e}")
                             except NotImplementedError as e:
                                 self.logger.warning(e)
 

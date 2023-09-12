@@ -2,6 +2,7 @@
 #   and modified as needed
 
 from contextlib import contextmanager
+from typing import Optional
 
 import torch
 from diffusers.models import UNet2DConditionModel
@@ -45,36 +46,74 @@ class IPAdapter:
 
     def __init__(
         self,
-        unet: UNet2DConditionModel,
         image_encoder_path: str,
         ip_adapter_ckpt_path: str,
         device: torch.device,
+        dtype: torch.dtype = torch.float16,
         num_tokens: int = 4,
     ):
-        self._unet = unet
-        self._device = device
+        self.device = device
+        self.dtype = dtype
+
         self._image_encoder_path = image_encoder_path
         self._ip_adapter_ckpt_path = ip_adapter_ckpt_path
         self._num_tokens = num_tokens
 
-        self._attn_processors = self._prepare_attention_processors()
-
-        # load image encoder
         self._image_encoder = CLIPVisionModelWithProjection.from_pretrained(self._image_encoder_path).to(
-            self._device, dtype=torch.float16
+            self.device, dtype=self.dtype
         )
         self._clip_image_processor = CLIPImageProcessor()
-        # image proj model
-        self._image_proj_model = self._init_image_proj_model()
 
-        self._load_weights()
+        # Fields to be initialized later in initialize().
+        self._unet = None
+        self._image_proj_model = None
+        self._attn_processors = None
+
+        self._state_dict = torch.load(self._ip_adapter_ckpt_path, map_location="cpu")
+
+    def is_initialized(self):
+        return self._unet is not None and self._image_proj_model is not None and self._attn_processors is not None
+
+    def initialize(self, unet: UNet2DConditionModel):
+        """Finish the model initialization process.
+
+        HACK: This is separate from __init__ for compatibility with the model manager. The full initialization requires
+        access to the UNet model to be patched, which can not easily be passed to __init__ by the model manager.
+
+        Args:
+            unet (UNet2DConditionModel): The UNet whose attention blocks will be patched by this IP-Adapter.
+        """
+        if self.is_initialized():
+            raise Exception("IPAdapter has already been initialized.")
+
+        self._unet = unet
+        self._image_proj_model = self._init_image_proj_model()
+        self._attn_processors = self._prepare_attention_processors()
+
+        # Copy the weights from the _state_dict into the models.
+        self._image_proj_model.load_state_dict(self._state_dict["image_proj"])
+        ip_layers = torch.nn.ModuleList(self._attn_processors.values())
+        ip_layers.load_state_dict(self._state_dict["ip_adapter"])
+
+        self._state_dict = None
+
+    def to(self, device: torch.device, dtype: Optional[torch.dtype] = None):
+        self.device = device
+        if dtype is not None:
+            self.dtype = dtype
+
+        for model in [self._image_encoder, self._image_proj_model, self._attn_processors]:
+            # If this is called before initialize(), then some models will still be None. We just update the non-None
+            # models.
+            if model is not None:
+                model.to(device=self.device, dtype=self.dtype)
 
     def _init_image_proj_model(self):
         image_proj_model = ImageProjModel(
             cross_attention_dim=self._unet.config.cross_attention_dim,
             clip_embeddings_dim=self._image_encoder.config.projection_dim,
             clip_extra_context_tokens=self._num_tokens,
-        ).to(self._device, dtype=torch.float16)
+        ).to(self.device, dtype=self.dtype)
         return image_proj_model
 
     def _prepare_attention_processors(self):
@@ -99,7 +138,7 @@ class IPAdapter:
                     hidden_size=hidden_size,
                     cross_attention_dim=cross_attention_dim,
                     scale=1.0,
-                ).to(self._device, dtype=torch.float16)
+                ).to(self.device, dtype=self.dtype)
         return attn_procs
 
     @contextmanager
@@ -109,30 +148,36 @@ class IPAdapter:
         Yields:
             None
         """
+        if not self.is_initialized():
+            raise Exception("Call IPAdapter.initialize() before calling IPAdapter.apply_ip_adapter_attention().")
+
         orig_attn_processors = self._unet.attn_processors
+        # Make a (moderately-) shallow copy of the self._attn_processors dict, because set_attn_processor(...) actually
+        # pops elements from the passed dict.
+        ip_adapter_attn_processors = {k: v for k, v in self._attn_processors.items()}
         try:
-            self._unet.set_attn_processor(self._attn_processors)
+            self._unet.set_attn_processor(ip_adapter_attn_processors)
             yield None
         finally:
             self._unet.set_attn_processor(orig_attn_processors)
 
-    def _load_weights(self):
-        state_dict = torch.load(self._ip_adapter_ckpt_path, map_location="cpu")
-        self._image_proj_model.load_state_dict(state_dict["image_proj"])
-        ip_layers = torch.nn.ModuleList(self._attn_processors.values())
-        ip_layers.load_state_dict(state_dict["ip_adapter"])
-
     @torch.inference_mode()
     def get_image_embeds(self, pil_image):
+        if not self.is_initialized():
+            raise Exception("Call IPAdapter.initialize() before calling IPAdapter.get_image_embeds().")
+
         if isinstance(pil_image, Image.Image):
             pil_image = [pil_image]
         clip_image = self._clip_image_processor(images=pil_image, return_tensors="pt").pixel_values
-        clip_image_embeds = self._image_encoder(clip_image.to(self._device, dtype=torch.float16)).image_embeds
+        clip_image_embeds = self._image_encoder(clip_image.to(self.device, dtype=self.dtype)).image_embeds
         image_prompt_embeds = self._image_proj_model(clip_image_embeds)
         uncond_image_prompt_embeds = self._image_proj_model(torch.zeros_like(clip_image_embeds))
         return image_prompt_embeds, uncond_image_prompt_embeds
 
     def set_scale(self, scale):
+        if not self.is_initialized():
+            raise Exception("Call IPAdapter.initialize() before calling IPAdapter.set_scale().")
+
         for attn_processor in self._attn_processors.values():
             if isinstance(attn_processor, IPAttnProcessor):
                 attn_processor.scale = scale
@@ -151,15 +196,18 @@ class IPAdapterPlus(IPAdapter):
             embedding_dim=self._image_encoder.config.hidden_size,
             output_dim=self._unet.config.cross_attention_dim,
             ff_mult=4,
-        ).to(self._device, dtype=torch.float16)
+        ).to(self.device, dtype=self.dtype)
         return image_proj_model
 
     @torch.inference_mode()
     def get_image_embeds(self, pil_image):
+        if not self.is_initialized():
+            raise Exception("Call IPAdapter.initialize() before calling IPAdapter.get_image_embeds().")
+
         if isinstance(pil_image, Image.Image):
             pil_image = [pil_image]
         clip_image = self._clip_image_processor(images=pil_image, return_tensors="pt").pixel_values
-        clip_image = clip_image.to(self._device, dtype=torch.float16)
+        clip_image = clip_image.to(self.device, dtype=self.dtype)
         clip_image_embeds = self._image_encoder(clip_image, output_hidden_states=True).hidden_states[-2]
         image_prompt_embeds = self._image_proj_model(clip_image_embeds)
         uncond_clip_image_embeds = self._image_encoder(

@@ -61,7 +61,7 @@ class ModelType(str, Enum):
     Lora = "lora"
     ControlNet = "controlnet"  # used by model_probe
     TextualInversion = "embedding"
-    IPAdapter = "ipadapter"
+    IPAdapter = "ip_adapter"
 
 
 class SubModelType(str, Enum):

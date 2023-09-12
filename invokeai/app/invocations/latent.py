@@ -403,14 +403,23 @@ class DenoiseLatentsInvocation(BaseInvocation):
         self,
         context: InvocationContext,
         ip_adapter: Optional[IPAdapterField],
-    ) -> IPAdapterData:
+        exit_stack: ExitStack,
+    ) -> Optional[IPAdapterData]:
         if ip_adapter is None:
             return None
 
         input_image = context.services.images.get_pil_image(ip_adapter.image.image_name)
+
+        ip_adapter_model = exit_stack.enter_context(
+            context.services.model_manager.get_model(
+                model_name=ip_adapter.ip_adapter_model,
+                model_type=ModelType.IPAdapter,
+                base_model=BaseModelType.StableDiffusion1,  # HACK(ryand): Pass this in properly
+                context=context,
+            )
+        )
         return IPAdapterData(
-            ip_adapter_model=ip_adapter.ip_adapter_model,  # name of model, NOT model object.
-            image_encoder_model=ip_adapter.image_encoder_model,  # name of model, NOT model object.
+            ip_adapter_model=ip_adapter_model,
             image=input_image,
             weight=ip_adapter.weight,
         )
@@ -543,6 +552,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 ip_adapter_data = self.prep_ip_adapter_data(
                     context=context,
                     ip_adapter=self.ip_adapter,
+                    exit_stack=exit_stack,
                 )
 
                 num_inference_steps, timesteps, init_timestep = self.init_scheduler(
