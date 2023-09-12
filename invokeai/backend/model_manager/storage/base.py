@@ -19,7 +19,7 @@ class InvalidModelException(Exception):
 
 
 class UnknownModelException(Exception):
-    """Raised on an attempt to delete a model with a nonexistent key."""
+    """Raised on an attempt to fetch or delete a model with a nonexistent key."""
 
 
 class ModelConfigStore(ABC):
@@ -90,7 +90,7 @@ class ModelConfigStore(ABC):
         pass
 
     @abstractmethod
-    def search_by_type(
+    def search_by_name(
         self,
         model_name: Optional[str] = None,
         base_model: Optional[BaseModelType] = None,
@@ -112,4 +112,4 @@ class ModelConfigStore(ABC):
         """
         Return all the model configs in the database.
         """
-        return self.search_by_type()
+        return self.search_by_name()

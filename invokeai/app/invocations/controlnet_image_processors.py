@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field, validator
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
 
-from ...backend.model_management import BaseModelType
+from ...backend.model_manager import BaseModelType
 from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,

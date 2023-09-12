@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from ...backend.model_management import BaseModelType, ModelType, SubModelType
+from ...backend.model_manager import BaseModelType, ModelType, SubModelType
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,

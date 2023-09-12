@@ -16,7 +16,7 @@ Typical usage:
         tags=['sfw','cartoon']
      )
 
-   # adding - the key becomes the model's "id" field
+   # adding - the key becomes the model's "key" field
    store.add_model('key1', config)
 
    # updating
@@ -30,18 +30,19 @@ Typical usage:
    # fetching config
    new_config = store.get_model('key1')
    print(new_config.name, new_config.base_model)
-   assert new_config.id == 'key1'
+   assert new_config.key == 'key1'
 
   # deleting
   store.del_model('key1')
 
   # searching
   configs = store.search_by_tag({'sfw','oss license'})
-  configs = store.search_by_type(base_model='sd-2', model_type='main')
+  configs = store.search_by_name(base_model='sd-2', model_type='main')
 """
 
 import threading
 import yaml
+from enum import Enum
 from pathlib import Path
 from typing import Union, Set, List, Optional
 from omegaconf import OmegaConf
@@ -110,8 +111,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
 
         Can raise DuplicateModelException and InvalidModelConfig exceptions.
         """
-        record = ModelConfigFactory.make_config(config)  # ensure it is a valid config obect
-        record.id = key  # add the key used to store the object
+        record = ModelConfigFactory.make_config(config, key)  # ensure it is a valid config obect
         dict_fields = record.dict()  # and back to a dict with valid fields
         try:
             self._lock.acquire()
@@ -120,10 +120,17 @@ class ModelConfigStoreYAML(ModelConfigStore):
                 raise DuplicateModelException(
                     f"Can't save {record.name} because a model named '{existing_model.name}' is already stored with the same key '{key}'"
                 )
-            self._config[key] = dict_fields
+            self._config[key] = self._fix_enums(dict_fields)
             self._commit()
         finally:
             self._lock.release()
+
+    def _fix_enums(self, original: dict) -> dict:
+        """In python 3.9, omegaconf stores incorrectly stringified enums"""
+        fixed_dict = {}
+        for key, value in original.items():
+            fixed_dict[key] = value.value if isinstance(value, Enum) else value
+        return fixed_dict
 
     def del_model(self, key: str) -> None:
         """
@@ -150,13 +157,13 @@ class ModelConfigStoreYAML(ModelConfigStore):
         :param config: Model configuration record. Either a dict with the
          required fields, or a ModelConfigBase instance.
         """
-        record = ModelConfigFactory.make_config(config)  # ensure it is a valid config obect
+        record = ModelConfigFactory.make_config(config, key)  # ensure it is a valid config obect
         dict_fields = record.dict()  # and back to a dict with valid fields
         try:
             self._lock.acquire()
             if key not in self._config:
                 raise UnknownModelException(f"Unknown key '{key}' for model config")
-            self._config[key] = dict_fields
+            self._config[key] = self._fix_enums(dict_fields)
             self._commit()
         finally:
             self._lock.release()
@@ -171,7 +178,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
         """
         try:
             record = self._config[key]
-            return ModelConfigFactory.make_config(record)
+            return ModelConfigFactory.make_config(record, key)
         except KeyError as e:
             raise UnknownModelException(f"Unknown key '{key}' for model config") from e
 
@@ -202,7 +209,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
             self._lock.release()
         return results
 
-    def search_by_type(
+    def search_by_name(
         self,
         model_name: Optional[str] = None,
         base_model: Optional[BaseModelType] = None,
@@ -224,7 +231,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
             for key, record in self._config.items():
                 if key == "__metadata__":
                     continue
-                model = ModelConfigFactory.make_config(record)
+                model = ModelConfigFactory.make_config(record, key)
                 if model_name and model.name != model_name:
                     continue
                 if base_model and model.base_model != base_model:

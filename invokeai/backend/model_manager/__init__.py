@@ -14,8 +14,16 @@ from .config import (  # noqa F401
     SubModelType,
     SilenceWarnings,
 )
-from .loader import ModelLoader  # noqa F401
-from .install import ModelInstall  # noqa F401
+from .lora import ONNXModelPatcher, ModelPatcher
+from .loader import ModelLoader, ModelInfo  # noqa F401
+from .install import ModelInstall, DownloadJobBase  # noqa F401
 from .probe import ModelProbe, InvalidModelException  # noqa F401
-from .storage import DuplicateModelException  # noqa F401
+from .storage import (
+    UnknownModelException,
+    DuplicateModelException,
+    ModelConfigStore,
+    ModelConfigStoreYAML,
+    ModelConfigStoreSQL,
+)  # noqa F401
 from .search import ModelSearch  # noqa F401
+from .merge import MergeInterpolationMethod, ModelMerger

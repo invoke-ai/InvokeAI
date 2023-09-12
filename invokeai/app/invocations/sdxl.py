@@ -1,4 +1,4 @@
-from ...backend.model_management import ModelType, SubModelType
+from ...backend.model_manager import ModelType, SubModelType
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,

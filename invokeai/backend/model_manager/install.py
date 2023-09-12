@@ -20,7 +20,7 @@ Typical usage:
   # register config, and install model in `models`
   id: str = installer.install_path('/path/to/model')
 
-  # download some remote models and install them in the background
+1  # download some remote models and install them in the background
   installer.install('stabilityai/stable-diffusion-2-1')
   installer.install('https://civitai.com/api/download/models/154208')
   installer.install('runwayml/stable-diffusion-v1-5')
@@ -58,7 +58,7 @@ from pydantic.networks import AnyHttpUrl
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
 from .search import ModelSearch
-from .storage import ModelConfigStore, ModelConfigStoreYAML, DuplicateModelException
+from .storage import ModelConfigStore, DuplicateModelException, get_config_store
 from .download import DownloadQueueBase, DownloadQueue, DownloadJobBase, ModelSourceMetadata
 from .hash import FastModelHash
 from .probe import ModelProbe, ModelProbeInfo, InvalidModelException
@@ -272,7 +272,7 @@ class ModelInstall(ModelInstallBase):
     ):  # noqa D107 - use base class docstrings
         self._config = config or InvokeAIAppConfig.get_config()
         self._logger = logger or InvokeAILogger.getLogger(config=self._config)
-        self._store = store or ModelConfigStoreYAML(self._config.model_conf_path)
+        self._store = store or get_config_store(self._config.model_conf_path)
         self._download_queue = download or DownloadQueue(config=self._config)
         self._async_installs = dict()
         self._installed = set()
@@ -289,7 +289,7 @@ class ModelInstall(ModelInstallBase):
         return self._register(model_path, info)
 
     def _register(self, model_path: Path, info: ModelProbeInfo) -> str:
-        id: str = FastModelHash.hash(model_path)
+        key: str = FastModelHash.hash(model_path)
         registration_data = dict(
             path=model_path.as_posix(),
             name=model_path.stem,
@@ -309,13 +309,13 @@ class ModelInstall(ModelInstallBase):
                             f"Could not infer prediction type for {model_path.stem}. Guessing 'v_prediction' for a SD-2 768 pixel model"
                         )
                         config_file = config_file[SchedulerPredictionType.VPrediction]
+                registration_data.update(
+                    config=Path(self._config.legacy_conf_dir, config_file).as_posix(),
+                )
             except KeyError as exc:
                 raise InvalidModelException("Configuration file for this checkpoint could not be determined") from exc
-            registration_data.update(
-                config=Path(self._config.legacy_conf_dir, config_file).as_posix(),
-            )
-        self._store.add_model(id, registration_data)
-        return id
+        self._store.add_model(key, registration_data)
+        return key
 
     def install_path(self, model_path: Union[Path, str]) -> str:  # noqa D102
         model_path = Path(model_path)
@@ -334,13 +334,13 @@ class ModelInstall(ModelInstallBase):
             info,
         )
 
-    def unregister(self, id: str):  # noqa D102
-        self._store.del_model(id)
+    def unregister(self, key: str):  # noqa D102
+        self._store.del_model(key)
 
-    def delete(self, id: str):  # noqa D102
-        model = self._store.get_model(id)
+    def delete(self, key: str):  # noqa D102
+        model = self._store.get_model(key)
         rmtree(model.path)
-        self.unregister(id)
+        self.unregister(key)
 
     def install(
         self, source: Union[str, Path, AnyHttpUrl], inplace: bool = True, variant: Optional[str] = None
@@ -381,6 +381,7 @@ class ModelInstall(ModelInstallBase):
                 info.description = f"Imported model {info.name}"
                 self._store.update_model(model_id, info)
                 self._async_installs[job.source] = model_id
+                job.model_key = model_id
             elif job.status == "error":
                 self._logger.warning(f"{job.source}: Model installation error: {job.error}")
             elif job.status == "cancelled":
@@ -421,8 +422,8 @@ class ModelInstall(ModelInstallBase):
         for model in self._store.all_models():
             path = Path(model.path)
             if not path.exists():
-                self._store.del_model(model.id)
-                unregistered.append(model.id)
+                self._store.del_model(model.key)
+                unregistered.append(model.key)
         return unregistered
 
     def hash(self, model_path: Union[Path, str]) -> str:  # noqa D102

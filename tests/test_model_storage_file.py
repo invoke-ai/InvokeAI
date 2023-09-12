@@ -12,6 +12,7 @@ from invokeai.backend.model_manager.storage import (
     UnknownModelException,
 )
 from invokeai.backend.model_manager.config import (
+    ModelType,
     TextualInversionConfig,
     DiffusersConfig,
     VaeDiffusersConfig,
@@ -113,14 +114,15 @@ def test_filter(store: ModelConfigStore):
     config3 = VaeDiffusersConfig(path="/tmp/config3", name="config3", base_model="sd-1", model_type="vae", tags=["sfw"])
     for c in config1, config2, config3:
         store.add_model(sha256(c.name.encode("utf-8")).hexdigest(), c)
-    matches = store.search_by_type(model_type="main")
+    matches = store.search_by_name(model_type="main")
     assert len(matches) == 2
     assert matches[0].name in {"config1", "config2"}
 
-    matches = store.search_by_type(model_type="vae")
+    matches = store.search_by_name(model_type="vae")
     assert len(matches) == 1
     assert matches[0].name == "config3"
-    assert matches[0].id == sha256("config3".encode("utf-8")).hexdigest()
+    assert matches[0].key == sha256("config3".encode("utf-8")).hexdigest()
+    assert isinstance(matches[0].model_type, ModelType)  # This tests that we get proper enums back
 
     matches = store.search_by_tag(["sfw"])
     assert len(matches) == 3

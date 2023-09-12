@@ -12,9 +12,8 @@ from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion impor
     SDXLConditioningInfo,
 )
 
-from ...backend.model_management.models import ModelType
-from ...backend.model_management.lora import ModelPatcher
-from ...backend.model_management.models import ModelNotFoundException
+from ...backend.model_manager import ModelType, UnknownModelException
+from ...backend.model_manager.lora import ModelPatcher
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
 from ...backend.util.devices import torch_dtype
 from .baseinvocation import (
@@ -94,7 +93,7 @@ class CompelInvocation(BaseInvocation):
                         ).context.model,
                     )
                 )
-            except ModelNotFoundException:
+            except UnknownModelException:
                 # print(e)
                 # import traceback
                 # print(traceback.format_exc())
@@ -208,7 +207,7 @@ class SDXLPromptInvocationBase:
                         ).context.model,
                     )
                 )
-            except ModelNotFoundException:
+            except UnknownModelException:
                 # print(e)
                 # import traceback
                 # print(traceback.format_exc())

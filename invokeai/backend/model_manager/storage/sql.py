@@ -16,7 +16,7 @@ Typical usage:
         tags=['sfw','cartoon']
      )
 
-   # adding - the key becomes the model's "id" field
+   # adding - the key becomes the model's "key" field
    store.add_model('key1', config)
 
    # updating
@@ -30,14 +30,14 @@ Typical usage:
    # fetching config
    new_config = store.get_model('key1')
    print(new_config.name, new_config.base_model)
-   assert new_config.id == 'key1'
+   assert new_config.key == 'key1'
 
   # deleting
   store.del_model('key1')
 
   # searching
   configs = store.search_by_tag({'sfw','oss license'})
-  configs = store.search_by_type(base_model='sd-2', model_type='main')
+  configs = store.search_by_name(base_model='sd-2', model_type='main')
 """
 
 import threading
@@ -173,8 +173,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
 
         Can raise DuplicateModelException and InvalidModelConfig exceptions.
         """
-        record = ModelConfigFactory.make_config(config)  # ensure it is a valid config obect.
-        record.id = key  # add the unique storage key to object
+        record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect.
         json_serialized = json.dumps(record.dict())  # and turn it into a json string.
         try:
             self._lock.acquire()
@@ -293,7 +292,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
         :param config: Model configuration record. Either a dict with the
          required fields, or a ModelConfigBase instance.
         """
-        record = ModelConfigFactory.make_config(config)  # ensure it is a valid config obect
+        record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect
         json_serialized = json.dumps(record.dict())  # and turn it into a json string.
         try:
             self._lock.acquire()
@@ -309,7 +308,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
                 """,
                 (record.base_model, record.model_type, record.name, record.path, json_serialized, key),
             )
-            if self._cursor.rowcount < 1:
+            if self._cursor.rowcount == 0:
                 raise UnknownModelException
             if record.tags:
                 self._update_tags(key, record.tags)
@@ -404,7 +403,7 @@ class ModelConfigStoreSQL(ModelConfigStore):
             self._lock.release()
         return results
 
-    def search_by_type(
+    def search_by_name(
         self,
         model_name: Optional[str] = None,
         base_model: Optional[BaseModelType] = None,

@@ -26,7 +26,7 @@ class ModelInfo:
     name: str
     base_model: BaseModelType
     type: ModelType
-    id: str
+    key: str
     location: Union[Path, str]
     precision: torch.dtype
     _cache: Optional[ModelCache] = None
@@ -186,7 +186,7 @@ class ModelLoader(ModelLoaderBase):
             name=model_config.name,
             base_model=model_config.base_model,
             type=submodel_type or model_type,
-            id=model_config.id,
+            key=model_config.key,
             location=model_path,
             precision=self._cache.precision,
             _cache=self._cache,

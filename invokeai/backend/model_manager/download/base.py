@@ -49,6 +49,9 @@ class DownloadJobBase(BaseModel):
     id: int = Field(description="Numeric ID of this job")
     source: str = Field(description="URL or repo_id to download")
     destination: Path = Field(description="Destination of URL on local disk")
+    model_key: Optional[str] = Field(
+        description="After model installation, this field will hold its primary key", default=None
+    )
     metadata: Optional[ModelSourceMetadata] = Field(description="Model metadata (source-specific)", default=None)
     access_token: Optional[str] = Field(description="access token needed to access this resource")
     status: DownloadJobStatus = Field(default=DownloadJobStatus.IDLE, description="Status of the download")

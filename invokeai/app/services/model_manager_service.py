@@ -9,20 +9,21 @@ from pydantic import Field
 from typing import Literal, Optional, Union, Callable, List, Tuple, TYPE_CHECKING
 from types import ModuleType
 
-from invokeai.backend.model_management import (
-    ModelManager,
+from invokeai.backend.model_manager import (
     BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelInfo,
-    AddModelResult,
-    SchedulerPredictionType,
-    ModelMerger,
+    DownloadJobBase,
     MergeInterpolationMethod,
-    ModelNotFoundException,
+    ModelConfigBase,
+    ModelInfo,
+    ModelLoader,
+    ModelMerger,
+    ModelType,
+    SchedulerPredictionType,
+    SubModelType,
+    UnknownModelException,
 )
-from invokeai.backend.model_management.model_search import FindModels
-from invokeai.backend.model_management.model_cache import CacheStats
+from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.cache import CacheStats
 
 import torch
 from invokeai.app.models.exceptions import CanceledException
@@ -128,7 +129,7 @@ class ModelManagerServiceBase(ABC):
         model_type: ModelType,
         model_attributes: dict,
         clobber: bool = False,
-    ) -> AddModelResult:
+    ) -> InstallJobBase:
         """
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
@@ -145,10 +146,10 @@ class ModelManagerServiceBase(ABC):
         base_model: BaseModelType,
         model_type: ModelType,
         model_attributes: dict,
-    ) -> AddModelResult:
+    ) -> ModelConfigBase:
         """
         Update the named model with a dictionary of attributes. Will fail with a
-        ModelNotFoundException if the name does not already exist.
+        UnknownModelException if the name does not already exist.
 
         On a successful update, the config will be changed in memory. Will fail
         with an assertion error if provided attributes are incorrect or
@@ -196,7 +197,7 @@ class ModelManagerServiceBase(ABC):
         model_name: str,
         base_model: BaseModelType,
         model_type: Literal[ModelType.Main, ModelType.Vae],
-    ) -> AddModelResult:
+    ) -> InstallJobBase:
         """
         Convert a checkpoint file into a diffusers folder, deleting the cached
         version and deleting the original checkpoint file if it is in the models
@@ -216,7 +217,7 @@ class ModelManagerServiceBase(ABC):
         self,
         items_to_import: set[str],
         prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
-    ) -> dict[str, AddModelResult]:
+    ) -> InstallJobBase:
         """Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.
         :param items_to_import: Set of strings corresponding to models to be imported.
@@ -249,7 +250,7 @@ class ModelManagerServiceBase(ABC):
         interp: Optional[MergeInterpolationMethod] = None,
         force: Optional[bool] = False,
         merge_dest_directory: Optional[Path] = None,
-    ) -> AddModelResult:
+    ) -> ModelConfigBase:
         """
         Merge two to three diffusrs pipeline models and save as a new model.
         :param model_names: List of 2-3 models to merge
@@ -438,7 +439,7 @@ class ModelManagerService(ModelManagerServiceBase):
         model_type: ModelType,
         model_attributes: dict,
         clobber: bool = False,
-    ) -> AddModelResult:
+    ) -> InstallJobBase:
         """
         Update the named model with a dictionary of attributes. Will fail with an
         assertion error if the name already exists. Pass clobber=True to overwrite.
@@ -455,17 +456,17 @@ class ModelManagerService(ModelManagerServiceBase):
         base_model: BaseModelType,
         model_type: ModelType,
         model_attributes: dict,
-    ) -> AddModelResult:
+    ) -> InstallJobBase:
         """
         Update the named model with a dictionary of attributes. Will fail with a
-        ModelNotFoundException exception if the name does not already exist.
+        UnknownModelException exception if the name does not already exist.
         On a successful update, the config will be changed in memory. Will fail
         with an assertion error if provided attributes are incorrect or
         the model name is missing. Call commit() to write changes to disk.
         """
         self.logger.debug(f"update model {model_name}")
         if not self.model_exists(model_name, base_model, model_type):
-            raise ModelNotFoundException(f"Unknown model {model_name}")
+            raise UnknownModelException(f"Unknown model {model_name}")
         return self.add_model(model_name, base_model, model_type, model_attributes, clobber=True)
 
     def del_model(
@@ -491,7 +492,7 @@ class ModelManagerService(ModelManagerServiceBase):
         convert_dest_directory: Optional[Path] = Field(
             default=None, description="Optional directory location for merged model"
         ),
-    ) -> AddModelResult:
+    ) -> InstallJobBase:
         """
         Convert a checkpoint file into a diffusers folder, deleting the cached
         version and deleting the original checkpoint file if it is in the models
@@ -560,7 +561,7 @@ class ModelManagerService(ModelManagerServiceBase):
         self,
         items_to_import: set[str],
         prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
-    ) -> dict[str, AddModelResult]:
+    ) -> dict[str, InstallJobBase]:
         """Import a list of paths, repo_ids or URLs. Returns the set of
         successfully imported items.
         :param items_to_import: Set of strings corresponding to models to be imported.
@@ -594,7 +595,7 @@ class ModelManagerService(ModelManagerServiceBase):
         merge_dest_directory: Optional[Path] = Field(
             default=None, description="Optional directory location for merged model"
         ),
-    ) -> AddModelResult:
+    ) -> str:
         """
         Merge two to three diffusrs pipeline models and save as a new model.
         :param model_names: List of 2-3 models to merge

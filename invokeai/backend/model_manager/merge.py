@@ -1,5 +1,5 @@
 """
-invokeai.backend.model_management.model_merge exports:
+invokeai.backend.model_manager.merge exports:
 merge_diffusion_models() -- combine multiple models by location and return a pipeline object
 merge_diffusion_models_and_commit() -- combine multiple models by ModelManager ID and write to models.yaml
 
@@ -15,7 +15,7 @@ from typing import List, Union, Optional
 
 import invokeai.backend.util.logging as logger
 
-from ...backend.model_management import ModelManager, ModelType, BaseModelType, ModelVariantType, AddModelResult
+from . import ModelLoader, ModelType, BaseModelType, ModelVariantType, ModelConfigBase
 
 
 class MergeInterpolationMethod(str, Enum):
@@ -26,7 +26,7 @@ class MergeInterpolationMethod(str, Enum):
 
 
 class ModelMerger(object):
-    def __init__(self, manager: ModelManager):
+    def __init__(self, manager: ModelLoader):
         self.manager = manager
 
     def merge_diffusion_models(
@@ -77,7 +77,7 @@ class ModelMerger(object):
         force: bool = False,
         merge_dest_directory: Optional[Path] = None,
         **kwargs,
-    ) -> AddModelResult:
+    ) -> ModelConfigBase:
         """
         :param models: up to three models, designated by their InvokeAI models.yaml model name
         :param base_model: base model (must be the same for all merged models!)

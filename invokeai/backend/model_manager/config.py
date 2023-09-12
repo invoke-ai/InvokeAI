@@ -114,7 +114,7 @@ class ModelConfigBase(BaseModel):
     base_model: BaseModelType
     model_type: ModelType
     model_format: ModelFormat
-    id: Optional[str] = Field(None)  # this may get added by the store
+    key: Optional[str] = Field(None)  # this will get added by the store
     description: Optional[str] = Field(None)
     author: Optional[str] = Field(description="Model author")
     license: Optional[str] = Field(description="License string")
@@ -244,6 +244,7 @@ class ModelConfigFactory(object):
     def make_config(
         cls,
         model_data: Union[dict, ModelConfigBase],
+        key: Optional[str] = None,
         dest_class: Optional[Type] = None,
     ) -> Union[
         MainCheckpointConfig,
@@ -263,6 +264,8 @@ class ModelConfigFactory(object):
         be selected automatically.
         """
         if isinstance(model_data, ModelConfigBase):
+            if key:
+                model_data.key = key
             return model_data
         try:
             model_format = model_data.get("model_format")
@@ -271,7 +274,10 @@ class ModelConfigFactory(object):
             class_to_return = dest_class or cls._class_map[model_format][model_type]
             if isinstance(class_to_return, dict):  # additional level allowed
                 class_to_return = class_to_return[model_base]
-            return class_to_return.parse_obj(model_data)
+            model = class_to_return.parse_obj(model_data)
+            if key:
+                model.key = key  # ensure consistency
+            return model
         except KeyError as exc:
             raise InvalidModelConfigException(
                 f"Unknown combination of model_format '{model_format}' and model_type '{model_type}'"
