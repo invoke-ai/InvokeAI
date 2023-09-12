@@ -1,4 +1,11 @@
-import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
+import {
+  Box,
+  FormControl,
+  Text,
+  Tooltip,
+  useDisclosure,
+  Heading,
+} from '@chakra-ui/react';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
@@ -20,6 +27,9 @@ import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
+import IAIInformationalPopover from '../../../../../common/components/IAIInformationalPopover';
+import InvokeAILogoImage from 'assets/images/logo.png';
+import { ParamPositiveConditioningPopover } from '../../../../informationalPopovers/components/paramPositiveConditioning';
 
 const promptInputSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -129,17 +139,19 @@ const ParamPositiveConditioning = () => {
           onClose={onClose}
           onSelect={handleSelectEmbedding}
         >
-          <IAITextarea
-            id="prompt"
-            name="prompt"
-            ref={promptRef}
-            value={prompt}
-            placeholder={t('parameters.positivePromptPlaceholder')}
-            onChange={handleChangePrompt}
-            onKeyDown={handleKeyDown}
-            resize="vertical"
-            minH={32}
-          />
+          <ParamPositiveConditioningPopover>
+            <IAITextarea
+              id="prompt"
+              name="prompt"
+              ref={promptRef}
+              value={prompt}
+              placeholder={t('parameters.positivePromptPlaceholder')}
+              onChange={handleChangePrompt}
+              onKeyDown={handleKeyDown}
+              resize="vertical"
+              minH={32}
+            />
+          </ParamPositiveConditioningPopover>
         </ParamEmbeddingPopover>
       </FormControl>
       {!isOpen && isEmbeddingEnabled && (

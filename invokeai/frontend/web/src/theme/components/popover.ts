@@ -29,13 +29,34 @@ const invokeAIContent = defineStyle((props) => {
   };
 });
 
+const informationalContent = defineStyle((props) => {
+  return {
+    [$arrowBg.variable]: mode('colors.base.100', 'colors.base.600')(props),
+    [$popperBg.variable]: mode('colors.base.100', 'colors.base.600')(props),
+    [$arrowShadowColor.variable]: mode(
+      'colors.base.400',
+      'colors.base.400'
+    )(props),
+    p: 0,
+    bg: mode('base.100', 'base.600')(props),
+    border: 'none',
+    shadow: 'dark-lg',
+  };
+});
+
 const invokeAI = definePartsStyle((props) => ({
   content: invokeAIContent(props),
+}));
+
+const informational = definePartsStyle((props) => ({
+  content: informationalContent(props),
+  body: { padding: 0 },
 }));
 
 export const popoverTheme = defineMultiStyleConfig({
   variants: {
     invokeAI,
+    informational,
   },
   defaultProps: {
     variant: 'invokeAI',
