@@ -98,7 +98,7 @@ class ImageCropInvocation(BaseInvocation):
         )
 
 
-@invocation("img_paste", title="Paste Image", tags=["image", "paste"], category="image", version="1.0.0")
+@invocation("img_paste", title="Paste Image", tags=["image", "paste"], category="image", version="1.0.1")
 class ImagePasteInvocation(BaseInvocation):
     """Pastes an image into another image."""
 
