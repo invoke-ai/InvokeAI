@@ -9,11 +9,7 @@ from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
 
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
-from invokeai.app.services.models.image_record import (
-    ImageRecord,
-    ImageRecordChanges,
-    deserialize_image_record,
-)
+from invokeai.app.services.models.image_record import ImageRecord, ImageRecordChanges, deserialize_image_record
 
 T = TypeVar("T", bound=BaseModel)
 

@@ -2,7 +2,7 @@
 
 
 import pathlib
-from typing import Literal, List, Optional, Union
+from typing import List, Literal, Optional, Union
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
@@ -10,13 +10,13 @@ from pydantic import BaseModel, parse_obj_as
 from starlette.exceptions import HTTPException
 
 from invokeai.backend import BaseModelType, ModelType
+from invokeai.backend.model_management import MergeInterpolationMethod
 from invokeai.backend.model_management.models import (
     OPENAPI_MODEL_CONFIGS,
-    SchedulerPredictionType,
-    ModelNotFoundException,
     InvalidModelException,
+    ModelNotFoundException,
+    SchedulerPredictionType,
 )
-from invokeai.backend.model_management import MergeInterpolationMethod
 
 from ..dependencies import ApiDependencies
 

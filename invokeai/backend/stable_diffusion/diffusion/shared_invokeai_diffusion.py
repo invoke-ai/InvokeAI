@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import math
 from contextlib import contextmanager
 from dataclasses import dataclass
-import math
 from typing import Any, Callable, Optional, Union
 
 import torch

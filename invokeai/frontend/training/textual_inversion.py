@@ -21,8 +21,8 @@ from npyscreen import widget
 from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
-
 from invokeai.app.services.config import InvokeAIAppConfig
+
 from ...backend.training import do_textual_inversion_training, parse_args
 
 TRAINING_DATA = "text-inversion-training-data"

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import copy
 from contextlib import contextmanager
-from typing import Optional, Dict, Tuple, Any, Union, List
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -13,7 +13,6 @@ from safetensors.torch import load_file
 from transformers import CLIPTextModel, CLIPTokenizer
 
 from .models.lora import LoRAModel
-
 
 """
 loras = [
@@ -307,8 +306,9 @@ class TextualInversionManager(BaseTextualInversionManager):
 
 
 class ONNXModelPatcher:
-    from .models.base import IAIOnnxRuntimeModel
     from diffusers import OnnxRuntimeModel
+
+    from .models.base import IAIOnnxRuntimeModel
 
     @classmethod
     @contextmanager

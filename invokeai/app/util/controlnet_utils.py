@@ -1,12 +1,12 @@
 from typing import Union
-import torch
-import numpy as np
-import cv2
-from PIL import Image
-from diffusers.utils import PIL_INTERPOLATION
 
-from einops import rearrange
+import cv2
+import numpy as np
+import torch
 from controlnet_aux.util import HWC3
+from diffusers.utils import PIL_INTERPOLATION
+from einops import rearrange
+from PIL import Image
 
 ###################################################################
 # Copy of scripts/lvminthin.py from Mikubill/sd-webui-controlnet
