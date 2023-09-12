@@ -24,6 +24,7 @@ import {
   consoleLogLevelChanged,
   setEnableImageDebugging,
   setShouldConfirmOnDelete,
+  setShouldDisableInformationalPopovers,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
   shouldUseNSFWCheckerChanged,
@@ -67,6 +68,7 @@ const selector = createSelector(
       shouldAntialiasProgressImage,
       shouldUseNSFWChecker,
       shouldUseWatermarker,
+      shouldDisableInformationalPopovers,
     } = system;
 
     const {
@@ -89,6 +91,7 @@ const selector = createSelector(
       shouldUseNSFWChecker,
       shouldUseWatermarker,
       shouldAutoChangeDimensions,
+      shouldDisableInformationalPopovers,
     };
   },
   {
@@ -165,6 +168,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     shouldUseNSFWChecker,
     shouldUseWatermarker,
     shouldAutoChangeDimensions,
+    shouldDisableInformationalPopovers,
   } = useAppSelector(selector);
 
   const handleClickResetWebUI = useCallback(() => {
@@ -323,6 +327,15 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     onChange={handleLanguageChanged}
                   />
                 )}
+                <SettingSwitch
+                  label="Disable informational popovers"
+                  isChecked={shouldDisableInformationalPopovers}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    dispatch(
+                      setShouldDisableInformationalPopovers(e.target.checked)
+                    )
+                  }
+                />
               </StyledFlex>
 
               {shouldShowDeveloperSettings && (

@@ -84,6 +84,7 @@ export interface SystemState {
   isUploading: boolean;
   shouldUseNSFWChecker: boolean;
   shouldUseWatermarker: boolean;
+  shouldDisableInformationalPopovers: boolean;
 }
 
 export const initialSystemState: SystemState = {
@@ -116,6 +117,7 @@ export const initialSystemState: SystemState = {
   isUploading: false,
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
+  shouldDisableInformationalPopovers: false,
 };
 
 export const systemSlice = createSlice({
@@ -193,6 +195,12 @@ export const systemSlice = createSlice({
     },
     shouldUseWatermarkerChanged(state, action: PayloadAction<boolean>) {
       state.shouldUseWatermarker = action.payload;
+    },
+    setShouldDisableInformationalPopovers(
+      state,
+      action: PayloadAction<boolean>
+    ) {
+      state.shouldDisableInformationalPopovers = action.payload;
     },
   },
   extraReducers(builder) {
@@ -432,6 +440,7 @@ export const {
   progressImageSet,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
+  setShouldDisableInformationalPopovers,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
