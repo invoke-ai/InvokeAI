@@ -43,6 +43,7 @@ class FastAPIEventService(EventServiceBase):
                     payload=event.get("payload"),
                     middleware_id=self.event_handler_id,
                 )
+                await asyncio.sleep(0.001)
 
             except Empty:
                 await asyncio.sleep(0.1)
