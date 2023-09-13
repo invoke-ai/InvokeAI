@@ -39,6 +39,7 @@ const FIELD_VALUE_FALLBACK_MAP: {
   LatentsPolymorphic: undefined,
   MetadataItem: undefined,
   MetadataItemCollection: [],
+  MetadataItemPolymorphic: undefined,
   MetadataDict: {},
   LoRAModelField: undefined,
   MainModelField: undefined,

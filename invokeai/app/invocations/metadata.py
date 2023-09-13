@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -217,7 +217,10 @@ class MetadataDictOutput(BaseInvocationOutput):
 
 @invocation("metadata", title="Metadata", tags=["metadata"], category="metadata", version="1.0.0")
 class MetadataInvocation(BaseInvocation):
-    items: list[MetadataItem] = InputField(description="List of metadata items")
+    items: Union[list[MetadataItem], MetadataItem] = InputField(description="List of metadata items")
 
     def invoke(self, context: InvocationContext) -> MetadataDictOutput:
+        if isinstance(self.items, MetadataItem):
+            return MetadataDictOutput(metadata_dict=(MetadataDict(data={self.items.label: self.items.value})))
+
         return MetadataDictOutput(metadata_dict=(MetadataDict(data={item.label: item.value for item in self.items})))

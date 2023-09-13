@@ -111,6 +111,7 @@ export const zFieldType = z.enum([
   'MetadataDict',
   'MetadataItem',
   'MetadataItemCollection',
+  'MetadataItemPolymorphic',
   'ONNXModelField',
   'Scheduler',
   'SDXLMainModelField',
@@ -634,6 +635,15 @@ export type MetadataItemCollectionInputFieldValue = z.infer<
   typeof zMetadataItemCollectionInputFieldValue
 >;
 
+export const zMetadataItemPolymorphicInputFieldValue =
+  zInputFieldValueBase.extend({
+    type: z.literal('MetadataItemPolymorphic'),
+    value: z.union([zMetadataItem, z.array(zMetadataItem)]).optional(),
+  });
+export type MetadataItemPolymorphicInputFieldValue = z.infer<
+  typeof zMetadataItemPolymorphicInputFieldValue
+>;
+
 export const zMetadataDict = z.record(z.any());
 export type MetadataDict = z.infer<typeof zMetadataDict>;
 
@@ -736,6 +746,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zVaeModelInputFieldValue,
   zMetadataItemInputFieldValue,
   zMetadataItemCollectionInputFieldValue,
+  zMetadataItemPolymorphicInputFieldValue,
   zMetadataDictInputFieldValue,
 ]);
 
@@ -1035,6 +1046,13 @@ export type MetadataItemCollectionInputFieldTemplate =
     type: 'MetadataItemCollection';
   };
 
+export type MetadataItemPolymorphicInputFieldTemplate = Omit<
+  MetadataItemInputFieldTemplate,
+  'type'
+> & {
+  type: 'MetadataItemPolymorphic';
+};
+
 export type MetadataDictInputFieldTemplate = InputFieldTemplateBase & {
   default: undefined;
   type: 'MetadataDict';
@@ -1094,7 +1112,8 @@ export type InputFieldTemplate =
   | VaeModelInputFieldTemplate
   | MetadataItemInputFieldTemplate
   | MetadataItemCollectionInputFieldTemplate
-  | MetadataDictInputFieldTemplate;
+  | MetadataDictInputFieldTemplate
+  | MetadataItemPolymorphicInputFieldTemplate;
 
 export const isInputFieldValue = (
   field?: InputFieldValue | OutputFieldValue

@@ -44,6 +44,7 @@ export const POLYMORPHIC_TYPES: FieldType[] = [
   'ConditioningPolymorphic',
   'ControlPolymorphic',
   'ColorPolymorphic',
+  'MetadataItemPolymorphic',
 ];
 
 export const MODEL_TYPES: FieldType[] = [
@@ -89,6 +90,7 @@ export const SINGLE_TO_POLYMORPHIC_MAP: FieldTypeMapWithNumber = {
   ConditioningField: 'ConditioningPolymorphic',
   ControlField: 'ControlPolymorphic',
   ColorField: 'ColorPolymorphic',
+  MetadataItem: 'MetadataItemPolymorphic',
 };
 
 export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
@@ -101,6 +103,7 @@ export const POLYMORPHIC_TO_SINGLE_MAP: FieldTypeMap = {
   ConditioningPolymorphic: 'ConditioningField',
   ControlPolymorphic: 'ControlField',
   ColorPolymorphic: 'ColorField',
+  MetadataItemPolymorphic: 'MetadataItem',
 };
 
 export const TYPES_WITH_INPUT_COMPONENTS: FieldType[] = [
@@ -150,8 +153,14 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
   },
   MetadataItemCollection: {
     color: 'gray.500',
-    description: 'MetadataItemCollection field type is accepted.',
+    description: 'Any field type is accepted.',
     title: 'Metadata Item Collection',
+  },
+  MetadataItemPolymorphic: {
+    color: 'gray.500',
+    description:
+      'MetadataItem or MetadataItemCollection field types are accepted.',
+    title: 'Metadata Item Polymorphic',
   },
   boolean: {
     color: 'green.500',

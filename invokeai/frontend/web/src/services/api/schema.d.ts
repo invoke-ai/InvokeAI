@@ -9634,7 +9634,7 @@ export type components = {
      */
     StableDiffusionOnnxModelFormat: 'olive' | 'onnx';
     /**
-     * StableDiffusion2ModelFormat
+     * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */

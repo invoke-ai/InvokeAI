@@ -178,6 +178,8 @@ class UIType(str, Enum):
     BoardField = "BoardField"
     Any = "Any"
     MetadataItem = "MetadataItem"
+    MetadataItemCollection = "MetadataItemCollection"
+    MetadataItemPolymorphic = "MetadataItemPolymorphic"
     MetadataDict = "MetadataDict"
     # endregion
 
