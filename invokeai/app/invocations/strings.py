@@ -1,103 +1,21 @@
 # 2023 skunkworxdark (https://github.com/skunkworxdark)
 
-from typing import Literal, Union, Optional
-from os.path import exists
 import re
-import numpy as np
-
-from pydantic import validator
 
 from invokeai.app.invocations.primitives import (
     StringOutput,
-    StringCollectionOutput,
 )
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     InputField,
-    Input,
     OutputField,
     InvocationContext,
     UIComponent,
-    UIType,
     invocation,
     invocation_output,
 )
-
-
-@invocation("strings_from_file", title="Strings from File", tags=["string", "file"], category="string", version="1.0.0")
-class StringsFromFileInvocation(BaseInvocation):
-    """Loads strings from a text file"""
-
-    file_path: str = InputField(description="Path to string text file")
-    pre_string: Optional[str] = InputField(
-        default=None, description="String to prepend to each string", ui_component=UIComponent.Textarea
-    )
-    post_string: Optional[str] = InputField(
-        default=None, description="String to append to each string", ui_component=UIComponent.Textarea
-    )
-    start_line: int = InputField(default=1, ge=1, description="Line in the file to start start from")
-    max_lines: int = InputField(default=1, ge=0, description="Max lines to read from file (0=all)")
-
-    @validator("file_path")
-    def file_path_exists(cls, v):
-        if not exists(v):
-            raise ValueError(FileNotFoundError)
-        return v
-
-    def stringsFromFile(
-        self,
-        file_path: str,
-        pre_string: Union[str, None],
-        post_string: Union[str, None],
-        start_line: int,
-        max_lines: int,
-    ):
-        strings = []
-        start_line -= 1
-        end_line = start_line + max_lines
-        if max_lines <= 0:
-            end_line = np.iinfo(np.int32).max
-        with open(file_path) as f:
-            for i, line in enumerate(f):
-                if i >= start_line and i < end_line:
-                    strings.append((pre_string or "") + line.strip() + (post_string or ""))
-                if i >= end_line:
-                    break
-        return strings
-
-    def invoke(self, context: InvocationContext) -> StringCollectionOutput:
-        strings = self.stringsFromFile(
-            self.file_path, self.pre_string, self.post_string, self.start_line, self.max_lines
-        )
-        return StringCollectionOutput(collection=strings)
-
-
-@invocation_output("strings_to_file_output")
-class StringsToFileInvocationOutput(BaseInvocationOutput):
-    """Base class for invocation that writes to a file and returns nothing of use"""
-
-
-@invocation("string_to_file", title="Strings to File", tags=["string", "file"], category="string", version="1.0.0")
-class StringsToFileInvocation(BaseInvocation):
-    """Save strings to a text file"""
-
-    file_path: str = InputField(description="Path to text file")
-    strings: Union[str, list[str], None] = InputField(
-        default=None, description="String or collection of strings to write", ui_type=UIType.Collection
-    )
-    append: bool = InputField(default=True, description="Append or overwrite file")
-
-    def invoke(self, context: InvocationContext) -> StringsToFileInvocationOutput:
-        with open(self.file_path, "a" if self.append else "w") as f:
-            if isinstance(self.strings, list):
-                for line in self.strings:
-                    f.write(line + "\n")
-            else:
-                f.write((self.strings or "") + "\n")
-
-        return StringsToFileInvocationOutput()
 
 
 @invocation_output("string_pos_neg_output")
@@ -222,47 +140,3 @@ class StringReplaceInvocation(BaseInvocation):
                 pattern = "(?i)" + re.escape(pattern)
             new_string = re.sub(pattern, (self.replace_string or ""), new_string)
         return StringOutput(value=new_string)
-
-
-@invocation("string_weight", title="String Weight", tags=["string", "weight"], category="string", version="1.0.0")
-class StringWeightInvocation(BaseInvocation):
-    """Takes a string and weight and outputs a new string in the format of a compel style (string)weight"""
-
-    string: str = InputField(default="", description="String to work on", ui_component=UIComponent.Textarea)
-    weight: float = InputField(default=1, gt=0, description="weight of the string")
-
-    def invoke(self, context: InvocationContext) -> StringOutput:
-        return StringOutput(value=f"({self.string}){self.weight}")
-
-
-COMBINE_TYPE = Literal[".and", ".blend"]
-
-
-@invocation(
-    "string_weights_to_combine",
-    title="String Weights to Combine",
-    tags=["string", "combine", "and", "blend"],
-    category="string",
-    version="1.0.0",
-)
-class StringWeightsToCombineInvocation(BaseInvocation):
-    """Takes a collection of (string)weight strings and converts it into a combined .and() or .blend() structure. Blank strings are ignored"""
-
-    string_weights: list[str] = InputField(
-        default=[""], description="String weights to combine", ui_type=UIType.Collection
-    )
-    combine_type: COMBINE_TYPE = InputField(
-        default=".and", description="Combine type .and() or .blend()", input=Input.Direct
-    )
-
-    def invoke(self, context: InvocationContext) -> StringOutput:
-        strings = []
-        numbers = []
-        for item in self.string_weights:
-            string, number = item.rsplit(")", 1)
-            string = string[1:].strip()
-            number = float(number)
-            if len(string) > 0:
-                strings.append(f'"{string}"')
-                numbers.append(number)
-        return StringOutput(value=f'({",".join(strings)}){self.combine_type}({",".join(map(str, numbers))})')
