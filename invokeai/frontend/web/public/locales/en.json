@@ -219,6 +219,7 @@
         "loadMore": "Load More",
         "maintainAspectRatio": "Maintain Aspect Ratio",
         "noImagesInGallery": "No Images to Display",
+        "setCurrentImage": "Set as Current Image",
         "showGenerations": "Show Generations",
         "showUploads": "Show Uploads",
         "singleColumnLayout": "Single Column Layout",
@@ -679,7 +680,15 @@
         "workflowValidation": "Workflow Validation Error",
         "workflowVersion": "Version",
         "zoomInNodes": "Zoom In",
-        "zoomOutNodes": "Zoom Out"
+        "zoomOutNodes": "Zoom Out",
+        "executionStateError": "Error",
+        "executionStateCompleted": "Completed",
+        "executionStateInProgress": "In Progress",
+        "versionUnknown": " Version Unknown",
+        "unknownNode": "Unknown Node",
+        "version": "Version",
+        "updateApp": "Update App",
+        "unknownTemplate": "Unknown Template"
     },
     "parameters": {
         "aspectRatio": "Ratio",
