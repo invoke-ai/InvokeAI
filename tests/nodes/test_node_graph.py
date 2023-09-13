@@ -816,7 +816,8 @@ def test_any_accepts_any():
 
 @pytest.mark.xfail(
     reason="""We need to update the validation for Collect -> Iterate to traverse to the Iterate
-    node's output and compare that against the item type of the Collect node's collection"""
+    node's output and compare that against the item type of the Collect node's collection. Until
+    then, Collect nodes may not output into Iterate nodes."""
 )
 def test_iterate_accepts_collection():
     g = Graph()
@@ -833,8 +834,9 @@ def test_iterate_accepts_collection():
     e3 = create_edge(n3.id, "collection", n4.id, "collection")
     g.add_edge(e1)
     g.add_edge(e2)
-    # Not throwing on this line is sufficient
-    g.add_edge(e3)
+    # eventually this should succeed
+    with pytest.raises(InvalidEdgeError, match="Cannot connect collector to iterator"):
+        g.add_edge(e3)
 
 
 def test_graph_can_generate_schema():
