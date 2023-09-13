@@ -7,6 +7,7 @@ import {
   zWorkflow,
 } from 'features/nodes/types/types';
 import { get } from 'lodash-es';
+import i18n from 'i18next';
 
 export const getMetadataAndWorkflowFromImageBlob = async (
   image: Blob
@@ -23,7 +24,7 @@ export const getMetadataAndWorkflowFromImageBlob = async (
     } else {
       logger('system').error(
         { error: parseify(metadataResult.error) },
-        'Problem reading metadata from image'
+        i18n.t('nodes.problemReadingMetadata')
       );
     }
   }
@@ -36,7 +37,7 @@ export const getMetadataAndWorkflowFromImageBlob = async (
     } else {
       logger('system').error(
         { error: parseify(workflowResult.error) },
-        'Problem reading workflow from image'
+        i18n.t('nodes.problemReadingWorkflow')
       );
     }
   }

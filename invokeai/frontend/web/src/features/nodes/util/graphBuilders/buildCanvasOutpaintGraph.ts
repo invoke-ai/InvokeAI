@@ -46,6 +46,7 @@ import {
   RANGE_OF_SIZE,
   SEAMLESS,
 } from './constants';
+import i18n from 'i18next';
 
 /**
  * Builds the Canvas tab's Outpaint graph.
@@ -83,8 +84,8 @@ export const buildCanvasOutpaintGraph = (
   } = state.generation;
 
   if (!model) {
-    log.error('No model found in state');
-    throw new Error('No model found in state');
+    log.error(i18n.t('nodes.noImageFoundState'));
+    throw new Error(i18n.t('nodes.noImageFoundState'));
   }
 
   // The bounding box determines width and height, not the width and height params

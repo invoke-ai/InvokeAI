@@ -23,6 +23,7 @@ import {
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import i18n from 'i18next';
 
 export const buildLinearSDXLTextToImageGraph = (
   state: RootState
@@ -58,8 +59,8 @@ export const buildLinearSDXLTextToImageGraph = (
     : initialGenerationState.shouldUseCpuNoise;
 
   if (!model) {
-    log.error('No model found in state');
-    throw new Error('No model found in state');
+    log.error(i18n.t('nodes.noModelFoundState'));
+    throw new Error(i18n.t('nodes.noModelFoundState'));
   }
 
   const fp32 = vaePrecision === 'fp32';

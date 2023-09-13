@@ -27,6 +27,7 @@ import {
   RESIZE,
   SEAMLESS,
 } from './constants';
+import i18n from 'i18next';
 
 /**
  * Builds the Image to Image tab graph.
@@ -75,13 +76,13 @@ export const buildLinearImageToImageGraph = (
    */
 
   if (!initialImage) {
-    log.error('No initial image found in state');
-    throw new Error('No initial image found in state');
+    log.error(i18n.t('nodes.noImageFoundState'));
+    throw new Error(i18n.t('nodes.noImageFoundState'));
   }
 
   if (!model) {
-    log.error('No model found in state');
-    throw new Error('No model found in state');
+    log.error(i18n.t('nodes.noModelFoundState'));
+    throw new Error(i18n.t('nodes.noModelFoundState'));
   }
 
   const fp32 = vaePrecision === 'fp32';

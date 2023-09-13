@@ -25,6 +25,7 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
+import i18n from 'i18next';
 
 /**
  * Builds the Canvas tab's Image to Image graph.
@@ -66,8 +67,8 @@ export const buildCanvasImageToImageGraph = (
   );
 
   if (!model) {
-    log.error('No model found in state');
-    throw new Error('No model found in state');
+    log.error(i18n.t('nodes.noModelFoundState'));
+    throw new Error(i18n.t('nodes.noModelFoundState'));
   }
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;

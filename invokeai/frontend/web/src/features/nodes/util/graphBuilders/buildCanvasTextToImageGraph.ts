@@ -27,6 +27,7 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
+import i18n from 'i18next';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
@@ -66,8 +67,8 @@ export const buildCanvasTextToImageGraph = (
   );
 
   if (!model) {
-    log.error('No model found in state');
-    throw new Error('No model found in state');
+    log.error(i18n.t('nodes.noModelFoundState'));
+    throw new Error(i18n.t('nodes.noModelFoundState'));
   }
 
   const use_cpu = shouldUseNoiseSettings

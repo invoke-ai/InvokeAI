@@ -9,6 +9,7 @@ import { buildCanvasSDXLInpaintGraph } from './buildCanvasSDXLInpaintGraph';
 import { buildCanvasSDXLOutpaintGraph } from './buildCanvasSDXLOutpaintGraph';
 import { buildCanvasSDXLTextToImageGraph } from './buildCanvasSDXLTextToImageGraph';
 import { buildCanvasTextToImageGraph } from './buildCanvasTextToImageGraph';
+import i18n from 'i18next';
 
 export const buildCanvasGraph = (
   state: RootState,
@@ -29,7 +30,7 @@ export const buildCanvasGraph = (
     }
   } else if (generationMode === 'img2img') {
     if (!canvasInitImage) {
-      throw new Error('Missing canvas init image');
+      throw new Error(i18n.t('nodes.missingCanvaInitImage'));
     }
     if (
       state.generation.model &&
@@ -41,7 +42,7 @@ export const buildCanvasGraph = (
     }
   } else if (generationMode === 'inpaint') {
     if (!canvasInitImage || !canvasMaskImage) {
-      throw new Error('Missing canvas init and mask images');
+      throw new Error(i18n.t('nodes.missingCanvaInitMaskImages'));
     }
     if (
       state.generation.model &&
@@ -57,7 +58,7 @@ export const buildCanvasGraph = (
     }
   } else {
     if (!canvasInitImage) {
-      throw new Error('Missing canvas init image');
+      throw new Error(i18n.t('nodes.missingCanvaInitImage'));
     }
     if (
       state.generation.model &&
