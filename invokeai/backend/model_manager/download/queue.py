@@ -78,7 +78,7 @@ class DownloadQueue(DownloadQueueBase):
     _queue: PriorityQueue
     _lock: threading.Lock
     _logger: InvokeAILogger
-    _event_handlers: Optional[List[DownloadEventHandler]]
+    _event_handlers: List[DownloadEventHandler] = Field(default_factory=list)
     _next_job_id: int = 0
     _sequence: int = 0  # This is for debugging and used to tag jobs in dequeueing order
     _requests: requests.sessions.Session
@@ -90,7 +90,7 @@ class DownloadQueue(DownloadQueueBase):
     def __init__(
         self,
         max_parallel_dl: int = 5,
-        event_handlers: Optional[List[DownloadEventHandler]] = None,
+        event_handlers: List[DownloadEventHandler] = [],
         requests_session: Optional[requests.sessions.Session] = None,
         config: Optional[InvokeAIAppConfig] = None,
     ):
@@ -139,19 +139,30 @@ class DownloadQueue(DownloadQueueBase):
         else:
             raise NotImplementedError(f"Don't know what to do with this type of source: {source}")
 
+        job = cls(
+            source=source,
+            destination=Path(destdir) / (filename or "."),
+            access_token=access_token,
+            event_handlers=(event_handlers or self._event_handlers),
+            **kwargs,
+        )
+
+        return self.submit_download_job(job, start)
+
+    def submit_download_job(
+        self,
+        job: DownloadJobBase,
+        start: bool = True,
+    ):
+        """Submit a job."""
+        # add the queue's handlers
+        for handler in self._event_handlers:
+            job.add_event_handler(handler)
         try:
             self._lock.acquire()
-            id = self._next_job_id
-            self._jobs[id] = cls(
-                id=id,
-                source=source,
-                destination=Path(destdir) / (filename or "."),
-                access_token=access_token,
-                event_handlers=(event_handlers or self._event_handlers),
-                **kwargs,
-            )
+            job.id = self._next_job_id
+            self._jobs[job.id] = job
             self._next_job_id += 1
-            job = self._jobs[id]
         finally:
             self._lock.release()
         if start:

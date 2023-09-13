@@ -20,7 +20,6 @@ from onnxruntime import (
     SessionOptions,
     get_available_providers,
 )
-from pydantic import BaseModel
 from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
 from ..config import (  # noqa F401
     BaseModelType,

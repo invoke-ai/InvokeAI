@@ -37,11 +37,11 @@ class ModelProbeInfo(object):
 
     model_type: ModelType
     base_type: BaseModelType
-    variant_type: ModelVariantType
-    prediction_type: SchedulerPredictionType
-    upcast_attention: bool
     format: ModelFormat
-    image_size: int
+    variant_type: ModelVariantType = "normal"
+    prediction_type: SchedulerPredictionType = "v_prediction"
+    upcast_attention: bool = False
+    image_size: int = None
 
 
 class ModelProbeBase(ABC):

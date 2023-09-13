@@ -20,7 +20,7 @@ Typical usage:
   # register config, and install model in `models`
   id: str = installer.install_path('/path/to/model')
 
-1  # download some remote models and install them in the background
+  # download some remote models and install them in the background
   installer.install('stabilityai/stable-diffusion-2-1')
   installer.install('https://civitai.com/api/download/models/154208')
   installer.install('runwayml/stable-diffusion-v1-5')
@@ -48,6 +48,7 @@ The following exceptions may be raised:
   DuplicateModelException
   UnknownModelTypeException
 """
+import re
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -60,6 +61,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 from .search import ModelSearch
 from .storage import ModelConfigStore, DuplicateModelException, get_config_store
 from .download import DownloadQueueBase, DownloadQueue, DownloadJobBase, ModelSourceMetadata
+from .download.queue import DownloadJobURL, DownloadJobRepoID, DownloadJobPath
 from .hash import FastModelHash
 from .probe import ModelProbe, ModelProbeInfo, InvalidModelException
 from .config import (
@@ -69,6 +71,30 @@ from .config import (
     ModelFormat,
     SchedulerPredictionType,
 )
+
+
+class ModelInstallJob(DownloadJobBase):
+    """This is a version of DownloadJobBase that has an additional slot for the model key and probe info."""
+
+    model_key: Optional[str] = Field(
+        description="After model installation, this field will hold its primary key", default=None
+    )
+    probe_info: Optional[ModelProbeInfo] = Field(
+        description="If provided, information here will be used instead of probing the model.",
+        default=None,
+    )
+
+
+class ModelInstallURLJob(DownloadJobURL, ModelInstallJob):
+    """Job for installing URLs."""
+
+
+class ModelInstallRepoIDJob(DownloadJobRepoID, ModelInstallJob):
+    """Job for installing repo ids."""
+
+
+class ModelInstallPathJob(DownloadJobPath, ModelInstallJob):
+    """Job for installing local paths."""
 
 
 class ModelInstallBase(ABC):
@@ -103,17 +129,18 @@ class ModelInstallBase(ABC):
         pass
 
     @abstractmethod
-    def register_path(self, model_path: Union[Path, str]) -> str:
+    def register_path(self, model_path: Union[Path, str], info: Optional[ModelProbeInfo] = None) -> str:
         """
         Probe and register the model at model_path.
 
         :param model_path: Filesystem Path to the model.
+        :param info: Optional ModelProbeInfo object. If not provided, model will be probed.
         :returns id: The string ID of the registered model.
         """
         pass
 
     @abstractmethod
-    def install_path(self, model_path: Union[Path, str]) -> str:
+    def install_path(self, model_path: Union[Path, str], info: Optional[ModelProbeInfo] = None) -> str:
         """
         Probe, register and install the model in the models directory.
 
@@ -121,13 +148,18 @@ class ModelInstallBase(ABC):
         the models directory handled by InvokeAI.
 
         :param model_path: Filesystem Path to the model.
+        :param info: Optional ModelProbeInfo object. If not provided, model will be probed.
         :returns id: The string ID of the installed model.
         """
         pass
 
     @abstractmethod
     def install(
-        self, source: Union[str, Path, AnyHttpUrl], inplace: bool = True, variant: Optional[str] = None
+        self,
+        source: Union[str, Path, AnyHttpUrl],
+        inplace: bool = True,
+        variant: Optional[str] = None,
+        info: Optional[ModelProbeInfo] = None,
     ) -> DownloadJobBase:
         """
         Download and install the indicated model.
@@ -146,6 +178,7 @@ class ModelInstallBase(ABC):
         the models directory, but registered in place (the default).
         :param variant: For HuggingFace models, this optional parameter
         specifies which variant to download (e.g. 'fp16')
+        :param info: Optional ModelProbeInfo object. If not provided, model will be probed.
         :returns DownloadQueueBase object.
 
         The `inplace` flag does not affect the behavior of downloaded
@@ -283,9 +316,9 @@ class ModelInstall(ModelInstallBase):
         """Return the queue."""
         return self._download_queue
 
-    def register_path(self, model_path: Union[Path, str]) -> str:  # noqa D102
+    def register_path(self, model_path: Union[Path, str], info: Optional[ModelProbeInfo] = None) -> str:  # noqa D102
         model_path = Path(model_path)
-        info: ModelProbeInfo = ModelProbe.probe(model_path)
+        info: ModelProbeInfo = info or ModelProbe.probe(model_path)
         return self._register(model_path, info)
 
     def _register(self, model_path: Path, info: ModelProbeInfo) -> str:
@@ -317,9 +350,13 @@ class ModelInstall(ModelInstallBase):
         self._store.add_model(key, registration_data)
         return key
 
-    def install_path(self, model_path: Union[Path, str]) -> str:  # noqa D102
+    def install_path(
+        self,
+        model_path: Union[Path, str],
+        info: Optional[ModelProbeInfo] = None,
+    ) -> str:  # noqa D102
         model_path = Path(model_path)
-        info: ModelProbeInfo = ModelProbe.probe(model_path)
+        info: ModelProbeInfo = info or ModelProbe.probe(model_path)
         dest_path = self._config.models_path / info.base_type.value / info.model_type.value / model_path.name
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -343,66 +380,94 @@ class ModelInstall(ModelInstallBase):
         self.unregister(key)
 
     def install(
-        self, source: Union[str, Path, AnyHttpUrl], inplace: bool = True, variant: Optional[str] = None
+        self,
+        source: Union[str, Path, AnyHttpUrl],
+        info: Optional[ModelProbeInfo] = None,
+        inplace: bool = True,
+        variant: Optional[str] = None,
+        access_token: Optional[str] = None,
     ) -> DownloadJobBase:  # noqa D102
-        # choose a temporary directory inside the models directory
-        models_dir = self._config.models_path
         queue = self._download_queue
 
-        def complete_installation(job: DownloadJobBase):
-            if job.status == "completed":
-                self._logger.info(f"{job.source}: Download finished with status {job.status}. Installing.")
-                model_id = self.install_path(job.destination)
-                info = self._store.get_model(model_id)
-                info.source = str(job.source)
-                metadata: ModelSourceMetadata = job.metadata
-                info.description = metadata.description or f"Imported model {info.name}"
-                info.author = metadata.author
-                info.tags = metadata.tags
-                info.license = metadata.license
-                info.thumbnail_url = metadata.thumbnail_url
-                self._store.update_model(model_id, info)
-                self._async_installs[job.source] = model_id
-            elif job.status == "error":
-                self._logger.warning(f"{job.source}: Model installation error: {job.error}")
-            elif job.status == "cancelled":
-                self._logger.warning(f"{job.source}: Model installation cancelled at caller's request.")
-            jobs = queue.list_jobs()
-            if self._tmpdir and len(jobs) <= 1 and job.status in ["completed", "error", "cancelled"]:
-                self._tmpdir.cleanup()
-                self._tmpdir = None
+        job = self._make_download_job(source, variant, access_token)
+        handler = (
+            self._complete_registration_handler
+            if inplace and Path(source).exists()
+            else self._complete_installation_handler
+        )
+        job.add_event_handler(handler)
+        job.probe_info = info
 
-        def complete_registration(job: DownloadJobBase):
-            if job.status == "completed":
-                self._logger.info(f"{job.source}: Installing in place.")
-                model_id = self.register_path(job.destination)
-                info = self._store.get_model(model_id)
-                info.source = str(job.source)
-                info.description = f"Imported model {info.name}"
-                self._store.update_model(model_id, info)
-                self._async_installs[job.source] = model_id
-                job.model_key = model_id
-            elif job.status == "error":
-                self._logger.warning(f"{job.source}: Model installation error: {job.error}")
-            elif job.status == "cancelled":
-                self._logger.warning(f"{job.source}: Model installation cancelled at caller's request.")
+        self._async_installs[source] = None
+        queue.submit_download_job(job, True)
+        return job
 
+    def _complete_installation_handler(self, job: DownloadJobBase):
+        if job.status == "completed":
+            self._logger.info(f"{job.source}: Download finished with status {job.status}. Installing.")
+            model_id = self.install_path(job.destination, job.probe_info)
+            info = self._store.get_model(model_id)
+            info.source = str(job.source)
+            metadata: ModelSourceMetadata = job.metadata
+            info.description = metadata.description or f"Imported model {info.name}"
+            info.author = metadata.author
+            info.tags = metadata.tags
+            info.license = metadata.license
+            info.thumbnail_url = metadata.thumbnail_url
+            self._store.update_model(model_id, info)
+            self._async_installs[job.source] = model_id
+            job.model_key = model_id
+        elif job.status == "error":
+            self._logger.warning(f"{job.source}: Model installation error: {job.error}")
+        elif job.status == "cancelled":
+            self._logger.warning(f"{job.source}: Model installation cancelled at caller's request.")
+        jobs = self._download_queue.list_jobs()
+        if self._tmpdir and len(jobs) <= 1 and job.status in ["completed", "error", "cancelled"]:
+            self._tmpdir.cleanup()
+            self._tmpdir = None
+
+    def _complete_registration_handler(self, job: DownloadJobBase):
+        if job.status == "completed":
+            self._logger.info(f"{job.source}: Installing in place.")
+            model_id = self.register_path(job.destination, job.probe_info)
+            info = self._store.get_model(model_id)
+            info.source = str(job.source)
+            info.description = f"Imported model {info.name}"
+            self._store.update_model(model_id, info)
+            self._async_installs[job.source] = model_id
+            job.model_key = model_id
+        elif job.status == "error":
+            self._logger.warning(f"{job.source}: Model installation error: {job.error}")
+        elif job.status == "cancelled":
+            self._logger.warning(f"{job.source}: Model installation cancelled at caller's request.")
+
+    def _make_download_job(
+        self,
+        source: Union[str, Path, AnyHttpUrl],
+        variant: Optional[str] = None,
+        access_token: Optional[str] = None,
+    ) -> DownloadJobBase:
         # In the event that we are being asked to install a path that is already on disk,
         # we simply probe and register/install it. The job does not actually do anything, but we
         # create one anyway in order to have similar behavior for local files, URLs and repo_ids.
         if Path(source).exists():  # a path that is already on disk
             source = Path(source)
             destdir = source
-            job = queue.create_download_job(source=source, destdir=destdir, start=False, variant=variant)
-            job.add_event_handler(complete_registration if inplace else complete_installation)
-        else:
-            self._tmpdir = self._tmpdir or tempfile.TemporaryDirectory(dir=models_dir)
-            job = queue.create_download_job(source=source, destdir=self._tmpdir.name, start=False, variant=variant)
-            job.add_event_handler(complete_installation)
+            return ModelInstallPathJob(source=source, destination=Path(destdir))
 
-        self._async_installs[source] = None
-        queue.start_job(job)
-        return job
+        # choose a temporary directory inside the models directory
+        models_dir = self._config.models_path
+        self._tmpdir = self._tmpdir or tempfile.TemporaryDirectory(dir=models_dir)
+
+        if re.match(r"^[\w-]+/[\w-]+$", str(source)):
+            cls = ModelInstallRepoIDJob
+            kwargs = dict(variant=variant)
+        elif re.match(r"^https?://", str(source)):
+            cls = ModelInstallURLJob
+            kwargs = {}
+        else:
+            raise NotImplementedError(f"Don't know what to do with this type of source: {source}")
+        return cls(source=source, destination=Path(self._tmpdir.name), access_token=access_token, **kwargs)
 
     def wait_for_installs(self) -> Dict[str, str]:  # noqa D102
         self._download_queue.join()

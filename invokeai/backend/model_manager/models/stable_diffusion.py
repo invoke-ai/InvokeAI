@@ -14,6 +14,7 @@ from .base import (
     read_checkpoint_meta,
     classproperty,
     InvalidModelException,
+    ModelNotFoundException,
 )
 from ..config import SilenceWarnings
 from .sdxl import StableDiffusionXLModel

@@ -46,12 +46,9 @@ class DownloadJobBase(BaseModel):
     """Class to monitor and control a model download request."""
 
     priority: int = Field(default=10, description="Queue priority; lower values are higher priority")
-    id: int = Field(description="Numeric ID of this job")
+    id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a placeholder
     source: str = Field(description="URL or repo_id to download")
     destination: Path = Field(description="Destination of URL on local disk")
-    model_key: Optional[str] = Field(
-        description="After model installation, this field will hold its primary key", default=None
-    )
     metadata: Optional[ModelSourceMetadata] = Field(description="Model metadata (source-specific)", default=None)
     access_token: Optional[str] = Field(description="access token needed to access this resource")
     status: DownloadJobStatus = Field(default=DownloadJobStatus.IDLE, description="Status of the download")
@@ -114,7 +111,7 @@ class DownloadQueueBase(ABC):
         event_handlers: Optional[List[DownloadEventHandler]] = None,
     ) -> DownloadJobBase:
         """
-        Create a download job.
+        Create and submit a download job.
 
         :param source: Source of the download - URL, repo_id or Path
         :param destdir: Directory to download into.
@@ -123,7 +120,22 @@ class DownloadQueueBase(ABC):
         :param start: Immediately start job [True]
         :param variant: Variant to download, such as "fp16" (repo_ids only).
         :param event_handlers: Optional callables that will be called whenever job status changes.
-        :returns job id: The numeric ID of the DownloadJobBase object for this task.
+        :returns the job: job.id will be a non-negative value after execution
+        """
+        pass
+
+    def submit_download_job(
+        self,
+        job: DownloadJobBase,
+        start: bool = True,
+    ):
+        """
+        Submit a download job.
+
+        :param job: A DownloadJobBase
+        :param start: Immediately start job [True]
+
+        After execution, `job.id` will be set to a non-negative value.
         """
         pass
 

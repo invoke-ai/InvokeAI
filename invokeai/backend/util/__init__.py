@@ -18,4 +18,4 @@ from .util import (  # noqa: F401
     Chdir,
 )
 from .attention import auto_detect_slice_size  # noqa: F401
-from .logging import InvokeAILogger
+from .logging import InvokeAILogger  # noqa: F401
