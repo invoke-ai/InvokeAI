@@ -172,7 +172,6 @@ class ControlNetData:
 @dataclass
 class IPAdapterData:
     ip_adapter_model: IPAdapter = Field(default=None)
-    image: PIL.Image = Field(default=None)
     # TODO: change to polymorphic so can do different weights per step (once implemented...)
     # weight: Union[float, List[float]] = Field(default=1.0)
     weight: float = Field(default=1.0)
@@ -415,20 +414,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if timesteps.shape[0] == 0:
             return latents, attention_map_saver
 
-        if ip_adapter_data is not None:
-            if not ip_adapter_data.ip_adapter_model.is_initialized():
-                # TODO(ryan): Do we need to initialize every time? How long does initialize take?
-                ip_adapter_data.ip_adapter_model.initialize(self.unet)
-            ip_adapter_data.ip_adapter_model.set_scale(ip_adapter_data.weight)
-
-            # Get image embeddings from CLIP and ImageProjModel.
-            image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_data.ip_adapter_model.get_image_embeds(
-                ip_adapter_data.image
-            )
-            conditioning_data.ip_adapter_conditioning = IPAdapterConditioningInfo(
-                image_prompt_embeds, uncond_image_prompt_embeds
-            )
-
         if conditioning_data.extra is not None and conditioning_data.extra.wants_cross_attention_control:
             attn_ctx = self.invokeai_diffuser.custom_attention_context(
                 self.invokeai_diffuser.model,
@@ -438,6 +423,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         elif ip_adapter_data is not None:
             # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
             # As it is now, the IP-Adapter will silently be skipped.
+
+            ip_adapter_data.ip_adapter_model.set_scale(ip_adapter_data.weight)
             attn_ctx = ip_adapter_data.ip_adapter_model.apply_ip_adapter_attention()
         else:
             attn_ctx = nullcontext()

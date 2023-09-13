@@ -46,7 +46,6 @@ class IPAdapter:
 
     def __init__(
         self,
-        image_encoder_path: str,
         ip_adapter_ckpt_path: str,
         device: torch.device,
         dtype: torch.dtype = torch.float16,
@@ -55,13 +54,9 @@ class IPAdapter:
         self.device = device
         self.dtype = dtype
 
-        self._image_encoder_path = image_encoder_path
         self._ip_adapter_ckpt_path = ip_adapter_ckpt_path
         self._num_tokens = num_tokens
 
-        self._image_encoder = CLIPVisionModelWithProjection.from_pretrained(self._image_encoder_path).to(
-            self.device, dtype=self.dtype
-        )
         self._clip_image_processor = CLIPImageProcessor()
 
         # Fields to be initialized later in initialize().
@@ -74,7 +69,7 @@ class IPAdapter:
     def is_initialized(self):
         return self._unet is not None and self._image_proj_model is not None and self._attn_processors is not None
 
-    def initialize(self, unet: UNet2DConditionModel):
+    def initialize(self, unet: UNet2DConditionModel, image_encoder: CLIPVisionModelWithProjection):
         """Finish the model initialization process.
 
         HACK: This is separate from __init__ for compatibility with the model manager. The full initialization requires
@@ -87,7 +82,9 @@ class IPAdapter:
             raise Exception("IPAdapter has already been initialized.")
 
         self._unet = unet
-        self._image_proj_model = self._init_image_proj_model()
+        # TODO(ryand): Eliminate the need to pass the image_encoder to initialize(). It should be possible to infer the
+        # necessary information from the state_dict.
+        self._image_proj_model = self._init_image_proj_model(image_encoder)
         self._attn_processors = self._prepare_attention_processors()
 
         # Copy the weights from the _state_dict into the models.
@@ -102,16 +99,16 @@ class IPAdapter:
         if dtype is not None:
             self.dtype = dtype
 
-        for model in [self._image_encoder, self._image_proj_model, self._attn_processors]:
+        for model in [self._image_proj_model, self._attn_processors]:
             # If this is called before initialize(), then some models will still be None. We just update the non-None
             # models.
             if model is not None:
                 model.to(device=self.device, dtype=self.dtype)
 
-    def _init_image_proj_model(self):
+    def _init_image_proj_model(self, image_encoder: CLIPVisionModelWithProjection):
         image_proj_model = ImageProjModel(
             cross_attention_dim=self._unet.config.cross_attention_dim,
-            clip_embeddings_dim=self._image_encoder.config.projection_dim,
+            clip_embeddings_dim=image_encoder.config.projection_dim,
             clip_extra_context_tokens=self._num_tokens,
         ).to(self.device, dtype=self.dtype)
         return image_proj_model
@@ -162,14 +159,14 @@ class IPAdapter:
             self._unet.set_attn_processor(orig_attn_processors)
 
     @torch.inference_mode()
-    def get_image_embeds(self, pil_image):
+    def get_image_embeds(self, pil_image, image_encoder: CLIPVisionModelWithProjection):
         if not self.is_initialized():
             raise Exception("Call IPAdapter.initialize() before calling IPAdapter.get_image_embeds().")
 
         if isinstance(pil_image, Image.Image):
             pil_image = [pil_image]
         clip_image = self._clip_image_processor(images=pil_image, return_tensors="pt").pixel_values
-        clip_image_embeds = self._image_encoder(clip_image.to(self.device, dtype=self.dtype)).image_embeds
+        clip_image_embeds = image_encoder(clip_image.to(self.device, dtype=self.dtype)).image_embeds
         image_prompt_embeds = self._image_proj_model(clip_image_embeds)
         uncond_image_prompt_embeds = self._image_proj_model(torch.zeros_like(clip_image_embeds))
         return image_prompt_embeds, uncond_image_prompt_embeds
@@ -186,21 +183,21 @@ class IPAdapter:
 class IPAdapterPlus(IPAdapter):
     """IP-Adapter with fine-grained features"""
 
-    def _init_image_proj_model(self):
+    def _init_image_proj_model(self, image_encoder: CLIPVisionModelWithProjection):
         image_proj_model = Resampler(
             dim=self._unet.config.cross_attention_dim,
             depth=4,
             dim_head=64,
             heads=12,
             num_queries=self._num_tokens,
-            embedding_dim=self._image_encoder.config.hidden_size,
+            embedding_dim=image_encoder.config.hidden_size,
             output_dim=self._unet.config.cross_attention_dim,
             ff_mult=4,
         ).to(self.device, dtype=self.dtype)
         return image_proj_model
 
     @torch.inference_mode()
-    def get_image_embeds(self, pil_image):
+    def get_image_embeds(self, pil_image, image_encoder: CLIPVisionModelWithProjection):
         if not self.is_initialized():
             raise Exception("Call IPAdapter.initialize() before calling IPAdapter.get_image_embeds().")
 
@@ -208,10 +205,10 @@ class IPAdapterPlus(IPAdapter):
             pil_image = [pil_image]
         clip_image = self._clip_image_processor(images=pil_image, return_tensors="pt").pixel_values
         clip_image = clip_image.to(self.device, dtype=self.dtype)
-        clip_image_embeds = self._image_encoder(clip_image, output_hidden_states=True).hidden_states[-2]
+        clip_image_embeds = image_encoder(clip_image, output_hidden_states=True).hidden_states[-2]
         image_prompt_embeds = self._image_proj_model(clip_image_embeds)
-        uncond_clip_image_embeds = self._image_encoder(
-            torch.zeros_like(clip_image), output_hidden_states=True
-        ).hidden_states[-2]
+        uncond_clip_image_embeds = image_encoder(torch.zeros_like(clip_image), output_hidden_states=True).hidden_states[
+            -2
+        ]
         uncond_image_prompt_embeds = self._image_proj_model(uncond_clip_image_embeds)
         return image_prompt_embeds, uncond_image_prompt_embeds

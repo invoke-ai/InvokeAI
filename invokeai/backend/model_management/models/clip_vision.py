@@ -60,7 +60,7 @@ class CLIPVisionModel(ModelBase):
         if child_type is not None:
             raise ValueError("There are no child models in a CLIP Vision model.")
 
-        model = CLIPVisionModelWithProjection.from_pretrained(self._image_encoder_path, torch_dtype=torch_dtype)
+        model = CLIPVisionModelWithProjection.from_pretrained(self.model_path, torch_dtype=torch_dtype)
 
         # Calculate a more accurate model size.
         self.model_size = calc_model_size_by_data(model)
