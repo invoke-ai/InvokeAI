@@ -172,9 +172,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import ClassVar, Dict, List, Literal, Union, get_type_hints, Optional
+from typing import ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
 
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig, OmegaConf
 from pydantic import Field, parse_obj_as
 
 from .base import InvokeAISettings

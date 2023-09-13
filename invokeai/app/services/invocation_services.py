@@ -1,21 +1,23 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from logging import Logger
+
     from invokeai.app.services.board_images import BoardImagesServiceABC
     from invokeai.app.services.boards import BoardServiceABC
-    from invokeai.app.services.images import ImageServiceABC
-    from invokeai.app.services.invocation_stats import InvocationStatsServiceBase
-    from invokeai.app.services.model_manager_service import ModelManagerServiceBase
-    from invokeai.app.services.events import EventServiceBase
-    from invokeai.app.services.latent_storage import LatentsStorageBase
-    from invokeai.app.services.invocation_queue import InvocationQueueABC
-    from invokeai.app.services.item_storage import ItemStorageABC
     from invokeai.app.services.config import InvokeAIAppConfig
+    from invokeai.app.services.events import EventServiceBase
     from invokeai.app.services.graph import GraphExecutionState, LibraryGraph
+    from invokeai.app.services.images import ImageServiceABC
+    from invokeai.app.services.invocation_queue import InvocationQueueABC
+    from invokeai.app.services.invocation_stats import InvocationStatsServiceBase
     from invokeai.app.services.invoker import InvocationProcessorABC
+    from invokeai.app.services.item_storage import ItemStorageABC
+    from invokeai.app.services.latent_storage import LatentsStorageBase
+    from invokeai.app.services.model_manager_service import ModelManagerServiceBase
 
 
 class InvocationServices:

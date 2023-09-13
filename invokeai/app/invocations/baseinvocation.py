@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
-import re
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
@@ -23,10 +23,10 @@ from typing import (
     get_type_hints,
 )
 
-from pydantic import BaseModel, Field, validator
-from pydantic.fields import Undefined, ModelField
-from pydantic.typing import NoArgAnyCallable
 import semver
+from pydantic import BaseModel, Field, validator
+from pydantic.fields import ModelField, Undefined
+from pydantic.typing import NoArgAnyCallable
 
 from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 

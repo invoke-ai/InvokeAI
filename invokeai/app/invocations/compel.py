@@ -5,16 +5,15 @@ from typing import List, Union
 import torch
 from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
-from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
 
+from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import (
     BasicConditioningInfo,
     SDXLConditioningInfo,
 )
 
-from ...backend.model_management.models import ModelType
 from ...backend.model_management.lora import ModelPatcher
-from ...backend.model_management.models import ModelNotFoundException
+from ...backend.model_management.models import ModelNotFoundException, ModelType
 from ...backend.stable_diffusion.diffusion import InvokeAIDiffuserComponent
 from ...backend.util.devices import torch_dtype
 from .baseinvocation import (

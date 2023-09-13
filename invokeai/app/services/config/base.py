@@ -9,15 +9,17 @@ the command line.
 """
 
 from __future__ import annotations
+
 import argparse
 import os
 import pydoc
 import sys
 from argparse import ArgumentParser
-from omegaconf import OmegaConf, DictConfig, ListConfig
 from pathlib import Path
+from typing import ClassVar, Dict, List, Literal, Union, get_args, get_origin, get_type_hints
+
+from omegaconf import DictConfig, ListConfig, OmegaConf
 from pydantic import BaseSettings
-from typing import ClassVar, Dict, List, Literal, Union, get_origin, get_type_hints, get_args
 
 
 class PagingArgumentParser(argparse.ArgumentParser):

@@ -8,19 +8,20 @@ import torch
 from omegaconf import OmegaConf
 
 from invokeai.app.services.config import InvokeAIAppConfig
+
 from .base import (
+    BaseModelType,
+    EmptyConfigLoader,
+    InvalidModelException,
     ModelBase,
     ModelConfigBase,
-    BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelVariantType,
-    EmptyConfigLoader,
-    calc_model_size_by_fs,
-    calc_model_size_by_data,
-    classproperty,
-    InvalidModelException,
     ModelNotFoundException,
+    ModelType,
+    ModelVariantType,
+    SubModelType,
+    calc_model_size_by_data,
+    calc_model_size_by_fs,
+    classproperty,
 )
 
 
