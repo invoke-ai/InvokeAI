@@ -146,7 +146,7 @@ const CancelButton = (props: Props) => {
           id="cancel-button"
           {...rest}
         >
-          Cancel
+          {t('parameters.cancel.cancel')}
         </IAIButton>
       )}
       <Menu closeOnSelect={false}>

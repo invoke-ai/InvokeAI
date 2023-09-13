@@ -15,6 +15,7 @@ import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { forEach } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
+import { useTranslation } from 'react-i18next';
 
 type ParamControlNetModelProps = {
   controlNet: ControlNetConfig;
@@ -35,6 +36,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
   const isBusy = useAppSelector(selectIsBusy);
 
   const { mainModel } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   const { data: controlNetModels } = useGetControlNetModelsQuery();
 
@@ -58,13 +60,13 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
         group: MODEL_TYPE_MAP[model.base_model],
         disabled,
         tooltip: disabled
-          ? `Incompatible base model: ${model.base_model}`
+          ? `${t('controlnet.incompatibleBaseModel')} ${model.base_model}`
           : undefined,
       });
     });
 
     return data;
-  }, [controlNetModels, mainModel?.base_model]);
+  }, [controlNetModels, mainModel?.base_model, t]);
 
   // grab the full model entity from the RTK Query cache
   const selectedModel = useMemo(
@@ -105,7 +107,7 @@ const ParamControlNetModel = (props: ParamControlNetModelProps) => {
       error={
         !selectedModel || mainModel?.base_model !== selectedModel.base_model
       }
-      placeholder="Select a model"
+      placeholder={t('controlnet.selectModel')}
       value={selectedModel?.id ?? null}
       onChange={handleModelChanged}
       disabled={isBusy || !isEnabled}

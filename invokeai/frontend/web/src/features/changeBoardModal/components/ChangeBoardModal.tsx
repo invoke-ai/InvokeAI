@@ -21,6 +21,7 @@ import {
   useRemoveImagesFromBoardMutation,
 } from 'services/api/endpoints/images';
 import { changeBoardReset, isModalOpenChanged } from '../store/slice';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
@@ -42,10 +43,11 @@ const ChangeBoardModal = () => {
   const { imagesToChange, isModalOpen } = useAppSelector(selector);
   const [addImagesToBoard] = useAddImagesToBoardMutation();
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
+  const { t } = useTranslation();
 
   const data = useMemo(() => {
     const data: { label: string; value: string }[] = [
-      { label: 'Uncategorized', value: 'none' },
+      { label: t('boards.uncategorized'), value: 'none' },
     ];
     (boards ?? []).forEach((board) =>
       data.push({
@@ -55,7 +57,7 @@ const ChangeBoardModal = () => {
     );
 
     return data;
-  }, [boards]);
+  }, [boards, t]);
 
   const handleClose = useCallback(() => {
     dispatch(changeBoardReset());
@@ -97,7 +99,7 @@ const ChangeBoardModal = () => {
       <AlertDialogOverlay>
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            Change Board
+            {t('boards.changeBoard')}
           </AlertDialogHeader>
 
           <AlertDialogBody>
@@ -107,7 +109,9 @@ const ChangeBoardModal = () => {
                 {`${imagesToChange.length > 1 ? 's' : ''}`} to board:
               </Text>
               <IAIMantineSearchableSelect
-                placeholder={isFetching ? 'Loading...' : 'Select Board'}
+                placeholder={
+                  isFetching ? t('boards.loading') : t('boards.selectBoard')
+                }
                 disabled={isFetching}
                 onChange={(v) => setSelectedBoard(v)}
                 value={selectedBoard}
@@ -117,10 +121,10 @@ const ChangeBoardModal = () => {
           </AlertDialogBody>
           <AlertDialogFooter>
             <IAIButton ref={cancelRef} onClick={handleClose}>
-              Cancel
+              {t('boards.cancel')}
             </IAIButton>
             <IAIButton colorScheme="accent" onClick={handleChangeBoard} ml={3}>
-              Move
+              {t('boards.move')}
             </IAIButton>
           </AlertDialogFooter>
         </AlertDialogContent>

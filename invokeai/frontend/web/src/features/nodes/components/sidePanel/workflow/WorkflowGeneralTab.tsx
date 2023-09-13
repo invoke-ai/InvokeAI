@@ -16,6 +16,7 @@ import {
 } from 'features/nodes/store/nodesSlice';
 import { ChangeEvent, memo, useCallback } from 'react';
 import ScrollableContent from '../ScrollableContent';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -85,6 +86,8 @@ const WorkflowGeneralTab = () => {
     [dispatch]
   );
 
+  const { t } = useTranslation();
+
   return (
     <ScrollableContent>
       <Flex
@@ -96,28 +99,36 @@ const WorkflowGeneralTab = () => {
         }}
       >
         <Flex sx={{ gap: 2, w: 'full' }}>
-          <IAIInput label="Name" value={name} onChange={handleChangeName} />
           <IAIInput
-            label="Version"
+            label={t('nodes.workflowName')}
+            value={name}
+            onChange={handleChangeName}
+          />
+          <IAIInput
+            label={t('nodes.workflowVersion')}
             value={version}
             onChange={handleChangeVersion}
           />
         </Flex>
         <Flex sx={{ gap: 2, w: 'full' }}>
           <IAIInput
-            label="Author"
+            label={t('nodes.workflowAuthor')}
             value={author}
             onChange={handleChangeAuthor}
           />
           <IAIInput
-            label="Contact"
+            label={t('nodes.workflowContact')}
             value={contact}
             onChange={handleChangeContact}
           />
         </Flex>
-        <IAIInput label="Tags" value={tags} onChange={handleChangeTags} />
+        <IAIInput
+          label={t('nodes.workflowTags')}
+          value={tags}
+          onChange={handleChangeTags}
+        />
         <FormControl as={Flex} sx={{ flexDir: 'column' }}>
-          <FormLabel>Short Description</FormLabel>
+          <FormLabel>{t('nodes.workflowDescription')}</FormLabel>
           <IAITextarea
             onChange={handleChangeDescription}
             value={description}
@@ -126,7 +137,7 @@ const WorkflowGeneralTab = () => {
           />
         </FormControl>
         <FormControl as={Flex} sx={{ flexDir: 'column', h: 'full' }}>
-          <FormLabel>Notes</FormLabel>
+          <FormLabel>{t('nodes.workflowNotes')}</FormLabel>
           <IAITextarea
             onChange={handleChangeNotes}
             value={notes}

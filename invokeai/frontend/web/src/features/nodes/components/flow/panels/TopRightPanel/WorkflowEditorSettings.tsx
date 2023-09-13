@@ -29,6 +29,7 @@ import { ChangeEvent, memo, useCallback } from 'react';
 import { FaCog } from 'react-icons/fa';
 import { SelectionMode } from 'reactflow';
 import ReloadNodeTemplatesButton from '../TopCenterPanel/ReloadSchemaButton';
+import { useTranslation } from 'react-i18next';
 
 const formLabelProps: FormLabelProps = {
   fontWeight: 600,
@@ -101,12 +102,14 @@ const WorkflowEditorSettings = forwardRef((_, ref) => {
     [dispatch]
   );
 
+  const { t } = useTranslation();
+
   return (
     <>
       <IAIIconButton
         ref={ref}
-        aria-label="Workflow Editor Settings"
-        tooltip="Workflow Editor Settings"
+        aria-label={t('nodes.workflowSettings')}
+        tooltip={t('nodes.workflowSettings')}
         icon={<FaCog />}
         onClick={onOpen}
       />
@@ -114,7 +117,7 @@ const WorkflowEditorSettings = forwardRef((_, ref) => {
       <Modal isOpen={isOpen} onClose={onClose} size="2xl" isCentered>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Workflow Editor Settings</ModalHeader>
+          <ModalHeader>{t('nodes.workflowSettings')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <Flex
@@ -129,31 +132,31 @@ const WorkflowEditorSettings = forwardRef((_, ref) => {
                 formLabelProps={formLabelProps}
                 onChange={handleChangeShouldAnimate}
                 isChecked={shouldAnimateEdges}
-                label="Animated Edges"
-                helperText="Animate selected edges and edges connected to selected nodes"
+                label={t('nodes.animatedEdges')}
+                helperText={t('nodes.animatedEdgesHelp')}
               />
               <Divider />
               <IAISwitch
                 formLabelProps={formLabelProps}
                 isChecked={shouldSnapToGrid}
                 onChange={handleChangeShouldSnap}
-                label="Snap to Grid"
-                helperText="Snap nodes to grid when moved"
+                label={t('nodes.snapToGrid')}
+                helperText={t('nodes.snapToGridHelp')}
               />
               <Divider />
               <IAISwitch
                 formLabelProps={formLabelProps}
                 isChecked={shouldColorEdges}
                 onChange={handleChangeShouldColor}
-                label="Color-Code Edges"
-                helperText="Color-code edges according to their connected fields"
+                label={t('nodes.colorCodeEdges')}
+                helperText={t('nodes.colorCodeEdgesHelp')}
               />
               <IAISwitch
                 formLabelProps={formLabelProps}
                 isChecked={selectionModeIsChecked}
                 onChange={handleChangeSelectionMode}
-                label="Fully Contain Nodes to Select"
-                helperText="Nodes must be fully inside the selection box to be selected"
+                label={t('nodes.fullyContainNodes')}
+                helperText={t('nodes.fullyContainNodesHelp')}
               />
               <Heading size="sm" pt={4}>
                 Advanced
@@ -162,8 +165,8 @@ const WorkflowEditorSettings = forwardRef((_, ref) => {
                 formLabelProps={formLabelProps}
                 isChecked={shouldValidateGraph}
                 onChange={handleChangeShouldValidate}
-                label="Validate Connections and Graph"
-                helperText="Prevent invalid connections from being made, and invalid graphs from being invoked"
+                label={t('nodes.validateConnections')}
+                helperText={t('nodes.validateConnectionsHelp')}
               />
               <ReloadNodeTemplatesButton />
             </Flex>
