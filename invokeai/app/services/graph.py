@@ -708,15 +708,14 @@ class Graph(BaseModel):
         input_root_type = next(t[0] for t in type_degrees if t[1] == 0)  # type: ignore
 
         # Verify that all outputs are lists
-        # if not all((get_origin(f) == list for f in output_fields)):
-        #     return False
-
-        # Verify that all outputs are lists
-        if not all(is_list_or_contains_list(f) for f in output_fields):
+        if not all(f is Any or is_list_or_contains_list(f) for f in output_fields):
             return False
 
         # Verify that all outputs match the input type (are a base class or the same class)
-        if not all((issubclass(input_root_type, get_args(f)[0]) for f in output_fields)):
+        if not all(
+            f is Any or is_union_subtype(input_root_type, get_args(f)[0]) or issubclass(input_root_type, get_args(f)[0])
+            for f in output_fields
+        ):
             return False
 
         return True
