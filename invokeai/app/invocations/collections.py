@@ -46,7 +46,7 @@ class RangeOfSizeInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
         return IntegerCollectionOutput(
-            collection=list(range(self.start, self.start + (self.step * (self.size + 1)), self.step))
+            collection=list(range(self.start, self.start + (self.step * self.size), self.step))
         )
 
 
