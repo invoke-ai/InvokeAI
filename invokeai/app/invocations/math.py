@@ -64,13 +64,21 @@ class RandomIntInvocation(BaseInvocation):
         return IntegerOutput(value=np.random.randint(self.low, self.high))
 
 
-@invocation("float_to_int", title="Float To Integer", tags=["math", "round", "integer", "float", "convert"], category="math", version="1.0.0")
+@invocation(
+    "float_to_int",
+    title="Float To Integer",
+    tags=["math", "round", "integer", "float", "convert"],
+    category="math",
+    version="1.0.0",
+)
 class FloatToIntegerInvocation(BaseInvocation):
     """Rounds a float number to (a multiple of) an integer."""
 
     value: float = InputField(default=0, description="The value to round")
-    multiple: int = InputField(default=1, ge=1,title="Multiple of", description="The multiple to round to")
-    method: Literal["Nearest", "Floor", "Ceiling", "Truncate"] = InputField(default="Nearest", description="The method to use for rounding")
+    multiple: int = InputField(default=1, ge=1, title="Multiple of", description="The multiple to round to")
+    method: Literal["Nearest", "Floor", "Ceiling", "Truncate"] = InputField(
+        default="Nearest", description="The method to use for rounding"
+    )
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         if self.method == "Nearest":
@@ -79,7 +87,7 @@ class FloatToIntegerInvocation(BaseInvocation):
             return IntegerOutput(value=np.floor(self.value / self.multiple) * self.multiple)
         elif self.method == "Ceiling":
             return IntegerOutput(value=np.ceil(self.value / self.multiple) * self.multiple)
-        else: #self.method == "Truncate"
+        else:  # self.method == "Truncate"
             return IntegerOutput(value=int(self.value / self.multiple) * self.multiple)
 
 
@@ -103,7 +111,7 @@ INTEGER_OPERATIONS = Literal[
     "Modulus A%B",
     "Absolute Value of A",
     "Minimum(A,B)",
-    "Maximum(A,B)"
+    "Maximum(A,B)",
 ]
 
 
@@ -121,10 +129,10 @@ INTEGER_OPERATIONS = Literal[
         "power",
         "absolute value",
         "min",
-        "max"
-        ],
-        category="math",
-        version="1.0.0"
+        "max",
+    ],
+    category="math",
+    version="1.0.0",
 )
 class IntegerMathInvocation(BaseInvocation):
     """Performs integer math."""
@@ -144,7 +152,7 @@ class IntegerMathInvocation(BaseInvocation):
         return v
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        #Python doesn't support switch statements until 3.10, but InvokeAI supports back to 3.9
+        # Python doesn't support switch statements until 3.10, but InvokeAI supports back to 3.9
         if self.operation == "Add A+B":
             return IntegerOutput(value=self.a + self.b)
         elif self.operation == "Subtract A-B":
@@ -154,14 +162,14 @@ class IntegerMathInvocation(BaseInvocation):
         elif self.operation == "Divide A/B":
             return IntegerOutput(value=int(self.a / self.b))
         elif self.operation == "Exponentiate A^B":
-            return IntegerOutput(value=self.a ** self.b)
+            return IntegerOutput(value=self.a**self.b)
         elif self.operation == "Modulus A%B":
             return IntegerOutput(value=self.a % self.b)
         elif self.operation == "Absolute Value of A":
             return IntegerOutput(value=abs(self.a))
         elif self.operation == "Minimum(A,B)":
             return IntegerOutput(value=min(self.a, self.b))
-        else: #self.operation == "Maximum(A,B)":
+        else:  # self.operation == "Maximum(A,B)":
             return IntegerOutput(value=max(self.a, self.b))
 
 
@@ -173,28 +181,16 @@ FLOAT_OPERATIONS = Literal[
     "Exponentiate A^B",
     "Absolute Value of A",
     "Minimum(A,B)",
-    "Maximum(A,B)"
+    "Maximum(A,B)",
 ]
 
 
 @invocation(
     "float_math",
     title="Float Math",
-    tags=[
-        "math",
-        "float",
-        "add",
-        "subtract",
-        "multiply",
-        "divide",
-        "power",
-        "root",
-        "absolute value",
-        "min",
-        "max"
-    ],
+    tags=["math", "float", "add", "subtract", "multiply", "divide", "power", "root", "absolute value", "min", "max"],
     category="math",
-    version="1.0.0"
+    version="1.0.0",
 )
 class FloatMathInvocation(BaseInvocation):
     """Performs floating point math."""
@@ -209,12 +205,12 @@ class FloatMathInvocation(BaseInvocation):
             raise ValueError("Cannot divide by zero")
         elif values["operation"] == "Exponentiate A^B" and values["a"] == 0 and v < 0:
             raise ValueError("Cannot raise zero to a negative power")
-        elif values["operation"] == "Exponentiate A^B" and type(values["a"]**v) == complex:
+        elif values["operation"] == "Exponentiate A^B" and type(values["a"] ** v) == complex:
             raise ValueError("Root operation resulted in a complex number")
         return v
 
     def invoke(self, context: InvocationContext) -> FloatOutput:
-        #Python doesn't support switch statements until 3.10, but InvokeAI supports back to 3.9
+        # Python doesn't support switch statements until 3.10, but InvokeAI supports back to 3.9
         if self.operation == "Add A+B":
             return FloatOutput(value=self.a + self.b)
         elif self.operation == "Subtract A-B":
@@ -224,12 +220,12 @@ class FloatMathInvocation(BaseInvocation):
         elif self.operation == "Divide A/B":
             return FloatOutput(value=self.a / self.b)
         elif self.operation == "Exponentiate A^B":
-            return FloatOutput(value=self.a ** self.b)
+            return FloatOutput(value=self.a**self.b)
         elif self.operation == "Square Root of A":
             return FloatOutput(value=np.sqrt(self.a))
         elif self.operation == "Absolute Value of A":
             return FloatOutput(value=abs(self.a))
         elif self.operation == "Minimum(A,B)":
             return FloatOutput(value=min(self.a, self.b))
-        else: #self.operation == "Maximum(A,B)":
+        else:  # self.operation == "Maximum(A,B)":
             return FloatOutput(value=max(self.a, self.b))
