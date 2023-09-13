@@ -10,11 +10,14 @@ import { setAdvancedAddScanModel } from '../../store/modelManagerSlice';
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
 import AdvancedAddDiffusers from './AdvancedAddDiffusers';
 import { ManualAddMode, advancedAddModeData } from './AdvancedAddModels';
+import { useTranslation } from 'react-i18next';
 
 export default function ScanAdvancedAddModels() {
   const advancedAddScanModel = useAppSelector(
     (state: RootState) => state.modelmanager.advancedAddScanModel
   );
+
+  const { t } = useTranslation();
 
   const [advancedAddMode, setAdvancedAddMode] =
     useState<ManualAddMode>('diffusers');
@@ -64,13 +67,13 @@ export default function ScanAdvancedAddModels() {
         </Text>
         <IAIIconButton
           icon={<FaTimes />}
-          aria-label="Close Advanced"
+          aria-label={t('modelManager.closeAdvanced')}
           onClick={() => dispatch(setAdvancedAddScanModel(null))}
           size="sm"
         />
       </Flex>
       <IAIMantineSelect
-        label="Model Type"
+        label={t('modelManager.modelType')}
         value={advancedAddMode}
         data={advancedAddModeData}
         onChange={(v) => {

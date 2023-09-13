@@ -4,6 +4,7 @@ import IAISwitch from 'common/components/IAISwitch';
 import { setShouldUseSDXLRefiner } from 'features/sdxl/store/sdxlSlice';
 import { ChangeEvent } from 'react';
 import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
+import { useTranslation } from 'react-i18next';
 
 export default function ParamUseSDXLRefiner() {
   const shouldUseSDXLRefiner = useAppSelector(
@@ -12,6 +13,7 @@ export default function ParamUseSDXLRefiner() {
   const isRefinerAvailable = useIsRefinerAvailable();
 
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleUseSDXLRefinerChange = (e: ChangeEvent<HTMLInputElement>) => {
     dispatch(setShouldUseSDXLRefiner(e.target.checked));
@@ -19,7 +21,7 @@ export default function ParamUseSDXLRefiner() {
 
   return (
     <IAISwitch
-      label="Use Refiner"
+      label={t('sdxl.useRefiner')}
       isChecked={shouldUseSDXLRefiner}
       onChange={handleUseSDXLRefinerChange}
       isDisabled={!isRefinerAvailable}

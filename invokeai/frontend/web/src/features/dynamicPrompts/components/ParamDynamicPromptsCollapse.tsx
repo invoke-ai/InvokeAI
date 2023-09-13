@@ -9,6 +9,7 @@ import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 import ParamDynamicPromptsCombinatorial from './ParamDynamicPromptsCombinatorial';
 import ParamDynamicPromptsToggle from './ParamDynamicPromptsEnabled';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -22,6 +23,7 @@ const selector = createSelector(
 
 const ParamDynamicPromptsCollapse = () => {
   const { activeLabel } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   const isDynamicPromptingEnabled =
     useFeatureStatus('dynamicPrompting').isFeatureEnabled;
@@ -31,7 +33,7 @@ const ParamDynamicPromptsCollapse = () => {
   }
 
   return (
-    <IAICollapse label="Dynamic Prompts" activeLabel={activeLabel}>
+    <IAICollapse label={t('prompt.dynamicPrompts')} activeLabel={activeLabel}>
       <Flex sx={{ gap: 2, flexDir: 'column' }}>
         <ParamDynamicPromptsToggle />
         <ParamDynamicPromptsCombinatorial />
