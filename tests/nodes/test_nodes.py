@@ -96,7 +96,7 @@ class AnyTypeTestInvocation(BaseInvocation):
 
 @invocation("test_polymorphic")
 class PolymorphicStringTestInvocation(BaseInvocation):
-    value: Union[list[str], str] = Field(default="")
+    value: Union[str, list[str]] = Field(default="")
 
     def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
         if isinstance(self.value, str):

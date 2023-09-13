@@ -9,7 +9,12 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.image import ShowImageInvocation
 from invokeai.app.invocations.math import AddInvocation, SubtractInvocation
-from invokeai.app.invocations.primitives import FloatInvocation, IntegerInvocation, StringInvocation
+from invokeai.app.invocations.primitives import (
+    FloatCollectionInvocation,
+    FloatInvocation,
+    IntegerInvocation,
+    StringInvocation,
+)
 from invokeai.app.invocations.upscale import ESRGANInvocation
 from invokeai.app.services.default_graphs import create_text_to_image
 from invokeai.app.services.graph import (
@@ -705,7 +710,7 @@ def test_polymorphic_accepts_single():
     g.add_edge(e1)
 
 
-def test_polymorphic_accepts_collection():
+def test_polymorphic_accepts_collection_of_same_base_type():
     g = Graph()
     n1 = PromptCollectionTestInvocation(id="1", collection=["banana", "sundae"])
     n2 = PolymorphicStringTestInvocation(id="2")
@@ -714,6 +719,36 @@ def test_polymorphic_accepts_collection():
     e1 = create_edge(n1.id, "collection", n2.id, "value")
     # Not throwing on this line is sufficient
     g.add_edge(e1)
+
+
+def test_polymorphic_does_not_accept_collection_of_different_base_type():
+    g = Graph()
+    n1 = FloatCollectionInvocation(id="1", collection=[1.0, 2.0, 3.0])
+    n2 = PolymorphicStringTestInvocation(id="2")
+    g.add_node(n1)
+    g.add_node(n2)
+    e1 = create_edge(n1.id, "collection", n2.id, "value")
+    with pytest.raises(InvalidEdgeError):
+        g.add_edge(e1)
+
+
+def test_polymorphic_does_not_accept_generic_collection():
+    g = Graph()
+    n1 = IntegerInvocation(id="1", value=1)
+    n2 = IntegerInvocation(id="2", value=2)
+    n3 = CollectInvocation(id="3")
+    n4 = PolymorphicStringTestInvocation(id="4")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+    g.add_node(n4)
+    e1 = create_edge(n1.id, "value", n3.id, "item")
+    e2 = create_edge(n2.id, "value", n3.id, "item")
+    e3 = create_edge(n3.id, "collection", n4.id, "value")
+    g.add_edge(e1)
+    g.add_edge(e2)
+    with pytest.raises(InvalidEdgeError):
+        g.add_edge(e3)
 
 
 def test_any_accepts_integer():
@@ -777,6 +812,29 @@ def test_any_accepts_any():
     e = create_edge(n1.id, "value", n2.id, "value")
     # Not throwing on this line is sufficient
     g.add_edge(e)
+
+
+@pytest.mark.xfail(
+    reason="""We need to update the validation for Collect -> Iterate to traverse to the Iterate
+    node's output and compare that against the item type of the Collect node's collection"""
+)
+def test_iterate_accepts_collection():
+    g = Graph()
+    n1 = IntegerInvocation(id="1", value=1)
+    n2 = IntegerInvocation(id="2", value=2)
+    n3 = CollectInvocation(id="3")
+    n4 = IterateInvocation(id="4")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+    g.add_node(n4)
+    e1 = create_edge(n1.id, "value", n3.id, "item")
+    e2 = create_edge(n2.id, "value", n3.id, "item")
+    e3 = create_edge(n3.id, "collection", n4.id, "collection")
+    g.add_edge(e1)
+    g.add_edge(e2)
+    # Not throwing on this line is sufficient
+    g.add_edge(e3)
 
 
 def test_graph_can_generate_schema():
