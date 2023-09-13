@@ -1,4 +1,5 @@
 import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
+import { JSXElementConstructor, ReactElement, ReactNode } from 'react';
 
 export type Coordinates = {
   x: number;
@@ -11,6 +12,17 @@ export type Dimensions = {
 };
 
 export type Rect = Coordinates & Dimensions;
+
+export type CustomStarUi = {
+  on: {
+    icon: ReactElement<any, string | JSXElementConstructor<any>> | undefined;
+    text: string;
+  };
+  off: {
+    icon: ReactElement<any, string | JSXElementConstructor<any>> | undefined;
+    text: string;
+  };
+};
 
 export interface UIState {
   activeTab: number;
@@ -25,4 +37,5 @@ export interface UIState {
   favoriteSchedulers: SchedulerParam[];
   globalContextMenuCloseTrigger: number;
   panels: Record<string, string>;
+  customStarUi?: CustomStarUi;
 }
