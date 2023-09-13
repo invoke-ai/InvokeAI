@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from queue import Queue
-from typing import Dict, Union, Optional
+from typing import Dict, Optional, Union
 
 import torch
 

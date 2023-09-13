@@ -130,37 +130,8 @@ export const imagesApi = api.injectEndpoints({
         extraOptions,
         fetchWithBaseQuery
       ) => {
-        const authToken = $authToken.get();
-        const projectId = $projectId.get();
-        const customBaseQuery = fetchBaseQuery({
-          baseUrl: '',
-          prepareHeaders: (headers) => {
-            if (authToken) {
-              headers.set('Authorization', `Bearer ${authToken}`);
-            }
-            if (projectId) {
-              headers.set('project-id', projectId);
-            }
-
-            return headers;
-          },
-          responseHandler: async (res) => {
-            return await res.blob();
-          },
-        });
-
-        const response = await customBaseQuery(
-          args.image.image_url,
-          api,
-          extraOptions
-        );
-        const blobData = await getMetadataAndWorkflowFromImageBlob(
-          response.data as Blob
-        );
-
-        let metadata = blobData.metadata;
-
         if (args.shouldFetchMetadataFromApi) {
+          let metadata;
           const metadataResponse = await fetchWithBaseQuery(
             `images/i/${args.image.image_name}/metadata`
           );
@@ -173,9 +144,38 @@ export const imagesApi = api.injectEndpoints({
               metadata = metadataResult.data;
             }
           }
-        }
+          return { data: { metadata } };
+        } else {
+          const authToken = $authToken.get();
+          const projectId = $projectId.get();
+          const customBaseQuery = fetchBaseQuery({
+            baseUrl: '',
+            prepareHeaders: (headers) => {
+              if (authToken) {
+                headers.set('Authorization', `Bearer ${authToken}`);
+              }
+              if (projectId) {
+                headers.set('project-id', projectId);
+              }
 
-        return { data: { ...blobData, metadata } };
+              return headers;
+            },
+            responseHandler: async (res) => {
+              return await res.blob();
+            },
+          });
+
+          const response = await customBaseQuery(
+            args.image.image_url,
+            api,
+            extraOptions
+          );
+          const data = await getMetadataAndWorkflowFromImageBlob(
+            response.data as Blob
+          );
+
+          return { data };
+        }
       },
       providesTags: (result, error, { image }) => [
         { type: 'ImageMetadataFromFile', id: image.image_name },
