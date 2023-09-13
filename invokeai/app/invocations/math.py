@@ -103,16 +103,29 @@ class RoundInvocation(BaseInvocation):
 
 
 INTEGER_OPERATIONS = Literal[
-    "Add A+B",
-    "Subtract A-B",
-    "Multiply A*B",
-    "Divide A/B",
-    "Exponentiate A^B",
-    "Modulus A%B",
-    "Absolute Value of A",
-    "Minimum(A,B)",
-    "Maximum(A,B)",
+    "ADD",
+    "SUB",
+    "MUL",
+    "DIV",
+    "EXP",
+    "MOD",
+    "ABS",
+    "MIN",
+    "MAX",
 ]
+
+
+INTEGER_OPERATIONS_LABELS = dict(
+    ADD="Add A+B",
+    SUB="Subtract A-B",
+    MUL="Multiply A*B",
+    DIV="Divide A/B",
+    EXP="Exponentiate A^B",
+    MOD="Modulus A%B",
+    ABS="Absolute Value of A",
+    MIN="Minimum(A,B)",
+    MAX="Maximum(A,B)",
+)
 
 
 @invocation(
@@ -137,52 +150,68 @@ INTEGER_OPERATIONS = Literal[
 class IntegerMathInvocation(BaseInvocation):
     """Performs integer math."""
 
-    operation: INTEGER_OPERATIONS = InputField(default="Add A+B", description="The operation to perform")
+    operation: INTEGER_OPERATIONS = InputField(
+        default="ADD", description="The operation to perform", ui_choice_labels=INTEGER_OPERATIONS_LABELS
+    )
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
     @validator("b")
     def no_unrepresentable_results(cls, v, values):
-        if values["operation"] == "Divide A/B" and v == 0:
+        if values["operation"] == "DIV" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif values["operation"] == "Modulus A%B" and v == 0:
+        elif values["operation"] == "MOD" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif values["operation"] == "Exponentiate A^B" and v < 0:
+        elif values["operation"] == "EXP" and v < 0:
             raise ValueError("Result of exponentiation is not an integer")
         return v
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         # Python doesn't support switch statements until 3.10, but InvokeAI supports back to 3.9
-        if self.operation == "Add A+B":
+        if self.operation == "ADD":
             return IntegerOutput(value=self.a + self.b)
-        elif self.operation == "Subtract A-B":
+        elif self.operation == "SUB":
             return IntegerOutput(value=self.a - self.b)
-        elif self.operation == "Multiply A*B":
+        elif self.operation == "MUL":
             return IntegerOutput(value=self.a * self.b)
-        elif self.operation == "Divide A/B":
+        elif self.operation == "DIV":
             return IntegerOutput(value=int(self.a / self.b))
-        elif self.operation == "Exponentiate A^B":
+        elif self.operation == "EXP":
             return IntegerOutput(value=self.a**self.b)
-        elif self.operation == "Modulus A%B":
+        elif self.operation == "MOD":
             return IntegerOutput(value=self.a % self.b)
-        elif self.operation == "Absolute Value of A":
+        elif self.operation == "ABS":
             return IntegerOutput(value=abs(self.a))
-        elif self.operation == "Minimum(A,B)":
+        elif self.operation == "MIN":
             return IntegerOutput(value=min(self.a, self.b))
-        else:  # self.operation == "Maximum(A,B)":
+        else:  # self.operation == "MAX":
             return IntegerOutput(value=max(self.a, self.b))
 
 
 FLOAT_OPERATIONS = Literal[
-    "Add A+B",
-    "Subtract A-B",
-    "Multiply A*B",
-    "Divide A/B",
-    "Exponentiate A^B",
-    "Absolute Value of A",
-    "Minimum(A,B)",
-    "Maximum(A,B)",
+    "ADD",
+    "SUB",
+    "MUL",
+    "DIV",
+    "EXP",
+    "ABS",
+    "SQRT",
+    "MIN",
+    "MAX",
 ]
+
+
+FLOAT_OPERATIONS_LABELS = dict(
+    ADD="Add A+B",
+    SUB="Subtract A-B",
+    MUL="Multiply A*B",
+    DIV="Divide A/B",
+    EXP="Exponentiate A^B",
+    ABS="Absolute Value of A",
+    SQRT="Square Root of A",
+    MIN="Minimum(A,B)",
+    MAX="Maximum(A,B)",
+)
 
 
 @invocation(
@@ -195,37 +224,39 @@ FLOAT_OPERATIONS = Literal[
 class FloatMathInvocation(BaseInvocation):
     """Performs floating point math."""
 
-    operation: FLOAT_OPERATIONS = InputField(default="Add A+B", description="The operation to perform")
+    operation: FLOAT_OPERATIONS = InputField(
+        default="ADD", description="The operation to perform", ui_choice_labels=FLOAT_OPERATIONS_LABELS
+    )
     a: float = InputField(default=0, description=FieldDescriptions.num_1)
     b: float = InputField(default=0, description=FieldDescriptions.num_2)
 
     @validator("b")
     def no_unrepresentable_results(cls, v, values):
-        if values["operation"] == "Divide A/B" and v == 0:
+        if values["operation"] == "DIV" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif values["operation"] == "Exponentiate A^B" and values["a"] == 0 and v < 0:
+        elif values["operation"] == "EXP" and values["a"] == 0 and v < 0:
             raise ValueError("Cannot raise zero to a negative power")
-        elif values["operation"] == "Exponentiate A^B" and type(values["a"] ** v) == complex:
+        elif values["operation"] == "EXP" and type(values["a"] ** v) == complex:
             raise ValueError("Root operation resulted in a complex number")
         return v
 
     def invoke(self, context: InvocationContext) -> FloatOutput:
         # Python doesn't support switch statements until 3.10, but InvokeAI supports back to 3.9
-        if self.operation == "Add A+B":
+        if self.operation == "ADD":
             return FloatOutput(value=self.a + self.b)
-        elif self.operation == "Subtract A-B":
+        elif self.operation == "SUB":
             return FloatOutput(value=self.a - self.b)
-        elif self.operation == "Multiply A*B":
+        elif self.operation == "MUL":
             return FloatOutput(value=self.a * self.b)
-        elif self.operation == "Divide A/B":
+        elif self.operation == "DIV":
             return FloatOutput(value=self.a / self.b)
-        elif self.operation == "Exponentiate A^B":
+        elif self.operation == "EXP":
             return FloatOutput(value=self.a**self.b)
-        elif self.operation == "Square Root of A":
+        elif self.operation == "SQRT":
             return FloatOutput(value=np.sqrt(self.a))
-        elif self.operation == "Absolute Value of A":
+        elif self.operation == "ABS":
             return FloatOutput(value=abs(self.a))
-        elif self.operation == "Minimum(A,B)":
+        elif self.operation == "MIN":
             return FloatOutput(value=min(self.a, self.b))
-        else:  # self.operation == "Maximum(A,B)":
+        else:  # self.operation == "MAX":
             return FloatOutput(value=max(self.a, self.b))
