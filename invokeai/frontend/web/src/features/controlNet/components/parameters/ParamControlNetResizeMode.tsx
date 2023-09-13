@@ -6,22 +6,24 @@ import {
   controlNetResizeModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type ParamControlNetResizeModeProps = {
   controlNet: ControlNetConfig;
 };
-
-const RESIZE_MODE_DATA = [
-  { label: 'Resize', value: 'just_resize' },
-  { label: 'Crop', value: 'crop_resize' },
-  { label: 'Fill', value: 'fill_resize' },
-];
 
 export default function ParamControlNetResizeMode(
   props: ParamControlNetResizeModeProps
 ) {
   const { resizeMode, isEnabled, controlNetId } = props.controlNet;
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+
+  const RESIZE_MODE_DATA = [
+    { label: t('controlnet.resize'), value: 'just_resize' },
+    { label: t('controlnet.crop'), value: 'crop_resize' },
+    { label: t('controlnet.fill'), value: 'fill_resize' },
+  ];
 
   const handleResizeModeChange = useCallback(
     (resizeMode: ResizeModes) => {
@@ -33,7 +35,7 @@ export default function ParamControlNetResizeMode(
   return (
     <IAIMantineSelect
       disabled={!isEnabled}
-      label="Resize Mode"
+      label={t('controlnet.resizeMode')}
       data={RESIZE_MODE_DATA}
       value={String(resizeMode)}
       onChange={handleResizeModeChange}

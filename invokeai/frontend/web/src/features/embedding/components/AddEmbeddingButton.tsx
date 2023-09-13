@@ -1,6 +1,7 @@
 import IAIIconButton from 'common/components/IAIIconButton';
 import { memo } from 'react';
 import { FaCode } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   onClick: () => void;
@@ -8,11 +9,12 @@ type Props = {
 
 const AddEmbeddingButton = (props: Props) => {
   const { onClick } = props;
+  const { t } = useTranslation();
   return (
     <IAIIconButton
       size="sm"
-      aria-label="Add Embedding"
-      tooltip="Add Embedding"
+      aria-label={t('embedding.addEmbedding')}
+      tooltip={t('embedding.addEmbedding')}
       icon={<FaCode />}
       sx={{
         p: 2,

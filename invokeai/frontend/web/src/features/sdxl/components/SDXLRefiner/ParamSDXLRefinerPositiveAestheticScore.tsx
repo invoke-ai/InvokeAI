@@ -6,6 +6,7 @@ import IAISlider from 'common/components/IAISlider';
 import { setRefinerPositiveAestheticScore } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
@@ -27,6 +28,7 @@ const ParamSDXLRefinerPositiveAestheticScore = () => {
   const isRefinerAvailable = useIsRefinerAvailable();
 
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleChange = useCallback(
     (v: number) => dispatch(setRefinerPositiveAestheticScore(v)),
@@ -40,7 +42,7 @@ const ParamSDXLRefinerPositiveAestheticScore = () => {
 
   return (
     <IAISlider
-      label="Positive Aesthetic Score"
+      label={t('sdxl.posAestheticScore')}
       step={shift ? 0.1 : 0.5}
       min={1}
       max={10}

@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIIconButton from 'common/components/IAIIconButton';
 import { FaLink } from 'react-icons/fa';
 import { setShouldConcatSDXLStylePrompt } from '../store/sdxlSlice';
+import { useTranslation } from 'react-i18next';
 
 export default function ParamSDXLConcatButton() {
   const shouldConcatSDXLStylePrompt = useAppSelector(
@@ -10,6 +11,7 @@ export default function ParamSDXLConcatButton() {
   );
 
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleShouldConcatPromptChange = () => {
     dispatch(setShouldConcatSDXLStylePrompt(!shouldConcatSDXLStylePrompt));
@@ -17,8 +19,8 @@ export default function ParamSDXLConcatButton() {
 
   return (
     <IAIIconButton
-      aria-label="Concatenate Prompt & Style"
-      tooltip="Concatenate Prompt & Style"
+      aria-label={t('sdxl.concatPromptStyle')}
+      tooltip={t('sdxl.concatPromptStyle')}
       variant="outline"
       isChecked={shouldConcatSDXLStylePrompt}
       onClick={handleShouldConcatPromptChange}

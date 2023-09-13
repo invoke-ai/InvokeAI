@@ -6,6 +6,7 @@ import { isInvocationNode } from 'features/nodes/types/types';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { forEach, map } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
+import i18n from 'i18next';
 
 const selector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -19,22 +20,22 @@ const selector = createSelector(
 
     // Cannot generate if already processing an image
     if (isProcessing) {
-      reasons.push('System busy');
+      reasons.push(i18n.t('parameters.invoke.systemBusy'));
     }
 
     // Cannot generate if not connected
     if (!isConnected) {
-      reasons.push('System disconnected');
+      reasons.push(i18n.t('parameters.invoke.systemDisconnected'));
     }
 
     if (activeTabName === 'img2img' && !initialImage) {
-      reasons.push('No initial image selected');
+      reasons.push(i18n.t('parameters.invoke.noInitialImageSelected'));
     }
 
     if (activeTabName === 'nodes') {
       if (nodes.shouldValidateGraph) {
         if (!nodes.nodes.length) {
-          reasons.push('No nodes in graph');
+          reasons.push(i18n.t('parameters.invoke.noNodesInGraph'));
         }
 
         nodes.nodes.forEach((node) => {
@@ -46,7 +47,7 @@ const selector = createSelector(
 
           if (!nodeTemplate) {
             // Node type not found
-            reasons.push('Missing node template');
+            reasons.push(i18n.t('parameters.invoke.missingNodeTemplate'));
             return;
           }
 
@@ -60,7 +61,7 @@ const selector = createSelector(
             );
 
             if (!fieldTemplate) {
-              reasons.push('Missing field template');
+              reasons.push(i18n.t('parameters.invoke.missingFieldTemplate'));
               return;
             }
 
@@ -70,9 +71,10 @@ const selector = createSelector(
               !hasConnection
             ) {
               reasons.push(
-                `${node.data.label || nodeTemplate.title} -> ${
-                  field.label || fieldTemplate.title
-                } missing input`
+                i18n.t('parameters.invoke.missingInputForField', {
+                  nodeLabel: node.data.label || nodeTemplate.title,
+                  fieldLabel: field.label || fieldTemplate.title,
+                })
               );
               return;
             }
@@ -81,7 +83,7 @@ const selector = createSelector(
       }
     } else {
       if (!model) {
-        reasons.push('No model selected');
+        reasons.push(i18n.t('parameters.invoke.noModelSelected'));
       }
 
       if (state.controlNet.isEnabled) {
@@ -90,7 +92,9 @@ const selector = createSelector(
             return;
           }
           if (!controlNet.model) {
-            reasons.push(`ControlNet ${i + 1} has no model selected.`);
+            reasons.push(
+              i18n.t('parameters.invoke.noModelForControlNet', { index: i + 1 })
+            );
           }
 
           if (
@@ -98,7 +102,11 @@ const selector = createSelector(
             (!controlNet.processedControlImage &&
               controlNet.processorType !== 'none')
           ) {
-            reasons.push(`ControlNet ${i + 1} has no control image`);
+            reasons.push(
+              i18n.t('parameters.invoke.noControlImageForControlNet', {
+                index: i + 1,
+              })
+            );
           }
         });
       }

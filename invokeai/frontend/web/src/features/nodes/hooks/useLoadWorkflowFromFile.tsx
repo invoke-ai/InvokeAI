@@ -9,10 +9,12 @@ import { memo, useCallback } from 'react';
 import { ZodError } from 'zod';
 import { fromZodError, fromZodIssue } from 'zod-validation-error';
 import { workflowLoadRequested } from '../store/actions';
+import { useTranslation } from 'react-i18next';
 
 export const useLoadWorkflowFromFile = () => {
   const dispatch = useAppDispatch();
   const logger = useLogger('nodes');
+  const { t } = useTranslation();
   const loadWorkflowFromFile = useCallback(
     (file: File | null) => {
       if (!file) {
@@ -28,7 +30,7 @@ export const useLoadWorkflowFromFile = () => {
 
           if (!result.success) {
             const { message } = fromZodError(result.error, {
-              prefix: 'Workflow Validation Error',
+              prefix: t('nodes.workflowValidation'),
             });
 
             logger.error({ error: parseify(result.error) }, message);
@@ -36,7 +38,7 @@ export const useLoadWorkflowFromFile = () => {
             dispatch(
               addToast(
                 makeToast({
-                  title: 'Unable to Validate Workflow',
+                  title: t('nodes.unableToValidateWorkflow'),
                   status: 'error',
                   duration: 5000,
                 })
@@ -54,7 +56,7 @@ export const useLoadWorkflowFromFile = () => {
           dispatch(
             addToast(
               makeToast({
-                title: 'Unable to Load Workflow',
+                title: t('nodes.unableToLoadWorkflow'),
                 status: 'error',
               })
             )
@@ -64,7 +66,7 @@ export const useLoadWorkflowFromFile = () => {
 
       reader.readAsText(file);
     },
-    [dispatch, logger]
+    [dispatch, logger, t]
   );
 
   return loadWorkflowFromFile;
