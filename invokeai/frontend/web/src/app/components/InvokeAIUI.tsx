@@ -15,6 +15,7 @@ import { socketMiddleware } from 'services/events/middleware';
 import Loading from '../../common/components/Loading/Loading';
 import '../../i18n';
 import AppDndContext from '../../features/dnd/components/AppDndContext';
+import { CustomStarUi } from '../../features/ui/store/uiTypes';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -30,6 +31,7 @@ interface Props extends PropsWithChildren {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
+  customStarUi?: CustomStarUi;
 }
 
 const InvokeAIUI = ({
@@ -40,6 +42,7 @@ const InvokeAIUI = ({
   middleware,
   projectId,
   selectedImage,
+  customStarUi,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -90,6 +93,7 @@ const InvokeAIUI = ({
                 config={config}
                 headerComponent={headerComponent}
                 selectedImage={selectedImage}
+                customStarUi={customStarUi}
               />
             </AppDndContext>
           </ThemeLocaleProvider>

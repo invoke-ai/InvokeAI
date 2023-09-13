@@ -18,6 +18,7 @@ import {
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
 import IAIDndImageIcon from '../../../../common/components/IAIDndImageIcon';
+import { uiSelector } from '../../../ui/store/uiSelectors';
 import { useTranslation } from 'react-i18next';
 
 interface HoverableImageProps {
@@ -33,6 +34,8 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const { handleClick, isSelected, selection, selectionCount } =
     useMultiselect(imageDTO);
+
+  const { customStarUi } = useAppSelector(uiSelector);
 
   const handleDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -91,12 +94,22 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const starIcon = useMemo(() => {
     if (imageDTO?.starred) {
-      return <MdStar size="20" />;
+      return customStarUi ? customStarUi.on.icon : <MdStar size="20" />;
     }
     if (!imageDTO?.starred && isHovered) {
-      return <MdStarBorder size="20" />;
+      return customStarUi ? customStarUi.off.icon : <MdStarBorder size="20" />;
     }
-  }, [imageDTO?.starred, isHovered]);
+  }, [imageDTO?.starred, isHovered, customStarUi]);
+
+  const starTooltip = useMemo(() => {
+    if (imageDTO?.starred) {
+      return customStarUi ? customStarUi.off.text : 'Unstar';
+    }
+    if (!imageDTO?.starred) {
+      return customStarUi ? customStarUi.on.text : 'Star';
+    }
+    return '';
+  }, [imageDTO?.starred, customStarUi]);
 
   if (!imageDTO) {
     return <IAIFillSkeleton />;
@@ -131,7 +144,7 @@ const GalleryImage = (props: HoverableImageProps) => {
             <IAIDndImageIcon
               onClick={toggleStarredState}
               icon={starIcon}
-              tooltip={imageDTO.starred ? 'Unstar' : 'Star'}
+              tooltip={starTooltip}
             />
 
             {isHovered && shift && (
