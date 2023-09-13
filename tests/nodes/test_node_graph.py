@@ -26,12 +26,12 @@ from invokeai.app.services.graph import (
 )
 
 from .test_nodes import (
+    AnyTypeTestInvocation,
     ImageToImageTestInvocation,
     ListPassThroughInvocation,
     PolymorphicStringTestInvocation,
     PromptCollectionTestInvocation,
     PromptTestInvocation,
-    AnyTypeTestInvocation,
     TextToImageTestInvocation,
 )
 
