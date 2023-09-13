@@ -8,10 +8,12 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodeOpacityChanged } from 'features/nodes/store/nodesSlice';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function NodeOpacitySlider() {
   const dispatch = useAppDispatch();
   const nodeOpacity = useAppSelector((state) => state.nodes.nodeOpacity);
+  const { t } = useTranslation();
 
   const handleChange = useCallback(
     (v: number) => {
@@ -23,7 +25,7 @@ export default function NodeOpacitySlider() {
   return (
     <Flex alignItems="center">
       <Slider
-        aria-label="Node Opacity"
+        aria-label={t('nodes.nodeOpacity')}
         value={nodeOpacity}
         min={0.5}
         max={1}

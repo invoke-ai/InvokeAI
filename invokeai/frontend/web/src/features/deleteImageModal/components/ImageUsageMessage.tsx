@@ -2,16 +2,19 @@ import { ListItem, Text, UnorderedList } from '@chakra-ui/react';
 import { some } from 'lodash-es';
 import { memo } from 'react';
 import { ImageUsage } from '../store/types';
+import { useTranslation } from 'react-i18next';
+
 type Props = {
   imageUsage?: ImageUsage;
   topMessage?: string;
   bottomMessage?: string;
 };
 const ImageUsageMessage = (props: Props) => {
+  const { t } = useTranslation();
   const {
     imageUsage,
-    topMessage = 'This image is currently in use in the following features:',
-    bottomMessage = 'If you delete this image, those features will immediately be reset.',
+    topMessage = t('gallery.currentlyInUse'),
+    bottomMessage = t('gallery.featuresWillReset'),
   } = props;
 
   if (!imageUsage) {
@@ -26,10 +29,18 @@ const ImageUsageMessage = (props: Props) => {
     <>
       <Text>{topMessage}</Text>
       <UnorderedList sx={{ paddingInlineStart: 6 }}>
-        {imageUsage.isInitialImage && <ListItem>Image to Image</ListItem>}
-        {imageUsage.isCanvasImage && <ListItem>Unified Canvas</ListItem>}
-        {imageUsage.isControlNetImage && <ListItem>ControlNet</ListItem>}
-        {imageUsage.isNodesImage && <ListItem>Node Editor</ListItem>}
+        {imageUsage.isInitialImage && (
+          <ListItem>{t('common.img2img')}</ListItem>
+        )}
+        {imageUsage.isCanvasImage && (
+          <ListItem>{t('common.unifiedCanvas')}</ListItem>
+        )}
+        {imageUsage.isControlNetImage && (
+          <ListItem>{t('common.controlNet')}</ListItem>
+        )}
+        {imageUsage.isNodesImage && (
+          <ListItem>{t('common.nodeEditor')}</ListItem>
+        )}
       </UnorderedList>
       <Text>{bottomMessage}</Text>
     </>

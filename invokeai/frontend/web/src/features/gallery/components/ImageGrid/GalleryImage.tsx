@@ -18,6 +18,7 @@ import {
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
 import IAIDndImageIcon from '../../../../common/components/IAIDndImageIcon';
+import { useTranslation } from 'react-i18next';
 
 interface HoverableImageProps {
   imageName: string;
@@ -28,6 +29,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const { imageName } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
   const shift = useAppSelector((state) => state.hotkeys.shift);
+  const { t } = useTranslation();
 
   const { handleClick, isSelected, selection, selectionCount } =
     useMultiselect(imageDTO);
@@ -136,7 +138,7 @@ const GalleryImage = (props: HoverableImageProps) => {
               <IAIDndImageIcon
                 onClick={handleDelete}
                 icon={<FaTrash />}
-                tooltip="Delete"
+                tooltip={t('gallery.deleteImage')}
                 styleOverrides={{
                   bottom: 2,
                   top: 'auto',

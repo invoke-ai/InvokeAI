@@ -7,6 +7,7 @@ import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.pidi_image_processor
   .default as RequiredPidiImageProcessorInvocation;
@@ -22,6 +23,7 @@ const PidiProcessor = (props: Props) => {
   const { image_resolution, detect_resolution, scribble, safe } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const isBusy = useAppSelector(selectIsBusy);
+  const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -66,7 +68,7 @@ const PidiProcessor = (props: Props) => {
   return (
     <ProcessorWrapper>
       <IAISlider
-        label="Detect Resolution"
+        label={t('controlnet.detectResolution')}
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
         handleReset={handleDetectResolutionReset}
@@ -78,7 +80,7 @@ const PidiProcessor = (props: Props) => {
         isDisabled={isBusy || !isEnabled}
       />
       <IAISlider
-        label="Image Resolution"
+        label={t('controlnet.imageResolution')}
         value={image_resolution}
         onChange={handleImageResolutionChanged}
         handleReset={handleImageResolutionReset}
@@ -90,12 +92,12 @@ const PidiProcessor = (props: Props) => {
         isDisabled={isBusy || !isEnabled}
       />
       <IAISwitch
-        label="Scribble"
+        label={t('controlnet.scribble')}
         isChecked={scribble}
         onChange={handleScribbleChanged}
       />
       <IAISwitch
-        label="Safe"
+        label={t('controlnet.safe')}
         isChecked={safe}
         onChange={handleSafeChanged}
         isDisabled={isBusy || !isEnabled}

@@ -18,6 +18,7 @@ import {
   useEffect,
   useRef,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   [stateSelector],
@@ -32,6 +33,7 @@ const BoardsSearch = () => {
   const dispatch = useAppDispatch();
   const { boardSearchText } = useAppSelector(selector);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
   const handleBoardSearch = useCallback(
     (searchTerm: string) => {
@@ -73,7 +75,7 @@ const BoardsSearch = () => {
     <InputGroup>
       <Input
         ref={inputRef}
-        placeholder="Search Boards..."
+        placeholder={t('boards.searchBoard')}
         value={boardSearchText}
         onKeyDown={handleKeydown}
         onChange={handleChange}
@@ -84,7 +86,7 @@ const BoardsSearch = () => {
             onClick={clearBoardSearch}
             size="xs"
             variant="ghost"
-            aria-label="Clear Search"
+            aria-label={t('boards.clearSearch')}
             opacity={0.5}
             icon={<CloseIcon boxSize={2} />}
           />
