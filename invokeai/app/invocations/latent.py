@@ -48,7 +48,6 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
-from ...backend.util.logging import InvokeAILogger
 from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
@@ -608,19 +607,10 @@ class LatentsToImageInvocation(BaseInvocation):
                 vae.to(dtype=torch.float16)
                 latents = latents.half()
 
-            try:
-                if self.tiled or context.services.configuration.tiled_decode:
-                    vae.enable_tiling()
-                else:
-                    vae.disable_tiling()
-            except AttributeError as err:
-                # FIXME: This is a TEMPORARY measure until AutoencoderTiny gets tiling support from https://github.com/huggingface/diffusers/pull/4627
-                if err.name.endswith("_tiling"):
-                    InvokeAILogger.getLogger(self.__class__.__name__).debug(
-                        "ignoring tiling error for %s", vae.__class__, exc_info=err
-                    )
-                else:
-                    raise
+            if self.tiled or context.services.configuration.tiled_decode:
+                vae.enable_tiling()
+            else:
+                vae.disable_tiling()
 
             # clear memory as vae decode can request a lot
             torch.cuda.empty_cache()
@@ -783,19 +773,10 @@ class ImageToLatentsInvocation(BaseInvocation):
                 vae.to(dtype=torch.float16)
                 # latents = latents.half()
 
-            try:
-                if tiled:
-                    vae.enable_tiling()
-                else:
-                    vae.disable_tiling()
-            except AttributeError as err:
-                # FIXME: This is a TEMPORARY measure until AutoencoderTiny gets tiling support from https://github.com/huggingface/diffusers/pull/4627
-                if err.name.endswith("_tiling"):
-                    InvokeAILogger.getLogger(ImageToLatentsInvocation.__name__).debug(
-                        "ignoring tiling error for %s", vae.__class__, exc_info=err
-                    )
-                else:
-                    raise
+            if tiled:
+                vae.enable_tiling()
+            else:
+                vae.disable_tiling()
 
             # non_noised_latents_from_image
             image_tensor = image_tensor.to(device=vae.device, dtype=vae.dtype)
