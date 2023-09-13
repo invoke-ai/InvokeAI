@@ -198,6 +198,7 @@ class _InputField(BaseModel):
     ui_type: Optional[UIType]
     ui_component: Optional[UIComponent]
     ui_order: Optional[int]
+    ui_choice_labels: Optional[dict[str, str]]
     item_default: Optional[Any]
 
 
@@ -246,6 +247,7 @@ def InputField(
     ui_component: Optional[UIComponent] = None,
     ui_hidden: bool = False,
     ui_order: Optional[int] = None,
+    ui_choice_labels: Optional[dict[str, str]] = None,
     item_default: Optional[Any] = None,
     **kwargs: Any,
 ) -> Any:
@@ -312,6 +314,7 @@ def InputField(
         ui_hidden=ui_hidden,
         ui_order=ui_order,
         item_default=item_default,
+        ui_choice_labels=ui_choice_labels,
         **kwargs,
     )
 
