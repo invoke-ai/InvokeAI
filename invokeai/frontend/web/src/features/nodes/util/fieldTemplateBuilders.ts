@@ -656,8 +656,8 @@ const buildEnumInputFieldTemplate = ({
   const template: EnumInputFieldTemplate = {
     ...baseField,
     type: 'enum',
-    enumType: (schemaObject.type as 'string' | 'number') ?? 'string', // TODO: dangerous?
-    options: options,
+    options,
+    ui_choice_labels: schemaObject.ui_choice_labels,
     default: schemaObject.default ?? options[0],
   };
 
