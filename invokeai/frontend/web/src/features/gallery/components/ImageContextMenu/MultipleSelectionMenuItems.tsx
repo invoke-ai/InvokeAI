@@ -12,10 +12,12 @@ import {
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from '../../../../services/api/endpoints/images';
+import { uiSelector } from '../../../ui/store/uiSelectors';
 
 const MultipleSelectionMenuItems = () => {
   const dispatch = useAppDispatch();
   const selection = useAppSelector((state) => state.gallery.selection);
+  const { customStarUi } = useAppSelector(uiSelector);
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
@@ -49,15 +51,18 @@ const MultipleSelectionMenuItems = () => {
     <>
       {areAllStarred && (
         <MenuItem
-          icon={<MdStarBorder />}
+          icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
           onClickCapture={handleUnstarSelection}
         >
-          Unstar All
+          {customStarUi ? customStarUi.off.text : `Unstar All`}
         </MenuItem>
       )}
       {(areAllUnstarred || (!areAllStarred && !areAllUnstarred)) && (
-        <MenuItem icon={<MdStar />} onClickCapture={handleStarSelection}>
-          Star All
+        <MenuItem
+          icon={customStarUi ? customStarUi.on.icon : <MdStar />}
+          onClickCapture={handleStarSelection}
+        >
+          {customStarUi ? customStarUi.on.text : `Star All`}
         </MenuItem>
       )}
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>

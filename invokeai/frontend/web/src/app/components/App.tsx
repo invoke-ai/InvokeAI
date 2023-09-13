@@ -18,6 +18,8 @@ import { usePreselectedImage } from '../../features/parameters/hooks/usePreselec
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
+import { CustomStarUi } from '../../features/ui/store/uiTypes';
+import { setCustomStarUi } from '../../features/ui/store/uiSlice';
 
 const DEFAULT_CONFIG = {};
 
@@ -28,12 +30,14 @@ interface Props {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
+  customStarUi?: CustomStarUi;
 }
 
 const App = ({
   config = DEFAULT_CONFIG,
   headerComponent,
   selectedImage,
+  customStarUi,
 }: Props) => {
   const language = useAppSelector(languageSelector);
 
@@ -56,6 +60,12 @@ const App = ({
       dispatch(configChanged(config));
     }
   }, [dispatch, config, logger]);
+
+  useEffect(() => {
+    if (customStarUi) {
+      dispatch(setCustomStarUi(customStarUi));
+    }
+  }, [customStarUi, dispatch]);
 
   useEffect(() => {
     dispatch(appStarted());
