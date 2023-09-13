@@ -1,23 +1,21 @@
+import pytest
+
+from invokeai.app.services.graph import Graph, GraphExecutionState, LibraryGraph
+from invokeai.app.services.invocation_queue import MemoryInvocationQueue
+from invokeai.app.services.invocation_services import InvocationServices
+from invokeai.app.services.invocation_stats import InvocationStatsService
+from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.processor import DefaultInvocationProcessor
+from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
+
 from .test_nodes import (
-    TestEventService,
     ErrorInvocation,
-    TextToImageTestInvocation,
     PromptTestInvocation,
+    TestEventService,
+    TextToImageTestInvocation,
     create_edge,
     wait_until,
 )
-from invokeai.app.services.invocation_queue import MemoryInvocationQueue
-from invokeai.app.services.processor import DefaultInvocationProcessor
-from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
-from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.invocation_services import InvocationServices
-from invokeai.app.services.invocation_stats import InvocationStatsService
-from invokeai.app.services.graph import (
-    Graph,
-    GraphExecutionState,
-    LibraryGraph,
-)
-import pytest
 
 
 @pytest.fixture

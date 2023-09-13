@@ -1,19 +1,20 @@
 import os
-import torch
 from typing import Optional
-from .base import (
-    ModelBase,
-    ModelConfigBase,
-    BaseModelType,
-    ModelType,
-    SubModelType,
-    classproperty,
-    ModelNotFoundException,
-    InvalidModelException,
-)
+
+import torch
 
 # TODO: naming
 from ..lora import TextualInversionModel as TextualInversionModelRaw
+from .base import (
+    BaseModelType,
+    InvalidModelException,
+    ModelBase,
+    ModelConfigBase,
+    ModelNotFoundException,
+    ModelType,
+    SubModelType,
+    classproperty,
+)
 
 
 class TextualInversionModel(ModelBase):

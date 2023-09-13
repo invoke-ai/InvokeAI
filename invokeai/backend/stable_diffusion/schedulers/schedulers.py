@@ -1,18 +1,18 @@
 from diffusers import (
     DDIMScheduler,
+    DDPMScheduler,
+    DEISMultistepScheduler,
     DPMSolverMultistepScheduler,
-    KDPM2DiscreteScheduler,
-    KDPM2AncestralDiscreteScheduler,
-    EulerDiscreteScheduler,
+    DPMSolverSDEScheduler,
+    DPMSolverSinglestepScheduler,
     EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
     HeunDiscreteScheduler,
+    KDPM2AncestralDiscreteScheduler,
+    KDPM2DiscreteScheduler,
     LMSDiscreteScheduler,
     PNDMScheduler,
     UniPCMultistepScheduler,
-    DPMSolverSinglestepScheduler,
-    DEISMultistepScheduler,
-    DDPMScheduler,
-    DPMSolverSDEScheduler,
 )
 
 SCHEDULER_MAP = dict(

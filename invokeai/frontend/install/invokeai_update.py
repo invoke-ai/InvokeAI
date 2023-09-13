@@ -4,6 +4,7 @@ pip install <path_to_git_source>.
 """
 import os
 import platform
+
 import pkg_resources
 import psutil
 import requests

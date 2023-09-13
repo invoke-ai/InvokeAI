@@ -6,8 +6,6 @@ import pytest
 from omegaconf import OmegaConf
 from pydantic import ValidationError
 
-from invokeai.app.services.config import InvokeAIAppConfig
-
 
 @pytest.fixture
 def patch_rootdir(tmp_path: Path, monkeypatch: Any) -> None:
@@ -75,6 +73,8 @@ def test_use_init(patch_rootdir):
 
 
 def test_legacy():
+    from invokeai.app.services.config import InvokeAIAppConfig
+
     conf = InvokeAIAppConfig.get_config()
     assert conf
     conf.parse_args(conf=init3, argv=[])
@@ -86,6 +86,8 @@ def test_legacy():
 
 
 def test_argv_override():
+    from invokeai.app.services.config import InvokeAIAppConfig
+
     conf = InvokeAIAppConfig.get_config()
     conf.parse_args(conf=init1, argv=["--always_use_cpu", "--max_cache=10"])
     assert conf.always_use_cpu
@@ -166,6 +168,8 @@ def test_type_coercion(patch_rootdir):
     """
 )
 def test_deny_nodes(patch_rootdir):
+    from invokeai.app.services.config import InvokeAIAppConfig
+
     # Allow integer, string and float, but explicitly deny float
     allow_deny_nodes_conf = OmegaConf.create(
         """

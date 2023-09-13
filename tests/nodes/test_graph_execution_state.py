@@ -1,30 +1,24 @@
-from .test_invoker import create_edge
-from .test_nodes import (
+import pytest
+
+# This import must happen before other invoke imports or test in other files(!!) break
+from .test_nodes import (  # isort: split
+    PromptCollectionTestInvocation,
+    PromptTestInvocation,
     TestEventService,
     TextToImageTestInvocation,
-    PromptTestInvocation,
-    PromptCollectionTestInvocation,
 )
-from invokeai.app.services.invocation_queue import MemoryInvocationQueue
-from invokeai.app.services.processor import DefaultInvocationProcessor
-from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
-from invokeai.app.invocations.baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    InvocationContext,
-)
+
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
+from invokeai.app.services.graph import CollectInvocation, Graph, GraphExecutionState, IterateInvocation, LibraryGraph
+from invokeai.app.services.invocation_queue import MemoryInvocationQueue
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats import InvocationStatsService
-from invokeai.app.services.graph import (
-    Graph,
-    CollectInvocation,
-    IterateInvocation,
-    GraphExecutionState,
-    LibraryGraph,
-)
-import pytest
+from invokeai.app.services.processor import DefaultInvocationProcessor
+from invokeai.app.services.sqlite import SqliteItemStorage, sqlite_memory
+
+from .test_invoker import create_edge
 
 
 @pytest.fixture

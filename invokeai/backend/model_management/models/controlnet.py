@@ -1,23 +1,26 @@
 import os
-import torch
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Literal, Optional
+
+import torch
+
+import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import InvokeAIAppConfig
+
 from .base import (
+    BaseModelType,
+    EmptyConfigLoader,
+    InvalidModelException,
     ModelBase,
     ModelConfigBase,
-    BaseModelType,
+    ModelNotFoundException,
     ModelType,
     SubModelType,
-    EmptyConfigLoader,
-    calc_model_size_by_fs,
     calc_model_size_by_data,
+    calc_model_size_by_fs,
     classproperty,
-    InvalidModelException,
-    ModelNotFoundException,
 )
-from invokeai.app.services.config import InvokeAIAppConfig
-import invokeai.backend.util.logging as logger
 
 
 class ControlNetModelFormat(str, Enum):

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
-import re
 from typing import (
     TYPE_CHECKING,
     AbstractSet,
@@ -23,10 +23,10 @@ from typing import (
     get_type_hints,
 )
 
-from pydantic import BaseModel, Field, validator
-from pydantic.fields import Undefined, ModelField
-from pydantic.typing import NoArgAnyCallable
 import semver
+from pydantic import BaseModel, Field, validator
+from pydantic.fields import ModelField, Undefined
+from pydantic.typing import NoArgAnyCallable
 
 from invokeai.app.services.config.invokeai_config import InvokeAIAppConfig
 
@@ -198,6 +198,7 @@ class _InputField(BaseModel):
     ui_type: Optional[UIType]
     ui_component: Optional[UIComponent]
     ui_order: Optional[int]
+    ui_choice_labels: Optional[dict[str, str]]
     item_default: Optional[Any]
 
 
@@ -246,6 +247,7 @@ def InputField(
     ui_component: Optional[UIComponent] = None,
     ui_hidden: bool = False,
     ui_order: Optional[int] = None,
+    ui_choice_labels: Optional[dict[str, str]] = None,
     item_default: Optional[Any] = None,
     **kwargs: Any,
 ) -> Any:
@@ -312,6 +314,7 @@ def InputField(
         ui_hidden=ui_hidden,
         ui_order=ui_order,
         item_default=item_default,
+        ui_choice_labels=ui_choice_labels,
         **kwargs,
     )
 

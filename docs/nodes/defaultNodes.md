@@ -22,6 +22,7 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |Divide Integers 			| Divides two numbers|
 |Dynamic Prompt 			| Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator|
 |Upscale (RealESRGAN) 			| Upscales an image using RealESRGAN.|
+|Float Math             | Perform basic math operations on two floats|
 |Float Primitive Collection 			| A collection of float primitive values|
 |Float Primitive 			| A float primitive value|
 |Float Range 			| Creates a range|
@@ -29,6 +30,7 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |Blur Image 			| Blurs an image|
 |Extract Image Channel 			| Gets a channel from an image.|
 |Image Primitive Collection 			| A collection of image primitive values|
+|Integer Math           | Perform basic math operations on two integers|
 |Convert Image Mode 			| Converts an image to a different mode.|
 |Crop Image 			| Crops an image to a specified box. The box can be outside of the image.|
 |Image Hue Adjustment 			| Adjusts the Hue of an image.|
@@ -42,6 +44,8 @@ The table below contains a list of the default nodes shipped with InvokeAI and t
 |Paste Image 			| Pastes an image into another image.|
 |ImageProcessor 			| Base class for invocations that preprocess images for ControlNet|
 |Resize Image 			| Resizes an image to specific dimensions|
+|Round Float            | Rounds a float to a specified number of decimal places|
+|Float to Integer       | Converts a float to an integer. Optionally rounds to an even multiple of a input number.|
 |Scale Image 			| Scales an image by a factor|
 |Image to Latents 			| Encodes an image into latents.|
 |Add Invisible Watermark 			| Add an invisible watermark to an image|
