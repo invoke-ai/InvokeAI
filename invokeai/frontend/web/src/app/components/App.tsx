@@ -12,33 +12,26 @@ import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
-import { ReactNode, memo, useCallback, useEffect } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { usePreselectedImage } from '../../features/parameters/hooks/usePreselectedImage';
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import GlobalHotkeys from './GlobalHotkeys';
 import Toaster from './Toaster';
-import { CustomStarUi } from '../../features/ui/store/uiTypes';
-import { setCustomStarUi } from '../../features/ui/store/uiSlice';
+import { useStore } from '@nanostores/react';
+import { $headerComponent } from 'app/store/nanostores/headerComponent';
 
 const DEFAULT_CONFIG = {};
 
 interface Props {
   config?: PartialAppConfig;
-  headerComponent?: ReactNode;
   selectedImage?: {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
-  customStarUi?: CustomStarUi;
 }
 
-const App = ({
-  config = DEFAULT_CONFIG,
-  headerComponent,
-  selectedImage,
-  customStarUi,
-}: Props) => {
+const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   const language = useAppSelector(languageSelector);
 
   const logger = useLogger('system');
@@ -62,18 +55,14 @@ const App = ({
   }, [dispatch, config, logger]);
 
   useEffect(() => {
-    if (customStarUi) {
-      dispatch(setCustomStarUi(customStarUi));
-    }
-  }, [customStarUi, dispatch]);
-
-  useEffect(() => {
     dispatch(appStarted());
   }, [dispatch]);
 
   useEffect(() => {
     handlePreselectedImage(selectedImage);
   }, [handlePreselectedImage, selectedImage]);
+
+  const headerComponent = useStore($headerComponent);
 
   return (
     <ErrorBoundary
