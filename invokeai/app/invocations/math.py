@@ -237,7 +237,7 @@ class FloatMathInvocation(BaseInvocation):
             raise ValueError("Cannot divide by zero")
         elif values["operation"] == "EXP" and values["a"] == 0 and v < 0:
             raise ValueError("Cannot raise zero to a negative power")
-        elif values["operation"] == "EXP" and type(values["a"] ** v) == complex:
+        elif values["operation"] == "EXP" and type(values["a"] ** v) is complex:
             raise ValueError("Root operation resulted in a complex number")
         return v
 
