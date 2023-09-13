@@ -16,6 +16,7 @@ import { menuListMotionProps } from 'theme/components/menu';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 import NoBoardContextMenuItems from './NoBoardContextMenuItems';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   board?: BoardDTO;
@@ -59,6 +60,8 @@ const BoardContextMenu = ({
     e.preventDefault();
   }, []);
 
+  const { t } = useTranslation();
+
   return (
     <IAIContextMenu<HTMLDivElement>
       menuProps={{ size: 'sm', isLazy: true }}
@@ -78,7 +81,7 @@ const BoardContextMenu = ({
               isDisabled={isAutoAdd || isProcessing || autoAssignBoardOnClick}
               onClick={handleSetAutoAdd}
             >
-              Auto-add to this Board
+              {t('boards.menuItemAutoAdd')}
             </MenuItem>
             {!board && <NoBoardContextMenuItems />}
             {board && (

@@ -7,6 +7,7 @@ import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.hed_image_processor
   .default as RequiredHedImageProcessorInvocation;
@@ -25,6 +26,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
   } = props;
   const isBusy = useAppSelector(selectIsBusy);
   const processorChanged = useProcessorNodeChanged();
+  const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -62,7 +64,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
   return (
     <ProcessorWrapper>
       <IAISlider
-        label="Detect Resolution"
+        label={t('controlnet.detectResolution')}
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
         handleReset={handleDetectResolutionReset}
@@ -74,7 +76,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         isDisabled={isBusy || !isEnabled}
       />
       <IAISlider
-        label="Image Resolution"
+        label={t('controlnet.imageResolution')}
         value={image_resolution}
         onChange={handleImageResolutionChanged}
         handleReset={handleImageResolutionReset}
@@ -86,7 +88,7 @@ const HedPreprocessor = (props: HedProcessorProps) => {
         isDisabled={isBusy || !isEnabled}
       />
       <IAISwitch
-        label="Scribble"
+        label={t('controlnet.scribble')}
         isChecked={scribble}
         onChange={handleScribbleChanged}
         isDisabled={isBusy || !isEnabled}

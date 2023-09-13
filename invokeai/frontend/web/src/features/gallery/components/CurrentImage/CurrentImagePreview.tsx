@@ -19,6 +19,7 @@ import { FaImage } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import ImageMetadataViewer from '../ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from '../NextPrevImageButtons';
+import { useTranslation } from 'react-i18next';
 
 export const imagesSelector = createSelector(
   [stateSelector, selectLastSelectedImage],
@@ -117,6 +118,8 @@ const CurrentImagePreview = () => {
 
   const timeoutId = useRef(0);
 
+  const { t } = useTranslation();
+
   const handleMouseOver = useCallback(() => {
     setShouldShowNextPrevButtons(true);
     window.clearTimeout(timeoutId.current);
@@ -164,7 +167,7 @@ const CurrentImagePreview = () => {
           isUploadDisabled={true}
           fitContainer
           useThumbailFallback
-          dropLabel="Set as Current Image"
+          dropLabel={t('gallery.setCurrentImage')}
           noContentFallback={
             <IAINoContentFallback icon={FaImage} label="No image selected" />
           }

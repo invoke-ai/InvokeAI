@@ -14,6 +14,7 @@ import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { NodeExecutionState, NodeStatus } from 'features/nodes/types/types';
 import { memo, useMemo } from 'react';
 import { FaCheck, FaEllipsisH, FaExclamation } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   nodeId: string;
@@ -72,10 +73,10 @@ type TooltipLabelProps = {
 
 const TooltipLabel = memo(({ nodeExecutionState }: TooltipLabelProps) => {
   const { status, progress, progressImage } = nodeExecutionState;
+  const { t } = useTranslation();
   if (status === NodeStatus.PENDING) {
     return <Text>Pending</Text>;
   }
-
   if (status === NodeStatus.IN_PROGRESS) {
     if (progressImage) {
       return (
@@ -97,18 +98,22 @@ const TooltipLabel = memo(({ nodeExecutionState }: TooltipLabelProps) => {
     }
 
     if (progress !== null) {
-      return <Text>In Progress ({Math.round(progress * 100)}%)</Text>;
+      return (
+        <Text>
+          {t('nodes.executionStateInProgress')} ({Math.round(progress * 100)}%)
+        </Text>
+      );
     }
 
-    return <Text>In Progress</Text>;
+    return <Text>{t('nodes.executionStateInProgress')}</Text>;
   }
 
   if (status === NodeStatus.COMPLETED) {
-    return <Text>Completed</Text>;
+    return <Text>{t('nodes.executionStateCompleted')}</Text>;
   }
 
   if (status === NodeStatus.FAILED) {
-    return <Text>nodeExecutionState.error</Text>;
+    return <Text>{t('nodes.executionStateError')}</Text>;
   }
 
   return null;

@@ -34,8 +34,8 @@ from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 
 from ...backend.model_management.lora import ModelPatcher
-from ...backend.model_management.seamless import set_seamless
 from ...backend.model_management.models import BaseModelType
+from ...backend.model_management.seamless import set_seamless
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ConditioningData,

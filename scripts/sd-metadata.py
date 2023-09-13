@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-import sys
 import json
+import sys
+
 from invokeai.backend.image_util import retrieve_metadata
 
 if len(sys.argv) < 2:

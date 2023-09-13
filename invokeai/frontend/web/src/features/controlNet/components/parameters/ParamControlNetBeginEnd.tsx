@@ -16,6 +16,7 @@ import {
   controlNetEndStepPctChanged,
 } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   controlNet: ControlNetConfig;
@@ -27,6 +28,7 @@ const ParamControlNetBeginEnd = (props: Props) => {
   const { beginStepPct, endStepPct, isEnabled, controlNetId } =
     props.controlNet;
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleStepPctChanged = useCallback(
     (v: number[]) => {
@@ -48,10 +50,10 @@ const ParamControlNetBeginEnd = (props: Props) => {
 
   return (
     <FormControl isDisabled={!isEnabled}>
-      <FormLabel>Begin / End Step Percentage</FormLabel>
+      <FormLabel>{t('controlnet.beginEndStepPercent')}</FormLabel>
       <HStack w="100%" gap={2} alignItems="center">
         <RangeSlider
-          aria-label={['Begin Step %', 'End Step %']}
+          aria-label={['Begin Step %', 'End Step %!']}
           value={[beginStepPct, endStepPct]}
           onChange={handleStepPctChanged}
           min={0}

@@ -95,7 +95,7 @@ const GalleryImageGrid = () => {
           justifyContent: 'center',
         }}
       >
-        <IAINoContentFallback label="Loading..." icon={FaImage} />
+        <IAINoContentFallback label={t('gallery.loading')} icon={FaImage} />
       </Flex>
     );
   }
@@ -140,7 +140,7 @@ const GalleryImageGrid = () => {
           onClick={handleLoadMoreImages}
           isDisabled={!areMoreAvailable}
           isLoading={isFetching}
-          loadingText="Loading"
+          loadingText={t('gallery.loading')}
           flexShrink={0}
         >
           {`Load More (${currentData.ids.length} of ${currentViewTotal})`}
@@ -153,7 +153,7 @@ const GalleryImageGrid = () => {
     return (
       <Box sx={{ w: 'full', h: 'full' }}>
         <IAINoContentFallback
-          label="Unable to load Gallery"
+          label={t('gallery.unableToLoad')}
           icon={FaExclamationCircle}
         />
       </Box>

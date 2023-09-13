@@ -28,22 +28,20 @@ from pydantic import BaseModel, Field, validator
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
-
 from ...backend.model_management import BaseModelType
 from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     FieldDescriptions,
-    InputField,
     Input,
+    InputField,
     InvocationContext,
     OutputField,
     UIType,
     invocation,
     invocation_output,
 )
-
 
 CONTROLNET_MODE_VALUES = Literal["balanced", "more_prompt", "more_control", "unbalanced"]
 CONTROLNET_RESIZE_VALUES = Literal[

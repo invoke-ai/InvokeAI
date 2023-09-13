@@ -1,26 +1,29 @@
-import os
 import json
+import os
 from enum import Enum
-from pydantic import Field
 from pathlib import Path
 from typing import Literal, Optional, Union
+
 from diffusers import StableDiffusionInpaintPipeline, StableDiffusionPipeline
-from .base import (
-    ModelConfigBase,
-    BaseModelType,
-    ModelType,
-    ModelVariantType,
-    DiffusersModel,
-    SilenceWarnings,
-    read_checkpoint_meta,
-    classproperty,
-    InvalidModelException,
-    ModelNotFoundException,
-)
-from .sdxl import StableDiffusionXLModel
+from omegaconf import OmegaConf
+from pydantic import Field
+
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from omegaconf import OmegaConf
+
+from .base import (
+    BaseModelType,
+    DiffusersModel,
+    InvalidModelException,
+    ModelConfigBase,
+    ModelNotFoundException,
+    ModelType,
+    ModelVariantType,
+    SilenceWarnings,
+    classproperty,
+    read_checkpoint_meta,
+)
+from .sdxl import StableDiffusionXLModel
 
 
 class StableDiffusion1ModelFormat(str, Enum):
@@ -272,8 +275,8 @@ def _convert_ckpt_and_cache(
         return output_path
 
     # to avoid circular import errors
-    from ..convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
     from ...util.devices import choose_torch_device, torch_dtype
+    from ..convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
 
     model_base_to_model_type = {
         BaseModelType.StableDiffusion1: "FrozenCLIPEmbedder",

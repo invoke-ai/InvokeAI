@@ -6,6 +6,7 @@ import {
 } from 'features/controlNet/store/controlNetSlice';
 import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   controlNet: ControlNetConfig;
@@ -15,6 +16,7 @@ const ParamControlNetShouldAutoConfig = (props: Props) => {
   const { controlNetId, isEnabled, shouldAutoConfig } = props.controlNet;
   const dispatch = useAppDispatch();
   const isBusy = useAppSelector(selectIsBusy);
+  const { t } = useTranslation();
 
   const handleShouldAutoConfigChanged = useCallback(() => {
     dispatch(controlNetAutoConfigToggled({ controlNetId }));
@@ -22,8 +24,8 @@ const ParamControlNetShouldAutoConfig = (props: Props) => {
 
   return (
     <IAISwitch
-      label="Auto configure processor"
-      aria-label="Auto configure processor"
+      label={t('controlnet.autoConfigure')}
+      aria-label={t('controlnet.autoConfigure')}
       isChecked={shouldAutoConfig}
       onChange={handleShouldAutoConfigChanged}
       isDisabled={isBusy || !isEnabled}

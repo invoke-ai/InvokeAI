@@ -104,7 +104,7 @@ The OpenPose control model allows for the identification of the general pose of 
 
 The MediaPipe Face identification processor is able to clearly identify facial features in order to capture vivid expressions of human faces.
 
-**Tile (experimental)**:
+**Tile**:
 
 The Tile model fills out details in the image to match the image, rather than the prompt. The Tile Model is a versatile tool that offers a range of functionalities. Its primary capabilities can be boiled down to two main behaviors:
 
@@ -116,8 +116,6 @@ The Tile Model can be a powerful tool in your arsenal for enhancing image qualit
 **Pix2Pix (experimental)**
 
 With Pix2Pix, you can input an image into the controlnet, and then "instruct" the model to change it using your prompt. For example, you can say "Make it winter" to add more wintry elements to a scene.
-
-**Inpaint**: Coming Soon - Currently this model is available but not functional on the Canvas. An upcoming release will provide additional capabilities for using this model when inpainting.
 
 Each of these models can be adjusted and combined with other ControlNet models to achieve different results, giving you even more control over your image generation process.
 

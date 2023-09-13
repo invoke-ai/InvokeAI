@@ -17,18 +17,19 @@ context. Use like this:
 """
 
 import gc
+import hashlib
 import os
 import sys
-import hashlib
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Union, types, Optional, Type, Any
+from typing import Any, Dict, Optional, Type, Union, types
 
 import torch
 
 import invokeai.backend.util.logging as logger
-from .models import BaseModelType, ModelType, SubModelType, ModelBase
+
+from .models import BaseModelType, ModelBase, ModelType, SubModelType
 
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously

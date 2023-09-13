@@ -14,12 +14,12 @@ from ..invocations import *  # noqa: F401 F403
 from ..invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    invocation,
     Input,
     InputField,
     InvocationContext,
     OutputField,
     UIType,
+    invocation,
     invocation_output,
 )
 
