@@ -1,4 +1,3 @@
-import { MenuItemProps } from '@chakra-ui/react';
 import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
 
 export type Coordinates = {
@@ -13,17 +12,6 @@ export type Dimensions = {
 
 export type Rect = Coordinates & Dimensions;
 
-export type CustomStarUi = {
-  on: {
-    icon: MenuItemProps['icon'];
-    text: string;
-  };
-  off: {
-    icon: MenuItemProps['icon'];
-    text: string;
-  };
-};
-
 export interface UIState {
   activeTab: number;
   shouldShowImageDetails: boolean;
@@ -37,5 +25,4 @@ export interface UIState {
   favoriteSchedulers: SchedulerParam[];
   globalContextMenuCloseTrigger: number;
   panels: Record<string, string>;
-  customStarUi?: CustomStarUi;
 }

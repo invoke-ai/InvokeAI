@@ -4,7 +4,7 @@ import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
 import { setActiveTabReducer } from './extraReducers';
 import { InvokeTabName } from './tabMap';
-import { CustomStarUi, UIState } from './uiTypes';
+import { UIState } from './uiTypes';
 
 export const initialUIState: UIState = {
   activeTab: 0,
@@ -19,7 +19,6 @@ export const initialUIState: UIState = {
   favoriteSchedulers: [],
   globalContextMenuCloseTrigger: 0,
   panels: {},
-  customStarUi: undefined,
 };
 
 export const uiSlice = createSlice({
@@ -71,9 +70,6 @@ export const uiSlice = createSlice({
     ) => {
       state.panels[action.payload.name] = action.payload.value;
     },
-    setCustomStarUi: (state, action: PayloadAction<CustomStarUi>) => {
-      state.customStarUi = action.payload;
-    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
@@ -95,7 +91,6 @@ export const {
   setShouldAutoChangeDimensions,
   contextMenusClosed,
   panelsChanged,
-  setCustomStarUi,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

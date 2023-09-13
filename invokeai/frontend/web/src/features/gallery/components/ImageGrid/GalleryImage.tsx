@@ -1,4 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
+import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
@@ -10,6 +12,7 @@ import {
 } from 'features/dnd/types';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { MouseEvent, memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
@@ -18,8 +21,6 @@ import {
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
 import IAIDndImageIcon from '../../../../common/components/IAIDndImageIcon';
-import { uiSelector } from '../../../ui/store/uiSelectors';
-import { useTranslation } from 'react-i18next';
 
 interface HoverableImageProps {
   imageName: string;
@@ -35,7 +36,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const { handleClick, isSelected, selection, selectionCount } =
     useMultiselect(imageDTO);
 
-  const { customStarUi } = useAppSelector(uiSelector);
+  const customStarUi = useStore($customStarUI);
 
   const handleDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {

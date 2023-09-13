@@ -1,4 +1,6 @@
 import { MenuItem } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
+import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   imagesToChangeSelected,
@@ -12,12 +14,11 @@ import {
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from '../../../../services/api/endpoints/images';
-import { uiSelector } from '../../../ui/store/uiSelectors';
 
 const MultipleSelectionMenuItems = () => {
   const dispatch = useAppDispatch();
   const selection = useAppSelector((state) => state.gallery.selection);
-  const { customStarUi } = useAppSelector(uiSelector);
+  const customStarUi = useStore($customStarUI);
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();

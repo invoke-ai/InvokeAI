@@ -15,7 +15,8 @@ import { socketMiddleware } from 'services/events/middleware';
 import Loading from '../../common/components/Loading/Loading';
 import '../../i18n';
 import AppDndContext from '../../features/dnd/components/AppDndContext';
-import { CustomStarUi } from '../../features/ui/store/uiTypes';
+import { $customStarUI, CustomStarUi } from 'app/store/nanostores/customStarUI';
+import { $headerComponent } from 'app/store/nanostores/headerComponent';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -83,18 +84,33 @@ const InvokeAIUI = ({
     };
   }, [apiUrl, token, middleware, projectId]);
 
+  useEffect(() => {
+    if (customStarUi) {
+      $customStarUI.set(customStarUi);
+    }
+
+    return () => {
+      $customStarUI.set(undefined);
+    };
+  }, [customStarUi]);
+
+  useEffect(() => {
+    if (headerComponent) {
+      $headerComponent.set(headerComponent);
+    }
+
+    return () => {
+      $headerComponent.set(undefined);
+    };
+  }, [headerComponent]);
+
   return (
     <React.StrictMode>
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
-              <App
-                config={config}
-                headerComponent={headerComponent}
-                selectedImage={selectedImage}
-                customStarUi={customStarUi}
-              />
+              <App config={config} selectedImage={selectedImage} />
             </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>

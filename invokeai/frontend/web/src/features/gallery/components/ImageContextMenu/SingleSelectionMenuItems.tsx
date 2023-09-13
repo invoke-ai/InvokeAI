@@ -1,5 +1,7 @@
 import { Flex, MenuItem, Spinner } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
+import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
@@ -7,6 +9,7 @@ import {
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -32,10 +35,8 @@ import {
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
 import { ImageDTO } from 'services/api/types';
-import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { configSelector } from '../../../system/store/configSelectors';
-import { uiSelector } from '../../../ui/store/uiSelectors';
+import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -51,7 +52,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
   const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
-  const { customStarUi } = useAppSelector(uiSelector);
+  const customStarUi = useStore($customStarUI);
 
   const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
     { image: imageDTO, shouldFetchMetadataFromApi },
