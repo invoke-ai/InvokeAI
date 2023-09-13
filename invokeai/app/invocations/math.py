@@ -1,10 +1,11 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-import numpy as np
 from typing import Literal
 
-from invokeai.app.invocations.primitives import IntegerOutput, FloatOutput
+import numpy as np
 from pydantic import validator
+
+from invokeai.app.invocations.primitives import FloatOutput, IntegerOutput
 
 from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, invocation
 
