@@ -1,5 +1,5 @@
+import { MenuItemProps } from '@chakra-ui/react';
 import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
-import { JSXElementConstructor, ReactElement } from 'react';
 
 export type Coordinates = {
   x: number;
@@ -15,11 +15,11 @@ export type Rect = Coordinates & Dimensions;
 
 export type CustomStarUi = {
   on: {
-    icon: ReactElement<any, string | JSXElementConstructor<any>> | undefined;
+    icon: MenuItemProps['icon'];
     text: string;
   };
   off: {
-    icon: ReactElement<any, string | JSXElementConstructor<any>> | undefined;
+    icon: MenuItemProps['icon'];
     text: string;
   };
 };
