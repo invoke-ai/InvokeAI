@@ -2429,9 +2429,9 @@ export type components = {
       image: components["schemas"]["ImageField"];
       /**
        * Ip Adapter Model
-       * @description The name of the IP-Adapter model.
+       * @description The IP-Adapter model to use.
        */
-      ip_adapter_model: string;
+      ip_adapter_model: components["schemas"]["IPAdapterModelField"];
       /**
        * Image Encoder Model
        * @description The name of the CLIP image encoder model.
@@ -2472,11 +2472,9 @@ export type components = {
       image?: components["schemas"]["ImageField"];
       /**
        * IP-Adapter Model
-       * @description The name of the IP-Adapter model.
-       * @default ip-adapter_sd15.bin
-       * @enum {string}
+       * @description The IP-Adapter model.
        */
-      ip_adapter_model?: "ip-adapter_sd15" | "ip-adapter-plus_sd15" | "ip-adapter-plus-face_sd15" | "ip-adapter_sdxl";
+      ip_adapter_model: components["schemas"]["IPAdapterModelField"];
       /**
        * Image Encoder Model
        * @description The name of the CLIP image encoder model.
@@ -2517,6 +2515,16 @@ export type components = {
        */
       model_format: "checkpoint";
       error?: components["schemas"]["ModelError"];
+    };
+    /** IPAdapterModelField */
+    IPAdapterModelField: {
+      /**
+       * Model Name
+       * @description Name of the IP-Adapter model
+       */
+      model_name: string;
+      /** @description Base model */
+      base_model: components["schemas"]["BaseModelType"];
     };
     /**
      * IPAdapterOutput
@@ -7188,7 +7196,7 @@ export type components = {
      * If a field should be provided a data type that does not exactly match the python type of the field,     use this to provide the type that should be used instead. See the node development docs for detail     on adding a new field type, which involves client-side changes.
      * @enum {string}
      */
-    UIType: "boolean" | "ColorField" | "ConditioningField" | "ControlField" | "float" | "ImageField" | "integer" | "LatentsField" | "string" | "BooleanCollection" | "ColorCollection" | "ConditioningCollection" | "ControlCollection" | "FloatCollection" | "ImageCollection" | "IntegerCollection" | "LatentsCollection" | "StringCollection" | "BooleanPolymorphic" | "ColorPolymorphic" | "ConditioningPolymorphic" | "ControlPolymorphic" | "FloatPolymorphic" | "ImagePolymorphic" | "IntegerPolymorphic" | "LatentsPolymorphic" | "StringPolymorphic" | "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VaeModelField" | "LoRAModelField" | "ControlNetModelField" | "UNetField" | "VaeField" | "ClipField" | "Collection" | "CollectionItem" | "enum" | "Scheduler" | "WorkflowField" | "IsIntermediate" | "MetadataField";
+    UIType: "boolean" | "ColorField" | "ConditioningField" | "ControlField" | "float" | "ImageField" | "integer" | "LatentsField" | "string" | "BooleanCollection" | "ColorCollection" | "ConditioningCollection" | "ControlCollection" | "FloatCollection" | "ImageCollection" | "IntegerCollection" | "LatentsCollection" | "StringCollection" | "BooleanPolymorphic" | "ColorPolymorphic" | "ConditioningPolymorphic" | "ControlPolymorphic" | "FloatPolymorphic" | "ImagePolymorphic" | "IntegerPolymorphic" | "LatentsPolymorphic" | "StringPolymorphic" | "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VaeModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "UNetField" | "VaeField" | "ClipField" | "Collection" | "CollectionItem" | "enum" | "Scheduler" | "WorkflowField" | "IsIntermediate" | "MetadataField";
     /**
      * UIComponent
      * @description The type of UI component to use for a field, used to override the default components, which are     inferred from the field type.
@@ -7228,12 +7236,6 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusion2ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -7246,11 +7248,17 @@ export type components = {
      */
     IPAdapterModelFormat: "checkpoint";
     /**
-     * StableDiffusionXLModelFormat
+     * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
@@ -7258,11 +7266,11 @@ export type components = {
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
-     * StableDiffusionOnnxModelFormat
+     * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;

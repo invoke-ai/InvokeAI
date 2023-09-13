@@ -60,6 +60,7 @@ export type OnnxModelField = s['OnnxModelField'];
 export type VAEModelField = s['VAEModelField'];
 export type LoRAModelField = s['LoRAModelField'];
 export type ControlNetModelField = s['ControlNetModelField'];
+export type IPAdapterModelField = s['IPAdapterModelField'];
 export type ModelsList = s['ModelsList'];
 export type ControlField = s['ControlField'];
 
@@ -73,6 +74,9 @@ export type ControlNetModelDiffusersConfig =
 export type ControlNetModelConfig =
   | ControlNetModelCheckpointConfig
   | ControlNetModelDiffusersConfig;
+export type IPAdapterModelCheckpointConfig =
+  s['IPAdapterModelCheckpointConfig'];
+export type IPAdapterModelConfig = IPAdapterModelCheckpointConfig;
 export type TextualInversionModelConfig = s['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
   | s['StableDiffusion1ModelDiffusersConfig']
@@ -88,6 +92,7 @@ export type AnyModelConfig =
   | LoRAModelConfig
   | VaeModelConfig
   | ControlNetModelConfig
+  | IPAdapterModelConfig
   | TextualInversionModelConfig
   | MainModelConfig
   | OnnxModelConfig;

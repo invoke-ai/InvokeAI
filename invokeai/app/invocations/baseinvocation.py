@@ -154,6 +154,7 @@ class UIType(str, Enum):
     VaeModel = "VaeModelField"
     LoRAModel = "LoRAModelField"
     ControlNetModel = "ControlNetModelField"
+    IPAdapterModel = "IPAdapterModelField"
     UNet = "UNetField"
     Vae = "VaeField"
     CLIP = "ClipField"

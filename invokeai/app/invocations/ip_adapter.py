@@ -6,6 +6,7 @@ from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     FieldDescriptions,
+    Input,
     InputField,
     InvocationContext,
     OutputField,
@@ -14,24 +15,22 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.primitives import ImageField
-
-IP_ADAPTER_MODELS = Literal[
-    "ip-adapter_sd15",
-    "ip-adapter-plus_sd15",
-    "ip-adapter-plus-face_sd15",
-    "ip-adapter_sdxl",
-]
+from invokeai.backend.model_management.models.base import BaseModelType
 
 IP_ADAPTER_IMAGE_ENCODER_MODELS = Literal[
     "models/core/ip_adapters/sd-1/image_encoder/", "models/core/ip_adapters/sdxl/image_encoder"
 ]
 
 
+class IPAdapterModelField(BaseModel):
+    model_name: str = Field(description="Name of the IP-Adapter model")
+    base_model: BaseModelType = Field(description="Base model")
+
+
 class IPAdapterField(BaseModel):
     image: ImageField = Field(description="The IP-Adapter image prompt.")
 
-    # TODO(ryand): Create and use a custom `IpAdapterModelField`.
-    ip_adapter_model: str = Field(description="The name of the IP-Adapter model.")
+    ip_adapter_model: IPAdapterModelField = Field(description="The IP-Adapter model to use.")
 
     # TODO(ryand): Create and use a `CLIPImageEncoderField` instead that is analogous to the `ClipField` used elsewhere.
     image_encoder_model: str = Field(description="The name of the CLIP image encoder model.")
@@ -51,10 +50,10 @@ class IPAdapterInvocation(BaseInvocation):
 
     # Inputs
     image: ImageField = InputField(description="The IP-Adapter image prompt.")
-    ip_adapter_model: IP_ADAPTER_MODELS = InputField(
-        default="ip-adapter_sd15.bin",
-        description="The name of the IP-Adapter model.",
+    ip_adapter_model: IPAdapterModelField = InputField(
+        description="The IP-Adapter model.",
         title="IP-Adapter Model",
+        input=Input.Direct,
     )
     image_encoder_model: IP_ADAPTER_IMAGE_ENCODER_MODELS = InputField(
         default="models/core/ip_adapters/sd-1/image_encoder/", description="The name of the CLIP image encoder model."

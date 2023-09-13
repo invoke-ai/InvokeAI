@@ -412,9 +412,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         ip_adapter_model = exit_stack.enter_context(
             context.services.model_manager.get_model(
-                model_name=ip_adapter.ip_adapter_model,
+                model_name=ip_adapter.ip_adapter_model.model_name,
                 model_type=ModelType.IPAdapter,
-                base_model=BaseModelType.StableDiffusion1,  # HACK(ryand): Pass this in properly
+                base_model=ip_adapter.ip_adapter_model.base_model,
                 context=context,
             )
         )
