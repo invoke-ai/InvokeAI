@@ -122,13 +122,16 @@ export const useIsValidConnection = () => {
 
         const isIntToFloat = sourceType === 'integer' && targetType === 'float';
 
+        const isEitherAnyType = sourceType === 'Any' || targetType === 'Any';
+
         return (
           isCollectionItemToNonCollection ||
           isNonCollectionToCollectionItem ||
           isAnythingToPolymorphicOfSameBaseType ||
           isGenericCollectionToAnyCollectionOrPolymorphic ||
           isCollectionToGenericCollection ||
-          isIntToFloat
+          isIntToFloat ||
+          isEitherAnyType
         );
       }
 

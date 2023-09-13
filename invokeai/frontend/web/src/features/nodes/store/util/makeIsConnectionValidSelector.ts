@@ -116,6 +116,8 @@ export const makeConnectionErrorSelector = (
 
       const isIntToFloat = sourceType === 'integer' && targetType === 'float';
 
+      const isEitherAnyType = sourceType === 'Any' || targetType === 'Any';
+
       if (
         !(
           isCollectionItemToNonCollection ||
@@ -123,7 +125,8 @@ export const makeConnectionErrorSelector = (
           isAnythingToPolymorphicOfSameBaseType ||
           isGenericCollectionToAnyCollectionOrPolymorphic ||
           isCollectionToGenericCollection ||
-          isIntToFloat
+          isIntToFloat ||
+          isEitherAnyType
         )
       ) {
         return i18n.t('nodes.fieldTypesMustMatch');

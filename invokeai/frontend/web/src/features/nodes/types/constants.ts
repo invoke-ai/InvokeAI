@@ -31,6 +31,7 @@ export const COLLECTION_TYPES: FieldType[] = [
   'ConditioningCollection',
   'ControlCollection',
   'ColorCollection',
+  'MetadataItemCollection',
 ];
 
 export const POLYMORPHIC_TYPES: FieldType[] = [
@@ -70,6 +71,7 @@ export const COLLECTION_MAP: FieldTypeMapWithNumber = {
   ConditioningField: 'ConditioningCollection',
   ControlField: 'ControlCollection',
   ColorField: 'ColorCollection',
+  MetadataItem: 'MetadataItemCollection',
 };
 export const isCollectionItemType = (
   itemType: string | undefined
@@ -131,6 +133,26 @@ export const isPolymorphicItemType = (
   Boolean(itemType && itemType in SINGLE_TO_POLYMORPHIC_MAP);
 
 export const FIELDS: Record<FieldType, FieldUIConfig> = {
+  Any: {
+    color: 'gray.500',
+    description: 'Any field type is accepted.',
+    title: 'Any',
+  },
+  MetadataDict: {
+    color: 'gray.500',
+    description: 'A metadata dict.',
+    title: 'Metadata Dict',
+  },
+  MetadataItem: {
+    color: 'gray.500',
+    description: 'A metadata item.',
+    title: 'Metadata Item',
+  },
+  MetadataItemCollection: {
+    color: 'gray.500',
+    description: 'MetadataItemCollection field type is accepted.',
+    title: 'Metadata Item Collection',
+  },
   boolean: {
     color: 'green.500',
     description: t('nodes.booleanDescription'),

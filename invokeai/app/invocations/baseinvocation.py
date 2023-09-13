@@ -175,8 +175,10 @@ class UIType(str, Enum):
     Scheduler = "Scheduler"
     WorkflowField = "WorkflowField"
     IsIntermediate = "IsIntermediate"
-    MetadataField = "MetadataField"
     BoardField = "BoardField"
+    Any = "Any"
+    MetadataItem = "MetadataItem"
+    MetadataDict = "MetadataDict"
     # endregion
 
 

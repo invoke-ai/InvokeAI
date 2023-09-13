@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -8,6 +8,7 @@ from invokeai.app.invocations.baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
+    UIType,
     invocation,
     invocation_output,
 )
@@ -178,3 +179,45 @@ class MetadataAccumulatorInvocation(BaseInvocation):
         """Collects and outputs a CoreMetadata object"""
 
         return MetadataAccumulatorOutput(metadata=CoreMetadata(**self.dict()))
+
+
+class MetadataItem(BaseModel):
+    label: str = Field(description="Label for this metadata item")
+    value: Any = Field(description="The value of the metadata item")
+
+
+@invocation_output("metadata_item_output")
+class MetadataItemOutput(BaseInvocationOutput):
+    """Metadata Item Output"""
+
+    item: MetadataItem = OutputField(description="Metadata Item")
+
+
+@invocation("metadata_item", title="Metadata Item", tags=["metadata"], category="metadata", version="1.0.0")
+class MetadataItemInvocation(BaseInvocation):
+    """Test Any"""
+
+    label: str = InputField(description="Label for this metadata item")
+    value: Any = InputField(description="The value of the metadata item", ui_type=UIType.Any)
+
+    def invoke(self, context: InvocationContext) -> MetadataItemOutput:
+        return MetadataItemOutput(item=MetadataItem(label=self.label, value=self.value))
+
+
+class MetadataDict(BaseModel):
+    """Metadata Dict"""
+
+    data: dict[str, Any] = Field(description="Metadata dict")
+
+
+@invocation_output("metadata_dict")
+class MetadataDictOutput(BaseInvocationOutput):
+    metadata_dict: MetadataDict = OutputField(description="Metadata Dict")
+
+
+@invocation("metadata", title="Metadata", tags=["metadata"], category="metadata", version="1.0.0")
+class MetadataInvocation(BaseInvocation):
+    items: list[MetadataItem] = InputField(description="List of metadata items")
+
+    def invoke(self, context: InvocationContext) -> MetadataDictOutput:
+        return MetadataDictOutput(metadata_dict=(MetadataDict(data={item.label: item.value for item in self.items})))
