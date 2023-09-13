@@ -235,7 +235,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         </MenuItem>
       ) : (
         <MenuItem
-          icon={customStarUi ? customStarUi.on.icon : <MdStar />}
+          icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
           onClickCapture={handleStarImage}
         >
           {customStarUi ? customStarUi.on.text : `Star Image`}

@@ -1,5 +1,5 @@
 import { SchedulerParam } from 'features/parameters/types/parameterSchemas';
-import { JSXElementConstructor, ReactElement, ReactNode } from 'react';
+import { JSXElementConstructor, ReactElement } from 'react';
 
 export type Coordinates = {
   x: number;
