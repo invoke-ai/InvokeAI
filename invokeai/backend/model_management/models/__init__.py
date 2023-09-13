@@ -18,6 +18,7 @@ from .base import (  # noqa: F401
     SilenceWarnings,
     SubModelType,
 )
+from .clip_vision import CLIPVisionModel
 from .controlnet import ControlNetModel  # TODO:
 from .ip_adapter import IPAdapterModel
 from .lora import LoRAModel
@@ -36,6 +37,7 @@ MODEL_CLASSES = {
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
         ModelType.IPAdapter: IPAdapterModel,
+        ModelType.CLIPVision: CLIPVisionModel,
     },
     BaseModelType.StableDiffusion2: {
         ModelType.ONNX: ONNXStableDiffusion2Model,
@@ -45,6 +47,7 @@ MODEL_CLASSES = {
         ModelType.ControlNet: ControlNetModel,
         ModelType.TextualInversion: TextualInversionModel,
         ModelType.IPAdapter: IPAdapterModel,
+        ModelType.CLIPVision: CLIPVisionModel,
     },
     BaseModelType.StableDiffusionXL: {
         ModelType.Main: StableDiffusionXLModel,
@@ -55,6 +58,7 @@ MODEL_CLASSES = {
         ModelType.TextualInversion: TextualInversionModel,
         ModelType.ONNX: ONNXStableDiffusion2Model,
         ModelType.IPAdapter: IPAdapterModel,
+        ModelType.CLIPVision: CLIPVisionModel,
     },
     BaseModelType.StableDiffusionXLRefiner: {
         ModelType.Main: StableDiffusionXLModel,
@@ -65,6 +69,7 @@ MODEL_CLASSES = {
         ModelType.TextualInversion: TextualInversionModel,
         ModelType.ONNX: ONNXStableDiffusion2Model,
         ModelType.IPAdapter: IPAdapterModel,
+        ModelType.CLIPVision: CLIPVisionModel,
     },
     # BaseModelType.Kandinsky2_1: {
     #    ModelType.Main: Kandinsky2_1Model,

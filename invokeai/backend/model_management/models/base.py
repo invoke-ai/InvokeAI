@@ -62,6 +62,7 @@ class ModelType(str, Enum):
     ControlNet = "controlnet"  # used by model_probe
     TextualInversion = "embedding"
     IPAdapter = "ip_adapter"
+    CLIPVision = "clip_vision"
 
 
 class SubModelType(str, Enum):

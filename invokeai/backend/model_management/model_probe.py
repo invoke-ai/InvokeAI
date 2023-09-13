@@ -8,6 +8,8 @@ import torch
 from diffusers import ConfigMixin, ModelMixin
 from picklescan.scanner import scan_file_path
 
+from invokeai.backend.model_management.models import BaseModelType
+
 from .models import (
     BaseModelType,
     InvalidModelException,
@@ -53,6 +55,7 @@ class ModelProbe(object):
         "AutoencoderKL": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
         "IPAdapterModel": ModelType.IPAdapter,
+        "CLIPVision": ModelType.CLIPVision,
     }
 
     @classmethod
@@ -119,14 +122,18 @@ class ModelProbe(object):
                     and prediction_type == SchedulerPredictionType.VPrediction
                 ),
                 format=format,
-                image_size=1024
-                if (base_type in {BaseModelType.StableDiffusionXL, BaseModelType.StableDiffusionXLRefiner})
-                else 768
-                if (
-                    base_type == BaseModelType.StableDiffusion2
-                    and prediction_type == SchedulerPredictionType.VPrediction
-                )
-                else 512,
+                image_size=(
+                    1024
+                    if (base_type in {BaseModelType.StableDiffusionXL, BaseModelType.StableDiffusionXLRefiner})
+                    else (
+                        768
+                        if (
+                            base_type == BaseModelType.StableDiffusion2
+                            and prediction_type == SchedulerPredictionType.VPrediction
+                        )
+                        else 512
+                    )
+                ),
             )
         except Exception:
             raise
@@ -372,6 +379,11 @@ class IPAdapterCheckpointProbe(CheckpointProbeBase):
         raise NotImplementedError()
 
 
+class CLIPVisionCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
 ########################################################
 # classes for probing folders
 #######################################################
@@ -520,6 +532,11 @@ class IPAdapterFolderProbe(FolderProbeBase):
         raise NotImplementedError()
 
 
+class CLIPVisionFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
 ############## register probe classes ######
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Vae, VaeFolderProbe)
@@ -527,6 +544,7 @@ ModelProbe.register_probe("diffusers", ModelType.Lora, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
 
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Vae, VaeCheckpointProbe)
@@ -534,5 +552,6 @@ ModelProbe.register_probe("checkpoint", ModelType.Lora, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
 
 ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)
