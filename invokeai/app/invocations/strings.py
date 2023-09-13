@@ -25,7 +25,7 @@ class StringPosNegOutput(BaseInvocationOutput):
 
 @invocation(
     "string_split_neg",
-    title="String Spilt Negative",
+    title="String Split Negative",
     tags=["string", "split", "negative"],
     category="string",
     version="1.0.0",
@@ -70,7 +70,7 @@ class String2Output(BaseInvocationOutput):
     string_2: str = OutputField(description="string 2")
 
 
-@invocation("string_split", title="String Spilt", tags=["string", "split"], category="string", version="1.0.0")
+@invocation("string_split", title="String Split", tags=["string", "split"], category="string", version="1.0.0")
 class StringSplitInvocation(BaseInvocation):
     """Splits string into two strings, based on the first occurance of the delimiter. The delimiter will be removed from the string"""
 
