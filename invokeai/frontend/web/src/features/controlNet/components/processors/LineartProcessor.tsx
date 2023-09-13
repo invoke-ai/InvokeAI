@@ -7,6 +7,7 @@ import { selectIsBusy } from 'features/system/store/systemSelectors';
 import { ChangeEvent, memo, useCallback } from 'react';
 import { useProcessorNodeChanged } from '../hooks/useProcessorNodeChanged';
 import ProcessorWrapper from './common/ProcessorWrapper';
+import { useTranslation } from 'react-i18next';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.lineart_image_processor
   .default as RequiredLineartImageProcessorInvocation;
@@ -22,6 +23,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
   const { image_resolution, detect_resolution, coarse } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const isBusy = useAppSelector(selectIsBusy);
+  const { t } = useTranslation();
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -59,7 +61,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
   return (
     <ProcessorWrapper>
       <IAISlider
-        label="Detect Resolution"
+        label={t('controlnet.detectResolution')}
         value={detect_resolution}
         onChange={handleDetectResolutionChanged}
         handleReset={handleDetectResolutionReset}
@@ -71,7 +73,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         isDisabled={isBusy || !isEnabled}
       />
       <IAISlider
-        label="Image Resolution"
+        label={t('controlnet.imageResolution')}
         value={image_resolution}
         onChange={handleImageResolutionChanged}
         handleReset={handleImageResolutionReset}
@@ -83,7 +85,7 @@ const LineartProcessor = (props: LineartProcessorProps) => {
         isDisabled={isBusy || !isEnabled}
       />
       <IAISwitch
-        label="Coarse"
+        label={t('controlnet.coarse')}
         isChecked={coarse}
         onChange={handleCoarseChanged}
         isDisabled={isBusy || !isEnabled}

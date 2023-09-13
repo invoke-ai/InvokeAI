@@ -286,7 +286,7 @@ export type BooleanPolymorphicInputFieldValue = z.infer<
 
 export const zEnumInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('enum'),
-  value: z.union([z.string(), z.number()]).optional(),
+  value: z.string().optional(),
 });
 export type EnumInputFieldValue = z.infer<typeof zEnumInputFieldValue>;
 
@@ -822,10 +822,10 @@ export type ControlPolymorphicInputFieldTemplate = Omit<
 };
 
 export type EnumInputFieldTemplate = InputFieldTemplateBase & {
-  default: string | number;
+  default: string;
   type: 'enum';
-  enumType: 'string' | 'number';
-  options: Array<string | number>;
+  options: string[];
+  labels?: { [key: string]: string };
 };
 
 export type MainModelInputFieldTemplate = InputFieldTemplateBase & {

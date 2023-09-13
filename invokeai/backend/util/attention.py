@@ -3,8 +3,8 @@
 Utility routine used for autodetection of optimal slice size
 for attention mechanism.
 """
-import torch
 import psutil
+import torch
 
 
 def auto_detect_slice_size(latents: torch.Tensor) -> str:

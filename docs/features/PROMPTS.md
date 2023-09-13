@@ -142,7 +142,7 @@ Prompt2prompt `.swap()` is not compatible with xformers, which will be temporari
 The `prompt2prompt` code is based off
 [bloc97's colab](https://github.com/bloc97/CrossAttentionControl).
 
-### Escaping parentheses () and speech marks ""
+### Escaping parentheses and speech marks 
 
 If the model you are using has parentheses () or speech marks "" as part of its
 syntax, you will need to "escape" these using a backslash, so that`(my_keyword)`
@@ -246,7 +246,7 @@ To create a Dynamic Prompt, follow these steps:
     Within the braces, separate each option using a vertical bar |.
     If you want to include multiple options from a single group, prefix with the desired number and $$.
 
-For instance: A {house|apartment|lodge|cottage} in {summer|winter|autumn|spring} designed in {2$$style1|style2|style3}.
+For instance: A {house|apartment|lodge|cottage} in {summer|winter|autumn|spring} designed in {style1|style2|style3}.
 ### How Dynamic Prompts Work
 
 Once a Dynamic Prompt is configured, the system generates an array of combinations using the options provided. Each group of options in curly braces is treated independently, with the system selecting one option from each group. For a prefixed set (e.g., 2$$), the system will select two distinct options.
@@ -273,3 +273,36 @@ Below are some useful strategies for creating Dynamic Prompts:
     Experiment with different quantities for the prefix. For example, 3$$ will select three distinct options.
     Be aware of coherence in your prompts. Although the system can generate all possible combinations, not all may semantically make sense. Therefore, carefully choose the options for each group.
     Always review and fine-tune the generated prompts as needed. While Dynamic Prompts can help you generate a multitude of combinations, the final polishing and refining remain in your hands.
+
+
+## SDXL Prompting
+
+Prompting with SDXL is slightly different than prompting with SD1.5 or SD2.1 models - SDXL expects a prompt _and_ a style. 
+
+
+### Prompting 
+<figure markdown>
+
+![SDXL prompt boxes in InvokeAI](../assets/prompt_syntax/sdxl-prompt.png)
+
+</figure>
+
+In the prompt box, enter a positive or negative prompt as you normally would. 
+
+For the style box you can enter a style that you want the image to be generated in. You can use styles from this example list, or any other style you wish: anime, photographic, digital art, comic book, fantasy art, analog film, neon punk, isometric, low poly, origami, line art, cinematic, 3d model, pixel art, etc.
+
+
+### Concatenated Prompts
+
+
+InvokeAI also has the option to concatenate the prompt and style inputs, by pressing the "link" button in the Positive Prompt box. 
+
+This concatenates the prompt & style inputs, and passes the joined prompt and style to the SDXL model. 
+![SDXL concatenated prompt boxes in InvokeAI](../assets/prompt_syntax/sdxl-prompt-concatenated.png)
+
+
+
+
+
+
+

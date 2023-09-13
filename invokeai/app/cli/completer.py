@@ -6,15 +6,15 @@ completer object.
 import atexit
 import readline
 import shlex
-
 from pathlib import Path
-from typing import List, Dict, Literal, get_args, get_type_hints, get_origin
+from typing import Dict, List, Literal, get_args, get_origin, get_type_hints
 
 import invokeai.backend.util.logging as logger
+
 from ...backend import ModelManager
 from ..invocations.baseinvocation import BaseInvocation
-from .commands import BaseCommand
 from ..services.invocation_services import InvocationServices
+from .commands import BaseCommand
 
 # singleton object, class variable
 completer = None

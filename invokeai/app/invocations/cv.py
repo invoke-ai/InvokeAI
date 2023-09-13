@@ -4,9 +4,10 @@
 import cv2 as cv
 import numpy
 from PIL import Image, ImageOps
-from invokeai.app.invocations.primitives import ImageField, ImageOutput
 
+from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
+
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 

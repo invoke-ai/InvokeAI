@@ -1,6 +1,6 @@
 from typing import Any
-from pydantic import BaseModel
 
+from pydantic import BaseModel
 
 """
 We want to exclude null values from objects that make their way to the client.

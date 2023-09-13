@@ -13,6 +13,7 @@ import ParamSDXLRefinerScheduler from './SDXLRefiner/ParamSDXLRefinerScheduler';
 import ParamSDXLRefinerStart from './SDXLRefiner/ParamSDXLRefinerStart';
 import ParamSDXLRefinerSteps from './SDXLRefiner/ParamSDXLRefinerSteps';
 import ParamUseSDXLRefiner from './SDXLRefiner/ParamUseSDXLRefiner';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -29,9 +30,10 @@ const selector = createSelector(
 
 const ParamSDXLRefinerCollapse = () => {
   const { activeLabel, shouldUseSliders } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   return (
-    <IAICollapse label="Refiner" activeLabel={activeLabel}>
+    <IAICollapse label={t('sdxl.refiner')} activeLabel={activeLabel}>
       <Flex sx={{ gap: 2, flexDir: 'column' }}>
         <ParamUseSDXLRefiner />
         <ParamSDXLRefinerModelSelect />

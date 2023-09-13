@@ -42,7 +42,7 @@ const ParamSDXLRefinerSteps = () => {
 
   return shouldUseSliders ? (
     <IAISlider
-      label={t('parameters.steps')}
+      label={t('sdxl.steps')}
       min={1}
       max={100}
       step={1}
@@ -57,7 +57,7 @@ const ParamSDXLRefinerSteps = () => {
     />
   ) : (
     <IAINumberInput
-      label={t('parameters.steps')}
+      label={t('sdxl.steps')}
       min={1}
       max={500}
       step={1}

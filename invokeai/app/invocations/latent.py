@@ -34,6 +34,22 @@ from invokeai.app.invocations.primitives import (
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
+
+from ...backend.model_management.lora import ModelPatcher
+from ...backend.model_management.models import BaseModelType
+from ...backend.model_management.seamless import set_seamless
+from ...backend.stable_diffusion import PipelineIntermediateState
+from ...backend.stable_diffusion.diffusers_pipeline import (
+    ConditioningData,
+    ControlNetData,
+    StableDiffusionGeneratorPipeline,
+    image_resized_to_grid_as_tensor,
+)
+from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
+from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
+from ...backend.util.devices import choose_precision, choose_torch_device
+from ...backend.util.logging import InvokeAILogger
+from ..models.image import ImageCategory, ResourceOrigin
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -49,21 +65,6 @@ from .baseinvocation import (
 from .compel import ConditioningField
 from .controlnet_image_processors import ControlField
 from .model import ModelInfo, UNetField, VaeField
-from ..models.image import ImageCategory, ResourceOrigin
-from ...backend.model_management import BaseModelType
-from ...backend.model_management.lora import ModelPatcher
-from ...backend.model_management.seamless import set_seamless
-from ...backend.stable_diffusion import PipelineIntermediateState
-from ...backend.stable_diffusion.diffusers_pipeline import (
-    ConditioningData,
-    ControlNetData,
-    StableDiffusionGeneratorPipeline,
-    image_resized_to_grid_as_tensor,
-)
-from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
-from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from ...backend.util.devices import choose_precision, choose_torch_device
-from ...backend.util.logging import InvokeAILogger
 
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
 

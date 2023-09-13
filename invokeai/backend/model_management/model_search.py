@@ -5,8 +5,8 @@ Abstract base class for recursive directory search for models.
 
 import os
 from abc import ABC, abstractmethod
-from typing import List, Set, types
 from pathlib import Path
+from typing import List, Set, types
 
 import invokeai.backend.util.logging as logger
 

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend import ModelManager, BaseModelType, ModelType, SubModelType
+from invokeai.backend import BaseModelType, ModelManager, ModelType, SubModelType
 
 BASIC_MODEL_NAME = ("SDXL base", BaseModelType.StableDiffusionXL, ModelType.Main)
 VAE_OVERRIDE_MODEL_NAME = ("SDXL with VAE", BaseModelType.StableDiffusionXL, ModelType.Main)

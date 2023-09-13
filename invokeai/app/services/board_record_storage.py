@@ -1,15 +1,13 @@
+import sqlite3
 import threading
 import uuid
 from abc import ABC, abstractmethod
 from typing import Optional, Union, cast
 
-import sqlite3
+from pydantic import BaseModel, Extra, Field
+
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
-from invokeai.app.services.models.board_record import (
-    BoardRecord,
-    deserialize_board_record,
-)
-from pydantic import BaseModel, Field, Extra
+from invokeai.app.services.models.board_record import BoardRecord, deserialize_board_record
 
 
 class BoardChanges(BaseModel, extra=Extra.forbid):

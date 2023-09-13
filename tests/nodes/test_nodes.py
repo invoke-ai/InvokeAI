@@ -1,5 +1,7 @@
 from typing import Any, Callable, Union
+
 from pydantic import Field
+
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -78,7 +80,7 @@ class PromptCollectionTestInvocation(BaseInvocation):
         return PromptCollectionTestInvocationOutput(collection=self.collection.copy())
 
 
-# Importing these at the top breaks previous tests
+# Importing these must happen after test invocations are defined or they won't register
 from invokeai.app.services.events import EventServiceBase  # noqa: E402
 from invokeai.app.services.graph import Edge, EdgeConnection  # noqa: E402
 

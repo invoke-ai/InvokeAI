@@ -1,8 +1,7 @@
 import { InputFieldTemplate, InputFieldValue } from '../types/types';
 
 const FIELD_VALUE_FALLBACK_MAP = {
-  'enum.number': 0,
-  'enum.string': '',
+  enum: '',
   boolean: false,
   BooleanCollection: [],
   BooleanPolymorphic: false,
@@ -62,19 +61,8 @@ export const buildInputFieldValue = (
     fieldKind: 'input',
   } as InputFieldValue;
 
-  if (template.type === 'enum') {
-    if (template.enumType === 'number') {
-      fieldValue.value =
-        template.default ?? FIELD_VALUE_FALLBACK_MAP['enum.number'];
-    }
-    if (template.enumType === 'string') {
-      fieldValue.value =
-        template.default ?? FIELD_VALUE_FALLBACK_MAP['enum.string'];
-    }
-  } else {
-    fieldValue.value =
-      template.default ?? FIELD_VALUE_FALLBACK_MAP[template.type];
-  }
+  fieldValue.value =
+    template.default ?? FIELD_VALUE_FALLBACK_MAP[template.type];
 
   return fieldValue;
 };
