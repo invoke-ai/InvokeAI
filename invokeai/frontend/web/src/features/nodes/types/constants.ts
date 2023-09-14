@@ -242,7 +242,7 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     title: 'IP-Adapter',
   },
   IPAdapterModelField: {
-    color: 'teal.500', // TODO(ryand): Pick a color
+    color: 'teal.500',
     description: 'IP-Adapter model',
     title: 'IP-Adapter Model',
   },
