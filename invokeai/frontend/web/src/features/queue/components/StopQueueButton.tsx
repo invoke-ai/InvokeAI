@@ -23,8 +23,8 @@ const StopQueueButton = ({ asIconButton }: Props) => {
       await stopQueue().unwrap();
       dispatch(
         addToast({
-          title: t('queue.stopSucceeded'),
-          status: 'success',
+          title: t('queue.stopRequested'),
+          status: 'info',
         })
       );
     } catch {

@@ -506,7 +506,7 @@ export type components = {
        * Batch Id
        * @description The ID of the batch
        */
-      batch_id?: string;
+      batch_id: string;
       /**
        * Data
        * @description The batch data collection.
@@ -6847,6 +6847,11 @@ export type components = {
        */
       started: boolean;
       /**
+       * Stop After Current
+       * @description Whether the session queue is pending a stop
+       */
+      stop_after_current: boolean;
+      /**
        * Pending
        * @description Number of queue items with status 'pending'
        */
@@ -6877,10 +6882,10 @@ export type components = {
        */
       total: number;
       /**
-       * Maximum
+       * Max Queue Size
        * @description Maximum number of queue items allowed
        */
-      maximum: number;
+      max_queue_size: number;
     };
     /**
      * SessionQueueItem
@@ -7998,23 +8003,11 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusionOnnxModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
-    /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion2ModelFormat
      * @description An enumeration.
@@ -8022,11 +8015,23 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
+     * StableDiffusionOnnxModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    /**
      * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;

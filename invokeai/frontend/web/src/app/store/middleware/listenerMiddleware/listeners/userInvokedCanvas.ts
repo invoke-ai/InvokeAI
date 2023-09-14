@@ -1,9 +1,9 @@
 import { logger } from 'app/logging/logger';
-import { userInvoked } from 'app/store/actions';
+import { enqueueRequested } from 'app/store/actions';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { parseify } from 'common/util/serialize';
 import {
-  canvasSessionIdChanged,
+  canvasBatchIdAdded,
   stagingAreaInitialized,
 } from 'features/canvas/store/canvasSlice';
 import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
@@ -11,9 +11,11 @@ import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
 import { buildCanvasGraph } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
-import { sessionReadyToInvoke } from 'features/system/store/actions';
+import { prepareLinearUIBatch } from 'features/nodes/util/graphBuilders/buildLinearBatchConfig';
+import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
-import { sessionCreated } from 'services/api/thunks/session';
+import { queueApi } from 'services/api/endpoints/queue';
 import { ImageDTO } from 'services/api/types';
 import { startAppListening } from '..';
 
@@ -32,11 +34,12 @@ import { startAppListening } from '..';
  */
 export const addUserInvokedCanvasListener = () => {
   startAppListening({
-    predicate: (action): action is ReturnType<typeof userInvoked> =>
-      userInvoked.match(action) && action.payload === 'unifiedCanvas',
+    predicate: (action): action is ReturnType<typeof enqueueRequested> =>
+      enqueueRequested.match(action) &&
+      action.payload.tabName === 'unifiedCanvas',
     effect: async (action, { getState, dispatch, take }) => {
       const log = logger('session');
-
+      const { prepend } = action.payload;
       const state = getState();
 
       const {
@@ -125,57 +128,117 @@ export const addUserInvokedCanvasListener = () => {
       // currently this action is just listened to for logging
       dispatch(canvasGraphBuilt(graph));
 
-      // Create the session, store the request id
-      const { requestId: sessionCreatedRequestId } = dispatch(
-        sessionCreated({ graph })
-      );
+      const batchConfig = prepareLinearUIBatch(state, graph, prepend);
 
-      // Take the session created action, matching by its request id
-      const [sessionCreatedAction] = await take(
-        (action): action is ReturnType<typeof sessionCreated.fulfilled> =>
-          sessionCreated.fulfilled.match(action) &&
-          action.meta.requestId === sessionCreatedRequestId
-      );
-      const session_id = sessionCreatedAction.payload.id;
+      try {
+        const req = dispatch(
+          queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
+            fixedCacheKey: 'enqueueBatch',
+          })
+        );
 
-      // Associate the init image with the session, now that we have the session ID
-      if (['img2img', 'inpaint'].includes(generationMode) && canvasInitImage) {
+        const enqueueResult = await req.unwrap();
+        req.reset();
+        dispatch(queueApi.endpoints.startQueueExecution.initiate());
+
+        log.debug({ enqueueResult: parseify(enqueueResult) }, 'Batch enqueued');
+
+        const batchId = enqueueResult.batch.batch_id;
+
+        // Prep the canvas staging area if it is not yet initialized
+        if (!state.canvas.layerState.stagingArea.boundingBox) {
+          dispatch(
+            stagingAreaInitialized({
+              batchId,
+              boundingBox: {
+                ...state.canvas.boundingBoxCoordinates,
+                ...state.canvas.boundingBoxDimensions,
+              },
+            })
+          );
+        } else {
+          // Associate the session with the canvas session ID
+          dispatch(canvasBatchIdAdded(batchId));
+        }
+
         dispatch(
-          imagesApi.endpoints.changeImageSessionId.initiate({
-            imageDTO: canvasInitImage,
-            session_id,
+          addToast({
+            title: t('queue.batchQueued'),
+            description: t('queue.batchQueuedDesc', {
+              item_count: enqueueResult.enqueued,
+              direction: prepend ? t('queue.front') : t('queue.back'),
+              directionAction: prepend
+                ? t('queue.prepended')
+                : t('queue.appended'),
+            }),
+            status: 'success',
+          })
+        );
+      } catch {
+        log.error(
+          { batchConfig: parseify(batchConfig) },
+          'Failed to enqueue batch'
+        );
+        dispatch(
+          addToast({
+            title: t('queue.batchFailedToQueue'),
+            status: 'error',
           })
         );
       }
 
-      // Associate the mask image with the session, now that we have the session ID
-      if (['inpaint'].includes(generationMode) && canvasMaskImage) {
-        dispatch(
-          imagesApi.endpoints.changeImageSessionId.initiate({
-            imageDTO: canvasMaskImage,
-            session_id,
-          })
-        );
-      }
+      // // Create the session, store the request id
+      // const { requestId: sessionCreatedRequestId } = dispatch(
+      //   sessionCreated({ graph })
+      // );
 
-      // Prep the canvas staging area if it is not yet initialized
-      if (!state.canvas.layerState.stagingArea.boundingBox) {
-        dispatch(
-          stagingAreaInitialized({
-            sessionId: session_id,
-            boundingBox: {
-              ...state.canvas.boundingBoxCoordinates,
-              ...state.canvas.boundingBoxDimensions,
-            },
-          })
-        );
-      }
+      // // Take the session created action, matching by its request id
+      // const [sessionCreatedAction] = await take(
+      //   (action): action is ReturnType<typeof sessionCreated.fulfilled> =>
+      //     sessionCreated.fulfilled.match(action) &&
+      //     action.meta.requestId === sessionCreatedRequestId
+      // );
+      // const session_id = sessionCreatedAction.payload.id;
 
-      // Flag the session with the canvas session ID
-      dispatch(canvasSessionIdChanged(session_id));
+      // // Associate the init image with the session, now that we have the session ID
+      // if (['img2img', 'inpaint'].includes(generationMode) && canvasInitImage) {
+      //   dispatch(
+      //     imagesApi.endpoints.changeImageSessionId.initiate({
+      //       imageDTO: canvasInitImage,
+      //       session_id,
+      //     })
+      //   );
+      // }
 
-      // We are ready to invoke the session!
-      dispatch(sessionReadyToInvoke());
+      // // Associate the mask image with the session, now that we have the session ID
+      // if (['inpaint'].includes(generationMode) && canvasMaskImage) {
+      //   dispatch(
+      //     imagesApi.endpoints.changeImageSessionId.initiate({
+      //       imageDTO: canvasMaskImage,
+      //       session_id,
+      //     })
+      //   );
+      // }
+
+      // // Prep the canvas staging area if it is not yet initialized
+      // if (!state.canvas.layerState.stagingArea.boundingBox) {
+      //   dispatch(
+      //     stagingAreaInitialized({
+      //       batch_id,
+      //       sessionId: session_id,
+      //       boundingBox: {
+      //         ...state.canvas.boundingBoxCoordinates,
+      //         ...state.canvas.boundingBoxDimensions,
+      //       },
+      //     })
+      //   );
+      // }
+
+      // // Flag the session with the canvas session ID
+      // dispatch(canvasSessionIdChanged(session_id));
+
+      // // We are ready to invoke the session!
+      // dispatch(sessionReadyToInvoke());
     },
   });
 };

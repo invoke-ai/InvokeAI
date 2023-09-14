@@ -1,60 +1,57 @@
 import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { unset } from 'lodash-es';
-import { BatchConfig, RandomIntInvocation } from 'services/api/types';
-import {
-  METADATA_ACCUMULATOR,
-  NOISE,
-  POSITIVE_CONDITIONING,
-  RANDOM_INT,
-} from './constants';
+import { components } from 'services/api/schema';
+import { BatchConfig } from 'services/api/types';
+import { METADATA_ACCUMULATOR, POSITIVE_CONDITIONING } from './constants';
 
 export const prepareLinearUIBatch = (
   state: RootState,
   graph: NonNullableGraph,
   prepend: boolean
 ): BatchConfig => {
-  const { shouldRandomizeSeed, iterations } = state.generation;
-
+  const { iterations, model } = state.generation;
+  const { shouldConcatSDXLStylePrompt, positiveStylePrompt } = state.sdxl;
   const { prompts } = state.dynamicPrompts;
-
-  if (shouldRandomizeSeed) {
-    const randomIntNode: RandomIntInvocation = {
-      id: RANDOM_INT,
-      type: 'rand_int',
-      is_intermediate: true,
-    };
-    graph.nodes[RANDOM_INT] = randomIntNode;
-    graph.edges.push({
-      source: { node_id: RANDOM_INT, field: 'value' },
-      destination: { node_id: NOISE, field: 'seed' },
-    });
-    graph.edges.push({
-      source: { node_id: RANDOM_INT, field: 'value' },
-      destination: { node_id: METADATA_ACCUMULATOR, field: 'seed' },
-    });
-
-    unset(graph.nodes[NOISE], 'seed');
-  }
 
   const data: BatchConfig['batch']['data'] = [];
 
   if (prompts.length > 1) {
     unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_prompt');
 
+    const zippedPrompts: components['schemas']['BatchDatum'][] = [];
     // zipped batch of prompts
-    data.push([
-      {
+    zippedPrompts.push({
+      node_path: POSITIVE_CONDITIONING,
+      field_name: 'prompt',
+      items: prompts,
+    });
+
+    zippedPrompts.push({
+      node_path: METADATA_ACCUMULATOR,
+      field_name: 'positive_prompt',
+      items: prompts,
+    });
+
+    if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
+      unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_style_prompt');
+      const stylePrompts = prompts.map((p) =>
+        [p, positiveStylePrompt].join(' ')
+      );
+      zippedPrompts.push({
         node_path: POSITIVE_CONDITIONING,
-        field_name: 'prompt',
-        items: prompts,
-      },
-      {
+        field_name: 'style',
+        items: stylePrompts,
+      });
+
+      zippedPrompts.push({
         node_path: METADATA_ACCUMULATOR,
-        field_name: 'positive_prompt',
-        items: prompts,
-      },
-    ]);
+        field_name: 'positive_style_prompt',
+        items: stylePrompts,
+      });
+    }
+
+    data.push(zippedPrompts);
   }
 
   const enqueueBatchArg: BatchConfig = {

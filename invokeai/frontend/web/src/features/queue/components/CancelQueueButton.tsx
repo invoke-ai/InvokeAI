@@ -42,7 +42,9 @@ const CancelQueueButton = ({ asIconButton }: Props) => {
       asIconButton={asIconButton}
       label={t('queue.cancel')}
       tooltip={t('queue.cancelTooltip')}
-      isDisabled={!queueStatusData?.started}
+      isDisabled={
+        !(queueStatusData?.started || queueStatusData?.stop_after_current)
+      }
       icon={<FaTimes />}
       onClick={handleClick}
       colorScheme="orange"

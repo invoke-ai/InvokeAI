@@ -4,8 +4,8 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { ImageDTO, ImageToLatentsInvocation } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -26,7 +26,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Canvas tab's Image to Image graph.
@@ -42,6 +42,7 @@ export const buildCanvasSDXLImageToImageGraph = (
     model,
     cfgScale: cfg_scale,
     scheduler,
+    seed,
     steps,
     vaePrecision,
     clipSkip,
@@ -55,7 +56,6 @@ export const buildCanvasSDXLImageToImageGraph = (
     shouldUseSDXLRefiner,
     refinerStart,
     sdxlImg2ImgDenoisingStrength: strength,
-    shouldConcatSDXLStylePrompt,
   } = state.sdxl;
 
   // The bounding box determines width and height, not the width and height params
@@ -86,8 +86,8 @@ export const buildCanvasSDXLImageToImageGraph = (
     : initialGenerationState.shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
-    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
+    buildSDXLStylePrompts(state);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -111,19 +111,20 @@ export const buildCanvasSDXLImageToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: craftedPositiveStylePrompt,
+        style: joinedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: craftedNegativeStylePrompt,
+        style: joinedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
         is_intermediate: true,
         use_cpu,
+        seed,
         width: !isUsingScaledDimensions
           ? width
           : scaledBoundingBoxDimensions.width,
@@ -335,10 +336,10 @@ export const buildCanvasSDXLImageToImageGraph = (
     height: !isUsingScaledDimensions
       ? height
       : scaledBoundingBoxDimensions.height,
-    positive_prompt: '', // set in addDynamicPromptsToGraph
+    positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model,
-    seed: 0, // set in addDynamicPromptsToGraph
+    seed,
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
@@ -360,6 +361,8 @@ export const buildCanvasSDXLImageToImageGraph = (
       field: 'metadata',
     },
   });
+
+  addRandomizeSeedToLinearGraph(state, graph);
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
@@ -385,9 +388,6 @@ export const buildCanvasSDXLImageToImageGraph = (
 
   // add LoRA support
   addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
-
-  // add dynamic prompts - also sets up core iteration and seed
-  addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);

@@ -11,13 +11,15 @@ import { canvasSelector } from '../store/canvasSelectors';
 const selector = createSelector(
   [systemSelector, canvasSelector],
   (system, canvas) => {
-    const { progressImage, sessionId } = system;
-    const { sessionId: canvasSessionId, boundingBox } =
-      canvas.layerState.stagingArea;
+    const { progressImage } = system;
+    const { sessionIds, boundingBox } = canvas.layerState.stagingArea;
 
     return {
       boundingBox,
-      progressImage: sessionId === canvasSessionId ? progressImage : undefined,
+      progressImage:
+        progressImage && sessionIds.includes(progressImage.sessionId)
+          ? progressImage
+          : undefined,
     };
   },
   {

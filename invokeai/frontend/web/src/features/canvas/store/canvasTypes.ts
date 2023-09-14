@@ -89,7 +89,8 @@ export type CanvasLayerState = {
   stagingArea: {
     images: CanvasImage[];
     selectedImageIndex: number;
-    sessionId?: string;
+    batchIds: string[];
+    sessionIds: string[];
     boundingBox?: IRect;
   };
 };

@@ -44,7 +44,7 @@ export interface SystemState {
   /**
    * The current progress image
    */
-  progressImage: ProgressImage | null;
+  progressImage: (ProgressImage & { sessionId: string }) | null;
   /**
    * The current socket session id
    */
@@ -183,8 +183,8 @@ export const systemSlice = createSlice({
     languageChanged: (state, action: PayloadAction<keyof typeof LANGUAGES>) => {
       state.language = action.payload;
     },
-    progressImageSet(state, action: PayloadAction<ProgressImage | null>) {
-      state.progressImage = action.payload;
+    progressImageReset(state) {
+      state.progressImage = null;
     },
     shouldUseNSFWCheckerChanged(state, action: PayloadAction<boolean>) {
       state.shouldUseNSFWChecker = action.payload;
@@ -242,7 +242,8 @@ export const systemSlice = createSlice({
      * Generator Progress
      */
     builder.addCase(appSocketGeneratorProgress, (state, action) => {
-      const { step, total_steps, progress_image } = action.payload.data;
+      const { step, total_steps, progress_image, graph_execution_state_id } =
+        action.payload.data;
 
       state.isProcessing = true;
       state.isCancelable = true;
@@ -251,7 +252,9 @@ export const systemSlice = createSlice({
       state.currentStatusHasSteps = true;
       state.currentStep = step + 1; // TODO: step starts at -1, think this is a bug
       state.totalSteps = total_steps;
-      state.progressImage = progress_image ?? null;
+      state.progressImage = progress_image
+        ? { ...progress_image, sessionId: graph_execution_state_id }
+        : null;
       state.statusTranslationKey = 'common.statusGenerating';
     });
 
@@ -411,7 +414,7 @@ export const {
   isPersistedChanged,
   shouldAntialiasProgressImageChanged,
   languageChanged,
-  progressImageSet,
+  progressImageReset,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } = systemSlice.actions;

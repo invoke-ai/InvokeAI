@@ -4,12 +4,12 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   DenoiseLatentsInvocation,
-  BatchConfig,
   ONNXTextToLatentsInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -26,12 +26,10 @@ import {
   SEAMLESS,
   TEXT_TO_IMAGE_GRAPH,
 } from './constants';
-import { prepareLinearUIBatch } from './buildLinearBatchConfig';
 
 export const buildLinearTextToImageGraph = (
-  state: RootState,
-  prepend: boolean
-): BatchConfig => {
+  state: RootState
+): NonNullableGraph => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -268,6 +266,8 @@ export const buildLinearTextToImageGraph = (
     },
   });
 
+  addRandomizeSeedToLinearGraph(state, graph);
+
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
     addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
@@ -279,9 +279,6 @@ export const buildLinearTextToImageGraph = (
 
   // add LoRA support
   addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
-
-  // add dynamic prompts - also sets up core iteration and seed
-  // addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
@@ -297,7 +294,5 @@ export const buildLinearTextToImageGraph = (
     addWatermarkerToGraph(state, graph);
   }
 
-  const enqueueBatchArg = prepareLinearUIBatch(state, graph, prepend);
-
-  return enqueueBatchArg;
+  return graph;
 };

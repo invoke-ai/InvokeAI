@@ -16,6 +16,7 @@ import {
   socketModelLoadCompleted,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
+  socketQueueStatusChanged,
   socketSessionRetrievalError,
 } from '../actions';
 import { ClientToServerEvents, ServerToClientEvents } from '../types';
@@ -167,5 +168,9 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
       });
     }
     dispatch(socketQueueItemStatusChanged({ data }));
+  });
+
+  socket.on('queue_status_changed', (data) => {
+    dispatch(socketQueueStatusChanged({ data }));
   });
 };

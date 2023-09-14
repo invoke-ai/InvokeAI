@@ -36,7 +36,6 @@ const QueueButton = ({
         isDisabled={isDisabled}
         colorScheme={colorScheme}
         isLoading={isLoading}
-        flexGrow={1}
       />
     );
   }

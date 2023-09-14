@@ -7,9 +7,9 @@ import {
   ImageToLatentsInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -41,6 +41,7 @@ export const buildLinearImageToImageGraph = (
     model,
     cfgScale: cfg_scale,
     scheduler,
+    seed,
     steps,
     initialImage,
     img2imgStrength: strength,
@@ -54,16 +55,6 @@ export const buildLinearImageToImageGraph = (
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
-
-  // TODO: add batch functionality
-  // const {
-  //   isEnabled: isBatchEnabled,
-  //   imageNames: batchImageNames,
-  //   asInitialImage,
-  // } = state.batch;
-
-  // const shouldBatch =
-  //   isBatchEnabled && batchImageNames.length > 0 && asInitialImage;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -120,6 +111,7 @@ export const buildLinearImageToImageGraph = (
         type: 'noise',
         id: NOISE,
         use_cpu,
+        seed,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -320,10 +312,10 @@ export const buildLinearImageToImageGraph = (
     cfg_scale,
     height,
     width,
-    positive_prompt: '', // set in addDynamicPromptsToGraph
+    positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model,
-    seed: 0, // set in addDynamicPromptsToGraph
+    seed,
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
@@ -346,6 +338,8 @@ export const buildLinearImageToImageGraph = (
     },
   });
 
+  addRandomizeSeedToLinearGraph(state, graph);
+
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
     addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
@@ -357,9 +351,6 @@ export const buildLinearImageToImageGraph = (
 
   // add LoRA support
   addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
-
-  // add dynamic prompts - also sets up core iteration and seed
-  addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);

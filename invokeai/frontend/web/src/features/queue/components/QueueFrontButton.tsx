@@ -25,7 +25,7 @@ const QueueFrontButton = () => {
   }, [dispatch, tabName]);
 
   useHotkeys(
-    ['ctrl+enter', 'meta+enter'],
+    ['ctrl+shift+enter', 'meta+shift+enter'],
     handleEnqueue,
     {
       enabled: () => !isLoading,
@@ -43,7 +43,6 @@ const QueueFrontButton = () => {
       tooltip={<EnqueueButtonTooltip prepend />}
       isLoading={isLoading}
       icon={<FaBoltLightning />}
-      flexGrow={1}
     />
   );
 };

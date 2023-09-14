@@ -8,11 +8,10 @@ import {
   ImageToLatentsInvocation,
   MaskEdgeInvocation,
   NoiseInvocation,
-  RandomIntInvocation,
-  RangeOfSizeInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -37,7 +36,6 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  RANDOM_INT,
   RANGE_OF_SIZE,
   SDXL_CANVAS_INPAINT_GRAPH,
   SDXL_DENOISE_LATENTS,
@@ -45,7 +43,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -65,7 +63,6 @@ export const buildCanvasSDXLInpaintGraph = (
     steps,
     iterations,
     seed,
-    shouldRandomizeSeed,
     vaePrecision,
     shouldUseNoiseSettings,
     shouldUseCpuNoise,
@@ -82,7 +79,6 @@ export const buildCanvasSDXLInpaintGraph = (
     sdxlImg2ImgDenoisingStrength: strength,
     shouldUseSDXLRefiner,
     refinerStart,
-    shouldConcatSDXLStylePrompt,
   } = state.sdxl;
 
   if (!model) {
@@ -113,8 +109,8 @@ export const buildCanvasSDXLInpaintGraph = (
     : shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
-    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
+    buildSDXLStylePrompts(state);
 
   const graph: NonNullableGraph = {
     id: SDXL_CANVAS_INPAINT_GRAPH,
@@ -128,13 +124,13 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: craftedPositiveStylePrompt,
+        style: joinedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: craftedNegativeStylePrompt,
+        style: joinedNegativeStylePrompt,
       },
       [MASK_BLUR]: {
         type: 'img_blur',
@@ -153,6 +149,7 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'noise',
         id: NOISE,
         use_cpu,
+        seed,
         is_intermediate: true,
       },
       [INPAINT_CREATE_MASK]: {
@@ -177,6 +174,7 @@ export const buildCanvasSDXLInpaintGraph = (
         type: 'noise',
         id: NOISE,
         use_cpu,
+        seed: seed + 1,
         is_intermediate: true,
       },
       [CANVAS_COHERENCE_NOISE_INCREMENT]: {
@@ -358,26 +356,6 @@ export const buildCanvasSDXLInpaintGraph = (
         },
       },
       // Canvas Refine
-      {
-        source: {
-          node_id: ITERATE,
-          field: 'item',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_NOISE_INCREMENT,
-          field: 'a',
-        },
-      },
-      {
-        source: {
-          node_id: CANVAS_COHERENCE_NOISE_INCREMENT,
-          field: 'value',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_NOISE,
-          field: 'seed',
-        },
-      },
       {
         source: {
           node_id: modelLoaderNodeId,
@@ -716,25 +694,7 @@ export const buildCanvasSDXLInpaintGraph = (
     });
   }
 
-  // Handle Seed
-  if (shouldRandomizeSeed) {
-    // Random int node to generate the starting seed
-    const randomIntNode: RandomIntInvocation = {
-      id: RANDOM_INT,
-      type: 'rand_int',
-    };
-
-    graph.nodes[RANDOM_INT] = randomIntNode;
-
-    // Connect random int to the start of the range of size so the range starts on the random first seed
-    graph.edges.push({
-      source: { node_id: RANDOM_INT, field: 'value' },
-      destination: { node_id: RANGE_OF_SIZE, field: 'start' },
-    });
-  } else {
-    // User specified seed, so set the start of the range of size to the seed
-    (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
-  }
+  addRandomizeSeedToLinearGraph(state, graph);
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {

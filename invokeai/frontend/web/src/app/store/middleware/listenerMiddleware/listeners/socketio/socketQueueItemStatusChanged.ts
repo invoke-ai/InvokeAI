@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import { canvasSessionIdAdded } from 'features/canvas/store/canvasSlice';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import {
   appSocketQueueItemStatusChanged,
@@ -9,7 +10,7 @@ import { startAppListening } from '../..';
 export const addSocketQueueItemStatusChangedEventListener = () => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
-    effect: (action, { dispatch }) => {
+    effect: (action, { dispatch, getState }) => {
       const log = logger('socketio');
       const { id, status: newStatus } = action.payload.data;
       log.debug(
@@ -27,6 +28,12 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
           });
         })
       );
+
+      const state = getState();
+      const { batch_id, graph_execution_state_id } = action.payload.data;
+      if (state.canvas.layerState.stagingArea.batchIds.includes(batch_id)) {
+        dispatch(canvasSessionIdAdded(graph_execution_state_id));
+      }
 
       dispatch(
         queueApi.util.invalidateTags([

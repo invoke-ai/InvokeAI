@@ -23,10 +23,10 @@ const ClearQueueButton = ({ asIconButton }: Props) => {
   const [clearQueue] = useClearQueueMutation();
   const handleClick = useCallback(async () => {
     try {
-      const data = await clearQueue().unwrap();
+      await clearQueue().unwrap();
       dispatch(
         addToast({
-          title: t('queue.clearSucceeded', { count: data.deleted }),
+          title: t('queue.clearSucceeded'),
           status: 'success',
         })
       );

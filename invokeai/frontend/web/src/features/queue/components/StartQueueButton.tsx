@@ -42,7 +42,11 @@ const StartQueueButton = ({ asIconButton }: Props) => {
       asIconButton={asIconButton}
       label={t('queue.start')}
       tooltip={t('queue.startTooltip')}
-      isDisabled={queueStatusData?.started || queueStatusData?.pending === 0}
+      isDisabled={
+        queueStatusData?.started ||
+        queueStatusData?.stop_after_current ||
+        queueStatusData?.pending === 0
+      }
       icon={<FaPlay />}
       onClick={handleClick}
       colorScheme="green"

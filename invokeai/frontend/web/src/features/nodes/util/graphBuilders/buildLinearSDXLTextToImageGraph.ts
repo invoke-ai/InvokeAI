@@ -3,8 +3,8 @@ import { RootState } from 'app/store/store';
 import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -22,7 +22,7 @@ import {
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
 } from './constants';
-import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
 
 export const buildLinearSDXLTextToImageGraph = (
   state: RootState
@@ -34,6 +34,7 @@ export const buildLinearSDXLTextToImageGraph = (
     model,
     cfgScale: cfg_scale,
     scheduler,
+    seed,
     steps,
     width,
     height,
@@ -49,7 +50,6 @@ export const buildLinearSDXLTextToImageGraph = (
     positiveStylePrompt,
     negativeStylePrompt,
     shouldUseSDXLRefiner,
-    shouldConcatSDXLStylePrompt,
     refinerStart,
   } = state.sdxl;
 
@@ -65,8 +65,8 @@ export const buildLinearSDXLTextToImageGraph = (
   const fp32 = vaePrecision === 'fp32';
 
   // Construct Style Prompt
-  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
-    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
+    buildSDXLStylePrompts(state);
 
   // Model Loader ID
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
@@ -93,17 +93,18 @@ export const buildLinearSDXLTextToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: craftedPositiveStylePrompt,
+        style: joinedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: craftedNegativeStylePrompt,
+        style: joinedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
+        seed,
         width,
         height,
         use_cpu,
@@ -228,10 +229,10 @@ export const buildLinearSDXLTextToImageGraph = (
     cfg_scale,
     height,
     width,
-    positive_prompt: '', // set in addDynamicPromptsToGraph
+    positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model,
-    seed: 0, // set in addDynamicPromptsToGraph
+    seed,
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
@@ -253,6 +254,8 @@ export const buildLinearSDXLTextToImageGraph = (
       field: 'metadata',
     },
   });
+
+  addRandomizeSeedToLinearGraph(state, graph);
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
@@ -276,9 +279,6 @@ export const buildLinearSDXLTextToImageGraph = (
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
-
-  // add dynamic prompts - also sets up core iteration and seed
-  addDynamicPromptsToGraph(state, graph);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

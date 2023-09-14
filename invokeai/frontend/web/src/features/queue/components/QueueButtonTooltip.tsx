@@ -4,15 +4,16 @@ import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
+import { usePredictedQueueCounts } from '../hooks/usePredictedQueueCounts';
 
 const tooltipSelector = createSelector(
   [stateSelector],
   ({ gallery }) => {
     const { autoAddBoardId } = gallery;
-
     return {
       autoAddBoardId,
     };
@@ -29,16 +30,27 @@ const QueueButtonTooltipContent = ({ prepend = false }: Props) => {
   const { isReady, reasons } = useIsReadyToEnqueue();
   const { autoAddBoardId } = useAppSelector(tooltipSelector);
   const autoAddBoardName = useBoardName(autoAddBoardId);
+  const [_, { isLoading }] = useEnqueueBatchMutation({
+    fixedCacheKey: 'enqueueBatch',
+  });
+  const counts = usePredictedQueueCounts();
+
+  const label = useMemo(() => {
+    if (isLoading) {
+      return t('queue.enqueueing');
+    }
+    if (isReady) {
+      if (prepend) {
+        return t('queue.queueFront', { predicted: counts?.predicted ?? '?' });
+      }
+      return t('queue.queueBack', { predicted: counts?.predicted ?? '?' });
+    }
+    return t('queue.notReady');
+  }, [counts?.predicted, isLoading, isReady, prepend, t]);
 
   return (
     <Flex flexDir="column" gap={1}>
-      <Text fontWeight={600}>
-        {isReady
-          ? prepend
-            ? t('queue.queueFront')
-            : t('queue.queueBack')
-          : t('queue.notReady')}
-      </Text>
+      <Text fontWeight={600}>{label}</Text>
       {reasons.length > 0 && (
         <UnorderedList>
           {reasons.map((reason, i) => (

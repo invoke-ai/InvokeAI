@@ -2,7 +2,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaScissors } from 'react-icons/fa6';
+import { BsStars } from 'react-icons/bs';
 import {
   useGetQueueStatusQuery,
   usePruneQueueMutation,
@@ -32,7 +32,7 @@ const PruneQueueButton = ({ asIconButton }: Props) => {
       const data = await pruneQueue().unwrap();
       dispatch(
         addToast({
-          title: t('queue.pruneSucceeded', { count: data.deleted }),
+          title: t('queue.pruneSucceeded', { item_count: data.deleted }),
           status: 'success',
         })
       );
@@ -53,8 +53,8 @@ const PruneQueueButton = ({ asIconButton }: Props) => {
       isDisabled={!count}
       asIconButton={asIconButton}
       label={t('queue.prune')}
-      tooltip={t('queue.pruneTooltip', { count })}
-      icon={<FaScissors />}
+      tooltip={t('queue.pruneTooltip', { item_count: count })}
+      icon={<BsStars />}
       onClick={handleClick}
       colorScheme="blue"
     />

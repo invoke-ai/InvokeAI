@@ -25,7 +25,7 @@ import {
   SDXL_REFINER_POSITIVE_CONDITIONING,
   SDXL_REFINER_SEAMLESS,
 } from './constants';
-import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
 
 export const addSDXLRefinerToGraph = (
   state: RootState,
@@ -79,7 +79,7 @@ export const addSDXLRefinerToGraph = (
 
   // Construct Style Prompt
   const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
-    craftSDXLStylePrompt(state, true);
+    buildSDXLStylePrompts(state, true);
 
   // Unplug SDXL Latents Generation To Latents To Image
   graph.edges = graph.edges.filter(

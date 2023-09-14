@@ -81,12 +81,12 @@ import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSa
 import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
 import { addUserInvokedCanvasListener } from './listeners/userInvokedCanvas';
-import { addUserInvokedImageToImageListener } from './listeners/userInvokedImageToImage';
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
-import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
+import { addUserEnqueuedT2iOrI2iListener } from './listeners/addUserEnqueuedT2iOrI2iListener';
 import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
 import { addDynamicPromptsListener } from './listeners/promptChanged';
 import { addSocketQueueItemStatusChangedEventListener } from './listeners/socketio/socketQueueItemStatusChanged';
+import { addSocketQueueStatusChangedEventListener } from './listeners/socketio/socketQueueStatusChanged';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -135,8 +135,7 @@ addImagesUnstarredListener();
 // User Invoked
 addUserInvokedCanvasListener();
 addUserInvokedNodesListener();
-addUserInvokedTextToImageListener();
-addUserInvokedImageToImageListener();
+addUserEnqueuedT2iOrI2iListener();
 addSessionReadyToInvokeListener();
 
 // Canvas actions
@@ -176,6 +175,7 @@ addModelLoadEventListener();
 addSessionRetrievalErrorEventListener();
 addInvocationRetrievalErrorEventListener();
 addSocketQueueItemStatusChangedEventListener();
+addSocketQueueStatusChangedEventListener();
 
 // Session Created
 addSessionCreatedPendingListener();

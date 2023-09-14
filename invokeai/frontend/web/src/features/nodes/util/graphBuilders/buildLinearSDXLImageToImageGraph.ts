@@ -7,8 +7,8 @@ import {
   ImageToLatentsInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -28,7 +28,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
+import { buildSDXLStylePrompts } from './helpers/craftSDXLStylePrompt';
 
 /**
  * Builds the Image to Image tab graph.
@@ -43,6 +43,7 @@ export const buildLinearSDXLImageToImageGraph = (
     model,
     cfgScale: cfg_scale,
     scheduler,
+    seed,
     steps,
     initialImage,
     shouldFitToWidthHeight,
@@ -59,7 +60,6 @@ export const buildLinearSDXLImageToImageGraph = (
   const {
     positiveStylePrompt,
     negativeStylePrompt,
-    shouldConcatSDXLStylePrompt,
     shouldUseSDXLRefiner,
     refinerStart,
     sdxlImg2ImgDenoisingStrength: strength,
@@ -94,8 +94,8 @@ export const buildLinearSDXLImageToImageGraph = (
     : initialGenerationState.shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
-    craftSDXLStylePrompt(state, shouldConcatSDXLStylePrompt);
+  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
+    buildSDXLStylePrompts(state);
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
@@ -110,18 +110,19 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
-        style: craftedPositiveStylePrompt,
+        style: joinedPositiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
-        style: craftedNegativeStylePrompt,
+        style: joinedNegativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
         use_cpu,
+        seed,
       },
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
@@ -333,10 +334,10 @@ export const buildLinearSDXLImageToImageGraph = (
     cfg_scale,
     height,
     width,
-    positive_prompt: '', // set in addDynamicPromptsToGraph
+    positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model,
-    seed: 0, // set in addDynamicPromptsToGraph
+    seed,
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
@@ -361,6 +362,8 @@ export const buildLinearSDXLImageToImageGraph = (
     },
   });
 
+  addRandomizeSeedToLinearGraph(state, graph);
+
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
     addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
@@ -383,9 +386,6 @@ export const buildLinearSDXLImageToImageGraph = (
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
-
-  // add dynamic prompts - also sets up core iteration and seed
-  addDynamicPromptsToGraph(state, graph);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

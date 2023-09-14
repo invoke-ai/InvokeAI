@@ -1,28 +1,21 @@
 import { RootState } from 'app/store/store';
 
-export const craftSDXLStylePrompt = (
-  state: RootState,
-  shouldConcatSDXLStylePrompt: boolean
-) => {
+export const buildSDXLStylePrompts = (state: RootState) => {
   const { positivePrompt, negativePrompt } = state.generation;
-  const { positiveStylePrompt, negativeStylePrompt } = state.sdxl;
+  const {
+    positiveStylePrompt,
+    negativeStylePrompt,
+    shouldConcatSDXLStylePrompt,
+  } = state.sdxl;
 
-  let craftedPositiveStylePrompt = positiveStylePrompt;
-  let craftedNegativeStylePrompt = negativeStylePrompt;
+  // Construct Style Prompt
+  const joinedPositiveStylePrompt = shouldConcatSDXLStylePrompt
+    ? [positivePrompt, positiveStylePrompt].join(' ')
+    : positiveStylePrompt;
 
-  if (shouldConcatSDXLStylePrompt) {
-    if (positiveStylePrompt.length > 0) {
-      craftedPositiveStylePrompt = `${positivePrompt} ${positiveStylePrompt}`;
-    } else {
-      craftedPositiveStylePrompt = positivePrompt;
-    }
+  const joinedNegativeStylePrompt = shouldConcatSDXLStylePrompt
+    ? [negativePrompt, negativeStylePrompt].join(' ')
+    : negativeStylePrompt;
 
-    if (negativeStylePrompt.length > 0) {
-      craftedNegativeStylePrompt = `${negativePrompt} ${negativeStylePrompt}`;
-    } else {
-      craftedNegativeStylePrompt = negativePrompt;
-    }
-  }
-
-  return { craftedPositiveStylePrompt, craftedNegativeStylePrompt };
+  return { joinedPositiveStylePrompt, joinedNegativeStylePrompt };
 };

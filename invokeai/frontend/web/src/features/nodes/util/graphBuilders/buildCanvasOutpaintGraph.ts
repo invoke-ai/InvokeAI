@@ -7,12 +7,11 @@ import {
   InfillPatchMatchInvocation,
   InfillTileInvocation,
   NoiseInvocation,
-  RandomIntInvocation,
-  RangeOfSizeInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -32,7 +31,6 @@ import {
   INPAINT_IMAGE_RESIZE_UP,
   INPAINT_INFILL,
   INPAINT_INFILL_RESIZE_DOWN,
-  ITERATE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   MASK_COMBINE,
@@ -42,8 +40,6 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  RANDOM_INT,
-  RANGE_OF_SIZE,
   SEAMLESS,
 } from './constants';
 
@@ -64,9 +60,7 @@ export const buildCanvasOutpaintGraph = (
     scheduler,
     steps,
     img2imgStrength: strength,
-    iterations,
     seed,
-    shouldRandomizeSeed,
     vaePrecision,
     shouldUseNoiseSettings,
     shouldUseCpuNoise,
@@ -158,6 +152,7 @@ export const buildCanvasOutpaintGraph = (
         type: 'noise',
         id: NOISE,
         use_cpu,
+        seed,
         is_intermediate: true,
       },
       [INPAINT_CREATE_MASK]: {
@@ -180,6 +175,7 @@ export const buildCanvasOutpaintGraph = (
         type: 'noise',
         id: NOISE,
         use_cpu,
+        seed: seed + 1,
         is_intermediate: true,
       },
       [CANVAS_COHERENCE_NOISE_INCREMENT]: {
@@ -208,20 +204,6 @@ export const buildCanvasOutpaintGraph = (
         type: 'color_correct',
         id: CANVAS_OUTPUT,
         is_intermediate: !shouldAutoSave,
-      },
-      [RANGE_OF_SIZE]: {
-        type: 'range_of_size',
-        id: RANGE_OF_SIZE,
-        is_intermediate: true,
-        // seed - must be connected manually
-        // start: 0,
-        size: iterations,
-        step: 1,
-      },
-      [ITERATE]: {
-        type: 'iterate',
-        id: ITERATE,
-        is_intermediate: true,
       },
     },
     edges: [
@@ -351,48 +333,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'denoise_mask',
         },
       },
-      // Iterate
-      {
-        source: {
-          node_id: RANGE_OF_SIZE,
-          field: 'collection',
-        },
-        destination: {
-          node_id: ITERATE,
-          field: 'collection',
-        },
-      },
-      {
-        source: {
-          node_id: ITERATE,
-          field: 'item',
-        },
-        destination: {
-          node_id: NOISE,
-          field: 'seed',
-        },
-      },
       // Canvas Refine
-      {
-        source: {
-          node_id: ITERATE,
-          field: 'item',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_NOISE_INCREMENT,
-          field: 'a',
-        },
-      },
-      {
-        source: {
-          node_id: CANVAS_COHERENCE_NOISE_INCREMENT,
-          field: 'value',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_NOISE,
-          field: 'seed',
-        },
-      },
       {
         source: {
           node_id: modelLoaderNodeId,
@@ -803,25 +744,7 @@ export const buildCanvasOutpaintGraph = (
     });
   }
 
-  // Handle Seed
-  if (shouldRandomizeSeed) {
-    // Random int node to generate the starting seed
-    const randomIntNode: RandomIntInvocation = {
-      id: RANDOM_INT,
-      type: 'rand_int',
-    };
-
-    graph.nodes[RANDOM_INT] = randomIntNode;
-
-    // Connect random int to the start of the range of size so the range starts on the random first seed
-    graph.edges.push({
-      source: { node_id: RANDOM_INT, field: 'value' },
-      destination: { node_id: RANGE_OF_SIZE, field: 'start' },
-    });
-  } else {
-    // User specified seed, so set the start of the range of size to the seed
-    (graph.nodes[RANGE_OF_SIZE] as RangeOfSizeInvocation).start = seed;
-  }
+  addRandomizeSeedToLinearGraph(state, graph);
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {

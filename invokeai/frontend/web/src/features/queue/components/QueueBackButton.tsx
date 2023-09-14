@@ -1,14 +1,14 @@
-import IAIButton from 'common/components/IAIButton';
-import { memo, useCallback } from 'react';
-import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
-import EnqueueButtonTooltip from './QueueButtonTooltip';
-import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
 import { enqueueRequested } from 'app/store/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIButton from 'common/components/IAIButton';
+import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
+import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
+import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
+import EnqueueButtonTooltip from './QueueButtonTooltip';
 
 const QueueBackButton = () => {
   const tabName = useAppSelector(activeTabNameSelector);
@@ -24,7 +24,7 @@ const QueueBackButton = () => {
   }, [dispatch, tabName]);
 
   useHotkeys(
-    ['ctrl+shift+enter', 'meta+shift+enter'],
+    ['ctrl+enter', 'meta+enter'],
     handleEnqueue,
     {
       enabled: () => !isLoading,
@@ -40,7 +40,8 @@ const QueueBackButton = () => {
       onClick={handleEnqueue}
       tooltip={<EnqueueButtonTooltip />}
       isLoading={isLoading}
-      flexGrow={1}
+      flexGrow={3}
+      minW={44}
     >
       {t('queue.queueBack')}
     </IAIButton>

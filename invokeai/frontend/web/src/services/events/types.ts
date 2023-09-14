@@ -143,7 +143,17 @@ export type InvocationRetrievalErrorEvent = {
 export type QueueItemStatusChangedEvent = {
   id: number;
   graph_execution_state_id: string;
+  batch_id: string;
   status: components['schemas']['SessionQueueItemDTO']['status'];
+};
+/**
+ * A `queue_status_changed` socket.io event.
+ *
+ * @example socket.on('queue_status_changed', (data: QueueItemStatusChangedEvent) => { ... }
+ */
+export type QueueStatusChangedEvent = {
+  started: boolean;
+  stop_after_current: boolean;
 };
 
 export type ClientEmitSubscribeSession = {
@@ -171,6 +181,7 @@ export type ServerToClientEvents = {
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
+  queue_status_changed: (payload: QueueStatusChangedEvent) => void;
 };
 
 export type ClientToServerEvents = {

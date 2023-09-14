@@ -4,9 +4,9 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import { ImageDTO, ImageToLatentsInvocation } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addRandomizeSeedToLinearGraph } from './addRandomizeSeedToLinearGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
@@ -40,6 +40,7 @@ export const buildCanvasImageToImageGraph = (
     model,
     cfgScale: cfg_scale,
     scheduler,
+    seed,
     steps,
     img2imgStrength: strength,
     vaePrecision,
@@ -118,6 +119,7 @@ export const buildCanvasImageToImageGraph = (
         id: NOISE,
         is_intermediate: true,
         use_cpu,
+        seed,
         width: !isUsingScaledDimensions
           ? width
           : scaledBoundingBoxDimensions.width,
@@ -322,10 +324,10 @@ export const buildCanvasImageToImageGraph = (
     height: !isUsingScaledDimensions
       ? height
       : scaledBoundingBoxDimensions.height,
-    positive_prompt: '', // set in addDynamicPromptsToGraph
+    positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model,
-    seed: 0, // set in addDynamicPromptsToGraph
+    seed,
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
@@ -348,6 +350,8 @@ export const buildCanvasImageToImageGraph = (
     },
   });
 
+  addRandomizeSeedToLinearGraph(state, graph);
+
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
     addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
@@ -359,9 +363,6 @@ export const buildCanvasImageToImageGraph = (
 
   // optionally add custom VAE
   addVAEToGraph(state, graph, modelLoaderNodeId);
-
-  // add dynamic prompts - also sets up core iteration and seed
-  addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);

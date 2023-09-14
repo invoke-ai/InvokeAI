@@ -9,6 +9,7 @@ import {
   ModelLoadCompletedEvent,
   ModelLoadStartedEvent,
   QueueItemStatusChangedEvent,
+  QueueStatusChangedEvent,
   SessionRetrievalErrorEvent,
 } from 'services/events/types';
 
@@ -218,7 +219,7 @@ export const appSocketInvocationRetrievalError = createAction<{
 }>('socket/appSocketInvocationRetrievalError');
 
 /**
- * Socket.IO Invocation Retrieval Error
+ * Socket.IO Quueue Item Status Changed
  *
  * Do not use. Only for use in middleware.
  */
@@ -227,8 +228,24 @@ export const socketQueueItemStatusChanged = createAction<{
 }>('socket/socketQueueItemStatusChanged');
 
 /**
- * App-level Invocation Retrieval Error
+ * App-level Quueue Item Status Changed
  */
 export const appSocketQueueItemStatusChanged = createAction<{
   data: QueueItemStatusChangedEvent;
 }>('socket/appSocketQueueItemStatusChanged');
+
+/**
+ * Socket.IO Queue Status Changed
+ *
+ * Do not use. Only for use in middleware.
+ */
+export const socketQueueStatusChanged = createAction<{
+  data: QueueStatusChangedEvent;
+}>('socket/socketQueueStatusChanged');
+
+/**
+ * App-level Queue Status Changed
+ */
+export const appSocketQueueStatusChanged = createAction<{
+  data: QueueStatusChangedEvent;
+}>('socket/appSocketQueueStatusChanged');
