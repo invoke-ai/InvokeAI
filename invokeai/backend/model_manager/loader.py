@@ -10,10 +10,10 @@ from typing import Union, Optional
 import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util import choose_precision, choose_torch_device, InvokeAILogger
+from invokeai.backend.util import choose_precision, choose_torch_device, InvokeAILogger, Chdir
 from .config import BaseModelType, ModelType, SubModelType, ModelConfigBase
 from .install import ModelInstallBase, ModelInstall
-from .storage import ModelConfigStore, ModelConfigStoreYAML, ModelConfigStoreSQL
+from .storage import ModelConfigStore, get_config_store
 from .cache import ModelCache, ModelLocker
 from .models import InvalidModelException, ModelBase, MODEL_CLASSES
 
@@ -93,13 +93,7 @@ class ModelLoader(ModelLoaderBase):
             models_file = config.model_conf_path
         else:
             models_file = config.root_path / "configs/models3.yaml"
-        store = (
-            ModelConfigStoreYAML(models_file)
-            if models_file.suffix == ".yaml"
-            else ModelConfigStoreSQL(models_file)
-            if models_file.suffix == ".db"
-            else None
-        )
+        store = get_config_store(models_file)
         if not store:
             raise ValueError(f"Invalid model configuration file: {models_file}")
 
@@ -128,6 +122,8 @@ class ModelLoader(ModelLoaderBase):
             sequential_offload=config.sequential_guidance,
             logger=self._logger,
         )
+
+        self._scan_models_directory()
 
     @property
     def store(self) -> ModelConfigStore:
@@ -223,3 +219,25 @@ class ModelLoader(ModelLoaderBase):
 
         model_path = self._resolve_model_path(model_path)
         return model_path, is_submodel_override
+
+    def _scan_models_directory(self):
+        defunct_models = set()
+        installed = set()
+
+        with Chdir(self._app_config.models_path):
+            
+            self._logger.info("Checking for models that have been moved or deleted from disk.")
+            for model_config in self._store.all_models():
+                path = self._resolve_model_path(model_config.path)
+                if not path.exists():
+                    self._logger.info(f"{model_config.name}: path {path.as_posix()} no longer exists. Unregistering.")
+                    defunct_models.add(model_config.key)
+            for key in defunct_models:
+                self._installer.unregister(key)
+
+            self._logger.info(f"Scanning {self._app_config.models_path} for new models")
+            for cur_base_model in BaseModelType:
+                for cur_model_type in ModelType:
+                    models_dir = self._resolve_model_path(Path(cur_base_model.value, cur_model_type.value))
+                    installed.update(self._installer.scan_directory(models_dir))
+            self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")

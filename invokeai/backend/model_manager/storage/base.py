@@ -3,12 +3,13 @@
 Abstract base class for storing and retrieving model configuration records.
 """
 
-
 from abc import ABC, abstractmethod
 from typing import Union, Set, List, Optional
 
 from ..config import ModelConfigBase, BaseModelType, ModelType
 
+# should match the InvokeAI version when this is first released.
+CONFIG_FILE_VERSION = "3.1.1"
 
 class DuplicateModelException(Exception):
     """Raised on an attempt to add a model with the same key twice."""
@@ -24,6 +25,14 @@ class UnknownModelException(Exception):
 
 class ModelConfigStore(ABC):
     """Abstract base class for storage and retrieval of model configs."""
+
+    @property
+    @abstractmethod
+    def version(self) -> str:
+        """
+        Return the config file/database schema version.
+        """
+        pass
 
     @abstractmethod
     def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> None:
@@ -113,3 +122,4 @@ class ModelConfigStore(ABC):
         Return all the model configs in the database.
         """
         return self.search_by_name()
+

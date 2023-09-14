@@ -58,10 +58,8 @@ from .base import (
     DuplicateModelException,
     UnknownModelException,
     ModelConfigStore,
+    CONFIG_FILE_VERSION,
 )
-
-# should match the InvokeAI version when this is first released.
-CONFIG_FILE_VERSION = "3.1.0"
 
 
 class ModelConfigStoreSQL(ModelConfigStore):
@@ -91,6 +89,8 @@ class ModelConfigStoreSQL(ModelConfigStore):
             self._conn.commit()
         finally:
             self._lock.release()
+        assert self.version == CONFIG_FILE_VERSION, \
+            f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
 
     def _create_tables(self) -> None:
         """Create sqlite3 tables."""
@@ -138,6 +138,16 @@ class ModelConfigStoreSQL(ModelConfigStore):
             """
         )
 
+        #  metadata table
+        self._cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS model_manager_metadata (
+                metadata_key TEXT NOT NULL PRIMARY KEY,
+                metadata_value TEXT NOT NULL
+            );
+            """
+        )
+
         # Add trigger for `updated_at`.
         self._cursor.execute(
             """--sql
@@ -162,6 +172,19 @@ class ModelConfigStoreSQL(ModelConfigStore):
             END;
             """
         )
+
+        # Add our version to the metadata table
+        self._cursor.execute(
+            """--sql
+            INSERT OR IGNORE into model_manager_metadata (
+               metadata_key,
+               metadata_value
+            )
+            VALUES (?,?);
+            """,
+            ("version",CONFIG_FILE_VERSION),
+        )
+        
 
     def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> None:
         """
@@ -213,6 +236,26 @@ class ModelConfigStoreSQL(ModelConfigStore):
             raise e
         finally:
             self._lock.release()
+
+    @property
+    def version(self) -> str:
+        """Return the version of the database schema."""
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                SELECT metadata_value FROM model_manager_metadata
+                WHERE metadata_key=?;
+                """,
+                ("version",),
+            )
+            rows = self._cursor.fetchone()
+            if not rows:
+                raise KeyError("Models database does not have metadata key 'version'")
+            return rows[0]
+        finally:
+            self._lock.release()
+
 
     def _update_tags(self, key: str, tags: List[str]) -> None:
         """Update tags for model with key."""

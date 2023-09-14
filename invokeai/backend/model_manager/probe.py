@@ -128,13 +128,17 @@ class ModelProbe(ModelProbeBase):
             format_type = "onnx" if model_type == ModelType.ONNX else "diffusers" if model.is_dir() else "checkpoint"
 
             probe_class = cls.PROBES[format_type].get(model_type)
+            
             if not probe_class:
                 return None
+
             probe = probe_class(model, prediction_type_helper)
+
             base_type = probe.get_base_type()
             variant_type = probe.get_variant_type()
             prediction_type = probe.get_scheduler_prediction_type()
             format = probe.get_format()
+                
             model_info = ModelProbeInfo(
                 model_type=model_type,
                 base_type=base_type,
@@ -228,12 +232,11 @@ class ModelProbe(ModelProbeBase):
 
     @classmethod
     def _scan_and_load_checkpoint(cls, model: Path) -> dict:
-        with SilenceWarnings():
-            if model.suffix.endswith((".ckpt", ".pt", ".bin")):
-                cls._scan_model(model)
-                return torch.load(model)
-            else:
-                return safetensors.torch.load_file(model)
+        if model.suffix.endswith((".ckpt", ".pt", ".bin")):
+            cls._scan_model(model)
+            return torch.load(model)
+        else:
+            return safetensors.torch.load_file(model)
 
     @classmethod
     def _scan_model(cls, model: Path):
@@ -469,12 +472,9 @@ class PipelineFolderProbe(FolderProbeBase):
         # exception results in our returning the
         # "normal" variant type
         try:
-            if self.model:
-                conf = self.model.unet.config
-            else:
-                config_file = self.folder_path / "unet" / "config.json"
-                with open(config_file, "r") as file:
-                    conf = json.load(file)
+            config_file = self.model / "unet" / "config.json"
+            with open(config_file, "r") as file:
+                conf = json.load(file)
 
             in_channels = conf["in_channels"]
             if in_channels == 9:
@@ -493,9 +493,9 @@ class VaeFolderProbe(FolderProbeBase):
 
     def get_base_type(self) -> BaseModelType:
         """Return the BaseModelType for a diffusers-style VAE."""
-        config_file = self.folder_path / "config.json"
+        config_file = self.model / "config.json"
         if not config_file.exists():
-            raise InvalidModelException(f"Cannot determine base type for {self.folder_path}")
+            raise InvalidModelException(f"Cannot determine base type for {self.model}")
         with open(config_file, "r") as file:
             config = json.load(file)
         return (
@@ -543,7 +543,7 @@ class ControlNetFolderProbe(FolderProbeBase):
         """Return the BaseModelType of a ControlNet model folder."""
         config_file = self.model / "config.json"
         if not config_file.exists():
-            raise InvalidModelException(f"Cannot determine base type for {self.folder_path}")
+            raise InvalidModelException(f"Cannot determine base type for {self.model}")
         with open(config_file, "r") as file:
             config = json.load(file)
         # no obvious way to distinguish between sd2-base and sd2-768
@@ -558,7 +558,7 @@ class ControlNetFolderProbe(FolderProbeBase):
             else None
         )
         if not base_model:
-            raise InvalidModelException(f"Unable to determine model base for {self.folder_path}")
+            raise InvalidModelException(f"Unable to determine model base for {self.model}")
         return base_model
 
 

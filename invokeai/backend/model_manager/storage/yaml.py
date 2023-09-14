@@ -59,10 +59,8 @@ from .base import (
     DuplicateModelException,
     UnknownModelException,
     ModelConfigStore,
+    CONFIG_FILE_VERSION,
 )
-
-# should match the InvokeAI version when this is first released.
-CONFIG_FILE_VERSION = "3.1.0"
 
 
 class ModelConfigStoreYAML(ModelConfigStore):
@@ -80,6 +78,8 @@ class ModelConfigStoreYAML(ModelConfigStore):
         if not self._filename.exists():
             self._initialize_yaml()
         self._config = OmegaConf.load(self._filename)
+        assert self.version == CONFIG_FILE_VERSION, \
+            f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
 
     def _initialize_yaml(self):
         try:
@@ -100,6 +100,11 @@ class ModelConfigStoreYAML(ModelConfigStore):
             newfile.replace(self._filename)
         finally:
             self._lock.release()
+
+    @property
+    def version(self) -> str:
+        """Return version of this config file/database."""
+        return self._config["__metadata__"].get('version')
 
     def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> None:
         """
