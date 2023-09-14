@@ -5,7 +5,11 @@ from typing import Any, Literal, Optional
 
 import torch
 
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
+from invokeai.backend.ip_adapter.ip_adapter import (
+    IPAdapter,
+    IPAdapterPlus,
+    build_ip_adapter,
+)
 from invokeai.backend.model_management.models.base import (
     BaseModelType,
     InvalidModelException,
@@ -79,16 +83,9 @@ class IPAdapterModel(ModelBase):
         if child_type is not None:
             raise ValueError("There are no child models in an IP-Adapter model.")
 
-        # TODO(ryand): Checking for "plus" in the file path is fragile. It should be possible to infer whether this is a
-        # "plus" variant by loading the state_dict.
-        if "plus" in str(self.model_path):
-            return IPAdapterPlus(
-                ip_adapter_ckpt_path=os.path.join(self.model_path, "ip_adapter.bin"), device="cpu", dtype=torch_dtype
-            )
-        else:
-            return IPAdapter(
-                ip_adapter_ckpt_path=os.path.join(self.model_path, "ip_adapter.bin"), device="cpu", dtype=torch_dtype
-            )
+        return build_ip_adapter(
+            ip_adapter_ckpt_path=os.path.join(self.model_path, "ip_adapter.bin"), device="cpu", dtype=torch_dtype
+        )
 
     @classmethod
     def convert_if_required(
