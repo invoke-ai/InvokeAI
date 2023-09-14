@@ -123,7 +123,6 @@ class Batch(BaseModel):
     class Config:
         schema_extra = {
             "required": [
-                "batch_id",
                 "graph",
                 "runs",
             ]
