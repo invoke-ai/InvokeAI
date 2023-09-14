@@ -1,3 +1,4 @@
+import threading
 import pytest
 
 # This import must happen before other invoke imports or test in other files(!!) break
@@ -37,9 +38,12 @@ def simple_graph():
 # the test invocations.
 @pytest.fixture
 def mock_services() -> InvocationServices:
+    lock = threading.Lock()
     # NOTE: none of these are actually called by the test invocations
     db_conn = sqlite3.connect(sqlite_memory, check_same_thread=False)
-    graph_execution_manager = SqliteItemStorage[GraphExecutionState](conn=db_conn, table_name="graph_executions")
+    graph_execution_manager = SqliteItemStorage[GraphExecutionState](
+        conn=db_conn, table_name="graph_executions", lock=lock
+    )
     return InvocationServices(
         model_manager=None,  # type: ignore
         events=TestEventService(),
@@ -47,14 +51,15 @@ def mock_services() -> InvocationServices:
         images=None,  # type: ignore
         latents=None,  # type: ignore
         boards=None,  # type: ignore
-        batch_manager=None,  # type: ignore
         board_images=None,  # type: ignore
         queue=MemoryInvocationQueue(),
-        graph_library=SqliteItemStorage[LibraryGraph](conn=db_conn, table_name="graphs"),
+        graph_library=SqliteItemStorage[LibraryGraph](conn=db_conn, table_name="graphs", lock=lock),
         graph_execution_manager=graph_execution_manager,
         performance_statistics=InvocationStatsService(graph_execution_manager),
         processor=DefaultInvocationProcessor(),
         configuration=None,  # type: ignore
+        session_execution=None,  # type: ignore
+        session_queue=None,  # type: ignore
     )
 
 

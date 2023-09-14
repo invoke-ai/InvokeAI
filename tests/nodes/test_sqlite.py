@@ -1,4 +1,5 @@
 import sqlite3
+import threading
 
 import pytest
 from pydantic import BaseModel, Field
@@ -14,7 +15,7 @@ class TestModel(BaseModel):
 @pytest.fixture
 def db() -> SqliteItemStorage[TestModel]:
     db_conn = sqlite3.connect(sqlite_memory, check_same_thread=False)
-    return SqliteItemStorage[TestModel](db_conn, "test", "id")
+    return SqliteItemStorage[TestModel](db_conn, table_name="test", id_field="id", lock=threading.Lock())
 
 
 def test_sqlite_service_can_create_and_get(db: SqliteItemStorage[TestModel]):
