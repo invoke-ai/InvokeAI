@@ -24,8 +24,9 @@ class IPAdapterModelFormat(str, Enum):
 
 
 class IPAdapterModel(ModelBase):
-    class CheckpointConfig(ModelConfigBase):
+    class InvokeAIConfig(ModelConfigBase):
         model_format: Literal[IPAdapterModelFormat.InvokeAI]
+        image_encoder_model: str
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.IPAdapter
@@ -45,6 +46,19 @@ class IPAdapterModel(ModelBase):
                 return IPAdapterModelFormat.InvokeAI
 
         raise InvalidModelException(f"Unexpected IP-Adapter model format: {path}")
+
+    @classmethod
+    def probe_config(cls, path: str, **kwargs) -> ModelConfigBase:
+        image_encoder_config_file = os.path.join(path, "image_encoder.txt")
+
+        with open(image_encoder_config_file, "r") as f:
+            image_encoder_model = f.readline().strip()
+
+        return cls.create_config(
+            path=path,
+            model_format=cls.detect_format(path),
+            image_encoder_model=image_encoder_model,
+        )
 
     @classproperty
     def save_to_config(cls) -> bool:

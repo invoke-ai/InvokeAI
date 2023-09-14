@@ -801,6 +801,16 @@ export type components = {
       model_format: "diffusers";
       error?: components["schemas"]["ModelError"];
     };
+    /** CLIPVisionModelField */
+    CLIPVisionModelField: {
+      /**
+       * Model Name
+       * @description Name of the CLIP Vision image encoder model
+       */
+      model_name: string;
+      /** @description Base model (usually 'Any') */
+      base_model: components["schemas"]["BaseModelType"];
+    };
     /**
      * CV2 Infill
      * @description Infills transparent areas of an image using OpenCV Inpainting
@@ -2457,7 +2467,7 @@ export type components = {
        * Image Encoder Model
        * @description The name of the CLIP image encoder model.
        */
-      image_encoder_model: string;
+      image_encoder_model: components["schemas"]["CLIPVisionModelField"];
       /**
        * Weight
        * @description The weight of the IP-Adapter.
@@ -2497,13 +2507,6 @@ export type components = {
        */
       ip_adapter_model: components["schemas"]["IPAdapterModelField"];
       /**
-       * Image Encoder Model
-       * @description The name of the CLIP image encoder model.
-       * @default models/core/ip_adapters/sd-1/image_encoder/
-       * @enum {string}
-       */
-      image_encoder_model?: "models/core/ip_adapters/sd-1/image_encoder/" | "models/core/ip_adapters/sdxl/image_encoder";
-      /**
        * Weight
        * @description The weight of the IP-Adapter.
        * @default 1
@@ -2516,8 +2519,18 @@ export type components = {
        */
       type: "ip_adapter";
     };
-    /** IPAdapterModelCheckpointConfig */
-    IPAdapterModelCheckpointConfig: {
+    /** IPAdapterModelField */
+    IPAdapterModelField: {
+      /**
+       * Model Name
+       * @description Name of the IP-Adapter model
+       */
+      model_name: string;
+      /** @description Base model */
+      base_model: components["schemas"]["BaseModelType"];
+    };
+    /** IPAdapterModelInvokeAIConfig */
+    IPAdapterModelInvokeAIConfig: {
       /** Model Name */
       model_name: string;
       base_model: components["schemas"]["BaseModelType"];
@@ -2536,16 +2549,8 @@ export type components = {
        */
       model_format: "invokeai";
       error?: components["schemas"]["ModelError"];
-    };
-    /** IPAdapterModelField */
-    IPAdapterModelField: {
-      /**
-       * Model Name
-       * @description Name of the IP-Adapter model
-       */
-      model_name: string;
-      /** @description Base model */
-      base_model: components["schemas"]["BaseModelType"];
+      /** Image Encoder Model */
+      image_encoder_model: string;
     };
     /**
      * IPAdapterOutput
@@ -4997,7 +5002,7 @@ export type components = {
     /** ModelsList */
     ModelsList: {
       /** Models */
-      models: (components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelCheckpointConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"])[];
+      models: (components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelInvokeAIConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"])[];
     };
     /**
      * Multiply Integers
@@ -7263,17 +7268,11 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
-     * ControlNetModelFormat
+     * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionXLModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
@@ -7281,23 +7280,29 @@ export type components = {
      */
     StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
+     * CLIPVisionModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    CLIPVisionModelFormat: "diffusers";
+    /**
+     * StableDiffusionXLModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
      * IPAdapterModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     IPAdapterModelFormat: "invokeai";
     /**
-     * StableDiffusionOnnxModelFormat
+     * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionOnnxModelFormat: "olive" | "onnx";
-    /**
-     * CLIPVisionModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    CLIPVisionModelFormat: "diffusers";
+    ControlNetModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -7747,14 +7752,14 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelCheckpointConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
+        "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelInvokeAIConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
       };
     };
     responses: {
       /** @description The model was updated successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelCheckpointConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
+          "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelInvokeAIConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
         };
       };
       /** @description Bad request */
@@ -7791,7 +7796,7 @@ export type operations = {
       /** @description The model imported successfully */
       201: {
         content: {
-          "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelCheckpointConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
+          "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelInvokeAIConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
         };
       };
       /** @description The model could not be found */
@@ -7825,14 +7830,14 @@ export type operations = {
   add_model: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelCheckpointConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
+        "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelInvokeAIConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
       };
     };
     responses: {
       /** @description The model added successfully */
       201: {
         content: {
-          "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelCheckpointConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
+          "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelInvokeAIConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
         };
       };
       /** @description The model could not be found */
@@ -7878,7 +7883,7 @@ export type operations = {
       /** @description Model converted successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelCheckpointConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
+          "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelInvokeAIConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
         };
       };
       /** @description Bad request */
@@ -7973,7 +7978,7 @@ export type operations = {
       /** @description Model converted successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelCheckpointConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
+          "application/json": components["schemas"]["ONNXStableDiffusion1ModelConfig"] | components["schemas"]["StableDiffusion1ModelCheckpointConfig"] | components["schemas"]["StableDiffusion1ModelDiffusersConfig"] | components["schemas"]["VaeModelConfig"] | components["schemas"]["LoRAModelConfig"] | components["schemas"]["ControlNetModelCheckpointConfig"] | components["schemas"]["ControlNetModelDiffusersConfig"] | components["schemas"]["TextualInversionModelConfig"] | components["schemas"]["IPAdapterModelInvokeAIConfig"] | components["schemas"]["CLIPVisionModelDiffusersConfig"] | components["schemas"]["ONNXStableDiffusion2ModelConfig"] | components["schemas"]["StableDiffusion2ModelCheckpointConfig"] | components["schemas"]["StableDiffusion2ModelDiffusersConfig"] | components["schemas"]["StableDiffusionXLModelCheckpointConfig"] | components["schemas"]["StableDiffusionXLModelDiffusersConfig"];
         };
       };
       /** @description Incompatible models */
