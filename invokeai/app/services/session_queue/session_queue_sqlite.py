@@ -383,18 +383,19 @@ class SqliteSessionQueue(SessionQueueBase):
 
     def prune(self) -> PruneResult:
         try:
+            where = "WHERE status = 'completed' OR status = 'failed' OR status = 'canceled'"
             self._lock.acquire()
             self._cursor.execute(
-                """--sql
+                f"""--sql
                 SELECT COUNT(*) FROM session_queue
-                WHERE status = 'completed' OR status = 'failed' OR status = 'canceled';
+                {where};
                 """
             )
             count = self._cursor.fetchone()[0]
             self._cursor.execute(
-                """--sql
+                f"""--sql
                 DELETE FROM session_queue
-                WHERE status = 'completed' OR status = 'failed' OR status = 'canceled';
+                {where};
                 """
             )
             self._conn.commit()
@@ -521,5 +522,5 @@ class SqliteSessionQueue(SessionQueueBase):
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
             total=total,
-            maximum=self._invoker.services.configuration.get_config().max_queue_size,
+            max_queue_size=self._invoker.services.configuration.get_config().max_queue_size,
         )

@@ -123,6 +123,7 @@ class Batch(BaseModel):
     class Config:
         schema_extra = {
             "required": [
+                "batch_id",
                 "graph",
                 "runs",
             ]
@@ -228,7 +229,7 @@ class SessionQueueStatusResult(BaseModel):
     failed: int = Field(..., description="Number of queue items with status 'error'")
     canceled: int = Field(..., description="Number of queue items with status 'canceled'")
     total: int = Field(..., description="Total number of queue items")
-    maximum: int = Field(..., description="Maximum number of queue items allowed")
+    max_queue_size: int = Field(..., description="Maximum number of queue items allowed")
 
 
 class SetManyQueueItemStatusResult(BaseModel):

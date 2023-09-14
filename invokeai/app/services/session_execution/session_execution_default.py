@@ -54,9 +54,18 @@ class DefaultSessionExecutionService(SessionExecutionServiceBase):
         if self._stop_after_current:
             self._stop_after_current = False
             self._started = False
+            self._emit_queue_status()
         self._current = None
         if self._started:
             self.invoke_next()
+
+    def _emit_queue_status(self) -> None:
+        self._invoker.services.events.emit_queue_status_changed(self._started, self._stop_after_current)
+
+    def _emit_queue_item_status(self) -> None:
+        if self._current is None:
+            return
+        self._invoker.services.events.emit_queue_item_status_changed(self._current)
 
     def invoke_next(self) -> None:
         # do not invoke if already invoking
@@ -70,33 +79,37 @@ class DefaultSessionExecutionService(SessionExecutionServiceBase):
             self._current = None
             self._started = False
             self._stop_after_current = False
+            self._emit_queue_status()
             return
 
         self._current = queue_item
         self._invoker.services.graph_execution_manager.set(queue_item.session)
-        self._invoker.services.events.emit_queue_item_status_changed(self._current)
+        self._emit_queue_item_status()
         self._invoker.invoke(self._current.session, invoke_all=True)
 
     def start(self) -> None:
         if not self._stop_after_current:
             self._started = True
+            self._emit_queue_status()
             self.invoke_next()
 
     def stop(self) -> None:
         self._started = False
         self._stop_after_current = True
+        self._emit_queue_status()
 
     def cancel(self) -> None:
         if self._current is not None:
             self._invoker.services.queue.cancel(self._current.session_id)
             self._current = self._invoker.services.session_queue.set_queue_item_status(self._current.id, "canceled")
-            self._invoker.services.events.emit_queue_item_status_changed(self._current)
+            self._emit_queue_item_status()
             self._current = None
         self._started = False
         self._stop_after_current = False
+        self._emit_queue_status()
 
     def get_current(self) -> Optional[SessionQueueItem]:
         return self._current
 
     def get_status(self) -> SessionExecutionStatusResult:
-        return SessionExecutionStatusResult(started=self._started)
+        return SessionExecutionStatusResult(started=self._started, stop_after_current=self._stop_after_current)
