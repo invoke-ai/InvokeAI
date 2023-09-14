@@ -152,4 +152,4 @@ class ApiDependencies:
     @staticmethod
     def shutdown():
         if ApiDependencies.invoker:
-            ApiDependencies.invoker.stop()
+            ApiDependencies.invoker.stop_service()

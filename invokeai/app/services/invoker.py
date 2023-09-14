@@ -52,13 +52,13 @@ class Invoker:
         self.services.queue.cancel(graph_execution_state_id)
 
     def __start_service(self, service) -> None:
-        # Call start() method on any services that have it
+        # Call start_service() method on any services that have it
         start_op = getattr(service, "start_service", None)
         if callable(start_op):
             start_op(self)
 
     def __stop_service(self, service) -> None:
-        # Call stop() method on any services that have it
+        # Call stop_service() method on any services that have it
         stop_op = getattr(service, "stop_service", None)
         if callable(stop_op):
             stop_op(self)
