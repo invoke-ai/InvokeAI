@@ -2,8 +2,8 @@ from typing import Optional
 
 from fastapi import Body, Path, Query
 from fastapi.routing import APIRouter
-from invokeai.app.services.session_execution.session_execution_common import SessionExecutionStatusResult
 
+from invokeai.app.services.session_execution.session_execution_common import SessionExecutionStatusResult
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,

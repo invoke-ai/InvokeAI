@@ -1,5 +1,4 @@
 import sqlite3
-from threading import Lock
 import threading
 from typing import Generic, Optional, TypeVar, get_args
 

@@ -7,7 +7,6 @@ from pydantic import BaseModel, Extra, Field
 
 from invokeai.app.services.image_record_storage import OffsetPaginatedResults
 from invokeai.app.services.models.board_record import BoardRecord, deserialize_board_record
-
 from invokeai.app.util.misc import uuid_string
 
 

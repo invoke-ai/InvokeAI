@@ -1,4 +1,5 @@
 from typing import Optional
+
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from fastapi import Body
 from fastapi.routing import APIRouter
