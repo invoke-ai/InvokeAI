@@ -20,13 +20,11 @@ import { FaCircleExclamation } from 'react-icons/fa6';
 const selector = createSelector(
   stateSelector,
   (state) => {
-    const { isEnabled, isLoading, isError, prompts, parsingError } =
-      state.dynamicPrompts;
+    const { isLoading, isError, prompts, parsingError } = state.dynamicPrompts;
 
     return {
       prompts,
       parsingError,
-      isDisabled: !isEnabled,
       isError,
       isLoading,
     };
@@ -39,7 +37,7 @@ const listItemStyles: ChakraProps['sx'] = {
 };
 
 const ParamDynamicPromptsPreview = () => {
-  const { prompts, parsingError, isDisabled, isLoading, isError } =
+  const { prompts, parsingError, isLoading, isError } =
     useAppSelector(selector);
 
   if (isError) {
@@ -61,24 +59,13 @@ const ParamDynamicPromptsPreview = () => {
   }
 
   return (
-    <FormControl isInvalid={Boolean(parsingError)} isDisabled={isDisabled}>
+    <FormControl isInvalid={Boolean(parsingError)}>
       <FormLabel whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
         Prompts Preview ({prompts.length}){parsingError && ` - ${parsingError}`}
       </FormLabel>
-      <Flex
-        h={64}
-        pos="relative"
-        layerStyle="third"
-        borderRadius="base"
-        p={2}
-        pointerEvents={isDisabled ? 'none' : 'auto'}
-      >
+      <Flex h={64} pos="relative" layerStyle="third" borderRadius="base" p={2}>
         <ScrollableContent>
-          <OrderedList
-            stylePosition="inside"
-            ms={0}
-            opacity={isDisabled ? 0.5 : 1}
-          >
+          <OrderedList stylePosition="inside" ms={0}>
             {prompts.map((prompt, i) => (
               <ListItem
                 fontSize="sm"

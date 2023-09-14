@@ -1,7 +1,6 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 
 export interface DynamicPromptsState {
-  isEnabled: boolean;
   maxPrompts: number;
   combinatorial: boolean;
   prompts: string[];
@@ -11,7 +10,6 @@ export interface DynamicPromptsState {
 }
 
 export const initialDynamicPromptsState: DynamicPromptsState = {
-  isEnabled: false,
   maxPrompts: 100,
   combinatorial: true,
   prompts: [],
@@ -34,9 +32,6 @@ export const dynamicPromptsSlice = createSlice({
     combinatorialToggled: (state) => {
       state.combinatorial = !state.combinatorial;
     },
-    isEnabledToggled: (state) => {
-      state.isEnabled = !state.isEnabled;
-    },
     promptsChanged: (state, action: PayloadAction<string[]>) => {
       state.prompts = action.payload;
     },
@@ -53,7 +48,6 @@ export const dynamicPromptsSlice = createSlice({
 });
 
 export const {
-  isEnabledToggled,
   maxPromptsChanged,
   maxPromptsReset,
   combinatorialToggled,

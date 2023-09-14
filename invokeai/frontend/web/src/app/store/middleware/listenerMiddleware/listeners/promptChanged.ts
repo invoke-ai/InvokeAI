@@ -1,7 +1,6 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import {
   combinatorialToggled,
-  isEnabledToggled,
   isErrorChanged,
   isLoadingChanged,
   maxPromptsChanged,
@@ -11,15 +10,14 @@ import {
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { setPositivePrompt } from 'features/parameters/store/generationSlice';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
-import { startAppListening } from '..';
 import { appSocketConnected } from 'services/events/actions';
+import { startAppListening } from '..';
 
 const matcher = isAnyOf(
   setPositivePrompt,
   combinatorialToggled,
   maxPromptsChanged,
   maxPromptsReset,
-  isEnabledToggled,
   appSocketConnected
 );
 
@@ -30,18 +28,18 @@ export const addDynamicPromptsListener = () => {
       action,
       { dispatch, getState, cancelActiveListeners, delay }
     ) => {
-      // Cancel any in-progress instances of this listener
+      // debounce request
       cancelActiveListeners();
-      // Delay before starting actual work (debounce)
       await delay(1000);
 
       const state = getState();
-      const { positivePrompt } = state.generation;
-      const { isEnabled, maxPrompts, combinatorial } = state.dynamicPrompts;
 
-      if (!isEnabled) {
+      if (state.config.disabledFeatures.includes('dynamicPrompting')) {
         return;
       }
+
+      const { positivePrompt } = state.generation;
+      const { maxPrompts, combinatorial } = state.dynamicPrompts;
 
       dispatch(isLoadingChanged(true));
 
@@ -64,7 +62,6 @@ export const addDynamicPromptsListener = () => {
       } catch {
         dispatch(isErrorChanged(true));
         dispatch(isLoadingChanged(false));
-        //no-op
       }
     },
   });

@@ -26,11 +26,9 @@ export const addDynamicPromptsToGraph = (
   const { positivePrompt, iterations, seed, shouldRandomizeSeed } =
     state.generation;
 
-  const {
-    combinatorial,
-    isEnabled: isDynamicPromptsEnabled,
-    maxPrompts,
-  } = state.dynamicPrompts;
+  const { combinatorial, maxPrompts } = state.dynamicPrompts;
+
+  const isDynamicPromptsEnabled = true;
 
   const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
     | MetadataAccumulatorInvocation

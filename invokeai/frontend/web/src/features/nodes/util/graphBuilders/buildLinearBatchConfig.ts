@@ -16,7 +16,7 @@ export const prepareLinearUIBatch = (
 ): BatchConfig => {
   const { shouldRandomizeSeed, iterations } = state.generation;
 
-  const { prompts, isEnabled: isDynamicPromptsEnabled } = state.dynamicPrompts;
+  const { prompts } = state.dynamicPrompts;
 
   if (shouldRandomizeSeed) {
     const randomIntNode: RandomIntInvocation = {
@@ -39,7 +39,7 @@ export const prepareLinearUIBatch = (
 
   const data: BatchConfig['batch']['data'] = [];
 
-  if (isDynamicPromptsEnabled) {
+  if (prompts.length > 1) {
     unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_prompt');
 
     // zipped batch of prompts

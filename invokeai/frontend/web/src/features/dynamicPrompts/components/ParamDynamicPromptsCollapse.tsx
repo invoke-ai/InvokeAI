@@ -8,19 +8,16 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 import ParamDynamicPromptsCombinatorial from './ParamDynamicPromptsCombinatorial';
-import ParamDynamicPromptsToggle from './ParamDynamicPromptsEnabled';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
 import ParamDynamicPromptsPreview from './ParamDynamicPromptsPreview';
 
 const selector = createSelector(
   stateSelector,
   (state) => {
-    const { isEnabled, prompts } = state.dynamicPrompts;
+    const { prompts } = state.dynamicPrompts;
 
     return {
-      activeLabel: isEnabled
-        ? `${prompts.length} Prompt${prompts.length > 1 ? 's' : ''}`
-        : undefined,
+      activeLabel: `${prompts.length} Prompt${prompts.length > 1 ? 's' : ''}`,
     };
   },
   defaultSelectorOptions
@@ -40,7 +37,6 @@ const ParamDynamicPromptsCollapse = () => {
   return (
     <IAICollapse label={t('prompt.dynamicPrompts')} activeLabel={activeLabel}>
       <Flex sx={{ gap: 2, flexDir: 'column' }}>
-        <ParamDynamicPromptsToggle />
         <ParamDynamicPromptsPreview />
         <ParamDynamicPromptsMaxPrompts />
         <ParamDynamicPromptsCombinatorial />
