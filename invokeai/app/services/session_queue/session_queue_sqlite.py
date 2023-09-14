@@ -409,10 +409,11 @@ class SqliteSessionQueue(SessionQueueBase):
         try:
             self._lock.acquire()
             placeholders = ", ".join(["?" for _ in batch_ids])
+            where = f"WHERE batch_id IN ({placeholders}) AND status != 'canceled' AND status != 'completed'"
             self._cursor.execute(
                 f"""--sql
                 SELECT COUNT(*) FROM session_queue
-                WHERE batch_id IN ({placeholders});
+                {where};
                 """,
                 batch_ids,
             )
@@ -421,7 +422,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 f"""--sql
                 UPDATE session_queue
                 SET status = 'canceled'
-                WHERE batch_id IN ({placeholders}) AND status != 'canceled' AND status != 'completed';
+                {where};
                 """,
                 batch_ids,
             )
