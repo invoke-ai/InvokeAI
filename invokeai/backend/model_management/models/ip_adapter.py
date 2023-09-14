@@ -1,7 +1,7 @@
 import os
 import typing
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 import torch
 
@@ -17,7 +17,6 @@ from invokeai.backend.model_management.models.base import (
     ModelConfigBase,
     ModelType,
     SubModelType,
-    calc_model_size_by_fs,
     classproperty,
 )
 

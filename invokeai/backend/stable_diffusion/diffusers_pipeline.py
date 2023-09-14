@@ -26,10 +26,9 @@ from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningData,
-    IPAdapterConditioningInfo,
 )
 
 from ..util import auto_detect_slice_size, normalize_device

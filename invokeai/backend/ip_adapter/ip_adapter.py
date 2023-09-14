@@ -1,7 +1,6 @@
 # copied from https://github.com/tencent-ailab/IP-Adapter (Apache License 2.0)
 #   and modified as needed
 
-import os
 from contextlib import contextmanager
 from typing import Optional, Union
 
@@ -17,8 +16,6 @@ from diffusers.models import UNet2DConditionModel
 #     from .attention_processor import IPAttnProcessor, AttnProcessor
 from PIL import Image
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
-
-from invokeai.backend.model_management.models.base import calc_model_size_by_data
 
 from .attention_processor import AttnProcessor, IPAttnProcessor
 from .resampler import Resampler

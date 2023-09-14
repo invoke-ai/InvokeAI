@@ -8,7 +8,6 @@ import torch
 from diffusers import ConfigMixin, ModelMixin
 from picklescan.scanner import scan_file_path
 
-from invokeai.backend.model_management.models import BaseModelType
 from invokeai.backend.model_management.models.ip_adapter import IPAdapterModelFormat
 
 from .models import (
@@ -512,7 +511,9 @@ class ControlNetFolderProbe(FolderProbeBase):
             else (
                 BaseModelType.StableDiffusion2
                 if dimension == 1024
-                else BaseModelType.StableDiffusionXL if dimension == 2048 else None
+                else BaseModelType.StableDiffusionXL
+                if dimension == 2048
+                else None
             )
         )
         if not base_model:
