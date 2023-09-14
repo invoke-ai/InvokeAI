@@ -448,7 +448,7 @@ class DownloadQueue(DownloadQueueBase):
             self._update_job_status(job, DownloadJobStatus.ERROR)
         except Exception as excp:
             self._logger.error(f"An error occurred while downloading/installing {dest}: {str(excp)}")
-            traceback.print_exception(excp)
+            print(traceback.format_exc())
             job.error = excp
             self._update_job_status(job, DownloadJobStatus.ERROR)
 
