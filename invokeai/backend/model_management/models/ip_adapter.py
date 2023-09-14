@@ -63,14 +63,12 @@ class IPAdapterModel(ModelBase):
         if child_type is not None:
             raise ValueError("There are no child models in an IP-Adapter model.")
 
-        # TODO(ryand): Update IPAdapter to accept a torch_dtype param.
-
         # TODO(ryand): Checking for "plus" in the file name is fragile. It should be possible to infer whether this is a
         # "plus" variant by loading the state_dict.
         if "plus" in str(self.model_path):
-            return IPAdapterPlus(ip_adapter_ckpt_path=self.model_path, device="cpu")
+            return IPAdapterPlus(ip_adapter_ckpt_path=self.model_path, device="cpu", dtype=torch_dtype)
         else:
-            return IPAdapter(ip_adapter_ckpt_path=self.model_path, device="cpu")
+            return IPAdapter(ip_adapter_ckpt_path=self.model_path, device="cpu", dtype=torch_dtype)
 
     @classmethod
     def convert_if_required(
