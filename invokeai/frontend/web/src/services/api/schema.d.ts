@@ -513,7 +513,7 @@ export type components = {
        * Batch Id
        * @description The ID of the batch
        */
-      batch_id: string;
+      batch_id?: string;
       /**
        * Data
        * @description The batch data collection.
@@ -730,6 +730,14 @@ export type components = {
        * @description The names of the images to add
        */
       image_names: string[];
+    };
+    /** Body_cancel_by_batch_ids */
+    Body_cancel_by_batch_ids: {
+      /**
+       * Batch Ids
+       * @description The list of batch_ids to cancel all queue items for
+       */
+      batch_ids: string[];
     };
     /** Body_delete_images_from_list */
     Body_delete_images_from_list: {
@@ -8018,24 +8026,6 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusionXLModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -8047,6 +8037,24 @@ export type components = {
      * @enum {string}
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionXLModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -9593,7 +9601,7 @@ export type operations = {
   cancel_by_batch_ids: {
     requestBody: {
       content: {
-        "application/json": string[];
+        "application/json": components["schemas"]["Body_cancel_by_batch_ids"];
       };
     };
     responses: {

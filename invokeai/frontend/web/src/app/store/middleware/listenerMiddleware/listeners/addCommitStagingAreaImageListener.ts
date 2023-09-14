@@ -22,7 +22,10 @@ export const addCommitStagingAreaImageListener = () => {
 
       try {
         const req = dispatch(
-          queueApi.endpoints.cancelByBatchIds.initiate(batchIds)
+          queueApi.endpoints.cancelByBatchIds.initiate(
+            { batch_ids: batchIds },
+            { fixedCacheKey: 'cancelByBatchIds' }
+          )
         );
         const { canceled } = await req.unwrap();
         req.reset();

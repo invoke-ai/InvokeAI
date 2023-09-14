@@ -139,11 +139,15 @@ export const addUserInvokedCanvasListener = () => {
 
         const enqueueResult = await req.unwrap();
         req.reset();
-        dispatch(queueApi.endpoints.startQueueExecution.initiate());
+        dispatch(
+          queueApi.endpoints.startQueueExecution.initiate(undefined, {
+            fixedCacheKey: 'startQueue',
+          })
+        );
 
         log.debug({ enqueueResult: parseify(enqueueResult) }, 'Batch enqueued');
 
-        const batchId = enqueueResult.batch.batch_id;
+        const batchId = enqueueResult.batch.batch_id as string; // we know the is a string, backend provides it
 
         // Prep the canvas staging area if it is not yet initialized
         if (!state.canvas.layerState.stagingArea.boundingBox) {

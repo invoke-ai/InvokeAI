@@ -1,14 +1,12 @@
 import { Middleware, MiddlewareAPI } from '@reduxjs/toolkit';
 import { AppThunkDispatch, RootState } from 'app/store/store';
 import { $authToken, $baseUrl } from 'services/api/client';
-import { sessionCreated } from 'services/api/thunks/session';
 import {
   ClientToServerEvents,
   ServerToClientEvents,
 } from 'services/events/types';
 import { setEventListeners } from 'services/events/util/setEventListeners';
 import { Socket, io } from 'socket.io-client';
-import { socketSubscribedSession } from './actions';
 
 export const socketMiddleware = () => {
   let areListenersSet = false;
@@ -48,8 +46,6 @@ export const socketMiddleware = () => {
     (storeApi: MiddlewareAPI<AppThunkDispatch, RootState>) =>
     (next) =>
     (action) => {
-      const { dispatch, getState } = storeApi;
-
       // Set listeners for `connect` and `disconnect` events once
       // Must happen in middleware to get access to `dispatch`
       if (!areListenersSet) {
@@ -58,31 +54,6 @@ export const socketMiddleware = () => {
         areListenersSet = true;
 
         socket.connect();
-      }
-
-      if (sessionCreated.fulfilled.match(action)) {
-        const sessionId = action.payload.id;
-        const oldSessionId = getState().system.sessionId;
-
-        // if (oldSessionId) {
-        //   socket.emit('unsubscribe_session', {
-        //     session: oldSessionId,
-        //   });
-
-        //   dispatch(
-        //     socketUnsubscribedSession({
-        //       sessionId: oldSessionId,
-        //     })
-        //   );
-        // }
-
-        socket.emit('subscribe_session', { session: sessionId });
-
-        dispatch(
-          socketSubscribedSession({
-            sessionId: sessionId,
-          })
-        );
       }
 
       next(action);

@@ -50,7 +50,11 @@ export const addUserEnqueuedT2iOrI2iListener = () => {
 
         const enqueueResult = await req.unwrap();
         req.reset();
-        dispatch(queueApi.endpoints.startQueueExecution.initiate());
+        dispatch(
+          queueApi.endpoints.startQueueExecution.initiate(undefined, {
+            fixedCacheKey: 'startQueue',
+          })
+        );
 
         log.debug({ enqueueResult: parseify(enqueueResult) }, 'Batch enqueued');
         dispatch(

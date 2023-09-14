@@ -251,10 +251,10 @@ export const queueApi = api.injectEndpoints({
       paths['/api/v1/queue/cancel_by_batch_ids']['put']['responses']['200']['content']['application/json'],
       paths['/api/v1/queue/cancel_by_batch_ids']['put']['requestBody']['content']['application/json']
     >({
-      query: (batch_ids) => ({
+      query: (body) => ({
         url: `queue/cancel_by_batch_ids`,
         method: 'PUT',
-        body: { batch_ids },
+        body,
       }),
       invalidatesTags: [
         'SessionQueueStatus',

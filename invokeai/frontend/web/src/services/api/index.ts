@@ -1,7 +1,4 @@
-import {
-  FullTagDescription,
-  TagDescription,
-} from '@reduxjs/toolkit/dist/query/endpointDefinitions';
+import { TagDescription } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
 import {
   BaseQueryFn,
   FetchArgs,
