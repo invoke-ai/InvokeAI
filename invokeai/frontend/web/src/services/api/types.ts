@@ -74,9 +74,8 @@ export type ControlNetModelDiffusersConfig =
 export type ControlNetModelConfig =
   | ControlNetModelCheckpointConfig
   | ControlNetModelDiffusersConfig;
-export type IPAdapterModelCheckpointConfig =
-  s['IPAdapterModelCheckpointConfig'];
-export type IPAdapterModelConfig = IPAdapterModelCheckpointConfig;
+export type IPAdapterModelInvokeAIConfig = s['IPAdapterModelInvokeAIConfig'];
+export type IPAdapterModelConfig = IPAdapterModelInvokeAIConfig;
 export type TextualInversionModelConfig = s['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
   | s['StableDiffusion1ModelDiffusersConfig']
