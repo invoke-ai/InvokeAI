@@ -72,7 +72,6 @@ class IPAdapterModel(ModelBase):
         if child_type is not None:
             raise ValueError("There are no child models in an IP-Adapter model.")
 
-        # TODO(ryand): Update self.model_size when the model is loaded from disk.
         return self.model_size
 
     def get_model(

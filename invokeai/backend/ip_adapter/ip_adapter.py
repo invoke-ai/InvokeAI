@@ -18,6 +18,8 @@ from diffusers.models import UNet2DConditionModel
 from PIL import Image
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
+from invokeai.backend.model_management.models.base import calc_model_size_by_data
+
 from .attention_processor import AttnProcessor, IPAttnProcessor
 from .resampler import Resampler
 
@@ -94,7 +96,7 @@ class IPAdapter:
 
         self._image_proj_model.to(device=self.device, dtype=self.dtype)
         if self._attn_processors is not None:
-            torch.nn.ModuleList(self._attn_processors).to(device=self.device, dtype=self.dtype)
+            torch.nn.ModuleList(self._attn_processors.values()).to(device=self.device, dtype=self.dtype)
 
     def _init_image_proj_model(self, state_dict):
         return ImageProjModel.from_state_dict(state_dict, self._num_tokens).to(self.device, dtype=self.dtype)
