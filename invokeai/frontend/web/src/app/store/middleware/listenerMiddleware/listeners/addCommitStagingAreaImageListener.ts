@@ -29,13 +29,15 @@ export const addCommitStagingAreaImageListener = () => {
         );
         const { canceled } = await req.unwrap();
         req.reset();
-        log.debug(`Canceled ${canceled} canvas batches`);
-        dispatch(
-          addToast({
-            title: t('queue.cancelByBatchIdsSucceeded'),
-            status: 'success',
-          })
-        );
+        if (canceled > 0) {
+          log.debug(`Canceled ${canceled} canvas batches`);
+          dispatch(
+            addToast({
+              title: t('queue.cancelByBatchIdsSucceeded'),
+              status: 'success',
+            })
+          );
+        }
         dispatch(canvasBatchesAndSessionsReset());
       } catch {
         log.error('Failed to cancel canvas batches');
