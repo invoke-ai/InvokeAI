@@ -19,13 +19,13 @@ from invokeai.backend.model_management.models.base import (
 
 
 class IPAdapterModelFormat(str, Enum):
-    # Checkpoint is the 'official' IP-Adapter model format from Tencent (i.e. https://huggingface.co/h94/IP-Adapter)
-    Checkpoint = "checkpoint"
+    # The custom IP-Adapter model format defined by InvokeAI.
+    InvokeAI = "invokeai"
 
 
 class IPAdapterModel(ModelBase):
     class CheckpointConfig(ModelConfigBase):
-        model_format: Literal[IPAdapterModelFormat.Checkpoint]
+        model_format: Literal[IPAdapterModelFormat.InvokeAI]
 
     def __init__(self, model_path: str, base_model: BaseModelType, model_type: ModelType):
         assert model_type == ModelType.IPAdapter
@@ -38,9 +38,11 @@ class IPAdapterModel(ModelBase):
         if not os.path.exists(path):
             raise ModuleNotFoundError(f"No IP-Adapter model at path '{path}'.")
 
-        if os.path.isfile(path):
-            if path.endswith((".safetensors", ".ckpt", ".pt", ".pth", ".bin")):
-                return IPAdapterModelFormat.Checkpoint
+        if os.path.isdir(path):
+            model_file = os.path.join(path, "ip_adapter.bin")
+            image_encoder_config_file = os.path.join(path, "image_encoder.txt")
+            if os.path.exists(model_file) and os.path.exists(image_encoder_config_file):
+                return IPAdapterModelFormat.InvokeAI
 
         raise InvalidModelException(f"Unexpected IP-Adapter model format: {path}")
 
@@ -63,12 +65,16 @@ class IPAdapterModel(ModelBase):
         if child_type is not None:
             raise ValueError("There are no child models in an IP-Adapter model.")
 
-        # TODO(ryand): Checking for "plus" in the file name is fragile. It should be possible to infer whether this is a
+        # TODO(ryand): Checking for "plus" in the file path is fragile. It should be possible to infer whether this is a
         # "plus" variant by loading the state_dict.
         if "plus" in str(self.model_path):
-            return IPAdapterPlus(ip_adapter_ckpt_path=self.model_path, device="cpu", dtype=torch_dtype)
+            return IPAdapterPlus(
+                ip_adapter_ckpt_path=os.path.join(self.model_path, "ip_adapter.bin"), device="cpu", dtype=torch_dtype
+            )
         else:
-            return IPAdapter(ip_adapter_ckpt_path=self.model_path, device="cpu", dtype=torch_dtype)
+            return IPAdapter(
+                ip_adapter_ckpt_path=os.path.join(self.model_path, "ip_adapter.bin"), device="cpu", dtype=torch_dtype
+            )
 
     @classmethod
     def convert_if_required(
@@ -79,7 +85,7 @@ class IPAdapterModel(ModelBase):
         base_model: BaseModelType,
     ) -> str:
         format = cls.detect_format(model_path)
-        if format == IPAdapterModelFormat.Checkpoint:
+        if format == IPAdapterModelFormat.InvokeAI:
             return model_path
         else:
             raise ValueError(f"Unsupported format: '{format}'.")

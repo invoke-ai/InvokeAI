@@ -9,6 +9,7 @@ from diffusers import ConfigMixin, ModelMixin
 from picklescan.scanner import scan_file_path
 
 from invokeai.backend.model_management.models import BaseModelType
+from invokeai.backend.model_management.models.ip_adapter import IPAdapterModelFormat
 
 from .models import (
     BaseModelType,
@@ -184,9 +185,10 @@ class ModelProbe(object):
                 return ModelType.ONNX
             if (folder_path / "learned_embeds.bin").exists():
                 return ModelType.TextualInversion
-
             if (folder_path / "pytorch_lora_weights.bin").exists():
                 return ModelType.Lora
+            if (folder_path / "image_encoder.txt").exists():
+                return ModelType.IPAdapter
 
             i = folder_path / "model_index.json"
             c = folder_path / "config.json"
@@ -532,8 +534,24 @@ class LoRAFolderProbe(FolderProbeBase):
 
 
 class IPAdapterFolderProbe(FolderProbeBase):
+    def get_format(self) -> str:
+        return IPAdapterModelFormat.InvokeAI.value
+
     def get_base_type(self) -> BaseModelType:
-        raise NotImplementedError()
+        model_file = self.folder_path / "ip_adapter.bin"
+        if not model_file.exists():
+            raise InvalidModelException("Unknown IP-Adapter model format.")
+
+        state_dict = torch.load(model_file)
+        cross_attention_dim = state_dict["ip_adapter"]["1.to_k_ip.weight"].shape[-1]
+        if cross_attention_dim == 768:
+            return BaseModelType.StableDiffusion1
+        elif cross_attention_dim == 1024:
+            return BaseModelType.StableDiffusion2
+        elif cross_attention_dim == 2048:
+            return BaseModelType.StableDiffusionXL
+        else:
+            raise InvalidModelException(f"IP-Adapter had unexpected cross-attention dimension: {cross_attention_dim}.")
 
 
 class CLIPVisionFolderProbe(FolderProbeBase):
