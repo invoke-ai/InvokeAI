@@ -28,16 +28,17 @@ The abstract base class for this class is InvocationStatsServiceBase. An impleme
 writes to the system log is stored in InvocationServices.performance_statistics.
 """
 
-import psutil
 import time
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from typing import Dict
 
+import psutil
 import torch
 
 import invokeai.backend.util.logging as logger
+from invokeai.backend.model_manager.cache import CacheStats
 
 from ..invocations.baseinvocation import BaseInvocation
 from .graph import GraphExecutionState

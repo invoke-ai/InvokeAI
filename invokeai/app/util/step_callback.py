@@ -1,5 +1,6 @@
 import torch
 from PIL import Image
+
 from invokeai.app.models.exceptions import CanceledException
 from invokeai.app.models.image import ProgressImage
 from ..invocations.baseinvocation import InvocationContext

@@ -5,8 +5,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from logging import Logger
 from pathlib import Path
-from pydantic import Field
-from typing import Literal, Optional, Union, Callable, List, Tuple, TYPE_CHECKING
 from types import ModuleType
 
 from invokeai.backend.model_manager import (
@@ -24,9 +22,13 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.cache import CacheStats
+from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Tuple, Union
 
 import torch
+from pydantic import Field
+
 from invokeai.app.models.exceptions import CanceledException
+
 from ...backend.util import choose_precision, choose_torch_device
 from .config import InvokeAIAppConfig
 

@@ -2,9 +2,8 @@
 Check that the invokeai_root is correctly configured and exit if not.
 """
 import sys
-from invokeai.app.services.config import (
-    InvokeAIAppConfig,
-)
+
+from invokeai.app.services.config import InvokeAIAppConfig
 
 
 def check_invokeai_root(config: InvokeAIAppConfig):

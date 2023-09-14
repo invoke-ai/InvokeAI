@@ -19,6 +19,7 @@ import {
   useGetMainModelsQuery,
   useGetOnnxModelsQuery,
 } from 'services/api/endpoints/models';
+import { useTranslation } from 'react-i18next';
 
 const MainModelInputFieldComponent = (
   props: FieldComponentProps<
@@ -29,7 +30,7 @@ const MainModelInputFieldComponent = (
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
-
+  const { t } = useTranslation();
   const { data: onnxModels, isLoading: isLoadingOnnxModels } =
     useGetOnnxModelsQuery(NON_SDXL_MAIN_MODELS);
   const { data: mainModels, isLoading: isLoadingMainModels } =
@@ -127,7 +128,9 @@ const MainModelInputFieldComponent = (
           tooltip={selectedModel?.description}
           value={selectedModel?.id}
           placeholder={
-            data.length > 0 ? 'Select a model' : 'No models available'
+            data.length > 0
+              ? t('models.selectModel')
+              : t('models.noModelsAvailable')
           }
           data={data}
           error={!selectedModel}

@@ -178,7 +178,6 @@ InvokeAI:
 import logging.handlers
 import socket
 import urllib.parse
-
 from abc import abstractmethod
 from pathlib import Path
 from typing import Optional

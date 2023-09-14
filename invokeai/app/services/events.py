@@ -1,7 +1,9 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 from typing import Any, Optional
+
 from invokeai.app.models.image import ProgressImage
+from invokeai.app.services.model_manager_service import BaseModelType, ModelInfo, ModelType, SubModelType
 from invokeai.app.util.misc import get_timestamp
 from invokeai.app.services.model_manager_service import (
     BaseModelType,

@@ -55,7 +55,9 @@ export default function AdvancedAddCheckpoint(
         dispatch(
           addToast(
             makeToast({
-              title: `Model Added: ${values.model_name}`,
+              title: t('modelManager.modelAdded', {
+                modelName: values.model_name,
+              }),
               status: 'success',
             })
           )
@@ -72,7 +74,7 @@ export default function AdvancedAddCheckpoint(
           dispatch(
             addToast(
               makeToast({
-                title: 'Model Add Failed',
+                title: t('toast.modelAddFailed'),
                 status: 'error',
               })
             )
@@ -90,15 +92,16 @@ export default function AdvancedAddCheckpoint(
     >
       <Flex flexDirection="column" gap={2}>
         <IAIMantineTextInput
-          label="Model Name"
+          label={t('modelManager.model')}
           required
           {...advancedAddCheckpointForm.getInputProps('model_name')}
         />
         <BaseModelSelect
+          label={t('modelManager.baseModel')}
           {...advancedAddCheckpointForm.getInputProps('base_model')}
         />
         <IAIMantineTextInput
-          label="Model Location"
+          label={t('modelManager.modelLocation')}
           required
           {...advancedAddCheckpointForm.getInputProps('path')}
           onBlur={(e) => {
@@ -114,14 +117,15 @@ export default function AdvancedAddCheckpoint(
           }}
         />
         <IAIMantineTextInput
-          label="Description"
+          label={t('modelManager.description')}
           {...advancedAddCheckpointForm.getInputProps('description')}
         />
         <IAIMantineTextInput
-          label="VAE Location"
+          label={t('modelManager.vaeLocation')}
           {...advancedAddCheckpointForm.getInputProps('vae')}
         />
         <ModelVariantSelect
+          label={t('modelManager.variant')}
           {...advancedAddCheckpointForm.getInputProps('variant')}
         />
         <Flex flexDirection="column" width="100%" gap={2}>
@@ -134,14 +138,14 @@ export default function AdvancedAddCheckpoint(
           ) : (
             <IAIMantineTextInput
               required
-              label="Custom Config File Location"
+              label={t('modelManager.customConfigFileLocation')}
               {...advancedAddCheckpointForm.getInputProps('config')}
             />
           )}
           <IAISimpleCheckbox
             isChecked={useCustomConfig}
             onChange={() => setUseCustomConfig(!useCustomConfig)}
-            label="Use Custom Config"
+            label={t('modelManager.useCustomConfig')}
           />
           <IAIButton mt={2} type="submit">
             {t('modelManager.addModel')}

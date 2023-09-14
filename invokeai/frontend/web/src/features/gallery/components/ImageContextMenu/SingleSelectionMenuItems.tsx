@@ -35,6 +35,7 @@ import { ImageDTO } from 'services/api/types';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { configSelector } from '../../../system/store/configSelectors';
+import { uiSelector } from '../../../ui/store/uiSelectors';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -50,6 +51,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
   const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
+  const { customStarUi } = useAppSelector(uiSelector);
 
   const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
     { image: imageDTO, shouldFetchMetadataFromApi },
@@ -225,12 +227,18 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         Change Board
       </MenuItem>
       {imageDTO.starred ? (
-        <MenuItem icon={<MdStar />} onClickCapture={handleUnstarImage}>
-          Unstar Image
+        <MenuItem
+          icon={customStarUi ? customStarUi.off.icon : <MdStar />}
+          onClickCapture={handleUnstarImage}
+        >
+          {customStarUi ? customStarUi.off.text : `Unstar Image`}
         </MenuItem>
       ) : (
-        <MenuItem icon={<MdStarBorder />} onClickCapture={handleStarImage}>
-          Star Image
+        <MenuItem
+          icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
+          onClickCapture={handleStarImage}
+        >
+          {customStarUi ? customStarUi.on.text : `Star Image`}
         </MenuItem>
       )}
       <MenuItem

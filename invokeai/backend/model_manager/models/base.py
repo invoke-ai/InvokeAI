@@ -1,15 +1,15 @@
+import inspect
 import json
 import os
 import sys
+import torch
 import typing
-import inspect
 from abc import ABCMeta, abstractmethod
 from contextlib import suppress
 from enum import Enum
 from pathlib import Path
-from picklescan.scanner import scan_file_path
+from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
 
-import torch
 import numpy as np
 import onnx
 import safetensors.torch
@@ -20,7 +20,7 @@ from onnxruntime import (
     SessionOptions,
     get_available_providers,
 )
-from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
+from picklescan.scanner import scan_file_path
 from ..config import (  # noqa F401
     BaseModelType,
     ModelType,
