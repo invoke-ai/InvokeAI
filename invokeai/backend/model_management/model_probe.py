@@ -54,8 +54,7 @@ class ModelProbe(object):
         "StableDiffusionXLInpaintPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
-        "IPAdapterModel": ModelType.IPAdapter,
-        "CLIPVision": ModelType.CLIPVision,
+        "CLIPVisionModelWithProjection": ModelType.CLIPVision,
     }
 
     @classmethod
@@ -196,7 +195,12 @@ class ModelProbe(object):
             if config_path:
                 with open(config_path, "r") as file:
                     conf = json.load(file)
-                class_name = conf["_class_name"]
+                if "_class_name" in conf:
+                    class_name = conf["_class_name"]
+                elif "architectures" in conf:
+                    class_name = conf["architectures"][0]
+                else:
+                    class_name = None
 
         if class_name and (type := cls.CLASS2TYPE.get(class_name)):
             return type

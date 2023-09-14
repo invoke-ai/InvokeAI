@@ -418,7 +418,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         image_encoder_model_info = context.services.model_manager.get_model(
             # TODO(ryand): Get this model_name from the IPAdapterField.
-            model_name="ip_adapter_clip_vision",
+            model_name="ip_adapter_sd_image_encoder",
             model_type=ModelType.CLIPVision,
             base_model=BaseModelType.Any,
             context=context,

@@ -318,7 +318,6 @@ class ModelInstall(object):
                 location = self._download_hf_pipeline(repo_id, staging)  # pipeline
             elif "unet/model.onnx" in files:
                 location = self._download_hf_model(repo_id, files, staging)
-            # TODO(ryand): Add special handling for ip_adapter?
             else:
                 for suffix in ["safetensors", "bin"]:
                     if f"pytorch_lora_weights.{suffix}" in files:
@@ -337,6 +336,11 @@ class ModelInstall(object):
                     elif f"learned_embeds.{suffix}" in files:
                         location = self._download_hf_model(repo_id, [f"learned_embeds.{suffix}"], staging)
                         break
+                    elif f"model.{suffix}" in files and "config.json" in files:
+                        # This elif-condition is pretty fragile, but it is intended to handle CLIP Vision models hosted
+                        # by InvokeAI for use with IP-Adapters.
+                        files = ["config.json", f"model.{suffix}"]
+                        location = self._download_hf_model(repo_id, files, staging)
             if not location:
                 logger.warning(f"Could not determine type of repo {repo_id}. Skipping install.")
                 return {}
