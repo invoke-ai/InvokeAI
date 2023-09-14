@@ -1,10 +1,10 @@
 import { Flex } from '@chakra-ui/react';
+import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { memo } from 'react';
 import EmbedWorkflowCheckbox from './EmbedWorkflowCheckbox';
 import SaveToGalleryCheckbox from './SaveToGalleryCheckbox';
 import UseCacheCheckbox from './UseCacheCheckbox';
-import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 
 type Props = {
   nodeId: string;

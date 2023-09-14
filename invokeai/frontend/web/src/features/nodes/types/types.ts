@@ -55,6 +55,10 @@ export type InvocationTemplate = {
    */
   outputType: string; // TODO: generate a union of output types
   /**
+   * Whether or not this invocation supports workflows
+   */
+  withWorkflow: boolean;
+  /**
    * The invocation's version.
    */
   version?: string;
@@ -109,6 +113,7 @@ export const zFieldType = z.enum([
   'LoRAModelField',
   'MainModelField',
   'MetadataDict',
+  'MetadataDictCollection',
   'MetadataItem',
   'MetadataItemCollection',
   'MetadataItemPolymorphic',
@@ -655,6 +660,15 @@ export type MetadataDictInputFieldValue = z.infer<
   typeof zMetadataDictInputFieldValue
 >;
 
+export const zMetadataDictCollectionInputFieldValue =
+  zInputFieldValueBase.extend({
+    type: z.literal('MetadataDictCollection'),
+    value: z.array(zMetadataDict).optional(),
+  });
+export type MetadataDictCollectionInputFieldValue = z.infer<
+  typeof zMetadataDictCollectionInputFieldValue
+>;
+
 export const zColorField = z.object({
   r: z.number().int().min(0).max(255),
   g: z.number().int().min(0).max(255),
@@ -748,6 +762,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zMetadataItemCollectionInputFieldValue,
   zMetadataItemPolymorphicInputFieldValue,
   zMetadataDictInputFieldValue,
+  zMetadataDictCollectionInputFieldValue,
 ]);
 
 export type InputFieldValue = z.infer<typeof zInputFieldValue>;
@@ -1058,6 +1073,12 @@ export type MetadataDictInputFieldTemplate = InputFieldTemplateBase & {
   type: 'MetadataDict';
 };
 
+export type MetadataDictCollectionInputFieldTemplate =
+  InputFieldTemplateBase & {
+    default: undefined;
+    type: 'MetadataDictCollection';
+  };
+
 /**
  * An input field template is generated on each page load from the OpenAPI schema.
  *
@@ -1113,7 +1134,8 @@ export type InputFieldTemplate =
   | MetadataItemInputFieldTemplate
   | MetadataItemCollectionInputFieldTemplate
   | MetadataDictInputFieldTemplate
-  | MetadataItemPolymorphicInputFieldTemplate;
+  | MetadataItemPolymorphicInputFieldTemplate
+  | MetadataDictCollectionInputFieldTemplate;
 
 export const isInputFieldValue = (
   field?: InputFieldValue | OutputFieldValue

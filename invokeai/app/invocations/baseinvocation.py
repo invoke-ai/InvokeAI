@@ -71,7 +71,12 @@ class FieldDescriptions:
     denoised_latents = "Denoised latents tensor"
     latents = "Latents tensor"
     strength = "Strength of denoising (proportional to steps)"
-    core_metadata = "Optional core metadata to be written to image"
+    metadata = "Optional metadata to be saved with the image"
+    metadata_dict_collection = "Collection of MetadataDicts"
+    metadata_item_polymorphic = "A single metadata item or collection of metadata items"
+    metadata_item_label = "Label for this metadata item"
+    metadata_item_value = "The value for this metadata item (may be any type)"
+    workflow = "Optional workflow to be saved with the image"
     interp_mode = "Interpolation mode"
     torch_antialias = "Whether or not to apply antialiasing (bilinear or bicubic only)"
     fp32 = "Whether or not to use full float32 precision"
@@ -626,22 +631,7 @@ class BaseInvocation(ABC, BaseModel):
     is_intermediate: bool = InputField(
         default=False, description="Whether or not this is an intermediate invocation.", ui_type=UIType.IsIntermediate
     )
-    workflow: Optional[str] = InputField(
-        default=None,
-        description="The workflow to save with the image",
-        ui_type=UIType.WorkflowField,
-    )
     use_cache: bool = InputField(default=True, description="Whether or not to use the cache")
-
-    @validator("workflow", pre=True)
-    def validate_workflow_is_json(cls, v):
-        if v is None:
-            return None
-        try:
-            json.loads(v)
-        except json.decoder.JSONDecodeError:
-            raise ValueError("Workflow must be valid JSON")
-        return v
 
     UIConfig: ClassVar[Type[UIConfigBase]]
 
@@ -747,3 +737,19 @@ def invocation_output(
         return cls
 
     return wrapper
+
+
+class WithWorkflow(BaseModel):
+    workflow: Optional[str] = InputField(
+        default=None, description=FieldDescriptions.workflow, ui_type=UIType.WorkflowField
+    )
+
+    @validator("workflow", pre=True)
+    def validate_workflow_is_json(cls, v):
+        if v is None:
+            return None
+        try:
+            json.loads(v)
+        except json.decoder.JSONDecodeError:
+            raise ValueError("Workflow must be valid JSON")
+        return v

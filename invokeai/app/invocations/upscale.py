@@ -7,11 +7,12 @@ import numpy as np
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from PIL import Image
 from realesrgan import RealESRGANer
+from invokeai.app.invocations.metadata import WithMetadata
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.models.image import ImageCategory, ResourceOrigin
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithWorkflow, invocation
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?
@@ -24,7 +25,7 @@ ESRGAN_MODELS = Literal[
 
 
 @invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.0.0")
-class ESRGANInvocation(BaseInvocation):
+class ESRGANInvocation(BaseInvocation, WithWorkflow, WithMetadata):
     """Upscales an image using RealESRGAN."""
 
     image: ImageField = InputField(description="The input image")
@@ -106,6 +107,7 @@ class ESRGANInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            metadata=self.metadata.data if self.metadata else None,
             workflow=self.workflow,
         )
 

@@ -53,6 +53,7 @@ import {
   LatentsPolymorphicInputFieldTemplate,
   LoRAModelInputFieldTemplate,
   MainModelInputFieldTemplate,
+  MetadataDictCollectionInputFieldTemplate,
   MetadataDictInputFieldTemplate,
   MetadataItemCollectionInputFieldTemplate,
   MetadataItemInputFieldTemplate,
@@ -796,6 +797,18 @@ const buildMetadataDictInputFieldTemplate = ({
   return template;
 };
 
+const buildMetadataDictCollectionInputFieldTemplate = ({
+  baseField,
+}: BuildInputFieldArg): MetadataDictCollectionInputFieldTemplate => {
+  const template: MetadataDictCollectionInputFieldTemplate = {
+    ...baseField,
+    type: 'MetadataDictCollection',
+    default: undefined,
+  };
+
+  return template;
+};
+
 const buildColorInputFieldTemplate = ({
   schemaObject,
   baseField,
@@ -973,6 +986,7 @@ const TEMPLATE_BUILDER_MAP: {
   MetadataItemCollection: buildMetadataItemCollectionInputFieldTemplate,
   MetadataItemPolymorphic: buildMetadataItemPolymorphicInputFieldTemplate,
   MetadataDict: buildMetadataDictInputFieldTemplate,
+  MetadataDictCollection: buildMetadataDictCollectionInputFieldTemplate,
   MainModelField: buildMainModelInputFieldTemplate,
   Scheduler: buildSchedulerInputFieldTemplate,
   SDXLMainModelField: buildSDXLMainModelInputFieldTemplate,

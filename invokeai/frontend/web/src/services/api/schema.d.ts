@@ -641,6 +641,16 @@ export type components = {
      */
     BlankImageInvocation: {
       /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -1141,6 +1151,16 @@ export type components = {
      */
     CV2InfillInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -1418,6 +1438,16 @@ export type components = {
      * using a mask to only color-correct certain regions of the target image.
      */
     ColorCorrectInvocation: {
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -2606,6 +2636,16 @@ export type components = {
      */
     ESRGANInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -3507,6 +3547,16 @@ export type components = {
      */
     ImageBlurInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -3571,6 +3621,16 @@ export type components = {
      */
     ImageChannelInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -3616,6 +3676,16 @@ export type components = {
      * @description Scale a specific color channel of an image.
      */
     ImageChannelMultiplyInvocation: {
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3690,6 +3760,16 @@ export type components = {
      * @description Add or subtract a value from a specific color channel of an image.
      */
     ImageChannelOffsetInvocation: {
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3815,6 +3895,16 @@ export type components = {
      */
     ImageConvertInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -3869,6 +3959,16 @@ export type components = {
      * @description Crops an image to a specified box. The box can be outside of the image.
      */
     ImageCropInvocation: {
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4019,6 +4119,16 @@ export type components = {
      */
     ImageHueAdjustmentInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -4063,6 +4173,16 @@ export type components = {
      * @description Inverse linear interpolation of all pixels of an image
      */
     ImageInverseLerpInvocation: {
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4154,6 +4274,16 @@ export type components = {
      */
     ImageLerpInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -4221,6 +4351,16 @@ export type components = {
      */
     ImageMultiplyInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -4264,6 +4404,16 @@ export type components = {
      * @description Add blur to NSFW-flagged images
      */
     ImageNSFWBlurInvocation: {
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4335,6 +4485,16 @@ export type components = {
      * @description Pastes an image into another image.
      */
     ImagePasteInvocation: {
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4471,6 +4631,16 @@ export type components = {
      */
     ImageResizeInvocation: {
       /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -4539,6 +4709,16 @@ export type components = {
      * @description Scales an image by a factor
      */
     ImageScaleInvocation: {
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4675,6 +4855,16 @@ export type components = {
      */
     ImageWatermarkInvocation: {
       /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -4733,6 +4923,16 @@ export type components = {
      */
     InfillColorInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -4782,6 +4982,16 @@ export type components = {
      * @description Infills transparent areas of an image using the PatchMatch algorithm
      */
     InfillPatchMatchInvocation: {
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4840,6 +5050,16 @@ export type components = {
      * @description Infills transparent areas of an image with tiles of the image
      */
     InfillTileInvocation: {
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5156,6 +5376,16 @@ export type components = {
      */
     LaMaInfillInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -5332,6 +5562,16 @@ export type components = {
      * @description Generates an image from latents.
      */
     LatentsToImageInvocation: {
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5779,6 +6019,16 @@ export type components = {
      */
     MaskCombineInvocation: {
       /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
        */
@@ -5822,6 +6072,16 @@ export type components = {
      * @description Applies an edge mask to an image
      */
     MaskEdgeInvocation: {
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5881,6 +6141,16 @@ export type components = {
      * @description Extracts the alpha channel of an image as a mask.
      */
     MaskFromAlphaInvocation: {
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -6569,6 +6839,16 @@ export type components = {
      * @description Generates an image from latents.
      */
     ONNXLatentsToImageInvocation: {
+      /**
+       * Workflow
+       * @description Optional workflow to be saved with the image
+       */
+      workflow?: string;
+      /**
+       * Metadata
+       * @description Optional metadata to be saved with the image
+       */
+      metadata?: components['schemas']['MetadataDict'];
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -9627,6 +9907,12 @@ export type components = {
      * @enum {string}
      */
     ControlNetModelFormat: 'checkpoint' | 'diffusers';
+    /**
+     * StableDiffusion2ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: 'checkpoint' | 'diffusers';
     /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.

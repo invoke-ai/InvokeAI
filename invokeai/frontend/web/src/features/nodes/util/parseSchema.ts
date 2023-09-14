@@ -4,7 +4,6 @@ import { reduce } from 'lodash-es';
 import { OpenAPIV3 } from 'openapi-types';
 import { AnyInvocationType } from 'services/events/types';
 import {
-  FieldType,
   InputFieldTemplate,
   InvocationSchemaObject,
   InvocationTemplate,
@@ -16,9 +15,9 @@ import {
 } from '../types/types';
 import { buildInputFieldTemplate, getFieldType } from './fieldTemplateBuilders';
 
-const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'metadata', 'use_cache'];
+const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
-const RESERVED_FIELD_TYPES = ['WorkflowField', 'IsIntermediate'];
+const RESERVED_FIELD_TYPES = ['IsIntermediate', 'WorkflowField'];
 
 const invocationDenylist: AnyInvocationType[] = [
   'graph',
@@ -38,7 +37,7 @@ const isReservedInputField = (nodeType: string, fieldName: string) => {
   return false;
 };
 
-const isReservedFieldType = (fieldType: FieldType) => {
+const isReservedFieldType = (fieldType: string) => {
   if (RESERVED_FIELD_TYPES.includes(fieldType)) {
     return true;
   }
@@ -82,6 +81,7 @@ export const parseSchema = (
     const tags = schema.tags ?? [];
     const description = schema.description ?? '';
     const version = schema.version;
+    let withWorkflow = false;
 
     const inputs = reduce(
       schema.properties,
@@ -108,7 +108,7 @@ export const parseSchema = (
 
         const fieldType = getFieldType(property);
 
-        if (!isFieldType(fieldType)) {
+        if (!fieldType) {
           logger('nodes').warn(
             {
               node: type,
@@ -116,8 +116,13 @@ export const parseSchema = (
               fieldType,
               field: parseify(property),
             },
-            'Skipping unknown input field type'
+            'Missing input field type'
           );
+          return inputsAccumulator;
+        }
+
+        if (fieldType === 'WorkflowField') {
+          withWorkflow = true;
           return inputsAccumulator;
         }
 
@@ -129,7 +134,20 @@ export const parseSchema = (
               fieldType,
               field: parseify(property),
             },
-            'Skipping reserved field type'
+            `Skipping reserved input field type: ${fieldType}`
+          );
+          return inputsAccumulator;
+        }
+
+        if (!isFieldType(fieldType)) {
+          logger('nodes').warn(
+            {
+              node: type,
+              fieldName: propertyName,
+              fieldType,
+              field: parseify(property),
+            },
+            `Skipping unknown input field type: ${fieldType}`
           );
           return inputsAccumulator;
         }
@@ -142,7 +160,7 @@ export const parseSchema = (
         );
 
         if (!field) {
-          logger('nodes').debug(
+          logger('nodes').warn(
             {
               node: type,
               fieldName: propertyName,
@@ -243,6 +261,7 @@ export const parseSchema = (
       inputs,
       outputs,
       useCache,
+      withWorkflow,
     };
 
     Object.assign(invocationsAccumulator, { [type]: invocation });

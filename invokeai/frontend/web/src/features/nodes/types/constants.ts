@@ -32,6 +32,7 @@ export const COLLECTION_TYPES: FieldType[] = [
   'ControlCollection',
   'ColorCollection',
   'MetadataItemCollection',
+  'MetadataDictCollection',
 ];
 
 export const POLYMORPHIC_TYPES: FieldType[] = [
@@ -73,6 +74,7 @@ export const COLLECTION_MAP: FieldTypeMapWithNumber = {
   ControlField: 'ControlCollection',
   ColorField: 'ColorCollection',
   MetadataItem: 'MetadataItemCollection',
+  MetadataDict: 'MetadataDictCollection',
 };
 export const isCollectionItemType = (
   itemType: string | undefined
@@ -145,6 +147,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'gray.500',
     description: 'A metadata dict.',
     title: 'Metadata Dict',
+  },
+  MetadataDictCollection: {
+    color: 'gray.500',
+    description: 'A collection of metadata dicts.',
+    title: 'Metadata Dict Collection',
   },
   MetadataItem: {
     color: 'gray.500',
