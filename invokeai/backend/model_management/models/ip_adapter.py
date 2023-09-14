@@ -13,6 +13,7 @@ from invokeai.backend.model_management.models.base import (
     ModelConfigBase,
     ModelType,
     SubModelType,
+    calc_model_size_by_fs,
     classproperty,
 )
 
@@ -30,7 +31,6 @@ class IPAdapterModel(ModelBase):
         assert model_type == ModelType.IPAdapter
         super().__init__(model_path, base_model, model_type)
 
-        # TODO(ryand): Check correct files for model size calculation.
         self.model_size = os.path.getsize(self.model_path)
 
     @classmethod
