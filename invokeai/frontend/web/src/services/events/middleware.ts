@@ -8,7 +8,7 @@ import {
 } from 'services/events/types';
 import { setEventListeners } from 'services/events/util/setEventListeners';
 import { Socket, io } from 'socket.io-client';
-import { socketSubscribed, socketUnsubscribed } from './actions';
+import { socketSubscribedSession } from './actions';
 
 export const socketMiddleware = () => {
   let areListenersSet = false;
@@ -64,22 +64,22 @@ export const socketMiddleware = () => {
         const sessionId = action.payload.id;
         const oldSessionId = getState().system.sessionId;
 
-        if (oldSessionId) {
-          socket.emit('unsubscribe', {
-            session: oldSessionId,
-          });
+        // if (oldSessionId) {
+        //   socket.emit('unsubscribe_session', {
+        //     session: oldSessionId,
+        //   });
 
-          dispatch(
-            socketUnsubscribed({
-              sessionId: oldSessionId,
-            })
-          );
-        }
+        //   dispatch(
+        //     socketUnsubscribedSession({
+        //       sessionId: oldSessionId,
+        //     })
+        //   );
+        // }
 
-        socket.emit('subscribe', { session: sessionId });
+        socket.emit('subscribe_session', { session: sessionId });
 
         dispatch(
-          socketSubscribed({
+          socketSubscribedSession({
             sessionId: sessionId,
           })
         );

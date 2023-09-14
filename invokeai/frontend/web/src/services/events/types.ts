@@ -6,6 +6,7 @@ import {
   ModelType,
   SubModelType,
 } from '../api/types';
+import { components } from 'services/api/schema';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -134,13 +135,28 @@ export type InvocationRetrievalErrorEvent = {
   error: string;
 };
 
-export type ClientEmitSubscribe = {
+/**
+ * A `queue_item_status_changed` socket.io event.
+ *
+ * @example socket.on('queue_item_status_changed', (data: QueueItemStatusChangedEvent) => { ... }
+ */
+export type QueueItemStatusChangedEvent = {
+  id: number;
+  graph_execution_state_id: string;
+  status: components['schemas']['SessionQueueItemDTO']['status'];
+};
+
+export type ClientEmitSubscribeSession = {
   session: string;
 };
 
-export type ClientEmitUnsubscribe = {
+export type ClientEmitUnsubscribeSession = {
   session: string;
 };
+
+export type ClientEmitSubscribeQueue = void;
+
+export type ClientEmitUnsubscribeQueue = void;
 
 export type ServerToClientEvents = {
   generator_progress: (payload: GeneratorProgressEvent) => void;
@@ -154,11 +170,14 @@ export type ServerToClientEvents = {
   model_load_completed: (payload: ModelLoadCompletedEvent) => void;
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
+  queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
 };
 
 export type ClientToServerEvents = {
   connect: () => void;
   disconnect: () => void;
-  subscribe: (payload: ClientEmitSubscribe) => void;
-  unsubscribe: (payload: ClientEmitUnsubscribe) => void;
+  subscribe_session: (payload: ClientEmitSubscribeSession) => void;
+  unsubscribe_session: (payload: ClientEmitUnsubscribeSession) => void;
+  subscribe_queue: (payload: ClientEmitSubscribeQueue) => void;
+  unsubscribe_queue: (payload: ClientEmitUnsubscribeQueue) => void;
 };

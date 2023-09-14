@@ -19,8 +19,6 @@ import {
   appSocketInvocationRetrievalError,
   appSocketInvocationStarted,
   appSocketSessionRetrievalError,
-  appSocketSubscribed,
-  appSocketUnsubscribed,
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
 import { makeToast } from '../util/makeToast';
@@ -197,21 +195,6 @@ export const systemSlice = createSlice({
   },
   extraReducers(builder) {
     /**
-     * Socket Subscribed
-     */
-    builder.addCase(appSocketSubscribed, (state, action) => {
-      state.sessionId = action.payload.sessionId;
-      state.canceledSession = '';
-    });
-
-    /**
-     * Socket Unsubscribed
-     */
-    builder.addCase(appSocketUnsubscribed, (state) => {
-      state.sessionId = null;
-    });
-
-    /**
      * Socket Connected
      */
     builder.addCase(appSocketConnected, (state) => {
@@ -327,7 +310,6 @@ export const systemSlice = createSlice({
       state.totalSteps = 0;
       state.statusTranslationKey = 'common.statusConnected';
       state.progressImage = null;
-
       state.toastQueue.push(
         makeToast({ title: t('toast.canceled'), status: 'warning' })
       );

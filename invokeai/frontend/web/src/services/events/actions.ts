@@ -8,6 +8,7 @@ import {
   InvocationStartedEvent,
   ModelLoadCompletedEvent,
   ModelLoadStartedEvent,
+  QueueItemStatusChangedEvent,
   SessionRetrievalErrorEvent,
 } from 'services/events/types';
 
@@ -41,35 +42,35 @@ export const appSocketDisconnected = createAction(
 );
 
 /**
- * Socket.IO Subscribed
+ * Socket.IO Subscribed Session
  *
  * Do not use. Only for use in middleware.
  */
-export const socketSubscribed = createAction<{
+export const socketSubscribedSession = createAction<{
   sessionId: string;
-}>('socket/socketSubscribed');
+}>('socket/socketSubscribedSession');
 
 /**
- * App-level Socket.IO Subscribed
+ * App-level Socket.IO Subscribed Session
  */
-export const appSocketSubscribed = createAction<{
+export const appSocketSubscribedSession = createAction<{
   sessionId: string;
-}>('socket/appSocketSubscribed');
+}>('socket/appSocketSubscribedSession');
 
 /**
- * Socket.IO Unsubscribed
+ * Socket.IO Unsubscribed Session
  *
  * Do not use. Only for use in middleware.
  */
-export const socketUnsubscribed = createAction<{ sessionId: string }>(
-  'socket/socketUnsubscribed'
+export const socketUnsubscribedSession = createAction<{ sessionId: string }>(
+  'socket/socketUnsubscribedSession'
 );
 
 /**
- * App-level Socket.IO Unsubscribed
+ * App-level Socket.IO Unsubscribed Session
  */
-export const appSocketUnsubscribed = createAction<{ sessionId: string }>(
-  'socket/appSocketUnsubscribed'
+export const appSocketUnsubscribedSession = createAction<{ sessionId: string }>(
+  'socket/appSocketUnsubscribedSession'
 );
 
 /**
@@ -215,3 +216,19 @@ export const socketInvocationRetrievalError = createAction<{
 export const appSocketInvocationRetrievalError = createAction<{
   data: InvocationRetrievalErrorEvent;
 }>('socket/appSocketInvocationRetrievalError');
+
+/**
+ * Socket.IO Invocation Retrieval Error
+ *
+ * Do not use. Only for use in middleware.
+ */
+export const socketQueueItemStatusChanged = createAction<{
+  data: QueueItemStatusChangedEvent;
+}>('socket/socketQueueItemStatusChanged');
+
+/**
+ * App-level Invocation Retrieval Error
+ */
+export const appSocketQueueItemStatusChanged = createAction<{
+  data: QueueItemStatusChangedEvent;
+}>('socket/appSocketQueueItemStatusChanged');

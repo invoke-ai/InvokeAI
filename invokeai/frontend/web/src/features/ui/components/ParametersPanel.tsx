@@ -1,16 +1,23 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
 import { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import ProcessButtons from 'features/parameters/components/ProcessButtons/ProcessButtons';
+import CancelQueueButton from 'features/queue/components/CancelQueueButton';
+import QueueBackButton from 'features/queue/components/QueueBackButton';
+import QueueFrontButton from 'features/queue/components/QueueFrontButton';
+import StartQueueButton from 'features/queue/components/StartQueueButton';
+import StopQueueButton from 'features/queue/components/StopQueueButton';
 import SDXLImageToImageTabParameters from 'features/sdxl/components/SDXLImageToImageTabParameters';
 import SDXLTextToImageTabParameters from 'features/sdxl/components/SDXLTextToImageTabParameters';
 import SDXLUnifiedCanvasTabParameters from 'features/sdxl/components/SDXLUnifiedCanvasTabParameters';
+import ProgressBar from 'features/system/components/ProgressBar';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { PropsWithChildren, memo } from 'react';
 import { activeTabNameSelector } from '../store/uiSelectors';
 import ImageToImageTabParameters from './tabs/ImageToImage/ImageToImageTabParameters';
 import TextToImageTabParameters from './tabs/TextToImage/TextToImageTabParameters';
 import UnifiedCanvasParameters from './tabs/UnifiedCanvas/UnifiedCanvasParameters';
+import PruneQueueButton from 'features/queue/components/PruneQueueButton';
+import ClearQueueButton from 'features/queue/components/ClearQueueButton';
 
 const ParametersPanel = () => {
   const activeTabName = useAppSelector(activeTabNameSelector);
@@ -67,7 +74,36 @@ const ParametersPanelWrapper = memo((props: PropsWithChildren) => {
         gap: 2,
       }}
     >
-      <ProcessButtons />
+      <Flex
+        layerStyle="first"
+        sx={{
+          w: 'full',
+          position: 'relative',
+          borderRadius: 'base',
+          p: 2,
+          gap: 2,
+          flexDir: 'column',
+        }}
+      >
+        <Flex gap={2} w="full">
+          <ButtonGroup isAttached flexGrow={1}>
+            <QueueBackButton />
+            <QueueFrontButton />
+          </ButtonGroup>
+          <ButtonGroup isAttached flexGrow={1}>
+            <StartQueueButton asIconButton />
+            <StopQueueButton asIconButton />
+            <CancelQueueButton asIconButton />
+          </ButtonGroup>
+          <ButtonGroup isAttached flexGrow={1}>
+            <PruneQueueButton asIconButton />
+            <ClearQueueButton asIconButton />
+          </ButtonGroup>
+        </Flex>
+        <Flex h={2} w="full">
+          <ProgressBar />
+        </Flex>
+      </Flex>
       <Flex
         layerStyle="first"
         sx={{

@@ -4,11 +4,13 @@ from typing import Any, Optional
 
 from invokeai.app.models.image import ProgressImage
 from invokeai.app.services.model_manager_service import BaseModelType, ModelInfo, ModelType, SubModelType
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.util.misc import get_timestamp
 
 
 class EventServiceBase:
     session_event: str = "session_event"
+    queue_event: str = "queue_event"
 
     """Basic event bus, to have an empty stand-in when not needed"""
 
@@ -16,9 +18,18 @@ class EventServiceBase:
         pass
 
     def __emit_session_event(self, event_name: str, payload: dict) -> None:
+        """Session events are emitted to a room with the session_id as the room name"""
         payload["timestamp"] = get_timestamp()
         self.dispatch(
             event_name=EventServiceBase.session_event,
+            payload=dict(event=event_name, data=payload),
+        )
+
+    def __emit_queue_event(self, event_name: str, payload: dict) -> None:
+        """Queue events are emitted to a room with "queue" as the room name"""
+        payload["timestamp"] = get_timestamp()
+        self.dispatch(
+            event_name=EventServiceBase.queue_event,
             payload=dict(event=event_name, data=payload),
         )
 
@@ -181,5 +192,16 @@ class EventServiceBase:
                 node_id=node_id,
                 error_type=error_type,
                 error=error,
+            ),
+        )
+
+    def emit_queue_item_status_changed(self, session_queue_item: SessionQueueItem) -> None:
+        """Emitted when a queue item is status_changed"""
+        self.__emit_queue_event(
+            event_name="queue_item_status_changed",
+            payload=dict(
+                id=session_queue_item.id,
+                graph_execution_state_id=session_queue_item.session_id,
+                status=session_queue_item.status,
             ),
         )

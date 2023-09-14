@@ -7,7 +7,7 @@ import {
   UnorderedList,
 } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { userInvoked } from 'app/store/actions';
+import { enqueueRequested } from 'app/store/actions';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
@@ -15,9 +15,8 @@ import IAIButton, { IAIButtonProps } from 'common/components/IAIButton';
 import IAIIconButton, {
   IAIIconButtonProps,
 } from 'common/components/IAIIconButton';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
+import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
 import { clampSymmetrySteps } from 'features/parameters/store/generationSlice';
-import ProgressBar from 'features/system/components/ProgressBar';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -33,12 +32,11 @@ interface InvokeButton
 export default function InvokeButton(props: InvokeButton) {
   const { asIconButton = false, sx, ...rest } = props;
   const dispatch = useAppDispatch();
-  const { isReady, isProcessing } = useIsReadyToInvoke();
+  const { isReady, isProcessing } = useIsReadyToEnqueue();
   const activeTabName = useAppSelector(activeTabNameSelector);
-
   const handleInvoke = useCallback(() => {
     dispatch(clampSymmetrySteps());
-    dispatch(userInvoked(activeTabName));
+    dispatch(enqueueRequested({ tabName: activeTabName, prepend: true }));
   }, [dispatch, activeTabName]);
 
   const { t } = useTranslation();
@@ -57,23 +55,6 @@ export default function InvokeButton(props: InvokeButton) {
   return (
     <Box style={{ flexGrow: 4 }} position="relative">
       <Box style={{ position: 'relative' }}>
-        {!isReady && (
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: '0',
-              left: '0',
-              right: '0',
-              height: '100%',
-              overflow: 'clip',
-              borderRadius: 'base',
-              ...sx,
-            }}
-            {...rest}
-          >
-            <ProgressBar />
-          </Box>
-        )}
         {asIconButton ? (
           <IAIIconButton
             aria-label={t('parameters.invoke.invoke')}
@@ -98,14 +79,9 @@ export default function InvokeButton(props: InvokeButton) {
             tooltip={<InvokeButtonTooltipContent />}
             aria-label={t('parameters.invoke.invoke')}
             type="submit"
-            data-progress={isProcessing}
-            isDisabled={!isReady}
             onClick={handleInvoke}
             colorScheme="accent"
             id="invoke-button"
-            leftIcon={isProcessing ? undefined : <FaPlay />}
-            isLoading={isProcessing}
-            loadingText={t('parameters.invoke.invoke')}
             sx={{
               w: 'full',
               flexGrow: 1,
@@ -135,7 +111,7 @@ const tooltipSelector = createSelector(
 );
 
 export const InvokeButtonTooltipContent = memo(() => {
-  const { isReady, reasons } = useIsReadyToInvoke();
+  const { isReady, reasons } = useIsReadyToEnqueue();
   const { autoAddBoardId } = useAppSelector(tooltipSelector);
   const autoAddBoardName = useBoardName(autoAddBoardId);
   const { t } = useTranslation();

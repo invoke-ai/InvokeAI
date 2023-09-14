@@ -15,8 +15,6 @@ const selector = createSelector(
       state.config.sd.iterations;
     const { iterations } = state.generation;
     const { shouldUseSliders } = state.ui;
-    const isDisabled =
-      state.dynamicPrompts.isEnabled && state.dynamicPrompts.combinatorial;
 
     const step = state.hotkeys.shift ? fineStep : coarseStep;
 
@@ -28,7 +26,6 @@ const selector = createSelector(
       inputMax,
       step,
       shouldUseSliders,
-      isDisabled,
     };
   },
   defaultSelectorOptions
@@ -43,7 +40,6 @@ const ParamIterations = () => {
     inputMax,
     step,
     shouldUseSliders,
-    isDisabled,
   } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -61,8 +57,7 @@ const ParamIterations = () => {
 
   return shouldUseSliders ? (
     <IAISlider
-      isDisabled={isDisabled}
-      label={t('parameters.images')}
+      label={t('parameters.runs')}
       step={step}
       min={min}
       max={sliderMax}
@@ -76,8 +71,7 @@ const ParamIterations = () => {
     />
   ) : (
     <IAINumberInput
-      isDisabled={isDisabled}
-      label={t('parameters.images')}
+      label={t('parameters.runs')}
       step={step}
       min={min}
       max={inputMax}

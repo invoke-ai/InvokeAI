@@ -85,6 +85,8 @@ import { addUserInvokedImageToImageListener } from './listeners/userInvokedImage
 import { addUserInvokedNodesListener } from './listeners/userInvokedNodes';
 import { addUserInvokedTextToImageListener } from './listeners/userInvokedTextToImage';
 import { addWorkflowLoadedListener } from './listeners/workflowLoaded';
+import { addDynamicPromptsListener } from './listeners/promptChanged';
+import { addSocketQueueItemStatusChangedEventListener } from './listeners/socketio/socketQueueItemStatusChanged';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -173,6 +175,7 @@ addSocketUnsubscribedListener();
 addModelLoadEventListener();
 addSessionRetrievalErrorEventListener();
 addInvocationRetrievalErrorEventListener();
+addSocketQueueItemStatusChangedEventListener();
 
 // Session Created
 addSessionCreatedPendingListener();
@@ -223,3 +226,6 @@ addUpscaleRequestedListener();
 
 // Tab Change
 addTabChangedListener();
+
+// Dynamic prompts
+addDynamicPromptsListener();

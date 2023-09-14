@@ -4,10 +4,10 @@ import { NonNullableGraph } from 'features/nodes/types/types';
 import { initialGenerationState } from 'features/parameters/store/generationSlice';
 import {
   DenoiseLatentsInvocation,
+  BatchConfig,
   ONNXTextToLatentsInvocation,
 } from 'services/api/types';
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addDynamicPromptsToGraph } from './addDynamicPromptsToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -26,10 +26,12 @@ import {
   SEAMLESS,
   TEXT_TO_IMAGE_GRAPH,
 } from './constants';
+import { prepareLinearUIBatch } from './buildLinearBatchConfig';
 
 export const buildLinearTextToImageGraph = (
-  state: RootState
-): NonNullableGraph => {
+  state: RootState,
+  prepend: boolean
+): BatchConfig => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -46,6 +48,7 @@ export const buildLinearTextToImageGraph = (
     vaePrecision,
     seamlessXAxis,
     seamlessYAxis,
+    seed,
   } = state.generation;
 
   const use_cpu = shouldUseNoiseSettings
@@ -132,6 +135,7 @@ export const buildLinearTextToImageGraph = (
       [NOISE]: {
         type: 'noise',
         id: NOISE,
+        seed,
         width,
         height,
         use_cpu,
@@ -240,10 +244,10 @@ export const buildLinearTextToImageGraph = (
     cfg_scale,
     height,
     width,
-    positive_prompt: '', // set in addDynamicPromptsToGraph
+    positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model,
-    seed: 0, // set in addDynamicPromptsToGraph
+    seed,
     steps,
     rand_device: use_cpu ? 'cpu' : 'cuda',
     scheduler,
@@ -277,7 +281,7 @@ export const buildLinearTextToImageGraph = (
   addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add dynamic prompts - also sets up core iteration and seed
-  addDynamicPromptsToGraph(state, graph);
+  // addDynamicPromptsToGraph(state, graph);
 
   // add controlnet, mutating `graph`
   addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
@@ -293,5 +297,7 @@ export const buildLinearTextToImageGraph = (
     addWatermarkerToGraph(state, graph);
   }
 
-  return graph;
+  const enqueueBatchArg = prepareLinearUIBatch(state, graph, prepend);
+
+  return enqueueBatchArg;
 };

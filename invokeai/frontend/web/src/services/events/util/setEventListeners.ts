@@ -15,8 +15,8 @@ import {
   socketInvocationStarted,
   socketModelLoadCompleted,
   socketModelLoadStarted,
+  socketQueueItemStatusChanged,
   socketSessionRetrievalError,
-  socketSubscribed,
 } from '../actions';
 import { ClientToServerEvents, ServerToClientEvents } from '../types';
 
@@ -27,7 +27,7 @@ type SetEventListenersArg = {
 
 export const setEventListeners = (arg: SetEventListenersArg) => {
   const { socket, storeApi } = arg;
-  const { dispatch, getState } = storeApi;
+  const { dispatch } = storeApi;
 
   /**
    * Connect
@@ -38,16 +38,7 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
 
     dispatch(socketConnected());
 
-    const { sessionId } = getState().system;
-
-    if (sessionId) {
-      socket.emit('subscribe', { session: sessionId });
-      dispatch(
-        socketSubscribed({
-          sessionId,
-        })
-      );
-    }
+    socket.emit('subscribe_queue');
   });
 
   socket.on('connect_error', (error) => {
@@ -161,5 +152,20 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
         data,
       })
     );
+  });
+
+  socket.on('queue_item_status_changed', (data) => {
+    const { status, graph_execution_state_id } = data;
+    if (status === 'in_progress') {
+      socket.emit('subscribe_session', {
+        session: graph_execution_state_id,
+      });
+    }
+    if (['new', 'completed', 'failed', 'canceled'].includes(status)) {
+      socket.emit('unsubscribe_session', {
+        session: graph_execution_state_id,
+      });
+    }
+    dispatch(socketQueueItemStatusChanged({ data }));
   });
 };

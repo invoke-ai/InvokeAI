@@ -53,13 +53,13 @@ class Invoker:
 
     def __start_service(self, service) -> None:
         # Call start() method on any services that have it
-        start_op = getattr(service, "start", None)
+        start_op = getattr(service, "start_service", None)
         if callable(start_op):
             start_op(self)
 
     def __stop_service(self, service) -> None:
         # Call stop() method on any services that have it
-        stop_op = getattr(service, "stop", None)
+        stop_op = getattr(service, "stop_service", None)
         if callable(stop_op):
             stop_op(self)
 
@@ -68,7 +68,7 @@ class Invoker:
         for service in vars(self.services):
             self.__start_service(getattr(self.services, service))
 
-    def stop(self) -> None:
+    def stop_service(self) -> None:
         """Stops the invoker. A new invoker will have to be created to execute further."""
         # First stop all services
         for service in vars(self.services):

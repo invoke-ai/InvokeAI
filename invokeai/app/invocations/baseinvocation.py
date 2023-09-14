@@ -520,6 +520,9 @@ class BaseInvocation(ABC, BaseModel):
         return signature(cls.invoke).return_annotation
 
     class Config:
+        validate_assignment = True
+        validate_all = True
+
         @staticmethod
         def schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
             uiconfig = getattr(model_class, "UIConfig", None)

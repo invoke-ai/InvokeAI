@@ -23,6 +23,7 @@ import { MouseEvent, ReactNode, memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaCube, FaFont, FaImage } from 'react-icons/fa';
+import { FaListOl } from 'react-icons/fa6';
 import { MdDeviceHub, MdGridOn } from 'react-icons/md';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 import { usePanel } from '../hooks/usePanel';
@@ -37,6 +38,7 @@ import ParametersPanel from './ParametersPanel';
 import ImageTab from './tabs/ImageToImage/ImageToImageTab';
 import ModelManagerTab from './tabs/ModelManager/ModelManagerTab';
 import NodesTab from './tabs/Nodes/NodesTab';
+import QueueTab from './tabs/Queue/QueueTab';
 import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImage/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvas/UnifiedCanvasTab';
@@ -79,6 +81,12 @@ const tabs: InvokeTabInfo[] = [
     icon: <Icon as={FaCube} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
     content: <ModelManagerTab />,
   },
+  {
+    id: 'queue',
+    translationKey: 'queue.queue',
+    icon: <Icon as={FaListOl} sx={{ boxSize: 6, pointerEvents: 'none' }} />,
+    content: <QueueTab />,
+  },
 ];
 
 const enabledTabsSelector = createSelector(
@@ -97,8 +105,8 @@ const SIDE_PANEL_MIN_SIZE_PX = 448;
 const MAIN_PANEL_MIN_SIZE_PX = 448;
 const GALLERY_PANEL_MIN_SIZE_PX = 360;
 
-export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager'];
-export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager'];
+export const NO_GALLERY_TABS: InvokeTabName[] = ['modelManager', 'queue'];
+export const NO_SIDE_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 
 const InvokeTabs = () => {
   const activeTab = useAppSelector(activeTabIndexSelector);

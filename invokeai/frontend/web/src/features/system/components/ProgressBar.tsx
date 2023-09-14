@@ -3,9 +3,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { SystemState } from 'features/system/store/systemSlice';
 import { isEqual } from 'lodash-es';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { systemSelector } from '../store/systemSelectors';
+import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 const progressBarSelector = createSelector(
   systemSelector,
@@ -24,17 +25,33 @@ const progressBarSelector = createSelector(
 
 const ProgressBar = () => {
   const { t } = useTranslation();
-  const { isProcessing, currentStep, totalSteps, currentStatusHasSteps } =
+  const { isProcessing } = useGetQueueStatusQuery(undefined, {
+    selectFromResult: ({ data }) => {
+      if (!data) {
+        return { isProcessing: false };
+      }
+
+      return { isProcessing: data.started };
+    },
+  });
+  const { currentStep, totalSteps, currentStatusHasSteps } =
     useAppSelector(progressBarSelector);
 
-  const value = currentStep ? Math.round((currentStep * 100) / totalSteps) : 0;
+  const value = useMemo(() => {
+    if (currentStep && isProcessing) {
+      return Math.round((currentStep * 100) / totalSteps);
+    }
+    return 0;
+  }, [currentStep, isProcessing, totalSteps]);
 
   return (
     <Progress
       value={value}
       aria-label={t('accessibility.invokeProgressBar')}
       isIndeterminate={isProcessing && !currentStatusHasSteps}
-      height="full"
+      h="full"
+      w="full"
+      borderRadius={2}
       colorScheme="accent"
     />
   );

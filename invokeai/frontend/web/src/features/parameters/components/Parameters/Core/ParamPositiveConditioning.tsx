@@ -12,7 +12,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 
 import { userInvoked } from 'app/store/actions';
 import IAITextarea from 'common/components/IAITextarea';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
+import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
 import { isEqual } from 'lodash-es';
@@ -42,7 +42,7 @@ const promptInputSelector = createSelector(
 const ParamPositiveConditioning = () => {
   const dispatch = useAppDispatch();
   const { prompt, activeTabName } = useAppSelector(promptInputSelector);
-  const isReady = useIsReadyToInvoke();
+  const isReady = useIsReadyToEnqueue();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { t } = useTranslation();

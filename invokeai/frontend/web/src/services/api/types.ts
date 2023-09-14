@@ -22,6 +22,9 @@ export type UpdateBoardArg =
     changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
   };
 
+export type BatchConfig =
+  paths['/api/v1/queue/enqueue_batch']['post']['requestBody']['content']['application/json'];
+
 /**
  * This is an unsafe type; the object inside is not guaranteed to be valid.
  */
@@ -99,6 +102,8 @@ export type ImportModelConfig = s['Body_import_model'];
 export type Graph = s['Graph'];
 export type Edge = s['Edge'];
 export type GraphExecutionState = s['GraphExecutionState'];
+export type Batch = s['Batch'];
+export type SessionQueueItemDTO = s['SessionQueueItemDTO'];
 
 // General nodes
 export type CollectInvocation = s['CollectInvocation'];

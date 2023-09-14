@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import { userInvoked } from 'app/store/actions';
 import IAITextarea from 'common/components/IAITextarea';
-import { useIsReadyToInvoke } from 'common/hooks/useIsReadyToInvoke';
+import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
 import AddEmbeddingButton from 'features/embedding/components/AddEmbeddingButton';
 import ParamEmbeddingPopover from 'features/embedding/components/ParamEmbeddingPopover';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -43,7 +43,7 @@ const promptInputSelector = createSelector(
  */
 const ParamSDXLPositiveStyleConditioning = () => {
   const dispatch = useAppDispatch();
-  const isReady = useIsReadyToInvoke();
+  const isReady = useIsReadyToEnqueue();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { t } = useTranslation();

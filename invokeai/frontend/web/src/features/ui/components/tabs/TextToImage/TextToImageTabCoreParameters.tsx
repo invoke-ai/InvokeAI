@@ -16,11 +16,15 @@ const selector = createSelector(
   stateSelector,
   ({ ui, generation }) => {
     const { shouldUseSliders } = ui;
-    const { shouldRandomizeSeed } = generation;
+    const { shouldRandomizeSeed, iterations } = generation;
 
-    const activeLabel = !shouldRandomizeSeed ? 'Manual Seed' : undefined;
+    const labelItems = [`${iterations} Run${iterations > 1 ? 's' : ''}`];
 
-    return { shouldUseSliders, activeLabel };
+    if (!shouldRandomizeSeed) {
+      labelItems.push('Manual Seed');
+    }
+
+    return { shouldUseSliders, activeLabel: labelItems.join(', ') };
   },
   defaultSelectorOptions
 );
