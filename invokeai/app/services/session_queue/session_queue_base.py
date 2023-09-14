@@ -10,6 +10,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     EnqueueResult,
     IsEmptyResult,
     IsFullResult,
+    CancelByBatchIDsResult,
     PruneResult,
     SessionQueueItem,
     SessionQueueItemDTO,
@@ -63,6 +64,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def is_full(self) -> IsFullResult:
         """Checks if the queue is empty"""
+        pass
+
+    @abstractmethod
+    def cancel_by_batch_ids(self, batch_ids: list[str]) -> CancelByBatchIDsResult:
+        """Cancels all queue items with matching batch IDs"""
         pass
 
     @abstractmethod

@@ -8,6 +8,7 @@ from invokeai.app.services.session_queue.session_queue_base import SessionQueueB
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,
+    CancelByBatchIDsResult,
     ClearResult,
     EnqueueResult,
     IsEmptyResult,
@@ -403,6 +404,34 @@ class SqliteSessionQueue(SessionQueueBase):
         finally:
             self._lock.release()
         return PruneResult(deleted=count)
+
+    def cancel_by_batch_ids(self, batch_ids: list[str]) -> CancelByBatchIDsResult:
+        try:
+            self._lock.acquire()
+            placeholders = ", ".join(["?" for _ in batch_ids])
+            self._cursor.execute(
+                f"""--sql
+                SELECT COUNT(*) FROM session_queue
+                WHERE batch_id IN ({placeholders});
+                """,
+                batch_ids,
+            )
+            count = self._cursor.fetchone()[0]
+            self._cursor.execute(
+                f"""--sql
+                UPDATE session_queue
+                SET status = 'canceled'
+                WHERE batch_id IN ({placeholders}) AND status != 'canceled' AND status != 'completed';
+                """,
+                batch_ids,
+            )
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            self._lock.release()
+        return CancelByBatchIDsResult(canceled=count)
 
     def get_queue_item(self, id: int) -> SessionQueueItem:
         try:

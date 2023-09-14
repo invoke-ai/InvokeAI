@@ -256,6 +256,10 @@ class PruneResult(ClearResult):
     pass
 
 
+class CancelByBatchIDsResult(BaseModel):
+    canceled: int = Field(..., description="Number of queue items canceled")
+
+
 class IsEmptyResult(BaseModel):
     """Result of checking if the session queue is empty"""
 

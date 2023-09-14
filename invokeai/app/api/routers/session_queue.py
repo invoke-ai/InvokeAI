@@ -7,6 +7,7 @@ from invokeai.app.services.session_execution.session_execution_common import Ses
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,
+    CancelByBatchIDsResult,
     ClearResult,
     EnqueueResult,
     PruneResult,
@@ -103,6 +104,19 @@ async def stop() -> None:
 async def cancel() -> None:
     """Stops session queue execution, immediately canceling the currently-executing session"""
     return ApiDependencies.invoker.services.session_execution.cancel()
+
+
+@session_queue_router.put(
+    "/cancel_by_batch_ids", operation_id="cancel_by_batch_ids", responses={200: {"model": CancelByBatchIDsResult}}
+)
+async def cancel_by_batch_ids(
+    batch_ids: list[str] = Body(description="The list of batch_ids to cancel all queue items for", embed=True),
+) -> CancelByBatchIDsResult:
+    """Immediately cancels all queue items from the given batch ids"""
+    current = ApiDependencies.invoker.services.session_execution.get_current()
+    if current is not None and current.batch_id in batch_ids:
+        ApiDependencies.invoker.services.session_execution.cancel()
+    return ApiDependencies.invoker.services.session_queue.cancel_by_batch_ids(batch_ids)
 
 
 @session_queue_router.put(
