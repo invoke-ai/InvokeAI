@@ -143,11 +143,15 @@ class ApiDependencies:
 
         create_system_graphs(services.graph_library)
 
-        logger.info("Cleaning database")
-        db_conn.execute("VACUUM;")
-        db_conn.commit()
-
         ApiDependencies.invoker = Invoker(services)
+
+        try:
+            lock.acquire()
+            db_conn.execute("VACUUM;")
+            db_conn.commit()
+            logger.info("Cleaned database")
+        finally:
+            lock.release()
 
     @staticmethod
     def shutdown():

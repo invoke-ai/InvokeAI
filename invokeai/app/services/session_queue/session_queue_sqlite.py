@@ -41,10 +41,6 @@ class SqliteSessionQueue(SessionQueueBase):
         try:
             self._lock.acquire()
             self._create_tables()
-            # TODO: do we want to clear the queue of completed items on startup?
-            # self._delete_completed_queue_items()
-            # If a queue item was in_progress on startup, assume the app was forcibly closed without stopping the queue; mark it as canceled
-            self._set_in_progress_to_canceled()
             self._conn.commit()
         finally:
             self._lock.release()
@@ -127,25 +123,27 @@ class SqliteSessionQueue(SessionQueueBase):
             """
         )
 
-    def _delete_completed_queue_items(self) -> None:
-        self._cursor.execute(
-            """--sql
-            DELETE FROM session_queue
-            WHERE status = 'completed' OR status = 'failed' OR status = 'canceled';
-            """
-        )
-
     def _set_in_progress_to_canceled(self) -> None:
-        self._cursor.execute(
-            """--sql
-            UPDATE session_queue
-            SET status = 'canceled'
-            WHERE status = 'in_progress';
-            """
-        )
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                UPDATE session_queue
+                SET status = 'canceled'
+                WHERE status = 'in_progress';
+                """
+            )
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            self._lock.release()
 
     def start_service(self, invoker: Invoker) -> None:
         self._invoker = invoker
+        self._set_in_progress_to_canceled()
+        prune_result = self.prune()
+        self._invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
 
     def enqueue(self, graph: Graph, prepend: bool) -> EnqueueResult:
         return self.enqueue_batch(Batch(graph=graph), prepend=prepend)
