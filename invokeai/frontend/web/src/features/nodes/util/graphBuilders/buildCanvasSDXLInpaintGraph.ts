@@ -28,7 +28,6 @@ import {
   INPAINT_IMAGE,
   INPAINT_IMAGE_RESIZE_DOWN,
   INPAINT_IMAGE_RESIZE_UP,
-  ITERATE,
   LATENTS_TO_IMAGE,
   MASK_BLUR,
   MASK_RESIZE_DOWN,
@@ -36,7 +35,6 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  RANGE_OF_SIZE,
   SDXL_CANVAS_INPAINT_GRAPH,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
@@ -61,7 +59,6 @@ export const buildCanvasSDXLInpaintGraph = (
     cfgScale: cfg_scale,
     scheduler,
     steps,
-    iterations,
     seed,
     vaePrecision,
     shouldUseNoiseSettings,
@@ -205,20 +202,6 @@ export const buildCanvasSDXLInpaintGraph = (
         is_intermediate: !shouldAutoSave,
         reference: canvasInitImage,
       },
-      [RANGE_OF_SIZE]: {
-        type: 'range_of_size',
-        id: RANGE_OF_SIZE,
-        is_intermediate: true,
-        // seed - must be connected manually
-        // start: 0,
-        size: iterations,
-        step: 1,
-      },
-      [ITERATE]: {
-        type: 'iterate',
-        id: ITERATE,
-        is_intermediate: true,
-      },
     },
     edges: [
       // Connect Model Loader to UNet and CLIP
@@ -332,27 +315,6 @@ export const buildCanvasSDXLInpaintGraph = (
         destination: {
           node_id: SDXL_DENOISE_LATENTS,
           field: 'denoise_mask',
-        },
-      },
-      // Iterate
-      {
-        source: {
-          node_id: RANGE_OF_SIZE,
-          field: 'collection',
-        },
-        destination: {
-          node_id: ITERATE,
-          field: 'collection',
-        },
-      },
-      {
-        source: {
-          node_id: ITERATE,
-          field: 'item',
-        },
-        destination: {
-          node_id: NOISE,
-          field: 'seed',
         },
       },
       // Canvas Refine
