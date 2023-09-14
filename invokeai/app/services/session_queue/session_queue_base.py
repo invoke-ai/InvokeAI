@@ -6,11 +6,11 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,
+    CancelByBatchIDsResult,
     ClearResult,
     EnqueueResult,
     IsEmptyResult,
     IsFullResult,
-    CancelByBatchIDsResult,
     PruneResult,
     SessionQueueItem,
     SessionQueueItemDTO,
