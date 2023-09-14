@@ -434,13 +434,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         input_image = context.services.images.get_pil_image(ip_adapter.image.image_name)
 
+        if not ip_adapter_model.is_initialized():
+            # TODO(ryan): Do we need to initialize every time? How long does initialize take?
+            ip_adapter_model.initialize(unet)
+
         # TODO(ryand): With some effort, the step of running the CLIP Vision encoder could be done before any other
         # models are needed in memory. This would help to reduce peak memory utilization in low-memory environments.
         with image_encoder_model_info as image_encoder_model:
-            if not ip_adapter_model.is_initialized():
-                # TODO(ryan): Do we need to initialize every time? How long does initialize take?
-                ip_adapter_model.initialize(unet, image_encoder_model)
-
             # Get image embeddings from CLIP and ImageProjModel.
             image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
                 input_image, image_encoder_model
