@@ -273,12 +273,12 @@ class IsFullResult(BaseModel):
 # region Util
 
 
-def populate_graph(graph: Graph, batch_data_items: Iterable[NodeFieldValue]) -> Graph:
+def populate_graph(graph: Graph, node_field_values: Iterable[NodeFieldValue]) -> Graph:
     """
     Populates the given graph with the given batch data items.
     """
     graph = graph.copy(deep=True)
-    for item in batch_data_items:
+    for item in node_field_values:
         node = graph.get_node(item.node_path)
         if node is None:
             continue
@@ -287,7 +287,7 @@ def populate_graph(graph: Graph, batch_data_items: Iterable[NodeFieldValue]) -> 
     return graph
 
 
-def create_sessions(batch: Batch, maximum: int) -> list[tuple[GraphExecutionState, list[NodeFieldValue]]]:
+def create_session_nfv_tuples(batch: Batch, maximum: int) -> list[tuple[GraphExecutionState, list[NodeFieldValue]]]:
     """
     Create all graph permutations from the given batch data and graph. Returns a list of tuples
     of the form (graph, batch_data_items) where batch_data_items is the list of BatchDataItems
@@ -347,7 +347,7 @@ class ValueTuple(NamedTuple):
     session: str
     session_id: str
     batch_id: str
-    field_values: Optional[str]
+    node_field_values: Optional[str]
     priority: int
 
 
@@ -356,7 +356,7 @@ ValuesToInsert: TypeAlias = list[ValueTuple]
 
 def prepare_values_to_insert(batch: Batch, priority: int, max_new_queue_items: int) -> ValuesToInsert:
     values_to_insert: ValuesToInsert = []
-    sessions = create_sessions(batch, max_new_queue_items)
+    sessions = create_session_nfv_tuples(batch, max_new_queue_items)
     for session, field_values in sessions:
         # sessions must have unique id
         session.id = uuid_string()
