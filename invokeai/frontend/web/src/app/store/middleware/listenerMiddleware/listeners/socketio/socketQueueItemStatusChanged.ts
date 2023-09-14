@@ -31,7 +31,7 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
 
       const state = getState();
       const { batch_id, graph_execution_state_id } = action.payload.data;
-      if (state.canvas.layerState.stagingArea.batchIds.includes(batch_id)) {
+      if (state.canvas.batchIds.includes(batch_id)) {
         dispatch(canvasSessionIdAdded(graph_execution_state_id));
       }
 

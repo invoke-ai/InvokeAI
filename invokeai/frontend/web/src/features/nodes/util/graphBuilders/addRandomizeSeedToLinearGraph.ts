@@ -14,6 +14,7 @@ export const addRandomizeSeedToLinearGraph = (
   graph: NonNullableGraph
 ) => {
   const { shouldRandomizeSeed } = state.generation;
+  const hasMetadataAccumulator = METADATA_ACCUMULATOR in graph.nodes;
 
   if (!shouldRandomizeSeed) {
     return;
@@ -29,10 +30,11 @@ export const addRandomizeSeedToLinearGraph = (
     source: { node_id: RANDOM_INT, field: 'value' },
     destination: { node_id: NOISE, field: 'seed' },
   });
-  graph.edges.push({
-    source: { node_id: RANDOM_INT, field: 'value' },
-    destination: { node_id: METADATA_ACCUMULATOR, field: 'seed' },
-  });
+  hasMetadataAccumulator &&
+    graph.edges.push({
+      source: { node_id: RANDOM_INT, field: 'value' },
+      destination: { node_id: METADATA_ACCUMULATOR, field: 'seed' },
+    });
   if (CANVAS_COHERENCE_NOISE in graph.nodes) {
     graph.edges.push({
       source: { node_id: RANDOM_INT, field: 'value' },

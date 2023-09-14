@@ -181,7 +181,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
       [CANVAS_COHERENCE_NOISE]: {
         type: 'noise',
-        id: NOISE,
+        id: CANVAS_COHERENCE_NOISE,
         use_cpu,
         seed: seed + 1,
         is_intermediate: true,

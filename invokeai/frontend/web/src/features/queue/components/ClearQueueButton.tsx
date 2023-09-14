@@ -9,6 +9,7 @@ import {
 } from 'services/api/endpoints/queue';
 import { listCursorChanged, listPriorityChanged } from '../store/queueSlice';
 import QueueButton from './common/QueueButton';
+import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 
 type Props = {
   asIconButton?: boolean;
@@ -20,7 +21,9 @@ const ClearQueueButton = ({ asIconButton }: Props) => {
   const dispatch = useAppDispatch();
   const { data: queueStatusData } = useGetQueueStatusQuery();
 
-  const [clearQueue] = useClearQueueMutation();
+  const [clearQueue] = useClearQueueMutation({ fixedCacheKey: 'clearQueue' });
+  const isQueueMutationInProgress = useIsQueueMutationInProgress();
+
   const handleClick = useCallback(async () => {
     try {
       await clearQueue().unwrap();
@@ -44,7 +47,7 @@ const ClearQueueButton = ({ asIconButton }: Props) => {
 
   return (
     <QueueButton
-      isDisabled={!queueStatusData?.total}
+      isDisabled={!queueStatusData?.total || isQueueMutationInProgress}
       asIconButton={asIconButton}
       label={t('queue.clear')}
       tooltip={t('queue.clearTooltip')}

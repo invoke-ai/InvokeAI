@@ -1,3 +1,5 @@
+import { useAppDispatch } from 'app/store/storeHooks';
+import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaStop } from 'react-icons/fa';
@@ -5,9 +7,8 @@ import {
   useGetQueueStatusQuery,
   useStopQueueExecutionMutation,
 } from 'services/api/endpoints/queue';
+import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import QueueButton from './common/QueueButton';
-import { addToast } from 'features/system/store/systemSlice';
-import { useAppDispatch } from 'app/store/storeHooks';
 
 type Props = {
   asIconButton?: boolean;
@@ -17,7 +18,11 @@ const StopQueueButton = ({ asIconButton }: Props) => {
   const { data: queueStatusData } = useGetQueueStatusQuery();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const [stopQueue] = useStopQueueExecutionMutation();
+  const [stopQueue] = useStopQueueExecutionMutation({
+    fixedCacheKey: 'stopQueue',
+  });
+  const isQueueMutationInProgress = useIsQueueMutationInProgress();
+
   const handleClick = useCallback(async () => {
     try {
       await stopQueue().unwrap();
@@ -42,7 +47,7 @@ const StopQueueButton = ({ asIconButton }: Props) => {
       asIconButton={asIconButton}
       label={t('queue.stop')}
       tooltip={t('queue.stopTooltip')}
-      isDisabled={!queueStatusData?.started}
+      isDisabled={!queueStatusData?.started || isQueueMutationInProgress}
       icon={<FaStop />}
       onClick={handleClick}
       colorScheme="gold"

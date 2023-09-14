@@ -349,6 +349,13 @@ export type paths = {
      */
     put: operations["cancel"];
   };
+  "/api/v1/queue/cancel_by_batch_ids": {
+    /**
+     * Cancel By Batch Ids
+     * @description Immediately cancels all queue items from the given batch ids
+     */
+    put: operations["cancel_by_batch_ids"];
+  };
   "/api/v1/queue/clear": {
     /**
      * Clear
@@ -1000,6 +1007,14 @@ export type components = {
        * @enum {string}
        */
       type: "infill_cv2";
+    };
+    /** CancelByBatchIDsResult */
+    CancelByBatchIDsResult: {
+      /**
+       * Canceled
+       * @description Number of queue items canceled
+       */
+      canceled: number;
     };
     /**
      * Canny Processor
@@ -8003,11 +8018,23 @@ export type components = {
       ui_order?: number;
     };
     /**
+     * StableDiffusion1ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    /**
      * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusion2ModelFormat
      * @description An enumeration.
@@ -8020,18 +8047,6 @@ export type components = {
      * @enum {string}
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
-    /**
-     * StableDiffusion1ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -9567,6 +9582,31 @@ export type operations = {
       200: {
         content: {
           "application/json": unknown;
+        };
+      };
+    };
+  };
+  /**
+   * Cancel By Batch Ids
+   * @description Immediately cancels all queue items from the given batch ids
+   */
+  cancel_by_batch_ids: {
+    requestBody: {
+      content: {
+        "application/json": string[];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["CancelByBatchIDsResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

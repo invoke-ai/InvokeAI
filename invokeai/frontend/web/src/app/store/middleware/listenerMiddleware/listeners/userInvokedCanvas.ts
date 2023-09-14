@@ -37,7 +37,7 @@ export const addUserInvokedCanvasListener = () => {
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
       enqueueRequested.match(action) &&
       action.payload.tabName === 'unifiedCanvas',
-    effect: async (action, { getState, dispatch, take }) => {
+    effect: async (action, { getState, dispatch }) => {
       const log = logger('session');
       const { prepend } = action.payload;
       const state = getState();
@@ -149,17 +149,16 @@ export const addUserInvokedCanvasListener = () => {
         if (!state.canvas.layerState.stagingArea.boundingBox) {
           dispatch(
             stagingAreaInitialized({
-              batchId,
               boundingBox: {
                 ...state.canvas.boundingBoxCoordinates,
                 ...state.canvas.boundingBoxDimensions,
               },
             })
           );
-        } else {
-          // Associate the session with the canvas session ID
-          dispatch(canvasBatchIdAdded(batchId));
         }
+
+        // Associate the session with the canvas session ID
+        dispatch(canvasBatchIdAdded(batchId));
 
         dispatch(
           addToast({

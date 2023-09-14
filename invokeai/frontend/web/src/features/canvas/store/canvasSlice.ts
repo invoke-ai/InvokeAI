@@ -34,8 +34,6 @@ import {
 export const initialLayerState: CanvasLayerState = {
   objects: [],
   stagingArea: {
-    batchIds: [],
-    sessionIds: [],
     images: [],
     selectedImageIndex: -1,
   },
@@ -87,6 +85,8 @@ export const initialCanvasState: CanvasState = {
   stageDimensions: { width: 0, height: 0 },
   stageScale: 1,
   tool: 'brush',
+  sessionIds: [],
+  batchIds: [],
 };
 
 export const canvasSlice = createSlice({
@@ -300,24 +300,25 @@ export const canvasSlice = createSlice({
       state.isMoveStageKeyHeld = action.payload;
     },
     canvasBatchIdAdded: (state, action: PayloadAction<string>) => {
-      state.layerState.stagingArea.batchIds.push(action.payload);
+      state.batchIds.push(action.payload);
     },
     canvasSessionIdAdded: (state, action: PayloadAction<string>) => {
-      state.layerState.stagingArea.sessionIds.push(action.payload);
+      state.sessionIds.push(action.payload);
+    },
+    canvasBatchesAndSessionsReset: (state) => {
+      state.sessionIds = [];
+      state.batchIds = [];
     },
     stagingAreaInitialized: (
       state,
       action: PayloadAction<{
-        batchId: string;
         boundingBox: IRect;
       }>
     ) => {
-      const { boundingBox, batchId } = action.payload;
+      const { boundingBox } = action.payload;
 
       state.layerState.stagingArea = {
         boundingBox,
-        batchIds: [batchId],
-        sessionIds: [],
         images: [],
         selectedImageIndex: -1,
       };
@@ -641,10 +642,7 @@ export const canvasSlice = createSlice({
         0
       );
     },
-    commitStagingAreaImage: (
-      state,
-      _action: PayloadAction<string | undefined>
-    ) => {
+    commitStagingAreaImage: (state) => {
       if (!state.layerState.stagingArea.images.length) {
         return;
       }
@@ -882,6 +880,7 @@ export const {
   canvasResized,
   canvasBatchIdAdded,
   canvasSessionIdAdded,
+  canvasBatchesAndSessionsReset,
 } = canvasSlice.actions;
 
 export default canvasSlice.reducer;

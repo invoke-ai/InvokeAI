@@ -7,7 +7,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
+import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import EnqueueButtonTooltip from './QueueButtonTooltip';
 
 const QueueBackButton = () => {
@@ -15,9 +15,8 @@ const QueueBackButton = () => {
   const { t } = useTranslation();
   const { isReady } = useIsReadyToEnqueue();
   const dispatch = useAppDispatch();
-  const [_, { isLoading }] = useEnqueueBatchMutation({
-    fixedCacheKey: 'enqueueBatch',
-  });
+  const isQueueMutationInProgress = useIsQueueMutationInProgress();
+
   const handleEnqueue = useCallback(() => {
     dispatch(clampSymmetrySteps());
     dispatch(enqueueRequested({ tabName, prepend: false }));
@@ -27,11 +26,11 @@ const QueueBackButton = () => {
     ['ctrl+enter', 'meta+enter'],
     handleEnqueue,
     {
-      enabled: () => !isLoading,
+      enabled: () => !isQueueMutationInProgress,
       preventDefault: true,
       enableOnFormTags: ['input', 'textarea', 'select'],
     },
-    [isLoading, tabName]
+    [isQueueMutationInProgress, tabName]
   );
   return (
     <IAIButton
@@ -39,7 +38,7 @@ const QueueBackButton = () => {
       colorScheme="accent"
       onClick={handleEnqueue}
       tooltip={<EnqueueButtonTooltip />}
-      isLoading={isLoading}
+      isLoading={isQueueMutationInProgress}
       flexGrow={3}
       minW={44}
     >

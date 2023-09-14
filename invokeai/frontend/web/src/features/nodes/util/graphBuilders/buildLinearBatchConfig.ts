@@ -15,9 +15,11 @@ export const prepareLinearUIBatch = (
   const { prompts } = state.dynamicPrompts;
 
   const data: BatchConfig['batch']['data'] = [];
+  const hasMetadataAccumulator = METADATA_ACCUMULATOR in graph.nodes;
 
   if (prompts.length > 1) {
-    unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_prompt');
+    hasMetadataAccumulator &&
+      unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_prompt');
 
     const zippedPrompts: components['schemas']['BatchDatum'][] = [];
     // zipped batch of prompts
@@ -27,28 +29,33 @@ export const prepareLinearUIBatch = (
       items: prompts,
     });
 
-    zippedPrompts.push({
-      node_path: METADATA_ACCUMULATOR,
-      field_name: 'positive_prompt',
-      items: prompts,
-    });
+    hasMetadataAccumulator &&
+      zippedPrompts.push({
+        node_path: METADATA_ACCUMULATOR,
+        field_name: 'positive_prompt',
+        items: prompts,
+      });
 
     if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
-      unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_style_prompt');
+      hasMetadataAccumulator &&
+        unset(graph.nodes[METADATA_ACCUMULATOR], 'positive_style_prompt');
+
       const stylePrompts = prompts.map((p) =>
         [p, positiveStylePrompt].join(' ')
       );
+
       zippedPrompts.push({
         node_path: POSITIVE_CONDITIONING,
         field_name: 'style',
         items: stylePrompts,
       });
 
-      zippedPrompts.push({
-        node_path: METADATA_ACCUMULATOR,
-        field_name: 'positive_style_prompt',
-        items: stylePrompts,
-      });
+      hasMetadataAccumulator &&
+        zippedPrompts.push({
+          node_path: METADATA_ACCUMULATOR,
+          field_name: 'positive_style_prompt',
+          items: stylePrompts,
+        });
     }
 
     data.push(zippedPrompts);

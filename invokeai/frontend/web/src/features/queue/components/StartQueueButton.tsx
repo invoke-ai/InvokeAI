@@ -7,6 +7,7 @@ import {
   useGetQueueStatusQuery,
   useStartQueueExecutionMutation,
 } from 'services/api/endpoints/queue';
+import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 import QueueButton from './common/QueueButton';
 
 type Props = {
@@ -17,7 +18,11 @@ const StartQueueButton = ({ asIconButton }: Props) => {
   const { data: queueStatusData } = useGetQueueStatusQuery();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const [startQueue] = useStartQueueExecutionMutation();
+  const [startQueue] = useStartQueueExecutionMutation({
+    fixedCacheKey: 'startQueue',
+  });
+  const isQueueMutationInProgress = useIsQueueMutationInProgress();
+
   const handleClick = useCallback(async () => {
     try {
       await startQueue().unwrap();
@@ -45,7 +50,8 @@ const StartQueueButton = ({ asIconButton }: Props) => {
       isDisabled={
         queueStatusData?.started ||
         queueStatusData?.stop_after_current ||
-        queueStatusData?.pending === 0
+        queueStatusData?.pending === 0 ||
+        isQueueMutationInProgress
       }
       icon={<FaPlay />}
       onClick={handleClick}

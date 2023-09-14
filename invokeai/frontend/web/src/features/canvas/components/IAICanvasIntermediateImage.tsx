@@ -12,7 +12,8 @@ const selector = createSelector(
   [systemSelector, canvasSelector],
   (system, canvas) => {
     const { progressImage } = system;
-    const { sessionIds, boundingBox } = canvas.layerState.stagingArea;
+    const { boundingBox } = canvas.layerState.stagingArea;
+    const { sessionIds } = canvas;
 
     return {
       boundingBox,

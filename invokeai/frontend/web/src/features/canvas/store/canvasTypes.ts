@@ -89,8 +89,6 @@ export type CanvasLayerState = {
   stagingArea: {
     images: CanvasImage[];
     selectedImageIndex: number;
-    batchIds: string[];
-    sessionIds: string[];
     boundingBox?: IRect;
   };
 };
@@ -167,6 +165,8 @@ export interface CanvasState {
   stageScale: number;
   tool: CanvasTool;
   generationMode?: GenerationMode;
+  batchIds: string[];
+  sessionIds: string[];
 }
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';

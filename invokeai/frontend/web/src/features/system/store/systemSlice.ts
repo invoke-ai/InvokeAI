@@ -5,6 +5,7 @@ import { userInvoked } from 'app/store/actions';
 import { t } from 'i18next';
 import { get, startCase, truncate, upperFirst } from 'lodash-es';
 import { LogLevelName } from 'roarr';
+import { queueApi } from 'services/api/endpoints/queue';
 import {
   isAnySessionRejected,
   sessionCanceled,
@@ -18,6 +19,7 @@ import {
   appSocketInvocationError,
   appSocketInvocationRetrievalError,
   appSocketInvocationStarted,
+  appSocketQueueStatusChanged,
   appSocketSessionRetrievalError,
 } from 'services/events/actions';
 import { ProgressImage } from 'services/events/types';
@@ -194,6 +196,12 @@ export const systemSlice = createSlice({
     },
   },
   extraReducers(builder) {
+    builder.addCase(appSocketQueueStatusChanged, (state, action) => {
+      const { started, stop_after_current } = action.payload.data;
+      if (!started && !stop_after_current) {
+        state.progressImage = null;
+      }
+    });
     /**
      * Socket Connected
      */
@@ -320,6 +328,10 @@ export const systemSlice = createSlice({
 
     // *** Matchers - must be after all cases ***
 
+    builder.addMatcher(isAnyCancelQueueItem, (state) => {
+      state.progressImage = null;
+    });
+
     /**
      * Session Invoked - REJECTED
      * Session Created - REJECTED
@@ -425,4 +437,10 @@ const isAnyServerError = isAnyOf(
   appSocketInvocationError,
   appSocketSessionRetrievalError,
   appSocketInvocationRetrievalError
+);
+
+const isAnyCancelQueueItem = isAnyOf(
+  queueApi.endpoints.cancelQueueItem.matchFulfilled,
+  queueApi.endpoints.cancelQueueExecution.matchFulfilled,
+  queueApi.endpoints.clearQueue.matchFulfilled
 );

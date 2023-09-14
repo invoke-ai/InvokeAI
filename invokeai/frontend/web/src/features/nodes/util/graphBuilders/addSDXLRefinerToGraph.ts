@@ -78,7 +78,7 @@ export const addSDXLRefinerToGraph = (
     : SDXL_MODEL_LOADER;
 
   // Construct Style Prompt
-  const { craftedPositiveStylePrompt, craftedNegativeStylePrompt } =
+  const { joinedPositiveStylePrompt, joinedNegativeStylePrompt } =
     buildSDXLStylePrompts(state, true);
 
   // Unplug SDXL Latents Generation To Latents To Image
@@ -100,13 +100,13 @@ export const addSDXLRefinerToGraph = (
   graph.nodes[SDXL_REFINER_POSITIVE_CONDITIONING] = {
     type: 'sdxl_refiner_compel_prompt',
     id: SDXL_REFINER_POSITIVE_CONDITIONING,
-    style: craftedPositiveStylePrompt,
+    style: joinedPositiveStylePrompt,
     aesthetic_score: refinerPositiveAestheticScore,
   };
   graph.nodes[SDXL_REFINER_NEGATIVE_CONDITIONING] = {
     type: 'sdxl_refiner_compel_prompt',
     id: SDXL_REFINER_NEGATIVE_CONDITIONING,
-    style: craftedNegativeStylePrompt,
+    style: joinedNegativeStylePrompt,
     aesthetic_score: refinerNegativeAestheticScore,
   };
   graph.nodes[SDXL_REFINER_DENOISE_LATENTS] = {

@@ -229,6 +229,8 @@
         "clearTooltip": "Cancel and Clear All Items",
         "clearSucceeded": "Queue Cleared",
         "clearFailed": "Problem Clearing Queue",
+        "cancelByBatchIdsSucceeded": "Batches Canceled",
+        "cancelByBatchIdsFailed": "Problem Canceling Items by Batch IDs",
         "current": "Current",
         "next": "Next",
         "status": "Status",

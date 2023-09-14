@@ -247,6 +247,22 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
     }),
+    cancelByBatchIds: build.mutation<
+      paths['/api/v1/queue/cancel_by_batch_ids']['put']['responses']['200']['content']['application/json'],
+      paths['/api/v1/queue/cancel_by_batch_ids']['put']['requestBody']['content']['application/json']
+    >({
+      query: (batch_ids) => ({
+        url: `queue/cancel_by_batch_ids`,
+        method: 'PUT',
+        body: { batch_ids },
+      }),
+      invalidatesTags: [
+        'SessionQueueStatus',
+        'CurrentSessionQueueItem',
+        'NextSessionQueueItem',
+        { type: 'SessionQueueItemDTO', id: LIST_TAG },
+      ],
+    }),
     listQueueItems: build.query<
       EntityState<components['schemas']['SessionQueueItemDTO']>,
       { cursor?: number; priority?: number } | undefined
@@ -288,6 +304,7 @@ export const queueApi = api.injectEndpoints({
 });
 
 export const {
+  useCancelByBatchIdsMutation,
   useEnqueueGraphMutation,
   useEnqueueBatchMutation,
   useCancelQueueExecutionMutation,

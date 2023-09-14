@@ -53,9 +53,7 @@ export const addInvocationCompleteEventListener = () => {
 
         // Add canvas images to the staging area
         if (
-          canvas.layerState.stagingArea.sessionIds.includes(
-            graph_execution_state_id
-          ) &&
+          canvas.sessionIds.includes(graph_execution_state_id) &&
           [CANVAS_OUTPUT].includes(data.source_node_id)
         ) {
           dispatch(addImageToStagingArea(imageDTO));

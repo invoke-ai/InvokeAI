@@ -8,6 +8,7 @@ import {
 } from 'services/api/endpoints/queue';
 import QueueButton from './common/QueueButton';
 import { addToast } from 'features/system/store/systemSlice';
+import { useIsQueueMutationInProgress } from '../hooks/useIsQueueMutationInProgress';
 
 type Props = {
   asIconButton?: boolean;
@@ -17,7 +18,11 @@ const CancelQueueButton = ({ asIconButton }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { data: queueStatusData } = useGetQueueStatusQuery();
-  const [cancelQueue] = useCancelQueueExecutionMutation();
+  const [cancelQueue] = useCancelQueueExecutionMutation({
+    fixedCacheKey: 'cancelQueue',
+  });
+  const isQueueMutationInProgress = useIsQueueMutationInProgress();
+
   const handleClick = useCallback(async () => {
     try {
       await cancelQueue().unwrap();
@@ -43,7 +48,8 @@ const CancelQueueButton = ({ asIconButton }: Props) => {
       label={t('queue.cancel')}
       tooltip={t('queue.cancelTooltip')}
       isDisabled={
-        !(queueStatusData?.started || queueStatusData?.stop_after_current)
+        !(queueStatusData?.started || queueStatusData?.stop_after_current) ||
+        isQueueMutationInProgress
       }
       icon={<FaTimes />}
       onClick={handleClick}
