@@ -229,8 +229,6 @@ class InvokeAIDiffuserComponent:
         total_step_count: int,
         **kwargs,
     ):
-        # TODO(ryand): Raise here if both cross attention control and ip-adapter are enabled?
-
         cross_attention_control_types_to_do = []
         context: Context = self.cross_attention_control_context
         if self.cross_attention_control_context is not None:
