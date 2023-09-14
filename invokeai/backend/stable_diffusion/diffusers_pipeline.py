@@ -423,9 +423,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         elif ip_adapter_data is not None:
             # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
             # As it is now, the IP-Adapter will silently be skipped.
-
-            ip_adapter_data.ip_adapter_model.set_scale(ip_adapter_data.weight)
-            attn_ctx = ip_adapter_data.ip_adapter_model.apply_ip_adapter_attention()
+            attn_ctx = ip_adapter_data.ip_adapter_model.apply_ip_adapter_attention(
+                unet=self.invokeai_diffuser.model, scale=ip_adapter_data.weight
+            )
         else:
             attn_ctx = nullcontext()
 
