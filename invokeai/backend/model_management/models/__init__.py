@@ -71,6 +71,17 @@ MODEL_CLASSES = {
         ModelType.IPAdapter: IPAdapterModel,
         ModelType.CLIPVision: CLIPVisionModel,
     },
+    BaseModelType.Any: {
+        ModelType.CLIPVision: CLIPVisionModel,
+        # The following model types are not expected to be used with BaseModelType.Any.
+        ModelType.ONNX: ONNXStableDiffusion2Model,
+        ModelType.Main: StableDiffusion2Model,
+        ModelType.Vae: VaeModel,
+        ModelType.Lora: LoRAModel,
+        ModelType.ControlNet: ControlNetModel,
+        ModelType.TextualInversion: TextualInversionModel,
+        ModelType.IPAdapter: IPAdapterModel,
+    },
     # BaseModelType.Kandinsky2_1: {
     #    ModelType.Main: Kandinsky2_1Model,
     #    ModelType.MoVQ: MoVQModel,

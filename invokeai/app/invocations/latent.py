@@ -420,7 +420,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # TODO(ryand): Get this model_name from the IPAdapterField.
             model_name="ip_adapter_clip_vision",
             model_type=ModelType.CLIPVision,
-            base_model=ip_adapter.ip_adapter_model.base_model,
+            base_model=BaseModelType.Any,
             context=context,
         )
 

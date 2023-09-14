@@ -534,7 +534,7 @@ class IPAdapterFolderProbe(FolderProbeBase):
 
 class CLIPVisionFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
-        raise NotImplementedError()
+        return BaseModelType.Any
 
 
 ############## register probe classes ######

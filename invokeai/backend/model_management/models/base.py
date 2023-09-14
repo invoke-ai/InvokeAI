@@ -47,6 +47,7 @@ class ModelNotFoundException(Exception):
 
 
 class BaseModelType(str, Enum):
+    Any = "any"  # For models that are not associated with any particular base model.
     StableDiffusion1 = "sd-1"
     StableDiffusion2 = "sd-2"
     StableDiffusionXL = "sdxl"
