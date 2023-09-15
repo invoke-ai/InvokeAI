@@ -94,9 +94,6 @@ const ParametersPanelWrapper = memo((props: PropsWithChildren) => {
           flexDir: 'column',
         }}
       >
-        <Flex h={2} w="full">
-          <ProgressBar />
-        </Flex>
         <Flex gap={2} w="full">
           <ButtonGroup isAttached flexGrow={2}>
             <QueueBackButton />
@@ -108,6 +105,9 @@ const ParametersPanelWrapper = memo((props: PropsWithChildren) => {
             <CancelQueueButton asIconButton />
             <ClearQueueButton asIconButton />
           </ButtonGroup>
+        </Flex>
+        <Flex h={2} w="full">
+          <ProgressBar />
         </Flex>
         <QueueCounts />
       </Flex>
@@ -182,7 +182,7 @@ const QueueCounts = memo(() => {
   }
 
   const { requested, predicted, max_queue_size } = counts;
-  const { pending } = queueStatus;
+  const { pending, in_progress } = queueStatus;
   return (
     <Flex>
       <Tooltip
@@ -214,8 +214,8 @@ const QueueCounts = memo(() => {
         fontStyle="oblique 10deg"
         opacity={0.7}
       >
-        {pending > 0
-          ? t('queue.queuePending', { pending })
+        {pending + in_progress > 0
+          ? t('queue.queuedCount', { item_count: pending + in_progress })
           : t('queue.queueEmpty')}
       </Text>
     </Flex>

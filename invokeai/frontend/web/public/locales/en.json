@@ -204,7 +204,7 @@
         "queueBack": "Add to Queue",
         "queueCountPrediction": "Add {{predicted}} to Queue",
         "queueMaxExceeded": "Max of {{max_queue_size}} exceeded, would skip {{skip}}",
-        "queuePending": "{{pending}} Pending",
+        "queuedCount": "{{item_count}} Queued",
         "queueTotal": "{{total}} Total",
         "queueEmpty": "Queue Empty",
         "enqueueing": "Queueing Sessions...",

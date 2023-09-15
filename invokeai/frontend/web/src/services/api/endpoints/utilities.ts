@@ -5,7 +5,7 @@ export const utilitiesApi = api.injectEndpoints({
   endpoints: (build) => ({
     dynamicPrompts: build.query<
       components['schemas']['DynamicPromptsResponse'],
-      { prompt: string; max_prompts: number; combinatorial: boolean }
+      { prompt: string; max_prompts: number }
     >({
       query: (arg) => ({
         url: 'utilities/dynamicprompts',

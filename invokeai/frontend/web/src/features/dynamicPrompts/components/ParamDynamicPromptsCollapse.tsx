@@ -7,7 +7,6 @@ import IAICollapse from 'common/components/IAICollapse';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
-import ParamDynamicPromptsCombinatorial from './ParamDynamicPromptsCombinatorial';
 import ParamDynamicPromptsMaxPrompts from './ParamDynamicPromptsMaxPrompts';
 import ParamDynamicPromptsPreview from './ParamDynamicPromptsPreview';
 
@@ -17,7 +16,7 @@ const selector = createSelector(
     const { prompts } = state.dynamicPrompts;
 
     return {
-      activeLabel: `${prompts.length} Prompt${prompts.length > 1 ? 's' : ''}`,
+      activeLabel: `${prompts.length} Prompt${prompts.length !== 1 ? 's' : ''}`,
     };
   },
   defaultSelectorOptions
@@ -39,7 +38,6 @@ const ParamDynamicPromptsCollapse = () => {
       <Flex sx={{ gap: 2, flexDir: 'column' }}>
         <ParamDynamicPromptsPreview />
         <ParamDynamicPromptsMaxPrompts />
-        <ParamDynamicPromptsCombinatorial />
       </Flex>
     </IAICollapse>
   );

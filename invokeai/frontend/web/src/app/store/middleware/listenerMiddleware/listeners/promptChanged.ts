@@ -39,7 +39,7 @@ export const addDynamicPromptsListener = () => {
       }
 
       const { positivePrompt } = state.generation;
-      const { maxPrompts, combinatorial } = state.dynamicPrompts;
+      const { maxPrompts } = state.dynamicPrompts;
 
       dispatch(isLoadingChanged(true));
 
@@ -48,7 +48,6 @@ export const addDynamicPromptsListener = () => {
           utilitiesApi.endpoints.dynamicPrompts.initiate({
             prompt: positivePrompt,
             max_prompts: maxPrompts,
-            combinatorial: combinatorial,
           })
         );
 
