@@ -5,6 +5,7 @@ import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlic
 import { addToast } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
+import { t } from 'i18next';
 
 export const addCanvasMaskToControlNetListener = () => {
   startAppListening({
@@ -31,8 +32,8 @@ export const addCanvasMaskToControlNetListener = () => {
         log.error('Problem getting mask layer blob');
         dispatch(
           addToast({
-            title: 'Problem Importing Mask',
-            description: 'Unable to export mask',
+            title: t('toast.problemImportingMask'),
+            description: t('toast.problemImportingMaskDesc'),
             status: 'error',
           })
         );
@@ -52,7 +53,7 @@ export const addCanvasMaskToControlNetListener = () => {
           crop_visible: true,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: 'Mask Sent to ControlNet & Assets' },
+            toastOptions: { title: t('toast.maskSentControlnetAssets') },
           },
         })
       ).unwrap();

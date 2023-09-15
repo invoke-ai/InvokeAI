@@ -7,6 +7,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { startAppListening } from '..';
+import { t } from 'i18next';
 
 export const addWorkflowLoadedListener = () => {
   startAppListening({
@@ -27,7 +28,7 @@ export const addWorkflowLoadedListener = () => {
         dispatch(
           addToast(
             makeToast({
-              title: 'Workflow Loaded',
+              title: t('toast.workflowLoaded'),
               status: 'success',
             })
           )
@@ -36,7 +37,7 @@ export const addWorkflowLoadedListener = () => {
         dispatch(
           addToast(
             makeToast({
-              title: 'Workflow Loaded with Warnings',
+              title: t('toast.loadedWithWarnings'),
               status: 'warning',
             })
           )

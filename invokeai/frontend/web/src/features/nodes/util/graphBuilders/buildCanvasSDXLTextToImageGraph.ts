@@ -29,7 +29,6 @@ import {
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
-import i18n from 'i18next';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
@@ -72,8 +71,8 @@ export const buildCanvasSDXLTextToImageGraph = (
     state.sdxl;
 
   if (!model) {
-    log.error(i18n.t('nodes.noModelFoundState'));
-    throw new Error(i18n.t('nodes.noModelFoundState'));
+    log.error('No model found in state');
+    throw new Error('No model found in state');
   }
 
   const use_cpu = shouldUseNoiseSettings

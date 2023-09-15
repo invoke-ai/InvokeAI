@@ -46,7 +46,6 @@ import {
   SEAMLESS,
 } from './constants';
 import { craftSDXLStylePrompt } from './helpers/craftSDXLStylePrompt';
-import i18n from 'i18next';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -87,8 +86,8 @@ export const buildCanvasSDXLInpaintGraph = (
   } = state.sdxl;
 
   if (!model) {
-    log.error(i18n.t('nodes.noModelFoundState'));
-    throw new Error(i18n.t('nodes.noModelFoundState'));
+    log.error('No model found in state');
+    throw new Error('No model found in state');
   }
 
   // The bounding box determines width and height, not the width and height params
