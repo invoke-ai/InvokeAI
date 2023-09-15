@@ -38,7 +38,6 @@ from .baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
-    UIType,
     invocation,
     invocation_output,
 )
