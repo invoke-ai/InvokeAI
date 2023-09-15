@@ -16,7 +16,7 @@ from .config import (  # noqa F401
 )
 from .lora import ONNXModelPatcher, ModelPatcher
 from .loader import ModelLoader, ModelInfo  # noqa F401
-from .install import ModelInstall, DownloadJobBase  # noqa F401
+from .install import ModelInstall, ModelInstallJob  # noqa F401
 from .probe import ModelProbe, InvalidModelException  # noqa F401
 from .storage import (
     UnknownModelException,

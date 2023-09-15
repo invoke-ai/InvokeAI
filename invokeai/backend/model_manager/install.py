@@ -53,7 +53,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from shutil import rmtree
-from typing import Optional, List, Union, Dict, Set
+from typing import Optional, List, Union, Dict, Set, Any
 from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -79,8 +79,8 @@ class ModelInstallJob(DownloadJobBase):
     model_key: Optional[str] = Field(
         description="After model installation, this field will hold its primary key", default=None
     )
-    probe_info: Optional[ModelProbeInfo] = Field(
-        description="If provided, information here will be used instead of probing the model.",
+    probe_override: Optional[Dict[str, Any]] = Field(
+        description="Keys in this dict will override like-named attributes in the automatic probe info",
         default=None,
     )
 
@@ -316,9 +316,12 @@ class ModelInstall(ModelInstallBase):
         """Return the queue."""
         return self._download_queue
 
-    def register_path(self, model_path: Union[Path, str], info: Optional[ModelProbeInfo] = None) -> str:  # noqa D102
+    def register_path(self,
+                      model_path: Union[Path, str],
+                      overrides: Optional[Dict[str, Any]] = None
+    ) -> str:  # noqa D102
         model_path = Path(model_path)
-        info: ModelProbeInfo = info or ModelProbe.probe(model_path)
+        info: ModelProbeInfo = self._probe_model(model_path, overrides)
         return self._register(model_path, info)
 
     def _register(self, model_path: Path, info: ModelProbeInfo) -> str:
@@ -351,12 +354,13 @@ class ModelInstall(ModelInstallBase):
         return key
 
     def install_path(
-        self,
-        model_path: Union[Path, str],
-        info: Optional[ModelProbeInfo] = None,
+            self,
+            model_path: Union[Path, str],
+            overrides: Optional[Dict[str, Any]] = None,
     ) -> str:  # noqa D102
         model_path = Path(model_path)
-        info: ModelProbeInfo = info or ModelProbe.probe(model_path)
+        info: ModelProbeInfo = self._probe_model(model_path, overrides)
+                
         dest_path = self._config.models_path / info.base_type.value / info.model_type.value / model_path.name
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -371,6 +375,16 @@ class ModelInstall(ModelInstallBase):
             info,
         )
 
+    def _probe_model(self,
+                     model_path: Union[Path, str],
+                     overrides: Optional[Dict[str,Any]] = None
+    ) -> ModelProbeInfo:
+        info: ModelProbeInfo = ModelProbe.probe(model_path)
+        if overrides:  # used to override probe fields
+            for key, value in overrides.items():
+                setattr(info, key, value) # may generate a pydantic validation error
+        return info
+
     def unregister(self, key: str):  # noqa D102
         self._store.del_model(key)
 
@@ -380,12 +394,12 @@ class ModelInstall(ModelInstallBase):
         self.unregister(key)
 
     def install(
-        self,
-        source: Union[str, Path, AnyHttpUrl],
-        info: Optional[ModelProbeInfo] = None,
-        inplace: bool = True,
-        variant: Optional[str] = None,
-        access_token: Optional[str] = None,
+            self,
+            source: Union[str, Path, AnyHttpUrl],
+            inplace: bool = True,
+            variant: Optional[str] = None,
+            probe_override: Optional[Dict[str, Any]] = None,
+            access_token: Optional[str] = None,
     ) -> DownloadJobBase:  # noqa D102
         queue = self._download_queue
 
@@ -395,8 +409,8 @@ class ModelInstall(ModelInstallBase):
             if inplace and Path(source).exists()
             else self._complete_installation_handler
         )
+        job.probe_override = probe_override
         job.add_event_handler(handler)
-        job.probe_info = info
 
         self._async_installs[source] = None
         queue.submit_download_job(job, True)
@@ -405,7 +419,7 @@ class ModelInstall(ModelInstallBase):
     def _complete_installation_handler(self, job: DownloadJobBase):
         if job.status == "completed":
             self._logger.info(f"{job.source}: Download finished with status {job.status}. Installing.")
-            model_id = self.install_path(job.destination, job.probe_info)
+            model_id = self.install_path(job.destination, job.probe_override)
             info = self._store.get_model(model_id)
             info.source = str(job.source)
             metadata: ModelSourceMetadata = job.metadata
@@ -429,7 +443,7 @@ class ModelInstall(ModelInstallBase):
     def _complete_registration_handler(self, job: DownloadJobBase):
         if job.status == "completed":
             self._logger.info(f"{job.source}: Installing in place.")
-            model_id = self.register_path(job.destination, job.probe_info)
+            model_id = self.register_path(job.destination, job.probe_override)
             info = self._store.get_model(model_id)
             info.source = str(job.source)
             info.description = f"Imported model {info.name}"

@@ -25,8 +25,6 @@ from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsSto
 from ..services.model_manager_service import ModelManagerService
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
-from ..services.model_manager_service import ModelManagerService
-from ..services.download_manager import DownloadQueueService
 from ..services.invocation_stats import InvocationStatsService
 from .events import FastAPIEventService
 
@@ -128,7 +126,6 @@ class ApiDependencies:
             processor=DefaultInvocationProcessor(),
             configuration=config,
             performance_statistics=InvocationStatsService(graph_execution_manager),
-            download_manager=DownloadQueueService(event_bus=events),
             logger=logger,
         )
 

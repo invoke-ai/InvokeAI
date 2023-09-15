@@ -136,6 +136,11 @@ class ModelConfigBase(BaseModel):
             v = list(v)
         return v
 
+    def update(self, attributes: dict):
+        """Update the object with fields in dict."""
+        for key, value in attributes.items():
+            setattr(self, key, value)  # may raise a validation error
+
 
 class CheckpointConfig(ModelConfigBase):
     """Model config for checkpoint-style models."""

@@ -329,14 +329,14 @@ class DownloadQueue(DownloadQueueBase):
             self._dones += 1
             self._queue.task_done()
 
-    def _fetch_metadata(self, job: DownloadJobBase) -> Tuple[AnyHttpUrl, ModelSourceMetadata]:
+    def _get_metadata_and_url(self, job: DownloadJobBase) -> AnyHttpUrl:
         """
         Fetch metadata from certain well-known URLs.
 
         The metadata will be stashed in job.metadata, if found
         Return the download URL.
         """
-        metadata = ModelSourceMetadata()
+        metadata = job.metadata
         url = job.source
         metadata_url = url
         try:
@@ -344,12 +344,14 @@ class DownloadQueue(DownloadQueueBase):
             if match := re.match(CIVITAI_MODEL_DOWNLOAD + r"(\d+)", metadata_url):
                 version = match.group(1)
                 resp = self._requests.get(CIVITAI_VERSIONS_ENDPOINT + version).json()
-                metadata.thumbnail_url = resp["images"][0]["url"]
-                metadata.description = (
-                    f"Trigger terms: {(', ').join(resp['trainedWords'])}"
-                    if resp["trainedWords"]
-                    else resp["description"]
-                )
+                metadata.thumbnail_url = metadata.thumbnail_url \
+                    or resp["images"][0]["url"]
+                metadata.description = metadata.description \
+                    or (
+                        f"Trigger terms: {(', ').join(resp['trainedWords'])}"
+                        if resp["trainedWords"]
+                        else resp["description"]
+                    )
                 metadata_url = CIVITAI_MODEL_PAGE + str(resp["modelId"])
 
             # a Civitai model page
@@ -360,21 +362,22 @@ class DownloadQueue(DownloadQueueBase):
                 # note that we munge the URL here to get the download URL of the first model
                 url = resp["modelVersions"][0]["downloadUrl"]
 
-                metadata.author = resp["creator"]["username"]
-                metadata.tags = resp["tags"]
-                metadata.thumbnail_url = resp["modelVersions"][0]["images"][0]["url"]
-                metadata.license = f"allowCommercialUse={resp['allowCommercialUse']}; allowDerivatives={resp['allowDerivatives']}; allowNoCredit={resp['allowNoCredit']}"
+                metadata.author = metadata.author or resp["creator"]["username"]
+                metadata.tags = metadata.tags or resp["tags"]
+                metadata.thumbnail_url = metadata.thumbnail_url \
+                    or resp["modelVersions"][0]["images"][0]["url"]
+                metadata.license = metadata.license \
+                    or f"allowCommercialUse={resp['allowCommercialUse']}; allowDerivatives={resp['allowDerivatives']}; allowNoCredit={resp['allowNoCredit']}"
         except (HTTPError, KeyError, TypeError, JSONDecodeError) as excp:
             self._logger.warn(excp)
 
-        # update metadata and return the download url
-        return url, metadata
+        # return the download url
+        return url
 
     def _download_with_resume(self, job: DownloadJobBase):
         """Do the actual download."""
         try:
-            url, metadata = self._fetch_metadata(job)
-            job.metadata = metadata
+            url = self._get_metadata_and_url(job)
 
             header = {"Authorization": f"Bearer {job.access_token}"} if job.access_token else {}
             open_mode = "wb"
@@ -602,7 +605,6 @@ class DownloadQueue(DownloadQueueBase):
         """Call when the source is a Path or pathlike object."""
         source = Path(job.source).resolve()
         destination = Path(job.destination).resolve()
-        job.metadata = ModelSourceMetadata()
         try:
             if source != destination:
                 shutil.move(source, destination)

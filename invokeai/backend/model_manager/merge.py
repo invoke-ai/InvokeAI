@@ -124,17 +124,26 @@ class ModelMerger(object):
         dump_path = (dump_path / merged_model_name).as_posix()
 
         merged_pipe.save_pretrained(dump_path, safe_serialization=True)
-        attributes = dict(
-            path=dump_path,
-            description=f"Merge of models {', '.join(model_names)}",
-            model_format="diffusers",
-            variant=ModelVariantType.Normal.value,
-            vae=vae,
-        )
-        return self.manager.add_model(
-            merged_model_name,
-            base_model=base_model,
+
+        # register model and get its unique key
+        info = ModelProbeInfo(
             model_type=ModelType.Main,
-            model_attributes=attributes,
-            clobber=True,
+            base_type=base_model,
+            format="diffusers",
         )
+        key = self.manager.installer.register_path(
+            model_path=dump_path,
+            info=info,
+        )
+
+        # update model's config
+        model_config = self.manager.store.get_model(key)
+        model_config.update(
+            dict(
+                name=merged_model_name,
+                description=f"Merge of models {', '.join(model_names)}",
+                vae=vae,
+            )
+        )
+        self.manager.store.update_model(key, model_config)
+        return model_config

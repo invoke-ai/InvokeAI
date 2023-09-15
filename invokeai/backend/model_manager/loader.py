@@ -14,7 +14,7 @@ from invokeai.backend.util import choose_precision, choose_torch_device, InvokeA
 from .config import BaseModelType, ModelType, SubModelType, ModelConfigBase
 from .install import ModelInstallBase, ModelInstall
 from .storage import ModelConfigStore, get_config_store
-from .cache import ModelCache, ModelLocker
+from .cache import ModelCache, ModelLocker, CacheStats
 from .models import InvalidModelException, ModelBase, MODEL_CLASSES
 
 
@@ -69,6 +69,34 @@ class ModelLoaderBase(ABC):
         """Return the ModelInstallBase object that supports this loader."""
         pass
 
+    @property
+    @abstractmethod
+    def logger(self) -> InvokeAILogger:
+        """Return the current logger."""
+        pass
+
+
+    @abstractmethod
+    def collect_cache_stats(
+            self,
+            cache_stats: CacheStats
+    ):
+        """Replace cache statistics."""
+    pass
+
+    @property
+    @abstractmethod
+    def precision(self) -> str:
+        """Return 'float32' or 'float16'."""
+        pass
+
+    @abstractmethod
+    def sync_to_config(self):
+        """
+        Reinitialize the store to sync in-memory and in-disk
+        versions.
+        """
+        pass
 
 class ModelLoader(ModelLoaderBase):
     """Implementation of ModelLoaderBase."""
@@ -79,6 +107,7 @@ class ModelLoader(ModelLoaderBase):
     _cache: ModelCache
     _logger: InvokeAILogger
     _cache_keys: dict
+    _models_file: Path
 
     def __init__(
         self,
@@ -102,6 +131,7 @@ class ModelLoader(ModelLoaderBase):
         self._logger = InvokeAILogger.getLogger()
         self._installer = ModelInstall(store=self._store, logger=self._logger, config=self._app_config)
         self._cache_keys = dict()
+        self._models_file = models_file
         device = torch.device(choose_torch_device())
         device_name = torch.cuda.get_device_name() if device == torch.device("cuda") else ""
         precision = choose_precision(device) if config.precision == "auto" else config.precision
@@ -131,9 +161,19 @@ class ModelLoader(ModelLoaderBase):
         return self._store
 
     @property
+    def precision(self) -> str:
+        """Return 'float32' or 'float16'."""
+        return self._cache.precision
+
+    @property
     def installer(self) -> ModelInstallBase:
         """Return the ModelInstallBase instance used by this class."""
         return self._installer
+
+    @property
+    def logger(self) -> InvokeAILogger:
+        """Return the current logger."""
+        return self._logger
 
     def get_model(self, key: str, submodel_type: Optional[SubModelType] = None) -> ModelInfo:
         """
@@ -188,6 +228,12 @@ class ModelLoader(ModelLoaderBase):
             _cache=self._cache,
         )
 
+    def collect_cache_stats(
+            self,
+            cache_stats: CacheStats
+    ):
+        self._cache.stats = cache_stats
+
     def _get_implementation(self, base_model: BaseModelType, model_type: ModelType) -> type[ModelBase]:
         """Get the concrete implementation class for a specific model type."""
         model_class = MODEL_CLASSES[base_model][model_type]
@@ -219,6 +265,10 @@ class ModelLoader(ModelLoaderBase):
 
         model_path = self._resolve_model_path(model_path)
         return model_path, is_submodel_override
+
+    def sync_to_config(self):
+        self._store = get_config_store(self._models_file)
+        self._scan_models_directory()
 
     def _scan_models_directory(self):
         defunct_models = set()

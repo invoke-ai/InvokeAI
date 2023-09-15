@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from invokeai.app.services.invocation_queue import InvocationQueueABC
     from invokeai.app.services.invocation_stats import InvocationStatsServiceBase
     from invokeai.app.services.invoker import InvocationProcessorABC
-    from invokeai.app.services.download_manager import DownloadQueueServiceBase
     from invokeai.app.services.item_storage import ItemStorageABC
     from invokeai.app.services.latent_storage import LatentsStorageBase
     from invokeai.app.services.model_manager_service import ModelManagerServiceBase
@@ -36,7 +35,6 @@ class InvocationServices:
     model_manager: "ModelManagerServiceBase"
     processor: "InvocationProcessorABC"
     performance_statistics: "InvocationStatsServiceBase"
-    download_manager: Optional["DownloadQueueServiceBase"]
     queue: "InvocationQueueABC"
 
     def __init__(
@@ -54,7 +52,6 @@ class InvocationServices:
         processor: "InvocationProcessorABC",
         performance_statistics: "InvocationStatsServiceBase",
         queue: "InvocationQueueABC",
-        download_manager: Optional["DownloadQueueServiceBase"] = None,  # optional for now pending design decisions
     ):
         self.board_images = board_images
         self.boards = boards
@@ -67,7 +64,6 @@ class InvocationServices:
         self.latents = latents
         self.logger = logger
         self.model_manager = model_manager
-        self.download_manager = download_manager
         self.processor = processor
         self.performance_statistics = performance_statistics
         self.queue = queue
