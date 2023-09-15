@@ -328,6 +328,7 @@ export const useRecallParameters = () => {
       }
 
       if (!loraModels || !loraModels.entities) {
+        parameterNotSetToast();
         return;
       }
 
@@ -340,14 +341,16 @@ export const useRecallParameters = () => {
       });
 
       if (!matchingId) {
-return;
-}
+        parameterNotSetToast();
+        return;
+      }
 
       const fullLoRA = loraModels.entities[matchingId];
 
       if (!fullLoRA) {
-return;
-}
+        parameterNotSetToast();
+        return;
+      }
 
       dispatch(loraRecalled({ ...fullLoRA, weight: lora.weight }));
 
