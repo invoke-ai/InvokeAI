@@ -147,7 +147,7 @@ def custom_openapi():
         invoker_schema["output"] = outputs_ref
         invoker_schema["class"] = "invocation"
 
-    from invokeai.backend.model_management.models import get_model_config_enums
+    from invokeai.backend.model_manager.models import get_model_config_enums
 
     for model_config_format_enum in set(get_model_config_enums()):
         name = model_config_format_enum.__qualname__

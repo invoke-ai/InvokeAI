@@ -28,24 +28,23 @@ from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.models.exceptions import CanceledException
 from .config import InvokeAIAppConfig
+from .events import EventServiceBase
 
 if TYPE_CHECKING:
     from ..invocations.baseinvocation import InvocationContext
 
 
 class ModelManagerServiceBase(ABC):
-    """Responsible for managing models on disk and in memory"""
+    """Responsible for managing models on disk and in memory."""
 
     @abstractmethod
-    def __init__(
-        self,
-        config: InvokeAIAppConfig,
-    ):
+    def __init__(self, config: InvokeAIAppConfig, event_bus: Optional[EventServiceBase] = None):
         """
-        Initialize with the path to the models.yaml config file.
-        Optional parameters are the torch device type, precision, max_models,
-        and sequential_offload boolean. Note that the default device
-        type and precision are set up for a CUDA system running at half precision.
+        Initialize a ModelManagerService.
+
+        :param config: InvokeAIAppConfig object
+        :param event_bus: Optional EventServiceBase object. If provided,
+        installation and download events will be sent to the event bus.
         """
         pass
 
@@ -102,6 +101,7 @@ class ModelManagerServiceBase(ABC):
     def list_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -> ModelConfigBase:
         """
         Return information about the model using the same format as list_models().
+
         If there are more than one model that match, raises a DuplicateModelException.
         If no model matches, raises an UnknownModelException
         """
@@ -115,9 +115,7 @@ class ModelManagerServiceBase(ABC):
         return model_configs[0]
 
     def all_models(self) -> List[ModelConfigBase]:
-        """
-        Returns a list of all the models.
-        """
+        """Return a list of all the models."""
         return self.list_models()
 
     @abstractmethod
@@ -125,8 +123,9 @@ class ModelManagerServiceBase(ABC):
         self, model_path: Path, probe_overrides: Optional[Dict[str, Any]] = None, wait: bool = False
     ) -> ModelInstallJob:
         """
-        Add a model using its path, with a dictionary of attributes. Will fail with an
-        assertion error if the name already exists.
+        Add a model using its path, with a dictionary of attributes.
+
+        Will fail with an assertion error if the name already exists.
         """
         pass
 
@@ -167,9 +166,7 @@ class ModelManagerServiceBase(ABC):
 
     @abstractmethod
     def list_checkpoint_configs(self) -> List[Path]:
-        """
-        List the checkpoint config paths from ROOT/configs/stable-diffusion.
-        """
+        """List the checkpoint config paths from ROOT/configs/stable-diffusion."""
         pass
 
     @abstractmethod
@@ -248,6 +245,8 @@ class ModelManagerServiceBase(ABC):
     @abstractmethod
     def sync_to_config(self):
         """
+        Synchronize the in-memory models with on-disk.
+
         Re-read models.yaml, rescan the models directory, and reimport models
         in the autoimport directories. Call after making changes outside the
         model manager API.
@@ -256,29 +255,57 @@ class ModelManagerServiceBase(ABC):
 
     @abstractmethod
     def collect_cache_stats(self, cache_stats: CacheStats):
+        """Reset model cache statistics for graph with graph_id."""
+        pass
+
+    @abstractmethod
+    def cancel_job(self, job: ModelInstallJob):
+        """Cancel this job."""
+        pass
+
+    @abstractmethod
+    def pause_job(self, job: ModelInstallJob):
+        """Pause this job."""
+        pass
+
+    @abstractmethod
+    def start_job(self, job: ModelInstallJob):
+        """(re)start this job."""
+        pass
+
+    @abstractmethod
+    def change_priority(self, job: ModelInstallJob, delta: int):
         """
-        Reset model cache statistics for graph with graph_id.
+        Raise or lower the priority of the job.
+
+        :param job: Job to  apply change to
+        :param delta: Value to increment or decrement priority.
+
+        Lower values are higher priority.  The default starting value is 10.
+        Thus to make my_job a really high priority job:
+           manager.change_priority(my_job, -10).
         """
         pass
 
 
 # implementation
 class ModelManagerService(ModelManagerServiceBase):
-    """Responsible for managing models on disk and in memory"""
+    """Responsible for managing models on disk and in memory."""
 
     _loader: ModelLoader = Field(description="InvokeAIAppConfig object for the current process")
+    _event_bus: EventServiceBase = Field(description="an event bus to send install events to", default=None)
 
-    def __init__(
-        self,
-        config: InvokeAIAppConfig,
-    ):
+    def __init__(self, config: InvokeAIAppConfig, event_bus: Optional[EventServiceBase] = None):
         """
-        Initialize with the path to the models.yaml config file.
-        Optional parameters are the torch device type, precision, max_models,
-        and sequential_offload boolean. Note that the default device
-        type and precision are set up for a CUDA system running at half precision.
+        Initialize a ModelManagerService.
+
+        :param config: InvokeAIAppConfig object
+        :param event_bus: Optional EventServiceBase object. If provided,
+        installation and download events will be sent to the event bus.
         """
-        self._loader = ModelLoader(config)
+        self._event_bus = event_bus
+        handlers = [self._event_bus.emit_model_event] if self._event_bus else None
+        self._loader = ModelLoader(config, event_handlers=handlers)
 
     def get_model(
         self,
@@ -287,10 +314,10 @@ class ModelManagerService(ModelManagerServiceBase):
         context: Optional[InvocationContext] = None,
     ) -> ModelInfo:
         """
-        Retrieve the indicated model. submodel can be used to get a
-        part (such as the vae) of a diffusers mode.
-        """
+        Retrieve the indicated model.
 
+        The submodel is required when fetching a main model.
+        """
         model_info: ModelInfo = self._loader.get_model(key, submodel_type)
 
         # we can emit model loading events if we are executing with access to the invocation context
@@ -309,6 +336,8 @@ class ModelManagerService(ModelManagerServiceBase):
         key: str,
     ) -> bool:
         """
+        Verify that a model with the given key exists.
+
         Given a model key, returns True if it is a valid
         identifier.
         """
@@ -316,7 +345,9 @@ class ModelManagerService(ModelManagerServiceBase):
 
     def model_info(self, key: str) -> ModelConfigBase:
         """
-        Given a model name returns a dict-like (OmegaConf) object describing it.
+        Return configuration information about a model.
+
+        Given a model key returns the ModelConfigBase describing it.
         """
         return self._loader.store.get_model(key)
 
@@ -332,12 +363,8 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         Return a ModelConfigBase object for each model in the database.
         """
-        return self._loader.store.search_by_name(model_name, base_model, model_type)
-
-        """
-        Return information about the model using the same format as list_models()
-        """
-        return self.mgr.list_model(model_name=model_name, base_model=base_model, model_type=model_type)
+        self.logger.warning(f"list_model(model_type={model_type})")
+        return self._loader.store.search_by_name(model_name=model_name, base_model=base_model, model_type=model_type)
 
     def add_model(
         self, model_path: Path, model_attributes: Optional[dict] = None, wait: bool = False
@@ -438,9 +465,7 @@ class ModelManagerService(ModelManagerServiceBase):
     def _emit_load_event(
         self,
         context,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
+        model_key: str,
         submodel: Optional[SubModelType] = None,
         model_info: Optional[ModelInfo] = None,
     ):
@@ -450,18 +475,14 @@ class ModelManagerService(ModelManagerServiceBase):
         if model_info:
             context.services.events.emit_model_load_completed(
                 graph_execution_state_id=context.graph_execution_state_id,
-                model_name=model_name,
-                base_model=base_model,
-                model_type=model_type,
+                model_key=model_key,
                 submodel=submodel,
                 model_info=model_info,
             )
         else:
             context.services.events.emit_model_load_started(
                 graph_execution_state_id=context.graph_execution_state_id,
-                model_name=model_name,
-                base_model=base_model,
-                model_type=model_type,
+                model_key=model_key,
                 submodel=submodel,
             )
 
@@ -488,7 +509,7 @@ class ModelManagerService(ModelManagerServiceBase):
         :param interp: Interpolation method. None (default)
         :param merge_dest_directory: Save the merged model to the designated directory (with 'merged_model_name' appended)
         """
-        merger = ModelMerger(self.mgr)
+        merger = ModelMerger(self._loader)
         try:
             self.logger.error("ModelMerger needs to be rewritten.")
             result = merger.merge_diffusion_models_and_save(
@@ -506,11 +527,16 @@ class ModelManagerService(ModelManagerServiceBase):
     def search_for_models(self, directory: Path) -> List[Path]:
         """
         Return list of all models found in the designated directory.
+
+        :param directory: Path to the directory to recursively search.
+        returns a list of model paths
         """
         return ModelSearch().search(directory)
 
     def sync_to_config(self):
         """
+        Synchronize the model manager to the database.
+
         Re-read models.yaml, rescan the models directory, and reimport models
         in the autoimport directories. Call after making changes outside the
         model manager API.
@@ -518,10 +544,8 @@ class ModelManagerService(ModelManagerServiceBase):
         return self._loader.sync_to_config()
 
     def list_checkpoint_configs(self) -> List[Path]:
-        """
-        List the checkpoint config paths from ROOT/configs/stable-diffusion.
-        """
-        config = self.mgr.app_config
+        """List the checkpoint config paths from ROOT/configs/stable-diffusion."""
+        config = self._loader.config
         conf_path = config.legacy_conf_path
         root_path = config.root_path
         return [(conf_path / x).relative_to(root_path) for x in conf_path.glob("**/*.yaml")]
@@ -538,3 +562,28 @@ class ModelManagerService(ModelManagerServiceBase):
         :param new_name: New name for the model
         """
         return self.update_model(key, {"name": new_name})
+
+    def cancel_job(self, job: ModelInstallJob):
+        """Cancel this job."""
+        self._loader.queue.cancel_job(job)
+
+    def pause_job(self, job: ModelInstallJob):
+        """Pause this job."""
+        self._loader.queue.pause_job(job)
+
+    def start_job(self, job: ModelInstallJob):
+        """(re)start this job."""
+        self._loader.queue.start_job(job)
+
+    def change_priority(self, job: ModelInstallJob, delta: int):
+        """
+        Raise or lower the priority of the job.
+
+        :param job: Job to  apply change to
+        :param delta: Value to increment or decrement priority.
+
+        Lower values are higher priority.  The default starting value is 10.
+        Thus to make my_job a really high priority job:
+           manager.change_priority(my_job, -10).
+        """
+        self._loader.queue.change_priority(job, delta)

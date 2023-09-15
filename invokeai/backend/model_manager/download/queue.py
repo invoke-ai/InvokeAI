@@ -83,10 +83,6 @@ class DownloadQueue(DownloadQueueBase):
     _sequence: int = 0  # This is for debugging and used to tag jobs in dequeueing order
     _requests: requests.sessions.Session
 
-    # for debugging
-    _gets: int = 0
-    _dones: int = 0
-
     def __init__(
         self,
         max_parallel_dl: int = 5,
@@ -111,10 +107,6 @@ class DownloadQueue(DownloadQueueBase):
         self._requests = requests_session or requests.Session()
 
         self._start_workers(max_parallel_dl)
-
-        # debugging - get rid of this
-        self._gets = 0
-        self._dones = 0
 
     def create_download_job(
         self,
@@ -297,7 +289,6 @@ class DownloadQueue(DownloadQueueBase):
         done = False
         while not done:
             job = self._queue.get()
-            self._gets += 1
 
             try:  # this is for debugging priority
                 self._lock.acquire()
@@ -326,7 +317,6 @@ class DownloadQueue(DownloadQueueBase):
             if self._in_terminal_state(job):
                 del self._jobs[job.id]
 
-            self._dones += 1
             self._queue.task_done()
 
     def _get_metadata_and_url(self, job: DownloadJobBase) -> AnyHttpUrl:

@@ -5,7 +5,7 @@ import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union, Optional, List
 
 import torch
 
@@ -16,6 +16,7 @@ from .install import ModelInstallBase, ModelInstall
 from .storage import ModelConfigStore, get_config_store
 from .cache import ModelCache, ModelLocker, CacheStats
 from .models import InvalidModelException, ModelBase, MODEL_CLASSES
+from .download import DownloadEventHandler
 
 
 @dataclass
@@ -75,6 +76,17 @@ class ModelLoaderBase(ABC):
         """Return the current logger."""
         pass
 
+    @property
+    def config(self) -> InvokeAIAppConfig:
+        """Return the config object used by this installer."""
+        pass
+
+    @property
+    @abstractmethod
+    def queue(self) -> str:
+        """Return the download queue object used by this object."""
+        pass
+
     @abstractmethod
     def collect_cache_stats(self, cache_stats: CacheStats):
         """Replace cache statistics."""
@@ -110,6 +122,7 @@ class ModelLoader(ModelLoaderBase):
     def __init__(
         self,
         config: InvokeAIAppConfig,
+        event_handlers: Optional[List[DownloadEventHandler]] = None,
     ):
         """
         Initialize ModelLoader object.
@@ -127,7 +140,12 @@ class ModelLoader(ModelLoaderBase):
         self._app_config = config
         self._store = store
         self._logger = InvokeAILogger.getLogger()
-        self._installer = ModelInstall(store=self._store, logger=self._logger, config=self._app_config)
+        self._installer = ModelInstall(
+            store=self._store,
+            logger=self._logger,
+            config=self._app_config,
+            event_handlers=event_handlers,
+        )
         self._cache_keys = dict()
         self._models_file = models_file
         device = torch.device(choose_torch_device())
@@ -172,6 +190,16 @@ class ModelLoader(ModelLoaderBase):
     def logger(self) -> InvokeAILogger:
         """Return the current logger."""
         return self._logger
+
+    @property
+    def config(self) -> InvokeAIAppConfig:
+        """Return the config object used by the installer."""
+        return self._app_config
+
+    @property
+    def queue(self) -> str:
+        """Return the download queue object used by this object."""
+        return self._installer.queue
 
     def get_model(self, key: str, submodel_type: Optional[SubModelType] = None) -> ModelInfo:
         """

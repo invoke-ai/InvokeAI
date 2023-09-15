@@ -15,6 +15,7 @@ from .base import (  # noqa: F401
     ModelVariantType,
     SchedulerPredictionType,
     InvalidModelException,
+    read_checkpoint_meta,
 )
 from .controlnet import ControlNetModel  # TODO:
 from .lora import LoRAModel
@@ -73,9 +74,7 @@ OPENAPI_MODEL_CONFIGS = list()
 
 
 class OpenAPIModelInfoBase(BaseModel):
-    model_name: str
-    base_model: BaseModelType
-    model_type: ModelType
+    key: str
 
 
 for base_model, models in MODEL_CLASSES.items():

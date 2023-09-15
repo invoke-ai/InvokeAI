@@ -114,7 +114,7 @@ class ApiDependencies:
         )
 
         services = InvocationServices(
-            model_manager=ModelManagerService(config, logger),
+            model_manager=ModelManagerService(config, events),
             events=events,
             latents=latents,
             images=images,

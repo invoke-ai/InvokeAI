@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from ...backend.model_manager import BaseModelType, ModelType, SubModelType
+from ...backend.model_manager import SubModelType
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -19,9 +19,7 @@ from .baseinvocation import (
 
 
 class ModelInfo(BaseModel):
-    model_name: str = Field(description="Info to load submodel")
-    base_model: BaseModelType = Field(description="Base model")
-    model_type: ModelType = Field(description="Info to load submodel")
+    key: str = Field(description="Unique ID for model")
     submodel: Optional[SubModelType] = Field(default=None, description="Info to load submodel")
 
 
@@ -61,16 +59,13 @@ class ModelLoaderOutput(BaseInvocationOutput):
 class MainModelField(BaseModel):
     """Main model field"""
 
-    model_name: str = Field(description="Name of the model")
-    base_model: BaseModelType = Field(description="Base model")
-    model_type: ModelType = Field(description="Model Type")
+    key: str = Field(description="Unique ID of the model")
 
 
 class LoRAModelField(BaseModel):
     """LoRA model field"""
 
-    model_name: str = Field(description="Name of the LoRA model")
-    base_model: BaseModelType = Field(description="Base model")
+    key: str = Field(description="Unique ID for model")
 
 
 @invocation("main_model_loader", title="Main Model", tags=["model"], category="model", version="1.0.0")
@@ -81,17 +76,12 @@ class MainModelLoaderInvocation(BaseInvocation):
     # TODO: precision?
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
-        base_model = self.model.base_model
-        model_name = self.model.model_name
-        model_type = ModelType.Main
+        """Load a main model, outputting its submodels."""
+        key = self.model.key
 
         # TODO: not found exceptions
-        if not context.services.model_manager.model_exists(
-            model_name=model_name,
-            base_model=base_model,
-            model_type=model_type,
-        ):
-            raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
+        if not context.services.model_manager.model_exists(key):
+            raise Exception(f"Unknown model {key}")
 
         """
         if not context.services.model_manager.model_exists(
@@ -125,30 +115,22 @@ class MainModelLoaderInvocation(BaseInvocation):
         return ModelLoaderOutput(
             unet=UNetField(
                 unet=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=key,
                     submodel=SubModelType.UNet,
                 ),
                 scheduler=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=key,
                     submodel=SubModelType.Scheduler,
                 ),
                 loras=[],
             ),
             clip=ClipField(
                 tokenizer=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=key,
                     submodel=SubModelType.Tokenizer,
                 ),
                 text_encoder=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=key,
                     submodel=SubModelType.TextEncoder,
                 ),
                 loras=[],
@@ -156,9 +138,7 @@ class MainModelLoaderInvocation(BaseInvocation):
             ),
             vae=VaeField(
                 vae=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=key,
                     submodel=SubModelType.Vae,
                 ),
             ),
@@ -167,7 +147,7 @@ class MainModelLoaderInvocation(BaseInvocation):
 
 @invocation_output("lora_loader_output")
 class LoraLoaderOutput(BaseInvocationOutput):
-    """Model loader output"""
+    """Model loader output."""
 
     unet: Optional[UNetField] = OutputField(default=None, description=FieldDescriptions.unet, title="UNet")
     clip: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
@@ -187,24 +167,20 @@ class LoraLoaderInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> LoraLoaderOutput:
+        """Load a LoRA model."""
         if self.lora is None:
             raise Exception("No LoRA provided")
 
-        base_model = self.lora.base_model
-        lora_name = self.lora.model_name
+        key = self.lora.key
 
-        if not context.services.model_manager.model_exists(
-            base_model=base_model,
-            model_name=lora_name,
-            model_type=ModelType.Lora,
-        ):
-            raise Exception(f"Unkown lora name: {lora_name}!")
+        if not context.services.model_manager.model_exists(key):
+            raise Exception(f"Unkown lora: {key}!")
 
-        if self.unet is not None and any(lora.model_name == lora_name for lora in self.unet.loras):
-            raise Exception(f'Lora "{lora_name}" already applied to unet')
+        if self.unet is not None and any(lora.key == key for lora in self.unet.loras):
+            raise Exception(f'Lora "{key}" already applied to unet')
 
-        if self.clip is not None and any(lora.model_name == lora_name for lora in self.clip.loras):
-            raise Exception(f'Lora "{lora_name}" already applied to clip')
+        if self.clip is not None and any(lora.key == key for lora in self.clip.loras):
+            raise Exception(f'Lora "{key}" already applied to clip')
 
         output = LoraLoaderOutput()
 
@@ -212,9 +188,7 @@ class LoraLoaderInvocation(BaseInvocation):
             output.unet = copy.deepcopy(self.unet)
             output.unet.loras.append(
                 LoraInfo(
-                    base_model=base_model,
-                    model_name=lora_name,
-                    model_type=ModelType.Lora,
+                    key=key,
                     submodel=None,
                     weight=self.weight,
                 )
@@ -224,9 +198,7 @@ class LoraLoaderInvocation(BaseInvocation):
             output.clip = copy.deepcopy(self.clip)
             output.clip.loras.append(
                 LoraInfo(
-                    base_model=base_model,
-                    model_name=lora_name,
-                    model_type=ModelType.Lora,
+                    key=key,
                     submodel=None,
                     weight=self.weight,
                 )
@@ -237,7 +209,7 @@ class LoraLoaderInvocation(BaseInvocation):
 
 @invocation_output("sdxl_lora_loader_output")
 class SDXLLoraLoaderOutput(BaseInvocationOutput):
-    """SDXL LoRA Loader Output"""
+    """SDXL LoRA Loader Output."""
 
     unet: Optional[UNetField] = OutputField(default=None, description=FieldDescriptions.unet, title="UNet")
     clip: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP 1")
@@ -261,27 +233,22 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> SDXLLoraLoaderOutput:
+        """Load an SDXL LoRA."""
         if self.lora is None:
             raise Exception("No LoRA provided")
 
-        base_model = self.lora.base_model
-        lora_name = self.lora.model_name
+        key = self.lora.key
+        if not context.services.model_manager.model_exists(key):
+            raise Exception(f"Unknown lora name: {key}!")
 
-        if not context.services.model_manager.model_exists(
-            base_model=base_model,
-            model_name=lora_name,
-            model_type=ModelType.Lora,
-        ):
-            raise Exception(f"Unknown lora name: {lora_name}!")
+        if self.unet is not None and any(lora.key == key for lora in self.unet.loras):
+            raise Exception(f'Lora "{key}" already applied to unet')
 
-        if self.unet is not None and any(lora.model_name == lora_name for lora in self.unet.loras):
-            raise Exception(f'Lora "{lora_name}" already applied to unet')
+        if self.clip is not None and any(lora.key == key for lora in self.clip.loras):
+            raise Exception(f'Lora "{key}" already applied to clip')
 
-        if self.clip is not None and any(lora.model_name == lora_name for lora in self.clip.loras):
-            raise Exception(f'Lora "{lora_name}" already applied to clip')
-
-        if self.clip2 is not None and any(lora.model_name == lora_name for lora in self.clip2.loras):
-            raise Exception(f'Lora "{lora_name}" already applied to clip2')
+        if self.clip2 is not None and any(lora.key == key for lora in self.clip2.loras):
+            raise Exception(f'Lora "{key}" already applied to clip2')
 
         output = SDXLLoraLoaderOutput()
 
@@ -289,9 +256,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
             output.unet = copy.deepcopy(self.unet)
             output.unet.loras.append(
                 LoraInfo(
-                    base_model=base_model,
-                    model_name=lora_name,
-                    model_type=ModelType.Lora,
+                    key=key,
                     submodel=None,
                     weight=self.weight,
                 )
@@ -301,9 +266,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
             output.clip = copy.deepcopy(self.clip)
             output.clip.loras.append(
                 LoraInfo(
-                    base_model=base_model,
-                    model_name=lora_name,
-                    model_type=ModelType.Lora,
+                    key=key,
                     submodel=None,
                     weight=self.weight,
                 )
@@ -313,9 +276,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
             output.clip2 = copy.deepcopy(self.clip2)
             output.clip2.loras.append(
                 LoraInfo(
-                    base_model=base_model,
-                    model_name=lora_name,
-                    model_type=ModelType.Lora,
+                    key=key,
                     submodel=None,
                     weight=self.weight,
                 )
@@ -325,10 +286,9 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
 
 
 class VAEModelField(BaseModel):
-    """Vae model field"""
+    """Vae model field."""
 
-    model_name: str = Field(description="Name of the model")
-    base_model: BaseModelType = Field(description="Base model")
+    key: str = Field(description="Unique ID for VAE model")
 
 
 @invocation_output("vae_loader_output")
@@ -340,29 +300,22 @@ class VaeLoaderOutput(BaseInvocationOutput):
 
 @invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.0")
 class VaeLoaderInvocation(BaseInvocation):
-    """Loads a VAE model, outputting a VaeLoaderOutput"""
+    """Loads a VAE model, outputting a VaeLoaderOutput."""
 
     vae_model: VAEModelField = InputField(
         description=FieldDescriptions.vae_model, input=Input.Direct, ui_type=UIType.VaeModel, title="VAE"
     )
 
     def invoke(self, context: InvocationContext) -> VaeLoaderOutput:
-        base_model = self.vae_model.base_model
-        model_name = self.vae_model.model_name
-        model_type = ModelType.Vae
+        """Load a VAE model."""
+        key = self.vae_model.key
 
-        if not context.services.model_manager.model_exists(
-            base_model=base_model,
-            model_name=model_name,
-            model_type=model_type,
-        ):
-            raise Exception(f"Unkown vae name: {model_name}!")
+        if not context.services.model_manager.model_exists(key):
+            raise Exception(f"Unkown vae name: {key}!")
         return VaeLoaderOutput(
             vae=VaeField(
                 vae=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=key,
                 )
             )
         )
@@ -370,7 +323,7 @@ class VaeLoaderInvocation(BaseInvocation):
 
 @invocation_output("seamless_output")
 class SeamlessModeOutput(BaseInvocationOutput):
-    """Modified Seamless Model output"""
+    """Modified Seamless Model output."""
 
     unet: Optional[UNetField] = OutputField(description=FieldDescriptions.unet, title="UNet")
     vae: Optional[VaeField] = OutputField(description=FieldDescriptions.vae, title="VAE")
@@ -390,6 +343,7 @@ class SeamlessModeInvocation(BaseInvocation):
     seamless_x: bool = InputField(default=True, input=Input.Any, description="Specify whether X axis is seamless")
 
     def invoke(self, context: InvocationContext) -> SeamlessModeOutput:
+        """Apply seamless transformation."""
         # Conditionally append 'x' and 'y' based on seamless_x and seamless_y
         unet = copy.deepcopy(self.unet)
         vae = copy.deepcopy(self.vae)

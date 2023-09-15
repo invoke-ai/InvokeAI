@@ -117,9 +117,7 @@ class EventServiceBase:
     def emit_model_load_started(
         self,
         graph_execution_state_id: str,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
+        model_key: str,
         submodel: SubModelType,
     ) -> None:
         """Emitted when a model is requested"""
@@ -127,9 +125,7 @@ class EventServiceBase:
             event_name="model_load_started",
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
-                model_name=model_name,
-                base_model=base_model,
-                model_type=model_type,
+                model_key=model_key,
                 submodel=submodel,
             ),
         )
@@ -137,9 +133,7 @@ class EventServiceBase:
     def emit_model_load_completed(
         self,
         graph_execution_state_id: str,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
+        model_key: str,
         submodel: SubModelType,
         model_info: ModelInfo,
     ) -> None:
@@ -148,9 +142,7 @@ class EventServiceBase:
             event_name="model_load_completed",
             payload=dict(
                 graph_execution_state_id=graph_execution_state_id,
-                model_name=model_name,
-                base_model=base_model,
-                model_type=model_type,
+                model_key=model_key,
                 submodel=submodel,
                 hash=model_info.hash,
                 location=str(model_info.location),
@@ -192,8 +184,8 @@ class EventServiceBase:
             ),
         )
 
-    def emit_model_download_event(self, job: DownloadJobBase):
-        """Emit event when the status of a download job changes."""
+    def emit_model_event(self, job: DownloadJobBase):
+        """Emit event when the status of a download/install job changes."""
         self.dispatch(  # use dispatch() directly here because we are not a session event.
-            event_name="install_model_event", payload=dict(job=job)
+            event_name="model_event", payload=dict(job=job)
         )

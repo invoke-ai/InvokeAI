@@ -10,11 +10,12 @@ from pydantic import BaseModel, parse_obj_as
 from starlette.exceptions import HTTPException
 
 from invokeai.backend import BaseModelType, ModelType
-from invokeai.backend.model_management import MergeInterpolationMethod
-from invokeai.backend.model_management.models import (
+from invokeai.backend.model_manager import MergeInterpolationMethod
+from invokeai.backend.model_manager import (
     OPENAPI_MODEL_CONFIGS,
+    ModelConfigBase,
     InvalidModelException,
-    ModelNotFoundException,
+    UnknownModelException,
     SchedulerPredictionType,
 )
 
@@ -28,9 +29,12 @@ ConvertModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 MergeModelResponse = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 ImportModelAttributes = Union[tuple(OPENAPI_MODEL_CONFIGS)]
 
+# class ModelsList(BaseModel):
+#    models: list[Union[tuple(OPENAPI_MODEL_CONFIGS)]]
+
 
 class ModelsList(BaseModel):
-    models: list[Union[tuple(OPENAPI_MODEL_CONFIGS)]]
+    models: List[ModelConfigBase]
 
 
 @models_router.get(
@@ -42,13 +46,14 @@ async def list_models(
     base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
     model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
 ) -> ModelsList:
-    """Gets a list of models"""
+    """Get a list of models."""
+    manager = ApiDependencies.invoker.services.model_manager
     if base_models and len(base_models) > 0:
         models_raw = list()
         for base_model in base_models:
-            models_raw.extend(ApiDependencies.invoker.services.model_manager.list_models(base_model, model_type))
+            models_raw.extend(manager.list_models(base_model=base_model, model_type=model_type))
     else:
-        models_raw = ApiDependencies.invoker.services.model_manager.list_models(None, model_type)
+        models_raw = manager.list_models(model_type=model_type)
     models = parse_obj_as(ModelsList, {"models": models_raw})
     return models
 
@@ -118,7 +123,7 @@ async def update_model(
             model_type=model_type,
         )
         model_response = parse_obj_as(UpdateModelResponse, model_raw)
-    except ModelNotFoundException as e:
+    except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         logger.error(str(e))
@@ -171,7 +176,7 @@ async def import_model(
         )
         return parse_obj_as(ImportModelResponse, model_raw)
 
-    except ModelNotFoundException as e:
+    except UnknownModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
     except InvalidModelException as e:
@@ -210,7 +215,7 @@ async def add_model(
             model_name=info.model_name, base_model=info.base_model, model_type=info.model_type
         )
         return parse_obj_as(ImportModelResponse, model_raw)
-    except ModelNotFoundException as e:
+    except UnknownModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -239,7 +244,7 @@ async def delete_model(
         )
         logger.info(f"Deleted model: {model_name}")
         return Response(status_code=204)
-    except ModelNotFoundException as e:
+    except UnknownModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -278,7 +283,7 @@ async def convert_model(
             model_name, base_model=base_model, model_type=model_type
         )
         response = parse_obj_as(ConvertModelResponse, model_raw)
-    except ModelNotFoundException as e:
+    except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found: {str(e)}")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -380,7 +385,7 @@ async def merge_models(
             model_type=ModelType.Main,
         )
         response = parse_obj_as(ConvertModelResponse, model_raw)
-    except ModelNotFoundException:
+    except UnknownModelException:
         raise HTTPException(status_code=404, detail=f"One or more of the models '{model_names}' not found")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

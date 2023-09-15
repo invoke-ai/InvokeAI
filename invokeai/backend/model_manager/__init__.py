@@ -1,7 +1,7 @@
 """
 Initialization file for invokeai.backend.model_manager.config
 """
-from .models.base import read_checkpoint_meta  # noqa F401
+from .models import read_checkpoint_meta, OPENAPI_MODEL_CONFIGS  # noqa F401
 from .config import (  # noqa F401
     BaseModelType,
     InvalidModelConfigException,

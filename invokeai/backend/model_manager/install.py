@@ -53,14 +53,20 @@ import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from shutil import rmtree
-from typing import Optional, List, Union, Dict, Set, Any
+from typing import Optional, List, Union, Dict, Set, Any, Callable
 from pydantic import Field
 from pydantic.networks import AnyHttpUrl
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
 from .search import ModelSearch
 from .storage import ModelConfigStore, DuplicateModelException, get_config_store
-from .download import DownloadQueueBase, DownloadQueue, DownloadJobBase, ModelSourceMetadata
+from .download import (
+    DownloadQueueBase,
+    DownloadQueue,
+    DownloadJobBase,
+    ModelSourceMetadata,
+    DownloadEventHandler,
+)
 from .download.queue import DownloadJobURL, DownloadJobRepoID, DownloadJobPath
 from .hash import FastModelHash
 from .probe import ModelProbe, ModelProbeInfo, InvalidModelException
@@ -97,6 +103,9 @@ class ModelInstallPathJob(DownloadJobPath, ModelInstallJob):
     """Job for installing local paths."""
 
 
+ModelInstallEventHandler = Callable[["ModelInstallJob"], None]
+
+
 class ModelInstallBase(ABC):
     """Abstract base class for InvokeAI model installation"""
 
@@ -107,6 +116,7 @@ class ModelInstallBase(ABC):
         config: Optional[InvokeAIAppConfig] = None,
         logger: Optional[InvokeAILogger] = None,
         download: Optional[DownloadQueueBase] = None,
+        event_handlers: Optional[List[DownloadEventHandler]] = None,
     ):
         """
         Create ModelInstall object.
@@ -119,6 +129,7 @@ class ModelInstallBase(ABC):
         uses the system-wide default logger.
         :param download: Optional DownloadQueueBase object. If None passed,
         a default queue object will be created.
+        :param event_handlers: List of event handlers to pass to the queue object.
         """
         pass
 
@@ -302,11 +313,12 @@ class ModelInstall(ModelInstallBase):
         config: Optional[InvokeAIAppConfig] = None,
         logger: Optional[InvokeAILogger] = None,
         download: Optional[DownloadQueueBase] = None,
+        event_handlers: Optional[List[DownloadEventHandler]] = None,
     ):  # noqa D107 - use base class docstrings
         self._config = config or InvokeAIAppConfig.get_config()
         self._logger = logger or InvokeAILogger.getLogger(config=self._config)
         self._store = store or get_config_store(self._config.model_conf_path)
-        self._download_queue = download or DownloadQueue(config=self._config)
+        self._download_queue = download or DownloadQueue(config=self._config, event_handlers=event_handlers)
         self._async_installs = dict()
         self._installed = set()
         self._tmpdir = None
