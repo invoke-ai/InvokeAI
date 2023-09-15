@@ -9,9 +9,10 @@ import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { startAppListening } from '..';
 import { imagesApi } from '../../../../../services/api/endpoints/images';
+import { t } from 'i18next';
 
 const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
-  title: 'Image Uploaded',
+  title: t('toast.imageUploaded'),
   status: 'success',
 };
 
@@ -57,8 +58,8 @@ export const addImageUploadedFulfilledListener = () => {
           // Fall back to just the board id if we can't find the board for some reason
           const board = data?.find((b) => b.board_id === autoAddBoardId);
           const description = board
-            ? `Added to board ${board.board_name}`
-            : `Added to board ${autoAddBoardId}`;
+            ? `${t('toast.addedToBoard')} ${board.board_name}`
+            : `${t('toast.addedToBoard')} ${autoAddBoardId}`;
 
           dispatch(
             addToast({
@@ -75,7 +76,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: 'Set as canvas initial image',
+            description: t('toast.setCanvasInitialImage'),
           })
         );
         return;
@@ -92,7 +93,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: 'Set as control image',
+            description: t('toast.setControlImage'),
           })
         );
         return;
@@ -103,7 +104,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: 'Set as initial image',
+            description: t('toast.setInitialImage'),
           })
         );
         return;
@@ -117,7 +118,7 @@ export const addImageUploadedFulfilledListener = () => {
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: `Set as node field ${fieldName}`,
+            description: `${t('toast.setNodeField')} ${fieldName}`,
           })
         );
         return;
@@ -140,7 +141,7 @@ export const addImageUploadedRejectedListener = () => {
       log.error({ ...sanitizedData }, 'Image upload failed');
       dispatch(
         addToast({
-          title: 'Image Upload Failed',
+          title: t('toast.imageUploadFailed'),
           description: action.error.message,
           status: 'error',
         })

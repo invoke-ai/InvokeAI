@@ -4,6 +4,7 @@ import { $logger } from 'app/logging/logger';
 import { downloadBlob } from 'features/canvas/util/downloadBlob';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 
 export const addCanvasDownloadedAsImageListener = () => {
   startAppListening({
@@ -20,8 +21,8 @@ export const addCanvasDownloadedAsImageListener = () => {
         moduleLog.error('Problem getting base layer blob');
         dispatch(
           addToast({
-            title: 'Problem Downloading Canvas',
-            description: 'Unable to export base layer',
+            title: t('toast.problemDownloadingCanvas'),
+            description: t('toast.problemDownloadingCanvasDesc'),
             status: 'error',
           })
         );
@@ -29,7 +30,9 @@ export const addCanvasDownloadedAsImageListener = () => {
       }
 
       downloadBlob(blob, 'canvas.png');
-      dispatch(addToast({ title: 'Canvas Downloaded', status: 'success' }));
+      dispatch(
+        addToast({ title: t('toast.canvasDownloaded'), status: 'success' })
+      );
     },
   });
 };
