@@ -17,12 +17,13 @@ import { useAppSelector } from '../../app/store/storeHooks';
 import { systemSelector } from '../../features/system/store/systemSelectors';
 
 interface Props extends PopoverProps {
-  heading: string;
+  heading?: string;
   paragraph: string;
   triggerComponent: ReactNode;
   image?: string;
   buttonLabel?: string;
   buttonHref?: string;
+  placement?: string;
 }
 
 function IAIInformationalPopover({
@@ -32,6 +33,7 @@ function IAIInformationalPopover({
   buttonLabel,
   buttonHref,
   triggerComponent,
+  placement,
 }: Props) {
   const { shouldDisableInformationalPopovers } = useAppSelector(systemSelector);
 
@@ -40,7 +42,7 @@ function IAIInformationalPopover({
   } else {
     return (
       <Popover
-        placement="top"
+        placement={placement || 'top'}
         closeOnBlur={false}
         trigger="hover"
         variant="informational"
@@ -58,14 +60,15 @@ function IAIInformationalPopover({
                 gap: 3,
                 flexDirection: 'column',
                 width: '100%',
+                alignItems: 'center',
               }}
             >
               {image && (
                 <Image
                   sx={{
                     objectFit: 'contain',
-                    maxW: '100%',
-                    maxH: 'full',
+                    maxW: '60%',
+                    maxH: '60%',
                     backgroundColor: 'white',
                   }}
                   src={image}
@@ -78,13 +81,13 @@ function IAIInformationalPopover({
                   flexDirection: 'column',
 
                   p: 3,
-                  pt: 0,
+                  pt: heading ? 0 : 3,
                 }}
               >
-                <PopoverHeader>{heading}</PopoverHeader>
-                <Text sx={{ pl: 3, pr: 3 }}>{paragraph}</Text>
+                {heading && <PopoverHeader>{heading}</PopoverHeader>}
+                <Text sx={{ px: 3 }}>{paragraph}</Text>
                 {buttonLabel && (
-                  <Flex sx={{ pl: 3, pr: 3 }} justifyContent="flex-end">
+                  <Flex sx={{ px: 3 }} justifyContent="flex-end">
                     <Button
                       onClick={() => window.open(buttonHref)}
                       size="sm"

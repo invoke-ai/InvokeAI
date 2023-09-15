@@ -1,6 +1,7 @@
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAISwitch from 'common/components/IAISwitch';
+import { NoiseEnablePopover } from 'features/informationalPopovers/components/noiseEnable';
 import { setShouldUseNoiseSettings } from 'features/parameters/store/generationSlice';
 import { ChangeEvent } from 'react';
 
@@ -15,10 +16,12 @@ export const ParamNoiseToggle = () => {
     dispatch(setShouldUseNoiseSettings(e.target.checked));
 
   return (
-    <IAISwitch
-      label="Enable Noise Settings"
-      isChecked={shouldUseNoiseSettings}
-      onChange={handleChange}
-    />
+    <NoiseEnablePopover>
+      <IAISwitch
+        label="Enable Noise Settings"
+        isChecked={shouldUseNoiseSettings}
+        onChange={handleChange}
+      />
+    </NoiseEnablePopover>
   );
 };

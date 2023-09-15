@@ -15,6 +15,7 @@ import {
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
 } from 'features/controlNet/store/controlNetSlice';
+import { ControlNetBeginEndPopover } from 'features/informationalPopovers/components/controlNetBeginEnd';
 import { memo, useCallback } from 'react';
 
 type Props = {
@@ -47,58 +48,60 @@ const ParamControlNetBeginEnd = (props: Props) => {
   );
 
   return (
-    <FormControl isDisabled={!isEnabled}>
-      <FormLabel>Begin / End Step Percentage</FormLabel>
-      <HStack w="100%" gap={2} alignItems="center">
-        <RangeSlider
-          aria-label={['Begin Step %', 'End Step %']}
-          value={[beginStepPct, endStepPct]}
-          onChange={handleStepPctChanged}
-          min={0}
-          max={1}
-          step={0.01}
-          minStepsBetweenThumbs={5}
-          isDisabled={!isEnabled}
-        >
-          <RangeSliderTrack>
-            <RangeSliderFilledTrack />
-          </RangeSliderTrack>
-          <Tooltip label={formatPct(beginStepPct)} placement="top" hasArrow>
-            <RangeSliderThumb index={0} />
-          </Tooltip>
-          <Tooltip label={formatPct(endStepPct)} placement="top" hasArrow>
-            <RangeSliderThumb index={1} />
-          </Tooltip>
-          <RangeSliderMark
-            value={0}
-            sx={{
-              insetInlineStart: '0 !important',
-              insetInlineEnd: 'unset !important',
-            }}
+    <ControlNetBeginEndPopover>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>Begin / End Step Percentage</FormLabel>
+        <HStack w="100%" gap={2} alignItems="center">
+          <RangeSlider
+            aria-label={['Begin Step %', 'End Step %']}
+            value={[beginStepPct, endStepPct]}
+            onChange={handleStepPctChanged}
+            min={0}
+            max={1}
+            step={0.01}
+            minStepsBetweenThumbs={5}
+            isDisabled={!isEnabled}
           >
-            0%
-          </RangeSliderMark>
-          <RangeSliderMark
-            value={0.5}
-            sx={{
-              insetInlineStart: '50% !important',
-              transform: 'translateX(-50%)',
-            }}
-          >
-            50%
-          </RangeSliderMark>
-          <RangeSliderMark
-            value={1}
-            sx={{
-              insetInlineStart: 'unset !important',
-              insetInlineEnd: '0 !important',
-            }}
-          >
-            100%
-          </RangeSliderMark>
-        </RangeSlider>
-      </HStack>
-    </FormControl>
+            <RangeSliderTrack>
+              <RangeSliderFilledTrack />
+            </RangeSliderTrack>
+            <Tooltip label={formatPct(beginStepPct)} placement="top" hasArrow>
+              <RangeSliderThumb index={0} />
+            </Tooltip>
+            <Tooltip label={formatPct(endStepPct)} placement="top" hasArrow>
+              <RangeSliderThumb index={1} />
+            </Tooltip>
+            <RangeSliderMark
+              value={0}
+              sx={{
+                insetInlineStart: '0 !important',
+                insetInlineEnd: 'unset !important',
+              }}
+            >
+              0%
+            </RangeSliderMark>
+            <RangeSliderMark
+              value={0.5}
+              sx={{
+                insetInlineStart: '50% !important',
+                transform: 'translateX(-50%)',
+              }}
+            >
+              50%
+            </RangeSliderMark>
+            <RangeSliderMark
+              value={1}
+              sx={{
+                insetInlineStart: 'unset !important',
+                insetInlineEnd: '0 !important',
+              }}
+            >
+              100%
+            </RangeSliderMark>
+          </RangeSlider>
+        </HStack>
+      </FormControl>
+    </ControlNetBeginEndPopover>
   );
 };
 

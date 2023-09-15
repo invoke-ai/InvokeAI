@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import { ParamSchedulerPopover } from 'features/informationalPopovers/components/paramScheduler';
 import { generationSelector } from 'features/parameters/store/generationSelectors';
 import { setScheduler } from 'features/parameters/store/generationSlice';
 import {
@@ -51,12 +52,14 @@ const ParamScheduler = () => {
   );
 
   return (
-    <IAIMantineSearchableSelect
-      label={t('parameters.scheduler')}
-      value={scheduler}
-      data={data}
-      onChange={handleChange}
-    />
+    <ParamSchedulerPopover>
+      <IAIMantineSearchableSelect
+        label={t('parameters.scheduler')}
+        value={scheduler}
+        data={data}
+        onChange={handleChange}
+      />
+    </ParamSchedulerPopover>
   );
 };
 

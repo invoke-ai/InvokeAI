@@ -5,6 +5,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAINumberInput from 'common/components/IAINumberInput';
 
 import IAISlider from 'common/components/IAISlider';
+import { ParamStepsPopover } from 'features/informationalPopovers/components/paramSteps';
 import {
   clampSymmetrySteps,
   setSteps,
@@ -56,30 +57,34 @@ const ParamSteps = () => {
   }, [dispatch]);
 
   return shouldUseSliders ? (
-    <IAISlider
-      label={t('parameters.steps')}
-      min={min}
-      max={sliderMax}
-      step={step}
-      onChange={handleChange}
-      handleReset={handleReset}
-      value={steps}
-      withInput
-      withReset
-      withSliderMarks
-      sliderNumberInputProps={{ max: inputMax }}
-    />
+    <ParamStepsPopover>
+      <IAISlider
+        label={t('parameters.steps')}
+        min={min}
+        max={sliderMax}
+        step={step}
+        onChange={handleChange}
+        handleReset={handleReset}
+        value={steps}
+        withInput
+        withReset
+        withSliderMarks
+        sliderNumberInputProps={{ max: inputMax }}
+      />
+    </ParamStepsPopover>
   ) : (
-    <IAINumberInput
-      label={t('parameters.steps')}
-      min={min}
-      max={inputMax}
-      step={step}
-      onChange={handleChange}
-      value={steps}
-      numberInputFieldProps={{ textAlign: 'center' }}
-      onBlur={handleBlur}
-    />
+    <ParamStepsPopover>
+      <IAINumberInput
+        label={t('parameters.steps')}
+        min={min}
+        max={inputMax}
+        step={step}
+        onChange={handleChange}
+        value={steps}
+        numberInputFieldProps={{ textAlign: 'center' }}
+        onBlur={handleBlur}
+      />
+    </ParamStepsPopover>
   );
 };
 

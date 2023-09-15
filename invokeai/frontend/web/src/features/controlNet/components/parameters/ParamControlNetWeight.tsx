@@ -4,6 +4,7 @@ import {
   ControlNetConfig,
   controlNetWeightChanged,
 } from 'features/controlNet/store/controlNetSlice';
+import { ControlNetWeightPopover } from 'features/informationalPopovers/components/controlNetWeight';
 import { memo, useCallback } from 'react';
 
 type ParamControlNetWeightProps = {
@@ -21,17 +22,19 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
   );
 
   return (
-    <IAISlider
-      isDisabled={!isEnabled}
-      label="Weight"
-      value={weight}
-      onChange={handleWeightChanged}
-      min={0}
-      max={2}
-      step={0.01}
-      withSliderMarks
-      sliderMarks={[0, 1, 2]}
-    />
+    <ControlNetWeightPopover>
+      <IAISlider
+        isDisabled={!isEnabled}
+        label="Weight"
+        value={weight}
+        onChange={handleWeightChanged}
+        min={0}
+        max={2}
+        step={0.01}
+        withSliderMarks
+        sliderMarks={[0, 1, 2]}
+      />
+    </ControlNetWeightPopover>
   );
 };
 

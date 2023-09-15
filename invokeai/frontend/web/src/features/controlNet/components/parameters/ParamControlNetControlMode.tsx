@@ -5,6 +5,7 @@ import {
   ControlNetConfig,
   controlNetControlModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
+import { ControlNetControlModePopover } from 'features/informationalPopovers/components/controlNetControlMode';
 import { useCallback } from 'react';
 
 type ParamControlNetControlModeProps = {
@@ -32,12 +33,14 @@ export default function ParamControlNetControlMode(
   );
 
   return (
-    <IAIMantineSelect
-      disabled={!isEnabled}
-      label="Control Mode"
-      data={CONTROL_MODE_DATA}
-      value={String(controlMode)}
-      onChange={handleControlModeChange}
-    />
+    <ControlNetControlModePopover>
+      <IAIMantineSelect
+        disabled={!isEnabled}
+        label="Control Mode"
+        data={CONTROL_MODE_DATA}
+        value={String(controlMode)}
+        onChange={handleControlModeChange}
+      />
+    </ControlNetControlModePopover>
   );
 }

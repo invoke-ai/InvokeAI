@@ -3,6 +3,7 @@ import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
+import { NoiseUseCPUPopover } from 'features/informationalPopovers/components/noiseUseCPU';
 import { shouldUseCpuNoiseChanged } from 'features/parameters/store/generationSlice';
 import { ChangeEvent } from 'react';
 
@@ -26,11 +27,13 @@ export const ParamCpuNoiseToggle = () => {
     dispatch(shouldUseCpuNoiseChanged(e.target.checked));
 
   return (
-    <IAISwitch
-      isDisabled={isDisabled}
-      label="Use CPU Noise"
-      isChecked={shouldUseCpuNoise}
-      onChange={handleChange}
-    />
+    <NoiseUseCPUPopover>
+      <IAISwitch
+        isDisabled={isDisabled}
+        label="Use CPU Noise"
+        isChecked={shouldUseCpuNoise}
+        onChange={handleChange}
+      />
+    </NoiseUseCPUPopover>
   );
 };

@@ -2,6 +2,7 @@ import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAISelectDataType } from 'common/components/IAIMantineSearchableSelect';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
+import { CompositingModePopover } from 'features/informationalPopovers/components/compositingMode';
 import { setCanvasCoherenceMode } from 'features/parameters/store/generationSlice';
 import { CanvasCoherenceModeParam } from 'features/parameters/types/parameterSchemas';
 
@@ -30,12 +31,14 @@ const ParamCanvasCoherenceMode = () => {
   };
 
   return (
-    <IAIMantineSelect
-      label={t('parameters.coherenceMode')}
-      data={coherenceModeSelectData}
-      value={canvasCoherenceMode}
-      onChange={handleCoherenceModeChange}
-    />
+    <CompositingModePopover>
+      <IAIMantineSelect
+        label={t('parameters.coherenceMode')}
+        data={coherenceModeSelectData}
+        value={canvasCoherenceMode}
+        onChange={handleCoherenceModeChange}
+      />
+    </CompositingModePopover>
   );
 };
 

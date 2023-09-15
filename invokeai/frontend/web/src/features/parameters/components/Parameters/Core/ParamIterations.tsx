@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
+import { ParamImagesPopover } from 'features/informationalPopovers/components/paramImages';
 import { setIterations } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -60,31 +61,35 @@ const ParamIterations = () => {
   }, [dispatch, initial]);
 
   return shouldUseSliders ? (
-    <IAISlider
-      isDisabled={isDisabled}
-      label={t('parameters.images')}
-      step={step}
-      min={min}
-      max={sliderMax}
-      onChange={handleChange}
-      handleReset={handleReset}
-      value={iterations}
-      withInput
-      withReset
-      withSliderMarks
-      sliderNumberInputProps={{ max: inputMax }}
-    />
+    <ParamImagesPopover>
+      <IAISlider
+        isDisabled={isDisabled}
+        label={t('parameters.images')}
+        step={step}
+        min={min}
+        max={sliderMax}
+        onChange={handleChange}
+        handleReset={handleReset}
+        value={iterations}
+        withInput
+        withReset
+        withSliderMarks
+        sliderNumberInputProps={{ max: inputMax }}
+      />
+    </ParamImagesPopover>
   ) : (
-    <IAINumberInput
-      isDisabled={isDisabled}
-      label={t('parameters.images')}
-      step={step}
-      min={min}
-      max={inputMax}
-      onChange={handleChange}
-      value={iterations}
-      numberInputFieldProps={{ textAlign: 'center' }}
-    />
+    <ParamImagesPopover>
+      <IAINumberInput
+        isDisabled={isDisabled}
+        label={t('parameters.images')}
+        step={step}
+        min={min}
+        max={inputMax}
+        onChange={handleChange}
+        value={iterations}
+        numberInputFieldProps={{ textAlign: 'center' }}
+      />
+    </ParamImagesPopover>
   );
 };
 

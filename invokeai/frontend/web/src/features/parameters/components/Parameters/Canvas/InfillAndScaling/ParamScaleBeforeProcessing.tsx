@@ -8,6 +8,7 @@ import {
   BOUNDING_BOX_SCALES_DICT,
   BoundingBoxScale,
 } from 'features/canvas/store/canvasTypes';
+import { ScaleBeforeProcessingPopover } from 'features/informationalPopovers/components/scaleBeforeProcessing';
 
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,12 +36,14 @@ const ParamScaleBeforeProcessing = () => {
   };
 
   return (
-    <IAIMantineSearchableSelect
-      label={t('parameters.scaleBeforeProcessing')}
-      data={BOUNDING_BOX_SCALES_DICT}
-      value={boundingBoxScale}
-      onChange={handleChangeBoundingBoxScaleMethod}
-    />
+    <ScaleBeforeProcessingPopover>
+      <IAIMantineSearchableSelect
+        label={t('parameters.scaleBeforeProcessing')}
+        data={BOUNDING_BOX_SCALES_DICT}
+        value={boundingBoxScale}
+        onChange={handleChangeBoundingBoxScaleMethod}
+      />
+    </ScaleBeforeProcessingPopover>
   );
 };
 

@@ -5,6 +5,7 @@ import {
   ResizeModes,
   controlNetResizeModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
+import { ControlNetResizeModePopover } from 'features/informationalPopovers/components/controlNetResizeMode';
 import { useCallback } from 'react';
 
 type ParamControlNetResizeModeProps = {
@@ -31,12 +32,14 @@ export default function ParamControlNetResizeMode(
   );
 
   return (
-    <IAIMantineSelect
-      disabled={!isEnabled}
-      label="Resize Mode"
-      data={RESIZE_MODE_DATA}
-      value={String(resizeMode)}
-      onChange={handleResizeModeChange}
-    />
+    <ControlNetResizeModePopover>
+      <IAIMantineSelect
+        disabled={!isEnabled}
+        label="Resize Mode"
+        data={RESIZE_MODE_DATA}
+        value={String(resizeMode)}
+        onChange={handleResizeModeChange}
+      />
+    </ControlNetResizeModePopover>
   );
 }
