@@ -22,6 +22,7 @@ import { memo, useMemo } from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
 import NotesTextarea from './NotesTextarea';
 import { useDoNodeVersionsMatch } from 'features/nodes/hooks/useDoNodeVersionsMatch';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   nodeId: string;
@@ -32,6 +33,7 @@ const InvocationNodeNotes = ({ nodeId }: Props) => {
   const label = useNodeLabel(nodeId);
   const title = useNodeTemplateTitle(nodeId);
   const doVersionsMatch = useDoNodeVersionsMatch(nodeId);
+  const { t } = useTranslation();
 
   return (
     <>
@@ -65,7 +67,7 @@ const InvocationNodeNotes = ({ nodeId }: Props) => {
       <Modal isOpen={isOpen} onClose={onClose} isCentered>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>{label || title || 'Unknown Node'}</ModalHeader>
+          <ModalHeader>{label || title || t('nodes.unknownNode')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <NotesTextarea nodeId={nodeId} />
@@ -82,6 +84,7 @@ export default memo(InvocationNodeNotes);
 const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
   const data = useNodeData(nodeId);
   const nodeTemplate = useNodeTemplate(nodeId);
+  const { t } = useTranslation();
 
   const title = useMemo(() => {
     if (data?.label && nodeTemplate?.title) {
@@ -96,8 +99,8 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
       return nodeTemplate.title;
     }
 
-    return 'Unknown Node';
-  }, [data, nodeTemplate]);
+    return t('nodes.unknownNode');
+  }, [data, nodeTemplate, t]);
 
   const versionComponent = useMemo(() => {
     if (!isInvocationNodeData(data) || !nodeTemplate) {
@@ -107,7 +110,7 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
     if (!data.version) {
       return (
         <Text as="span" sx={{ color: 'error.500' }}>
-          Version unknown
+          {t('nodes.versionUnknown')}
         </Text>
       );
     }
@@ -115,7 +118,7 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
     if (!nodeTemplate.version) {
       return (
         <Text as="span" sx={{ color: 'error.500' }}>
-          Version {data.version} (unknown template)
+          {t('nodes.version')} {data.version} ({t('nodes.unknownTemplate')})
         </Text>
       );
     }
@@ -123,7 +126,7 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
     if (compare(data.version, nodeTemplate.version, '<')) {
       return (
         <Text as="span" sx={{ color: 'error.500' }}>
-          Version {data.version} (update node)
+          {t('nodes.version')} {data.version} ({t('nodes.updateNode')})
         </Text>
       );
     }
@@ -131,16 +134,20 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
     if (compare(data.version, nodeTemplate.version, '>')) {
       return (
         <Text as="span" sx={{ color: 'error.500' }}>
-          Version {data.version} (update app)
+          {t('nodes.version')} {data.version} ({t('nodes.updateApp')})
         </Text>
       );
     }
 
-    return <Text as="span">Version {data.version}</Text>;
-  }, [data, nodeTemplate]);
+    return (
+      <Text as="span">
+        {t('nodes.version')} {data.version}
+      </Text>
+    );
+  }, [data, nodeTemplate, t]);
 
   if (!isInvocationNodeData(data)) {
-    return <Text sx={{ fontWeight: 600 }}>Unknown Node</Text>;
+    return <Text sx={{ fontWeight: 600 }}>{t('nodes.unknownNode')}</Text>;
   }
 
   return (

@@ -4,9 +4,11 @@ import IAISwitch from 'common/components/IAISwitch';
 import { NoiseEnablePopover } from 'features/informationalPopovers/components/noiseEnable';
 import { setShouldUseNoiseSettings } from 'features/parameters/store/generationSlice';
 import { ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const ParamNoiseToggle = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const shouldUseNoiseSettings = useAppSelector(
     (state: RootState) => state.generation.shouldUseNoiseSettings
@@ -18,7 +20,7 @@ export const ParamNoiseToggle = () => {
   return (
     <NoiseEnablePopover>
       <IAISwitch
-        label="Enable Noise Settings"
+        label={t('parameters.enableNoiseSettings')}
         isChecked={shouldUseNoiseSettings}
         onChange={handleChange}
       />

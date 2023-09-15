@@ -12,9 +12,11 @@ import TopCenterPanel from './flow/panels/TopCenterPanel/TopCenterPanel';
 import TopRightPanel from './flow/panels/TopRightPanel/TopRightPanel';
 import BottomLeftPanel from './flow/panels/BottomLeftPanel/BottomLeftPanel';
 import MinimapPanel from './flow/panels/MinimapPanel/MinimapPanel';
+import { useTranslation } from 'react-i18next';
 
 const NodeEditor = () => {
   const isReady = useAppSelector((state) => state.nodes.isReady);
+  const { t } = useTranslation();
   return (
     <Flex
       layerStyle="first"
@@ -82,7 +84,7 @@ const NodeEditor = () => {
               }}
             >
               <IAINoContentFallback
-                label="Loading Nodes..."
+                label={t('nodes.loadingNodes')}
                 icon={MdDeviceHub}
               />
             </Flex>

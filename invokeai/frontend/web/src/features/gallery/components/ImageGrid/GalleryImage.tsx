@@ -1,4 +1,6 @@
 import { Box, Flex } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
+import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
@@ -10,6 +12,7 @@ import {
 } from 'features/dnd/types';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { MouseEvent, memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
@@ -28,9 +31,12 @@ const GalleryImage = (props: HoverableImageProps) => {
   const { imageName } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
   const shift = useAppSelector((state) => state.hotkeys.shift);
+  const { t } = useTranslation();
 
   const { handleClick, isSelected, selection, selectionCount } =
     useMultiselect(imageDTO);
+
+  const customStarUi = useStore($customStarUI);
 
   const handleDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -89,12 +95,22 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const starIcon = useMemo(() => {
     if (imageDTO?.starred) {
-      return <MdStar size="20" />;
+      return customStarUi ? customStarUi.on.icon : <MdStar size="20" />;
     }
     if (!imageDTO?.starred && isHovered) {
-      return <MdStarBorder size="20" />;
+      return customStarUi ? customStarUi.off.icon : <MdStarBorder size="20" />;
     }
-  }, [imageDTO?.starred, isHovered]);
+  }, [imageDTO?.starred, isHovered, customStarUi]);
+
+  const starTooltip = useMemo(() => {
+    if (imageDTO?.starred) {
+      return customStarUi ? customStarUi.off.text : 'Unstar';
+    }
+    if (!imageDTO?.starred) {
+      return customStarUi ? customStarUi.on.text : 'Star';
+    }
+    return '';
+  }, [imageDTO?.starred, customStarUi]);
 
   if (!imageDTO) {
     return <IAIFillSkeleton />;
@@ -129,14 +145,14 @@ const GalleryImage = (props: HoverableImageProps) => {
             <IAIDndImageIcon
               onClick={toggleStarredState}
               icon={starIcon}
-              tooltip={imageDTO.starred ? 'Unstar' : 'Star'}
+              tooltip={starTooltip}
             />
 
             {isHovered && shift && (
               <IAIDndImageIcon
                 onClick={handleDelete}
                 icon={<FaTrash />}
-                tooltip="Delete"
+                tooltip={t('gallery.deleteImage')}
                 styleOverrides={{
                   bottom: 2,
                   top: 'auto',

@@ -1,4 +1,6 @@
 import { MenuItem } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
+import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   imagesToChangeSelected,
@@ -16,6 +18,7 @@ import {
 const MultipleSelectionMenuItems = () => {
   const dispatch = useAppDispatch();
   const selection = useAppSelector((state) => state.gallery.selection);
+  const customStarUi = useStore($customStarUI);
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
@@ -49,15 +52,18 @@ const MultipleSelectionMenuItems = () => {
     <>
       {areAllStarred && (
         <MenuItem
-          icon={<MdStarBorder />}
+          icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
           onClickCapture={handleUnstarSelection}
         >
-          Unstar All
+          {customStarUi ? customStarUi.off.text : `Unstar All`}
         </MenuItem>
       )}
       {(areAllUnstarred || (!areAllStarred && !areAllUnstarred)) && (
-        <MenuItem icon={<MdStar />} onClickCapture={handleStarSelection}>
-          Star All
+        <MenuItem
+          icon={customStarUi ? customStarUi.on.icon : <MdStar />}
+          onClickCapture={handleStarSelection}
+        >
+          {customStarUi ? customStarUi.on.text : `Star All`}
         </MenuItem>
       )}
       <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>

@@ -17,6 +17,7 @@ import { FaInfoCircle, FaTrash } from 'react-icons/fa';
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   nodeId: string;
@@ -27,7 +28,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } =
     useMouseOverNode(nodeId);
-
+  const { t } = useTranslation();
   const handleRemoveField = useCallback(() => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
   }, [dispatch, fieldName, nodeId]);
@@ -75,8 +76,8 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
             </Flex>
           </Tooltip>
           <IAIIconButton
-            aria-label="Remove from Linear View"
-            tooltip="Remove from Linear View"
+            aria-label={t('nodes.removeLinearView')}
+            tooltip={t('nodes.removeLinearView')}
             variant="ghost"
             size="sm"
             onClick={handleRemoveField}

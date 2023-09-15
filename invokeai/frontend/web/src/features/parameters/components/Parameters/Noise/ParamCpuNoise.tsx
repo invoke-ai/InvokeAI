@@ -6,6 +6,7 @@ import IAISwitch from 'common/components/IAISwitch';
 import { NoiseUseCPUPopover } from 'features/informationalPopovers/components/noiseUseCPU';
 import { shouldUseCpuNoiseChanged } from 'features/parameters/store/generationSlice';
 import { ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -22,6 +23,7 @@ const selector = createSelector(
 export const ParamCpuNoiseToggle = () => {
   const dispatch = useAppDispatch();
   const { isDisabled, shouldUseCpuNoise } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
     dispatch(shouldUseCpuNoiseChanged(e.target.checked));
@@ -30,7 +32,7 @@ export const ParamCpuNoiseToggle = () => {
     <NoiseUseCPUPopover>
       <IAISwitch
         isDisabled={isDisabled}
-        label="Use CPU Noise"
+        label={t('parameters.useCpuNoise')}
         isChecked={shouldUseCpuNoise}
         onChange={handleChange}
       />

@@ -26,6 +26,7 @@ import {
   ControlNetConfig,
   controlNetImageChanged,
 } from '../store/controlNetSlice';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   controlNet: ControlNetConfig;
@@ -56,6 +57,7 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
   } = controlNet;
 
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const { pendingControlImages, autoAddBoardId } = useAppSelector(selector);
   const activeTabName = useAppSelector(activeTabNameSelector);
@@ -208,18 +210,18 @@ const ControlNetImagePreview = ({ isSmall, controlNet }: Props) => {
         <IAIDndImageIcon
           onClick={handleResetControlImage}
           icon={controlImage ? <FaUndo /> : undefined}
-          tooltip="Reset Control Image"
+          tooltip={t('controlnet.resetControlImage')}
         />
         <IAIDndImageIcon
           onClick={handleSaveControlImage}
           icon={controlImage ? <FaSave size={16} /> : undefined}
-          tooltip="Save Control Image"
+          tooltip={t('controlnet.saveControlImage')}
           styleOverrides={{ marginTop: 6 }}
         />
         <IAIDndImageIcon
           onClick={handleSetControlImageToDimensions}
           icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
-          tooltip="Set Control Image Dimensions To W/H"
+          tooltip={t('controlnet.setControlImageDimensions')}
           styleOverrides={{ marginTop: 12 }}
         />
       </>

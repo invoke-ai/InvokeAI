@@ -7,6 +7,7 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { memo } from 'react';
 import LinearViewField from '../../flow/nodes/Invocation/fields/LinearViewField';
 import ScrollableContent from '../ScrollableContent';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -20,6 +21,7 @@ const selector = createSelector(
 
 const WorkflowLinearTab = () => {
   const { fields } = useAppSelector(selector);
+  const { t } = useTranslation();
 
   return (
     <Box
@@ -51,7 +53,7 @@ const WorkflowLinearTab = () => {
             ))
           ) : (
             <IAINoContentFallback
-              label="No fields added to Linear View"
+              label={t('nodes.noFieldsLinearview')}
               icon={null}
             />
           )}

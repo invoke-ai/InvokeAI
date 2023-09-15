@@ -17,6 +17,7 @@ import {
 } from 'features/controlNet/store/controlNetSlice';
 import { ControlNetBeginEndPopover } from 'features/informationalPopovers/components/controlNetBeginEnd';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   controlNet: ControlNetConfig;
@@ -28,6 +29,7 @@ const ParamControlNetBeginEnd = (props: Props) => {
   const { beginStepPct, endStepPct, isEnabled, controlNetId } =
     props.controlNet;
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleStepPctChanged = useCallback(
     (v: number[]) => {
@@ -50,10 +52,10 @@ const ParamControlNetBeginEnd = (props: Props) => {
   return (
     <ControlNetBeginEndPopover>
       <FormControl isDisabled={!isEnabled}>
-        <FormLabel>Begin / End Step Percentage</FormLabel>
+        <FormLabel>{t('controlnet.beginEndStepPercent')}</FormLabel>
         <HStack w="100%" gap={2} alignItems="center">
           <RangeSlider
-            aria-label={['Begin Step %', 'End Step %']}
+            aria-label={['Begin Step %', 'End Step %!']}
             value={[beginStepPct, endStepPct]}
             onChange={handleStepPctChanged}
             min={0}
@@ -62,6 +64,22 @@ const ParamControlNetBeginEnd = (props: Props) => {
             minStepsBetweenThumbs={5}
             isDisabled={!isEnabled}
           >
+            <RangeSliderTrack>
+              <RangeSliderFilledTrack />
+            </RangeSliderTrack>
+            <Tooltip label={formatPct(beginStepPct)} placement="top" hasArrow>
+              <RangeSliderThumb index={0} />
+            </Tooltip>
+            <Tooltip label={formatPct(endStepPct)} placement="top" hasArrow>
+              <RangeSliderThumb index={1} />
+            </Tooltip>
+            <RangeSliderMark
+              value={0}
+              sx={{
+                insetInlineStart: '0 !important',
+                insetInlineEnd: 'unset !important',
+              }}
+            >
             <RangeSliderTrack>
               <RangeSliderFilledTrack />
             </RangeSliderTrack>

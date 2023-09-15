@@ -89,7 +89,7 @@ const RefinerModelInputFieldComponent = (
   return isLoading ? (
     <IAIMantineSearchableSelect
       label={t('modelManager.model')}
-      placeholder="Loading..."
+      placeholder={t('models.loading')}
       disabled={true}
       data={[]}
     />
@@ -99,7 +99,11 @@ const RefinerModelInputFieldComponent = (
         className="nowheel nodrag"
         tooltip={selectedModel?.description}
         value={selectedModel?.id}
-        placeholder={data.length > 0 ? 'Select a model' : 'No models available'}
+        placeholder={
+          data.length > 0
+            ? t('models.selectModel')
+            : t('models.noModelsAvailable')
+        }
         data={data}
         error={!selectedModel}
         disabled={data.length === 0}
