@@ -1,11 +1,4 @@
-import {
-  Box,
-  FormControl,
-  Text,
-  Tooltip,
-  useDisclosure,
-  Heading,
-} from '@chakra-ui/react';
+import { Box, FormControl, useDisclosure } from '@chakra-ui/react';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ChangeEvent, KeyboardEvent, memo, useCallback, useRef } from 'react';
@@ -28,7 +21,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 import IAIInformationalPopover from '../../../../../common/components/IAIInformationalPopover';
-import InvokeAILogoImage from 'assets/images/logo.png';
 
 const promptInputSelector = createSelector(
   [stateSelector, activeTabNameSelector],

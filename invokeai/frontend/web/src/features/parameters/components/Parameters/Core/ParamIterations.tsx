@@ -5,7 +5,6 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
-import { ParamImagesPopover } from 'features/informationalPopovers/components/paramImages';
 import { setIterations } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

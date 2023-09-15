@@ -996,7 +996,7 @@
             "heading": "Use CPU Noise",
             "paragraph": "Uses the CPU to generate random noise."
         },
-        "paramsCFGScale": {
+        "paramCFGScale": {
             "heading": "CFG Scale",
             "paragraph": "Controls how much your prompt influences the generation process."
         },
@@ -1012,9 +1012,17 @@
             "heading": "Model",
             "paragraph": "Model used for the denoising steps. Different models are trained to specialize in producing different aesthetic results and content."
         },
+        "paramNegativeConditioning": {
+            "heading": "Negative Prompts",
+            "paragraph": "This is where you enter your negative prompts."
+        },
         "paramPositiveConditioning": {
             "heading": "Positive Prompts",
             "paragraph": "This is where you enter your positive prompts."
+        },
+        "paramRatio": {
+            "heading": "Ratio",
+            "paragraph": "The ratio of the dimensions of the image generated. An image size (in number of pixels) equivalent to 512x512 is recommended for SD1.5 models and a size equivalent to 1024x1024 is recommended for SDXL models."
         },
         "paramScheduler": {
             "heading": "Scheduler",
@@ -1023,10 +1031,6 @@
         "paramSeed": {
             "heading": "Seed",
             "paragraph": "Controls the starting noise used for generation. Disable “Random Seed” to produce identical results with the same generation settings."
-        },
-        "paramNegativeConditioning": {
-            "heading": "Negative Prompts",
-            "paragraph": "This is where you enter your negative prompts."
         },
         "paramSteps": {
             "heading": "Steps",
