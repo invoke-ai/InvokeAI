@@ -6,11 +6,16 @@ import {
   StringInputFieldTemplate,
   StringInputFieldValue,
   FieldComponentProps,
+  StringPolymorphicInputFieldValue,
+  StringPolymorphicInputFieldTemplate,
 } from 'features/nodes/types/types';
 import { ChangeEvent, memo, useCallback } from 'react';
 
 const StringInputFieldComponent = (
-  props: FieldComponentProps<StringInputFieldValue, StringInputFieldTemplate>
+  props: FieldComponentProps<
+    StringInputFieldValue | StringPolymorphicInputFieldValue,
+    StringInputFieldTemplate | StringPolymorphicInputFieldTemplate
+  >
 ) => {
   const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();

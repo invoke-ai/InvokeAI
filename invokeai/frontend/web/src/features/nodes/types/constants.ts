@@ -96,6 +96,28 @@ export const POLYMORPHIC_TO_SINGLE_MAP = {
   ColorPolymorphic: 'ColorField',
 };
 
+export const TYPES_WITH_INPUT_COMPONENTS = [
+  'string',
+  'StringPolymorphic',
+  'boolean',
+  'BooleanPolymorphic',
+  'integer',
+  'float',
+  'FloatPolymorphic',
+  'IntegerPolymorphic',
+  'enum',
+  'ImageField',
+  'ImagePolymorphic',
+  'MainModelField',
+  'SDXLRefinerModelField',
+  'VaeModelField',
+  'LoRAModelField',
+  'ControlNetModelField',
+  'ColorField',
+  'SDXLMainModelField',
+  'Scheduler',
+];
+
 export const isPolymorphicItemType = (
   itemType: string | undefined
 ): itemType is keyof typeof SINGLE_TO_POLYMORPHIC_MAP =>
