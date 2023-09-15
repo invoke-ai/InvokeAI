@@ -200,19 +200,10 @@ class EventServiceBase:
         self.__emit_queue_event(
             event_name="queue_item_status_changed",
             payload=dict(
-                id=session_queue_item.id,
+                queue_id=session_queue_item.queue_id,
+                item_id=session_queue_item.item_id,
                 graph_execution_state_id=session_queue_item.session_id,
                 batch_id=session_queue_item.batch_id,
                 status=session_queue_item.status,
-            ),
-        )
-
-    def emit_queue_status_changed(self, started: bool, stop_after_current: bool) -> None:
-        """Emitted when a queue item is status_changed"""
-        self.__emit_queue_event(
-            event_name="queue_status_changed",
-            payload=dict(
-                started=started,
-                stop_after_current=stop_after_current,
             ),
         )

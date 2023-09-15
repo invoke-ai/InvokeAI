@@ -189,59 +189,6 @@ export const addUserInvokedCanvasListener = () => {
           })
         );
       }
-
-      // // Create the session, store the request id
-      // const { requestId: sessionCreatedRequestId } = dispatch(
-      //   sessionCreated({ graph })
-      // );
-
-      // // Take the session created action, matching by its request id
-      // const [sessionCreatedAction] = await take(
-      //   (action): action is ReturnType<typeof sessionCreated.fulfilled> =>
-      //     sessionCreated.fulfilled.match(action) &&
-      //     action.meta.requestId === sessionCreatedRequestId
-      // );
-      // const session_id = sessionCreatedAction.payload.id;
-
-      // // Associate the init image with the session, now that we have the session ID
-      // if (['img2img', 'inpaint'].includes(generationMode) && canvasInitImage) {
-      //   dispatch(
-      //     imagesApi.endpoints.changeImageSessionId.initiate({
-      //       imageDTO: canvasInitImage,
-      //       session_id,
-      //     })
-      //   );
-      // }
-
-      // // Associate the mask image with the session, now that we have the session ID
-      // if (['inpaint'].includes(generationMode) && canvasMaskImage) {
-      //   dispatch(
-      //     imagesApi.endpoints.changeImageSessionId.initiate({
-      //       imageDTO: canvasMaskImage,
-      //       session_id,
-      //     })
-      //   );
-      // }
-
-      // // Prep the canvas staging area if it is not yet initialized
-      // if (!state.canvas.layerState.stagingArea.boundingBox) {
-      //   dispatch(
-      //     stagingAreaInitialized({
-      //       batch_id,
-      //       sessionId: session_id,
-      //       boundingBox: {
-      //         ...state.canvas.boundingBoxCoordinates,
-      //         ...state.canvas.boundingBoxDimensions,
-      //       },
-      //     })
-      //   );
-      // }
-
-      // // Flag the session with the canvas session ID
-      // dispatch(canvasSessionIdChanged(session_id));
-
-      // // We are ready to invoke the session!
-      // dispatch(sessionReadyToInvoke());
     },
   });
 };

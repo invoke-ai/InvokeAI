@@ -141,7 +141,8 @@ export type InvocationRetrievalErrorEvent = {
  * @example socket.on('queue_item_status_changed', (data: QueueItemStatusChangedEvent) => { ... }
  */
 export type QueueItemStatusChangedEvent = {
-  id: number;
+  queue_id: string;
+  item_id: string;
   graph_execution_state_id: string;
   batch_id: string;
   status: components['schemas']['SessionQueueItemDTO']['status'];
@@ -164,9 +165,13 @@ export type ClientEmitUnsubscribeSession = {
   session: string;
 };
 
-export type ClientEmitSubscribeQueue = void;
+export type ClientEmitSubscribeQueue = {
+  queue_id: string;
+};
 
-export type ClientEmitUnsubscribeQueue = void;
+export type ClientEmitUnsubscribeQueue = {
+  queue_id: string;
+};
 
 export type ServerToClientEvents = {
   generator_progress: (payload: GeneratorProgressEvent) => void;
@@ -181,7 +186,6 @@ export type ServerToClientEvents = {
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
-  queue_status_changed: (payload: QueueStatusChangedEvent) => void;
 };
 
 export type ClientToServerEvents = {

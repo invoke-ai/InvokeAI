@@ -27,68 +27,69 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def enqueue(self, graph: Graph, prepend: bool) -> EnqueueResult:
+    def enqueue(self, queue_id: str, graph: Graph, prepend: bool) -> EnqueueResult:
         """Enqueues a single graph for execution."""
         pass
 
     @abstractmethod
-    def enqueue_batch(self, batch: Batch, prepend: bool) -> EnqueueResult:
+    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueResult:
         """Enqueues all permutations of a batch for execution."""
         pass
 
     @abstractmethod
-    def dequeue(self) -> Optional[SessionQueueItem]:
+    def dequeue(self, queue_id: str) -> Optional[SessionQueueItem]:
         """Dequeues the next session queue item, returning it if one is available."""
         pass
 
     @abstractmethod
-    def peek(self) -> Optional[SessionQueueItem]:
+    def peek(self, queue_id: str) -> Optional[SessionQueueItem]:
         """Peeks at the next session queue item, returning it if one is available."""
         pass
 
     @abstractmethod
-    def clear(self) -> ClearResult:
+    def clear(self, queue_id: str) -> ClearResult:
         """Deletes all session queue items"""
         pass
 
     @abstractmethod
-    def prune(self) -> PruneResult:
+    def prune(self, queue_id: str) -> PruneResult:
         """Deletes all completed and errored session queue items"""
         pass
 
     @abstractmethod
-    def is_empty(self) -> IsEmptyResult:
+    def is_empty(self, queue_id: str) -> IsEmptyResult:
         """Checks if the queue is empty"""
         pass
 
     @abstractmethod
-    def is_full(self) -> IsFullResult:
+    def is_full(self, queue_id: str) -> IsFullResult:
         """Checks if the queue is empty"""
         pass
 
     @abstractmethod
-    def cancel_by_batch_ids(self, batch_ids: list[str]) -> CancelByBatchIDsResult:
+    def cancel_by_batch_ids(self, queue_id: str, batch_ids: list[str]) -> CancelByBatchIDsResult:
         """Cancels all queue items with matching batch IDs"""
         pass
 
     @abstractmethod
-    def get_status(self) -> SessionQueueStatusResult:
+    def get_status(self, queue_id: str) -> SessionQueueStatusResult:
         """Gets the number of queue items with each status"""
         pass
 
     @abstractmethod
     def list_queue_items(
         self,
+        queue_id: str,
         limit: int,
         priority: int,
-        cursor: Optional[int] = None,
+        order_id: Optional[int] = None,
         status: Optional[QUEUE_ITEM_STATUS] = None,
     ) -> CursorPaginatedResults[SessionQueueItemDTO]:
         """Gets a page of session queue items"""
         pass
 
     @abstractmethod
-    def get_queue_item(self, id: int) -> SessionQueueItem:
+    def get_queue_item(self, queue_id: str, item_id: str) -> SessionQueueItem:
         """Gets a session queue item by ID"""
         pass
 
@@ -98,16 +99,18 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def set_queue_item_status(self, id: int, status: QUEUE_ITEM_STATUS) -> SessionQueueItem:
+    def set_queue_item_status(self, queue_id: str, item_id: str, status: QUEUE_ITEM_STATUS) -> SessionQueueItem:
         """Sets the status of a session queue item"""
         pass
 
     @abstractmethod
-    def set_many_queue_item_status(self, ids: list[str], status: QUEUE_ITEM_STATUS) -> SetManyQueueItemStatusResult:
+    def set_many_queue_item_status(
+        self, queue_id: str, item_ids: list[str], status: QUEUE_ITEM_STATUS
+    ) -> SetManyQueueItemStatusResult:
         """Sets the status of a session queue item"""
         pass
 
     @abstractmethod
-    def delete_queue_item(self, id: int) -> SessionQueueItem:
+    def delete_queue_item(self, queue_id: str, item_id: str) -> SessionQueueItem:
         """Deletes a session queue item by ID"""
         pass

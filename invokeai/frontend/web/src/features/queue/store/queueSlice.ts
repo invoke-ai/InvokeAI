@@ -1,5 +1,4 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import { queueApi } from 'services/api/endpoints/queue';
 
 export interface QueueState {
   listCursor: number | undefined;
@@ -23,25 +22,14 @@ export const queueSlice = createSlice({
     listPriorityChanged: (state, action: PayloadAction<number | undefined>) => {
       state.listPriority = action.payload;
     },
-  },
-  extraReducers(builder) {
-    builder.addMatcher(
-      queueApi.endpoints.enqueueBatch.matchPending,
-      (state) => {
-        state.listCursor = undefined;
-        state.listPriority = undefined;
-      }
-    );
-    builder.addMatcher(
-      queueApi.endpoints.enqueueGraph.matchPending,
-      (state) => {
-        state.listCursor = undefined;
-        state.listPriority = undefined;
-      }
-    );
+    listParamsReset: (state) => {
+      state.listCursor = undefined;
+      state.listPriority = undefined;
+    },
   },
 });
 
-export const { listCursorChanged, listPriorityChanged } = queueSlice.actions;
+export const { listCursorChanged, listPriorityChanged, listParamsReset } =
+  queueSlice.actions;
 
 export default queueSlice.reducer;

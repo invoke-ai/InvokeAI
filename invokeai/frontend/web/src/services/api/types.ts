@@ -23,7 +23,7 @@ export type UpdateBoardArg =
   };
 
 export type BatchConfig =
-  paths['/api/v1/queue/enqueue_batch']['post']['requestBody']['content']['application/json'];
+  paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json'];
 
 /**
  * This is an unsafe type; the object inside is not guaranteed to be valid.

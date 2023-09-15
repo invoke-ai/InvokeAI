@@ -1,7 +1,7 @@
 import datetime
 import json
 from itertools import chain, product
-from typing import Iterable, Literal, NamedTuple, Optional, TypeAlias, Union, cast
+from typing import Iterable, Literal, Optional, TypeAlias, Union, cast
 
 from pydantic import BaseModel, Field, StrictStr, parse_raw_as, root_validator, validator
 from pydantic.json import pydantic_encoder
@@ -134,6 +134,8 @@ class Batch(BaseModel):
 
 # region Queue Items
 
+DEFAULT_QUEUE_ID = "default"
+
 QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "completed", "failed", "canceled"]
 
 
@@ -150,7 +152,8 @@ def get_session(queue_item_dict: dict) -> GraphExecutionState:
 class SessionQueueItemWithoutGraph(BaseModel):
     """Session queue item without the full graph. Used for serialization."""
 
-    id: int = Field(description="The ID of the session queue item")
+    item_id: str = Field(description="The unique identifier of the session queue item")
+    order_id: int = Field(description="The auto-incrementing ID of the session queue item")
     status: QUEUE_ITEM_STATUS = Field(default="pending", description="The status of this queue item")
     priority: int = Field(default=0, description="The priority of this queue item")
     batch_id: str = Field(description="The ID of the batch associated with this queue item")
@@ -160,6 +163,7 @@ class SessionQueueItemWithoutGraph(BaseModel):
     field_values: Optional[list[NodeFieldValue]] = Field(
         default=None, description="The field values that were used for this queue item"
     )
+    queue_id: str = Field(description="The id of the queue with which this item is associated")
     error: Optional[str] = Field(default=None, description="The error message if this queue item errored")
     created_at: Union[datetime.datetime, str] = Field(description="When this queue item was created")
     updated_at: Union[datetime.datetime, str] = Field(description="When this queue item was updated")
@@ -174,9 +178,11 @@ class SessionQueueItemWithoutGraph(BaseModel):
     class Config:
         schema_extra = {
             "required": [
-                "id",
+                "item_id",
+                "order_id",
                 "status",
                 "batch_id",
+                "queue_id",
                 "session_id",
                 "priority",
                 "session_id",
@@ -203,9 +209,11 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
     class Config:
         schema_extra = {
             "required": [
-                "id",
+                "item_id",
+                "order_id",
                 "status",
                 "batch_id",
+                "queue_id",
                 "session_id",
                 "session",
                 "priority",
@@ -222,6 +230,7 @@ class SessionQueueItem(SessionQueueItemWithoutGraph):
 
 
 class SessionQueueStatusResult(BaseModel):
+    queue_id: str = Field(..., description="The ID of the queue")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
     completed: int = Field(..., description="Number of queue items with status 'complete'")
@@ -232,7 +241,7 @@ class SessionQueueStatusResult(BaseModel):
 
 
 class SetManyQueueItemStatusResult(BaseModel):
-    ids: list[str] = Field(..., description="The queue item IDs that were updated")
+    item_ids: list[str] = Field(..., description="The queue item IDs that were updated")
     status: QUEUE_ITEM_STATUS = Field(..., description="The new status of the queue items")
 
 
@@ -347,33 +356,43 @@ def calc_session_count(batch: Batch) -> int:
     return len(data_product) * batch.runs
 
 
-class ValueTuple(NamedTuple):
-    session: str
-    session_id: str
-    batch_id: str
-    node_field_values: Optional[str]
-    priority: int
+ValuesToInsert: TypeAlias = list[
+    tuple[
+        str,  # item_id
+        str,  # queue_id
+        str,  # session json
+        str,  # session_id
+        str,  # batch_id
+        Optional[str],  # field_values json
+        int,  # priority
+        int,  # order_id
+    ]
+]
+"""(item_id, queue_id, session (json), session_id, batch_id, field_values (json), priority)"""
 
 
-ValuesToInsert: TypeAlias = list[ValueTuple]
-
-
-def prepare_values_to_insert(batch: Batch, priority: int, max_new_queue_items: int) -> ValuesToInsert:
+def prepare_values_to_insert(
+    queue_id: str, batch: Batch, priority: int, max_new_queue_items: int, order_id: int
+) -> ValuesToInsert:
     values_to_insert: ValuesToInsert = []
-    sessions = create_session_nfv_tuples(batch, max_new_queue_items)
-    for session, field_values in sessions:
+    session_and_field_value_tuples = create_session_nfv_tuples(batch, max_new_queue_items)
+    for session, field_values in session_and_field_value_tuples:
         # sessions must have unique id
         session.id = uuid_string()
         values_to_insert.append(
-            ValueTuple(
-                session.json(),
-                session.id,
-                batch.batch_id,
+            (
+                uuid_string(),  # item_id
+                queue_id,  # queue_id
+                session.json(),  # session (json)
+                session.id,  # session_id
+                batch.batch_id,  # batch_id
                 # must use pydantic_encoder bc field_values is a list of models
-                json.dumps(field_values, default=pydantic_encoder) if field_values else None,
-                priority,
+                json.dumps(field_values, default=pydantic_encoder) if field_values else None,  # field_values (json)
+                priority,  # priority
+                order_id,
             )
         )
+        order_id += 1
     return values_to_insert
 
 

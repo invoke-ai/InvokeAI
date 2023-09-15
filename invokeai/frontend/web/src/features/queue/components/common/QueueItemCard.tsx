@@ -35,7 +35,7 @@ const QueueItemCard = ({
               .filter((v) => v.node_path !== 'metadata_accumulator')
               .map(({ node_path, field_name, value }) => (
                 <Text
-                  key={`${session_queue_item.id}.${node_path}.${field_name}.${value}`}
+                  key={`${session_queue_item.item_id}.${node_path}.${field_name}.${value}`}
                 >
                   <Text as="span" fontWeight={600}>
                     {node_path}.{field_name}

@@ -41,11 +41,13 @@ class SocketIO:
         await self.__sio.emit(
             event=event[1]["event"],
             data=event[1]["data"],
-            room="queue",
+            room=event[1]["data"]["queue_id"],
         )
 
-    async def _handle_sub_queue(self, sid, *args, **kwargs):
-        self.__sio.enter_room(sid, "queue")
+    async def _handle_sub_queue(self, sid, data, *args, **kwargs):
+        if "queue_id" in data:
+            self.__sio.enter_room(sid, data["queue_id"])
 
-    async def _handle_unsub_queue(self, sid, *args, **kwargs):
-        self.__sio.enter_room(sid, "queue")
+    async def _handle_unsub_queue(self, sid, data, *args, **kwargs):
+        if "queue_id" in data:
+            self.__sio.enter_room(sid, data["queue_id"])

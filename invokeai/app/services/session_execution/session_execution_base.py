@@ -13,31 +13,46 @@ class SessionExecutionServiceBase(ABC):
         pass
 
     @abstractmethod
-    def invoke_next(self) -> None:
+    def invoke_next(self, queue_id: str) -> None:
         """Invokes the next queue item"""
         pass
 
     @abstractmethod
-    def start(self) -> None:
+    def start(
+        self,
+        queue_id: str,
+    ) -> None:
         """Starts session queue execution"""
         pass
 
     @abstractmethod
-    def stop(self) -> None:
+    def stop(
+        self,
+        queue_id: str,
+    ) -> None:
         """Stops session queue execution after the currently executing session finishes"""
         pass
 
     @abstractmethod
-    def cancel(self) -> None:
+    def cancel(
+        self,
+        queue_id: str,
+    ) -> None:
         """Stops session queue execution, immediately canceling the currently-executing session"""
         pass
 
     @abstractmethod
-    def get_current(self) -> Optional[SessionQueueItem]:
+    def get_current(
+        self,
+        queue_id: str,
+    ) -> Optional[SessionQueueItem]:
         """Gets the currently-executing queue item"""
         pass
 
     @abstractmethod
-    def get_status(self) -> SessionExecutionStatusResult:
+    def get_status(
+        self,
+        queue_id: str,
+    ) -> SessionExecutionStatusResult:
         """Gets the status of the session queue"""
         pass

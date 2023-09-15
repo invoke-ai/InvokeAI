@@ -6,6 +6,7 @@ from invokeai.app.services.graph import Graph
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
 from invokeai.app.services.session_queue.session_queue_common import (
+    DEFAULT_QUEUE_ID,
     QUEUE_ITEM_STATUS,
     Batch,
     CancelByBatchIDsResult,
@@ -50,8 +51,10 @@ class SqliteSessionQueue(SessionQueueBase):
         self._cursor.execute(
             """--sql
             CREATE TABLE IF NOT EXISTS session_queue (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, -- used for ordering, cursor pagination
+                item_id TEXT NOT NULL PRIMARY KEY, -- the unique identifier of this queue item
+                order_id INTEGER NOT NULL, -- used for ordering, cursor pagination
                 batch_id TEXT NOT NULL, -- identifier of the batch this queue item belongs to
+                queue_id TEXT NOT NULL, -- identifier of the queue this queue item belongs to
                 session_id TEXT NOT NULL UNIQUE, -- duplicated data from the session column, for ease of access
                 field_values TEXT, -- NULL if no values are associated with this queue item
                 session TEXT NOT NULL, -- the session to be executed
@@ -69,7 +72,13 @@ class SqliteSessionQueue(SessionQueueBase):
 
         self._cursor.execute(
             """--sql
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_session_queue_id ON session_queue(id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_session_queue_item_id ON session_queue(item_id);
+            """
+        )
+
+        self._cursor.execute(
+            """--sql
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_session_queue_order_id ON session_queue(order_id);
             """
         )
 
@@ -102,11 +111,14 @@ class SqliteSessionQueue(SessionQueueBase):
             CREATE TRIGGER IF NOT EXISTS tg_session_queue_completed_at
             AFTER UPDATE OF status ON session_queue
             FOR EACH ROW
-            WHEN NEW.status = 'completed' OR NEW.status = 'failed' or NEW.status = 'canceled'
+            WHEN
+              NEW.status = 'completed'
+              OR NEW.status = 'failed'
+              OR NEW.status = 'canceled'
             BEGIN
               UPDATE session_queue
               SET completed_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-              WHERE id = NEW.id;
+              WHERE item_id = NEW.item_id;
             END;
             """
         )
@@ -119,7 +131,7 @@ class SqliteSessionQueue(SessionQueueBase):
             BEGIN
                 UPDATE session_queue
                 SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                WHERE id = old.id;
+                WHERE item_id = old.item_id;
             END;
             """
         )
@@ -143,47 +155,67 @@ class SqliteSessionQueue(SessionQueueBase):
     def start_service(self, invoker: Invoker) -> None:
         self._invoker = invoker
         self._set_in_progress_to_canceled()
-        prune_result = self.prune()
+        prune_result = self.prune(DEFAULT_QUEUE_ID)
         self._invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
 
-    def enqueue(self, graph: Graph, prepend: bool) -> EnqueueResult:
-        return self.enqueue_batch(Batch(graph=graph), prepend=prepend)
+    def enqueue(self, queue_id: str, graph: Graph, prepend: bool) -> EnqueueResult:
+        return self.enqueue_batch(queue_id=queue_id, batch=Batch(graph=graph), prepend=prepend)
 
-    def _get_current_queue_size(self) -> int:
+    def _get_current_queue_size(self, queue_id: str) -> int:
         self._cursor.execute(
             """--sql
             SELECT count(*)
             FROM session_queue
-            WHERE status = 'pending'
-            """
+            WHERE
+              queue_id = ?
+              AND status = 'pending'
+            """,
+            (queue_id,),
         )
         return cast(int, self._cursor.fetchone()[0])
 
-    def _get_highest_priority(self) -> int:
+    def _get_highest_priority(self, queue_id: str) -> int:
         self._cursor.execute(
             """--sql
             SELECT MAX(priority)
             FROM session_queue
-            WHERE status = 'pending'
-            """
+            WHERE
+              queue_id = ?
+              AND status = 'pending'
+            """,
+            (queue_id,),
         )
         return cast(Union[int, None], self._cursor.fetchone()[0]) or 0
 
-    def enqueue_batch(self, batch: Batch, prepend: bool) -> EnqueueResult:
+    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueResult:
         try:
             self._lock.acquire()
 
             # TODO: how does this work in a multi-user scenario?
-            current_queue_size = self._get_current_queue_size()
+            current_queue_size = self._get_current_queue_size(queue_id=queue_id)
             max_queue_size = self._invoker.services.configuration.get_config().max_queue_size
             max_new_queue_items = max_queue_size - current_queue_size
 
             priority = 0
             if prepend:
-                priority = self._get_highest_priority() + 1
+                priority = self._get_highest_priority(queue_id=queue_id) + 1
+
+            self._cursor.execute(
+                """--sql
+                SELECT MAX(order_id)
+                FROM session_queue
+                """
+            )
+            max_order_id = cast(Optional[int], self._cursor.fetchone()[0]) or 0
 
             requested_count = calc_session_count(batch)
-            values_to_insert = prepare_values_to_insert(batch, priority, max_new_queue_items)
+            values_to_insert = prepare_values_to_insert(
+                queue_id=queue_id,
+                batch=batch,
+                priority=priority,
+                max_new_queue_items=max_new_queue_items,
+                order_id=max_order_id + 1,
+            )
             enqueued_count = len(values_to_insert)
 
             if requested_count > enqueued_count:
@@ -191,8 +223,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
             self._cursor.executemany(
                 """--sql
-                INSERT INTO session_queue (session, session_id, batch_id, field_values, priority)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO session_queue (item_id, queue_id, session, session_id, batch_id, field_values, priority, order_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values_to_insert,
             )
@@ -209,16 +241,22 @@ class SqliteSessionQueue(SessionQueueBase):
             priority=priority,
         )
 
-    def dequeue(self) -> Optional[SessionQueueItem]:
+    def dequeue(self, queue_id: str) -> Optional[SessionQueueItem]:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                SELECT id FROM session_queue
-                WHERE status = 'pending'
-                ORDER BY priority DESC, id ASC -- created_at doesn't have high enough precision to be used for ordering
+                SELECT item_id
+                FROM session_queue
+                WHERE
+                  queue_id = ?
+                  AND status = 'pending'
+                ORDER BY
+                  priority DESC,
+                  order_id ASC -- created_at doesn't have high enough precision to be used for ordering
                 LIMIT 1
-                """
+                """,
+                (queue_id,),
             )
             result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
         except Exception:
@@ -228,18 +266,24 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         if result is None:
             return None
-        return self.set_queue_item_status(result[0], "in_progress")
+        return self.set_queue_item_status(queue_id=queue_id, item_id=result[0], status="in_progress")
 
-    def peek(self) -> Optional[SessionQueueItem]:
+    def peek(self, queue_id: str) -> Optional[SessionQueueItem]:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                SELECT * FROM session_queue
-                WHERE status = 'pending'
-                ORDER BY priority DESC, created_at ASC
+                SELECT *
+                FROM session_queue
+                WHERE
+                  queue_id = ?
+                  AND status = 'pending'
+                ORDER BY
+                  priority DESC,
+                  created_at ASC
                 LIMIT 1
-                """
+                """,
+                (queue_id,),
             )
             result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
         except Exception:
@@ -251,16 +295,18 @@ class SqliteSessionQueue(SessionQueueBase):
             return None
         return SessionQueueItem.from_dict(dict(result))
 
-    def set_queue_item_status(self, id: int, status: QUEUE_ITEM_STATUS) -> SessionQueueItem:
+    def set_queue_item_status(self, queue_id: str, item_id: int, status: QUEUE_ITEM_STATUS) -> SessionQueueItem:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
                 UPDATE session_queue
                 SET status = ?
-                WHERE id = ?
+                WHERE
+                  queue_id = ?
+                  AND item_id = ?
                 """,
-                (status, id),
+                (status, queue_id, item_id),
             )
             self._conn.commit()
         except Exception:
@@ -268,32 +314,39 @@ class SqliteSessionQueue(SessionQueueBase):
             raise
         finally:
             self._lock.release()
-        return self.get_queue_item(id)
+        return self.get_queue_item(queue_id=queue_id, item_id=item_id)
 
-    def set_many_queue_item_status(self, ids: list[str], status: QUEUE_ITEM_STATUS) -> SetManyQueueItemStatusResult:
+    def set_many_queue_item_status(
+        self, queue_id: str, item_ids: list[str], status: QUEUE_ITEM_STATUS
+    ) -> SetManyQueueItemStatusResult:
         try:
             self._lock.acquire()
 
             # update the queue items
-            placeholders = ", ".join(["?" for _ in ids])
+            placeholders = ", ".join(["?" for _ in item_ids])
 
             update_query = f"""--sql
             UPDATE session_queue
             SET status = ?
-            WHERE id IN ({placeholders})
+            WHERE
+              queue_id in ?
+              AND item_id IN ({placeholders})
             """
 
-            self._cursor.execute(update_query, [status] + ids)
+            self._cursor.execute(update_query, [queue_id, status] + item_ids)
             self._conn.commit()
 
             # get queue items from list which were set to the status successfully
             fetch_query = f"""--sql
-            SELECT id
+            SELECT item_id
             FROM session_queue
-            WHERE status = ? AND id IN ({placeholders})
+            WHERE
+              queue_id = ?
+              AND status = ?
+              AND item_id IN ({placeholders})
             """
 
-            self._cursor.execute(fetch_query, [status] + ids)
+            self._cursor.execute(fetch_query, [queue_id, status] + item_ids)
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
         except Exception:
             self._conn.rollback()
@@ -302,16 +355,18 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
 
         updated_ids = [row[0] for row in result]
-        return SetManyQueueItemStatusResult(ids=updated_ids, status=status)
+        return SetManyQueueItemStatusResult(item_ids=updated_ids, status=status)
 
-    def is_empty(self) -> IsEmptyResult:
+    def is_empty(self, queue_id: str) -> IsEmptyResult:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
                 SELECT count(*)
                 FROM session_queue
-                """
+                WHERE queue_id = ?
+                """,
+                (queue_id,),
             )
             is_empty = cast(int, self._cursor.fetchone()[0]) == 0
         except Exception:
@@ -321,14 +376,16 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         return IsEmptyResult(is_empty=is_empty)
 
-    def is_full(self) -> IsFullResult:
+    def is_full(self, queue_id: str) -> IsFullResult:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
                 SELECT count(*)
                 FROM session_queue
-                """
+                WHERE queue_id = ?
+                """,
+                (queue_id,),
             )
             max_queue_size = self._invoker.services.configuration.max_queue_size
             is_full = cast(int, self._cursor.fetchone()[0]) >= max_queue_size
@@ -339,16 +396,18 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         return IsFullResult(is_full=is_full)
 
-    def delete_queue_item(self, id: int) -> SessionQueueItem:
-        queue_item = self.get_queue_item(id)
+    def delete_queue_item(self, queue_id: str, item_id: int) -> SessionQueueItem:
+        queue_item = self.get_queue_item(queue_id=queue_id, item_id=item_id)
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
                 DELETE FROM session_queue
-                WHERE id = ?
+                WHERE
+                  queue_id = ?
+                  AND item_id = ?
                 """,
-                (id,),
+                (queue_id, item_id),
             )
             self._conn.commit()
         except Exception:
@@ -358,19 +417,25 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         return queue_item
 
-    def clear(self) -> ClearResult:
+    def clear(self, queue_id: str) -> ClearResult:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                SELECT COUNT(*) FROM session_queue
-                """
+                SELECT COUNT(*)
+                FROM session_queue
+                WHERE queue_id = ?
+                """,
+                (queue_id,),
             )
             count = self._cursor.fetchone()[0]
             self._cursor.execute(
                 """--sql
-                DELETE FROM session_queue
-                """
+                DELETE
+                FROM session_queue
+                WHERE queue_id = ?
+                """,
+                (queue_id,),
             )
             self._conn.commit()
         except Exception:
@@ -380,22 +445,34 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         return ClearResult(deleted=count)
 
-    def prune(self) -> PruneResult:
+    def prune(self, queue_id: str) -> PruneResult:
         try:
-            where = "WHERE status = 'completed' OR status = 'failed' OR status = 'canceled'"
+            where = """--sql
+                WHERE
+                  queue_id = ?
+                  AND (
+                    status = 'completed'
+                    OR status = 'failed'
+                    OR status = 'canceled'
+                  )
+                """
             self._lock.acquire()
             self._cursor.execute(
                 f"""--sql
-                SELECT COUNT(*) FROM session_queue
+                SELECT COUNT(*)
+                FROM session_queue
                 {where};
-                """
+                """,
+                (queue_id,),
             )
             count = self._cursor.fetchone()[0]
             self._cursor.execute(
                 f"""--sql
-                DELETE FROM session_queue
+                DELETE
+                FROM session_queue
                 {where};
-                """
+                """,
+                (queue_id,),
             )
             self._conn.commit()
         except Exception:
@@ -405,17 +482,25 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         return PruneResult(deleted=count)
 
-    def cancel_by_batch_ids(self, batch_ids: list[str]) -> CancelByBatchIDsResult:
+    def cancel_by_batch_ids(self, queue_id: str, batch_ids: list[str]) -> CancelByBatchIDsResult:
         try:
             self._lock.acquire()
             placeholders = ", ".join(["?" for _ in batch_ids])
-            where = f"WHERE batch_id IN ({placeholders}) AND status != 'canceled' AND status != 'completed'"
+            where = f"""--sql
+                WHERE
+                  queue_id = ?
+                  AND batch_id IN ({placeholders})
+                  AND status != 'canceled'
+                  AND status != 'completed'
+                """
+            params = [queue_id] + batch_ids
             self._cursor.execute(
                 f"""--sql
-                SELECT COUNT(*) FROM session_queue
+                SELECT COUNT(*)
+                FROM session_queue
                 {where};
                 """,
-                batch_ids,
+                tuple(params),
             )
             count = self._cursor.fetchone()[0]
             self._cursor.execute(
@@ -424,7 +509,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 SET status = 'canceled'
                 {where};
                 """,
-                batch_ids,
+                tuple(params),
             )
             self._conn.commit()
         except Exception:
@@ -434,15 +519,17 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         return CancelByBatchIDsResult(canceled=count)
 
-    def get_queue_item(self, id: int) -> SessionQueueItem:
+    def get_queue_item(self, queue_id: str, item_id: int) -> SessionQueueItem:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
                 SELECT * FROM session_queue
-                WHERE id = ?
+                WHERE
+                  queue_id = ?
+                  AND item_id = ?
                 """,
-                (id,),
+                (queue_id, item_id),
             )
             result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
         except Exception:
@@ -451,7 +538,7 @@ class SqliteSessionQueue(SessionQueueBase):
         finally:
             self._lock.release()
         if result is None:
-            raise SessionQueueItemNotFoundError(f"No queue item with id {id}")
+            raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
         return SessionQueueItem.from_dict(dict(result))
 
     def get_queue_item_by_session_id(self, session_id: str) -> SessionQueueItem:
@@ -460,7 +547,8 @@ class SqliteSessionQueue(SessionQueueBase):
             self._cursor.execute(
                 """--sql
                 SELECT * FROM session_queue
-                WHERE session_id = ?
+                WHERE
+                  session_id = ?
                 """,
                 (session_id,),
             )
@@ -476,15 +564,17 @@ class SqliteSessionQueue(SessionQueueBase):
 
     def list_queue_items(
         self,
+        queue_id: str,
         limit: int,
         priority: int,
-        cursor: Optional[int] = None,
+        order_id: Optional[int] = None,
         status: Optional[QUEUE_ITEM_STATUS] = None,
     ) -> CursorPaginatedResults[SessionQueueItemDTO]:
         try:
             self._lock.acquire()
             query = """--sql
-                SELECT id,
+                SELECT item_id,
+                    order_id,
                     status,
                     priority,
                     field_values,
@@ -493,23 +583,33 @@ class SqliteSessionQueue(SessionQueueBase):
                     updated_at,
                     completed_at,
                     session_id,
-                    batch_id
+                    batch_id,
+                    queue_id
                 FROM session_queue
-                WHERE 1 = 1
+                WHERE queue_id = ?
             """
-            params = []
+            params: list[Union[str, int]] = [queue_id]
 
             if status is not None:
-                query += " AND status = ?"
+                query += """--sql
+                    AND status = ?
+                    """
                 params.append(status)
 
-            if cursor is not None:
-                query += " AND (priority < ?) OR (priority = ? AND id > ?)"
-                params.extend([priority, priority, cursor])
+            if order_id is not None:
+                query += """--sql
+                    AND (priority < ?) OR (priority = ? AND order_id > ?)
+                    """
+                params.extend([priority, priority, order_id])
 
-            query += " ORDER BY priority DESC, id ASC LIMIT ?"
+            query += """--sql
+                ORDER BY
+                  priority DESC,
+                  order_id ASC
+                LIMIT ?
+                """
             params.append(limit + 1)
-            self._cursor.execute(query, tuple(params))
+            self._cursor.execute(query, params)
             results = cast(list[sqlite3.Row], self._cursor.fetchall())
             items = [SessionQueueItemDTO.from_dict(dict(result)) for result in results]
             has_more = False
@@ -524,15 +624,17 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
         return CursorPaginatedResults(items=items, limit=limit, has_more=has_more)
 
-    def get_status(self) -> SessionQueueStatusResult:
+    def get_status(self, queue_id: str) -> SessionQueueStatusResult:
         try:
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
                 SELECT status, count(*)
                 FROM session_queue
+                WHERE queue_id = ?
                 GROUP BY status
-                """
+                """,
+                (queue_id,),
             )
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
             total = sum(row[1] for row in result)
@@ -544,6 +646,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self._lock.release()
 
         return SessionQueueStatusResult(
+            queue_id=queue_id,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
             completed=counts.get("completed", 0),

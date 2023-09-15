@@ -83,15 +83,10 @@ const QueueTab = () => {
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
 
-  const { data: listQueueItemsData } = useListQueueItemsQuery(
-    {
-      cursor: listCursor,
-      priority: listPriority,
-    },
-    { refetchOnMountOrArgChange: true }
-  );
-
-  console.log(listCursor, listPriority);
+  const { data: listQueueItemsData } = useListQueueItemsQuery({
+    cursor: listCursor,
+    priority: listPriority,
+  });
 
   const queueItems = useMemo(() => {
     if (!listQueueItemsData) {
@@ -101,9 +96,14 @@ const QueueTab = () => {
   }, [listQueueItemsData]);
 
   const handleLoadMore = useCallback(() => {
-    dispatch(listCursorChanged(queueItems[queueItems.length - 1]?.id));
+    if (!listQueueItemsData?.has_more) {
+      return;
+    }
+    dispatch(listCursorChanged(queueItems[queueItems.length - 1]?.order_id));
     dispatch(listPriorityChanged(queueItems[queueItems.length - 1]?.priority));
-  }, [dispatch, queueItems]);
+  }, [dispatch, listQueueItemsData?.has_more, queueItems]);
+
+  console.log(listCursor, listPriority);
 
   return (
     <Box ref={rootRef} w="full" h="full">
@@ -157,7 +157,7 @@ const FixedHeaderContent: FixedHeaderContent = () => (
 
 const ItemContent: ItemContent<SessionQueueItemDTO, unknown> = (
   index,
-  { id, status, batch_id, field_values }
+  { item_id, status, batch_id, field_values }
 ) => (
   <>
     <Td
@@ -182,7 +182,7 @@ const ItemContent: ItemContent<SessionQueueItemDTO, unknown> = (
             .filter((v) => v.node_path !== 'metadata_accumulator')
             .map(({ node_path, field_name, value }) => (
               <Text
-                key={`${id}.${node_path}.${field_name}.${value}`}
+                key={`${item_id}.${node_path}.${field_name}.${value}`}
                 whiteSpace="nowrap"
                 textOverflow="ellipsis"
                 overflow="hidden"

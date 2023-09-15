@@ -307,98 +307,98 @@ export type paths = {
      */
     post: operations["set_log_level"];
   };
-  "/api/v1/queue/enqueue": {
+  "/api/v1/queue/{queue_id}/enqueue": {
     /**
      * Enqueue
      * @description Enqueues a graph for single execution.
      */
     post: operations["enqueue"];
   };
-  "/api/v1/queue/enqueue_batch": {
+  "/api/v1/queue/{queue_id}/enqueue_batch": {
     /**
      * Enqueue Batch
      * @description Processes a batch and enqueues the output graphs for execution.
      */
     post: operations["enqueue_batch"];
   };
-  "/api/v1/queue/list": {
+  "/api/v1/queue/{queue_id}/list": {
     /**
      * List Queue Items
      * @description Gets all queue items (without graphs)
      */
     get: operations["list_queue_items"];
   };
-  "/api/v1/queue/start": {
+  "/api/v1/queue/{queue_id}/start": {
     /**
      * Start
      * @description Starts session queue execution
      */
     put: operations["start"];
   };
-  "/api/v1/queue/stop": {
+  "/api/v1/queue/{queue_id}/stop": {
     /**
      * Stop
      * @description Stops session queue execution, waiting for the currently executing session to finish
      */
     put: operations["stop"];
   };
-  "/api/v1/queue/cancel": {
+  "/api/v1/queue/{queue_id}/cancel": {
     /**
      * Cancel
      * @description Stops session queue execution, immediately canceling the currently-executing session
      */
     put: operations["cancel"];
   };
-  "/api/v1/queue/cancel_by_batch_ids": {
+  "/api/v1/queue/{queue_id}/cancel_by_batch_ids": {
     /**
      * Cancel By Batch Ids
      * @description Immediately cancels all queue items from the given batch ids
      */
     put: operations["cancel_by_batch_ids"];
   };
-  "/api/v1/queue/clear": {
+  "/api/v1/queue/{queue_id}/clear": {
     /**
      * Clear
      * @description Clears the queue entirely, immediately canceling the currently-executing session
      */
     put: operations["clear"];
   };
-  "/api/v1/queue/prune": {
+  "/api/v1/queue/{queue_id}/prune": {
     /**
      * Prune
      * @description Prunes all completed or errored queue items
      */
     put: operations["prune"];
   };
-  "/api/v1/queue/current": {
+  "/api/v1/queue/{queue_id}/current": {
     /**
      * Current
      * @description Gets the currently execution queue item
      */
     get: operations["current"];
   };
-  "/api/v1/queue/peek": {
+  "/api/v1/queue/{queue_id}/peek": {
     /**
      * Peek
      * @description Gets the next queue item, without executing it
      */
     get: operations["peek"];
   };
-  "/api/v1/queue/status": {
+  "/api/v1/queue/{queue_id}/status": {
     /**
      * Get Status
      * @description Gets the status of the session queue
      */
     get: operations["get_status"];
   };
-  "/api/v1/queue/q/{id}": {
+  "/api/v1/queue/{queue_id}/i/{item_id}": {
     /**
      * Get Queue Item
      * @description Gets a queue item
      */
     get: operations["get_queue_item"];
   };
-  "/api/v1/queue/q/{id}/cancel": {
+  "/api/v1/queue/{queue_id}/i/{item_id}/cancel": {
     /**
      * Cancel Queue Item
      * @description Deletes a queue item
@@ -6875,6 +6875,11 @@ export type components = {
        */
       stop_after_current: boolean;
       /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
        * Pending
        * @description Number of queue items with status 'pending'
        */
@@ -6916,10 +6921,15 @@ export type components = {
      */
     SessionQueueItem: {
       /**
-       * Id
-       * @description The ID of the session queue item
+       * Item Id
+       * @description The unique identifier of the session queue item
        */
-      id: number;
+      item_id: string;
+      /**
+       * Order Id
+       * @description The auto-incrementing ID of the session queue item
+       */
+      order_id: number;
       /**
        * Status
        * @description The status of this queue item
@@ -6948,6 +6958,11 @@ export type components = {
        * @description The field values that were used for this queue item
        */
       field_values?: components["schemas"]["NodeFieldValue"][];
+      /**
+       * Queue Id
+       * @description The id of the queue with which this item is associated
+       */
+      queue_id: string;
       /**
        * Error
        * @description The error message if this queue item errored
@@ -6980,10 +6995,15 @@ export type components = {
      */
     SessionQueueItemDTO: {
       /**
-       * Id
-       * @description The ID of the session queue item
+       * Item Id
+       * @description The unique identifier of the session queue item
        */
-      id: number;
+      item_id: string;
+      /**
+       * Order Id
+       * @description The auto-incrementing ID of the session queue item
+       */
+      order_id: number;
       /**
        * Status
        * @description The status of this queue item
@@ -7012,6 +7032,11 @@ export type components = {
        * @description The field values that were used for this queue item
        */
       field_values?: components["schemas"]["NodeFieldValue"][];
+      /**
+       * Queue Id
+       * @description The id of the queue with which this item is associated
+       */
+      queue_id: string;
       /**
        * Error
        * @description The error message if this queue item errored
@@ -9463,6 +9488,12 @@ export type operations = {
    * @description Enqueues a graph for single execution.
    */
   enqueue: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     requestBody: {
       content: {
         "application/json": components["schemas"]["Body_enqueue"];
@@ -9494,6 +9525,12 @@ export type operations = {
    * @description Processes a batch and enqueues the output graphs for execution.
    */
   enqueue_batch: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     requestBody: {
       content: {
         "application/json": components["schemas"]["Body_enqueue_batch"];
@@ -9536,6 +9573,10 @@ export type operations = {
         /** @description The pagination cursor priority */
         priority?: number;
       };
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
     };
     responses: {
       /** @description Successful Response */
@@ -9557,11 +9598,23 @@ export type operations = {
    * @description Starts session queue execution
    */
   start: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -9571,11 +9624,23 @@ export type operations = {
    * @description Stops session queue execution, waiting for the currently executing session to finish
    */
   stop: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -9585,11 +9650,23 @@ export type operations = {
    * @description Stops session queue execution, immediately canceling the currently-executing session
    */
   cancel: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -9599,6 +9676,12 @@ export type operations = {
    * @description Immediately cancels all queue items from the given batch ids
    */
   cancel_by_batch_ids: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     requestBody: {
       content: {
         "application/json": components["schemas"]["Body_cancel_by_batch_ids"];
@@ -9624,11 +9707,23 @@ export type operations = {
    * @description Clears the queue entirely, immediately canceling the currently-executing session
    */
   clear: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
           "application/json": components["schemas"]["ClearResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -9638,11 +9733,23 @@ export type operations = {
    * @description Prunes all completed or errored queue items
    */
   prune: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
           "application/json": components["schemas"]["PruneResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -9652,11 +9759,23 @@ export type operations = {
    * @description Gets the currently execution queue item
    */
   current: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
           "application/json": components["schemas"]["SessionQueueItem"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -9666,11 +9785,23 @@ export type operations = {
    * @description Gets the next queue item, without executing it
    */
   peek: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
           "application/json": components["schemas"]["SessionQueueItem"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -9680,11 +9811,23 @@ export type operations = {
    * @description Gets the status of the session queue
    */
   get_status: {
+    parameters: {
+      path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
           "application/json": components["schemas"]["SessionQueueAndExecutionStatusResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -9696,8 +9839,10 @@ export type operations = {
   get_queue_item: {
     parameters: {
       path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
         /** @description The queue item to get */
-        id: number;
+        item_id: string;
       };
     };
     responses: {
@@ -9722,8 +9867,10 @@ export type operations = {
   cancel_queue_item: {
     parameters: {
       path: {
+        /** @description The queue id to perform this operation on */
+        queue_id: string;
         /** @description The queue item to cancel */
-        id: number;
+        item_id: string;
       };
     };
     responses: {
