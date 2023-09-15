@@ -15,7 +15,6 @@ import {
   isInvocationSchemaObject,
 } from '../types/types';
 import { buildInputFieldTemplate, getFieldType } from './fieldTemplateBuilders';
-import i18n from 'i18next';
 
 const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'metadata'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
@@ -98,7 +97,7 @@ export const parseSchema = (
         if (isReservedInputField(type, propertyName)) {
           logger('nodes').trace(
             { node: type, fieldName: propertyName, field: parseify(property) },
-            i18n.t('nodes.skippedReservedInput')
+            'Skipped reserved input field'
           );
           return inputsAccumulator;
         }
@@ -106,7 +105,7 @@ export const parseSchema = (
         if (!isInvocationFieldSchema(property)) {
           logger('nodes').warn(
             { node: type, propertyName, property: parseify(property) },
-            i18n.t('nodes.unhandledInputProperty')
+            'Unhandled input property'
           );
           return inputsAccumulator;
         }
@@ -121,7 +120,7 @@ export const parseSchema = (
               fieldType,
               field: parseify(property),
             },
-            i18n.t('nodes.skippingUnknownInputType')
+            'Skipping unknown input field type'
           );
           return inputsAccumulator;
         }
@@ -134,7 +133,7 @@ export const parseSchema = (
               fieldType,
               field: parseify(property),
             },
-            i18n.t('nodes.skippingReservedFieldType')
+            'Skipping reserved field type'
           );
           return inputsAccumulator;
         }
@@ -154,7 +153,7 @@ export const parseSchema = (
               fieldType,
               field: parseify(property),
             },
-            i18n.t('nodes.skippingInputNoTemplate')
+            'Skipping input field with no template'
           );
           return inputsAccumulator;
         }
@@ -170,24 +169,21 @@ export const parseSchema = (
     if (!outputSchemaName) {
       logger('nodes').warn(
         { outputRefObject: parseify(schema.output) },
-        i18n.t('nodes.noOutputSchemaName')
+        'No output schema name found in ref object'
       );
       return invocationsAccumulator;
     }
 
     const outputSchema = openAPI.components?.schemas?.[outputSchemaName];
     if (!outputSchema) {
-      logger('nodes').warn(
-        { outputSchemaName },
-        i18n.t('nodes.outputSchemaNotFound')
-      );
+      logger('nodes').warn({ outputSchemaName }, 'Output schema not found');
       return invocationsAccumulator;
     }
 
     if (!isInvocationOutputSchemaObject(outputSchema)) {
       logger('nodes').error(
         { outputSchema: parseify(outputSchema) },
-        i18n.t('nodes.invalidOutputSchema')
+        'Invalid output schema'
       );
       return invocationsAccumulator;
     }
@@ -200,7 +196,7 @@ export const parseSchema = (
         if (!isAllowedOutputField(type, propertyName)) {
           logger('nodes').trace(
             { type, propertyName, property: parseify(property) },
-            i18n.t('nodes.skippedReservedOutput')
+            'Skipped reserved output field'
           );
           return outputsAccumulator;
         }
@@ -208,7 +204,7 @@ export const parseSchema = (
         if (!isInvocationFieldSchema(property)) {
           logger('nodes').warn(
             { type, propertyName, property: parseify(property) },
-            i18n.t('nodes.unhandledOutputProperty')
+            'Unhandled output property'
           );
           return outputsAccumulator;
         }
@@ -218,7 +214,7 @@ export const parseSchema = (
         if (!isFieldType(fieldType)) {
           logger('nodes').warn(
             { fieldName: propertyName, fieldType, field: parseify(property) },
-            i18n.t('nodes.skippingUnknownOutputType')
+            'Skipping unknown output field type'
           );
           return outputsAccumulator;
         }
