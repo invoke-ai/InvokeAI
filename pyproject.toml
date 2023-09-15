@@ -48,7 +48,6 @@ dependencies = [
   "facexlib",
   "fastapi==0.88.0",
   "fastapi-events==0.8.0",
-  "fastapi-socketio==0.0.10",
   "huggingface-hub~=0.16.4",
   "invisible-watermark~=0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "matplotlib",                 # needed for plotting of Penner easing functions
