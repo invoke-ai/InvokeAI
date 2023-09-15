@@ -20,6 +20,7 @@ import {
 import { O } from 'ts-toolbelt';
 import { JsonObject } from 'type-fest';
 import { z } from 'zod';
+import i18n from 'i18next';
 
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
 
@@ -1304,23 +1305,35 @@ export const zValidatedWorkflow = zWorkflow.transform((workflow) => {
     const targetNode = keyedNodes[edge.target];
     const issues: string[] = [];
     if (!sourceNode) {
-      issues.push(`Output node ${edge.source} does not exist`);
+      issues.push(
+        `${i18n.t('nodes.outputNode')} ${edge.source} ${i18n.t(
+          'nodes.doesNotExist'
+        )}`
+      );
     } else if (
       edge.type === 'default' &&
       !(edge.sourceHandle in sourceNode.data.outputs)
     ) {
       issues.push(
-        `Output field "${edge.source}.${edge.sourceHandle}" does not exist`
+        `${i18n.t('nodes.outputField')}"${edge.source}.${
+          edge.sourceHandle
+        }" ${i18n.t('nodes.doesNotExist')}`
       );
     }
     if (!targetNode) {
-      issues.push(`Input node ${edge.target} does not exist`);
+      issues.push(
+        `${i18n.t('nodes.inputNode')} ${edge.target} ${i18n.t(
+          'nodes.doesNotExist'
+        )}`
+      );
     } else if (
       edge.type === 'default' &&
       !(edge.targetHandle in targetNode.data.inputs)
     ) {
       issues.push(
-        `Input field "${edge.target}.${edge.targetHandle}" does not exist`
+        `${i18n.t('nodes.inputField')} "${edge.target}.${
+          edge.targetHandle
+        }" ${i18n.t('nodes.doesNotExist')}`
       );
     }
     if (issues.length) {
@@ -1328,7 +1341,9 @@ export const zValidatedWorkflow = zWorkflow.transform((workflow) => {
       const src = edge.type === 'default' ? edge.sourceHandle : edge.source;
       const tgt = edge.type === 'default' ? edge.targetHandle : edge.target;
       warnings.push({
-        message: `Edge "${src} -> ${tgt}" skipped`,
+        message: `${i18n.t('nodes.edge')} "${src} -> ${tgt}" ${i18n.t(
+          'nodes.skipped'
+        )}`,
         issues,
         data: edge,
       });

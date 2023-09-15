@@ -4,6 +4,7 @@ import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { addToast } from 'features/system/store/systemSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { startAppListening } from '..';
+import { t } from 'i18next';
 
 export const addCanvasMaskSavedToGalleryListener = () => {
   startAppListening({
@@ -30,8 +31,8 @@ export const addCanvasMaskSavedToGalleryListener = () => {
         log.error('Problem getting mask layer blob');
         dispatch(
           addToast({
-            title: 'Problem Saving Mask',
-            description: 'Unable to export mask',
+            title: t('toast.problemSavingMask'),
+            description: t('toast.problemSavingMaskDesc'),
             status: 'error',
           })
         );
@@ -51,7 +52,7 @@ export const addCanvasMaskSavedToGalleryListener = () => {
           crop_visible: true,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: 'Mask Saved to Assets' },
+            toastOptions: { title: t('toast.maskSavedAssets') },
           },
         })
       );
