@@ -3,7 +3,6 @@
 from fastapi import FastAPI
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event
-from fastapi_socketio import SocketManager
 from socketio import AsyncServer, ASGIApp
 
 from ..services.events import EventServiceBase
