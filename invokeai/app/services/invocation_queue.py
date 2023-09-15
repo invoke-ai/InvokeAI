@@ -3,9 +3,9 @@
 import time
 from abc import ABC, abstractmethod
 from queue import Queue
+from typing import Optional
 
 from pydantic import BaseModel, Field
-from typing import Optional
 
 
 class InvocationQueueItem(BaseModel):

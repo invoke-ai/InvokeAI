@@ -9,13 +9,7 @@ from pydantic.fields import Field
 # Importing * is bad karma but needed here for node detection
 from ...invocations import *  # noqa: F401 F403
 from ...invocations.baseinvocation import BaseInvocation
-from ...services.graph import (
-    Edge,
-    EdgeConnection,
-    Graph,
-    GraphExecutionState,
-    NodeAlreadyExecutedError,
-)
+from ...services.graph import Edge, EdgeConnection, Graph, GraphExecutionState, NodeAlreadyExecutedError
 from ...services.item_storage import PaginatedResults
 from ..dependencies import ApiDependencies
 

@@ -8,18 +8,7 @@ from abc import ABCMeta, abstractmethod
 from contextlib import suppress
 from enum import Enum
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generic,
-    List,
-    Literal,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-)
+from typing import Any, Callable, Dict, Generic, List, Literal, Optional, Type, TypeVar, Union
 
 import numpy as np
 import onnx

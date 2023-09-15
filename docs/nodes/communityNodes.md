@@ -4,9 +4,9 @@ These are nodes that have been developed by the community, for the community. If
 
 If you'd like to submit a node for the community, please refer to the [node creation overview](contributingNodes.md).
 
-To download a node, simply download the `.py` node file from the link and add it to the `invokeai/app/invocations` folder in your Invoke AI install location. Along with the node, an example node graph should be provided to help you get started with the node. 
+To download a node, simply download the `.py` node file from the link and add it to the `invokeai/app/invocations` folder in your Invoke AI install location. If you used the automated installation, this can be found inside the `.venv` folder. Along with the node, an example node graph should be provided to help you get started with the node. 
 
-To use a community node graph, download the the `.json` node graph file and load it into Invoke AI via the **Load Nodes** button on the Node Editor. 
+To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
 ## Community Nodes
 
@@ -41,7 +41,7 @@ To use a community node graph, download the the `.json` node graph file and load
 
 **Description:** This InvokeAI node takes in a collection of images and randomly chooses one. This can be useful when you have a number of poses to choose from for a ControlNet node, or a number of input images for another purpose.
 
-**Node Link:** https://github.com/JPPhoto/film-grain-node
+**Node Link:** https://github.com/JPPhoto/image-picker-node
 
 --------------------------------
 ### Retroize
@@ -175,6 +175,24 @@ A third node is included, *Random Switch (Integers)*, which is just a generic ve
 
 **Example Usage:**
 ![size stepper usage graph](https://raw.githubusercontent.com/dwringer/size-stepper-nodes/main/size_nodes_usage.jpg)
+
+--------------------------------
+
+### Text font to Image
+
+**Description:** text font to text image node for InvokeAI, download a font to use (or if in font cache uses it from there), the text is always resized to the image size, but can control that with padding, optional 2nd line
+
+**Node Link:** https://github.com/mickr777/textfontimage
+
+**Output Examples**
+
+![a3609d48-d9b7-41f0-b280-063d857986fb](https://github.com/mickr777/InvokeAI/assets/115216705/c21b0af3-d9c6-4c16-9152-846a23effd36)
+
+Results after using the depth controlnet
+
+![9133eabb-bcda-4326-831e-1b641228b178](https://github.com/mickr777/InvokeAI/assets/115216705/915f1a53-968e-43eb-aa61-07cd8f1a733a)
+![4f9a3fa8-9be9-4236-8a3e-fcec66decd2a](https://github.com/mickr777/InvokeAI/assets/115216705/821ef89e-8a60-44f5-b94e-471a9d8690cc)
+![babd69c4-9d60-4a55-a834-5e8397f62610](https://github.com/mickr777/InvokeAI/assets/115216705/2befcb6d-49f4-4bfd-b5fc-1fee19274f89)
 
 --------------------------------
 

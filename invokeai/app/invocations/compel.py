@@ -4,13 +4,7 @@ from typing import List, Union
 
 import torch
 from compel import Compel, ReturnedEmbeddingsType
-from compel.prompt_parser import (
-    Blend,
-    Conjunction,
-    CrossAttentionControlSubstitute,
-    FlattenedPrompt,
-    Fragment,
-)
+from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
 
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (

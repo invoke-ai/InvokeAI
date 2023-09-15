@@ -16,6 +16,7 @@ import { forEach } from 'lodash-es';
 import { PropsWithChildren, memo, useCallback, useMemo, useRef } from 'react';
 import { useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
 import { PARAMETERS_PANEL_WIDTH } from 'theme/util/constants';
+import { useTranslation } from 'react-i18next';
 
 type Props = PropsWithChildren & {
   onSelect: (v: string) => void;
@@ -27,6 +28,7 @@ const ParamEmbeddingPopover = (props: Props) => {
   const { onSelect, isOpen, onClose, children } = props;
   const { data: embeddingQueryData } = useGetTextualInversionModelsQuery();
   const inputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
   const currentMainModel = useAppSelector(
     (state: RootState) => state.generation.model
@@ -52,7 +54,7 @@ const ParamEmbeddingPopover = (props: Props) => {
         group: MODEL_TYPE_MAP[embedding.base_model],
         disabled,
         tooltip: disabled
-          ? `Incompatible base model: ${embedding.base_model}`
+          ? `${t('embedding.incompatibleModel')} ${embedding.base_model}`
           : undefined,
       });
     });
@@ -63,7 +65,7 @@ const ParamEmbeddingPopover = (props: Props) => {
     );
 
     return data.sort((a, b) => (a.disabled && !b.disabled ? 1 : -1));
-  }, [embeddingQueryData, currentMainModel?.base_model]);
+  }, [embeddingQueryData, currentMainModel?.base_model, t]);
 
   const handleChange = useCallback(
     (v: string | null) => {
@@ -118,10 +120,10 @@ const ParamEmbeddingPopover = (props: Props) => {
             <IAIMantineSearchableSelect
               inputRef={inputRef}
               autoFocus
-              placeholder="Add Embedding"
+              placeholder={t('embedding.addEmbedding')}
               value={null}
               data={data}
-              nothingFound="No matching Embeddings"
+              nothingFound={t('embedding.noMatchingEmbedding')}
               itemComponent={IAIMantineSelectItemWithTooltip}
               disabled={data.length === 0}
               onDropdownClose={onClose}

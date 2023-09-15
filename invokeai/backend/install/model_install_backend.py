@@ -19,18 +19,8 @@ from tqdm import tqdm
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_management import (
-    AddModelResult,
-    BaseModelType,
-    ModelManager,
-    ModelType,
-    ModelVariantType,
-)
-from invokeai.backend.model_management.model_probe import (
-    ModelProbe,
-    ModelProbeInfo,
-    SchedulerPredictionType,
-)
+from invokeai.backend.model_management import AddModelResult, BaseModelType, ModelManager, ModelType, ModelVariantType
+from invokeai.backend.model_management.model_probe import ModelProbe, ModelProbeInfo, SchedulerPredictionType
 from invokeai.backend.util import download_with_resume
 from invokeai.backend.util.devices import choose_torch_device, torch_dtype
 

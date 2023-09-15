@@ -5,6 +5,7 @@ import {
   controlNetWeightChanged,
 } from 'features/controlNet/store/controlNetSlice';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type ParamControlNetWeightProps = {
   controlNet: ControlNetConfig;
@@ -13,6 +14,7 @@ type ParamControlNetWeightProps = {
 const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
   const { weight, isEnabled, controlNetId } = props.controlNet;
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const handleWeightChanged = useCallback(
     (weight: number) => {
       dispatch(controlNetWeightChanged({ controlNetId, weight }));
@@ -23,7 +25,7 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
   return (
     <IAISlider
       isDisabled={!isEnabled}
-      label="Weight"
+      label={t('controlnet.weight')}
       value={weight}
       onChange={handleWeightChanged}
       min={0}

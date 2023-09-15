@@ -76,7 +76,7 @@ export default function InvokeButton(props: InvokeButton) {
         )}
         {asIconButton ? (
           <IAIIconButton
-            aria-label={t('parameters.invoke')}
+            aria-label={t('parameters.invoke.invoke')}
             type="submit"
             icon={<FaPlay />}
             isDisabled={!isReady}
@@ -96,7 +96,7 @@ export default function InvokeButton(props: InvokeButton) {
         ) : (
           <IAIButton
             tooltip={<InvokeButtonTooltipContent />}
-            aria-label={t('parameters.invoke')}
+            aria-label={t('parameters.invoke.invoke')}
             type="submit"
             data-progress={isProcessing}
             isDisabled={!isReady}
@@ -105,7 +105,7 @@ export default function InvokeButton(props: InvokeButton) {
             id="invoke-button"
             leftIcon={isProcessing ? undefined : <FaPlay />}
             isLoading={isProcessing}
-            loadingText={t('parameters.invoke')}
+            loadingText={t('parameters.invoke.invoke')}
             sx={{
               w: 'full',
               flexGrow: 1,
@@ -138,11 +138,14 @@ export const InvokeButtonTooltipContent = memo(() => {
   const { isReady, reasons } = useIsReadyToInvoke();
   const { autoAddBoardId } = useAppSelector(tooltipSelector);
   const autoAddBoardName = useBoardName(autoAddBoardId);
+  const { t } = useTranslation();
 
   return (
     <Flex flexDir="column" gap={1}>
       <Text fontWeight={600}>
-        {isReady ? 'Ready to Invoke' : 'Unable to Invoke'}
+        {isReady
+          ? t('parameters.invoke.readyToInvoke')
+          : t('parameters.invoke.unableToInvoke')}
       </Text>
       {reasons.length > 0 && (
         <UnorderedList>
@@ -159,7 +162,7 @@ export const InvokeButtonTooltipContent = memo(() => {
         _dark={{ borderColor: 'base.900' }}
       />
       <Text fontWeight={400} fontStyle="oblique 10deg">
-        Adding images to{' '}
+        {t('parameters.invoke.addingImagesTo')}{' '}
         <Text as="span" fontWeight={600}>
           {autoAddBoardName || 'Uncategorized'}
         </Text>

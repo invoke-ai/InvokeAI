@@ -5,10 +5,11 @@ configuration variable, that allows the checker to be supressed.
 """
 import numpy as np
 from PIL import Image
-from invokeai.backend import SilenceWarnings
-from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util.devices import choose_torch_device
+
 import invokeai.backend.util.logging as logger
+from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend import SilenceWarnings
+from invokeai.backend.util.devices import choose_torch_device
 
 config = InvokeAIAppConfig.get_config()
 

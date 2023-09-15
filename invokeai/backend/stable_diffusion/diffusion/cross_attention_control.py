@@ -11,12 +11,7 @@ import diffusers
 import psutil
 import torch
 from compel.cross_attention_control import Arguments
-from diffusers.models.attention_processor import (
-    Attention,
-    AttentionProcessor,
-    AttnProcessor,
-    SlicedAttnProcessor,
-)
+from diffusers.models.attention_processor import Attention, AttentionProcessor, AttnProcessor, SlicedAttnProcessor
 from diffusers.models.unet_2d_condition import UNet2DConditionModel
 from torch import nn
 

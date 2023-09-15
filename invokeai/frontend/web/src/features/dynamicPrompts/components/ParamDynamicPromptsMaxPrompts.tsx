@@ -8,6 +8,7 @@ import {
   maxPromptsChanged,
   maxPromptsReset,
 } from '../store/dynamicPromptsSlice';
+import { useTranslation } from 'react-i18next';
 
 const selector = createSelector(
   stateSelector,
@@ -31,6 +32,7 @@ const ParamDynamicPromptsMaxPrompts = () => {
   const { maxPrompts, min, sliderMax, inputMax, isDisabled } =
     useAppSelector(selector);
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleChange = useCallback(
     (v: number) => {
@@ -45,7 +47,7 @@ const ParamDynamicPromptsMaxPrompts = () => {
 
   return (
     <IAISlider
-      label="Max Prompts"
+      label={t('prompt.maxPrompts')}
       isDisabled={isDisabled}
       min={min}
       max={sliderMax}

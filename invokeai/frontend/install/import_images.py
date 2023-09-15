@@ -6,25 +6,25 @@
 # pylint: disable=broad-exception-caught
 """Script to import images into the new database system for 3.0.0"""
 
-import os
 import datetime
-import shutil
-import locale
-import sqlite3
-import json
 import glob
+import json
+import locale
+import os
 import re
+import shutil
+import sqlite3
 import uuid
-import yaml
+from pathlib import Path
+
 import PIL
 import PIL.ImageOps
 import PIL.PngImagePlugin
-
-from pathlib import Path
+import yaml
 from prompt_toolkit import prompt
-from prompt_toolkit.shortcuts import message_dialog
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.shortcuts import message_dialog
 
 from invokeai.app.services.config import InvokeAIAppConfig
 

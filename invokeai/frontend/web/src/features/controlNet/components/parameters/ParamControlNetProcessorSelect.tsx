@@ -15,6 +15,7 @@ import {
   controlNetProcessorTypeChanged,
 } from '../../store/controlNetSlice';
 import { ControlNetProcessorType } from '../../store/types';
+import { useTranslation } from 'react-i18next';
 
 type ParamControlNetProcessorSelectProps = {
   controlNet: ControlNetConfig;
@@ -57,6 +58,7 @@ const ParamControlNetProcessorSelect = (
   const { controlNetId, isEnabled, processorNode } = props.controlNet;
   const isBusy = useAppSelector(selectIsBusy);
   const controlNetProcessors = useAppSelector(selector);
+  const { t } = useTranslation();
 
   const handleProcessorTypeChanged = useCallback(
     (v: string | null) => {
@@ -72,7 +74,7 @@ const ParamControlNetProcessorSelect = (
 
   return (
     <IAIMantineSearchableSelect
-      label="Processor"
+      label={t('controlnet.processor')}
       value={processorNode.type ?? 'canny_image_processor'}
       data={controlNetProcessors}
       onChange={handleProcessorTypeChanged}

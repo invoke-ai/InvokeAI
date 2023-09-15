@@ -14,12 +14,12 @@ from ..invocations import *  # noqa: F401 F403
 from ..invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    invocation,
     Input,
     InputField,
     InvocationContext,
     OutputField,
     UIType,
+    invocation,
     invocation_output,
 )
 
@@ -182,7 +182,7 @@ class IterateInvocationOutput(BaseInvocationOutput):
 
 
 # TODO: Fill this out and move to invocations
-@invocation("iterate")
+@invocation("iterate", version="1.0.0")
 class IterateInvocation(BaseInvocation):
     """Iterates over a list of items"""
 
@@ -203,7 +203,7 @@ class CollectInvocationOutput(BaseInvocationOutput):
     )
 
 
-@invocation("collect")
+@invocation("collect", version="1.0.0")
 class CollectInvocation(BaseInvocation):
     """Collects values into a collection"""
 

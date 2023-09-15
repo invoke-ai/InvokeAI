@@ -2,14 +2,15 @@
 Not really a test, but a way to verify that the paths are existing
 and fail early if they are not.
 """
-import unittest
 import pathlib
+import unittest
 from os import path as osp
+
 from PIL import Image
 
-import invokeai.frontend.web.dist as frontend
-import invokeai.configs as configs
 import invokeai.app.assets.images as image_assets
+import invokeai.configs as configs
+import invokeai.frontend.web.dist as frontend
 
 
 class ConfigsTestCase(unittest.TestCase):
