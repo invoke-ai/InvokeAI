@@ -2,9 +2,9 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
-import { ParamCFGScalePopover } from 'features/informationalPopovers/components/paramCFGScale';
 import { setCfgScale } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,7 +54,7 @@ const ParamCFGScale = () => {
   );
 
   return shouldUseSliders ? (
-    <ParamCFGScalePopover>
+    <IAIInformationalPopover details="paramCFGScale">
       <IAISlider
         label={t('parameters.cfgScale')}
         step={shift ? 0.1 : 0.5}
@@ -69,9 +69,9 @@ const ParamCFGScale = () => {
         withSliderMarks
         isInteger={false}
       />
-    </ParamCFGScalePopover>
+    </IAIInformationalPopover>
   ) : (
-    <ParamCFGScalePopover>
+    <IAIInformationalPopover details="paramCFGScale">
       <IAINumberInput
         label={t('parameters.cfgScale')}
         step={0.5}
@@ -82,7 +82,7 @@ const ParamCFGScale = () => {
         isInteger={false}
         numberInputFieldProps={{ textAlign: 'center' }}
       />
-    </ParamCFGScalePopover>
+    </IAIInformationalPopover>
   );
 };
 

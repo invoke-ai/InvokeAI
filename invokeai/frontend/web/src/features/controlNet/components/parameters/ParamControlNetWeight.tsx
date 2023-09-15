@@ -1,10 +1,10 @@
 import { useAppDispatch } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
 import {
   ControlNetConfig,
   controlNetWeightChanged,
 } from 'features/controlNet/store/controlNetSlice';
-import { ControlNetWeightPopover } from 'features/informationalPopovers/components/controlNetWeight';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -24,7 +24,7 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
   );
 
   return (
-    <ControlNetWeightPopover>
+    <IAIInformationalPopover details="controlNetWeight">
       <IAISlider
         isDisabled={!isEnabled}
         label={t('controlnet.weight')}
@@ -36,7 +36,7 @@ const ParamControlNetWeight = (props: ParamControlNetWeightProps) => {
         withSliderMarks
         sliderMarks={[0, 1, 2]}
       />
-    </ControlNetWeightPopover>
+    </IAIInformationalPopover>
   );
 };
 

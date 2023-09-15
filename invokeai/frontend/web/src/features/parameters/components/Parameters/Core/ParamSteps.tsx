@@ -2,10 +2,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAINumberInput from 'common/components/IAINumberInput';
 
 import IAISlider from 'common/components/IAISlider';
-import { ParamStepsPopover } from 'features/informationalPopovers/components/paramSteps';
 import {
   clampSymmetrySteps,
   setSteps,
@@ -57,7 +57,7 @@ const ParamSteps = () => {
   }, [dispatch]);
 
   return shouldUseSliders ? (
-    <ParamStepsPopover>
+    <IAIInformationalPopover details="paramSteps">
       <IAISlider
         label={t('parameters.steps')}
         min={min}
@@ -71,9 +71,9 @@ const ParamSteps = () => {
         withSliderMarks
         sliderNumberInputProps={{ max: inputMax }}
       />
-    </ParamStepsPopover>
+    </IAIInformationalPopover>
   ) : (
-    <ParamStepsPopover>
+    <IAIInformationalPopover details="paramSteps">
       <IAINumberInput
         label={t('parameters.steps')}
         min={min}
@@ -84,7 +84,7 @@ const ParamSteps = () => {
         numberInputFieldProps={{ textAlign: 'center' }}
         onBlur={handleBlur}
       />
-    </ParamStepsPopover>
+    </IAIInformationalPopover>
   );
 };
 

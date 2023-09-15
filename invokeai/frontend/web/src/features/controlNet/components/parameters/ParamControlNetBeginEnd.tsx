@@ -10,12 +10,12 @@ import {
   Tooltip,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import {
   ControlNetConfig,
   controlNetBeginStepPctChanged,
   controlNetEndStepPctChanged,
 } from 'features/controlNet/store/controlNetSlice';
-import { ControlNetBeginEndPopover } from 'features/informationalPopovers/components/controlNetBeginEnd';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -50,7 +50,7 @@ const ParamControlNetBeginEnd = (props: Props) => {
   );
 
   return (
-    <ControlNetBeginEndPopover>
+    <IAIInformationalPopover details="controlNetBeginEnd">
       <FormControl isDisabled={!isEnabled}>
         <FormLabel>{t('controlnet.beginEndStepPercent')}</FormLabel>
         <HStack w="100%" gap={2} alignItems="center">
@@ -64,22 +64,6 @@ const ParamControlNetBeginEnd = (props: Props) => {
             minStepsBetweenThumbs={5}
             isDisabled={!isEnabled}
           >
-            <RangeSliderTrack>
-              <RangeSliderFilledTrack />
-            </RangeSliderTrack>
-            <Tooltip label={formatPct(beginStepPct)} placement="top" hasArrow>
-              <RangeSliderThumb index={0} />
-            </Tooltip>
-            <Tooltip label={formatPct(endStepPct)} placement="top" hasArrow>
-              <RangeSliderThumb index={1} />
-            </Tooltip>
-            <RangeSliderMark
-              value={0}
-              sx={{
-                insetInlineStart: '0 !important',
-                insetInlineEnd: 'unset !important',
-              }}
-            >
             <RangeSliderTrack>
               <RangeSliderFilledTrack />
             </RangeSliderTrack>
@@ -119,7 +103,7 @@ const ParamControlNetBeginEnd = (props: Props) => {
           </RangeSlider>
         </HStack>
       </FormControl>
-    </ControlNetBeginEndPopover>
+    </IAIInformationalPopover>
   );
 };
 

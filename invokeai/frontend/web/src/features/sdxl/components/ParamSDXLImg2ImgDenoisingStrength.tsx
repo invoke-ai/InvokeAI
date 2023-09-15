@@ -7,7 +7,7 @@ import SubParametersWrapper from 'features/parameters/components/Parameters/SubP
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { setSDXLImg2ImgDenoisingStrength } from '../store/sdxlSlice';
-import { ParamDenoisingStrengthPopover } from 'features/informationalPopovers/components/paramDenoisingStrength';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 const selector = createSelector(
   [stateSelector],
@@ -37,7 +37,7 @@ const ParamSDXLImg2ImgDenoisingStrength = () => {
 
   return (
     <SubParametersWrapper>
-      <ParamDenoisingStrengthPopover>
+      <IAIInformationalPopover details="paramDenoisingStrength">
         <IAISlider
           label={t('sdxl.denoisingStrength')}
           step={0.01}
@@ -51,7 +51,7 @@ const ParamSDXLImg2ImgDenoisingStrength = () => {
           withSliderMarks
           withReset
         />
-      </ParamDenoisingStrengthPopover>
+      </IAIInformationalPopover>
     </SubParametersWrapper>
   );
 };

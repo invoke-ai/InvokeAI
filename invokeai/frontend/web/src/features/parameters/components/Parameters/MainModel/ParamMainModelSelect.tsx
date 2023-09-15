@@ -21,7 +21,7 @@ import {
   useGetOnnxModelsQuery,
 } from 'services/api/endpoints/models';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
-import { ParamModelPopover } from 'features/informationalPopovers/components/paramModel';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 const selector = createSelector(
   stateSelector,
@@ -119,7 +119,7 @@ const ParamMainModelSelect = () => {
       data={[]}
     />
   ) : (
-    <ParamModelPopover>
+    <IAIInformationalPopover details="paramModel" placement="bottom">
       <Flex w="100%" alignItems="center" gap={3}>
         <IAIMantineSearchableSelect
           tooltip={selectedModel?.description}
@@ -140,7 +140,7 @@ const ParamMainModelSelect = () => {
           </Box>
         )}
       </Flex>
-    </ParamModelPopover>
+    </IAIInformationalPopover>
   );
 };
 

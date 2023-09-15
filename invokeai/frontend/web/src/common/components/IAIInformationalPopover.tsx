@@ -15,11 +15,11 @@ import {
 import { ReactNode } from 'react';
 import { useAppSelector } from '../../app/store/storeHooks';
 import { systemSelector } from '../../features/system/store/systemSelectors';
+import { useTranslation } from 'react-i18next';
 
 interface Props extends PopoverProps {
-  heading?: string;
-  paragraph: string;
-  triggerComponent: ReactNode;
+  details: string;
+  children: ReactNode;
   image?: string;
   buttonLabel?: string;
   buttonHref?: string;
@@ -27,18 +27,21 @@ interface Props extends PopoverProps {
 }
 
 function IAIInformationalPopover({
-  heading,
-  paragraph,
+  details,
   image,
   buttonLabel,
   buttonHref,
-  triggerComponent,
+  children,
   placement,
 }: Props) {
   const { shouldDisableInformationalPopovers } = useAppSelector(systemSelector);
+  const { t } = useTranslation();
+
+  const heading = t(`popovers.${details}.heading`);
+  const paragraph = t(`popovers.${details}.paragraph`);
 
   if (shouldDisableInformationalPopovers) {
-    return triggerComponent;
+    return children;
   } else {
     return (
       <Popover
@@ -48,7 +51,7 @@ function IAIInformationalPopover({
         variant="informational"
       >
         <PopoverTrigger>
-          <div>{triggerComponent}</div>
+          <div>{children}</div>
         </PopoverTrigger>
         <PopoverContent>
           <PopoverArrow />

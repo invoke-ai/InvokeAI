@@ -5,8 +5,8 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
 import { memo, useCallback } from 'react';
 import { combinatorialToggled } from '../store/dynamicPromptsSlice';
-import { DynamicPromptsCombinatorialPopover } from 'features/informationalPopovers/components/dynamicPromptsCombinatorial';
 import { useTranslation } from 'react-i18next';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 const selector = createSelector(
   stateSelector,
@@ -28,14 +28,14 @@ const ParamDynamicPromptsCombinatorial = () => {
   }, [dispatch]);
 
   return (
-    <DynamicPromptsCombinatorialPopover>
+    <IAIInformationalPopover details="dynamicPromptsCombinatorial">
       <IAISwitch
         isDisabled={isDisabled}
         label={t('prompt.combinatorial')}
         isChecked={combinatorial}
         onChange={handleChange}
       />
-    </DynamicPromptsCombinatorialPopover>
+    </IAIInformationalPopover>
   );
 };
 

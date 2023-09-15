@@ -1,11 +1,11 @@
 import { useAppDispatch } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   ControlNetConfig,
   ResizeModes,
   controlNetResizeModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
-import { ControlNetResizeModePopover } from 'features/informationalPopovers/components/controlNetResizeMode';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -34,7 +34,7 @@ export default function ParamControlNetResizeMode(
   );
 
   return (
-    <ControlNetResizeModePopover>
+    <IAIInformationalPopover details="controlNetResizeMode">
       <IAIMantineSelect
         disabled={!isEnabled}
         label={t('controlnet.resizeMode')}
@@ -42,6 +42,6 @@ export default function ParamControlNetResizeMode(
         value={String(resizeMode)}
         onChange={handleResizeModeChange}
       />
-    </ControlNetResizeModePopover>
+    </IAIInformationalPopover>
   );
 }

@@ -29,7 +29,6 @@ import { useTranslation } from 'react-i18next';
 import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 import IAIInformationalPopover from '../../../../../common/components/IAIInformationalPopover';
 import InvokeAILogoImage from 'assets/images/logo.png';
-import { ParamPositiveConditioningPopover } from '../../../../informationalPopovers/components/paramPositiveConditioning';
 
 const promptInputSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -139,7 +138,7 @@ const ParamPositiveConditioning = () => {
           onClose={onClose}
           onSelect={handleSelectEmbedding}
         >
-          <ParamPositiveConditioningPopover>
+          <IAIInformationalPopover details="paramPositiveConditioning">
             <IAITextarea
               id="prompt"
               name="prompt"
@@ -151,7 +150,7 @@ const ParamPositiveConditioning = () => {
               resize="vertical"
               minH={32}
             />
-          </ParamPositiveConditioningPopover>
+          </IAIInformationalPopover>
         </ParamEmbeddingPopover>
       </FormControl>
       {!isOpen && isEmbeddingEnabled && (

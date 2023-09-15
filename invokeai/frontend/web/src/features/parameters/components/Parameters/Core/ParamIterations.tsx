@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAINumberInput from 'common/components/IAINumberInput';
 import IAISlider from 'common/components/IAISlider';
 import { ParamImagesPopover } from 'features/informationalPopovers/components/paramImages';
@@ -61,7 +62,7 @@ const ParamIterations = () => {
   }, [dispatch, initial]);
 
   return shouldUseSliders ? (
-    <ParamImagesPopover>
+    <IAIInformationalPopover details="paramImages">
       <IAISlider
         isDisabled={isDisabled}
         label={t('parameters.images')}
@@ -76,9 +77,9 @@ const ParamIterations = () => {
         withSliderMarks
         sliderNumberInputProps={{ max: inputMax }}
       />
-    </ParamImagesPopover>
+    </IAIInformationalPopover>
   ) : (
-    <ParamImagesPopover>
+    <IAIInformationalPopover details="paramImages">
       <IAINumberInput
         isDisabled={isDisabled}
         label={t('parameters.images')}
@@ -89,7 +90,7 @@ const ParamIterations = () => {
         value={iterations}
         numberInputFieldProps={{ textAlign: 'center' }}
       />
-    </ParamImagesPopover>
+    </IAIInformationalPopover>
   );
 };
 

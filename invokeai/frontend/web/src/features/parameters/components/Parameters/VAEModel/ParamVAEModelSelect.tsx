@@ -15,7 +15,7 @@ import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectI
 import { vaeSelected } from 'features/parameters/store/generationSlice';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { modelIdToVAEModelParam } from 'features/parameters/util/modelIdToVAEModelParam';
-import { ParamVAEPopover } from 'features/informationalPopovers/components/paramVAE';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 const selector = createSelector(
   stateSelector,
@@ -94,7 +94,7 @@ const ParamVAEModelSelect = () => {
   );
 
   return (
-    <ParamVAEPopover>
+    <IAIInformationalPopover details="paramVAE">
       <IAIMantineSearchableSelect
         itemComponent={IAIMantineSelectItemWithTooltip}
         tooltip={selectedVaeModel?.description}
@@ -106,7 +106,7 @@ const ParamVAEModelSelect = () => {
         disabled={data.length === 0}
         clearable
       />
-    </ParamVAEPopover>
+    </IAIInformationalPopover>
   );
 };
 

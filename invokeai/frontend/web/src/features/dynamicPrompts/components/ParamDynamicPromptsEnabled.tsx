@@ -5,8 +5,8 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAISwitch from 'common/components/IAISwitch';
 import { memo, useCallback } from 'react';
 import { isEnabledToggled } from '../store/dynamicPromptsSlice';
-import { DynamicPromptsTogglePopover } from 'features/informationalPopovers/components/dynamicPromptsToggle';
 import { useTranslation } from 'react-i18next';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 
 const selector = createSelector(
   stateSelector,
@@ -28,14 +28,13 @@ const ParamDynamicPromptsToggle = () => {
   }, [dispatch]);
 
   return (
-    <DynamicPromptsTogglePopover>
+    <IAIInformationalPopover details="dynamicPromptsToggle">
       <IAISwitch
         label={t('prompt.enableDynamicPrompts')}
         isChecked={isEnabled}
         onChange={handleToggleIsEnabled}
       />
-    </DynamicPromptsTogglePopover>
-
+    </IAIInformationalPopover>
   );
 };
 

@@ -1,11 +1,11 @@
 import { useAppDispatch } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
 import {
   ControlModes,
   ControlNetConfig,
   controlNetControlModeChanged,
 } from 'features/controlNet/store/controlNetSlice';
-import { ControlNetControlModePopover } from 'features/informationalPopovers/components/controlNetControlMode';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -35,7 +35,7 @@ export default function ParamControlNetControlMode(
   );
 
   return (
-    <ControlNetControlModePopover>
+    <IAIInformationalPopover details="controlNetControlMode">
       <IAIMantineSelect
         disabled={!isEnabled}
         label={t('controlnet.controlMode')}
@@ -43,6 +43,6 @@ export default function ParamControlNetControlMode(
         value={String(controlMode)}
         onChange={handleControlModeChange}
       />
-    </ControlNetControlModePopover>
+    </IAIInformationalPopover>
   );
 }

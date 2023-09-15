@@ -2,8 +2,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { ParamVAEPrecisionPopover } from 'features/informationalPopovers/components/paramVAEPrecision';
 import { vaePrecisionChanged } from 'features/parameters/store/generationSlice';
 import { PrecisionParam } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback } from 'react';
@@ -35,14 +35,14 @@ const ParamVAEModelSelect = () => {
   );
 
   return (
-    <ParamVAEPrecisionPopover>
+    <IAIInformationalPopover details="paramVAEPrecision">
       <IAIMantineSelect
         label="VAE Precision"
         value={vaePrecision}
         data={DATA}
         onChange={handleChange}
       />
-    </ParamVAEPrecisionPopover>
+    </IAIInformationalPopover>
   );
 };
 

@@ -1,7 +1,7 @@
 import { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIInformationalPopover from 'common/components/IAIInformationalPopover';
 import IAISlider from 'common/components/IAISlider';
-import { ClipSkipPopover } from 'features/informationalPopovers/components/clipSkip';
 import { setClipSkip } from 'features/parameters/store/generationSlice';
 import { clipSkipMap } from 'features/parameters/types/constants';
 import { useCallback, useMemo } from 'react';
@@ -43,7 +43,7 @@ export default function ParamClipSkip() {
   }, [model]);
 
   return (
-    <ClipSkipPopover>
+    <IAIInformationalPopover details="clipSkip">
       <IAISlider
         label={t('parameters.clipSkip')}
         aria-label={t('parameters.clipSkip')}
@@ -58,6 +58,6 @@ export default function ParamClipSkip() {
         withReset
         handleReset={handleClipSkipReset}
       />
-    </ClipSkipPopover>
+    </IAIInformationalPopover>
   );
 }
