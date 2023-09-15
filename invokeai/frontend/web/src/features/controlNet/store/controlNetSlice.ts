@@ -1,9 +1,13 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import { ControlNetModelParam } from 'features/parameters/types/parameterSchemas';
+import {
+  ControlNetModelParam,
+  IPAdapterModelParam,
+} from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, forEach } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import { components } from 'services/api/schema';
 import { isAnySessionRejected } from 'services/api/thunks/session';
+import { ImageDTO } from 'services/api/types';
 import { appSocketInvocationError } from 'services/events/actions';
 import { controlNetImageProcessed } from './actions';
 import {
@@ -56,16 +60,30 @@ export type ControlNetConfig = {
   shouldAutoConfig: boolean;
 };
 
+export type IPAdapterConfig = {
+  adapterImage: ImageDTO | null;
+  model: IPAdapterModelParam | null;
+  weight: number;
+};
+
 export type ControlNetState = {
   controlNets: Record<string, ControlNetConfig>;
   isEnabled: boolean;
   pendingControlImages: string[];
+  isIPAdapterEnabled: boolean;
+  ipAdapterInfo: IPAdapterConfig;
 };
 
 export const initialControlNetState: ControlNetState = {
   controlNets: {},
   isEnabled: false,
   pendingControlImages: [],
+  isIPAdapterEnabled: false,
+  ipAdapterInfo: {
+    adapterImage: null,
+    model: null,
+    weight: 1,
+  },
 };
 
 export const controlNetSlice = createSlice({
@@ -353,6 +371,21 @@ export const controlNetSlice = createSlice({
     controlNetReset: () => {
       return { ...initialControlNetState };
     },
+    isIPAdapterEnableToggled: (state) => {
+      state.isIPAdapterEnabled = !state.isIPAdapterEnabled;
+    },
+    ipAdapterImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
+      state.ipAdapterInfo.adapterImage = action.payload;
+    },
+    ipAdapterWeightChanged: (state, action: PayloadAction<number>) => {
+      state.ipAdapterInfo.weight = action.payload;
+    },
+    ipAdapterModelChanged: (
+      state,
+      action: PayloadAction<IPAdapterModelParam | null>
+    ) => {
+      state.ipAdapterInfo.model = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(controlNetImageProcessed, (state, action) => {
@@ -412,6 +445,10 @@ export const {
   controlNetProcessorTypeChanged,
   controlNetReset,
   controlNetAutoConfigToggled,
+  isIPAdapterEnableToggled,
+  ipAdapterImageChanged,
+  ipAdapterWeightChanged,
+  ipAdapterModelChanged,
 } = controlNetSlice.actions;
 
 export default controlNetSlice.reducer;

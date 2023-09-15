@@ -191,7 +191,9 @@
         "showAdvanced": "Show Advanced",
         "toggleControlNet": "Toggle this ControlNet",
         "w": "W",
-        "weight": "Weight"
+        "weight": "Weight",
+        "enableIPAdapter": "Enable IP Adapter",
+        "ipAdapterModel": "Adapter Model"
     },
     "embedding": {
         "addEmbedding": "Add Embedding",
@@ -1036,6 +1038,7 @@
         "serverError": "Server Error",
         "setCanvasInitialImage": "Set as canvas initial image",
         "setControlImage": "Set as control image",
+        "setIPAdapterImage": "Set as IP Adapter Image",
         "setInitialImage": "Set as initial image",
         "setNodeField": "Set as node field",
         "tempFoldersEmptied": "Temp Folder Emptied",

@@ -6,6 +6,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAICollapse from 'common/components/IAICollapse';
 import IAIIconButton from 'common/components/IAIIconButton';
 import ControlNet from 'features/controlNet/components/ControlNet';
+import IPAdapterPanel from 'features/controlNet/components/ipAdapter/IPAdapterPanel';
 import ParamControlNetFeatureToggle from 'features/controlNet/components/parameters/ParamControlNetFeatureToggle';
 import {
   controlNetAdded,
@@ -101,6 +102,7 @@ const ParamControlNetCollapse = () => {
             <ControlNet controlNet={c} />
           </Fragment>
         ))}
+        <IPAdapterPanel />
       </Flex>
     </IAICollapse>
   );
