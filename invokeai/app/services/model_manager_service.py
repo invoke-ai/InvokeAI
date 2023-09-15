@@ -18,7 +18,7 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
     UnknownModelException,
-    DuplicateModelException
+    DuplicateModelException,
 )
 from invokeai.backend.model_manager.cache import CacheStats
 from typing import TYPE_CHECKING, List, Optional, Union, Dict, Any
@@ -51,10 +51,10 @@ class ModelManagerServiceBase(ABC):
 
     @abstractmethod
     def get_model(
-            self,
-            key: str,
-            submodel_type: Optional[SubModelType] = None,
-            context: Optional[InvocationContext] = None,
+        self,
+        key: str,
+        submodel_type: Optional[SubModelType] = None,
+        context: Optional[InvocationContext] = None,
     ) -> ModelInfo:
         """Retrieve the indicated model identified by key.
 
@@ -71,8 +71,8 @@ class ModelManagerServiceBase(ABC):
 
     @abstractmethod
     def model_exists(
-            self,
-            key: str,
+        self,
+        key: str,
     ) -> bool:
         pass
 
@@ -85,10 +85,11 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def list_models(self,
-                    model_name: Optional[str] = None,
-                    base_model: Optional[BaseModelType] = None,
-                    model_type: Optional[ModelType] = None,
+    def list_models(
+        self,
+        model_name: Optional[str] = None,
+        base_model: Optional[BaseModelType] = None,
+        model_type: Optional[ModelType] = None,
     ) -> List[ModelConfigBase]:
         """
         Return a list of ModelConfigBases that match the base, type and name criteria.
@@ -104,13 +105,11 @@ class ModelManagerServiceBase(ABC):
         If there are more than one model that match, raises a DuplicateModelException.
         If no model matches, raises an UnknownModelException
         """
-        model_configs = self.list_models(
-            model_name=model_name,
-            base_model=base_model,
-            model_type=model_type
-        )
+        model_configs = self.list_models(model_name=model_name, base_model=base_model, model_type=model_type)
         if len(model_configs) > 1:
-            raise DuplicateModelException("More than one model share the same name and type: {base_model}/{model_type}/{model_name}")
+            raise DuplicateModelException(
+                "More than one model share the same name and type: {base_model}/{model_type}/{model_name}"
+            )
         if len(model_configs) == 0:
             raise UnknownModelException("No known model with name and type: {base_model}/{model_type}/{model_name}")
         return model_configs[0]
@@ -123,22 +122,19 @@ class ModelManagerServiceBase(ABC):
 
     @abstractmethod
     def add_model(
-            self,
-            model_path: Path,
-            probe_overrides: Optional[Dict[str, Any]] = None,
-            wait: bool = False
+        self, model_path: Path, probe_overrides: Optional[Dict[str, Any]] = None, wait: bool = False
     ) -> ModelInstallJob:
         """
         Add a model using its path, with a dictionary of attributes. Will fail with an
-        assertion error if the name already exists. 
+        assertion error if the name already exists.
         """
         pass
 
     @abstractmethod
     def update_model(
-            self,
-            key: str,
-            new_config: Union[dict, ModelConfigBase],
+        self,
+        key: str,
+        new_config: Union[dict, ModelConfigBase],
     ) -> ModelConfigBase:
         """
         Update the named model with a dictionary of attributes. Will fail with a
@@ -151,11 +147,7 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def del_model(
-            self,
-            key: str,
-            delete_files: bool = False
-    ):
+    def del_model(self, key: str, delete_files: bool = False):
         """
         Delete the named model from configuration. If delete_files
         is true, then the underlying file or directory will be
@@ -164,9 +156,9 @@ class ModelManagerServiceBase(ABC):
         pass
 
     def rename_model(
-            self,
-            key: str,
-            new_name: str,
+        self,
+        key: str,
+        new_name: str,
     ) -> ModelConfigBase:
         """
         Rename the indicated model.
@@ -182,14 +174,14 @@ class ModelManagerServiceBase(ABC):
 
     @abstractmethod
     def convert_model(
-            self,
-            key: str,
-            convert_dest_directory: Path,
+        self,
+        key: str,
+        convert_dest_directory: Path,
     ) -> ModelConfigBase:
         """
         Convert a checkpoint file into a diffusers folder.
 
-        This will delete the cached version if there is any and delete the original 
+        This will delete the cached version if there is any and delete the original
         checkpoint file if it is in the models directory.
         :param key: Unique key for the model to convert.
         :param convert_dest_directory: Save the converted model to the designated directory (`models/etc/etc` by default)
@@ -201,10 +193,10 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def install_model (
-            self,
-            source: Union[str, Path, AnyHttpUrl],
-            model_attributes: Optional[Dict[str, Any]] = None,
+    def install_model(
+        self,
+        source: Union[str, Path, AnyHttpUrl],
+        model_attributes: Optional[Dict[str, Any]] = None,
     ) -> ModelInstallJob:
         """Import a path, repo_id or URL. Returns an ModelInstallJob.
 
@@ -270,7 +262,7 @@ class ModelManagerServiceBase(ABC):
         pass
 
 
-# implementation                    
+# implementation
 class ModelManagerService(ModelManagerServiceBase):
     """Responsible for managing models on disk and in memory"""
 
@@ -289,18 +281,18 @@ class ModelManagerService(ModelManagerServiceBase):
         self._loader = ModelLoader(config)
 
     def get_model(
-            self,
-            key: str,
-            submodel_type: Optional[SubModelType] = None,
-            context: Optional[InvocationContext] = None,
+        self,
+        key: str,
+        submodel_type: Optional[SubModelType] = None,
+        context: Optional[InvocationContext] = None,
     ) -> ModelInfo:
         """
         Retrieve the indicated model. submodel can be used to get a
         part (such as the vae) of a diffusers mode.
         """
-        
+
         model_info: ModelInfo = self._loader.get_model(key, submodel_type)
-        
+
         # we can emit model loading events if we are executing with access to the invocation context
         if context:
             self._emit_load_event(
@@ -313,8 +305,8 @@ class ModelManagerService(ModelManagerServiceBase):
         return model_info
 
     def model_exists(
-            self,
-            key: str,
+        self,
+        key: str,
     ) -> bool:
         """
         Given a model key, returns True if it is a valid
@@ -331,10 +323,11 @@ class ModelManagerService(ModelManagerServiceBase):
     # def all_models(self) -> List[ModelConfigBase]  -- defined in base class, same as list_models()
     # def list_model(self, model_name: str, base_model: BaseModelType, model_type: ModelType) -- defined in base class
 
-    def list_models(self,
-                    model_name: Optional[str] = None,
-                    base_model: Optional[BaseModelType] = None,
-                    model_type: Optional[ModelType] = None,
+    def list_models(
+        self,
+        model_name: Optional[str] = None,
+        base_model: Optional[BaseModelType] = None,
+        model_type: Optional[ModelType] = None,
     ) -> List[ModelConfigBase]:
         """
         Return a ModelConfigBase object for each model in the database.
@@ -347,14 +340,11 @@ class ModelManagerService(ModelManagerServiceBase):
         return self.mgr.list_model(model_name=model_name, base_model=base_model, model_type=model_type)
 
     def add_model(
-            self,
-            model_path: Path,
-            model_attributes: Optional[dict] = None,
-            wait: bool = False
+        self, model_path: Path, model_attributes: Optional[dict] = None, wait: bool = False
     ) -> ModelInstallJob:
         """
         Add a model using its path, with a dictionary of attributes. Will fail with an
-        assertion error if the name already exists. 
+        assertion error if the name already exists.
         """
         self.logger.debug(f"add/update model {model_path}")
         return self._loader.installer.install(
@@ -363,16 +353,16 @@ class ModelManagerService(ModelManagerServiceBase):
         )
 
     def install_model(
-            self, 
-            source: Union[str, Path, AnyHttpUrl],
-            model_attributes: Optional[Dict[str, Any]] = None,
+        self,
+        source: Union[str, Path, AnyHttpUrl],
+        model_attributes: Optional[Dict[str, Any]] = None,
     ) -> ModelInstallJob:
         """
         Add a model using its path, with a dictionary of attributes. Will fail with an
-        assertion error if the name already exists. 
+        assertion error if the name already exists.
         """
         self.logger.debug(f"add/update model {source}")
-        variant = 'fp16' if self._loader.precision == 'float16' else None
+        variant = "fp16" if self._loader.precision == "float16" else None
         return self._loader.installer.install(
             source,
             probe_override=model_attributes,
@@ -380,9 +370,9 @@ class ModelManagerService(ModelManagerServiceBase):
         )
 
     def update_model(
-            self,
-            key: str,
-            new_config: Union[dict, ModelConfigBase],
+        self,
+        key: str,
+        new_config: Union[dict, ModelConfigBase],
     ) -> ModelConfigBase:
         """
         Update the named model with a dictionary of attributes. Will fail with a
@@ -398,9 +388,9 @@ class ModelManagerService(ModelManagerServiceBase):
         return self._loader.store.update_model(key, new_config)
 
     def del_model(
-            self,
-            key: str,
-            delete_files: bool = False,
+        self,
+        key: str,
+        delete_files: bool = False,
     ):
         """
         Delete the named model from configuration. If delete_files is true,
@@ -418,9 +408,9 @@ class ModelManagerService(ModelManagerServiceBase):
                 path.unlink()
 
     def convert_model(
-            self,
-            key: str,
-            convert_dest_directory: Path,
+        self,
+        key: str,
+        convert_dest_directory: Path,
     ) -> ModelConfigBase:
         """
         Convert a checkpoint file into a diffusers folder, deleting the cached
@@ -436,7 +426,7 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         model_info = self.model_info(key)
         self.logger.debug(f"convert model {model_info.name}")
-        self.logger.warning('This is not implemented yet')
+        self.logger.warning("This is not implemented yet")
         return self._loader.convert_model(key, convert_dest_directory)
 
     def collect_cache_stats(self, cache_stats: CacheStats):
@@ -478,17 +468,17 @@ class ModelManagerService(ModelManagerServiceBase):
     @property
     def logger(self):
         return self._loader.logger
-    
+
     def merge_models(
-            self,
-            model_keys: List[str] = Field(
-                default=None, min_items=2, max_items=3, description="List of model keys to merge"
-            ),
-            merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
-            alpha: Optional[float] = 0.5,
-            interp: Optional[MergeInterpolationMethod] = None,
-            force: Optional[bool] = False,
-            merge_dest_directory: Optional[Path] = None,
+        self,
+        model_keys: List[str] = Field(
+            default=None, min_items=2, max_items=3, description="List of model keys to merge"
+        ),
+        merged_model_name: str = Field(default=None, description="Name of destination model after merging"),
+        alpha: Optional[float] = 0.5,
+        interp: Optional[MergeInterpolationMethod] = None,
+        force: Optional[bool] = False,
+        merge_dest_directory: Optional[Path] = None,
     ) -> ModelConfigBase:
         """
         Merge two to three diffusrs pipeline models and save as a new model.
@@ -500,7 +490,7 @@ class ModelManagerService(ModelManagerServiceBase):
         """
         merger = ModelMerger(self.mgr)
         try:
-            self.logger.error('ModelMerger needs to be rewritten.')
+            self.logger.error("ModelMerger needs to be rewritten.")
             result = merger.merge_diffusion_models_and_save(
                 model_keys=model_keys,
                 merged_model_name=merged_model_name,

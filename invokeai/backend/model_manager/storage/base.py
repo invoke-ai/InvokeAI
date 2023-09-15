@@ -11,6 +11,7 @@ from ..config import ModelConfigBase, BaseModelType, ModelType
 # should match the InvokeAI version when this is first released.
 CONFIG_FILE_VERSION = "3.1.1"
 
+
 class DuplicateModelException(Exception):
     """Raised on an attempt to add a model with the same key twice."""
 
@@ -122,4 +123,3 @@ class ModelConfigStore(ABC):
         Return all the model configs in the database.
         """
         return self.search_by_name()
-

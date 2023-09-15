@@ -75,13 +75,10 @@ class ModelLoaderBase(ABC):
         """Return the current logger."""
         pass
 
-
     @abstractmethod
-    def collect_cache_stats(
-            self,
-            cache_stats: CacheStats
-    ):
+    def collect_cache_stats(self, cache_stats: CacheStats):
         """Replace cache statistics."""
+
     pass
 
     @property
@@ -97,6 +94,7 @@ class ModelLoaderBase(ABC):
         versions.
         """
         pass
+
 
 class ModelLoader(ModelLoaderBase):
     """Implementation of ModelLoaderBase."""
@@ -228,10 +226,7 @@ class ModelLoader(ModelLoaderBase):
             _cache=self._cache,
         )
 
-    def collect_cache_stats(
-            self,
-            cache_stats: CacheStats
-    ):
+    def collect_cache_stats(self, cache_stats: CacheStats):
         self._cache.stats = cache_stats
 
     def _get_implementation(self, base_model: BaseModelType, model_type: ModelType) -> type[ModelBase]:
@@ -275,7 +270,6 @@ class ModelLoader(ModelLoaderBase):
         installed = set()
 
         with Chdir(self._app_config.models_path):
-            
             self._logger.info("Checking for models that have been moved or deleted from disk.")
             for model_config in self._store.all_models():
                 path = self._resolve_model_path(model_config.path)

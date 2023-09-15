@@ -344,14 +344,12 @@ class DownloadQueue(DownloadQueueBase):
             if match := re.match(CIVITAI_MODEL_DOWNLOAD + r"(\d+)", metadata_url):
                 version = match.group(1)
                 resp = self._requests.get(CIVITAI_VERSIONS_ENDPOINT + version).json()
-                metadata.thumbnail_url = metadata.thumbnail_url \
-                    or resp["images"][0]["url"]
-                metadata.description = metadata.description \
-                    or (
-                        f"Trigger terms: {(', ').join(resp['trainedWords'])}"
-                        if resp["trainedWords"]
-                        else resp["description"]
-                    )
+                metadata.thumbnail_url = metadata.thumbnail_url or resp["images"][0]["url"]
+                metadata.description = metadata.description or (
+                    f"Trigger terms: {(', ').join(resp['trainedWords'])}"
+                    if resp["trainedWords"]
+                    else resp["description"]
+                )
                 metadata_url = CIVITAI_MODEL_PAGE + str(resp["modelId"])
 
             # a Civitai model page
@@ -364,10 +362,11 @@ class DownloadQueue(DownloadQueueBase):
 
                 metadata.author = metadata.author or resp["creator"]["username"]
                 metadata.tags = metadata.tags or resp["tags"]
-                metadata.thumbnail_url = metadata.thumbnail_url \
-                    or resp["modelVersions"][0]["images"][0]["url"]
-                metadata.license = metadata.license \
+                metadata.thumbnail_url = metadata.thumbnail_url or resp["modelVersions"][0]["images"][0]["url"]
+                metadata.license = (
+                    metadata.license
                     or f"allowCommercialUse={resp['allowCommercialUse']}; allowDerivatives={resp['allowDerivatives']}; allowNoCredit={resp['allowNoCredit']}"
+                )
         except (HTTPError, KeyError, TypeError, JSONDecodeError) as excp:
             self._logger.warn(excp)
 

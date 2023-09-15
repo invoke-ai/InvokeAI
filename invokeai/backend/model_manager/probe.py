@@ -128,7 +128,7 @@ class ModelProbe(ModelProbeBase):
             format_type = "onnx" if model_type == ModelType.ONNX else "diffusers" if model.is_dir() else "checkpoint"
 
             probe_class = cls.PROBES[format_type].get(model_type)
-            
+
             if not probe_class:
                 return None
 
@@ -138,7 +138,7 @@ class ModelProbe(ModelProbeBase):
             variant_type = probe.get_variant_type()
             prediction_type = probe.get_scheduler_prediction_type()
             format = probe.get_format()
-                
+
             model_info = ModelProbeInfo(
                 model_type=model_type,
                 base_type=base_type,

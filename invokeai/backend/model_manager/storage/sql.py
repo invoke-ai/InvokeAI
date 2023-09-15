@@ -89,8 +89,9 @@ class ModelConfigStoreSQL(ModelConfigStore):
             self._conn.commit()
         finally:
             self._lock.release()
-        assert self.version == CONFIG_FILE_VERSION, \
-            f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
+        assert (
+            self.version == CONFIG_FILE_VERSION
+        ), f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
 
     def _create_tables(self) -> None:
         """Create sqlite3 tables."""
@@ -182,9 +183,8 @@ class ModelConfigStoreSQL(ModelConfigStore):
             )
             VALUES (?,?);
             """,
-            ("version",CONFIG_FILE_VERSION),
+            ("version", CONFIG_FILE_VERSION),
         )
-        
 
     def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> None:
         """
@@ -255,7 +255,6 @@ class ModelConfigStoreSQL(ModelConfigStore):
             return rows[0]
         finally:
             self._lock.release()
-
 
     def _update_tags(self, key: str, tags: List[str]) -> None:
         """Update tags for model with key."""

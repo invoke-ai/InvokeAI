@@ -78,8 +78,9 @@ class ModelConfigStoreYAML(ModelConfigStore):
         if not self._filename.exists():
             self._initialize_yaml()
         self._config = OmegaConf.load(self._filename)
-        assert self.version == CONFIG_FILE_VERSION, \
-            f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
+        assert (
+            self.version == CONFIG_FILE_VERSION
+        ), f"Model config version {self.version} does not match expected version {CONFIG_FILE_VERSION}"
 
     def _initialize_yaml(self):
         try:
@@ -104,7 +105,7 @@ class ModelConfigStoreYAML(ModelConfigStore):
     @property
     def version(self) -> str:
         """Return version of this config file/database."""
-        return self._config["__metadata__"].get('version')
+        return self._config["__metadata__"].get("version")
 
     def add_model(self, key: str, config: Union[dict, ModelConfigBase]) -> None:
         """

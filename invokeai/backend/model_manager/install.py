@@ -316,9 +316,8 @@ class ModelInstall(ModelInstallBase):
         """Return the queue."""
         return self._download_queue
 
-    def register_path(self,
-                      model_path: Union[Path, str],
-                      overrides: Optional[Dict[str, Any]] = None
+    def register_path(
+        self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None
     ) -> str:  # noqa D102
         model_path = Path(model_path)
         info: ModelProbeInfo = self._probe_model(model_path, overrides)
@@ -354,13 +353,13 @@ class ModelInstall(ModelInstallBase):
         return key
 
     def install_path(
-            self,
-            model_path: Union[Path, str],
-            overrides: Optional[Dict[str, Any]] = None,
+        self,
+        model_path: Union[Path, str],
+        overrides: Optional[Dict[str, Any]] = None,
     ) -> str:  # noqa D102
         model_path = Path(model_path)
         info: ModelProbeInfo = self._probe_model(model_path, overrides)
-                
+
         dest_path = self._config.models_path / info.base_type.value / info.model_type.value / model_path.name
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -375,14 +374,11 @@ class ModelInstall(ModelInstallBase):
             info,
         )
 
-    def _probe_model(self,
-                     model_path: Union[Path, str],
-                     overrides: Optional[Dict[str,Any]] = None
-    ) -> ModelProbeInfo:
+    def _probe_model(self, model_path: Union[Path, str], overrides: Optional[Dict[str, Any]] = None) -> ModelProbeInfo:
         info: ModelProbeInfo = ModelProbe.probe(model_path)
         if overrides:  # used to override probe fields
             for key, value in overrides.items():
-                setattr(info, key, value) # may generate a pydantic validation error
+                setattr(info, key, value)  # may generate a pydantic validation error
         return info
 
     def unregister(self, key: str):  # noqa D102
@@ -394,12 +390,12 @@ class ModelInstall(ModelInstallBase):
         self.unregister(key)
 
     def install(
-            self,
-            source: Union[str, Path, AnyHttpUrl],
-            inplace: bool = True,
-            variant: Optional[str] = None,
-            probe_override: Optional[Dict[str, Any]] = None,
-            access_token: Optional[str] = None,
+        self,
+        source: Union[str, Path, AnyHttpUrl],
+        inplace: bool = True,
+        variant: Optional[str] = None,
+        probe_override: Optional[Dict[str, Any]] = None,
+        access_token: Optional[str] = None,
     ) -> DownloadJobBase:  # noqa D102
         queue = self._download_queue
 

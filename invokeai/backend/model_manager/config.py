@@ -172,10 +172,12 @@ class VaeDiffusersConfig(ModelConfigBase):
 
     model_format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
+
 class ControlNetDiffusersConfig(ModelConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     model_format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
 
 class TextualInversionConfig(ModelConfigBase):
     """Model config for textual inversion embeddings."""
