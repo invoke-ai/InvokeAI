@@ -38,4 +38,4 @@ async def parse_dynamicprompts(
     except ParseException as e:
         prompts = [prompt]
         error = str(e)
-    return DynamicPromptsResponse(prompts=prompts, error=error)
+    return DynamicPromptsResponse(prompts=prompts if prompts else [""], error=error)
