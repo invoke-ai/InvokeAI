@@ -1,3 +1,5 @@
+import os
+
 from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.baseinvocation import (
@@ -14,6 +16,9 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType
+from invokeai.backend.model_management.models.ip_adapter import (
+    get_ip_adapter_image_encoder_model_id,
+)
 
 
 class IPAdapterModelField(BaseModel):
@@ -57,7 +62,15 @@ class IPAdapterInvocation(BaseInvocation):
         ip_adapter_info = context.services.model_manager.model_info(
             self.ip_adapter_model.model_name, self.ip_adapter_model.base_model, ModelType.IPAdapter
         )
-        image_encoder_model_name = ip_adapter_info["image_encoder_model"].split("/")[-1].strip()
+        # HACK(ryand): This is bad for a couple of reasons: 1) we are bypassing the model manager to read the model
+        # directly, and 2) we are reading from disk every time this invocation is called without caching the result.
+        # A better solution would be to store the image encoder model reference in the IP-Adapter model info, but this
+        # is currently messy due to differences between how the model info is generated when installing a model from
+        # disk vs. downloading the model.
+        image_encoder_model_id = get_ip_adapter_image_encoder_model_id(
+            os.path.join(context.services.configuration.get_config().models_path, ip_adapter_info["path"])
+        )
+        image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         image_encoder_model = CLIPVisionModelField(
             model_name=image_encoder_model_name,
             base_model=BaseModelType.Any,

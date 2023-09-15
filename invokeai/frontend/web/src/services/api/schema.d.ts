@@ -2549,8 +2549,6 @@ export type components = {
        */
       model_format: "invokeai";
       error?: components["schemas"]["ModelError"];
-      /** Image Encoder Model */
-      image_encoder_model: string;
     };
     /**
      * IPAdapterOutput
@@ -7262,17 +7260,29 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusion2ModelFormat
+     * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    ControlNetModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusionXLModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
+    /**
+     * IPAdapterModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    IPAdapterModelFormat: "invokeai";
     /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
@@ -7286,23 +7296,11 @@ export type components = {
      */
     CLIPVisionModelFormat: "diffusers";
     /**
-     * StableDiffusionXLModelFormat
+     * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
-    /**
-     * IPAdapterModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    IPAdapterModelFormat: "invokeai";
-    /**
-     * ControlNetModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;

@@ -511,9 +511,7 @@ class ControlNetFolderProbe(FolderProbeBase):
             else (
                 BaseModelType.StableDiffusion2
                 if dimension == 1024
-                else BaseModelType.StableDiffusionXL
-                if dimension == 2048
-                else None
+                else BaseModelType.StableDiffusionXL if dimension == 2048 else None
             )
         )
         if not base_model:
@@ -543,7 +541,7 @@ class IPAdapterFolderProbe(FolderProbeBase):
         if not model_file.exists():
             raise InvalidModelException("Unknown IP-Adapter model format.")
 
-        state_dict = torch.load(model_file)
+        state_dict = torch.load(model_file, map_location="cpu")
         cross_attention_dim = state_dict["ip_adapter"]["1.to_k_ip.weight"].shape[-1]
         if cross_attention_dim == 768:
             return BaseModelType.StableDiffusion1
