@@ -7,9 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from diffusers.models.attention_processor import AttnProcessor as DiffusersAttnProcessor
-from diffusers.models.attention_processor import (
-    AttnProcessor2_0 as DiffusersAttnProcessor2_0,
-)
+from diffusers.models.attention_processor import AttnProcessor2_0 as DiffusersAttnProcessor2_0
 
 
 # Create versions of AttnProcessor and AttnProcessor2_0 that are sub-classes of nn.Module. This is required for

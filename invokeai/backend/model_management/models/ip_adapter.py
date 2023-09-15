@@ -5,11 +5,7 @@ from typing import Literal, Optional
 
 import torch
 
-from invokeai.backend.ip_adapter.ip_adapter import (
-    IPAdapter,
-    IPAdapterPlus,
-    build_ip_adapter,
-)
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus, build_ip_adapter
 from invokeai.backend.model_management.models.base import (
     BaseModelType,
     InvalidModelException,

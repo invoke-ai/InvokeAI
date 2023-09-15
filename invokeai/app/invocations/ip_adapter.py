@@ -16,9 +16,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType
-from invokeai.backend.model_management.models.ip_adapter import (
-    get_ip_adapter_image_encoder_model_id,
-)
+from invokeai.backend.model_management.models.ip_adapter import get_ip_adapter_image_encoder_model_id
 
 
 class IPAdapterModelField(BaseModel):

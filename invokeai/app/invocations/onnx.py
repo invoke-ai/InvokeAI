@@ -13,12 +13,7 @@ from pydantic import BaseModel, Field, validator
 from tqdm import tqdm
 
 from invokeai.app.invocations.metadata import CoreMetadata
-from invokeai.app.invocations.primitives import (
-    ConditioningField,
-    ConditioningOutput,
-    ImageField,
-    ImageOutput,
-)
+from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend import BaseModelType, ModelType, SubModelType
 
@@ -40,13 +35,7 @@ from .baseinvocation import (
     invocation_output,
 )
 from .controlnet_image_processors import ControlField
-from .latent import (
-    SAMPLER_NAME_VALUES,
-    LatentsField,
-    LatentsOutput,
-    build_latents_output,
-    get_scheduler,
-)
+from .latent import SAMPLER_NAME_VALUES, LatentsField, LatentsOutput, build_latents_output, get_scheduler
 from .model import ClipField, ModelInfo, UNetField, VaeField
 
 ORT_TO_NP_TYPE = {

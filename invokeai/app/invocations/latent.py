@@ -35,10 +35,7 @@ from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    ConditioningData,
-    IPAdapterConditioningInfo,
-)
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
 
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.model_management.models import BaseModelType
@@ -50,9 +47,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
     StableDiffusionGeneratorPipeline,
     image_resized_to_grid_as_tensor,
 )
-from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import (
-    PostprocessingSettings,
-)
+from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
 from ..models.image import ImageCategory, ResourceOrigin
