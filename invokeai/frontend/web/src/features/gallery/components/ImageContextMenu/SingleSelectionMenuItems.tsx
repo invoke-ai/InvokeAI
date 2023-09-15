@@ -37,6 +37,7 @@ import {
 import { ImageDTO } from 'services/api/types';
 import { configSelector } from '../../../system/store/configSelectors';
 import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import { flushSync } from 'react-dom';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -115,8 +116,10 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   const handleSendToCanvas = useCallback(() => {
     dispatch(sentImageToCanvas());
+    flushSync(() => {
+      dispatch(setActiveTab('unifiedCanvas'));
+    });
     dispatch(setInitialCanvasImage(imageDTO));
-    dispatch(setActiveTab('unifiedCanvas'));
 
     toaster({
       title: t('toast.sentToUnifiedCanvas'),
