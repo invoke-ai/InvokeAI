@@ -335,8 +335,8 @@ class ImageResizeInvocation(BaseInvocation):
     """Resizes an image to specific dimensions"""
 
     image: ImageField = InputField(description="The image to resize")
-    width: int = InputField(default=512, ge=64, multiple_of=8, description="The width to resize to (px)")
-    height: int = InputField(default=512, ge=64, multiple_of=8, description="The height to resize to (px)")
+    width: int = InputField(default=512, gt=0, description="The width to resize to (px)")
+    height: int = InputField(default=512, gt=0, description="The height to resize to (px)")
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
     metadata: Optional[CoreMetadata] = InputField(
         default=None, description=FieldDescriptions.core_metadata, ui_hidden=True

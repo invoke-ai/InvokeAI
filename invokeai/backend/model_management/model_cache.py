@@ -29,7 +29,11 @@ import torch
 
 import invokeai.backend.util.logging as logger
 
+from ..util.devices import choose_torch_device
 from .models import BaseModelType, ModelBase, ModelType, SubModelType
+
+if choose_torch_device() == torch.device("mps"):
+    from torch import mps
 
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
@@ -406,6 +410,8 @@ class ModelCache(object):
 
         gc.collect()
         torch.cuda.empty_cache()
+        if choose_torch_device() == torch.device("mps"):
+            mps.empty_cache()
 
         self.logger.debug(f"After unloading: cached_models={len(self._cached_models)}")
 
@@ -426,6 +432,8 @@ class ModelCache(object):
 
         gc.collect()
         torch.cuda.empty_cache()
+        if choose_torch_device() == torch.device("mps"):
+            mps.empty_cache()
 
     def _local_model_hash(self, model_path: Union[str, Path]) -> str:
         sha = hashlib.sha256()
