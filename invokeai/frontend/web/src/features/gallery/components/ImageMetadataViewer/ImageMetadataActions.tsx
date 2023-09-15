@@ -1,8 +1,9 @@
-import { CoreMetadata } from 'features/nodes/types/types';
+import { CoreMetadata, LoRAMetadataType } from 'features/nodes/types/types';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { memo, useCallback } from 'react';
 import ImageMetadataItem from './ImageMetadataItem';
 import { useTranslation } from 'react-i18next';
+import { isValidLoRAModel } from '../../../parameters/types/parameterSchemas';
 
 type Props = {
   metadata?: CoreMetadata;
@@ -24,6 +25,7 @@ const ImageMetadataActions = (props: Props) => {
     recallWidth,
     recallHeight,
     recallStrength,
+    recallLoRA,
   } = useRecallParameters();
 
   const handleRecallPositivePrompt = useCallback(() => {
@@ -65,6 +67,13 @@ const ImageMetadataActions = (props: Props) => {
   const handleRecallStrength = useCallback(() => {
     recallStrength(metadata?.strength);
   }, [metadata?.strength, recallStrength]);
+
+  const handleRecallLoRA = useCallback(
+    (lora: LoRAMetadataType) => {
+      recallLoRA(lora);
+    },
+    [recallLoRA]
+  );
 
   if (!metadata || Object.keys(metadata).length === 0) {
     return null;
@@ -130,20 +139,6 @@ const ImageMetadataActions = (props: Props) => {
           onClick={handleRecallHeight}
         />
       )}
-      {/* {metadata.threshold !== undefined && (
-          <MetadataItem
-            label={t('metadata.threshold')}
-            value={metadata.threshold}
-            onClick={() => dispatch(setThreshold(Number(metadata.threshold)))}
-          />
-        )}
-        {metadata.perlin !== undefined && (
-          <MetadataItem
-            label={t('metadata.perlin')}
-            value={metadata.perlin}
-            onClick={() => dispatch(setPerlin(Number(metadata.perlin)))}
-          />
-        )} */}
       {metadata.scheduler && (
         <ImageMetadataItem
           label={t('metadata.scheduler')}
@@ -165,40 +160,6 @@ const ImageMetadataActions = (props: Props) => {
           onClick={handleRecallCfgScale}
         />
       )}
-      {/* {metadata.variations && metadata.variations.length > 0 && (
-          <MetadataItem
-            label="{t('metadata.variations')}
-            value={seedWeightsToString(metadata.variations)}
-            onClick={() =>
-              dispatch(
-                setSeedWeights(seedWeightsToString(metadata.variations))
-              )
-            }
-          />
-        )}
-        {metadata.seamless && (
-          <MetadataItem
-            label={t('metadata.seamless')}
-            value={metadata.seamless}
-            onClick={() => dispatch(setSeamless(metadata.seamless))}
-          />
-        )}
-        {metadata.hires_fix && (
-          <MetadataItem
-            label={t('metadata.hiresFix')}
-            value={metadata.hires_fix}
-            onClick={() => dispatch(setHiresFix(metadata.hires_fix))}
-          />
-        )} */}
-
-      {/* {init_image_path && (
-          <MetadataItem
-            label={t('metadata.initImage')}
-            value={init_image_path}
-            isLink
-            onClick={() => dispatch(setInitialImage(init_image_path))}
-          />
-        )} */}
       {metadata.strength && (
         <ImageMetadataItem
           label={t('metadata.strength')}
@@ -206,13 +167,19 @@ const ImageMetadataActions = (props: Props) => {
           onClick={handleRecallStrength}
         />
       )}
-      {/* {metadata.fit && (
-          <MetadataItem
-            label={t('metadata.fit')}
-            value={metadata.fit}
-            onClick={() => dispatch(setShouldFitToWidthHeight(metadata.fit))}
-          />
-        )} */}
+      {metadata.loras &&
+        metadata.loras.map((lora, index) => {
+          if (isValidLoRAModel(lora.lora)) {
+            return (
+              <ImageMetadataItem
+                key={index}
+                label="LoRA"
+                value={`${lora.lora.model_name} - ${lora.weight}`}
+                onClick={() => handleRecallLoRA(lora)}
+              />
+            );
+          }
+        })}
     </>
   );
 };
