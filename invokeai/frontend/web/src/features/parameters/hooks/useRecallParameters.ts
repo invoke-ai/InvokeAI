@@ -1,6 +1,10 @@
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { CoreMetadata } from 'features/nodes/types/types';
+import {
+  CoreMetadata,
+  LoRAMetadataType,
+  LoraInfo,
+} from 'features/nodes/types/types';
 import {
   refinerModelChanged,
   setNegativeStylePromptSDXL,
@@ -30,6 +34,7 @@ import {
 import {
   isValidCfgScale,
   isValidHeight,
+  isValidLoRAModel,
   isValidMainModel,
   isValidNegativePrompt,
   isValidPositivePrompt,
@@ -45,6 +50,8 @@ import {
   isValidStrength,
   isValidWidth,
 } from '../types/parameterSchemas';
+import { loraRecalled } from '../../lora/store/loraSlice';
+import { useGetLoRAModelsQuery } from '../../../services/api/endpoints/models';
 
 export const useRecallParameters = () => {
   const dispatch = useAppDispatch();
@@ -307,6 +314,48 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
+  /**
+   * Recall LoRA with toast
+   */
+
+  const { data: loraModels } = useGetLoRAModelsQuery();
+
+  const recallLoRA = useCallback(
+    (lora: LoRAMetadataType) => {
+      if (!isValidLoRAModel(lora.lora)) {
+        parameterNotSetToast();
+        return;
+      }
+
+      if (!loraModels || !loraModels.entities) {
+        return;
+      }
+
+      const matchingId = Object.keys(loraModels.entities).find((loraId) => {
+        const matchesBaseModel =
+          loraModels.entities[loraId]?.base_model === lora.lora.base_model;
+        const matchesModelName =
+          loraModels.entities[loraId]?.model_name === lora.lora.model_name;
+        return matchesBaseModel && matchesModelName;
+      });
+
+      if (!matchingId) {
+return;
+}
+
+      const fullLoRA = loraModels.entities[matchingId];
+
+      if (!fullLoRA) {
+return;
+}
+
+      dispatch(loraRecalled({ ...fullLoRA, weight: lora.weight }));
+
+      parameterSetToast();
+    },
+    [dispatch, parameterSetToast, parameterNotSetToast, loraModels]
+  );
+
   /*
    * Sets image as initial image with toast
    */
@@ -444,6 +493,7 @@ export const useRecallParameters = () => {
     recallWidth,
     recallHeight,
     recallStrength,
+    recallLoRA,
     recallAllParameters,
     sendToImageToImage,
   };
