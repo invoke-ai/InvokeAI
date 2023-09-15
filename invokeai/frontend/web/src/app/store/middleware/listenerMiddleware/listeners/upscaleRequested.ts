@@ -1,7 +1,11 @@
 import { createAction } from '@reduxjs/toolkit';
+import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import { buildAdHocUpscaleGraph } from 'features/nodes/util/graphBuilders/buildAdHocUpscaleGraph';
-import { sessionReadyToInvoke } from 'features/system/store/actions';
-import { sessionCreated } from 'services/api/thunks/session';
+import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
+import { queueApi } from 'services/api/endpoints/queue';
+import { BatchConfig } from 'services/api/types';
 import { startAppListening } from '..';
 
 export const upscaleRequested = createAction<{ image_name: string }>(
@@ -11,7 +15,9 @@ export const upscaleRequested = createAction<{ image_name: string }>(
 export const addUpscaleRequestedListener = () => {
   startAppListening({
     actionCreator: upscaleRequested,
-    effect: async (action, { dispatch, getState, take }) => {
+    effect: async (action, { dispatch, getState }) => {
+      const log = logger('session');
+
       const { image_name } = action.payload;
       const { esrganModelName } = getState().postprocessing;
 
@@ -19,13 +25,41 @@ export const addUpscaleRequestedListener = () => {
         image_name,
         esrganModelName,
       });
+      const batchConfig: BatchConfig = {
+        batch: {
+          graph,
+          runs: 1,
+        },
+        prepend: true,
+      };
 
-      // Create a session to run the graph & wait til it's ready to invoke
-      dispatch(sessionCreated({ graph }));
+      try {
+        const req = dispatch(
+          queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
+            fixedCacheKey: 'enqueueBatch',
+          })
+        );
 
-      await take(sessionCreated.fulfilled.match);
-
-      dispatch(sessionReadyToInvoke());
+        const enqueueResult = await req.unwrap();
+        req.reset();
+        dispatch(
+          queueApi.endpoints.startQueueExecution.initiate(undefined, {
+            fixedCacheKey: 'startQueue',
+          })
+        );
+        log.debug({ enqueueResult: parseify(enqueueResult) }, 'Batch enqueued');
+      } catch {
+        log.error(
+          { batchConfig: parseify(batchConfig) },
+          'Failed to enqueue batch'
+        );
+        dispatch(
+          addToast({
+            title: t('queue.batchFailedToQueue'),
+            status: 'error',
+          })
+        );
+      }
     },
   });
 };

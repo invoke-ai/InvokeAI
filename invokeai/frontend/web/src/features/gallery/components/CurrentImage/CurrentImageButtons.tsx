@@ -46,6 +46,7 @@ import {
 import { menuListMotionProps } from 'theme/components/menu';
 import { sentImageToImg2Img } from '../../store/actions';
 import SingleSelectionMenuItems from '../ImageContextMenu/SingleSelectionMenuItems';
+import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 
 const currentImageButtonsSelector = createSelector(
   [stateSelector, activeTabNameSelector],
@@ -99,7 +100,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
   } = useAppSelector(currentImageButtonsSelector);
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
-
+  const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
@@ -313,15 +314,12 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         {isUpscalingEnabled && (
-          <ButtonGroup
-            isAttached={true}
-            isDisabled={shouldDisableToolbarButtons}
-          >
+          <ButtonGroup isAttached={true} isDisabled={isQueueMutationInProgress}>
             {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
           </ButtonGroup>
         )}
 
-        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
+        <ButtonGroup isAttached={true}>
           <IAIIconButton
             icon={<FaCode />}
             tooltip={`${t('parameters.info')} (I)`}
@@ -342,10 +340,7 @@ const CurrentImageButtons = (props: CurrentImageButtonsProps) => {
         </ButtonGroup>
 
         <ButtonGroup isAttached={true}>
-          <DeleteImageButton
-            onClick={handleDelete}
-            isDisabled={shouldDisableToolbarButtons}
-          />
+          <DeleteImageButton onClick={handleDelete} />
         </ButtonGroup>
       </Flex>
     </>
