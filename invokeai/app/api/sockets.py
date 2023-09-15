@@ -10,11 +10,12 @@ from ..services.events import EventServiceBase
 
 class SocketIO:
     __sio: AsyncServer
+    __app: ASGIApp
 
     def __init__(self, app: FastAPI):
         self.__sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
-        _app = ASGIApp(socketio_server=self.__sio, socketio_path="socket.io")
-        app.mount("/ws", _app)
+        self.__app = ASGIApp(socketio_server=self.__sio, socketio_path="socket.io")
+        app.mount("/ws", self.__app)
         self.__sio.on("subscribe", handler=self._handle_sub)
         self.__sio.on("unsubscribe", handler=self._handle_unsub)
 
