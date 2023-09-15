@@ -94,6 +94,7 @@ export const zFieldType = z.enum([
   'IntegerCollection',
   'IntegerPolymorphic',
   'IPAdapterField',
+  'IPAdapterModelField',
   'LatentsCollection',
   'LatentsField',
   'LatentsPolymorphic',
@@ -389,9 +390,12 @@ export type ControlCollectionInputFieldValue = z.infer<
   typeof zControlCollectionInputFieldValue
 >;
 
+export const zIPAdapterModel = zModelIdentifier;
+export type IPAdapterModel = z.infer<typeof zIPAdapterModel>;
+
 export const zIPAdapterField = z.object({
   image: zImageField,
-  ip_adapter_model: z.string().trim().min(1),
+  ip_adapter_model: zIPAdapterModel,
   image_encoder_model: z.string().trim().min(1),
   weight: z.number(),
 });
@@ -554,6 +558,17 @@ export type ControlNetModelInputFieldValue = z.infer<
   typeof zControlNetModelInputFieldValue
 >;
 
+export const zIPAdapterModelField = zModelIdentifier;
+export type IPAdapterModelField = z.infer<typeof zIPAdapterModelField>;
+
+export const zIPAdapterModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('IPAdapterModelField'),
+  value: zIPAdapterModelField.optional(),
+});
+export type IPAdapterModelInputFieldValue = z.infer<
+  typeof zIPAdapterModelInputFieldValue
+>;
+
 export const zCollectionInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('Collection'),
   value: z.array(z.any()).optional(), // TODO: should this field ever have a value?
@@ -637,6 +652,7 @@ export const zInputFieldValue = z.discriminatedUnion('type', [
   zIntegerPolymorphicInputFieldValue,
   zIntegerInputFieldValue,
   zIPAdapterInputFieldValue,
+  zIPAdapterModelInputFieldValue,
   zLatentsInputFieldValue,
   zLatentsCollectionInputFieldValue,
   zLatentsPolymorphicInputFieldValue,
@@ -881,6 +897,11 @@ export type ControlNetModelInputFieldTemplate = InputFieldTemplateBase & {
   type: 'ControlNetModelField';
 };
 
+export type IPAdapterModelInputFieldTemplate = InputFieldTemplateBase & {
+  default: string;
+  type: 'IPAdapterModelField';
+};
+
 export type CollectionInputFieldTemplate = InputFieldTemplateBase & {
   default: [];
   type: 'Collection';
@@ -953,6 +974,7 @@ export type InputFieldTemplate =
   | IntegerPolymorphicInputFieldTemplate
   | IntegerInputFieldTemplate
   | IPAdapterInputFieldTemplate
+  | IPAdapterModelInputFieldTemplate
   | LatentsInputFieldTemplate
   | LatentsCollectionInputFieldTemplate
   | LatentsPolymorphicInputFieldTemplate

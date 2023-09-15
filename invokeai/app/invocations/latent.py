@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torchvision.transforms as T
 from diffusers.image_processor import VaeImageProcessor
+from diffusers.models import UNet2DConditionModel
 from diffusers.models.attention_processor import (
     AttnProcessor2_0,
     LoRAAttnProcessor2_0,
@@ -32,9 +33,11 @@ from invokeai.app.invocations.primitives import (
 )
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningData,
+    IPAdapterConditioningInfo,
 )
 
 from ...backend.model_management.lora import ModelPatcher
@@ -193,7 +196,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -403,15 +406,47 @@ class DenoiseLatentsInvocation(BaseInvocation):
         self,
         context: InvocationContext,
         ip_adapter: Optional[IPAdapterField],
-    ) -> IPAdapterData:
+        conditioning_data: ConditioningData,
+        unet: UNet2DConditionModel,
+        exit_stack: ExitStack,
+    ) -> Optional[IPAdapterData]:
+        """If IP-Adapter is enabled, then this function loads the requisite models, and adds the image prompt embeddings
+        to the `conditioning_data` (in-place).
+        """
         if ip_adapter is None:
             return None
 
+        image_encoder_model_info = context.services.model_manager.get_model(
+            model_name=ip_adapter.image_encoder_model.model_name,
+            model_type=ModelType.CLIPVision,
+            base_model=ip_adapter.image_encoder_model.base_model,
+            context=context,
+        )
+
+        ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
+            context.services.model_manager.get_model(
+                model_name=ip_adapter.ip_adapter_model.model_name,
+                model_type=ModelType.IPAdapter,
+                base_model=ip_adapter.ip_adapter_model.base_model,
+                context=context,
+            )
+        )
+
         input_image = context.services.images.get_pil_image(ip_adapter.image.image_name)
+
+        # TODO(ryand): With some effort, the step of running the CLIP Vision encoder could be done before any other
+        # models are needed in memory. This would help to reduce peak memory utilization in low-memory environments.
+        with image_encoder_model_info as image_encoder_model:
+            # Get image embeddings from CLIP and ImageProjModel.
+            image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
+                input_image, image_encoder_model
+            )
+            conditioning_data.ip_adapter_conditioning = IPAdapterConditioningInfo(
+                image_prompt_embeds, uncond_image_prompt_embeds
+            )
+
         return IPAdapterData(
-            ip_adapter_model=ip_adapter.ip_adapter_model,  # name of model, NOT model object.
-            image_encoder_model=ip_adapter.image_encoder_model,  # name of model, NOT model object.
-            image=input_image,
+            ip_adapter_model=ip_adapter_model,
             weight=ip_adapter.weight,
         )
 
@@ -543,6 +578,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 ip_adapter_data = self.prep_ip_adapter_data(
                     context=context,
                     ip_adapter=self.ip_adapter,
+                    conditioning_data=conditioning_data,
+                    unet=unet,
+                    exit_stack=exit_stack,
                 )
 
                 num_inference_steps, timesteps, init_timestep = self.init_scheduler(

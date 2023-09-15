@@ -40,6 +40,7 @@ export const POLYMORPHIC_TYPES = [
 ];
 
 export const MODEL_TYPES = [
+  'IPAdapterModelField',
   'ControlNetModelField',
   'LoRAModelField',
   'MainModelField',
@@ -239,6 +240,11 @@ export const FIELDS: Record<FieldType, FieldUIConfig> = {
     color: 'green.300',
     description: 'IP-Adapter info passed between nodes.',
     title: 'IP-Adapter',
+  },
+  IPAdapterModelField: {
+    color: 'teal.500',
+    description: 'IP-Adapter model',
+    title: 'IP-Adapter Model',
   },
   LatentsCollection: {
     color: 'pink.500',

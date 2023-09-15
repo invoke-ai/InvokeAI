@@ -30,6 +30,7 @@ const FIELD_VALUE_FALLBACK_MAP = {
   IntegerCollection: [],
   IntegerPolymorphic: 0,
   IPAdapterField: undefined,
+  IPAdapterModelField: undefined,
   LatentsCollection: [],
   LatentsField: undefined,
   LatentsPolymorphic: undefined,

@@ -5,8 +5,8 @@ Abstract base class for recursive directory search for models.
 
 import os
 from abc import ABC, abstractmethod
-from typing import List, Set, types
 from pathlib import Path
+from typing import List, Set, types
 
 import invokeai.backend.util.logging as logger
 
@@ -79,7 +79,7 @@ class ModelSearch(ABC):
                         self._models_found += 1
                         self._scanned_dirs.add(path)
                     except Exception as e:
-                        self.logger.warning(str(e))
+                        self.logger.warning(f"Failed to process '{path}': {e}")
 
             for f in files:
                 path = Path(root) / f
@@ -90,7 +90,7 @@ class ModelSearch(ABC):
                         self.on_model_found(path)
                         self._models_found += 1
                     except Exception as e:
-                        self.logger.warning(str(e))
+                        self.logger.warning(f"Failed to process '{path}': {e}")
 
 
 class FindModels(ModelSearch):

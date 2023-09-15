@@ -61,6 +61,7 @@ import {
   LatentsField,
   ConditioningField,
   IPAdapterInputFieldTemplate,
+  IPAdapterModelInputFieldTemplate,
 } from '../types/types';
 import { ControlField } from 'services/api/types';
 
@@ -430,6 +431,19 @@ const buildControlNetModelInputFieldTemplate = ({
   const template: ControlNetModelInputFieldTemplate = {
     ...baseField,
     type: 'ControlNetModelField',
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildIPAdapterModelInputFieldTemplate = ({
+  schemaObject,
+  baseField,
+}: BuildInputFieldArg): IPAdapterModelInputFieldTemplate => {
+  const template: IPAdapterModelInputFieldTemplate = {
+    ...baseField,
+    type: 'IPAdapterModelField',
     default: schemaObject.default ?? undefined,
   };
 
@@ -866,6 +880,7 @@ const TEMPLATE_BUILDER_MAP = {
   IntegerCollection: buildIntegerCollectionInputFieldTemplate,
   IntegerPolymorphic: buildIntegerPolymorphicInputFieldTemplate,
   IPAdapterField: buildIPAdapterInputFieldTemplate,
+  IPAdapterModelField: buildIPAdapterModelInputFieldTemplate,
   LatentsCollection: buildLatentsCollectionInputFieldTemplate,
   LatentsField: buildLatentsInputFieldTemplate,
   LatentsPolymorphic: buildLatentsPolymorphicInputFieldTemplate,

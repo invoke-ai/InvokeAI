@@ -1,4 +1,4 @@
-from typing import Literal
+import os
 
 from pydantic import BaseModel, Field
 
@@ -6,6 +6,7 @@ from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     FieldDescriptions,
+    Input,
     InputField,
     InvocationContext,
     OutputField,
@@ -14,28 +15,26 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.primitives import ImageField
+from invokeai.backend.model_management.models.base import BaseModelType, ModelType
+from invokeai.backend.model_management.models.ip_adapter import (
+    get_ip_adapter_image_encoder_model_id,
+)
 
-IP_ADAPTER_MODELS = Literal[
-    "models/core/ip_adapters/sd-1/ip-adapter_sd15.bin",
-    "models/core/ip_adapters/sd-1/ip-adapter-plus_sd15.bin",
-    "models/core/ip_adapters/sd-1/ip-adapter-plus-face_sd15.bin",
-    "models/core/ip_adapters/sdxl/ip-adapter_sdxl.bin",
-]
 
-IP_ADAPTER_IMAGE_ENCODER_MODELS = Literal[
-    "models/core/ip_adapters/sd-1/image_encoder/", "models/core/ip_adapters/sdxl/image_encoder"
-]
+class IPAdapterModelField(BaseModel):
+    model_name: str = Field(description="Name of the IP-Adapter model")
+    base_model: BaseModelType = Field(description="Base model")
+
+
+class CLIPVisionModelField(BaseModel):
+    model_name: str = Field(description="Name of the CLIP Vision image encoder model")
+    base_model: BaseModelType = Field(description="Base model (usually 'Any')")
 
 
 class IPAdapterField(BaseModel):
     image: ImageField = Field(description="The IP-Adapter image prompt.")
-
-    # TODO(ryand): Create and use a custom `IpAdapterModelField`.
-    ip_adapter_model: str = Field(description="The name of the IP-Adapter model.")
-
-    # TODO(ryand): Create and use a `CLIPImageEncoderField` instead that is analogous to the `ClipField` used elsewhere.
-    image_encoder_model: str = Field(description="The name of the CLIP image encoder model.")
-
+    ip_adapter_model: IPAdapterModelField = Field(description="The IP-Adapter model to use.")
+    image_encoder_model: CLIPVisionModelField = Field(description="The name of the CLIP image encoder model.")
     weight: float = Field(default=1.0, ge=0, description="The weight of the IP-Adapter.")
 
 
@@ -51,26 +50,37 @@ class IPAdapterInvocation(BaseInvocation):
 
     # Inputs
     image: ImageField = InputField(description="The IP-Adapter image prompt.")
-    ip_adapter_model: IP_ADAPTER_MODELS = InputField(
-        default="models/core/ip_adapters/sd-1/ip-adapter_sd15.bin",
-        description="The name of the IP-Adapter model.",
+    ip_adapter_model: IPAdapterModelField = InputField(
+        description="The IP-Adapter model.",
         title="IP-Adapter Model",
-    )
-    image_encoder_model: IP_ADAPTER_IMAGE_ENCODER_MODELS = InputField(
-        default="models/core/ip_adapters/sd-1/image_encoder/", description="The name of the CLIP image encoder model."
+        input=Input.Direct,
     )
     weight: float = InputField(default=1.0, description="The weight of the IP-Adapter.", ui_type=UIType.Float)
 
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
+        # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
+        ip_adapter_info = context.services.model_manager.model_info(
+            self.ip_adapter_model.model_name, self.ip_adapter_model.base_model, ModelType.IPAdapter
+        )
+        # HACK(ryand): This is bad for a couple of reasons: 1) we are bypassing the model manager to read the model
+        # directly, and 2) we are reading from disk every time this invocation is called without caching the result.
+        # A better solution would be to store the image encoder model reference in the IP-Adapter model info, but this
+        # is currently messy due to differences between how the model info is generated when installing a model from
+        # disk vs. downloading the model.
+        image_encoder_model_id = get_ip_adapter_image_encoder_model_id(
+            os.path.join(context.services.configuration.get_config().models_path, ip_adapter_info["path"])
+        )
+        image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
+        image_encoder_model = CLIPVisionModelField(
+            model_name=image_encoder_model_name,
+            base_model=BaseModelType.Any,
+        )
+
         return IPAdapterOutput(
             ip_adapter=IPAdapterField(
                 image=self.image,
-                ip_adapter_model=(
-                    context.services.configuration.get_config().root_dir / self.ip_adapter_model
-                ).as_posix(),
-                image_encoder_model=(
-                    context.services.configuration.get_config().root_dir / self.image_encoder_model
-                ).as_posix(),
+                ip_adapter_model=self.ip_adapter_model,
+                image_encoder_model=image_encoder_model,
                 weight=self.weight,
             ),
         )
