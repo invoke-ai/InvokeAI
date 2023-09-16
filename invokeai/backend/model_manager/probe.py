@@ -10,21 +10,14 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Callable, Optional
+
+import safetensors.torch
+import torch
 from picklescan.scanner import scan_file_path
 
-import torch
-import safetensors.torch
-
-from .util import read_checkpoint_meta
-from .config import (
-    ModelType,
-    BaseModelType,
-    ModelVariantType,
-    ModelFormat,
-    SchedulerPredictionType,
-)
-from .util import SilenceWarnings, lora_token_vector_length
+from .config import BaseModelType, ModelFormat, ModelType, ModelVariantType, SchedulerPredictionType
+from .util import SilenceWarnings, lora_token_vector_length, read_checkpoint_meta
 
 
 class InvalidModelException(Exception):

@@ -11,10 +11,9 @@ from .base import (  # noqa: F401
     ModelConfigBase,
     ModelNotFoundException,
     ModelType,
-    SubModelType,
     ModelVariantType,
     SchedulerPredictionType,
-    InvalidModelException,
+    SubModelType,
     read_checkpoint_meta,
 )
 from .controlnet import ControlNetModel  # TODO:

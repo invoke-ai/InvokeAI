@@ -44,7 +44,6 @@ from ..invocations.baseinvocation import BaseInvocation
 from .graph import GraphExecutionState
 from .item_storage import ItemStorageABC
 from .model_manager_service import ModelManagerService
-from invokeai.backend.model_manager.cache import CacheStats
 
 # size of GIG in bytes
 GIG = 1073741824

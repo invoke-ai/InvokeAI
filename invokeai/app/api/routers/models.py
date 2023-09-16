@@ -10,13 +10,13 @@ from pydantic import BaseModel, parse_obj_as
 from starlette.exceptions import HTTPException
 
 from invokeai.backend import BaseModelType, ModelType
-from invokeai.backend.model_manager import MergeInterpolationMethod
 from invokeai.backend.model_manager import (
     OPENAPI_MODEL_CONFIGS,
-    ModelConfigBase,
     InvalidModelException,
-    UnknownModelException,
+    MergeInterpolationMethod,
+    ModelConfigBase,
     SchedulerPredictionType,
+    UnknownModelException,
 )
 
 from ..dependencies import ApiDependencies

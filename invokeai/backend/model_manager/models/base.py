@@ -2,33 +2,30 @@ import inspect
 import json
 import os
 import sys
-import torch
 import typing
 from abc import ABCMeta, abstractmethod
 from contextlib import suppress
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Optional, Type, Literal, TypeVar, Generic, Callable, Any, Union
+from typing import Any, Callable, Dict, Generic, List, Literal, Optional, Type, TypeVar, Union
 
 import numpy as np
 import onnx
 import safetensors.torch
-from diffusers import DiffusionPipeline, ConfigMixin
+import torch
+from diffusers import ConfigMixin, DiffusionPipeline
 from onnx import numpy_helper
-from onnxruntime import (
-    InferenceSession,
-    SessionOptions,
-    get_available_providers,
-)
+from onnxruntime import InferenceSession, SessionOptions, get_available_providers
 from picklescan.scanner import scan_file_path
+
 from ..config import (  # noqa F401
     BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelVariantType,
-    ModelFormat,
-    SchedulerPredictionType,
     ModelConfigBase,
+    ModelFormat,
+    ModelType,
+    ModelVariantType,
+    SchedulerPredictionType,
+    SubModelType,
 )
 
 

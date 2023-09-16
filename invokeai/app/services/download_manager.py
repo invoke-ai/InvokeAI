@@ -5,10 +5,13 @@ Model download service.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List, Union
+from typing import List, Optional, Union
+
 from pydantic.networks import AnyHttpUrl
+
+from invokeai.backend.model_manager.download import DownloadEventHandler, DownloadJobBase, DownloadQueue
+
 from .events import EventServiceBase
-from invokeai.backend.model_manager.download import DownloadQueue, DownloadJobBase, DownloadEventHandler
 
 
 class DownloadQueueServiceBase(ABC):

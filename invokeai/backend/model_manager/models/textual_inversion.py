@@ -1,11 +1,12 @@
 import os
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 import torch
 
+from ..config import ModelFormat, TextualInversionConfig
+
 # TODO: naming
 from ..lora import TextualInversionModel as TextualInversionModelRaw
-from ..config import ModelFormat, TextualInversionConfig
 from .base import (
     BaseModelType,
     InvalidModelException,

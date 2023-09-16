@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Literal
 
 from diffusers import OnnxRuntimeModel
+
 from ..config import ONNXSD1Config, ONNXSD2Config
 from .base import (
     BaseModelType,

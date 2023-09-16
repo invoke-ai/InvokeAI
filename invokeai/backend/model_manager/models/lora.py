@@ -2,10 +2,11 @@ import bisect
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, Union, Literal
+from typing import Dict, Literal, Optional, Union
 
 import torch
 from safetensors.torch import load_file
+
 from ..config import LoRAConfig
 from .base import (
     BaseModelType,

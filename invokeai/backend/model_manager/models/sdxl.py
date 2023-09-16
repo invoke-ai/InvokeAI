@@ -5,7 +5,8 @@ from typing import Literal, Optional
 
 from omegaconf import OmegaConf
 from pydantic import Field
-from ..config import MainDiffusersConfig, MainCheckpointConfig
+
+from ..config import MainCheckpointConfig, MainDiffusersConfig
 from .base import (
     BaseModelType,
     DiffusersModel,

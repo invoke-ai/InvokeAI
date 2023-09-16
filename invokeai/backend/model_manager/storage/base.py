@@ -4,9 +4,9 @@ Abstract base class for storing and retrieving model configuration records.
 """
 
 from abc import ABC, abstractmethod
-from typing import Union, Set, List, Optional
+from typing import List, Optional, Set, Union
 
-from ..config import ModelConfigBase, BaseModelType, ModelType
+from ..config import BaseModelType, ModelConfigBase, ModelType
 
 # should match the InvokeAI version when this is first released.
 CONFIG_FILE_VERSION = "3.1.1"

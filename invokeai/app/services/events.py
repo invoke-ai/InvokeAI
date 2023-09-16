@@ -5,12 +5,6 @@ from typing import Any, Optional
 from invokeai.app.models.image import ProgressImage
 from invokeai.app.services.model_manager_service import BaseModelType, ModelInfo, ModelType, SubModelType
 from invokeai.app.util.misc import get_timestamp
-from invokeai.app.services.model_manager_service import (
-    BaseModelType,
-    ModelType,
-    SubModelType,
-    ModelInfo,
-)
 from invokeai.backend.model_manager.download import DownloadJobBase
 
 

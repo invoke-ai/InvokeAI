@@ -1,37 +1,36 @@
 # Copyright (c) 2023, Lincoln D. Stein
 """Implementation of multithreaded download queue for invokeai."""
 
-import re
 import os
-import requests
+import re
 import shutil
 import threading
 import time
 import traceback
-
 from json import JSONDecodeError
 from pathlib import Path
-from requests import HTTPError
-from typing import Dict, Optional, Set, List, Tuple, Union
-
-from pydantic import Field, validator, ValidationError
-from pydantic.networks import AnyHttpUrl
 from queue import PriorityQueue
+from typing import Dict, List, Optional, Set, Tuple, Union
 
+import requests
 from huggingface_hub import HfApi, hf_hub_url
+from pydantic import Field, ValidationError, validator
+from pydantic.networks import AnyHttpUrl
+from requests import HTTPError
 
-from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.app.services.config import InvokeAIAppConfig
-from . import REPO_ID_RE, HTTP_RE
-from .base import (
-    DownloadQueueBase,
-    DownloadJobStatus,
-    DownloadEventHandler,
-    UnknownJobIDException,
-    DownloadJobBase,
-    ModelSourceMetadata,
-)
+from invokeai.backend.util.logging import InvokeAILogger
+
 from ..storage import DuplicateModelException
+from . import HTTP_RE, REPO_ID_RE
+from .base import (
+    DownloadEventHandler,
+    DownloadJobBase,
+    DownloadJobStatus,
+    DownloadQueueBase,
+    ModelSourceMetadata,
+    UnknownJobIDException,
+)
 
 # Maximum number of bytes to download during each call to requests.iter_content()
 DOWNLOAD_CHUNK_SIZE = 100000

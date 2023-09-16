@@ -41,26 +41,16 @@ Typical usage:
 """
 
 import threading
-import yaml
 from enum import Enum
 from pathlib import Path
-from typing import Union, Set, List, Optional
+from typing import List, Optional, Set, Union
+
+import yaml
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
-from ..config import (
-    ModelConfigBase,
-    ModelConfigFactory,
-    BaseModelType,
-    ModelType,
-)
-
-from .base import (
-    DuplicateModelException,
-    UnknownModelException,
-    ModelConfigStore,
-    CONFIG_FILE_VERSION,
-)
+from ..config import BaseModelType, ModelConfigBase, ModelConfigFactory, ModelType
+from .base import CONFIG_FILE_VERSION, DuplicateModelException, ModelConfigStore, UnknownModelException
 
 
 class ModelConfigStoreYAML(ModelConfigStore):

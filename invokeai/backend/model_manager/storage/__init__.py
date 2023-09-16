@@ -3,9 +3,9 @@ Initialization file for invokeai.backend.model_manager.storage
 """
 import pathlib
 
-from .base import ModelConfigStore, UnknownModelException, DuplicateModelException  # noqa F401
-from .yaml import ModelConfigStoreYAML  # noqa F401
+from .base import DuplicateModelException, ModelConfigStore, UnknownModelException  # noqa F401
 from .sql import ModelConfigStoreSQL  # noqa F401
+from .yaml import ModelConfigStoreYAML  # noqa F401
 
 
 def get_config_store(location: pathlib.Path) -> ModelConfigStore:

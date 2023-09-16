@@ -22,11 +22,12 @@ Example usage:
 
 import os
 from abc import ABC, abstractmethod
-from typing import Set, Optional, Callable, Union
 from pathlib import Path
+from typing import Callable, Optional, Set, Union
+
+from pydantic import BaseModel, Field
 
 from invokeai.backend.util.logging import InvokeAILogger
-from pydantic import Field, BaseModel
 
 default_logger = InvokeAILogger.getLogger()
 

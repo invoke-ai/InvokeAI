@@ -53,32 +53,29 @@ import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from shutil import rmtree
-from typing import Optional, List, Union, Dict, Set, Any, Callable
+from typing import Any, Callable, Dict, List, Optional, Set, Union
+
 from pydantic import Field
 from pydantic.networks import AnyHttpUrl
+
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
-from .search import ModelSearch
-from .storage import ModelConfigStore, DuplicateModelException, get_config_store
+
+from .config import BaseModelType, ModelFormat, ModelType, ModelVariantType, SchedulerPredictionType
 from .download import (
-    DownloadQueueBase,
-    DownloadQueue,
-    DownloadJobBase,
-    ModelSourceMetadata,
-    DownloadEventHandler,
-    REPO_ID_RE,
     HTTP_RE,
+    REPO_ID_RE,
+    DownloadEventHandler,
+    DownloadJobBase,
+    DownloadQueue,
+    DownloadQueueBase,
+    ModelSourceMetadata,
 )
-from .download.queue import DownloadJobURL, DownloadJobRepoID, DownloadJobPath
+from .download.queue import DownloadJobPath, DownloadJobRepoID, DownloadJobURL
 from .hash import FastModelHash
-from .probe import ModelProbe, ModelProbeInfo, InvalidModelException
-from .config import (
-    ModelType,
-    BaseModelType,
-    ModelVariantType,
-    ModelFormat,
-    SchedulerPredictionType,
-)
+from .probe import InvalidModelException, ModelProbe, ModelProbeInfo
+from .search import ModelSearch
+from .storage import DuplicateModelException, ModelConfigStore, get_config_store
 
 
 class ModelInstallJob(DownloadJobBase):

@@ -16,7 +16,7 @@ from diffusers import logging as dlogging
 
 import invokeai.backend.util.logging as logger
 
-from . import ModelLoader, ModelType, BaseModelType, ModelVariantType, ModelConfigBase
+from . import BaseModelType, ModelConfigBase, ModelLoader, ModelType, ModelVariantType
 
 
 class MergeInterpolationMethod(str, Enum):

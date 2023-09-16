@@ -4,15 +4,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal, Optional, Union
 
+from diffusers import StableDiffusionInpaintPipeline, StableDiffusionPipeline
 from omegaconf import OmegaConf
 from pydantic import Field
 
-from diffusers import StableDiffusionInpaintPipeline, StableDiffusionPipeline
-from ..config import SilenceWarnings
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
 
-from ..config import MainCheckpointConfig, MainDiffusersConfig
+from ..config import MainCheckpointConfig, MainDiffusersConfig, SilenceWarnings
 from .base import (
     BaseModelType,
     DiffusersModel,

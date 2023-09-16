@@ -40,26 +40,14 @@ Typical usage:
   configs = store.search_by_name(base_model='sd-2', model_type='main')
 """
 
-import threading
-import sqlite3
 import json
+import sqlite3
+import threading
 from pathlib import Path
-from typing import Union, List, Optional, Set
+from typing import List, Optional, Set, Union
 
-
-from ..config import (
-    ModelConfigBase,
-    ModelConfigFactory,
-    BaseModelType,
-    ModelType,
-)
-
-from .base import (
-    DuplicateModelException,
-    UnknownModelException,
-    ModelConfigStore,
-    CONFIG_FILE_VERSION,
-)
+from ..config import BaseModelType, ModelConfigBase, ModelConfigFactory, ModelType
+from .base import CONFIG_FILE_VERSION, DuplicateModelException, ModelConfigStore, UnknownModelException
 
 
 class ModelConfigStoreSQL(ModelConfigStore):

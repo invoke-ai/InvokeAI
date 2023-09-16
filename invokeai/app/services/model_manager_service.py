@@ -5,9 +5,15 @@ from __future__ import annotations
 import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
+from pydantic import Field
+from pydantic.networks import AnyHttpUrl
+
+from invokeai.app.models.exceptions import CanceledException
 from invokeai.backend.model_manager import (
     BaseModelType,
+    DuplicateModelException,
     MergeInterpolationMethod,
     ModelConfigBase,
     ModelInfo,
@@ -18,15 +24,9 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
     UnknownModelException,
-    DuplicateModelException,
 )
 from invokeai.backend.model_manager.cache import CacheStats
-from typing import TYPE_CHECKING, List, Optional, Union, Dict, Any
 
-from pydantic import Field
-from pydantic.networks import AnyHttpUrl
-
-from invokeai.app.models.exceptions import CanceledException
 from .config import InvokeAIAppConfig
 from .events import EventServiceBase
 

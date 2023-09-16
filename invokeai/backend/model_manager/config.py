@@ -20,16 +20,16 @@ Validation errors will raise an InvalidModelConfigException error.
 
 """
 import warnings
-
 from enum import Enum
-from typing import Optional, Literal, List, Union, Type
-from omegaconf.listconfig import ListConfig  # to support the yaml backend
+from typing import List, Literal, Optional, Type, Union
+
 import pydantic
-from pydantic import BaseModel, Field, Extra
-from pydantic.error_wrappers import ValidationError
 
 # import these so that we can silence them
 from diffusers import logging as diffusers_logging
+from omegaconf.listconfig import ListConfig  # to support the yaml backend
+from pydantic import BaseModel, Extra, Field
+from pydantic.error_wrappers import ValidationError
 from transformers import logging as transformers_logging
 
 

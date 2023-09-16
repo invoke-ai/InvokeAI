@@ -7,7 +7,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import List, Optional, Callable, Union
+from typing import Callable, List, Optional, Union
+
 from pydantic import BaseModel, Field
 from pydantic.networks import AnyHttpUrl
 

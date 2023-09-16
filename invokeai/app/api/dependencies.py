@@ -25,7 +25,6 @@ from ..services.latent_storage import DiskLatentsStorage, ForwardCacheLatentsSto
 from ..services.model_manager_service import ModelManagerService
 from ..services.processor import DefaultInvocationProcessor
 from ..services.sqlite import SqliteItemStorage
-from ..services.invocation_stats import InvocationStatsService
 from .events import FastAPIEventService
 
 

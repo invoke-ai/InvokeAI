@@ -5,18 +5,19 @@ import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Optional, List
+from typing import List, Optional, Union
 
 import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util import choose_precision, choose_torch_device, InvokeAILogger, Chdir
-from .config import BaseModelType, ModelType, SubModelType, ModelConfigBase
-from .install import ModelInstallBase, ModelInstall
-from .storage import ModelConfigStore, get_config_store
-from .cache import ModelCache, ModelLocker, CacheStats
-from .models import InvalidModelException, ModelBase, MODEL_CLASSES
+from invokeai.backend.util import Chdir, InvokeAILogger, choose_precision, choose_torch_device
+
+from .cache import CacheStats, ModelCache, ModelLocker
+from .config import BaseModelType, ModelConfigBase, ModelType, SubModelType
 from .download import DownloadEventHandler
+from .install import ModelInstall, ModelInstallBase
+from .models import MODEL_CLASSES, InvalidModelException, ModelBase
+from .storage import ModelConfigStore, get_config_store
 
 
 @dataclass

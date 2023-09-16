@@ -4,13 +4,14 @@ Various utilities used by the model manager.
 """
 import json
 import warnings
-import torch
-import safetensors
 from pathlib import Path
 from typing import Optional, Union
+
+import safetensors
+import torch
 from diffusers import logging as diffusers_logging
-from transformers import logging as transformers_logging
 from picklescan.scanner import scan_file_path
+from transformers import logging as transformers_logging
 
 
 class SilenceWarnings(object):

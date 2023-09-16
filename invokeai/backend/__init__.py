@@ -2,15 +2,15 @@
 Initialization file for invokeai.backend
 """
 from .model_manager import (  # noqa F401
-    ModelLoader,
-    ModelInstall,
-    ModelConfigStore,
-    SilenceWarnings,
+    BaseModelType,
     DuplicateModelException,
     InvalidModelException,
-    BaseModelType,
+    ModelConfigStore,
+    ModelInstall,
+    ModelLoader,
     ModelType,
-    SubModelType,
-    SchedulerPredictionType,
     ModelVariantType,
+    SchedulerPredictionType,
+    SilenceWarnings,
+    SubModelType,
 )

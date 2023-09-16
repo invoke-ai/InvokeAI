@@ -1,14 +1,15 @@
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 import safetensors
 import torch
 from omegaconf import OmegaConf
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from ..config import VaeDiffusersConfig, VaeCheckpointConfig
+
+from ..config import VaeCheckpointConfig, VaeDiffusersConfig
 from .base import (
     BaseModelType,
     EmptyConfigLoader,

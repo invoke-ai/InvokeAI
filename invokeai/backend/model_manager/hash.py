@@ -8,11 +8,12 @@ from invokeai.backend.model_managre.model_hash import FastModelHash
 'a8e693a126ea5b831c96064dc569956f'
 """
 
-import os
 import hashlib
-from imohash import hashfile
+import os
 from pathlib import Path
 from typing import Dict, Union
+
+from imohash import hashfile
 
 
 class FastModelHash(object):
