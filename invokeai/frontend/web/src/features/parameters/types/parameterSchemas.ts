@@ -339,7 +339,7 @@ export const zIPAdapterModel = z.object({
 /**
  * Type alias for model parameter, inferred from its zod schema
  */
-export type zIPAdapterModelParam = z.infer<typeof zIPAdapterModel>;
+export type IPAdapterModelParam = z.infer<typeof zIPAdapterModel>;
 /**
  * Zod schema for l2l strength parameter
  */

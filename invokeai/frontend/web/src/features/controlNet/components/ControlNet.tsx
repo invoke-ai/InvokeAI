@@ -18,6 +18,7 @@ import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import IAIIconButton from 'common/components/IAIIconButton';
 import IAISwitch from 'common/components/IAISwitch';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useTranslation } from 'react-i18next';
 import { useToggle } from 'react-use';
 import { v4 as uuidv4 } from 'uuid';
 import ControlNetImagePreview from './ControlNetImagePreview';
@@ -28,7 +29,6 @@ import ParamControlNetBeginEnd from './parameters/ParamControlNetBeginEnd';
 import ParamControlNetControlMode from './parameters/ParamControlNetControlMode';
 import ParamControlNetProcessorSelect from './parameters/ParamControlNetProcessorSelect';
 import ParamControlNetResizeMode from './parameters/ParamControlNetResizeMode';
-import { useTranslation } from 'react-i18next';
 
 type ControlNetProps = {
   controlNet: ControlNetConfig;
