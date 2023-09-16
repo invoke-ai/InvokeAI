@@ -1,14 +1,18 @@
 import { Flex } from '@chakra-ui/react';
 import { skipToken } from '@reduxjs/toolkit/dist/query';
 import { RootState } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
+import IAIIconButton from 'common/components/IAIIconButton';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { ipAdapterImageChanged } from 'features/controlNet/store/controlNetSlice';
 import {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FaUndo } from 'react-icons/fa';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const ParamIPAdapterImage = () => {
@@ -19,6 +23,9 @@ const ParamIPAdapterImage = () => {
   const isIPAdapterEnabled = useAppSelector(
     (state: RootState) => state.controlNet.isIPAdapterEnabled
   );
+
+  const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(
     ipAdapterInfo.adapterImage?.image_name ?? skipToken
@@ -56,12 +63,28 @@ const ParamIPAdapterImage = () => {
         droppableData={droppableData}
         draggableData={draggableData}
         isUploadDisabled={!isIPAdapterEnabled}
-        fitContainer
-        // dropLabel="Set as Initial Image"
+        dropLabel={t('toast.setIPAdapterImage')}
         noContentFallback={
-          <IAINoContentFallback label="No IP Adapter Image Selected" />
+          <IAINoContentFallback
+            label={t('controlnet.ipAdapterImageFallback')}
+          />
         }
       />
+
+      {ipAdapterInfo.adapterImage && (
+        <IAIIconButton
+          tooltip={t('controlnet.resetIPAdapterImage')}
+          aria-label={t('controlnet.resetIPAdapterImage')}
+          icon={<FaUndo />}
+          onClick={() => dispatch(ipAdapterImageChanged(null))}
+          isDisabled={!imageDTO}
+          sx={{
+            position: 'absolute',
+            top: 3,
+            right: 3,
+          }}
+        />
+      )}
     </Flex>
   );
 };

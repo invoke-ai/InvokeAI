@@ -22,6 +22,10 @@ const ParamIPAdapterWeight = () => {
     [dispatch]
   );
 
+  const handleWeightReset = useCallback(() => {
+    dispatch(ipAdapterWeightChanged(1));
+  }, [dispatch]);
+
   return (
     <IAISlider
       isDisabled={!isIpAdapterEnabled}
@@ -33,6 +37,8 @@ const ParamIPAdapterWeight = () => {
       step={0.01}
       withSliderMarks
       sliderMarks={[0, 1, 2]}
+      withReset
+      handleReset={handleWeightReset}
     />
   );
 };
