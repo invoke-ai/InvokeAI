@@ -84,11 +84,11 @@ export const queueApi = api.injectEndpoints({
       },
     }),
     enqueueGraph: build.mutation<
-      paths['/api/v1/queue/{queue_id}/enqueue']['post']['responses']['201']['content']['application/json'],
-      paths['/api/v1/queue/{queue_id}/enqueue']['post']['requestBody']['content']['application/json']
+      paths['/api/v1/queue/{queue_id}/enqueue_graph']['post']['responses']['201']['content']['application/json'],
+      paths['/api/v1/queue/{queue_id}/enqueue_graph']['post']['requestBody']['content']['application/json']
     >({
       query: (arg) => ({
-        url: `queue/${$queueId.get()}/enqueue`,
+        url: `queue/${$queueId.get()}/enqueue_graph`,
         body: arg,
         method: 'POST',
       }),

@@ -247,7 +247,9 @@
         "batchQueuedDesc": "Added {{item_count}} sessions to {{direction}} of queue",
         "front": "front",
         "back": "back",
-        "batchFailedToQueue": "Failed to Queue Batch"
+        "batchFailedToQueue": "Failed to Queue Batch",
+        "graphQueued": "Graph queued",
+        "graphFailedToQueue": "Failed to queue graph"
     },
     "gallery": {
         "allImagesLoaded": "All Images Loaded",

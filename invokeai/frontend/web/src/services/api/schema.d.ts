@@ -307,12 +307,12 @@ export type paths = {
      */
     post: operations["set_log_level"];
   };
-  "/api/v1/queue/{queue_id}/enqueue": {
+  "/api/v1/queue/{queue_id}/enqueue_graph": {
     /**
-     * Enqueue
+     * Enqueue Graph
      * @description Enqueues a graph for single execution.
      */
-    post: operations["enqueue"];
+    post: operations["enqueue_graph"];
   };
   "/api/v1/queue/{queue_id}/enqueue_batch": {
     /**
@@ -747,20 +747,6 @@ export type components = {
        */
       image_names: string[];
     };
-    /** Body_enqueue */
-    Body_enqueue: {
-      /**
-       * Graph
-       * @description The graph to enqueue
-       */
-      graph: components["schemas"]["Graph"];
-      /**
-       * Prepend
-       * @description Whether or not to prepend this batch in the queue
-       * @default false
-       */
-      prepend?: boolean;
-    };
     /** Body_enqueue_batch */
     Body_enqueue_batch: {
       /**
@@ -768,6 +754,20 @@ export type components = {
        * @description Batch to process
        */
       batch: components["schemas"]["Batch"];
+      /**
+       * Prepend
+       * @description Whether or not to prepend this batch in the queue
+       * @default false
+       */
+      prepend?: boolean;
+    };
+    /** Body_enqueue_graph */
+    Body_enqueue_graph: {
+      /**
+       * Graph
+       * @description The graph to enqueue
+       */
+      graph: components["schemas"]["Graph"];
       /**
        * Prepend
        * @description Whether or not to prepend this batch in the queue
@@ -2336,8 +2336,8 @@ export type components = {
        */
       field: string;
     };
-    /** EnqueueResult */
-    EnqueueResult: {
+    /** EnqueueBatchResult */
+    EnqueueBatchResult: {
       /**
        * Enqueued
        * @description The total number of queue items enqueued
@@ -2358,6 +2358,34 @@ export type components = {
        * @description The priority of the enqueued batch
        */
       priority: number;
+    };
+    /** EnqueueGraphResult */
+    EnqueueGraphResult: {
+      /**
+       * Enqueued
+       * @description The total number of queue items enqueued
+       */
+      enqueued: number;
+      /**
+       * Requested
+       * @description The total number of queue items requested to be enqueued
+       */
+      requested: number;
+      /**
+       * Batch
+       * @description The batch that was enqueued
+       */
+      batch: components["schemas"]["Batch"];
+      /**
+       * Priority
+       * @description The priority of the enqueued batch
+       */
+      priority: number;
+      /**
+       * Queue Item
+       * @description The queue item that was enqueued
+       */
+      queue_item: components["schemas"]["SessionQueueItemDTO"];
     };
     /**
      * Float Collection Primitive
@@ -8051,12 +8079,6 @@ export type components = {
       ui_order?: number;
     };
     /**
-     * StableDiffusion2ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
-    /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
@@ -8080,6 +8102,12 @@ export type components = {
      * @enum {string}
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    /**
+     * StableDiffusion2ModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -9484,10 +9512,10 @@ export type operations = {
     };
   };
   /**
-   * Enqueue
+   * Enqueue Graph
    * @description Enqueues a graph for single execution.
    */
-  enqueue: {
+  enqueue_graph: {
     parameters: {
       path: {
         /** @description The queue id to perform this operation on */
@@ -9496,7 +9524,7 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_enqueue"];
+        "application/json": components["schemas"]["Body_enqueue_graph"];
       };
     };
     responses: {
@@ -9509,7 +9537,7 @@ export type operations = {
       /** @description Created */
       201: {
         content: {
-          "application/json": components["schemas"]["EnqueueResult"];
+          "application/json": components["schemas"]["EnqueueGraphResult"];
         };
       };
       /** @description Validation Error */
@@ -9546,7 +9574,7 @@ export type operations = {
       /** @description Created */
       201: {
         content: {
-          "application/json": components["schemas"]["EnqueueResult"];
+          "application/json": components["schemas"]["EnqueueBatchResult"];
         };
       };
       /** @description Validation Error */

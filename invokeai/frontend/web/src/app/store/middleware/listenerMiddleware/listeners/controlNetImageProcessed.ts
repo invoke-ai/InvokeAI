@@ -1,10 +1,12 @@
 import { logger } from 'app/logging/logger';
+import { parseify } from 'common/util/serialize';
 import { controlNetImageProcessed } from 'features/controlNet/store/actions';
 import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { sessionReadyToInvoke } from 'features/system/store/actions';
+import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
+import { queueApi } from 'services/api/endpoints/queue';
 import { isImageOutput } from 'services/api/guards';
-import { sessionCreated } from 'services/api/thunks/session';
 import { Graph, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 import { startAppListening } from '..';
@@ -33,49 +35,67 @@ export const addControlNetImageProcessedListener = () => {
           },
         },
       };
-
-      // Create a session to run the graph & wait til it's ready to invoke
-      const sessionCreatedAction = dispatch(sessionCreated({ graph }));
-      const [sessionCreatedFulfilledAction] = await take(
-        (action): action is ReturnType<typeof sessionCreated.fulfilled> =>
-          sessionCreated.fulfilled.match(action) &&
-          action.meta.requestId === sessionCreatedAction.requestId
-      );
-
-      const sessionId = sessionCreatedFulfilledAction.payload.id;
-
-      // Invoke the session & wait til it's complete
-      dispatch(sessionReadyToInvoke());
-      const [invocationCompleteAction] = await take(
-        (action): action is ReturnType<typeof socketInvocationComplete> =>
-          socketInvocationComplete.match(action) &&
-          action.payload.data.graph_execution_state_id === sessionId
-      );
-
-      // We still have to check the output type
-      if (isImageOutput(invocationCompleteAction.payload.data.result)) {
-        const { image_name } =
-          invocationCompleteAction.payload.data.result.image;
-
-        // Wait for the ImageDTO to be received
-        const [{ payload }] = await take(
-          (action) =>
-            imagesApi.endpoints.getImageDTO.matchFulfilled(action) &&
-            action.payload.image_name === image_name
+      try {
+        const req = dispatch(
+          queueApi.endpoints.enqueueGraph.initiate(
+            { graph, prepend: true },
+            {
+              fixedCacheKey: 'enqueueGraph',
+            }
+          )
         );
-
-        const processedControlImage = payload as ImageDTO;
-
-        log.debug(
-          { controlNetId: action.payload, processedControlImage },
-          'ControlNet image processed'
-        );
-
-        // Update the processed image in the store
+        const enqueueResult = await req.unwrap();
+        req.reset();
         dispatch(
-          controlNetProcessedImageChanged({
-            controlNetId,
-            processedControlImage: processedControlImage.image_name,
+          queueApi.endpoints.startQueueExecution.initiate(undefined, {
+            fixedCacheKey: 'startQueue',
+          })
+        );
+        log.debug(
+          { enqueueResult: parseify(enqueueResult) },
+          t('queue.graphQueued')
+        );
+
+        const [invocationCompleteAction] = await take(
+          (action): action is ReturnType<typeof socketInvocationComplete> =>
+            socketInvocationComplete.match(action) &&
+            action.payload.data.graph_execution_state_id ===
+              enqueueResult.queue_item.session_id
+        );
+
+        // We still have to check the output type
+        if (isImageOutput(invocationCompleteAction.payload.data.result)) {
+          const { image_name } =
+            invocationCompleteAction.payload.data.result.image;
+
+          // Wait for the ImageDTO to be received
+          const [{ payload }] = await take(
+            (action) =>
+              imagesApi.endpoints.getImageDTO.matchFulfilled(action) &&
+              action.payload.image_name === image_name
+          );
+
+          const processedControlImage = payload as ImageDTO;
+
+          log.debug(
+            { controlNetId: action.payload, processedControlImage },
+            'ControlNet image processed'
+          );
+
+          // Update the processed image in the store
+          dispatch(
+            controlNetProcessedImageChanged({
+              controlNetId,
+              processedControlImage: processedControlImage.image_name,
+            })
+          );
+        }
+      } catch {
+        log.error({ graph: parseify(graph) }, t('queue.graphFailedToQueue'));
+        dispatch(
+          addToast({
+            title: t('queue.graphFailedToQueue'),
+            status: 'error',
           })
         );
       }

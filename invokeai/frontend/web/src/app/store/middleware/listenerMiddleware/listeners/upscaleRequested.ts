@@ -5,7 +5,6 @@ import { buildAdHocUpscaleGraph } from 'features/nodes/util/graphBuilders/buildA
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
-import { BatchConfig } from 'services/api/types';
 import { startAppListening } from '..';
 
 export const upscaleRequested = createAction<{ image_name: string }>(
@@ -25,19 +24,15 @@ export const addUpscaleRequestedListener = () => {
         image_name,
         esrganModelName,
       });
-      const batchConfig: BatchConfig = {
-        batch: {
-          graph,
-          runs: 1,
-        },
-        prepend: true,
-      };
 
       try {
         const req = dispatch(
-          queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
-            fixedCacheKey: 'enqueueBatch',
-          })
+          queueApi.endpoints.enqueueGraph.initiate(
+            { graph, prepend: true },
+            {
+              fixedCacheKey: 'enqueueGraph',
+            }
+          )
         );
 
         const enqueueResult = await req.unwrap();
@@ -47,15 +42,15 @@ export const addUpscaleRequestedListener = () => {
             fixedCacheKey: 'startQueue',
           })
         );
-        log.debug({ enqueueResult: parseify(enqueueResult) }, 'Batch enqueued');
-      } catch {
-        log.error(
-          { batchConfig: parseify(batchConfig) },
-          'Failed to enqueue batch'
+        log.debug(
+          { enqueueResult: parseify(enqueueResult) },
+          t('queue.graphQueued')
         );
+      } catch {
+        log.error({ graph: parseify(graph) }, t('queue.graphFailedToQueue'));
         dispatch(
           addToast({
-            title: t('queue.batchFailedToQueue'),
+            title: t('queue.graphFailedToQueue'),
             status: 'error',
           })
         );
