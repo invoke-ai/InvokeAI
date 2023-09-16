@@ -1,16 +1,15 @@
+## Remove Background 1.0
+## A node for InvokeAI, written by YMGenesis/Matthew Janik
+
 from typing import Literal
-from invokeai.app.models.image import (ImageCategory, ResourceOrigin)
+
+from invokeai.app.invocations.baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.invocations.baseinvocation import (
-    BaseInvocation,
-    InvocationContext,
-    InputField,
-    invocation,
-    )
+from invokeai.app.models.image import ImageCategory, ResourceOrigin
 
 rembg_models = Literal[
     "isnet-anime",
-    #"isnet-general-use", # on the github page but not shipped with pip it seems
+    "isnet-general-use",  # on the github page but not shipped with pip it seems
     "silueta",
     "u2net_cloth_seg",
     "u2net_human_seg",
@@ -18,23 +17,35 @@ rembg_models = Literal[
     "u2netp",
 ]
 
-@invocation("remove_background", title="Remove Background", tags=["image", "remove", "background", "rembg"], category="image", version="1.0.0")
+
+@invocation(
+    "remove_background",
+    title="Remove Background",
+    tags=["image", "remove", "background", "rembg"],
+    category="image",
+    version="1.0.0",
+)
 class RemoveBackgroundInvocation(BaseInvocation):
     """Outputs an image with the background removed behind the subject using rembg."""
 
-    image:       ImageField  = InputField(description="Image to remove background from")
-    model_name:  rembg_models = InputField(default="u2net", description="Model to use to remove background")
+    image: ImageField = InputField(description="Image to remove background from")
+    model_name: rembg_models = InputField(default="u2net", description="Model to use to remove background")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
         try:
-            from rembg import remove, new_session
+            from rembg import new_session, remove
+
             session = new_session(self.model_name)
             image = remove(image, session=session)
         except:
-            context.services.logger.warning("Remove Background --> To use this node, please quit InvokeAI and execute 'pip install rembg' from outside your InvokeAI folder with your InvokeAI virtual environment activated.")
-            context.services.logger.warning("Remove Background --> rembg package not found. Passing through unaltered image!")
+            context.services.logger.warning(
+                "Remove Background --> To use this node, please quit InvokeAI and execute 'pip install rembg' from outside your InvokeAI folder with your InvokeAI virtual environment activated."
+            )
+            context.services.logger.warning(
+                "Remove Background --> rembg package not found. Passing through unaltered image!"
+            )
 
         image_dto = context.services.images.create(
             image=image,
